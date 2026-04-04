@@ -137,3 +137,22 @@ dist
 # Vite logs files
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
+
+# Turborepo
+.turbo
+
+# Prisma
+packages/db/prisma/*.db
+packages/db/prisma/*.db-journal
+
+# Supabase
+.supabase
+
+# Vercel
+.vercel
+
+# Environment
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
