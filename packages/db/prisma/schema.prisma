@@ -1,0 +1,218 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Categories (self-relation: category → subcategory) ─────────────────────
+
+model Category {
+  id        String   @id @default(cuid())
+  slug      String   @unique
+  name      String
+  parentId  String?  @map("parent_id")
+  position  Int      @default(0)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  parent   Category?  @relation("CategoryTree", fields: [parentId], references: [id])
+  children Category[] @relation("CategoryTree")
+
+  products Product[]
+
+  @@index([parentId])
+  @@map("categories")
+}
+
+// ─── Products (← 1С Номенклатура) ───────────────────────────────────────────
+
+model Product {
+  id              String   @id @default(cuid())
+  code1C          String?  @unique @map("code_1c")
+  articleCode     String?  @map("article_code")
+  name            String
+  slug            String   @unique
+  categoryId      String   @map("category_id")
+  description     String   @default("")
+  quality         String
+  season          String   @default("")
+  country         String
+  priceUnit       String   @default("kg") @map("price_unit")
+  averageWeight   Float?   @map("average_weight")
+  videoUrl        String?  @map("video_url")
+  inStock         Boolean  @default(true) @map("in_stock")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  category Category       @relation(fields: [categoryId], references: [id])
+  images   ProductImage[]
+  lots     Lot[]
+  prices   Price[]
+
+  @@index([categoryId])
+  @@index([quality])
+  @@index([inStock])
+  @@index([articleCode])
+  @@map("products")
+}
+
+// ─── Product Images (← 1С зображення номенклатури) ──────────────────────────
+
+model ProductImage {
+  id        String   @id @default(cuid())
+  productId String   @map("product_id")
+  url       String
+  alt       String   @default("")
+  position  Int      @default(0)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId])
+  @@map("product_images")
+}
+
+// ─── Lots / Bags (← 1С Серії + ТовариНаСкладах) ────────────────────────────
+
+model Lot {
+  id        String   @id @default(cuid())
+  productId String   @map("product_id")
+  barcode   String   @unique
+  weight    Float
+  quantity  Int      @default(1)
+  status    String   @default("free")
+  priceEur  Float    @map("price_eur")
+  videoUrl  String?  @map("video_url")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  product    Product     @relation(fields: [productId], references: [id])
+  barcodes   Barcode[]
+  orderItems OrderItem[]
+
+  @@index([productId])
+  @@index([status])
+  @@map("lots")
+}
+
+// ─── Barcodes (← 1С ШтрихКоди) ─────────────────────────────────────────────
+
+model Barcode {
+  id    String @id @default(cuid())
+  lotId String @map("lot_id")
+  code  String @unique
+  type  String @default("EAN13")
+
+  lot Lot @relation(fields: [lotId], references: [id], onDelete: Cascade)
+
+  @@index([lotId])
+  @@map("barcodes")
+}
+
+// ─── Prices (← 1С ЦіниНоменклатури) ────────────────────────────────────────
+
+model Price {
+  id        String    @id @default(cuid())
+  productId String    @map("product_id")
+  priceType String    @map("price_type")
+  currency  String    @default("EUR")
+  amount    Float
+  validFrom DateTime  @default(now()) @map("valid_from")
+  validTo   DateTime? @map("valid_to")
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId, priceType])
+  @@map("prices")
+}
+
+// ─── Customers (← 1С Контрагенти) ──────────────────────────────────────────
+
+model Customer {
+  id        String   @id @default(cuid())
+  code1C    String?  @unique @map("code_1c")
+  name      String
+  phone     String?
+  email     String?
+  telegram  String?
+  city      String?
+  notes     String?
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  orders Order[]
+
+  @@map("customers")
+}
+
+// ─── Orders (← 1С ЗаказПокупателя) ─────────────────────────────────────────
+
+model Order {
+  id           String   @id @default(cuid())
+  code1C       String?  @unique @map("code_1c")
+  customerId   String   @map("customer_id")
+  status       String   @default("draft")
+  totalEur     Float    @default(0) @map("total_eur")
+  totalUah     Float    @default(0) @map("total_uah")
+  exchangeRate Float    @default(0) @map("exchange_rate")
+  notes        String?
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  customer Customer    @relation(fields: [customerId], references: [id])
+  items    OrderItem[]
+
+  @@index([customerId])
+  @@index([status])
+  @@map("orders")
+}
+
+// ─── Order Items (← табличні секції документів) ─────────────────────────────
+
+model OrderItem {
+  id        String @id @default(cuid())
+  orderId   String @map("order_id")
+  lotId     String @map("lot_id")
+  productId String @map("product_id")
+  priceEur  Float  @map("price_eur")
+  weight    Float
+  quantity  Int    @default(1)
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  lot   Lot   @relation(fields: [lotId], references: [id])
+
+  @@index([orderId])
+  @@map("order_items")
+}
+
+// ─── Exchange Rates (← 1С КурсиВалют) ──────────────────────────────────────
+
+model ExchangeRate {
+  id           String   @id @default(cuid())
+  currencyFrom String   @map("currency_from")
+  currencyTo   String   @map("currency_to")
+  rate         Float
+  date         DateTime @default(now())
+  source       String   @default("1c")
+
+  @@unique([currencyFrom, currencyTo, date])
+  @@map("exchange_rates")
+}
+
+// ─── Sync Log (tracking 1C sync operations) ────────────────────────────────
+
+model SyncLog {
+  id        String   @id @default(cuid())
+  entity    String
+  entityId  String?  @map("entity_id")
+  action    String
+  payload   Json?
+  syncedAt  DateTime @default(now()) @map("synced_at")
+
+  @@index([entity, entityId])
+  @@index([syncedAt])
+  @@map("sync_log")
+}
