@@ -32,12 +32,16 @@ model Category {
 model Product {
   id              String   @id @default(cuid())
   code1C          String?  @unique @map("code_1c")
+  articleCode     String?  @map("article_code")
   name            String
   slug            String   @unique
   categoryId      String   @map("category_id")
   description     String   @default("")
   quality         String
+  season          String   @default("")
   country         String
+  priceUnit       String   @default("kg") @map("price_unit")
+  averageWeight   Float?   @map("average_weight")
   videoUrl        String?  @map("video_url")
   inStock         Boolean  @default(true) @map("in_stock")
   createdAt       DateTime @default(now()) @map("created_at")
@@ -51,6 +55,7 @@ model Product {
   @@index([categoryId])
   @@index([quality])
   @@index([inStock])
+  @@index([articleCode])
   @@map("products")
 }
 
