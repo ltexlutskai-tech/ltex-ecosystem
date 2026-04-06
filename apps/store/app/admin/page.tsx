@@ -9,8 +9,11 @@ import {
 } from "@ltex/ui";
 import {
   ORDER_STATUS_LABELS,
+  QUALITY_LABELS,
   type OrderStatus,
+  type QualityLevel,
 } from "@ltex/shared";
+import { LOT_STATUS_LABELS, type LotStatus } from "@ltex/shared";
 import { ShoppingCart, Package, Boxes, TrendingUp } from "lucide-react";
 
 async function getStats() {
@@ -21,7 +24,9 @@ async function getStats() {
     productsCount,
     lotsCount,
     lotsByStatus,
+    productsByQuality,
     recentOrders,
+    ordersLast30Days,
   ] = await Promise.all([
     prisma.order.count(),
     prisma.order.groupBy({
@@ -37,11 +42,25 @@ async function getStats() {
       by: ["status"],
       _count: { id: true },
     }),
+    prisma.product.groupBy({
+      by: ["quality"],
+      _count: { id: true },
+      orderBy: { _count: { id: "desc" } },
+    }),
     prisma.order.findMany({
       take: 10,
       orderBy: { createdAt: "desc" },
       include: { customer: true, _count: { select: { items: true } } },
     }),
+    prisma.$queryRaw<{ day: Date; count: bigint; total: number }[]>`
+      SELECT DATE(created_at) as day,
+             COUNT(*)::bigint as count,
+             COALESCE(SUM(total_eur), 0) as total
+      FROM orders
+      WHERE created_at >= NOW() - INTERVAL '30 days'
+      GROUP BY DATE(created_at)
+      ORDER BY day ASC
+    `,
   ]);
 
   return {
@@ -55,8 +74,64 @@ async function getStats() {
     lotsByStatus: Object.fromEntries(
       lotsByStatus.map((g) => [g.status, g._count.id]),
     ) as Record<string, number>,
+    productsByQuality: productsByQuality.map((g) => ({
+      quality: g.quality,
+      count: g._count.id,
+    })),
     recentOrders,
+    ordersLast30Days: ordersLast30Days.map((d) => ({
+      day: new Date(d.day).toLocaleDateString("uk-UA", { day: "2-digit", month: "2-digit" }),
+      count: Number(d.count),
+      total: Number(d.total),
+    })),
   };
+}
+
+const BAR_COLORS: Record<string, string> = {
+  free: "bg-green-500",
+  reserved: "bg-amber-500",
+  on_sale: "bg-blue-500",
+  extra: "bg-purple-500",
+  cream: "bg-pink-500",
+  first: "bg-green-500",
+  second: "bg-amber-500",
+  stock: "bg-blue-500",
+  mix: "bg-gray-500",
+};
+
+function BarChart({
+  data,
+  labelKey,
+  valueKey,
+  labels,
+}: {
+  data: { label: string; value: number }[];
+  labelKey?: string;
+  valueKey?: string;
+  labels?: Record<string, string>;
+}) {
+  void labelKey;
+  void valueKey;
+  const max = Math.max(...data.map((d) => d.value), 1);
+
+  return (
+    <div className="space-y-2">
+      {data.map((item) => (
+        <div key={item.label} className="flex items-center gap-2">
+          <span className="w-24 truncate text-xs text-gray-600">
+            {labels?.[item.label] ?? item.label}
+          </span>
+          <div className="flex-1">
+            <div
+              className={`h-5 rounded ${BAR_COLORS[item.label] ?? "bg-green-500"} transition-all`}
+              style={{ width: `${(item.value / max) * 100}%`, minWidth: item.value > 0 ? "4px" : "0px" }}
+            />
+          </div>
+          <span className="w-10 text-right text-xs font-medium">{item.value}</span>
+        </div>
+      ))}
+    </div>
+  );
 }
 
 export default async function AdminDashboard() {
@@ -91,7 +166,7 @@ export default async function AdminDashboard() {
       value: stats.lotsCount,
       icon: Boxes,
       detail: Object.entries(stats.lotsByStatus)
-        .map(([status, count]) => `${status}: ${count}`)
+        .map(([status, count]) => `${LOT_STATUS_LABELS[status as LotStatus] ?? status}: ${count}`)
         .join(", "),
     },
   ];
@@ -117,6 +192,77 @@ export default async function AdminDashboard() {
         ))}
       </div>
 
+      {/* Charts Row */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        {/* Orders last 30 days */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Замовлення (30 днів)</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {stats.ordersLast30Days.length === 0 ? (
+              <p className="text-sm text-gray-500">Немає даних</p>
+            ) : (
+              <div className="flex items-end gap-1" style={{ height: 120 }}>
+                {stats.ordersLast30Days.map((d) => {
+                  const max = Math.max(...stats.ordersLast30Days.map((x) => x.count), 1);
+                  const height = (d.count / max) * 100;
+                  return (
+                    <div
+                      key={d.day}
+                      className="group relative flex-1"
+                      title={`${d.day}: ${d.count} замовл., €${d.total.toFixed(0)}`}
+                    >
+                      <div
+                        className="w-full rounded-t bg-green-500 transition-colors hover:bg-green-600"
+                        style={{ height: `${Math.max(height, 2)}%` }}
+                      />
+                      <div className="pointer-events-none absolute bottom-full left-1/2 z-10 mb-1 hidden -translate-x-1/2 whitespace-nowrap rounded bg-gray-800 px-2 py-1 text-xs text-white group-hover:block">
+                        {d.day}: {d.count} зам.
+                        <br />€{d.total.toFixed(0)}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Quality distribution */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Товари за якістю</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <BarChart
+              data={stats.productsByQuality.map((q) => ({
+                label: q.quality,
+                value: q.count,
+              }))}
+              labels={QUALITY_LABELS as unknown as Record<string, string>}
+            />
+          </CardContent>
+        </Card>
+
+        {/* Lots by status */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Лоти за статусом</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <BarChart
+              data={Object.entries(stats.lotsByStatus).map(([status, count]) => ({
+                label: status,
+                value: count,
+              }))}
+              labels={LOT_STATUS_LABELS as unknown as Record<string, string>}
+            />
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Recent orders */}
       <Card>
         <CardHeader>
           <CardTitle className="text-lg">Останні замовлення</CardTitle>

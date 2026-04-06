@@ -21,12 +21,17 @@ export default async function CatalogPage({
   const params = await searchParams;
   const page = parseInt(params.page ?? "1", 10);
 
+  const priceMin = params.priceMin ? parseFloat(params.priceMin) : undefined;
+  const priceMax = params.priceMax ? parseFloat(params.priceMax) : undefined;
+
   const { products, total, totalPages } = await getCatalogProducts({
     quality: params.quality,
     season: params.season,
     country: params.country,
     q: params.q,
     sort: params.sort,
+    priceMin: priceMin && !isNaN(priceMin) ? priceMin : undefined,
+    priceMax: priceMax && !isNaN(priceMax) ? priceMax : undefined,
     page,
   });
 
@@ -36,6 +41,8 @@ export default async function CatalogPage({
   if (params.country) filterParams.set("country", params.country);
   if (params.q) filterParams.set("q", params.q);
   if (params.sort) filterParams.set("sort", params.sort);
+  if (params.priceMin) filterParams.set("priceMin", params.priceMin);
+  if (params.priceMax) filterParams.set("priceMax", params.priceMax);
   const baseHref = filterParams.toString()
     ? `/catalog?${filterParams.toString()}`
     : "/catalog";

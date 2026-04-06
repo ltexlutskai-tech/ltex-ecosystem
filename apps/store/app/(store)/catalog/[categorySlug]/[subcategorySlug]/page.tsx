@@ -1,10 +1,13 @@
 import type { Metadata } from "next";
 import { prisma } from "@ltex/db";
 import { notFound } from "next/navigation";
+import { getCatalogProducts } from "@/lib/catalog";
 import { ProductCard } from "@/components/store/product-card";
 import { CatalogFilters } from "@/components/store/catalog-filters";
 import { Pagination } from "@/components/store/pagination";
 import { Breadcrumbs } from "@/components/store/breadcrumbs";
+
+export const revalidate = 60;
 
 interface Props {
   params: Promise<{ categorySlug: string; subcategorySlug: string }>;
@@ -36,42 +39,29 @@ export default async function SubcategoryPage({ params, searchParams }: Props) {
 
   if (!parent || !subcategory || subcategory.parentId !== parent.id) notFound();
 
-  const where: Record<string, unknown> = {
-    categoryId: subcategory.id,
-    inStock: true,
-  };
-  if (sp.quality) where.quality = sp.quality;
-  if (sp.season) where.season = sp.season;
-  if (sp.country) where.country = sp.country;
-  if (sp.q) {
-    where.OR = [
-      { name: { contains: sp.q, mode: "insensitive" } },
-      { articleCode: { contains: sp.q, mode: "insensitive" } },
-    ];
-  }
+  const priceMin = sp.priceMin ? parseFloat(sp.priceMin) : undefined;
+  const priceMax = sp.priceMax ? parseFloat(sp.priceMax) : undefined;
 
-  const perPage = 24;
-  const [products, total] = await Promise.all([
-    prisma.product.findMany({
-      where,
-      include: {
-        images: { take: 1, orderBy: { position: "asc" } },
-        prices: { where: { priceType: "wholesale" }, take: 1 },
-        _count: { select: { lots: true } },
-      },
-      orderBy: { updatedAt: "desc" },
-      skip: (page - 1) * perPage,
-      take: perPage,
-    }),
-    prisma.product.count({ where }),
-  ]);
-  const totalPages = Math.ceil(total / perPage);
+  const { products, total, totalPages } = await getCatalogProducts({
+    categoryId: subcategory.id,
+    quality: sp.quality,
+    season: sp.season,
+    country: sp.country,
+    q: sp.q,
+    sort: sp.sort,
+    priceMin: priceMin && !isNaN(priceMin) ? priceMin : undefined,
+    priceMax: priceMax && !isNaN(priceMax) ? priceMax : undefined,
+    page,
+  });
 
   const filterParams = new URLSearchParams();
   if (sp.quality) filterParams.set("quality", sp.quality);
   if (sp.season) filterParams.set("season", sp.season);
   if (sp.country) filterParams.set("country", sp.country);
   if (sp.q) filterParams.set("q", sp.q);
+  if (sp.sort) filterParams.set("sort", sp.sort);
+  if (sp.priceMin) filterParams.set("priceMin", sp.priceMin);
+  if (sp.priceMax) filterParams.set("priceMax", sp.priceMax);
   const base = `/catalog/${categorySlug}/${subcategorySlug}`;
   const baseHref = filterParams.toString()
     ? `${base}?${filterParams.toString()}`

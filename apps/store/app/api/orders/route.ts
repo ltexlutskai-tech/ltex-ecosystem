@@ -3,8 +3,19 @@ import { prisma } from "@ltex/db";
 import { MIN_ORDER_KG } from "@ltex/shared";
 import { orderSchema } from "@/lib/validations";
 import { notifyNewOrder } from "@/lib/notifications";
+import { rateLimit, getClientIp } from "@/lib/rate-limit";
 
 export async function POST(request: NextRequest) {
+  // Rate limit: 5 orders per minute per IP
+  const ip = getClientIp(request);
+  const limit = rateLimit(`orders:${ip}`, { windowMs: 60_000, max: 5 });
+  if (!limit.allowed) {
+    return NextResponse.json(
+      { error: "Забагато запитів. Спробуйте через хвилину." },
+      { status: 429, headers: { "Retry-After": "60" } },
+    );
+  }
+
   let body: unknown;
   try {
     body = await request.json();

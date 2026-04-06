@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { prisma } from "@ltex/db";
 import { z } from "zod";
 import { syncProductSchema } from "@/lib/validations";
+import { rateLimit, getClientIp } from "@/lib/rate-limit";
 
 const syncProductsSchema = z.array(syncProductSchema);
 
@@ -9,6 +11,13 @@ export async function POST(request: NextRequest) {
   const authHeader = request.headers.get("authorization");
   if (authHeader !== `Bearer ${process.env.SYNC_API_KEY}`) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  // Rate limit: 10 sync requests per minute
+  const ip = getClientIp(request);
+  const limit = rateLimit(`sync-products:${ip}`, { windowMs: 60_000, max: 10 });
+  if (!limit.allowed) {
+    return NextResponse.json({ error: "Rate limit exceeded" }, { status: 429 });
   }
 
   let body: unknown;
@@ -79,6 +88,11 @@ export async function POST(request: NextRequest) {
     } catch (err) {
       errors.push(`Failed: ${p.code1C} — ${err instanceof Error ? err.message : "unknown"}`);
     }
+  }
+
+  // Revalidate catalog pages after sync
+  if (created > 0 || updated > 0) {
+    revalidatePath("/catalog", "layout");
   }
 
   return NextResponse.json({

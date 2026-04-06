@@ -1,11 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { prisma } from "@ltex/db";
 import { syncLotsSchema } from "@/lib/validations";
+import { rateLimit, getClientIp } from "@/lib/rate-limit";
 
 export async function POST(request: NextRequest) {
   const authHeader = request.headers.get("authorization");
   if (authHeader !== `Bearer ${process.env.SYNC_API_KEY}`) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const ip = getClientIp(request);
+  const limit = rateLimit(`sync-lots:${ip}`, { windowMs: 60_000, max: 10 });
+  if (!limit.allowed) {
+    return NextResponse.json({ error: "Rate limit exceeded" }, { status: 429 });
   }
 
   let body: unknown;
@@ -70,6 +78,11 @@ export async function POST(request: NextRequest) {
     } catch (err) {
       errors.push(`Failed: ${lot.barcode} — ${err instanceof Error ? err.message : "unknown"}`);
     }
+  }
+
+  if (created > 0 || updated > 0) {
+    revalidatePath("/lots");
+    revalidatePath("/catalog", "layout");
   }
 
   return NextResponse.json({
