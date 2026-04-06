@@ -1,27 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@ltex/db";
 import { MIN_ORDER_KG } from "@ltex/shared";
-import { z } from "zod";
-
-const orderSchema = z.object({
-  customer: z.object({
-    name: z.string().min(1, "Ім'я обов'язкове").max(200),
-    phone: z.string().min(10, "Невірний номер телефону").max(20),
-    telegram: z.string().max(100).optional(),
-  }),
-  items: z
-    .array(
-      z.object({
-        lotId: z.string().min(1),
-        productId: z.string().min(1),
-        priceEur: z.number().positive(),
-        weight: z.number().positive(),
-        quantity: z.number().int().positive(),
-      }),
-    )
-    .min(1, "Додайте хоча б один лот"),
-  notes: z.string().max(1000).optional(),
-});
+import { orderSchema } from "@/lib/validations";
 
 export async function POST(request: NextRequest) {
   let body: unknown;

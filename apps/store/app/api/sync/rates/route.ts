@@ -1,16 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@ltex/db";
-import { z } from "zod";
-
-const rateSchema = z.object({
-  currencyFrom: z.enum(["EUR", "UAH", "USD"]),
-  currencyTo: z.enum(["EUR", "UAH", "USD"]),
-  rate: z.number().positive(),
-  date: z.string().datetime().optional(),
-  source: z.string().optional(),
-});
-
-const syncRatesSchema = z.array(rateSchema);
+import { syncRatesSchema } from "@/lib/validations";
 
 export async function POST(request: NextRequest) {
   const authHeader = request.headers.get("authorization");

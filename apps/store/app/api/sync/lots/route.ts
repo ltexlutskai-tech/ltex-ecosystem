@@ -1,18 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@ltex/db";
-import { z } from "zod";
-
-const lotSchema = z.object({
-  barcode: z.string().min(1),
-  articleCode: z.string().min(1),
-  weight: z.number().positive(),
-  quantity: z.number().int().positive().optional(),
-  status: z.enum(["free", "reserved", "on_sale"]).optional(),
-  priceEur: z.number().positive(),
-  videoUrl: z.string().url().optional().or(z.literal("")),
-});
-
-const syncLotsSchema = z.array(lotSchema);
+import { syncLotsSchema } from "@/lib/validations";
 
 export async function POST(request: NextRequest) {
   const authHeader = request.headers.get("authorization");

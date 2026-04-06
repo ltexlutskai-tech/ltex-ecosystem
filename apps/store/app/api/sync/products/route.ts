@@ -1,24 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@ltex/db";
 import { z } from "zod";
+import { syncProductSchema } from "@/lib/validations";
 
-const productSchema = z.object({
-  code1C: z.string().min(1),
-  articleCode: z.string().optional(),
-  name: z.string().min(1),
-  slug: z.string().min(1),
-  categorySlug: z.string().min(1),
-  description: z.string().optional(),
-  quality: z.string().min(1),
-  season: z.string().optional(),
-  country: z.string().min(1),
-  priceUnit: z.enum(["kg", "piece"]).optional(),
-  averageWeight: z.number().positive().optional(),
-  videoUrl: z.string().url().optional().or(z.literal("")),
-  inStock: z.boolean().optional(),
-});
-
-const syncProductsSchema = z.array(productSchema);
+const syncProductsSchema = z.array(syncProductSchema);
 
 export async function POST(request: NextRequest) {
   const authHeader = request.headers.get("authorization");
