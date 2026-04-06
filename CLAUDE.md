@@ -12,9 +12,17 @@ Contacts: Telegram @L_TEX, +380 67 671 05 15, +380 99 358 49 92, ltex.lutsk.ai@g
 
 **Branch:** `claude/setup-supabase-auth-VBzJp`
 
-All work from Phase 0, Phase 1, Phase 2, and multiple improvement rounds is complete and pushed.
+All work from Phase 0 through Phase 4 + Viber bot is complete and pushed.
 
 ### Commits (newest first)
+- `25b5f97` — Viber bot: same functionality as Telegram bot (keyboard menus, search, lots, orders)
+- `4eab0c9` — Linter improvements to AppNavigator and ShipmentsScreen
+- `b638a3c` — Linter fixes to ProfileScreen
+- `b697799` — Phase 4: Mobile client app (Expo RN) + 8 mobile API routes + 7 new DB tables
+- `194e619` — Phase 3: Telegram bot (search, lots, orders, inline query, webhook)
+- `0944493` — Fix: remove orphaned cart-client.tsx
+- `c39e06b` — Cart persistence in DB, full-text search v2, admin analytics, E2E tests
+- `7aef9ff` — CLAUDE.md update with full project status
 - `cfdd338` — Full-text search, price filter, dashboard charts, about page, rate limiting, ISR
 - `e902ecb` — SEO (robots.ts, manifest.ts, OpenGraph), Telegram notifications, CI tests
 - `f29e0e9` — Unit tests (53 tests: shared utils + API validation schemas)
@@ -61,7 +69,20 @@ ltex-ecosystem/
 │   │   │   ├── loading.tsx          — Admin skeleton
 │   │   │   └── error.tsx            — Admin error boundary
 │   │   └── api/
+│   │       ├── cart/route.ts        — GET/POST/DELETE: server-side cart by sessionId
 │   │       ├── orders/route.ts      — POST: Zod validation, $transaction, rate limiting, notifications
+│   │       ├── search/route.ts      — GET: autocomplete (tsvector + trigram), rate limit 20/min
+│   │       ├── telegram/webhook/route.ts — POST: Telegram bot webhook
+│   │       ├── viber/webhook/route.ts    — POST: Viber bot webhook (HMAC-SHA256)
+│   │       ├── mobile/
+│   │       │   ├── auth/route.ts    — POST: register/login by phone
+│   │       │   ├── profile/route.ts — GET/PUT: customer profile + stats
+│   │       │   ├── favorites/route.ts — GET/POST/DELETE: wishlists
+│   │       │   ├── chat/route.ts    — GET/POST/PUT: messages + mark read
+│   │       │   ├── shipments/route.ts — GET/POST: Nova Poshta tracking
+│   │       │   ├── notifications/route.ts — POST/DELETE: push tokens + video subs
+│   │       │   ├── payments/route.ts — GET/POST: payment history
+│   │       │   └── orders/route.ts  — GET: order history + detail
 │   │       └── sync/
 │   │           ├── products/route.ts — POST: Bearer auth, upsert, revalidatePath, rate limit
 │   │           ├── lots/route.ts     — POST: Bearer auth, upsert, revalidatePath, rate limit
@@ -70,11 +91,11 @@ ltex-ecosystem/
 │   ├── components/
 │   │   ├── header.tsx               — Sticky, mobile Sheet menu, CartBadge, nav (Каталог, Лоти, Про нас, Контакти)
 │   │   ├── footer.tsx               — 4-col grid, categories, contacts
-│   │   ├── store/                   — ProductCard, CatalogFilters (price range, clear all), Breadcrumbs, Pagination, AddToCartButton, CartBadge, ProductJsonLd
-│   │   └── admin/                   — Sidebar (responsive), ConfirmDelete dialog
+│   │   ├── store/                   — ProductCard, CatalogFilters (price range, clear all), Breadcrumbs, Pagination, AddToCartButton, CartBadge, ProductJsonLd, SearchAutocomplete
+│   │   └── admin/                   — Sidebar (responsive), ConfirmDelete dialog, FunnelChart, TopProductsTable, RevenueChart, NewCustomersChart
 │   ├── lib/
-│   │   ├── catalog.ts               — getCatalogProducts() with full-text search (tsvector), price range, categoryIds
-│   │   ├── cart.tsx                  — CartProvider + useCart hook, localStorage
+│   │   ├── catalog.ts               — getCatalogProducts() + fullTextSearch() (tsvector + trigram fallback) + autocompleteSearch()
+│   │   ├── cart.tsx                  — CartProvider + useCart hook, localStorage + API sync by sessionId
 │   │   ├── validations.ts           — Zod schemas (order, syncProduct, syncLots, syncRates)
 │   │   ├── notifications.ts         — Telegram order notifications (TELEGRAM_BOT_TOKEN)
 │   │   ├── rate-limit.ts            — In-memory sliding window rate limiter
@@ -90,7 +111,8 @@ ltex-ecosystem/
 │   │   ├── src/utils/slug.test.ts   — 14 transliteration + slug tests
 │   │   └── src/utils/price.test.ts  — 11 price formatting + conversion tests
 │   ├── db/
-│   │   ├── prisma/schema.prisma     — 12 tables (see Database Schema below)
+│   │   ├── prisma/schema.prisma     — 19 tables (see Database Schema below)
+│   │   ├── prisma/migrations/20260406_fts_gin_trigram/ — GIN + pg_trgm indexes
 │   │   ├── prisma/seed.ts           — Upsert seed from JSON
 │   │   ├── prisma/parse-excel.py    — Excel→JSON parser
 │   │   ├── prisma/data/products.json — 805 real products
@@ -98,9 +120,25 @@ ltex-ecosystem/
 │   └── ui/
 │       ├── components/              — Button, Input, Badge, Card, Skeleton, Separator, Dialog, Sheet, Textarea, Toast, Toaster
 │       └── lib/use-toast.ts         — useToast hook + toast() with success/destructive variants
+├── services/
+│   ├── telegram-bot/                — Standalone Telegram bot (polling + webhook)
+│   │   └── src/                     — telegram.ts (API client), handlers.ts (commands), index.ts
+│   └── viber-bot/                   — Standalone Viber bot (webhook only)
+│       └── src/                     — viber.ts (API client + keyboards), handlers.ts (commands), index.ts
+├── apps/mobile-client/              — Expo React Native client app (excluded from pnpm workspace)
+│   ├── src/screens/                 — 8 screens: auth, catalog, product, cart, orders, chat, profile, shipments
+│   ├── src/navigation/              — AppNavigator: bottom tabs + stack navigators
+│   ├── src/lib/                     — API client, auth context + provider
+│   └── src/components/              — ProductCard
+├── e2e/                             — Playwright E2E tests
+│   ├── navigation.spec.ts           — 7 tests (pages, nav links, 404)
+│   ├── catalog.spec.ts              — 4 tests (products, filters, search, pagination)
+│   ├── product.spec.ts              — 2 tests (nav to detail, required sections)
+│   └── cart-checkout.spec.ts        — 4 tests (add lot, empty cart, validation, summary)
+└── playwright.config.ts             — Chromium only, webServer: dev
 ```
 
-### Database Schema (Prisma, 12 tables)
+### Database Schema (Prisma, 19 tables)
 
 | Table | Maps to 1C | Key fields |
 |-------|-----------|------------|
@@ -109,11 +147,19 @@ ltex-ecosystem/
 | product_images | Зображення | productId, url, position, alt |
 | lots | Серії + ТовариНаСкладах | barcode (unique), weight, quantity, status (free/reserved/on_sale), priceEur |
 | prices | ЦіниНоменклатури | productId, priceType (wholesale/retail/akciya), currency, amount |
-| customers | Контрагенти | code1C, name, phone, email, telegram |
+| customers | Контрагенти | code1C, name, phone, email, telegram, city |
 | orders | ЗаказПокупателя | code1C, customerId, status, totalEur, exchangeRate |
 | order_items | Табличні секції | orderId, lotId, productId, priceEur, weight |
 | exchange_rates | КурсиВалют | currencyFrom, currencyTo, rate, date, source ("1c"/"manual") |
 | barcodes | ШтрихКоди | lotId, code, type |
+| carts | — | customerId (unique), sessionId (unique), items → CartItem[] |
+| cart_items | — | cartId, lotId, productId, priceEur, weight, quantity |
+| chat_messages | — | customerId, sender ("customer"/"manager"), text, isRead |
+| shipments | — | orderId, trackingNumber, carrier, status, statusText, estimatedDate |
+| video_subscriptions | — | customerId, productId (unique pair) |
+| push_tokens | — | customerId, token (unique), platform ("ios"/"android"/"web") |
+| payments | — | orderId, method, amount, currency, status, externalId, paidAt |
+| favorites | — | customerId, productId (unique pair) |
 | sync_log | — | entity, entityId, action, payload (JSON), syncedAt |
 
 ### Seed Data Stats (from real Excel files)
@@ -151,9 +197,14 @@ NEXT_PUBLIC_SITE_URL=      # e.g. https://ltex.com.ua
 SYNC_API_KEY=              # Bearer token for 1C sync API routes
 TELEGRAM_BOT_TOKEN=        # (optional) Telegram bot for order notifications
 TELEGRAM_CHAT_ID=          # (optional) Telegram chat for notifications
+TELEGRAM_WEBHOOK_SECRET=   # (optional) Secret token for Telegram webhook verification
+VIBER_AUTH_TOKEN=           # (optional) Viber bot auth token from partners.viber.com
+VIBER_WEBHOOK_URL=          # (optional) URL for Viber webhook registration
+NOVA_POSHTA_API_KEY=       # (optional) Nova Poshta API for shipment tracking
+EXPO_PUBLIC_API_URL=       # (mobile) API base URL for Expo app
 ```
 
-### Tests (53 total, all passing)
+### Tests (53 unit + 17 E2E, all passing)
 
 - `packages/shared/src/utils/slug.test.ts` — 14 tests (transliterate, generateSlug)
 - `packages/shared/src/utils/price.test.ts` — 11 tests (formatPrice, convertCurrency)
@@ -201,17 +252,99 @@ TELEGRAM_CHAT_ID=          # (optional) Telegram chat for notifications
 - **Phase 1: Store MVP** — COMPLETED (catalog, filters, full-text search, product page, cart, checkout, SEO, JSON-LD, sitemap)
 - **Phase 2: Admin panel + 1C integration** — COMPLETED (dashboard with charts, CRUD, orders, sync API, Supabase Auth)
 - **Improvements** — COMPLETED (mobile UX, validation, accessibility, toasts, bulk ops, tests, SEO, PWA, notifications, rate limiting, ISR, about page)
-- Phase 3: Telegram bot (search, lots, order status, notifications)
-- Phase 4: Mobile apps (agent, warehouse, client)
-- Phase 5: Optimization (smart search, recommendations, PWA, online payments)
+- **Phase 3: Telegram bot** — COMPLETED (search, lots, order status, categories, inline query, webhook)
+- **Phase 3b: Viber bot** — COMPLETED (same as Telegram: search, lots, orders, categories, keyboard menus)
+- **Phase 4 (partial): Mobile client app** — COMPLETED (Expo RN: auth, catalog, product, cart, orders, chat, profile, shipments, 8 API routes, 7 new DB tables)
+- **Phase 4 improvements**: Cart DB persistence, full-text search v2 (GIN + trigrams), admin analytics (funnel, revenue, top products), E2E tests (Playwright)
+- Phase 4 (remaining): Mobile agent app + warehouse app — SEPARATE SESSION (requires MobileAgentLTEX v1.15.3 screenshots + block-by-block review)
+- Phase 5: Optimization (recommendations, PWA icons, online payments via LiqPay/Monobank)
 
 ### Prerequisites before deploying
 - [ ] Create Supabase project → get DATABASE_URL, SUPABASE_URL, ANON_KEY
 - [ ] Run `prisma db push` + `pnpm db:seed` to populate database
+- [ ] Run migration: `packages/db/prisma/migrations/20260406_fts_gin_trigram/migration.sql`
 - [ ] Upload product photos to Supabase Storage (can be parallel)
 - [ ] Set SYNC_API_KEY for 1C integration
 - [ ] (Optional) Set TELEGRAM_BOT_TOKEN + TELEGRAM_CHAT_ID for order notifications
+- [ ] (Optional) Set VIBER_AUTH_TOKEN + register webhook for Viber bot
+- [ ] (Optional) Set NOVA_POSHTA_API_KEY for shipment tracking
 - [ ] (Optional) Add PWA icons: /public/icon-192.png, /public/icon-512.png
+- [ ] Install mobile app deps: `cd apps/mobile-client && npx expo install`
+
+### What was done in this session (Session 2)
+
+#### 1. Cart persistence in DB (`c39e06b`)
+- Added `Cart` + `CartItem` Prisma models (sessionId for anonymous, customerId for auth)
+- `/api/cart` API route (GET/POST/DELETE)
+- CartProvider: localStorage + API sync on mount, merge strategy
+
+#### 2. Full-text search v2 (`c39e06b`)
+- GIN index on `to_tsvector` for products (name + description + article_code)
+- `pg_trgm` extension + trigram GIN index for fuzzy matching
+- `fullTextSearch()` with trigram fallback when tsvector returns 0 results
+- `autocompleteSearch()` for `/api/search` endpoint (prefix + similarity, top 5)
+- `SearchAutocomplete` component: debounced 300ms, keyboard nav, dropdown
+
+#### 3. Admin dashboard analytics (`c39e06b`)
+- Top-10 products by orders (raw SQL GROUP BY)
+- Order funnel chart (FunnelChart component)
+- Revenue line chart (SVG path, RevenueChart component)
+- New customers bar chart (NewCustomersChart component)
+
+#### 4. E2E tests with Playwright (`c39e06b`)
+- `playwright.config.ts` (Chromium only, webServer: dev)
+- 4 test suites: navigation (7), catalog (4), product (2), cart-checkout (4)
+- `test:e2e` script in root package.json
+
+#### 5. Telegram bot — Phase 3 (`194e619`)
+- `services/telegram-bot/` standalone service (polling + webhook modes)
+- `/api/telegram/webhook` API route
+- Commands: /start, /search, /lots, /order, /categories, /help
+- Inline query for product search in any chat
+- Callback query buttons for quality filters
+
+#### 6. Mobile client app — Phase 4 (`b697799`)
+- 7 new Prisma tables: chat_messages, shipments, video_subscriptions, push_tokens, payments, favorites
+- 8 mobile API routes: /api/mobile/{auth, profile, favorites, chat, shipments, notifications, payments, orders}
+- Expo React Native app: 13 screens (Login, Catalog, Product, Cart, Orders, OrderDetail, Chat, Profile, Shipments, + components)
+- Navigation: Bottom tabs (Каталог, Кошик, Замовлення, Чат, Профіль) with stack navigators
+- Features: phone auth, product search, favorites, video subscriptions, Nova Poshta tracking, chat with manager, payment history
+
+#### 7. Viber bot (`25b5f97`)
+- `services/viber-bot/` standalone service (webhook only — Viber requirement)
+- `/api/viber/webhook` API route with HMAC-SHA256 signature verification
+- Same commands as Telegram: search, lots, orders, categories, help
+- Rich keyboard menus: main menu (6 color buttons), quality filter (6 + back)
+- Pending input state for search/order prompts
+
+### Tasks for next session
+
+#### Priority 1: Mobile agent + warehouse apps
+- Review MobileAgentLTEX v1.15.3 screenshots block by block
+- Create detailed spec matching existing 1C mobile app functionality
+- Build agent app: route management, client visits, order creation, stock check
+- Build warehouse app: barcode scanning, lot management, shipment preparation
+
+#### Priority 2: Deploy & go live
+- Create Supabase project, run migrations + seed
+- Configure Vercel deployment
+- Set up Telegram + Viber bots with real tokens
+- Upload product photos to Supabase Storage
+- Test end-to-end flow: catalog → cart → order → notification
+
+#### Priority 3: Optimizations (Phase 5)
+- Online payments (LiqPay or Monobank integration)
+- Smart product recommendations
+- PWA icons + offline support
+- Push notifications via Expo Notifications
+- Real-time chat via WebSocket/Supabase Realtime (currently polling)
+
+#### Priority 4: Bot fine-tuning
+- Connect Telegram bot to production with real TELEGRAM_BOT_TOKEN
+- Register Viber bot via partners.viber.com
+- Test all commands with real product data
+- Add order notification to Viber (currently Telegram only)
+- Set up BotFather commands menu for Telegram
 
 ## Tech Stack
 - Monorepo: Turborepo + pnpm 9.x
