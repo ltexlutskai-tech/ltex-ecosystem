@@ -35,6 +35,9 @@ jobs:
       - name: Generate Prisma Client
         run: pnpm --filter @ltex/db exec prisma generate
 
+      - name: Test
+        run: pnpm --filter @ltex/shared test && pnpm --filter @ltex/store test
+
       - name: Typecheck
         run: pnpm typecheck
 

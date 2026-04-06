@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@ltex/db";
 import { MIN_ORDER_KG } from "@ltex/shared";
 import { orderSchema } from "@/lib/validations";
+import { notifyNewOrder } from "@/lib/notifications";
 
 export async function POST(request: NextRequest) {
   let body: unknown;
@@ -95,6 +96,17 @@ export async function POST(request: NextRequest) {
 
       return ord;
     });
+
+    // Send notification (non-blocking, doesn't affect response)
+    notifyNewOrder({
+      orderId: order.id,
+      customerName: customer.name,
+      customerPhone: customer.phone,
+      totalEur,
+      totalUah,
+      itemCount: items.length,
+      totalWeight,
+    }).catch(() => {});
 
     return NextResponse.json({ orderId: order.id }, { status: 201 });
   } catch {
