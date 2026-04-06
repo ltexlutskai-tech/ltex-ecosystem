@@ -4,15 +4,15 @@
  * Structure:
  * - Not logged in → LoginScreen
  * - Logged in → Bottom Tabs:
- *   - Каталог (CatalogStack: Catalog → Product)
- *   - Кошик (CartScreen)
+ *   - Каталог (CatalogStack: Catalog → ProductDetail)
+ *   - Кошик (CartStack: Cart)
  *   - Замовлення (OrdersStack: Orders → OrderDetail)
- *   - Чат (ChatScreen)
- *   - Профіль (ProfileStack: Profile → Shipments)
+ *   - Чат (ChatStack: Chat)
+ *   - Профіль (ProfileStack: Profile → Shipments, Favorites, Subscriptions, Payments)
  */
 
 import React from "react";
-import { ActivityIndicator, View } from "react-native";
+import { ActivityIndicator, View, StyleSheet } from "react-native";
 import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
@@ -34,41 +34,146 @@ import { ShipmentsScreen } from "@/screens/shipments/ShipmentsScreen";
 
 const BRAND_COLOR = "#16a34a";
 
+const defaultScreenOptions = {
+  headerTintColor: BRAND_COLOR,
+  headerBackTitle: "Назад",
+  headerTitleStyle: {
+    fontWeight: "600" as const,
+  },
+};
+
+// ─── Type declarations for navigation params ───────────────────────────────
+
+type CatalogStackParamList = {
+  CatalogList: undefined;
+  ProductDetail: { productId: string; slug: string; name: string };
+};
+
+type OrdersStackParamList = {
+  OrdersList: undefined;
+  OrderDetail: { orderId: string; orderCode: string };
+};
+
+type ProfileStackParamList = {
+  ProfileMain: undefined;
+  Shipments: undefined;
+  Favorites: undefined;
+  Subscriptions: undefined;
+  PaymentsHistory: undefined;
+};
+
 // ─── Stack Navigators ────────────────────────────────────────────────────────
 
-const CatalogStack = createNativeStackNavigator();
+const CatalogStackNav = createNativeStackNavigator<CatalogStackParamList>();
 function CatalogStackNavigator() {
   return (
-    <CatalogStack.Navigator screenOptions={{ headerTintColor: BRAND_COLOR }}>
-      <CatalogStack.Screen name="CatalogList" component={CatalogScreen} options={{ title: "Каталог" }} />
-      <CatalogStack.Screen name="Product" component={ProductScreen} options={{ title: "Товар" }} />
-    </CatalogStack.Navigator>
+    <CatalogStackNav.Navigator screenOptions={defaultScreenOptions}>
+      <CatalogStackNav.Screen
+        name="CatalogList"
+        component={CatalogScreen}
+        options={{ title: "Каталог" }}
+      />
+      <CatalogStackNav.Screen
+        name="ProductDetail"
+        component={ProductScreen as React.ComponentType<any>}
+        options={{ title: "Товар" }}
+      />
+    </CatalogStackNav.Navigator>
   );
 }
 
-const OrdersStack = createNativeStackNavigator();
+const CartStackNav = createNativeStackNavigator();
+function CartStackNavigator() {
+  return (
+    <CartStackNav.Navigator screenOptions={defaultScreenOptions}>
+      <CartStackNav.Screen
+        name="CartMain"
+        component={CartScreen as React.ComponentType<any>}
+        options={{ title: "Кошик" }}
+      />
+    </CartStackNav.Navigator>
+  );
+}
+
+const OrdersStackNav = createNativeStackNavigator<OrdersStackParamList>();
 function OrdersStackNavigator() {
   return (
-    <OrdersStack.Navigator screenOptions={{ headerTintColor: BRAND_COLOR }}>
-      <OrdersStack.Screen name="OrdersList" component={OrdersScreen} options={{ title: "Замовлення" }} />
-      <OrdersStack.Screen name="OrderDetail" component={OrderDetailScreen} options={{ title: "Деталі замовлення" }} />
-    </OrdersStack.Navigator>
+    <OrdersStackNav.Navigator screenOptions={defaultScreenOptions}>
+      <OrdersStackNav.Screen
+        name="OrdersList"
+        component={OrdersScreen}
+        options={{ title: "Замовлення" }}
+      />
+      <OrdersStackNav.Screen
+        name="OrderDetail"
+        component={OrderDetailScreen as React.ComponentType<any>}
+        options={{ title: "Деталі замовлення" }}
+      />
+    </OrdersStackNav.Navigator>
   );
 }
 
-const ProfileStack = createNativeStackNavigator();
+const ChatStackNav = createNativeStackNavigator();
+function ChatStackNavigator() {
+  return (
+    <ChatStackNav.Navigator screenOptions={defaultScreenOptions}>
+      <ChatStackNav.Screen
+        name="ChatMain"
+        component={ChatScreen}
+        options={{ title: "Чат з менеджером" }}
+      />
+    </ChatStackNav.Navigator>
+  );
+}
+
+const ProfileStackNav = createNativeStackNavigator<ProfileStackParamList>();
 function ProfileStackNavigator() {
   return (
-    <ProfileStack.Navigator screenOptions={{ headerTintColor: BRAND_COLOR }}>
-      <ProfileStack.Screen name="ProfileMain" component={ProfileScreen} options={{ title: "Профіль" }} />
-      <ProfileStack.Screen name="Shipments" component={ShipmentsScreen} options={{ title: "Відстеження посилок" }} />
-    </ProfileStack.Navigator>
+    <ProfileStackNav.Navigator screenOptions={defaultScreenOptions}>
+      <ProfileStackNav.Screen
+        name="ProfileMain"
+        component={ProfileScreen as React.ComponentType<any>}
+        options={{ title: "Профіль" }}
+      />
+      <ProfileStackNav.Screen
+        name="Shipments"
+        component={ShipmentsScreen}
+        options={{ title: "Відправлення" }}
+      />
+      <ProfileStackNav.Screen
+        name="Favorites"
+        component={PlaceholderScreen("Обране", "heart-outline", "#dc2626")}
+        options={{ title: "Обране" }}
+      />
+      <ProfileStackNav.Screen
+        name="Subscriptions"
+        component={PlaceholderScreen(
+          "Підписки на відео-огляди",
+          "notifications-outline",
+          "#7c3aed",
+        )}
+        options={{ title: "Підписки" }}
+      />
+      <ProfileStackNav.Screen
+        name="PaymentsHistory"
+        component={PlaceholderScreen("Історія оплат", "wallet-outline", "#0284c7")}
+        options={{ title: "Історія оплат" }}
+      />
+    </ProfileStackNav.Navigator>
   );
 }
 
 // ─── Bottom Tabs ─────────────────────────────────────────────────────────────
 
 const Tab = createBottomTabNavigator();
+
+const TAB_ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
+  CatalogTab: "grid-outline",
+  CartTab: "cart-outline",
+  OrdersTab: "receipt-outline",
+  ChatTab: "chatbubbles-outline",
+  ProfileTab: "person-outline",
+};
 
 function MainTabs() {
   return (
@@ -77,22 +182,47 @@ function MainTabs() {
         headerShown: false,
         tabBarActiveTintColor: BRAND_COLOR,
         tabBarInactiveTintColor: "#9ca3af",
+        tabBarLabelStyle: {
+          fontSize: 11,
+          fontWeight: "500",
+        },
+        tabBarStyle: {
+          borderTopColor: "#f3f4f6",
+          paddingBottom: 4,
+          paddingTop: 4,
+          height: 56,
+        },
         tabBarIcon: ({ color, size }) => {
-          let iconName: keyof typeof Ionicons.glyphMap = "help-circle-outline";
-          if (route.name === "Catalog") iconName = "grid-outline";
-          else if (route.name === "Cart") iconName = "cart-outline";
-          else if (route.name === "Orders") iconName = "receipt-outline";
-          else if (route.name === "Chat") iconName = "chatbubbles-outline";
-          else if (route.name === "Profile") iconName = "person-outline";
+          const iconName = TAB_ICONS[route.name] ?? "help-circle-outline";
           return <Ionicons name={iconName} size={size} color={color} />;
         },
       })}
     >
-      <Tab.Screen name="Catalog" component={CatalogStackNavigator} options={{ tabBarLabel: "Каталог" }} />
-      <Tab.Screen name="Cart" component={CartScreen} options={{ tabBarLabel: "Кошик", headerShown: true, title: "Кошик" }} />
-      <Tab.Screen name="Orders" component={OrdersStackNavigator} options={{ tabBarLabel: "Замовлення" }} />
-      <Tab.Screen name="Chat" component={ChatScreen} options={{ tabBarLabel: "Чат", headerShown: true, title: "Чат з менеджером" }} />
-      <Tab.Screen name="Profile" component={ProfileStackNavigator} options={{ tabBarLabel: "Профіль" }} />
+      <Tab.Screen
+        name="CatalogTab"
+        component={CatalogStackNavigator}
+        options={{ tabBarLabel: "Каталог" }}
+      />
+      <Tab.Screen
+        name="CartTab"
+        component={CartStackNavigator}
+        options={{ tabBarLabel: "Кошик" }}
+      />
+      <Tab.Screen
+        name="OrdersTab"
+        component={OrdersStackNavigator}
+        options={{ tabBarLabel: "Замовлення" }}
+      />
+      <Tab.Screen
+        name="ChatTab"
+        component={ChatStackNavigator}
+        options={{ tabBarLabel: "Чат" }}
+      />
+      <Tab.Screen
+        name="ProfileTab"
+        component={ProfileStackNavigator}
+        options={{ tabBarLabel: "Профіль" }}
+      />
     </Tab.Navigator>
   );
 }
@@ -106,7 +236,7 @@ function RootNavigator() {
 
   if (isLoading) {
     return (
-      <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+      <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={BRAND_COLOR} />
       </View>
     );
@@ -117,7 +247,11 @@ function RootNavigator() {
       {customerId ? (
         <RootStack.Screen name="Main" component={MainTabs} />
       ) : (
-        <RootStack.Screen name="Login" component={LoginScreen} />
+        <RootStack.Screen
+          name="Login"
+          component={LoginScreen}
+          options={{ animationTypeForReplace: "pop" }}
+        />
       )}
     </RootStack.Navigator>
   );
@@ -134,3 +268,57 @@ export function AppNavigator() {
     </AuthProvider>
   );
 }
+
+// ─── Placeholder for screens not yet built ──────────────────────────────────
+
+function PlaceholderScreen(
+  _title: string,
+  icon: keyof typeof Ionicons.glyphMap,
+  color: string,
+) {
+  return function Screen() {
+    return (
+      <View style={styles.placeholderContainer}>
+        <Ionicons name={icon} size={48} color={color} />
+        <View style={styles.placeholderTextBox}>
+          <View style={styles.placeholderBadge}>
+            <Ionicons name="construct-outline" size={14} color="#d97706" />
+          </View>
+        </View>
+      </View>
+    );
+  };
+}
+
+const styles = StyleSheet.create({
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#fff",
+  },
+  placeholderContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 32,
+    backgroundColor: "#f9fafb",
+  },
+  placeholderTextBox: {
+    marginTop: 16,
+    alignItems: "center",
+    gap: 8,
+  },
+  placeholderBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: "#fffbeb",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  placeholderContent: {
+    alignItems: "center",
+  },
+});
