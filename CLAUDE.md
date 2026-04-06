@@ -319,32 +319,72 @@ EXPO_PUBLIC_API_URL=       # (mobile) API base URL for Expo app
 
 ### Tasks for next session
 
-#### Priority 1: Mobile agent + warehouse apps
-- Review MobileAgentLTEX v1.15.3 screenshots block by block
-- Create detailed spec matching existing 1C mobile app functionality
-- Build agent app: route management, client visits, order creation, stock check
-- Build warehouse app: barcode scanning, lot management, shipment preparation
+#### Session 3: Phase 5 (Optimization) + Viber bot + Deploy prep
 
-#### Priority 2: Deploy & go live
-- Create Supabase project, run migrations + seed
-- Configure Vercel deployment
-- Set up Telegram + Viber bots with real tokens
-- Upload product photos to Supabase Storage
-- Test end-to-end flow: catalog → cart → order → notification
+**IMPORTANT Business Context:** L-TEX НЕ приймає онлайн-оплати. Клієнти роблять замовлення → менеджер отримує нотифікацію → менеджер формує реалізацію та оплату в 1С. Тому НЕ потрібно: LiqPay, Monobank, online payment gateway. Таблиця `payments` використовується тільки для відображення історії оплат клієнту (дані з 1С).
 
-#### Priority 3: Optimizations (Phase 5)
-- Online payments (LiqPay or Monobank integration)
-- Smart product recommendations
-- PWA icons + offline support
-- Push notifications via Expo Notifications
-- Real-time chat via WebSocket/Supabase Realtime (currently polling)
+##### Задача 1: Viber бот — нотифікації замовлень (як в Telegram)
+Зараз: Telegram бот надсилає нотифікацію менеджеру при новому замовленні (`lib/notifications.ts`). Viber бот тільки відповідає на команди.
+- Додати `notifyViberNewOrder()` в `lib/notifications.ts`
+- Додати env var `VIBER_ADMIN_USER_ID` — ID менеджера в Viber для нотифікацій
+- Викликати в `/api/orders/route.ts` поряд з Telegram нотифікацією
+- Формат: такий самий як Telegram (клієнт, телефон, позицій, вага, сума)
 
-#### Priority 4: Bot fine-tuning
-- Connect Telegram bot to production with real TELEGRAM_BOT_TOKEN
-- Register Viber bot via partners.viber.com
-- Test all commands with real product data
-- Add order notification to Viber (currently Telegram only)
-- Set up BotFather commands menu for Telegram
+##### Задача 2: Smart product recommendations
+Зараз: на сторінці товару немає рекомендацій.
+- Створити `lib/recommendations.ts` з функцією `getRecommendations(productId, limit=6)`
+- Алгоритм: товари тієї ж категорії + якості, або тієї ж категорії іншої якості, ordered by lot count DESC (пріоритет: є вільні лоти)
+- Додати секцію "Схожі товари" на сторінку `/product/[slug]` (після лотів, перед footer)
+- Компонент: горизонтальна сітка 2-3 карток з ProductCard
+- Також показувати "Часто купують разом" — товари з тих самих замовлень (order_items GROUP BY productId WHERE orderId IN orders_with_this_product)
+
+##### Задача 3: PWA іконки + offline fallback
+Зараз: `manifest.ts` є, але іконок немає (`/public/icon-192.png`, `/public/icon-512.png`).
+- Створити SVG іконку L-TEX (зелений #16a34a, літери "LT") і конвертувати в PNG 192x192 та 512x512
+- Або створити простий placeholder-іконки через CSS/Canvas
+- Додати `<link rel="apple-touch-icon">` в layout.tsx
+- Додати `public/offline.html` — проста сторінка "Немає з'єднання"
+- Додати Service Worker реєстрацію для offline fallback (Next.js PWA з `next-pwa` або `@serwist/next`)
+
+##### Задача 4: Push notifications (Expo)
+Зараз: таблиця `push_tokens` є, `/api/mobile/notifications` API є, але фактичне відправлення push немає.
+- Додати `lib/push.ts` з функцією `sendPushNotification(customerId, title, body, data?)`
+- Використовувати Expo Push API (`https://exp.host/--/api/v2/push/send`)
+- Викликати при: нове повідомлення в чаті від менеджера, зміна статусу замовлення, нове відео по підписці
+- В мобільному додатку: зареєструвати push token при першому запуску (`expo-notifications`)
+
+##### Задача 5: Real-time чат (замість polling)
+Зараз: ChatScreen опитує `/api/mobile/chat` кожні 10 сек. Це неефективно.
+- Варіант A: Supabase Realtime (subscribe на `chat_messages` table changes)
+- Варіант B: Server-Sent Events (SSE) endpoint `/api/mobile/chat/stream`
+- Варіант C: Залишити polling, але зменшити інтервал до 3 сек тільки коли чат відкритий
+- Обрати найпростіший варіант який не потребує додаткової інфраструктури
+
+##### Задача 6: BotFather меню для Telegram
+- Створити скрипт `services/telegram-bot/src/setup-commands.ts`
+- Який через Telegram API (`setMyCommands`) реєструє меню:
+  - /search — Пошук товарів
+  - /lots — Доступні лоти (мішки)
+  - /order — Статус замовлення
+  - /categories — Категорії товарів
+  - /help — Допомога
+- Запускати один раз: `tsx services/telegram-bot/src/setup-commands.ts`
+
+##### Задача 7: Deploy preparation
+- Оновити `.env.example` файли з усіма новими env vars
+- Додати `scripts/deploy-checklist.md` з покроковою інструкцією
+- Перевірити що `prisma db push` працює без помилок
+- Додати `scripts/register-webhooks.ts` — скрипт для реєстрації Telegram + Viber webhooks
+- Перевірити що build проходить на чистому Node.js 20 (без локального кешу)
+
+##### Задача 8 (окрема сесія, потрібні скріншоти): Mobile agent + warehouse
+- Потрібні скріншоти MobileAgentLTEX v1.15.3
+- Кожен розділ і блок додатку розбирати окремо
+- Побудувати точну копію функціоналу на Expo React Native
+- Інтеграція з 1С HTTP Service "Боти"
+
+#### Порядок виконання в Session 3: 1 → 6 → 2 → 3 → 4 → 5 → 7
+(Viber нотифікації першим, бо просте; BotFather теж швидке; рекомендації незалежні; PWA та push — більш складні; real-time чат останнім)
 
 ## Tech Stack
 - Monorepo: Turborepo + pnpm 9.x
