@@ -47,10 +47,11 @@ model Product {
   createdAt       DateTime @default(now()) @map("created_at")
   updatedAt       DateTime @updatedAt @map("updated_at")
 
-  category Category       @relation(fields: [categoryId], references: [id])
-  images   ProductImage[]
-  lots     Lot[]
-  prices   Price[]
+  category  Category       @relation(fields: [categoryId], references: [id])
+  images    ProductImage[]
+  lots      Lot[]
+  prices    Price[]
+  cartItems CartItem[]
 
   @@index([categoryId])
   @@index([quality])
@@ -92,6 +93,7 @@ model Lot {
   product    Product     @relation(fields: [productId], references: [id])
   barcodes   Barcode[]
   orderItems OrderItem[]
+  cartItems  CartItem[]
 
   @@index([productId])
   @@index([status])
@@ -144,6 +146,7 @@ model Customer {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   orders Order[]
+  cart   Cart?
 
   @@map("customers")
 }
@@ -200,6 +203,39 @@ model ExchangeRate {
 
   @@unique([currencyFrom, currencyTo, date])
   @@map("exchange_rates")
+}
+
+// ─── Carts (server-side cart persistence) ───────────────────────────────────
+
+model Cart {
+  id         String   @id @default(cuid())
+  customerId String?  @unique @map("customer_id")
+  sessionId  String?  @unique @map("session_id")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  customer Customer? @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  items    CartItem[]
+
+  @@map("carts")
+}
+
+model CartItem {
+  id        String @id @default(cuid())
+  cartId    String @map("cart_id")
+  lotId     String @map("lot_id")
+  productId String @map("product_id")
+  priceEur  Float  @map("price_eur")
+  weight    Float
+  quantity  Int    @default(1)
+
+  cart    Cart    @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  lot     Lot     @relation(fields: [lotId], references: [id])
+  product Product @relation(fields: [productId], references: [id])
+
+  @@unique([cartId, lotId])
+  @@index([cartId])
+  @@map("cart_items")
 }
 
 // ─── Sync Log (tracking 1C sync operations) ────────────────────────────────

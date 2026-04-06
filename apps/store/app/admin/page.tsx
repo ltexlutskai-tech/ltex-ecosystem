@@ -15,8 +15,33 @@ import {
 } from "@ltex/shared";
 import { LOT_STATUS_LABELS, type LotStatus } from "@ltex/shared";
 import { ShoppingCart, Package, Boxes, TrendingUp } from "lucide-react";
+import {
+  FunnelChart,
+  TopProductsTable,
+  RevenueChart,
+  NewCustomersChart,
+} from "@/components/admin/charts";
+
+interface TopProduct {
+  productId: string;
+  productName: string;
+  orderCount: number;
+  totalEur: number;
+}
+
+interface DailyRevenue {
+  date: Date;
+  revenue: number;
+}
+
+interface DailyCustomers {
+  date: Date;
+  count: number;
+}
 
 async function getStats() {
+  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+
   const [
     ordersCount,
     ordersByStatus,
@@ -27,6 +52,9 @@ async function getStats() {
     productsByQuality,
     recentOrders,
     ordersLast30Days,
+    topProducts,
+    revenueLast30Days,
+    newCustomersLast30Days,
   ] = await Promise.all([
     prisma.order.count(),
     prisma.order.groupBy({
@@ -61,13 +89,49 @@ async function getStats() {
       GROUP BY DATE(created_at)
       ORDER BY day ASC
     `,
+
+    // Top 10 products by order count
+    prisma.$queryRawUnsafe<TopProduct[]>(
+      `SELECT oi.product_id AS "productId", p.name AS "productName",
+              COUNT(DISTINCT oi.order_id)::int AS "orderCount",
+              ROUND(SUM(oi.price_eur * oi.quantity)::numeric, 2)::float AS "totalEur"
+       FROM order_items oi
+       JOIN products p ON p.id = oi.product_id
+       GROUP BY oi.product_id, p.name
+       ORDER BY "orderCount" DESC
+       LIMIT 10`,
+    ),
+
+    // Revenue last 30 days
+    prisma.$queryRawUnsafe<DailyRevenue[]>(
+      `SELECT DATE(created_at) AS date,
+              ROUND(SUM(total_eur)::numeric, 2)::float AS revenue
+       FROM orders WHERE created_at >= $1 AND status != 'cancelled'
+       GROUP BY DATE(created_at) ORDER BY date`,
+      thirtyDaysAgo,
+    ),
+
+    // New customers last 30 days
+    prisma.$queryRawUnsafe<DailyCustomers[]>(
+      `SELECT DATE(created_at) AS date, COUNT(*)::int AS count
+       FROM customers WHERE created_at >= $1
+       GROUP BY DATE(created_at) ORDER BY date`,
+      thirtyDaysAgo,
+    ),
   ]);
+
+  // Build funnel data from ordersByStatus
+  const funnelOrder = ["draft", "pending", "confirmed", "processing", "shipped", "delivered", "cancelled"];
+  const ordersByStatusMap = Object.fromEntries(
+    ordersByStatus.map((g) => [g.status, g._count.id]),
+  ) as Record<string, number>;
+  const funnelData = funnelOrder
+    .filter((s) => (ordersByStatusMap[s] ?? 0) > 0)
+    .map((status) => ({ status, count: ordersByStatusMap[status] ?? 0 }));
 
   return {
     ordersCount,
-    ordersByStatus: Object.fromEntries(
-      ordersByStatus.map((g) => [g.status, g._count.id]),
-    ) as Record<string, number>,
+    ordersByStatus: ordersByStatusMap,
     totalRevenue: totalRevenue._sum.totalEur ?? 0,
     productsCount,
     lotsCount,
@@ -84,6 +148,10 @@ async function getStats() {
       count: Number(d.count),
       total: Number(d.total),
     })),
+    topProducts,
+    funnelData,
+    revenueLast30Days,
+    newCustomersLast30Days,
   };
 }
 
@@ -192,7 +260,7 @@ export default async function AdminDashboard() {
         ))}
       </div>
 
-      {/* Charts Row */}
+      {/* Charts Row 1: Existing */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {/* Orders last 30 days */}
         <Card>
@@ -260,6 +328,18 @@ export default async function AdminDashboard() {
             />
           </CardContent>
         </Card>
+      </div>
+
+      {/* Charts Row 2: Funnel + Revenue */}
+      <div className="grid gap-4 md:grid-cols-2">
+        <FunnelChart data={stats.funnelData} />
+        <RevenueChart data={stats.revenueLast30Days} />
+      </div>
+
+      {/* Charts Row 3: Top products + New customers */}
+      <div className="grid gap-4 md:grid-cols-2">
+        <TopProductsTable data={stats.topProducts} />
+        <NewCustomersChart data={stats.newCustomersLast30Days} />
       </div>
 
       {/* Recent orders */}

@@ -6,6 +6,7 @@ import {
   useReducer,
   useCallback,
   useEffect,
+  useState,
   type ReactNode,
 } from "react";
 
@@ -53,29 +54,95 @@ interface CartContextType {
   totalWeight: number;
   totalEur: number;
   itemCount: number;
+  isLoading: boolean;
 }
 
 const CartContext = createContext<CartContextType | null>(null);
 
 const STORAGE_KEY = "ltex-cart";
+const SESSION_ID_KEY = "ltex-session-id";
+
+function getSessionId(): string {
+  if (typeof window === "undefined") return "";
+  let sessionId = localStorage.getItem(SESSION_ID_KEY);
+  if (!sessionId) {
+    sessionId = crypto.randomUUID();
+    localStorage.setItem(SESSION_ID_KEY, sessionId);
+  }
+  return sessionId;
+}
+
+async function fetchServerCart(sessionId: string): Promise<CartItem[]> {
+  try {
+    const res = await fetch(`/api/cart?sessionId=${encodeURIComponent(sessionId)}`);
+    if (!res.ok) return [];
+    const data = await res.json();
+    return data.items ?? [];
+  } catch {
+    return [];
+  }
+}
+
+async function syncCartToServer(sessionId: string, items: CartItem[]) {
+  try {
+    await fetch("/api/cart", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sessionId, items }),
+    });
+  } catch {
+    // Fallback to localStorage only
+  }
+}
+
+function mergeItems(local: CartItem[], server: CartItem[]): CartItem[] {
+  const merged = new Map<string, CartItem>();
+  for (const item of server) {
+    merged.set(item.lotId, item);
+  }
+  for (const item of local) {
+    if (!merged.has(item.lotId)) {
+      merged.set(item.lotId, item);
+    }
+  }
+  return Array.from(merged.values());
+}
 
 export function CartProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(cartReducer, { items: [] });
+  const [isLoading, setIsLoading] = useState(true);
 
+  // Load cart: merge localStorage + server on mount
   useEffect(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY);
-      if (saved) {
-        dispatch({ type: "LOAD", items: JSON.parse(saved) });
+    async function init() {
+      let localItems: CartItem[] = [];
+      try {
+        const saved = localStorage.getItem(STORAGE_KEY);
+        if (saved) localItems = JSON.parse(saved);
+      } catch {}
+
+      const sessionId = getSessionId();
+      const serverItems = await fetchServerCart(sessionId);
+      const merged = mergeItems(localItems, serverItems);
+      dispatch({ type: "LOAD", items: merged });
+
+      // Sync merged back if there are new local items
+      if (merged.length > 0 && merged.length !== serverItems.length) {
+        await syncCartToServer(sessionId, merged);
       }
-    } catch {}
+      setIsLoading(false);
+    }
+    init();
   }, []);
 
+  // Save to localStorage + server on changes
   useEffect(() => {
+    if (isLoading) return;
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state.items));
     } catch {}
-  }, [state.items]);
+    syncCartToServer(getSessionId(), state.items);
+  }, [state.items, isLoading]);
 
   const addItem = useCallback(
     (item: CartItem) => dispatch({ type: "ADD", item }),
@@ -100,6 +167,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
         totalWeight,
         totalEur,
         itemCount: state.items.length,
+        isLoading,
       }}
     >
       {children}

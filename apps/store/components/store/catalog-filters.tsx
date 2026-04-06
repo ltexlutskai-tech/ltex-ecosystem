@@ -5,13 +5,13 @@ import { useCallback, useState, useEffect } from "react";
 import { QUALITY_LEVELS, QUALITY_LABELS } from "@ltex/shared";
 import { SEASONS, SEASON_LABELS } from "@ltex/shared";
 import { COUNTRIES, COUNTRY_LABELS } from "@ltex/shared";
+import { SearchAutocomplete } from "./search-autocomplete";
 
 export function CatalogFilters() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
-  const [searchValue, setSearchValue] = useState(searchParams.get("q") ?? "");
   const [priceMinValue, setPriceMinValue] = useState(
     searchParams.get("priceMin") ?? "",
   );
@@ -19,9 +19,10 @@ export function CatalogFilters() {
     searchParams.get("priceMax") ?? "",
   );
 
-  // Sync search input with URL on navigation
+  // Sync price inputs with URL on navigation
   useEffect(() => {
-    setSearchValue(searchParams.get("q") ?? "");
+    setPriceMinValue(searchParams.get("priceMin") ?? "");
+    setPriceMaxValue(searchParams.get("priceMax") ?? "");
   }, [searchParams]);
 
   const updateFilter = useCallback(
@@ -55,7 +56,6 @@ export function CatalogFilters() {
   }, [router, pathname, searchParams, priceMinValue, priceMaxValue]);
 
   const clearAll = useCallback(() => {
-    setSearchValue("");
     setPriceMinValue("");
     setPriceMaxValue("");
     router.push(pathname);
@@ -73,17 +73,12 @@ export function CatalogFilters() {
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap gap-3">
-        <input
-          value={searchValue}
-          onChange={(e) => setSearchValue(e.target.value)}
-          placeholder="Пошук товарів..."
-          className="w-full rounded-md border px-3 py-2 text-sm sm:w-60"
-          onKeyDown={(e) => {
-            if (e.key === "Enter") {
-              updateFilter("q", searchValue);
-            }
-          }}
-        />
+        <div className="w-full sm:w-60">
+          <SearchAutocomplete
+            defaultValue={searchParams.get("q") ?? ""}
+            placeholder="Пошук товарів..."
+          />
+        </div>
 
         <select
           value={searchParams.get("quality") ?? ""}

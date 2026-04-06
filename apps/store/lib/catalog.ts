@@ -94,7 +94,8 @@ export async function getCatalogProducts(params: CatalogParams): Promise<Catalog
 /**
  * Full-text search using PostgreSQL to_tsvector/to_tsquery.
  * Searches across name, description, and article code.
- * Falls back to ILIKE if tsquery parsing fails.
+ * Falls back to trigram similarity if tsvector gives 0 results,
+ * then to ILIKE as last resort.
  */
 async function fullTextSearch(params: CatalogParams & { q: string }): Promise<CatalogResult> {
   const {
@@ -122,60 +123,61 @@ async function fullTextSearch(params: CatalogParams & { q: string }): Promise<Ca
     return getCatalogProducts({ ...params, q: undefined });
   }
 
-  // Build WHERE conditions
-  const conditions: string[] = [
-    `p.in_stock = true`,
-    `(
-      to_tsvector('simple', p.name || ' ' || COALESCE(p.description, '') || ' ' || COALESCE(p.article_code, ''))
-      @@ to_tsquery('simple', $1)
-      OR p.name ILIKE $2
-      OR COALESCE(p.article_code, '') ILIKE $2
-    )`,
-  ];
+  // Build WHERE conditions for filters (excluding search)
+  const filterConditions: string[] = [`p.in_stock = true`];
   const queryParams: (string | number)[] = [words, `%${q}%`];
   let paramIdx = 3;
 
   if (categoryIds && categoryIds.length > 0) {
     const placeholders = categoryIds.map((_, i) => `$${paramIdx + i}`).join(", ");
-    conditions.push(`p.category_id IN (${placeholders})`);
+    filterConditions.push(`p.category_id IN (${placeholders})`);
     queryParams.push(...categoryIds);
     paramIdx += categoryIds.length;
   } else if (categoryId) {
-    conditions.push(`p.category_id = $${paramIdx}`);
+    filterConditions.push(`p.category_id = $${paramIdx}`);
     queryParams.push(categoryId);
     paramIdx++;
   }
   if (quality) {
-    conditions.push(`p.quality = $${paramIdx}`);
+    filterConditions.push(`p.quality = $${paramIdx}`);
     queryParams.push(quality);
     paramIdx++;
   }
   if (season) {
-    conditions.push(`p.season = $${paramIdx}`);
+    filterConditions.push(`p.season = $${paramIdx}`);
     queryParams.push(season);
     paramIdx++;
   }
   if (country) {
-    conditions.push(`p.country = $${paramIdx}`);
+    filterConditions.push(`p.country = $${paramIdx}`);
     queryParams.push(country);
     paramIdx++;
   }
   if (priceMin !== undefined) {
-    conditions.push(
+    filterConditions.push(
       `EXISTS (SELECT 1 FROM prices pr WHERE pr.product_id = p.id AND pr.price_type = 'wholesale' AND pr.amount >= $${paramIdx})`,
     );
     queryParams.push(priceMin);
     paramIdx++;
   }
   if (priceMax !== undefined) {
-    conditions.push(
+    filterConditions.push(
       `EXISTS (SELECT 1 FROM prices pr WHERE pr.product_id = p.id AND pr.price_type = 'wholesale' AND pr.amount <= $${paramIdx})`,
     );
     queryParams.push(priceMax);
     paramIdx++;
   }
 
-  const whereClause = conditions.join(" AND ");
+  const filterClause = filterConditions.join(" AND ");
+
+  // Full WHERE with tsvector + ILIKE search
+  const searchCondition = `(
+    to_tsvector('simple', p.name || ' ' || COALESCE(p.description, '') || ' ' || COALESCE(p.article_code, ''))
+    @@ to_tsquery('simple', $1)
+    OR p.name ILIKE $2
+    OR COALESCE(p.article_code, '') ILIKE $2
+  )`;
+  const whereClause = `${filterClause} AND ${searchCondition}`;
 
   // Count query
   const countResult = await prisma.$queryRawUnsafe<[{ count: bigint }]>(
@@ -183,6 +185,11 @@ async function fullTextSearch(params: CatalogParams & { q: string }): Promise<Ca
     ...queryParams,
   );
   const total = Number(countResult[0]?.count ?? 0);
+
+  // If tsvector + ILIKE gave 0 results, try trigram similarity fallback
+  if (total === 0) {
+    return trigramFallbackSearch(q, filterConditions, queryParams.slice(2), page, perPage);
+  }
 
   // Search query with relevance ranking
   const offset = (page - 1) * perPage;
@@ -218,4 +225,118 @@ async function fullTextSearch(params: CatalogParams & { q: string }): Promise<Ca
   products.sort((a, b) => (idOrder.get(a.id) ?? 0) - (idOrder.get(b.id) ?? 0));
 
   return { products, total, totalPages: Math.ceil(total / perPage) };
+}
+
+/**
+ * Trigram similarity fallback when tsvector gives 0 results.
+ * Requires pg_trgm extension and GIN index on name.
+ */
+async function trigramFallbackSearch(
+  q: string,
+  filterConditions: string[],
+  filterParams: (string | number)[],
+  page: number,
+  perPage: number,
+): Promise<CatalogResult> {
+  const sanitized = q.replace(/[^\p{L}\p{N}\s'-]/gu, "").trim();
+  if (!sanitized) return { products: [], total: 0, totalPages: 0 };
+
+  // Build params: $1 = search query, then filter params
+  const params: (string | number)[] = [sanitized, ...filterParams];
+  const filterClause = filterConditions
+    .map((cond) => {
+      // Shift param indices: filter params were $3+ originally, now $2+
+      return cond.replace(/\$(\d+)/g, (_, num) => `$${Number(num)}`);
+    })
+    .join(" AND ");
+
+  const countResult = await prisma.$queryRawUnsafe<[{ count: bigint }]>(
+    `SELECT COUNT(*) as count FROM products p
+     WHERE ${filterClause} AND similarity(p.name, $1) > 0.3`,
+    ...params,
+  );
+  const total = Number(countResult[0]?.count ?? 0);
+
+  if (total === 0) return { products: [], total: 0, totalPages: 0 };
+
+  const offset = (page - 1) * perPage;
+  const productIds = await prisma.$queryRawUnsafe<{ id: string }[]>(
+    `SELECT p.id, similarity(p.name, $1) AS rank
+     FROM products p
+     WHERE ${filterClause} AND similarity(p.name, $1) > 0.3
+     ORDER BY rank DESC
+     LIMIT ${perPage} OFFSET ${offset}`,
+    ...params,
+  );
+
+  const ids = productIds.map((r) => r.id);
+  const products = ids.length
+    ? await prisma.product.findMany({
+        where: { id: { in: ids } },
+        include: {
+          images: { take: 1, orderBy: { position: "asc" } },
+          prices: { where: { priceType: "wholesale" }, take: 1 },
+          _count: { select: { lots: true } },
+        },
+      })
+    : [];
+
+  const idOrder = new Map(ids.map((id, i) => [id, i]));
+  products.sort((a, b) => (idOrder.get(a.id) ?? 0) - (idOrder.get(b.id) ?? 0));
+
+  return { products, total, totalPages: Math.ceil(total / perPage) };
+}
+
+/**
+ * Autocomplete search for the search dropdown.
+ * Combines tsvector prefix matching + trigram similarity, returns top 5.
+ */
+export interface AutocompleteResult {
+  id: string;
+  name: string;
+  slug: string;
+  quality: string;
+  rank: number;
+}
+
+export async function autocompleteSearch(query: string): Promise<AutocompleteResult[]> {
+  if (!query || query.trim().length < 2) return [];
+
+  const sanitized = query.replace(/[^\p{L}\p{N}\s'-]/gu, "").trim();
+  if (!sanitized) return [];
+
+  // Build prefix tsquery
+  const words = sanitized
+    .split(/\s+/)
+    .filter((w) => w.length >= 2)
+    .map((w) => `${w}:*`)
+    .join(" & ");
+
+  if (!words) return [];
+
+  // Combine tsvector prefix matching + trigram similarity
+  const results = await prisma.$queryRawUnsafe<AutocompleteResult[]>(
+    `SELECT DISTINCT ON (id) id, name, slug, quality, score AS rank FROM (
+       SELECT id, name, slug, quality,
+              ts_rank(to_tsvector('simple', name || ' ' || COALESCE(description, '') || ' ' || COALESCE(article_code, '')),
+                      to_tsquery('simple', $1)) * 2 AS score
+       FROM products
+       WHERE to_tsvector('simple', name || ' ' || COALESCE(description, '') || ' ' || COALESCE(article_code, ''))
+             @@ to_tsquery('simple', $1)
+             AND in_stock = true
+       UNION ALL
+       SELECT id, name, slug, quality,
+              similarity(name, $2) AS score
+       FROM products
+       WHERE similarity(name, $2) > 0.2 AND in_stock = true
+     ) sub
+     ORDER BY id, rank DESC
+     LIMIT 5`,
+    words,
+    sanitized,
+  );
+
+  // Re-sort by rank
+  results.sort((a, b) => Number(b.rank) - Number(a.rank));
+  return results.slice(0, 5);
 }
