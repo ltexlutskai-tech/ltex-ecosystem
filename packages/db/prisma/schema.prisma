@@ -47,11 +47,13 @@ model Product {
   createdAt       DateTime @default(now()) @map("created_at")
   updatedAt       DateTime @updatedAt @map("updated_at")
 
-  category  Category       @relation(fields: [categoryId], references: [id])
-  images    ProductImage[]
-  lots      Lot[]
-  prices    Price[]
-  cartItems CartItem[]
+  category           Category           @relation(fields: [categoryId], references: [id])
+  images             ProductImage[]
+  lots               Lot[]
+  prices             Price[]
+  cartItems          CartItem[]
+  videoSubscriptions VideoSubscription[]
+  favorites          Favorite[]
 
   @@index([categoryId])
   @@index([quality])
@@ -145,8 +147,12 @@ model Customer {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  orders Order[]
-  cart   Cart?
+  orders             Order[]
+  cart               Cart?
+  chatMessages       ChatMessage[]
+  videoSubscriptions VideoSubscription[]
+  pushTokens         PushToken[]
+  favorites          Favorite[]
 
   @@map("customers")
 }
@@ -165,8 +171,10 @@ model Order {
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
 
-  customer Customer    @relation(fields: [customerId], references: [id])
-  items    OrderItem[]
+  customer  Customer    @relation(fields: [customerId], references: [id])
+  items     OrderItem[]
+  shipments Shipment[]
+  payments  Payment[]
 
   @@index([customerId])
   @@index([status])
@@ -236,6 +244,113 @@ model CartItem {
   @@unique([cartId, lotId])
   @@index([cartId])
   @@map("cart_items")
+}
+
+// ─── Chat Messages (customer ↔ manager) ────────────────────────────────────
+
+model ChatMessage {
+  id         String   @id @default(cuid())
+  customerId String   @map("customer_id")
+  sender     String   // "customer" | "manager"
+  text       String
+  imageUrl   String?  @map("image_url")
+  isRead     Boolean  @default(false) @map("is_read")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([customerId, createdAt])
+  @@map("chat_messages")
+}
+
+// ─── Shipment Tracking (Nova Poshta) ────────────────────────────────────────
+
+model Shipment {
+  id              String   @id @default(cuid())
+  orderId         String   @map("order_id")
+  trackingNumber  String   @map("tracking_number")
+  carrier         String   @default("nova_poshta")
+  status          String   @default("created")
+  statusText      String?  @map("status_text")
+  estimatedDate   DateTime? @map("estimated_date")
+  recipientCity   String?  @map("recipient_city")
+  recipientBranch String?  @map("recipient_branch")
+  lastCheckedAt   DateTime? @map("last_checked_at")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@unique([orderId, trackingNumber])
+  @@index([trackingNumber])
+  @@map("shipments")
+}
+
+// ─── Video Review Subscriptions ─────────────────────────────────────────────
+
+model VideoSubscription {
+  id         String   @id @default(cuid())
+  customerId String   @map("customer_id")
+  productId  String   @map("product_id")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  product  Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([customerId, productId])
+  @@map("video_subscriptions")
+}
+
+// ─── Push Notification Tokens ───────────────────────────────────────────────
+
+model PushToken {
+  id         String   @id @default(cuid())
+  customerId String   @map("customer_id")
+  token      String   @unique
+  platform   String   // "ios" | "android" | "web"
+  active     Boolean  @default(true)
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([customerId])
+  @@map("push_tokens")
+}
+
+// ─── Payments ───────────────────────────────────────────────────────────────
+
+model Payment {
+  id            String   @id @default(cuid())
+  orderId       String   @map("order_id")
+  method        String   // "cash" | "card" | "bank_transfer" | "online"
+  amount        Float
+  currency      String   @default("UAH")
+  status        String   @default("pending") // pending | completed | failed | refunded
+  externalId    String?  @map("external_id")  // payment gateway ID
+  paidAt        DateTime? @map("paid_at")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@index([externalId])
+  @@map("payments")
+}
+
+// ─── Favorites (wishlists) ──────────────────────────────────────────────────
+
+model Favorite {
+  id         String   @id @default(cuid())
+  customerId String   @map("customer_id")
+  productId  String   @map("product_id")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  product  Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([customerId, productId])
+  @@map("favorites")
 }
 
 // ─── Sync Log (tracking 1C sync operations) ────────────────────────────────

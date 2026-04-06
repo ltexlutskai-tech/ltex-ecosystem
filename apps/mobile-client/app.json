@@ -1,0 +1,41 @@
+{
+  "expo": {
+    "name": "L-TEX",
+    "slug": "ltex-client",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "scheme": "ltex",
+    "splash": {
+      "backgroundColor": "#16a34a"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "ua.com.ltex.client"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#16a34a"
+      },
+      "package": "ua.com.ltex.client"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/notification-icon.png",
+          "color": "#16a34a"
+        }
+      ]
+    ],
+    "extra": {
+      "apiUrl": "https://ltex.com.ua/api",
+      "eas": {
+        "projectId": ""
+      }
+    }
+  }
+}
