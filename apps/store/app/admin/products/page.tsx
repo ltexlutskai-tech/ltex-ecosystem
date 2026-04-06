@@ -4,7 +4,7 @@ import { prisma } from "@ltex/db";
 import { Badge, Button } from "@ltex/ui";
 import { QUALITY_LABELS, type QualityLevel } from "@ltex/shared";
 import Link from "next/link";
-import { deleteProduct } from "./actions";
+import { DeleteProductButton } from "./delete-button";
 
 export default async function ProductsPage({
   searchParams,
@@ -106,14 +106,10 @@ export default async function ProductsPage({
                     >
                       Ред.
                     </Link>
-                    <form action={deleteProduct.bind(null, product.id)}>
-                      <button
-                        type="submit"
-                        className="text-red-500 hover:underline"
-                      >
-                        Вид.
-                      </button>
-                    </form>
+                    <DeleteProductButton
+                      productId={product.id}
+                      productName={product.name}
+                    />
                   </div>
                 </td>
               </tr>

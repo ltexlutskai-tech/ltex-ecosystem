@@ -1,27 +1,46 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@ltex/db";
 import { MIN_ORDER_KG } from "@ltex/shared";
+import { z } from "zod";
+
+const orderSchema = z.object({
+  customer: z.object({
+    name: z.string().min(1, "Ім'я обов'язкове").max(200),
+    phone: z.string().min(10, "Невірний номер телефону").max(20),
+    telegram: z.string().max(100).optional(),
+  }),
+  items: z
+    .array(
+      z.object({
+        lotId: z.string().min(1),
+        productId: z.string().min(1),
+        priceEur: z.number().positive(),
+        weight: z.number().positive(),
+        quantity: z.number().int().positive(),
+      }),
+    )
+    .min(1, "Додайте хоча б один лот"),
+  notes: z.string().max(1000).optional(),
+});
 
 export async function POST(request: NextRequest) {
-  const body = await request.json();
-  const { customer, items, notes } = body as {
-    customer: { name: string; phone: string; telegram?: string };
-    items: {
-      lotId: string;
-      productId: string;
-      priceEur: number;
-      weight: number;
-      quantity: number;
-    }[];
-    notes?: string;
-  };
-
-  if (!customer?.name || !customer?.phone || !items?.length) {
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
     return NextResponse.json(
-      { error: "Заповніть обов'язкові поля" },
+      { error: "Невалідний JSON" },
       { status: 400 },
     );
   }
+
+  const parsed = orderSchema.safeParse(body);
+  if (!parsed.success) {
+    const firstError = parsed.error.issues[0]?.message ?? "Помилка валідації";
+    return NextResponse.json({ error: firstError }, { status: 400 });
+  }
+
+  const { customer, items, notes } = parsed.data;
 
   const totalWeight = items.reduce((sum, i) => sum + i.weight, 0);
   if (totalWeight < MIN_ORDER_KG) {
@@ -67,36 +86,41 @@ export async function POST(request: NextRequest) {
   const rate = latestRate?.rate ?? 0;
   const totalUah = Math.round(totalEur * rate * 100) / 100;
 
-  // Create order + reserve lots in transaction
-  const order = await prisma.$transaction(async (tx) => {
-    const ord = await tx.order.create({
-      data: {
-        customerId: dbCustomer.id,
-        status: "pending",
-        totalEur,
-        totalUah,
-        exchangeRate: rate,
-        notes: notes ?? null,
-        items: {
-          create: items.map((i) => ({
-            lotId: i.lotId,
-            productId: i.productId,
-            priceEur: i.priceEur,
-            weight: i.weight,
-            quantity: i.quantity,
-          })),
+  try {
+    const order = await prisma.$transaction(async (tx) => {
+      const ord = await tx.order.create({
+        data: {
+          customerId: dbCustomer.id,
+          status: "pending",
+          totalEur,
+          totalUah,
+          exchangeRate: rate,
+          notes: notes ?? null,
+          items: {
+            create: items.map((i) => ({
+              lotId: i.lotId,
+              productId: i.productId,
+              priceEur: i.priceEur,
+              weight: i.weight,
+              quantity: i.quantity,
+            })),
+          },
         },
-      },
+      });
+
+      await tx.lot.updateMany({
+        where: { id: { in: lotIds } },
+        data: { status: "reserved" },
+      });
+
+      return ord;
     });
 
-    // Reserve lots
-    await tx.lot.updateMany({
-      where: { id: { in: lotIds } },
-      data: { status: "reserved" },
-    });
-
-    return ord;
-  });
-
-  return NextResponse.json({ orderId: order.id }, { status: 201 });
+    return NextResponse.json({ orderId: order.id }, { status: 201 });
+  } catch {
+    return NextResponse.json(
+      { error: "Помилка створення замовлення. Спробуйте пізніше." },
+      { status: 500 },
+    );
+  }
 }

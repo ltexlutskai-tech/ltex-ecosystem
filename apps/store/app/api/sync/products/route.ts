@@ -1,5 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@ltex/db";
+import { z } from "zod";
+
+const productSchema = z.object({
+  code1C: z.string().min(1),
+  articleCode: z.string().optional(),
+  name: z.string().min(1),
+  slug: z.string().min(1),
+  categorySlug: z.string().min(1),
+  description: z.string().optional(),
+  quality: z.string().min(1),
+  season: z.string().optional(),
+  country: z.string().min(1),
+  priceUnit: z.enum(["kg", "piece"]).optional(),
+  averageWeight: z.number().positive().optional(),
+  videoUrl: z.string().url().optional().or(z.literal("")),
+  inStock: z.boolean().optional(),
+});
+
+const syncProductsSchema = z.array(productSchema);
 
 export async function POST(request: NextRequest) {
   const authHeader = request.headers.get("authorization");
@@ -7,25 +26,25 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const products: Array<{
-    code1C: string;
-    articleCode?: string;
-    name: string;
-    slug: string;
-    categorySlug: string;
-    description?: string;
-    quality: string;
-    season?: string;
-    country: string;
-    priceUnit?: string;
-    averageWeight?: number;
-    videoUrl?: string;
-    inStock?: boolean;
-  }> = await request.json();
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+  }
 
+  const parsed = syncProductsSchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: "Validation failed", details: parsed.error.issues.slice(0, 5) },
+      { status: 400 },
+    );
+  }
+
+  const products = parsed.data;
   let created = 0;
   let updated = 0;
-  let errors = 0;
+  const errors: string[] = [];
 
   for (const p of products) {
     try {
@@ -33,7 +52,7 @@ export async function POST(request: NextRequest) {
         where: { slug: p.categorySlug },
       });
       if (!category) {
-        errors++;
+        errors.push(`Category not found: ${p.categorySlug} (product: ${p.code1C})`);
         continue;
       }
 
@@ -51,21 +70,16 @@ export async function POST(request: NextRequest) {
         country: p.country,
         priceUnit: p.priceUnit ?? "kg",
         averageWeight: p.averageWeight ?? null,
-        videoUrl: p.videoUrl ?? null,
+        videoUrl: p.videoUrl || null,
         articleCode: p.articleCode ?? null,
         inStock: p.inStock ?? true,
       };
 
       if (existing) {
-        await prisma.product.update({
-          where: { code1C: p.code1C },
-          data,
-        });
+        await prisma.product.update({ where: { code1C: p.code1C }, data });
         updated++;
       } else {
-        await prisma.product.create({
-          data: { ...data, code1C: p.code1C },
-        });
+        await prisma.product.create({ data: { ...data, code1C: p.code1C } });
         created++;
       }
 
@@ -77,10 +91,16 @@ export async function POST(request: NextRequest) {
           payload: JSON.parse(JSON.stringify(p)),
         },
       });
-    } catch {
-      errors++;
+    } catch (err) {
+      errors.push(`Failed: ${p.code1C} — ${err instanceof Error ? err.message : "unknown"}`);
     }
   }
 
-  return NextResponse.json({ created, updated, errors, total: products.length });
+  return NextResponse.json({
+    created,
+    updated,
+    errors: errors.length,
+    errorDetails: errors.slice(0, 10),
+    total: products.length,
+  });
 }

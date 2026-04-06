@@ -1,5 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@ltex/db";
+import { z } from "zod";
+
+const lotSchema = z.object({
+  barcode: z.string().min(1),
+  articleCode: z.string().min(1),
+  weight: z.number().positive(),
+  quantity: z.number().int().positive().optional(),
+  status: z.enum(["free", "reserved", "on_sale"]).optional(),
+  priceEur: z.number().positive(),
+  videoUrl: z.string().url().optional().or(z.literal("")),
+});
+
+const syncLotsSchema = z.array(lotSchema);
 
 export async function POST(request: NextRequest) {
   const authHeader = request.headers.get("authorization");
@@ -7,19 +20,25 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const lots: Array<{
-    barcode: string;
-    articleCode: string;
-    weight: number;
-    quantity?: number;
-    status?: string;
-    priceEur: number;
-    videoUrl?: string;
-  }> = await request.json();
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+  }
 
+  const parsed = syncLotsSchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: "Validation failed", details: parsed.error.issues.slice(0, 5) },
+      { status: 400 },
+    );
+  }
+
+  const lots = parsed.data;
   let created = 0;
   let updated = 0;
-  let errors = 0;
+  const errors: string[] = [];
 
   for (const lot of lots) {
     try {
@@ -27,7 +46,7 @@ export async function POST(request: NextRequest) {
         where: { articleCode: lot.articleCode },
       });
       if (!product) {
-        errors++;
+        errors.push(`Product not found: ${lot.articleCode} (barcode: ${lot.barcode})`);
         continue;
       }
 
@@ -41,19 +60,14 @@ export async function POST(request: NextRequest) {
         quantity: lot.quantity ?? 1,
         status: lot.status ?? "free",
         priceEur: lot.priceEur,
-        videoUrl: lot.videoUrl ?? null,
+        videoUrl: lot.videoUrl || null,
       };
 
       if (existing) {
-        await prisma.lot.update({
-          where: { barcode: lot.barcode },
-          data,
-        });
+        await prisma.lot.update({ where: { barcode: lot.barcode }, data });
         updated++;
       } else {
-        await prisma.lot.create({
-          data: { ...data, barcode: lot.barcode },
-        });
+        await prisma.lot.create({ data: { ...data, barcode: lot.barcode } });
         created++;
       }
 
@@ -65,10 +79,16 @@ export async function POST(request: NextRequest) {
           payload: JSON.parse(JSON.stringify(lot)),
         },
       });
-    } catch {
-      errors++;
+    } catch (err) {
+      errors.push(`Failed: ${lot.barcode} — ${err instanceof Error ? err.message : "unknown"}`);
     }
   }
 
-  return NextResponse.json({ created, updated, errors, total: lots.length });
+  return NextResponse.json({
+    created,
+    updated,
+    errors: errors.length,
+    errorDetails: errors.slice(0, 10),
+    total: lots.length,
+  });
 }

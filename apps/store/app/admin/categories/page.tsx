@@ -3,7 +3,7 @@ export const dynamic = "force-dynamic";
 import { prisma } from "@ltex/db";
 import { Button } from "@ltex/ui";
 import { CategoryForm } from "./category-form";
-import { deleteCategory } from "./actions";
+import { DeleteCategoryButton } from "./delete-button";
 
 export default async function CategoriesPage() {
   const categories = await prisma.category.findMany({
@@ -43,14 +43,10 @@ export default async function CategoriesPage() {
                 </span>
               </div>
               {cat._count.products === 0 && cat.children.length === 0 && (
-                <form action={deleteCategory.bind(null, cat.id)}>
-                  <button
-                    type="submit"
-                    className="text-sm text-red-500 hover:underline"
-                  >
-                    Видалити
-                  </button>
-                </form>
+                <DeleteCategoryButton
+                  categoryId={cat.id}
+                  categoryName={cat.name}
+                />
               )}
             </div>
             {cat.children.length > 0 && (
@@ -70,14 +66,10 @@ export default async function CategoriesPage() {
                       </span>
                     </div>
                     {sub._count.products === 0 && (
-                      <form action={deleteCategory.bind(null, sub.id)}>
-                        <button
-                          type="submit"
-                          className="text-xs text-red-500 hover:underline"
-                        >
-                          Видалити
-                        </button>
-                      </form>
+                      <DeleteCategoryButton
+                        categoryId={sub.id}
+                        categoryName={sub.name}
+                      />
                     )}
                   </div>
                 ))}
