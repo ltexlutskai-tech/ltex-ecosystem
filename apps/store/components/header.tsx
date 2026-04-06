@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Button } from "@ltex/ui";
 import { APP_NAME, CONTACTS } from "@ltex/shared";
+import { CartBadge } from "@/components/store/cart-badge";
 
 const NAV_LINKS = [
   { href: "/catalog", label: "Каталог" },
@@ -30,6 +31,7 @@ export function Header() {
         </div>
 
         <div className="flex items-center gap-4">
+          <CartBadge />
           <a
             href={`tel:${CONTACTS.phones[0]?.replace(/\s/g, "")}`}
             className="hidden text-sm font-medium lg:block"
