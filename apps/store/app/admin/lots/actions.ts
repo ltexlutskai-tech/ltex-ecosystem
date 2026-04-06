@@ -17,3 +17,18 @@ export async function updateLotStatus(lotId: string, status: LotStatus) {
   revalidatePath("/admin/lots");
   revalidatePath("/admin");
 }
+
+export async function bulkUpdateLotStatus(lotIds: string[], status: LotStatus) {
+  if (!LOT_STATUSES.includes(status)) {
+    throw new Error(`Invalid status: ${status}`);
+  }
+  if (lotIds.length === 0) return;
+
+  await prisma.lot.updateMany({
+    where: { id: { in: lotIds } },
+    data: { status },
+  });
+
+  revalidatePath("/admin/lots");
+  revalidatePath("/admin");
+}

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { LOT_STATUSES, LOT_STATUS_LABELS, type LotStatus } from "@ltex/shared";
+import { toast } from "@ltex/ui";
 import { updateLotStatus } from "./actions";
 
 export function LotStatusForm({
@@ -19,6 +20,17 @@ export function LotStatusForm({
     setLoading(true);
     try {
       await updateLotStatus(lotId, newStatus);
+      toast({
+        title: "Статус оновлено",
+        description: `Лот → ${LOT_STATUS_LABELS[newStatus]}`,
+        variant: "success",
+      });
+    } catch {
+      toast({
+        title: "Помилка",
+        description: "Не вдалося оновити статус",
+        variant: "destructive",
+      });
     } finally {
       setLoading(false);
     }

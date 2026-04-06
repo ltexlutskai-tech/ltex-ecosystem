@@ -12,6 +12,7 @@ import {
   FolderTree,
   ArrowLeftRight,
   RefreshCw,
+  FileText,
   LogOut,
   Menu,
 } from "lucide-react";
@@ -25,6 +26,7 @@ const navItems = [
   { href: "/admin/customers", label: "Клієнти", icon: Users },
   { href: "/admin/categories", label: "Категорії", icon: FolderTree },
   { href: "/admin/rates", label: "Курси валют", icon: ArrowLeftRight },
+  { href: "/admin/sync-log", label: "Журнал синхр.", icon: FileText },
 ];
 
 function NavContent() {

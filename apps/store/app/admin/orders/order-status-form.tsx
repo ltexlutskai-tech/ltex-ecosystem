@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { ORDER_STATUSES, ORDER_STATUS_LABELS, type OrderStatus } from "@ltex/shared";
+import { toast } from "@ltex/ui";
 import { updateOrderStatus } from "./actions";
 
 export function OrderStatusForm({
@@ -19,6 +20,17 @@ export function OrderStatusForm({
     setLoading(true);
     try {
       await updateOrderStatus(orderId, newStatus);
+      toast({
+        title: "Статус оновлено",
+        description: `Замовлення → ${ORDER_STATUS_LABELS[newStatus]}`,
+        variant: "success",
+      });
+    } catch {
+      toast({
+        title: "Помилка",
+        description: "Не вдалося оновити статус",
+        variant: "destructive",
+      });
     } finally {
       setLoading(false);
     }

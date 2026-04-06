@@ -46,4 +46,7 @@ export {
   SheetDescription,
 } from "../components/sheet";
 
+export { Toaster } from "../components/toaster";
+export { useToast, toast } from "../lib/use-toast";
+
 export { cn } from "../lib/utils";

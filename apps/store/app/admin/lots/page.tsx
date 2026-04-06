@@ -1,16 +1,9 @@
 export const dynamic = "force-dynamic";
 
 import { prisma } from "@ltex/db";
-import { Badge } from "@ltex/ui";
-import { LOT_STATUSES, LOT_STATUS_LABELS, type LotStatus } from "@ltex/shared";
+import { LOT_STATUSES, LOT_STATUS_LABELS } from "@ltex/shared";
 import Link from "next/link";
-import { LotStatusForm } from "./lot-status-form";
-
-const statusColors: Record<LotStatus, "default" | "secondary" | "destructive" | "outline" | "accent"> = {
-  free: "default",
-  reserved: "accent",
-  on_sale: "secondary",
-};
+import { LotsTable } from "./lots-table";
 
 export default async function LotsPage({
   searchParams,
@@ -83,54 +76,19 @@ export default async function LotsPage({
         </button>
       </form>
 
-      <div className="overflow-x-auto rounded-lg border bg-white">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b bg-gray-50 text-left text-gray-500">
-              <th className="px-4 py-3 font-medium">Штрихкод</th>
-              <th className="px-4 py-3 font-medium">Товар</th>
-              <th className="px-4 py-3 font-medium">Вага (кг)</th>
-              <th className="px-4 py-3 font-medium">К-сть</th>
-              <th className="px-4 py-3 font-medium">Ціна EUR</th>
-              <th className="px-4 py-3 font-medium">Статус</th>
-              <th className="px-4 py-3 font-medium">Змінити</th>
-            </tr>
-          </thead>
-          <tbody>
-            {lots.map((lot) => (
-              <tr key={lot.id} className="border-b hover:bg-gray-50">
-                <td className="px-4 py-3 font-mono text-xs">{lot.barcode}</td>
-                <td className="px-4 py-3">
-                  <div className="max-w-xs truncate">{lot.product.name}</div>
-                </td>
-                <td className="px-4 py-3">{lot.weight}</td>
-                <td className="px-4 py-3">{lot.quantity}</td>
-                <td className="px-4 py-3">€{lot.priceEur.toFixed(2)}</td>
-                <td className="px-4 py-3">
-                  <Badge variant={statusColors[lot.status as LotStatus] ?? "secondary"}>
-                    {LOT_STATUS_LABELS[lot.status as LotStatus] ?? lot.status}
-                  </Badge>
-                </td>
-                <td className="px-4 py-3">
-                  <LotStatusForm lotId={lot.id} currentStatus={lot.status as LotStatus} />
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <LotsTable lots={lots} />
 
       {totalPages > 1 && (
         <div className="flex items-center justify-center gap-2">
-          {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => {
-            const params = new URLSearchParams();
-            if (query) params.set("q", query);
-            if (status) params.set("status", status);
-            params.set("page", String(p));
+          {Array.from({ length: Math.min(totalPages, 20) }, (_, i) => i + 1).map((p) => {
+            const searchP = new URLSearchParams();
+            if (query) searchP.set("q", query);
+            if (status) searchP.set("status", status);
+            searchP.set("page", String(p));
             return (
               <Link
                 key={p}
-                href={`/admin/lots?${params.toString()}`}
+                href={`/admin/lots?${searchP.toString()}`}
                 className={`rounded-md border px-3 py-1 text-sm ${p === page ? "bg-green-50 text-green-700 border-green-200" : "hover:bg-gray-50"}`}
               >
                 {p}
