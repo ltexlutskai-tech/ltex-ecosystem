@@ -211,15 +211,15 @@ async function main() {
 
   console.log(`\nУнікальних артикулів: ${grouped.size}`);
 
-  // 3. Find products in DB
+  // 3. Find products in DB by code1C (numeric code in filenames matches code1C, not articleCode)
   const articleCodes = [...grouped.keys()];
   const products = await prisma.product.findMany({
-    where: { articleCode: { in: articleCodes } },
-    select: { id: true, articleCode: true, name: true },
+    where: { code1C: { in: articleCodes } },
+    select: { id: true, code1C: true, name: true },
   });
 
   const productMap = new Map(
-    products.map((p) => [p.articleCode!, p]),
+    products.map((p) => [p.code1C!, p]),
   );
 
   const notFound: string[] = [];
