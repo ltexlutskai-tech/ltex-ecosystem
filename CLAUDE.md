@@ -10,26 +10,9 @@ Contacts: Telegram @L_TEX, +380 67 671 05 15, +380 99 358 49 92, ltex.lutsk.ai@g
 
 ## Current Status
 
-**Branch:** `claude/setup-supabase-auth-VBzJp`
+**Branch:** `main` (all work merged)
 
-All work from Phase 0 through Phase 4 + Viber bot is complete and pushed.
-
-### Commits (newest first)
-- `25b5f97` — Viber bot: same functionality as Telegram bot (keyboard menus, search, lots, orders)
-- `4eab0c9` — Linter improvements to AppNavigator and ShipmentsScreen
-- `b638a3c` — Linter fixes to ProfileScreen
-- `b697799` — Phase 4: Mobile client app (Expo RN) + 8 mobile API routes + 7 new DB tables
-- `194e619` — Phase 3: Telegram bot (search, lots, orders, inline query, webhook)
-- `0944493` — Fix: remove orphaned cart-client.tsx
-- `c39e06b` — Cart persistence in DB, full-text search v2, admin analytics, E2E tests
-- `7aef9ff` — CLAUDE.md update with full project status
-- `cfdd338` — Full-text search, price filter, dashboard charts, about page, rate limiting, ISR
-- `e902ecb` — SEO (robots.ts, manifest.ts, OpenGraph), Telegram notifications, CI tests
-- `f29e0e9` — Unit tests (53 tests: shared utils + API validation schemas)
-- `05c6767` — Toast notifications, sync log viewer, bulk lot operations
-- `86923ee` — UX improvements: mobile, Zod validation, accessibility, error handling
-- `ccc7cb9` — Phase 1: Store MVP (catalog, product, lots, cart, checkout, SEO)
-- `4ca0feb` — Phase 2: Admin panel, Supabase Auth, 1C sync API
+All work from Phase 0 through Phase 4 + Viber bot is complete and merged into main.
 
 ## What Exists Now
 
@@ -259,19 +242,35 @@ EXPO_PUBLIC_API_URL=       # (mobile) API base URL for Expo app
 - Phase 4 (remaining): Mobile agent app + warehouse app — SEPARATE SESSION (requires MobileAgentLTEX v1.15.3 screenshots + block-by-block review)
 - Phase 5: Optimization (recommendations, PWA icons, online payments via LiqPay/Monobank)
 
-### Prerequisites before deploying
-- [ ] Create Supabase project → get DATABASE_URL, SUPABASE_URL, ANON_KEY
-- [ ] Run `prisma db push` + `pnpm db:seed` to populate database
+### Infrastructure
+
+**Supabase** (project: `ltex-ecosystem`, region: Frankfurt eu-central-1):
+- URL: `auxrlweedivnffxjwvln.supabase.co`
+- DB: Healthy, 11 tables created via `prisma db push`
+- Storage: Empty (no buckets yet — photos not uploaded)
+- Auth: API keys configured (publishable + secret)
+
+**Netlify** (site: `stalwart-dango-04a9b9`):
+- URL: `stalwart-dango-04a9b9.netlify.app`
+- Deploys from GitHub, Next.js
+- Env vars configured: DATABASE_URL, DIRECT_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY, NEXT_PUBLIC_SUPABASE_URL
+- **NOTE**: Need to update deploy branch to `main`
+
+### Prerequisites / remaining setup
+- [x] Create Supabase project → get DATABASE_URL, SUPABASE_URL, ANON_KEY
+- [x] Run `prisma db push` to create tables
+- [ ] Run `pnpm db:seed` to populate database with 805 products + 725 lots
 - [ ] Run migration: `packages/db/prisma/migrations/20260406_fts_gin_trigram/migration.sql`
-- [ ] Upload product photos to Supabase Storage (can be parallel)
+- [ ] Upload product photos to Supabase Storage (create bucket first)
 - [ ] Set SYNC_API_KEY for 1C integration
+- [ ] Switch Netlify deploy branch from old branch to `main`
 - [ ] (Optional) Set TELEGRAM_BOT_TOKEN + TELEGRAM_CHAT_ID for order notifications
 - [ ] (Optional) Set VIBER_AUTH_TOKEN + register webhook for Viber bot
 - [ ] (Optional) Set NOVA_POSHTA_API_KEY for shipment tracking
 - [ ] (Optional) Add PWA icons: /public/icon-192.png, /public/icon-512.png
 - [ ] Install mobile app deps: `cd apps/mobile-client && npx expo install`
 
-### What was done in this session (Session 2)
+### What was done in previous sessions
 
 #### 1. Cart persistence in DB (`c39e06b`)
 - Added `Cart` + `CartItem` Prisma models (sessionId for anonymous, customerId for auth)
@@ -397,7 +396,7 @@ EXPO_PUBLIC_API_URL=       # (mobile) API base URL for Expo app
 - Files: Supabase Storage
 - Testing: Vitest
 - CI/CD: GitHub Actions (test + typecheck + build)
-- Hosting: Vercel
+- Hosting: Netlify (stalwart-dango-04a9b9.netlify.app)
 
 ## Important Notes
 - Language: Ukrainian (primary), site lang="uk"
