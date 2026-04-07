@@ -14,6 +14,11 @@ import {
 import { Breadcrumbs } from "@/components/store/breadcrumbs";
 import { AddToCartButton } from "@/components/store/add-to-cart-button";
 import { ProductJsonLd } from "@/components/store/product-json-ld";
+import { ProductCard } from "@/components/store/product-card";
+import {
+  getRecommendations,
+  getFrequentlyBoughtTogether,
+} from "@/lib/recommendations";
 
 interface Props {
   params: Promise<{ slug: string }>;
@@ -284,6 +289,44 @@ export default async function ProductPage({ params }: Props) {
           </div>
         </div>
       )}
+
+      {/* Recommendations */}
+      <RecommendationsSection productId={product.id} />
     </div>
+  );
+}
+
+async function RecommendationsSection({ productId }: { productId: string }) {
+  const [similar, boughtTogether] = await Promise.all([
+    getRecommendations(productId, 6),
+    getFrequentlyBoughtTogether(productId, 4),
+  ]);
+
+  if (similar.length === 0 && boughtTogether.length === 0) return null;
+
+  return (
+    <>
+      {similar.length > 0 && (
+        <div className="mt-10">
+          <h2 className="text-xl font-bold">Схожі товари</h2>
+          <div className="mt-4 grid grid-cols-2 gap-4 md:grid-cols-3">
+            {similar.map((product) => (
+              <ProductCard key={product.id} product={product} />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {boughtTogether.length > 0 && (
+        <div className="mt-10">
+          <h2 className="text-xl font-bold">Часто купують разом</h2>
+          <div className="mt-4 grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
+            {boughtTogether.map((product) => (
+              <ProductCard key={product.id} product={product} />
+            ))}
+          </div>
+        </div>
+      )}
+    </>
   );
 }

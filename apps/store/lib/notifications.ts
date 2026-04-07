@@ -1,9 +1,10 @@
 /**
  * Order notification utilities.
  *
- * Sends a Telegram message to the admin when a new order is placed.
- * Requires TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID env vars.
- * Gracefully no-ops if not configured.
+ * Sends notifications to admin channels when a new order is placed.
+ * - Telegram: requires TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID env vars.
+ * - Viber: requires VIBER_AUTH_TOKEN and VIBER_ADMIN_USER_ID env vars.
+ * Gracefully no-ops per channel if not configured.
  */
 
 interface OrderNotification {
@@ -17,7 +18,10 @@ interface OrderNotification {
 }
 
 export async function notifyNewOrder(order: OrderNotification): Promise<void> {
-  await sendTelegramNotification(order);
+  await Promise.allSettled([
+    sendTelegramNotification(order),
+    sendViberNotification(order),
+  ]);
 }
 
 async function sendTelegramNotification(
@@ -54,6 +58,48 @@ async function sendTelegramNotification(
   } catch {
     // Silently fail — don't break order flow for notification issues
     console.error("Failed to send Telegram notification");
+  }
+}
+
+async function sendViberNotification(
+  order: OrderNotification,
+): Promise<void> {
+  const authToken = process.env.VIBER_AUTH_TOKEN;
+  const adminUserId = process.env.VIBER_ADMIN_USER_ID;
+
+  if (!authToken || !adminUserId) return;
+
+  const siteUrl =
+    process.env.NEXT_PUBLIC_SITE_URL ?? "https://ltex.com.ua";
+
+  const text = [
+    `🛒 Нове замовлення!`,
+    ``,
+    `Клієнт: ${order.customerName}`,
+    `Телефон: ${order.customerPhone}`,
+    `Позицій: ${order.itemCount}`,
+    `Вага: ${order.totalWeight.toFixed(1)} кг`,
+    `Сума: €${order.totalEur.toFixed(2)} / ${order.totalUah.toFixed(2)} ₴`,
+    ``,
+    `Переглянути: ${siteUrl}/admin/orders`,
+  ].join("\n");
+
+  try {
+    await fetch("https://chatapi.viber.com/pa/send_message", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Viber-Auth-Token": authToken,
+      },
+      body: JSON.stringify({
+        receiver: adminUserId,
+        type: "text",
+        text,
+      }),
+    });
+  } catch {
+    // Silently fail — don't break order flow for notification issues
+    console.error("Failed to send Viber notification");
   }
 }
 

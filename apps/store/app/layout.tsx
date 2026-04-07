@@ -49,6 +49,9 @@ export default function RootLayout({
 }) {
   return (
     <html lang="uk">
+      <head>
+        <link rel="apple-touch-icon" href="/icon-192.png" />
+      </head>
       <body className="font-sans">{children}</body>
     </html>
   );

@@ -1,8 +1,30 @@
 import { Button } from "@ltex/ui";
-import { APP_NAME, MIN_ORDER_KG, CATEGORIES, CONTACTS } from "@ltex/shared";
+import { APP_NAME, MIN_ORDER_KG, CONTACTS } from "@ltex/shared";
+import { prisma } from "@ltex/db";
 import Link from "next/link";
 
-export default function HomePage() {
+export const revalidate = 60;
+
+export default async function HomePage() {
+  const parentCategories = await prisma.category.findMany({
+    where: { parentId: null },
+    include: {
+      children: { select: { id: true } },
+    },
+    orderBy: { position: "asc" },
+  });
+
+  // Count products in each parent category (including subcategories)
+  const categories = await Promise.all(
+    parentCategories.map(async (cat) => {
+      const childIds = cat.children.map((c) => c.id);
+      const allIds = [cat.id, ...childIds];
+      const productCount = await prisma.product.count({
+        where: { categoryId: { in: allIds }, inStock: true },
+      });
+      return { ...cat, productCount };
+    })
+  );
   const jsonLd = {
     "@context": "https://schema.org",
     "@type": "WebSite",
@@ -46,7 +68,7 @@ export default function HomePage() {
         <div className="container mx-auto px-4">
           <h2 className="text-2xl font-bold">Категорії товарів</h2>
           <div className="mt-6 grid gap-4 grid-cols-2 sm:grid-cols-3 lg:grid-cols-4">
-            {CATEGORIES.map((cat) => (
+            {categories.map((cat) => (
               <Link
                 key={cat.slug}
                 href={`/catalog/${cat.slug}`}
@@ -56,7 +78,7 @@ export default function HomePage() {
                   {cat.name}
                 </h3>
                 <p className="mt-1 text-xs text-gray-500">
-                  {cat.subcategories.length} підкатегорій
+                  {cat.productCount} товарів
                 </p>
               </Link>
             ))}

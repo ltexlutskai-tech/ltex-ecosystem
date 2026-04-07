@@ -1,6 +1,7 @@
 import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
 import { CartProvider } from "@/lib/cart";
+import { ServiceWorkerRegister } from "@/components/sw-register";
 
 export default function StoreLayout({
   children,
@@ -9,6 +10,7 @@ export default function StoreLayout({
 }) {
   return (
     <CartProvider>
+      <ServiceWorkerRegister />
       <div className="flex min-h-screen flex-col">
         <Header />
         <main className="flex-1">{children}</main>

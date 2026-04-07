@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@ltex/db";
+import { sendPushNotification } from "@/lib/push";
 
 /**
  * GET /api/mobile/chat?customerId=xxx&cursor=xxx&limit=50
@@ -55,27 +56,39 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  const { customerId, text, imageUrl } = body as {
+  const { customerId, text, imageUrl, sender } = body as {
     customerId: string;
     text: string;
     imageUrl?: string;
+    sender?: string;
   };
 
   if (!customerId || (!text?.trim() && !imageUrl)) {
     return NextResponse.json({ error: "customerId and text/imageUrl required" }, { status: 400 });
   }
 
+  const messageSender = sender === "manager" ? "manager" : "customer";
+
   const message = await prisma.chatMessage.create({
     data: {
       customerId,
-      sender: "customer",
+      sender: messageSender,
       text: text?.trim() ?? "",
       imageUrl: imageUrl ?? null,
     },
   });
 
-  // TODO: Send push notification to manager via Telegram
-  // notifyManagerNewMessage(customerId, text)
+  // When a manager sends a message, push-notify the customer
+  if (messageSender === "manager") {
+    sendPushNotification(
+      customerId,
+      "Нове повідомлення від менеджера",
+      text?.trim() ?? "Нове повідомлення",
+      { type: "chat", customerId },
+    ).catch(() => {
+      // Non-blocking — don't fail the response for push errors
+    });
+  }
 
   return NextResponse.json({
     id: message.id,

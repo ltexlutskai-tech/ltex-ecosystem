@@ -99,6 +99,9 @@ export const chatApi = {
     api("/mobile/chat", { method: "POST", body: { customerId, text, imageUrl } }),
   markRead: (customerId: string, upToMessageId?: string) =>
     api("/mobile/chat", { method: "PUT", body: { customerId, upToMessageId } }),
+  /** Returns the full SSE stream URL for EventSource connection */
+  streamUrl: (customerId: string) =>
+    `${API_URL}/mobile/chat/stream?customerId=${encodeURIComponent(customerId)}`,
 };
 
 // Shipments

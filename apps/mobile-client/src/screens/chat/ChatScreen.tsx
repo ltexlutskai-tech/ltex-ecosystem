@@ -10,6 +10,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Alert,
+  AppState,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "@/lib/auth";
@@ -30,7 +31,7 @@ interface ChatScreenProps {
   };
 }
 
-const POLL_INTERVAL = 10000;
+const POLL_FALLBACK_INTERVAL = 10000;
 
 export function ChatScreen(_props: ChatScreenProps) {
   const { customerId } = useAuth();
@@ -43,6 +44,10 @@ export function ChatScreen(_props: ChatScreenProps) {
   const [cursor, setCursor] = useState<string | undefined>(undefined);
   const [hasMore, setHasMore] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [useSSE, setUseSSE] = useState(true);
+
+  const eventSourceRef = useRef<EventSource | null>(null);
+  const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const fetchMessages = useCallback(
     async (loadCursor?: string, prepend = false) => {
@@ -83,19 +88,129 @@ export function ChatScreen(_props: ChatScreenProps) {
     [customerId],
   );
 
-  // Initial load
+  // ─── SSE connection ──────────────────────────────────────────────────────────
+  const connectSSE = useCallback(() => {
+    if (!customerId) return;
+
+    // Check if EventSource is available (not available in all RN environments)
+    if (typeof EventSource === "undefined") {
+      setUseSSE(false);
+      return;
+    }
+
+    try {
+      const url = chatApi.streamUrl(customerId);
+      const es = new EventSource(url);
+      eventSourceRef.current = es;
+
+      es.addEventListener("connected", () => {
+        // SSE connected successfully — no action needed
+      });
+
+      es.addEventListener("message", (event: MessageEvent) => {
+        try {
+          const msg: ChatMessage = JSON.parse(event.data);
+          setMessages((prev) => {
+            // Avoid duplicates (e.g. own messages already added optimistically)
+            if (prev.some((m) => m.id === msg.id)) {
+              // Update existing message (e.g. temp → real id)
+              return prev.map((m) => (m.id === msg.id ? msg : m));
+            }
+            // Insert at the beginning (newest first, list is inverted)
+            return [msg, ...prev];
+          });
+
+          // Auto-mark manager messages as read while chat is open
+          if (msg.sender === "manager" && !msg.isRead) {
+            chatApi.markRead(customerId, msg.id).catch(() => {});
+          }
+        } catch {
+          // Ignore parse errors
+        }
+      });
+
+      es.addEventListener("timeout", () => {
+        // Server closed the connection after 5 min — reconnect
+        closeSSE();
+        connectSSE();
+      });
+
+      es.addEventListener("error", () => {
+        // SSE failed — fall back to polling
+        closeSSE();
+        setUseSSE(false);
+      });
+
+      // Clean up polling if SSE is active
+      if (pollTimerRef.current) {
+        clearInterval(pollTimerRef.current);
+        pollTimerRef.current = null;
+      }
+    } catch {
+      setUseSSE(false);
+    }
+  }, [customerId]);
+
+  const closeSSE = useCallback(() => {
+    if (eventSourceRef.current) {
+      eventSourceRef.current.close();
+      eventSourceRef.current = null;
+    }
+  }, []);
+
+  // ─── Polling fallback ────────────────────────────────────────────────────────
+  const startPolling = useCallback(() => {
+    if (!customerId || pollTimerRef.current) return;
+    pollTimerRef.current = setInterval(() => {
+      fetchMessages();
+    }, POLL_FALLBACK_INTERVAL);
+  }, [customerId, fetchMessages]);
+
+  const stopPolling = useCallback(() => {
+    if (pollTimerRef.current) {
+      clearInterval(pollTimerRef.current);
+      pollTimerRef.current = null;
+    }
+  }, []);
+
+  // ─── Initial load ────────────────────────────────────────────────────────────
   useEffect(() => {
     fetchMessages().finally(() => setLoading(false));
   }, [fetchMessages]);
 
-  // Poll for new messages
+  // ─── Start SSE or polling ────────────────────────────────────────────────────
   useEffect(() => {
     if (!customerId) return;
-    const interval = setInterval(() => {
-      fetchMessages();
-    }, POLL_INTERVAL);
-    return () => clearInterval(interval);
-  }, [customerId, fetchMessages]);
+
+    if (useSSE) {
+      connectSSE();
+    } else {
+      startPolling();
+    }
+
+    return () => {
+      closeSSE();
+      stopPolling();
+    };
+  }, [customerId, useSSE, connectSSE, closeSSE, startPolling, stopPolling]);
+
+  // ─── Reconnect when app comes to foreground ──────────────────────────────────
+  useEffect(() => {
+    const subscription = AppState.addEventListener("change", (nextState) => {
+      if (nextState === "active" && customerId) {
+        // Refresh messages when app comes back
+        fetchMessages();
+        // Reconnect SSE if it was closed
+        if (useSSE && !eventSourceRef.current) {
+          connectSSE();
+        }
+      } else if (nextState === "background") {
+        // Close SSE when app goes to background to save resources
+        closeSSE();
+      }
+    });
+    return () => subscription.remove();
+  }, [customerId, useSSE, fetchMessages, connectSSE, closeSSE]);
 
   const handleLoadMore = useCallback(async () => {
     if (loadingMore || !hasMore || !cursor) return;
