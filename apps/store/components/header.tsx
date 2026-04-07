@@ -21,7 +21,7 @@ export function Header() {
           <Link href="/" className="text-xl font-bold text-primary">
             {APP_NAME}
           </Link>
-          <nav className="hidden gap-6 md:flex">
+          <nav aria-label="Основна навігація" className="hidden gap-6 md:flex">
             {NAV_LINKS.map((link) => (
               <Link
                 key={link.href}
@@ -65,7 +65,7 @@ export function Header() {
                   {APP_NAME}
                 </SheetTitle>
               </SheetHeader>
-              <nav className="mt-6 flex flex-col gap-4">
+              <nav aria-label="Мобільна навігація" className="mt-6 flex flex-col gap-4">
                 {NAV_LINKS.map((link) => (
                   <SheetClose key={link.href} asChild>
                     <Link

@@ -8,8 +8,8 @@ export function CartBadge() {
   const { itemCount, totalWeight } = useCart();
 
   return (
-    <Link href="/cart" className="relative flex items-center gap-1 text-sm font-medium">
-      <ShoppingCart className="h-5 w-5" />
+    <Link href="/cart" className="relative flex items-center gap-1 text-sm font-medium" aria-label={itemCount > 0 ? `Кошик: ${itemCount} товарів, ${totalWeight.toFixed(1)} кг` : "Кошик"}>
+      <ShoppingCart className="h-5 w-5" aria-hidden="true" />
       {itemCount > 0 && (
         <span className="absolute -right-2 -top-2 flex h-4 w-4 items-center justify-center rounded-full bg-green-600 text-[10px] font-bold text-white">
           {itemCount}

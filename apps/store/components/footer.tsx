@@ -4,7 +4,7 @@ import { APP_NAME, CONTACTS, CATEGORIES } from "@ltex/shared";
 
 export function Footer() {
   return (
-    <footer className="border-t bg-secondary/50">
+    <footer className="border-t bg-secondary/50" role="contentinfo">
       <div className="container mx-auto px-4 py-12">
         <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
           <div>
