@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@ltex/db";
+import { mobileFavoriteSchema } from "@/lib/validations";
 
 /**
  * GET /api/mobile/favorites?customerId=xxx
@@ -52,17 +53,18 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  let body: Record<string, unknown>;
+  let body: unknown;
   try {
     body = await request.json();
   } catch {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  const { customerId, productId } = body as { customerId: string; productId: string };
-  if (!customerId || !productId) {
-    return NextResponse.json({ error: "customerId and productId required" }, { status: 400 });
+  const parsed = mobileFavoriteSchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Невірні дані" }, { status: 400 });
   }
+  const { customerId, productId } = parsed.data;
 
   const favorite = await prisma.favorite.upsert({
     where: { customerId_productId: { customerId, productId } },
@@ -74,17 +76,18 @@ export async function POST(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
-  let body: Record<string, unknown>;
+  let body: unknown;
   try {
     body = await request.json();
   } catch {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  const { customerId, productId } = body as { customerId: string; productId: string };
-  if (!customerId || !productId) {
-    return NextResponse.json({ error: "customerId and productId required" }, { status: 400 });
+  const parsed = mobileFavoriteSchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Невірні дані" }, { status: 400 });
   }
+  const { customerId, productId } = parsed.data;
 
   await prisma.favorite.deleteMany({ where: { customerId, productId } });
   return NextResponse.json({ success: true });

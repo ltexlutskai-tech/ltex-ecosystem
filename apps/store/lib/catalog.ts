@@ -1,5 +1,4 @@
-import { prisma } from "@ltex/db";
-import type { Prisma } from "@ltex/db";
+import { prisma, type Prisma, type Product, type ProductImage, type Price } from "@ltex/db";
 
 interface CatalogParams {
   categoryId?: string;
@@ -15,8 +14,13 @@ interface CatalogParams {
   perPage?: number;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type CatalogResult = { products: any[]; total: number; totalPages: number };
+type ProductWithRelations = Product & {
+  images: ProductImage[];
+  prices: Price[];
+  _count: { lots: number };
+};
+
+type CatalogResult = { products: ProductWithRelations[]; total: number; totalPages: number };
 
 export async function getCatalogProducts(params: CatalogParams): Promise<CatalogResult> {
   const {
@@ -221,8 +225,8 @@ async function fullTextSearch(params: CatalogParams & { q: string }): Promise<Ca
     : [];
 
   // Preserve relevance order
-  const idOrder = new Map(ids.map((id, i) => [id, i]));
-  products.sort((a, b) => (idOrder.get(a.id) ?? 0) - (idOrder.get(b.id) ?? 0));
+  const idOrder = new Map<string, number>(ids.map((id, i) => [id, i]));
+  products.sort((a: { id: string }, b: { id: string }) => (idOrder.get(a.id) ?? 0) - (idOrder.get(b.id) ?? 0));
 
   return { products, total, totalPages: Math.ceil(total / perPage) };
 }
@@ -281,8 +285,8 @@ async function trigramFallbackSearch(
       })
     : [];
 
-  const idOrder = new Map(ids.map((id, i) => [id, i]));
-  products.sort((a, b) => (idOrder.get(a.id) ?? 0) - (idOrder.get(b.id) ?? 0));
+  const idOrder = new Map<string, number>(ids.map((id, i) => [id, i]));
+  products.sort((a: { id: string }, b: { id: string }) => (idOrder.get(a.id) ?? 0) - (idOrder.get(b.id) ?? 0));
 
   return { products, total, totalPages: Math.ceil(total / perPage) };
 }
@@ -315,7 +319,7 @@ export async function autocompleteSearch(query: string): Promise<AutocompleteRes
   if (!words) return [];
 
   // Combine tsvector prefix matching + trigram similarity
-  const results = await prisma.$queryRawUnsafe<AutocompleteResult[]>(
+  const results: AutocompleteResult[] = await (prisma.$queryRawUnsafe as (query: string, ...values: (string | number)[]) => Promise<AutocompleteResult[]>)(
     `SELECT DISTINCT ON (id) id, name, slug, quality, score AS rank FROM (
        SELECT id, name, slug, quality,
               ts_rank(to_tsvector('simple', name || ' ' || COALESCE(description, '') || ' ' || COALESCE(article_code, '')),
@@ -337,6 +341,6 @@ export async function autocompleteSearch(query: string): Promise<AutocompleteRes
   );
 
   // Re-sort by rank
-  results.sort((a, b) => Number(b.rank) - Number(a.rank));
+  results.sort((a: AutocompleteResult, b: AutocompleteResult) => Number(b.rank) - Number(a.rank));
   return results.slice(0, 5);
 }

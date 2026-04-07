@@ -18,6 +18,43 @@ import {
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://ltex.com.ua";
 
+// Local types for Prisma query results (avoids implicit any from ungenerated client)
+interface ProductSearchResult {
+  name: string;
+  slug: string;
+  quality: string;
+  priceUnit: string;
+  prices: { amount: number }[];
+  _count: { lots: number };
+}
+
+interface LotSearchResult {
+  barcode: string;
+  weight: number;
+  priceEur: number;
+  product: { name: string; quality: string; priceUnit: string; slug: string };
+}
+
+interface OrderResult {
+  id: string;
+  code1C: string | null;
+  status: string;
+  totalEur: number;
+  totalUah: number;
+  exchangeRate: number;
+  createdAt: Date;
+  customer: { name: string; phone: string | null };
+  items: { productId: string; weight: number; priceEur: number }[];
+}
+
+interface CategoryResult {
+  id: string;
+  name: string;
+  slug: string;
+  _count: { products: number };
+  children: { id: string; name: string; slug: string; _count: { products: number } }[];
+}
+
 // ─── State: track users waiting for input ────────────────────────────────────
 
 const pendingInput = new Map<string, "search" | "order">();
@@ -159,7 +196,7 @@ async function handleSearch(userId: string, query: string): Promise<void> {
     return;
   }
 
-  const lines = products.map((p, i) => {
+  const lines = (products as ProductSearchResult[]).map((p: ProductSearchResult, i: number) => {
     const price = p.prices[0]?.amount;
     const priceStr = price ? `€${price.toFixed(2)}/${p.priceUnit === "kg" ? "кг" : "шт"}` : "";
     const quality = QUALITY_LABELS[p.quality as QualityLevel] ?? p.quality;
@@ -204,7 +241,7 @@ async function handleLots(userId: string, qualityFilter: string): Promise<void> 
     return;
   }
 
-  const lines = lots.map((lot, i) => {
+  const lines = (lots as LotSearchResult[]).map((lot: LotSearchResult, i: number) => {
     const quality = QUALITY_LABELS[lot.product.quality as QualityLevel] ?? lot.product.quality;
     return `${i + 1}. ${lot.product.name}\n   ${quality} • ${lot.weight} кг • €${lot.priceEur.toFixed(2)}\n   Штрихкод: ${lot.barcode}`;
   });
@@ -272,30 +309,31 @@ async function handleOrder(userId: string, orderId: string): Promise<void> {
     return;
   }
 
-  const productIds = [...new Set(order.items.map((i) => i.productId))];
+  const typedOrder = order as unknown as OrderResult;
+  const productIds = [...new Set(typedOrder.items.map((i: OrderResult["items"][number]) => i.productId))];
   const products = await prisma.product.findMany({
     where: { id: { in: productIds } },
     select: { id: true, name: true },
   });
-  const productNames = new Map(products.map((p) => [p.id, p.name]));
+  const productNames = new Map((products as { id: string; name: string }[]).map((p: { id: string; name: string }) => [p.id, p.name]));
 
-  const statusLabel = ORDER_STATUS_LABELS[order.status as OrderStatus] ?? order.status;
-  const itemLines = order.items.slice(0, 5).map(
-    (item) => `  • ${productNames.get(item.productId) ?? "?"} — ${item.weight} кг, €${item.priceEur.toFixed(2)}`,
+  const statusLabel = ORDER_STATUS_LABELS[typedOrder.status as OrderStatus] ?? typedOrder.status;
+  const itemLines = typedOrder.items.slice(0, 5).map(
+    (item: OrderResult["items"][number]) => `  • ${productNames.get(item.productId) ?? "?"} — ${item.weight} кг, €${item.priceEur.toFixed(2)}`,
   );
-  if (order.items.length > 5) {
-    itemLines.push(`  ... та ще ${order.items.length - 5} позицій`);
+  if (typedOrder.items.length > 5) {
+    itemLines.push(`  ... та ще ${typedOrder.items.length - 5} позицій`);
   }
 
   const text = [
-    `📋 Замовлення ${order.code1C ?? order.id.slice(0, 8)}`,
+    `📋 Замовлення ${typedOrder.code1C ?? typedOrder.id.slice(0, 8)}`,
     ``,
     `Статус: ${statusLabel}`,
-    `Клієнт: ${order.customer.name}`,
-    `Сума: €${order.totalEur.toFixed(2)}`,
-    order.totalUah > 0 ? `Сума (UAH): ${order.totalUah.toFixed(2)} ₴` : "",
-    `Позицій: ${order.items.length}`,
-    `Дата: ${new Date(order.createdAt).toLocaleDateString("uk-UA")}`,
+    `Клієнт: ${typedOrder.customer.name}`,
+    `Сума: €${typedOrder.totalEur.toFixed(2)}`,
+    typedOrder.totalUah > 0 ? `Сума (UAH): ${typedOrder.totalUah.toFixed(2)} ₴` : "",
+    `Позицій: ${typedOrder.items.length}`,
+    `Дата: ${new Date(typedOrder.createdAt).toLocaleDateString("uk-UA")}`,
     ``,
     `Товари:`,
     ...itemLines,

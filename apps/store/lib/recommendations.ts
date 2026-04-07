@@ -57,7 +57,7 @@ export async function getRecommendations(
   if (sameQuality.length >= limit) return sameQuality;
 
   // Fill remaining with same category, different quality
-  const existingIds = [productId, ...sameQuality.map((p) => p.id)];
+  const existingIds = [productId, ...sameQuality.map((p: { id: string }) => p.id)];
   const remaining = limit - sameQuality.length;
 
   const differentQuality = await prisma.product.findMany({
@@ -95,7 +95,7 @@ export async function getFrequentlyBoughtTogether(
   const coProducts = await prisma.orderItem.groupBy({
     by: ["productId"],
     where: {
-      orderId: { in: orderIds.map((o) => o.orderId) },
+      orderId: { in: orderIds.map((o: { orderId: string }) => o.orderId) },
       productId: { not: productId },
     },
     _count: { productId: true },
@@ -107,17 +107,17 @@ export async function getFrequentlyBoughtTogether(
 
   const products = await prisma.product.findMany({
     where: {
-      id: { in: coProducts.map((c) => c.productId) },
+      id: { in: coProducts.map((c: { productId: string }) => c.productId) },
       inStock: true,
     },
     select: productSelect(),
   });
 
   // Sort by the frequency order from groupBy
-  const orderMap = new Map(
-    coProducts.map((c, i) => [c.productId, i]),
+  const orderMap = new Map<string, number>(
+    coProducts.map((c: { productId: string }, i: number) => [c.productId, i]),
   );
   return products.sort(
-    (a, b) => (orderMap.get(a.id) ?? 99) - (orderMap.get(b.id) ?? 99),
+    (a: { id: string }, b: { id: string }) => (orderMap.get(a.id) ?? 99) - (orderMap.get(b.id) ?? 99),
   );
 }

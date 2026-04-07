@@ -169,8 +169,8 @@ async function main() {
           code1C,
         },
       });
-    } catch (e: any) {
-      if (e.code === "P2002") {
+    } catch (e: unknown) {
+      if (e instanceof Object && "code" in e && e.code === "P2002") {
         // Duplicate code1C — retry without it
         product = await prisma.product.upsert({
           where: { slug: p.slug },

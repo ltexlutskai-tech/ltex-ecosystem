@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@ltex/db";
+import { mobileNotificationTokenSchema, mobileVideoSubscriptionSchema } from "@/lib/validations";
 
 /**
  * POST /api/mobile/notifications/register — Register push token
@@ -64,15 +65,11 @@ export async function POST(request: NextRequest) {
 
   // Register push token
   if (action === "register_token") {
-    const { customerId, token, platform } = body as {
-      customerId: string;
-      token: string;
-      platform: string;
-    };
-
-    if (!customerId || !token || !platform) {
-      return NextResponse.json({ error: "customerId, token, platform required" }, { status: 400 });
+    const tokenParsed = mobileNotificationTokenSchema.safeParse(body);
+    if (!tokenParsed.success) {
+      return NextResponse.json({ error: tokenParsed.error.issues[0]?.message ?? "Невірні дані" }, { status: 400 });
     }
+    const { customerId, token, platform } = tokenParsed.data;
 
     const pushToken = await prisma.pushToken.upsert({
       where: { token },
@@ -85,11 +82,11 @@ export async function POST(request: NextRequest) {
 
   // Subscribe to video reviews
   if (action === "subscribe_video") {
-    const { customerId, productId } = body as { customerId: string; productId: string };
-
-    if (!customerId || !productId) {
-      return NextResponse.json({ error: "customerId and productId required" }, { status: 400 });
+    const subParsed = mobileVideoSubscriptionSchema.safeParse(body);
+    if (!subParsed.success) {
+      return NextResponse.json({ error: subParsed.error.issues[0]?.message ?? "Невірні дані" }, { status: 400 });
     }
+    const { customerId, productId } = subParsed.data;
 
     const subscription = await prisma.videoSubscription.upsert({
       where: { customerId_productId: { customerId, productId } },

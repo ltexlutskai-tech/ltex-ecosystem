@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@ltex/db";
+import { mobilePaymentSchema } from "@/lib/validations";
 
 /**
  * GET /api/mobile/payments?customerId=xxx — Payment history
@@ -54,29 +55,18 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  let body: Record<string, unknown>;
+  let body: unknown;
   try {
     body = await request.json();
   } catch {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  const { orderId, method, amount, currency, externalId } = body as {
-    orderId: string;
-    method: string;
-    amount: number;
-    currency?: string;
-    externalId?: string;
-  };
-
-  if (!orderId || !method || !amount) {
-    return NextResponse.json({ error: "orderId, method, amount required" }, { status: 400 });
+  const parsed = mobilePaymentSchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Невірні дані" }, { status: 400 });
   }
-
-  const validMethods = ["cash", "card", "bank_transfer", "online"];
-  if (!validMethods.includes(method)) {
-    return NextResponse.json({ error: `method must be one of: ${validMethods.join(", ")}` }, { status: 400 });
-  }
+  const { orderId, method, amount, currency, externalId } = parsed.data;
 
   const payment = await prisma.payment.create({
     data: {

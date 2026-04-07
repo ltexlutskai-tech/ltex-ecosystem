@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@ltex/db";
+import { mobileShipmentCreateSchema } from "@/lib/validations";
 
 /**
  * GET /api/mobile/shipments?customerId=xxx
@@ -124,24 +125,21 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  let body: Record<string, unknown>;
+  let body: unknown;
   try {
     body = await request.json();
   } catch {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  const { orderId, trackingNumber, carrier, recipientCity, recipientBranch } = body as {
-    orderId: string;
-    trackingNumber: string;
-    carrier?: string;
-    recipientCity?: string;
-    recipientBranch?: string;
-  };
-
-  if (!orderId || !trackingNumber) {
-    return NextResponse.json({ error: "orderId and trackingNumber required" }, { status: 400 });
+  const parsed = mobileShipmentCreateSchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Невірні дані" }, { status: 400 });
   }
+  const { orderId, trackingNumber, carrier } = parsed.data;
+  const rawBody = body as Record<string, unknown>;
+  const recipientCity = rawBody.recipientCity as string | undefined;
+  const recipientBranch = rawBody.recipientBranch as string | undefined;
 
   const shipment = await prisma.shipment.upsert({
     where: { orderId_trackingNumber: { orderId, trackingNumber } },

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@ltex/db";
+import { mobileAuthSchema } from "@/lib/validations";
 
 /**
  * POST /api/mobile/auth — Register or login by phone.
@@ -10,21 +11,19 @@ import { prisma } from "@ltex/db";
  * For now, upserts customer by phone number.
  */
 export async function POST(request: NextRequest) {
-  let body: Record<string, unknown>;
+  let body: unknown;
   try {
     body = await request.json();
   } catch {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  const phone = (body.phone as string)?.trim();
-  if (!phone || phone.length < 10) {
-    return NextResponse.json({ error: "Телефон обов'язковий (мін. 10 символів)" }, { status: 400 });
+  const parsed = mobileAuthSchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Невірні дані" }, { status: 400 });
   }
 
-  const name = (body.name as string)?.trim() || undefined;
-  const telegram = (body.telegram as string)?.trim() || undefined;
-  const city = (body.city as string)?.trim() || undefined;
+  const { phone, name, telegram, city } = parsed.data;
 
   let customer = await prisma.customer.findFirst({ where: { phone } });
   const isNew = !customer;

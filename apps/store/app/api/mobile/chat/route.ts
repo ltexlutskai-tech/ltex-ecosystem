@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@ltex/db";
 import { sendPushNotification } from "@/lib/push";
+import { mobileChatMessageSchema } from "@/lib/validations";
 
 /**
  * GET /api/mobile/chat?customerId=xxx&cursor=xxx&limit=50
@@ -49,25 +50,20 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  let body: Record<string, unknown>;
+  let body: unknown;
   try {
     body = await request.json();
   } catch {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  const { customerId, text, imageUrl, sender } = body as {
-    customerId: string;
-    text: string;
-    imageUrl?: string;
-    sender?: string;
-  };
-
-  if (!customerId || (!text?.trim() && !imageUrl)) {
-    return NextResponse.json({ error: "customerId and text/imageUrl required" }, { status: 400 });
+  const parsed = mobileChatMessageSchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Невірні дані" }, { status: 400 });
   }
-
-  const messageSender = sender === "manager" ? "manager" : "customer";
+  const { customerId, text, sender } = parsed.data;
+  const imageUrl = (body as Record<string, unknown>).imageUrl as string | undefined;
+  const messageSender = sender;
 
   const message = await prisma.chatMessage.create({
     data: {

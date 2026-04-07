@@ -57,7 +57,7 @@ export async function sendPushNotification(
   }
 
   // Build messages (one per token)
-  const messages: ExpoPushMessage[] = tokens.map((t) => ({
+  const messages: ExpoPushMessage[] = tokens.map((t: { id: string; token: string }) => ({
     to: t.token,
     title,
     body,
@@ -110,7 +110,7 @@ export async function sendPushNotification(
       await prisma.pushToken.updateMany({
         where: { id: { in: tokensToDeactivate } },
         data: { active: false },
-      }).catch((err) => {
+      }).catch((err: unknown) => {
         console.error("Failed to deactivate invalid push tokens:", err);
       });
     }

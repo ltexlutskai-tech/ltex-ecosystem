@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@ltex/db";
+import { mobileProfileUpdateSchema } from "@/lib/validations";
 
 /**
  * GET /api/mobile/profile?customerId=xxx
@@ -52,23 +53,24 @@ export async function GET(request: NextRequest) {
 }
 
 export async function PUT(request: NextRequest) {
-  let body: Record<string, unknown>;
+  let body: unknown;
   try {
     body = await request.json();
   } catch {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  const customerId = body.customerId as string;
-  if (!customerId) {
-    return NextResponse.json({ error: "customerId required" }, { status: 400 });
+  const parsed = mobileProfileUpdateSchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Невірні дані" }, { status: 400 });
   }
+  const { customerId, name, email, telegram, city } = parsed.data;
 
   const data: Record<string, string | null> = {};
-  if (body.name) data.name = body.name as string;
-  if (body.email !== undefined) data.email = (body.email as string) || null;
-  if (body.telegram !== undefined) data.telegram = (body.telegram as string) || null;
-  if (body.city !== undefined) data.city = (body.city as string) || null;
+  if (name) data.name = name;
+  if (email !== undefined) data.email = email ?? null;
+  if (telegram !== undefined) data.telegram = telegram ?? null;
+  if (city !== undefined) data.city = city ?? null;
 
   const customer = await prisma.customer.update({
     where: { id: customerId },
