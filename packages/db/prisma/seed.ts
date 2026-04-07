@@ -136,6 +136,8 @@ async function main() {
       continue;
     }
 
+    const code1C = p.code1C && p.code1C !== "None" ? p.code1C : null;
+
     const product = await prisma.product.upsert({
       where: { slug: p.slug },
       update: {
@@ -148,7 +150,7 @@ async function main() {
         videoUrl: p.videoUrl,
         inStock: p.inStock,
         articleCode: p.articleCode,
-        code1C: p.code1C,
+        code1C,
       },
       create: {
         slug: p.slug,
@@ -162,7 +164,7 @@ async function main() {
         videoUrl: p.videoUrl,
         inStock: p.inStock,
         articleCode: p.articleCode,
-        code1C: p.code1C,
+        code1C,
       },
     });
 
