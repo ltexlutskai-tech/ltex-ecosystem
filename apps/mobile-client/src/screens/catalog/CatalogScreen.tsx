@@ -37,10 +37,12 @@ export function CatalogScreen({ navigation }: CatalogScreenProps) {
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const fetchProducts = useCallback(
     async (pageNum: number, isRefresh = false) => {
       try {
+        setError(null);
         const params: Record<string, string> = {
           page: String(pageNum),
           limit: "20",
@@ -63,7 +65,7 @@ export function CatalogScreen({ navigation }: CatalogScreenProps) {
         }
         setHasMore(pageNum < (data.totalPages ?? 1));
       } catch {
-        // silently handle — products stay as they are
+        setError("Не вдалося завантажити товари. Потягніть вниз для оновлення.");
       }
     },
     [search, quality],
@@ -149,6 +151,10 @@ export function CatalogScreen({ navigation }: CatalogScreenProps) {
         <View style={styles.centered}>
           <ActivityIndicator size="large" color="#16a34a" />
           <Text style={styles.loadingText}>Завантаження каталогу...</Text>
+        </View>
+      ) : error && products.length === 0 ? (
+        <View style={styles.centered}>
+          <Text style={styles.errorText}>{error}</Text>
         </View>
       ) : (
         <FlatList
@@ -254,6 +260,12 @@ const styles = StyleSheet.create({
     marginTop: 4,
     fontSize: 13,
     color: "#9ca3af",
+  },
+  errorText: {
+    fontSize: 14,
+    color: "#dc2626",
+    textAlign: "center",
+    lineHeight: 20,
   },
   emptyList: {
     flexGrow: 1,

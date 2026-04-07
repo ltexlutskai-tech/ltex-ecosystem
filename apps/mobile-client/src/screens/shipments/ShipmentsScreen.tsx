@@ -69,16 +69,18 @@ export function ShipmentsScreen(_props: ShipmentsScreenProps) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [trackingLoading, setTrackingLoading] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const fetchShipments = useCallback(async () => {
     if (!customerId) return;
     try {
+      setError(null);
       const data = (await shipmentsApi.list(customerId)) as {
         shipments: Shipment[];
       };
       setShipments(data.shipments ?? []);
     } catch {
-      // Silently handle
+      setError("Не вдалося завантажити відправлення");
     }
   }, [customerId]);
 
@@ -317,11 +319,13 @@ export function ShipmentsScreen(_props: ShipmentsScreenProps) {
         }
         ListEmptyComponent={
           <View style={styles.centered}>
-            <Ionicons name="cube-outline" size={48} color="#d1d5db" />
-            <Text style={styles.emptyTitle}>Немає відправлень</Text>
-            <Text style={styles.emptyHint}>
-              Тут з'являться ваші посилки після відправки замовлень
-            </Text>
+            <Ionicons name={error ? "alert-circle-outline" : "cube-outline"} size={48} color={error ? "#dc2626" : "#d1d5db"} />
+            <Text style={styles.emptyTitle}>{error ?? "Немає відправлень"}</Text>
+            {!error && (
+              <Text style={styles.emptyHint}>
+                Тут з'являться ваші посилки після відправки замовлень
+              </Text>
+            )}
           </View>
         }
       />

@@ -64,16 +64,18 @@ export function OrdersScreen({ navigation }: OrdersScreenProps) {
   const [orders, setOrders] = useState<OrderSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const fetchOrders = useCallback(async () => {
     if (!customerId) return;
     try {
+      setError(null);
       const data = (await ordersApi.list(customerId)) as {
         orders: OrderSummary[];
       };
       setOrders(data.orders ?? []);
     } catch {
-      // silently handle
+      setError("Не вдалося завантажити замовлення");
     }
   }, [customerId]);
 
@@ -208,11 +210,13 @@ export function OrdersScreen({ navigation }: OrdersScreenProps) {
         }
         ListEmptyComponent={
           <View style={styles.centered}>
-            <Ionicons name="receipt-outline" size={48} color="#d1d5db" />
-            <Text style={styles.emptyTitle}>Замовлень поки немає</Text>
-            <Text style={styles.emptyHint}>
-              Оформіть перше замовлення з каталогу
-            </Text>
+            <Ionicons name={error ? "alert-circle-outline" : "receipt-outline"} size={48} color={error ? "#dc2626" : "#d1d5db"} />
+            <Text style={styles.emptyTitle}>{error ?? "Замовлень поки немає"}</Text>
+            {!error && (
+              <Text style={styles.emptyHint}>
+                Оформіть перше замовлення з каталогу
+              </Text>
+            )}
           </View>
         }
       />
