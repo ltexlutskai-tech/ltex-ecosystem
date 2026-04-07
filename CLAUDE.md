@@ -14,6 +14,12 @@ Contacts: Telegram @L_TEX, +380 67 671 05 15, +380 99 358 49 92, ltex.lutsk.ai@g
 
 All work from Phase 0 through Phase 4 + Viber bot is complete and merged into main.
 
+**IMPORTANT FOR NEW SESSIONS:** Do NOT re-audit or re-merge branches. All branches have been cleaned up — only `main` exists. The project is fully functional:
+- Supabase DB: 805 products, 725 lots, 49 categories seeded
+- Netlify: deploying from `main` at stalwart-dango-04a9b9.netlify.app
+- Site is LIVE and working (catalog, lots, cart, admin, API routes)
+- DO NOT repeat seed, merge, or infrastructure setup — it's all done
+
 ## What Exists Now
 
 ```
