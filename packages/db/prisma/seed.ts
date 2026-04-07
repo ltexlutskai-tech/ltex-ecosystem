@@ -138,35 +138,62 @@ async function main() {
 
     const code1C = p.code1C && p.code1C !== "None" ? p.code1C : null;
 
-    const product = await prisma.product.upsert({
-      where: { slug: p.slug },
-      update: {
-        name: p.name,
-        categoryId,
-        quality: p.quality,
-        season: p.season,
-        priceUnit: p.priceUnit,
-        averageWeight: p.averageWeight,
-        videoUrl: p.videoUrl,
-        inStock: p.inStock,
-        articleCode: p.articleCode,
-        code1C,
-      },
-      create: {
-        slug: p.slug,
-        name: p.name,
-        categoryId,
-        quality: p.quality,
-        season: p.season,
-        country: p.country,
-        priceUnit: p.priceUnit,
-        averageWeight: p.averageWeight,
-        videoUrl: p.videoUrl,
-        inStock: p.inStock,
-        articleCode: p.articleCode,
-        code1C,
-      },
-    });
+    let product;
+    try {
+      product = await prisma.product.upsert({
+        where: { slug: p.slug },
+        update: {
+          name: p.name,
+          categoryId,
+          quality: p.quality,
+          season: p.season,
+          priceUnit: p.priceUnit,
+          averageWeight: p.averageWeight,
+          videoUrl: p.videoUrl,
+          inStock: p.inStock,
+          articleCode: p.articleCode,
+          code1C,
+        },
+        create: {
+          slug: p.slug,
+          name: p.name,
+          categoryId,
+          quality: p.quality,
+          season: p.season,
+          country: p.country,
+          priceUnit: p.priceUnit,
+          averageWeight: p.averageWeight,
+          videoUrl: p.videoUrl,
+          inStock: p.inStock,
+          articleCode: p.articleCode,
+          code1C,
+        },
+      });
+    } catch (e: any) {
+      if (e.code === "P2002") {
+        // Duplicate code1C — retry without it
+        product = await prisma.product.upsert({
+          where: { slug: p.slug },
+          update: { name: p.name, categoryId },
+          create: {
+            slug: p.slug,
+            name: p.name,
+            categoryId,
+            quality: p.quality,
+            season: p.season,
+            country: p.country,
+            priceUnit: p.priceUnit,
+            averageWeight: p.averageWeight,
+            videoUrl: p.videoUrl,
+            inStock: p.inStock,
+            articleCode: p.articleCode,
+          },
+        });
+        console.warn(`  ⚠️ Duplicate code1C ${code1C}, saved without it: ${p.name}`);
+      } else {
+        throw e;
+      }
+    }
 
     productMap.set(p.articleCode, product.id);
 
