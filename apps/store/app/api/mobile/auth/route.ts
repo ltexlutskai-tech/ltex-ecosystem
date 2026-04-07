@@ -25,34 +25,38 @@ export async function POST(request: NextRequest) {
 
   const { phone, name, telegram, city } = parsed.data;
 
-  let customer = await prisma.customer.findFirst({ where: { phone } });
-  const isNew = !customer;
+  try {
+    let customer = await prisma.customer.findFirst({ where: { phone } });
+    const isNew = !customer;
 
-  if (!customer) {
-    if (!name) {
-      return NextResponse.json({ error: "Ім'я обов'язкове для реєстрації" }, { status: 400 });
+    if (!customer) {
+      if (!name) {
+        return NextResponse.json({ error: "Ім'я обов'язкове для реєстрації" }, { status: 400 });
+      }
+      customer = await prisma.customer.create({
+        data: { name, phone, telegram, city },
+      });
+    } else if (name || telegram || city) {
+      customer = await prisma.customer.update({
+        where: { id: customer.id },
+        data: {
+          ...(name && { name }),
+          ...(telegram && { telegram }),
+          ...(city && { city }),
+        },
+      });
     }
-    customer = await prisma.customer.create({
-      data: { name, phone, telegram, city },
-    });
-  } else if (name || telegram || city) {
-    customer = await prisma.customer.update({
-      where: { id: customer.id },
-      data: {
-        ...(name && { name }),
-        ...(telegram && { telegram }),
-        ...(city && { city }),
-      },
-    });
-  }
 
-  return NextResponse.json({
-    customerId: customer.id,
-    name: customer.name,
-    phone: customer.phone,
-    email: customer.email,
-    telegram: customer.telegram,
-    city: customer.city,
-    isNew,
-  });
+    return NextResponse.json({
+      customerId: customer.id,
+      name: customer.name,
+      phone: customer.phone,
+      email: customer.email,
+      telegram: customer.telegram,
+      city: customer.city,
+      isNew,
+    });
+  } catch {
+    return NextResponse.json({ error: "Server error" }, { status: 500 });
+  }
 }
