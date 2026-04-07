@@ -323,74 +323,112 @@ EXPO_PUBLIC_API_URL=       # (mobile) API base URL for Expo app
 - Rich keyboard menus: main menu (6 color buttons), quality filter (6 + back)
 - Pending input state for search/order prompts
 
-### Tasks for next session
+### Session 4 Analysis Report (2026-04-07)
 
-#### Session 3: Phase 5 (Optimization) + Viber bot + Deploy prep
+#### Project Completion Status: ~85% MVP
 
-**IMPORTANT Business Context:** L-TEX НЕ приймає онлайн-оплати. Клієнти роблять замовлення → менеджер отримує нотифікацію → менеджер формує реалізацію та оплату в 1С. Тому НЕ потрібно: LiqPay, Monobank, online payment gateway. Таблиця `payments` використовується тільки для відображення історії оплат клієнту (дані з 1С).
+| Component | Completion | Details |
+|-----------|-----------|---------|
+| Монорепо структура | 100% | Turborepo + pnpm, 3 packages, 2 apps, 2 services |
+| База даних | 100% | 19 таблиць, 805 products, 725 lots seeded |
+| Web Store | 100% | Каталог, пошук, кошик, checkout, SEO, PWA |
+| Admin Panel | 100% | Dashboard, CRUD, analytics, auth |
+| API Layer | 100% | 18 ендпоінтів, rate limiting, validation |
+| Telegram Bot | 100% | Повний функціонал + webhook + BotFather |
+| Viber Bot | 100% | Повний функціонал + нотифікації |
+| Mobile Client App | 80% | Екрани готові, потрібне тестування |
+| Тестування | 70% | 70 тестів (53 unit + 17 E2E), E2E вимкнені в CI |
+| 1С Інтеграція | 60% | API готовий, потрібна конфігурація 1С |
+| Deploy / Production | 60% | Netlify працює, webhooks + фото не налаштовані |
+| Mobile Agent App | 0% | Окрема сесія, потрібні скріншоти |
+| Warehouse App | 0% | Окрема сесія |
 
-##### Задача 1: Viber бот — нотифікації замовлень (як в Telegram)
-Зараз: Telegram бот надсилає нотифікацію менеджеру при новому замовленні (`lib/notifications.ts`). Viber бот тільки відповідає на команди.
-- Додати `notifyViberNewOrder()` в `lib/notifications.ts`
-- Додати env var `VIBER_ADMIN_USER_ID` — ID менеджера в Viber для нотифікацій
-- Викликати в `/api/orders/route.ts` поряд з Telegram нотифікацією
-- Формат: такий самий як Telegram (клієнт, телефон, позицій, вага, сума)
+#### Stats: 161 файлів TS/TSX, 18,082 рядків коду, 28 комітів, 19 Prisma моделей, 18 API routes
 
-##### Задача 2: Smart product recommendations
-Зараз: на сторінці товару немає рекомендацій.
-- Створити `lib/recommendations.ts` з функцією `getRecommendations(productId, limit=6)`
-- Алгоритм: товари тієї ж категорії + якості, або тієї ж категорії іншої якості, ordered by lot count DESC (пріоритет: є вільні лоти)
-- Додати секцію "Схожі товари" на сторінку `/product/[slug]` (після лотів, перед footer)
-- Компонент: горизонтальна сітка 2-3 карток з ProductCard
-- Також показувати "Часто купують разом" — товари з тих самих замовлень (order_items GROUP BY productId WHERE orderId IN orders_with_this_product)
+### Tasks for next session (Session 4)
 
-##### Задача 3: PWA іконки + offline fallback
-Зараз: `manifest.ts` є, але іконок немає (`/public/icon-192.png`, `/public/icon-512.png`).
-- Створити SVG іконку L-TEX (зелений #16a34a, літери "LT") і конвертувати в PNG 192x192 та 512x512
-- Або створити простий placeholder-іконки через CSS/Canvas
-- Додати `<link rel="apple-touch-icon">` в layout.tsx
-- Додати `public/offline.html` — проста сторінка "Немає з'єднання"
-- Додати Service Worker реєстрацію для offline fallback (Next.js PWA з `next-pwa` або `@serwist/next`)
+**IMPORTANT:** Працювати на гілці `main`. НЕ створювати нову гілку.
+**IMPORTANT:** НЕ повторювати seed, merge, або infrastructure setup — все вже зроблено.
+**IMPORTANT:** L-TEX НЕ приймає онлайн-оплати. Таблиця `payments` — тільки для відображення історії з 1С.
 
-##### Задача 4: Push notifications (Expo)
-Зараз: таблиця `push_tokens` є, `/api/mobile/notifications` API є, але фактичне відправлення push немає.
-- Додати `lib/push.ts` з функцією `sendPushNotification(customerId, title, body, data?)`
-- Використовувати Expo Push API (`https://exp.host/--/api/v2/push/send`)
-- Викликати при: нове повідомлення в чаті від менеджера, зміна статусу замовлення, нове відео по підписці
-- В мобільному додатку: зареєструвати push token при першому запуску (`expo-notifications`)
+#### Автономні задачі (не потребують участі користувача)
 
-##### Задача 5: Real-time чат (замість polling)
-Зараз: ChatScreen опитує `/api/mobile/chat` кожні 10 сек. Це неефективно.
-- Варіант A: Supabase Realtime (subscribe на `chat_messages` table changes)
-- Варіант B: Server-Sent Events (SSE) endpoint `/api/mobile/chat/stream`
-- Варіант C: Залишити polling, але зменшити інтервал до 3 сек тільки коли чат відкритий
-- Обрати найпростіший варіант який не потребує додаткової інфраструктури
+##### Задача 1: Збільшити тестове покриття (зараз 70% → ціль 90%)
+Зараз: 53 unit тести (slug, price, validations). Немає тестів для ключової бізнес-логіки.
+- Додати unit тести для `lib/recommendations.ts` — getRecommendations(), getFrequentlyBoughtTogether()
+  - Mock Prisma client, перевірити: фільтрація по категорії/якості, сортування по лотах, ліміт
+- Додати unit тести для `lib/notifications.ts` — sendTelegramNotification(), sendViberNotification(), notifyNewOrder()
+  - Mock fetch, перевірити: формат повідомлення, обробка відсутніх env vars, Promise.allSettled
+- Додати unit тести для `lib/push.ts` — sendPushNotification()
+  - Mock fetch до Expo Push API, перевірити: batch sending, token deactivation на DeviceNotRegistered
+- Додати unit тести для `lib/rate-limit.ts` — sliding window logic
+  - Перевірити: ліміт спрацьовує, window sliding, різні IP
+- Додати unit тести для `lib/cart.tsx` — CartProvider logic
+  - Mock localStorage + API, перевірити: add/remove/clear, merge strategy, sessionId
+- Додати unit тести для `lib/catalog.ts` — fullTextSearch(), autocompleteSearch()
+  - Mock Prisma $queryRawUnsafe, перевірити: tsvector query, trigram fallback, sanitization
+- **Файли:** створити `lib/recommendations.test.ts`, `lib/notifications.test.ts`, `lib/push.test.ts`, `lib/rate-limit.test.ts`, `lib/catalog.test.ts` в `apps/store/`
+- **Ціль:** додати ~40-50 нових unit тестів
 
-##### Задача 6: BotFather меню для Telegram
-- Створити скрипт `services/telegram-bot/src/setup-commands.ts`
-- Який через Telegram API (`setMyCommands`) реєструє меню:
-  - /search — Пошук товарів
-  - /lots — Доступні лоти (мішки)
-  - /order — Статус замовлення
-  - /categories — Категорії товарів
-  - /help — Допомога
-- Запускати один раз: `tsx services/telegram-bot/src/setup-commands.ts`
+##### Задача 2: Покращити TypeScript strict mode і типізацію
+- Перевірити всі файли на `any` типи і замінити на правильні типи
+- Перевірити що `strict: true` в tsconfig.json для всіх packages
+- Виправити всі TypeScript warnings/errors якщо є
+- Переконатися що `pnpm typecheck` проходить без помилок
 
-##### Задача 7: Deploy preparation
-- Оновити `.env.example` файли з усіма новими env vars
-- Додати `scripts/deploy-checklist.md` з покроковою інструкцією
-- Перевірити що `prisma db push` працює без помилок
-- Додати `scripts/register-webhooks.ts` — скрипт для реєстрації Telegram + Viber webhooks
-- Перевірити що build проходить на чистому Node.js 20 (без локального кешу)
+##### Задача 3: Покращити обробку помилок в API routes
+- Перевірити всі 18 API routes на консистентну обробку помилок
+- Додати proper HTTP status codes де відсутні (400, 401, 404, 429, 500)
+- Переконатися що всі routes повертають JSON з полем `error` при помилці
+- Перевірити rate limiting на всіх публічних routes (orders, search, cart)
+- Додати request body size validation де відсутній
 
-##### Задача 8 (окрема сесія, потрібні скріншоти): Mobile agent + warehouse
-- Потрібні скріншоти MobileAgentLTEX v1.15.3
-- Кожен розділ і блок додатку розбирати окремо
-- Побудувати точну копію функціоналу на Expo React Native
-- Інтеграція з 1С HTTP Service "Боти"
+##### Задача 4: Покращити Mobile Client App
+- Додати proper error handling на всіх екранах (try/catch + user-friendly повідомлення)
+- Додати pull-to-refresh на CatalogScreen, OrdersScreen, ShipmentsScreen
+- Додати empty states (коли немає товарів, замовлень, повідомлень)
+- Додати skeleton loaders замість простих "Завантаження..." текстів
+- Перевірити навігацію між екранами на консистентність
+- Додати expo-notifications реєстрацію push token при першому запуску
 
-#### Порядок виконання в Session 3: 1 → 6 → 2 → 3 → 4 → 5 → 7
-(Viber нотифікації першим, бо просте; BotFather теж швидке; рекомендації незалежні; PWA та push — більш складні; real-time чат останнім)
+##### Задача 5: Accessibility (a11y) покращення
+- Додати `aria-label` на всі інтерактивні елементи без тексту (іконки, кнопки)
+- Перевірити keyboard navigation на всіх сторінках store
+- Додати `role` атрибути де потрібно (navigation, main, complementary)
+- Перевірити color contrast для тексту на зеленому фоні (#16a34a)
+- Додати skip-to-content link в header
+- Додати focus-visible стилі де відсутні
+
+##### Задача 6: SEO та Performance оптимізація
+- Перевірити всі сторінки на наявність proper `<title>` та `<meta description>`
+- Додати `<meta>` для Open Graph зображень на category та product сторінках
+- Оптимізувати SQL запити в catalog.ts — перевірити N+1 проблеми, додати includes де потрібно
+- Перевірити що ISR revalidation працює правильно на всіх сторінках
+- Додати `rel="canonical"` на сторінках з пагінацією
+- Перевірити sitemap.ts — чи всі продукти та категорії включені
+
+##### Задача 7: CI/CD покращення
+- Увімкнути E2E тести в GitHub Actions (з mock DATABASE_URL або test DB)
+- Додати lint step в CI pipeline (зараз тільки typecheck + test + build)
+- Додати cache для pnpm store в CI для швидших builds
+- Додати перевірку розміру bundle (next build --analyze або similar)
+
+##### Задача 8: Code quality та рефакторинг
+- Видалити невикористаний код (dead imports, unused variables)
+- Перевірити консистентність error messages (українською для UI, англійською для API)
+- Перевірити що всі Zod schemas в validations.ts покривають всі API routes
+- Додати Zod validation для mobile API routes де відсутній
+- Перевірити що всі admin actions мають proper auth checks
+
+#### Порядок виконання: 1 → 2 → 8 → 3 → 4 → 5 → 6 → 7
+(Тести першими — вони виявлять баги; потім типізація; потім якість коду і API; mobile; a11y; SEO; CI останнім)
+
+#### Задачі що потребують участі користувача (НЕ для автономної сесії)
+- **Mobile Agent App** — потрібні скріншоти MobileAgentLTEX v1.15.3
+- **Warehouse App** — потрібні вимоги та скріншоти
+- **Інфраструктура** — запуск міграцій, реєстрація webhooks, завантаження фото (потрібен доступ до Supabase/Netlify)
+- **1С інтеграція** — налаштування на стороні 1С (HTTP Service, Exchange Plans, cron)
+- **Кастомний домен** — ltex.com.ua (потрібен доступ до DNS)
 
 ## Tech Stack
 - Monorepo: Turborepo + pnpm 9.x
