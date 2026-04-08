@@ -711,7 +711,57 @@ EXPO_PUBLIC_API_URL=       # (mobile) API base URL for Expo app
 **IMPORTANT:** L-TEX НЕ приймає онлайн-оплати. Таблиця `payments` — тільки для відображення історії з 1С.
 **IMPORTANT:** CI тепер зелений (format + test + typecheck + build). НЕ ламати CI.
 
-Session 9 tasks will be defined by the orchestrator.
+#### Task 1: Fix Netlify build — Prisma generate (CRITICAL, blocks deploy)
+
+Netlify build fails with:
+```
+app/(store)/catalog/[categorySlug]/page.tsx:58:43
+Type error: Parameter 'c' implicitly has an 'any' type.
+> 58 |   const childIds = category.children.map((c) => c.id);
+```
+
+**Root cause:** Netlify build command `turbo run build --filter @ltex/store` does NOT run `prisma generate` first. The `@ltex/db` package has no `build` script, so turbo skips it. Without generated Prisma types, all Prisma query results are `any`, and `strict: true` catches it.
+
+Local CI passes because `pnpm --filter @ltex/db exec prisma generate` runs as a separate step.
+
+**Fix (choose one):**
+- **Option A (recommended):** Add `"build": "prisma generate"` to `packages/db/package.json` scripts. This way `turbo run build` will generate Prisma types as a dependency step.
+- **Option B:** Create `netlify.toml` with build command: `pnpm --filter @ltex/db exec prisma generate && turbo run build --filter @ltex/store`
+
+After fixing, verify locally:
+```bash
+pnpm --filter @ltex/db run clean   # removes node_modules/.prisma
+pnpm build                          # must pass (generates Prisma first)
+```
+
+#### Task 2: Audit all `notFound()` narrowing (while you're there)
+
+Check all 6 files that use `notFound()` after Prisma queries. Ensure TypeScript narrows the type correctly after the `notFound()` call. Files:
+- `app/(store)/catalog/[categorySlug]/page.tsx:56`
+- `app/(store)/catalog/[categorySlug]/[subcategorySlug]/page.tsx:55`
+- `app/(store)/product/[slug]/page.tsx:87`
+- `app/(store)/order/[id]/confirmation/page.tsx:31`
+- `app/(store)/order/[id]/status/page.tsx:48`
+- `app/admin/products/[id]/page.tsx:25`
+
+If narrowing doesn't work (because `notFound()` return type isn't recognized as `never`), add explicit type assertions or early returns:
+```typescript
+if (!category) notFound();
+// If 'c' still has 'any' type, try:
+if (!category) return notFound();
+// or cast: const cat = category!;
+```
+
+#### Task 3: Final CI + build verification
+
+After fixes:
+1. `pnpm format:check` — must pass
+2. `pnpm test` — must pass (186 tests)
+3. `pnpm typecheck` — must pass (0 errors)
+4. `pnpm build` — must pass
+5. Simulate Netlify build: `pnpm --filter @ltex/db run clean && pnpm build` — must pass
+
+Commit and push to feature branch.
 
 #### Задачі що потребують участі користувача (НЕ для автономної сесії)
 
