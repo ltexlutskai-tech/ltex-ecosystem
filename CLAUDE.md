@@ -701,82 +701,110 @@ EXPO_PUBLIC_API_URL=       # (mobile) API base URL for Expo app
 | `claude/admin-gallery-orders-WDIWr`     | Merged, remote delete pending             |
 | `claude/add-i18n-email-analytics-Xz9Ua` | Merged, remote delete pending             |
 | `claude/fix-ci-pipeline-mzwgS`          | Merged, remote delete pending             |
+| `claude/fix-netlify-prisma-build-JoYVE` | Merged, remote delete pending             |
 
-**ACTION REQUIRED:** Delete 6 branches via GitHub UI.
+**ACTION REQUIRED:** Delete 7 branches via GitHub UI.
 
-### Tasks for next session (Session 9)
+### Session 9 Completion Report (2026-04-08)
+
+#### Що зроблено (1 коміт `95d623b`, всі 3 задачі виконані):
+
+| Задача | Статус | Деталі |
+|--------|--------|--------|
+| 1. Fix Netlify build (Prisma generate) | **ГОТОВО** | Додано `"build": "prisma generate"` в `packages/db/package.json` + `packages/db/turbo.json` з `cache: false` |
+| 2. Аудит `notFound()` narrowing | **ГОТОВО** | Всі 6 файлів перевірені — `notFound()` повертає `never` в Next.js 15, narrowing працює коректно. Помилка Netlify була виключно через відсутні Prisma types |
+| 3. CI + Netlify build верифікація | **ГОТОВО** | Всі 4 кроки CI проходять + симуляція Netlify build проходить |
+
+#### Кореневу причину виправлено:
+
+Turbo `"build": { "dependsOn": ["^build"] }` означає що build кожного пакета залежить від build його залежностей. Але `@ltex/db` не мав `build` скрипта — turbo його пропускав. Без `prisma generate` всі Prisma query results мали тип `any`, і `strict: true` ловив implicit any параметри.
+
+#### Метрики:
+
+| Метрика | До Session 9 | Після Session 9 |
+|---------|--------------|-----------------|
+| Netlify deploy | FAIL (Prisma types) | **Виправлено** (потрібен retry) |
+| Нові файли | — | `packages/db/turbo.json` |
+| Змінено файлів | — | 3 файли |
+| Total commits | 45 | **46** |
+
+### Tasks for next session (Session 10)
 
 **IMPORTANT:** НЕ повторювати seed, merge, або infrastructure setup — все вже зроблено.
-**IMPORTANT:** НЕ повторювати задачі Session 4-8 — ВСЕ ЗРОБЛЕНО. Дивись completion reports вище.
+**IMPORTANT:** НЕ повторювати задачі Session 4-9 — ВСЕ ЗРОБЛЕНО. Дивись completion reports вище.
 **IMPORTANT:** L-TEX НЕ приймає онлайн-оплати. Таблиця `payments` — тільки для відображення історії з 1С.
 **IMPORTANT:** CI тепер зелений (format + test + typecheck + build). НЕ ламати CI.
 
-#### Task 1: Fix Netlify build — Prisma generate (CRITICAL, blocks deploy)
+#### Task 1: Create infrastructure SQL scripts
 
-Netlify build fails with:
+Create `scripts/` directory with ready-to-run SQL scripts for Supabase:
 
+**a) `scripts/enable-rls.sql`** — Enable Row-Level Security on all 19 tables:
+```sql
+ALTER TABLE categories ENABLE ROW LEVEL SECURITY;
+ALTER TABLE products ENABLE ROW LEVEL SECURITY;
+-- ... all 19 tables
 ```
-app/(store)/catalog/[categorySlug]/page.tsx:58:43
-Type error: Parameter 'c' implicitly has an 'any' type.
-> 58 |   const childIds = category.children.map((c) => c.id);
-```
+Note: Prisma uses direct DATABASE_URL (bypasses RLS), so the site will continue working. RLS only blocks Supabase JS Client (anon key).
 
-**Root cause:** Netlify build command `turbo run build --filter @ltex/store` does NOT run `prisma generate` first. The `@ltex/db` package has no `build` script, so turbo skips it. Without generated Prisma types, all Prisma query results are `any`, and `strict: true` catches it.
+**b) `scripts/fts-migration.sql`** — Copy the existing migration from `packages/db/prisma/migrations/20260406_fts_gin_trigram/migration.sql` into scripts/ for easy access. Verify the SQL is correct and add comments explaining what each index does.
 
-Local CI passes because `pnpm --filter @ltex/db exec prisma generate` runs as a separate step.
+#### Task 2: Create Supabase Storage upload script
 
-**Fix (choose one):**
+Create `scripts/upload-photos.ts`:
+- Read product images from a local directory (configurable path)
+- Upload to Supabase Storage bucket `product-images`
+- Update `product_images` table with uploaded URLs
+- Handle errors gracefully (skip failed uploads, log them)
+- Require `SUPABASE_SERVICE_ROLE_KEY` env var for storage access
 
-- **Option A (recommended):** Add `"build": "prisma generate"` to `packages/db/package.json` scripts. This way `turbo run build` will generate Prisma types as a dependency step.
-- **Option B:** Create `netlify.toml` with build command: `pnpm --filter @ltex/db exec prisma generate && turbo run build --filter @ltex/store`
+This script will be run manually by the user after they create the storage bucket.
 
-After fixing, verify locally:
+#### Task 3: Create webhook registration scripts
 
-```bash
-pnpm --filter @ltex/db run clean   # removes node_modules/.prisma
-pnpm build                          # must pass (generates Prisma first)
-```
+**a) `scripts/register-telegram-webhook.ts`:**
+- Register Telegram bot webhook URL using Bot API `setWebhook`
+- Set `secret_token` for verification
+- Require `TELEGRAM_BOT_TOKEN` and site URL as args
+- Print success/failure status
 
-#### Task 2: Audit all `notFound()` narrowing (while you're there)
+**b) `scripts/register-viber-webhook.ts`:**
+- Register Viber webhook using Viber REST API
+- Require `VIBER_AUTH_TOKEN` and webhook URL
+- Print success/failure status
 
-Check all 6 files that use `notFound()` after Prisma queries. Ensure TypeScript narrows the type correctly after the `notFound()` call. Files:
+#### Task 4: Add `netlify.toml` configuration
 
-- `app/(store)/catalog/[categorySlug]/page.tsx:56`
-- `app/(store)/catalog/[categorySlug]/[subcategorySlug]/page.tsx:55`
-- `app/(store)/product/[slug]/page.tsx:87`
-- `app/(store)/order/[id]/confirmation/page.tsx:31`
-- `app/(store)/order/[id]/status/page.tsx:48`
-- `app/admin/products/[id]/page.tsx:25`
+Create `netlify.toml` in project root with:
+- Build command (current Netlify UI setting, moved to code for reproducibility)
+- Publish directory
+- Node.js version pinned to 22
+- Security headers (X-Frame-Options, X-Content-Type-Options, Referrer-Policy, Permissions-Policy)
+- Redirect rules if needed (e.g., www → non-www)
 
-If narrowing doesn't work (because `notFound()` return type isn't recognized as `never`), add explicit type assertions or early returns:
+#### Task 5: Final CI + build verification
 
-```typescript
-if (!category) notFound();
-// If 'c' still has 'any' type, try:
-if (!category) return notFound();
-// or cast: const cat = category!;
-```
-
-#### Task 3: Final CI + build verification
-
-After fixes:
-
+After all tasks:
 1. `pnpm format:check` — must pass
-2. `pnpm test` — must pass (186 tests)
+2. `pnpm test` — must pass (186+ tests)
 3. `pnpm typecheck` — must pass (0 errors)
 4. `pnpm build` — must pass
-5. Simulate Netlify build: `pnpm --filter @ltex/db run clean && pnpm build` — must pass
 
 Commit and push to feature branch.
 
 #### Задачі що потребують участі користувача (НЕ для автономної сесії)
 
-- **Видалити merged branches** — 6 branches через GitHub UI (див. Branch Cleanup вище)
-- **Mobile Agent App** — потрібні скріншоти MobileAgentLTEX v1.15.3
-- **Warehouse App** — потрібні вимоги та скріншоти
-- **Інфраструктура** — запуск міграцій, реєстрація webhooks, завантаження фото (потрібен доступ до Supabase/Netlify)
-- **1С інтеграція** — налаштування на стороні 1С (HTTP Service, Exchange Plans, cron)
-- **Кастомний домен** — ltex.com.ua (потрібен доступ до DNS)
+- **Видалити merged branches** — 7 branches через GitHub UI (див. Branch Cleanup вище)
+- **Увімкнути RLS** — запустити `scripts/enable-rls.sql` в Supabase SQL Editor
+- **Запустити FTS міграцію** — запустити `scripts/fts-migration.sql` в Supabase SQL Editor
+- **Запустити seed** — `pnpm db:seed` з правильним DATABASE_URL
+- **Створити Storage bucket** — `product-images` в Supabase Dashboard
+- **Завантажити фото** — `npx tsx scripts/upload-photos.ts` (після створення bucket)
+- **Retry Netlify deploy** — перевірити що фікс Prisma generate працює
+- **Netlify env vars** — додати NEXT_PUBLIC_SITE_URL, SYNC_API_KEY
+- **Telegram/Viber webhooks** — запустити скрипти реєстрації
+- **1С інтеграція** — налаштування на стороні 1С
+- **Кастомний домен** — ltex.com.ua (DNS + Netlify)
 
 ## Orchestration Workflow
 
