@@ -595,6 +595,60 @@ EXPO_PUBLIC_API_URL=       # (mobile) API base URL for Expo app
 - **1С інтеграція** — налаштування на стороні 1С (HTTP Service, Exchange Plans, cron)
 - **Кастомний домен** — ltex.com.ua (потрібен доступ до DNS)
 
+## Orchestration Workflow
+
+### Session Types
+
+**Orchestrator** — управляє проектом, НЕ кодить:
+- Review та merge feature branches в main
+- Видалення merged branches
+- Перевірка CI/deploy статусу
+- Оновлення CLAUDE.md (звіти, задачі)
+- Планування задач для worker-сесій
+
+**Worker** — кодить, НЕ управляє:
+- Виконує задачі з "Tasks for next session" в CLAUDE.md
+- Автоматично створює feature branch (це нормально)
+- Пушить результат на свою гілку
+- НЕ мерджить в main — це робить orchestrator
+
+### Процес
+
+```
+Orchestrator: план → CLAUDE.md → push main
+    ↓
+Worker: читає CLAUDE.md → кодить → push feature branch
+    ↓
+Orchestrator: review → merge → cleanup → новий план
+```
+
+### Worker Session Checklist (для orchestrator після кожної worker-сесії)
+
+- [ ] `git fetch origin` — знайти нову гілку
+- [ ] `git log origin/<branch> --oneline` — переглянути коміти
+- [ ] `git diff main..origin/<branch> --stat` — переглянути зміни
+- [ ] `git merge origin/<branch>` — merge в main
+- [ ] `git push origin main` — push main
+- [ ] `git push origin --delete <branch>` — видалити merged branch
+- [ ] Перевірити CI — green?
+- [ ] Оновити CLAUDE.md — звіт + нові задачі
+
+### Infrastructure Status (потребує доступу користувача)
+
+| Задача | Статус | Що потрібно |
+|--------|--------|-------------|
+| Netlify deploy branch = main | DONE | — |
+| Netlify env: DATABASE_URL, SUPABASE | DONE | — |
+| Netlify env: NEXT_PUBLIC_SITE_URL | PENDING | Додати в Netlify Dashboard |
+| Netlify env: SYNC_API_KEY | PENDING | `openssl rand -hex 32`, додати в Netlify + 1С |
+| Netlify env: TELEGRAM_BOT_TOKEN + CHAT_ID | PENDING | Від @BotFather |
+| Netlify env: VIBER_AUTH_TOKEN | PENDING | З partners.viber.com |
+| FTS migration (GIN + trigram indexes) | PENDING | Запустити SQL в Supabase SQL Editor |
+| Supabase Storage bucket (product-images) | PENDING | Створити в Supabase Dashboard |
+| Завантажити фото продуктів | PENDING | `npx tsx scripts/upload-photos.ts` |
+| Зареєструвати webhooks ботів | PENDING | `npx tsx scripts/register-webhooks.ts` |
+| Кастомний домен ltex.com.ua | PENDING | DNS налаштування |
+
 ## Tech Stack
 
 - Monorepo: Turborepo + pnpm 9.x
