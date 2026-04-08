@@ -2,8 +2,10 @@
 
 import { prisma } from "@ltex/db";
 import { revalidatePath } from "next/cache";
+import { requireAdmin } from "@/lib/admin-auth";
 
 export async function createCategory(formData: FormData) {
+  await requireAdmin();
   const name = formData.get("name") as string;
   const slug = formData.get("slug") as string;
   const parentId = (formData.get("parentId") as string) || null;
@@ -26,6 +28,7 @@ export async function createCategory(formData: FormData) {
 }
 
 export async function deleteCategory(id: string) {
+  await requireAdmin();
   const productsCount = await prisma.product.count({
     where: { categoryId: id },
   });

@@ -4,8 +4,10 @@ import { prisma } from "@ltex/db";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient as createSupabaseAdmin } from "@/lib/supabase/server";
+import { requireAdmin } from "@/lib/admin-auth";
 
 export async function createProduct(formData: FormData) {
+  await requireAdmin();
   const data = {
     name: formData.get("name") as string,
     slug: formData.get("slug") as string,
@@ -30,6 +32,7 @@ export async function createProduct(formData: FormData) {
 }
 
 export async function updateProduct(id: string, formData: FormData) {
+  await requireAdmin();
   const data = {
     name: formData.get("name") as string,
     slug: formData.get("slug") as string,
@@ -54,6 +57,7 @@ export async function updateProduct(id: string, formData: FormData) {
 }
 
 export async function deleteProduct(id: string) {
+  await requireAdmin();
   await prisma.product.delete({ where: { id } });
   revalidatePath("/admin/products");
 }
@@ -62,6 +66,7 @@ export async function uploadProductImage(
   productId: string,
   formData: FormData,
 ) {
+  await requireAdmin();
   const file = formData.get("file") as File;
   if (!file || file.size === 0) return;
 
@@ -97,6 +102,7 @@ export async function uploadProductImage(
 }
 
 export async function deleteProductImage(imageId: string, productId: string) {
+  await requireAdmin();
   const image = await prisma.productImage.findUnique({
     where: { id: imageId },
   });

@@ -4,6 +4,7 @@ import { prisma } from "@ltex/db";
 import { ORDER_STATUSES, type OrderStatus } from "@ltex/shared";
 import { revalidatePath } from "next/cache";
 import { sendPushNotification } from "@/lib/push";
+import { requireAdmin } from "@/lib/admin-auth";
 
 const STATUS_LABELS: Record<string, string> = {
   pending: "Очікує",
@@ -15,6 +16,7 @@ const STATUS_LABELS: Record<string, string> = {
 };
 
 export async function updateOrderStatus(orderId: string, status: OrderStatus) {
+  await requireAdmin();
   if (!ORDER_STATUSES.includes(status)) {
     throw new Error(`Invalid status: ${status}`);
   }

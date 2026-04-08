@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@ltex/db";
 import { mobileAuthSchema } from "@/lib/validations";
+import { rateLimit, getClientIp } from "@/lib/rate-limit";
 
 /**
  * POST /api/mobile/auth — Register or login by phone.
@@ -11,6 +12,16 @@ import { mobileAuthSchema } from "@/lib/validations";
  * For now, upserts customer by phone number.
  */
 export async function POST(request: NextRequest) {
+  // Rate limit: 10 auth requests per minute per IP (brute force protection)
+  const ip = getClientIp(request);
+  const limit = rateLimit(`mobile-auth:${ip}`, { windowMs: 60_000, max: 10 });
+  if (!limit.allowed) {
+    return NextResponse.json(
+      { error: "Забагато спроб. Зачекайте хвилину." },
+      { status: 429 },
+    );
+  }
+
   let body: unknown;
   try {
     body = await request.json();
