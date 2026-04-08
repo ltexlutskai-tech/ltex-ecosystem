@@ -1,0 +1,51 @@
+# Netlify configuration for L-TEX Ecosystem
+# Site: stalwart-dango-04a9b9.netlify.app
+
+[build]
+  # Build the store app via Turborepo (runs prisma generate → next build)
+  command = "pnpm install --frozen-lockfile && pnpm build --filter=@ltex/store..."
+  publish = "apps/store/.next"
+  # Base directory (monorepo root)
+  base = "/"
+
+[build.environment]
+  NODE_VERSION = "22"
+  PNPM_VERSION = "9.15.4"
+
+# Next.js on Netlify requires the @netlify/plugin-nextjs plugin
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
+
+# ═══════════════════════════════════════════════════════════════════════
+# Security headers
+# ═══════════════════════════════════════════════════════════════════════
+# These complement the headers set in next.config.js (which apply to
+# Next.js-rendered pages). Netlify headers cover static assets and
+# edge-served content.
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "DENY"
+    X-Content-Type-Options = "nosniff"
+    X-XSS-Protection = "1; mode=block"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Permissions-Policy = "camera=(), microphone=(), geolocation=(), interest-cohort=()"
+    Strict-Transport-Security = "max-age=31536000; includeSubDomains"
+
+# Cache static assets aggressively
+[[headers]]
+  for = "/_next/static/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+# ═══════════════════════════════════════════════════════════════════════
+# Redirects
+# ═══════════════════════════════════════════════════════════════════════
+
+# www → non-www redirect
+[[redirects]]
+  from = "https://www.ltex.com.ua/*"
+  to = "https://ltex.com.ua/:splat"
+  status = 301
+  force = true
