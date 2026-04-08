@@ -1,7 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { ORDER_STATUSES, ORDER_STATUS_LABELS, type OrderStatus } from "@ltex/shared";
+import {
+  ORDER_STATUSES,
+  ORDER_STATUS_LABELS,
+  type OrderStatus,
+} from "@ltex/shared";
 import { toast } from "@ltex/ui";
 import { updateOrderStatus } from "./actions";
 

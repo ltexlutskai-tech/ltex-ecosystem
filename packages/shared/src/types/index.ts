@@ -1,4 +1,9 @@
-export { PRICE_UNITS, PRICE_UNIT_LABELS, SEASONS, SEASON_LABELS } from "./product";
+export {
+  PRICE_UNITS,
+  PRICE_UNIT_LABELS,
+  SEASONS,
+  SEASON_LABELS,
+} from "./product";
 export type { Product, PriceUnit, Season } from "./product";
 
 export { LOT_STATUSES, LOT_STATUS_LABELS } from "./lot";

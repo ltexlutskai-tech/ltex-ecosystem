@@ -10,7 +10,10 @@ import {
 import Link from "next/link";
 import { OrderStatusForm } from "./order-status-form";
 
-const statusColors: Record<OrderStatus, "default" | "secondary" | "destructive" | "outline" | "accent"> = {
+const statusColors: Record<
+  OrderStatus,
+  "default" | "secondary" | "destructive" | "outline" | "accent"
+> = {
   draft: "secondary",
   pending: "outline",
   confirmed: "accent",
@@ -105,9 +108,7 @@ export default async function OrdersPage({
                     </Badge>
                   </td>
                   <td className="px-4 py-3">€{order.totalEur.toFixed(2)}</td>
-                  <td className="px-4 py-3">
-                    ₴{order.totalUah.toFixed(2)}
-                  </td>
+                  <td className="px-4 py-3">₴{order.totalUah.toFixed(2)}</td>
                   <td className="px-4 py-3">{order._count.items}</td>
                   <td className="px-4 py-3">
                     {new Date(order.createdAt).toLocaleDateString("uk-UA")}

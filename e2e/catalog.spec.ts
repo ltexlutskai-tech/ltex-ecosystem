@@ -14,7 +14,9 @@ test.describe("Catalog", () => {
     await page.waitForLoadState("networkidle");
 
     // Select a quality filter
-    const qualitySelect = page.locator("select").filter({ hasText: /Екстра|Крем|1й сорт/ });
+    const qualitySelect = page
+      .locator("select")
+      .filter({ hasText: /Екстра|Крем|1й сорт/ });
     if (await qualitySelect.isVisible()) {
       await qualitySelect.selectOption("extra");
       await page.waitForURL(/quality=extra/);
@@ -39,7 +41,9 @@ test.describe("Catalog", () => {
     await page.waitForLoadState("networkidle");
 
     // Check if pagination exists (only if there are enough products)
-    const nextButton = page.locator("a, button").filter({ hasText: /наступна|далі|→|next/i });
+    const nextButton = page
+      .locator("a, button")
+      .filter({ hasText: /наступна|далі|→|next/i });
     if (await nextButton.isVisible()) {
       await nextButton.click();
       await expect(page).toHaveURL(/page=2/);

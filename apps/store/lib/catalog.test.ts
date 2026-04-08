@@ -159,7 +159,11 @@ describe("getCatalogProducts", () => {
   });
 
   it("sorts by price ascending post-fetch", async () => {
-    const products = [makeProduct("a", 30), makeProduct("b", 10), makeProduct("c", 20)];
+    const products = [
+      makeProduct("a", 30),
+      makeProduct("b", 10),
+      makeProduct("c", 20),
+    ];
     mockFindMany.mockResolvedValue(products);
     mockCount.mockResolvedValue(3);
 
@@ -171,7 +175,11 @@ describe("getCatalogProducts", () => {
   });
 
   it("sorts by price descending post-fetch", async () => {
-    const products = [makeProduct("a", 10), makeProduct("b", 30), makeProduct("c", 20)];
+    const products = [
+      makeProduct("a", 10),
+      makeProduct("b", 30),
+      makeProduct("c", 20),
+    ];
     mockFindMany.mockResolvedValue(products);
     mockCount.mockResolvedValue(3);
 
@@ -240,8 +248,20 @@ describe("autocompleteSearch", () => {
 
   it("returns search results for valid query", async () => {
     mockQueryRaw.mockResolvedValue([
-      { id: "p1", name: "Куртка зимова", slug: "kurtka-zymova", quality: "first", rank: BigInt(2) },
-      { id: "p2", name: "Куртка літня", slug: "kurtka-litnya", quality: "extra", rank: BigInt(1) },
+      {
+        id: "p1",
+        name: "Куртка зимова",
+        slug: "kurtka-zymova",
+        quality: "first",
+        rank: BigInt(2),
+      },
+      {
+        id: "p2",
+        name: "Куртка літня",
+        slug: "kurtka-litnya",
+        quality: "extra",
+        rank: BigInt(1),
+      },
     ]);
 
     const result = await autocompleteSearch("куртка");
@@ -249,7 +269,9 @@ describe("autocompleteSearch", () => {
     expect(result).toHaveLength(2);
     expect(mockQueryRaw).toHaveBeenCalled();
     // Should be sorted by rank descending
-    expect(Number(result[0]!.rank)).toBeGreaterThanOrEqual(Number(result[1]!.rank));
+    expect(Number(result[0]!.rank)).toBeGreaterThanOrEqual(
+      Number(result[1]!.rank),
+    );
   });
 
   it("sanitizes special characters in query", async () => {

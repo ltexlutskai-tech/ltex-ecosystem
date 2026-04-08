@@ -1,12 +1,7 @@
 export const dynamic = "force-dynamic";
 
 import { prisma } from "@ltex/db";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@ltex/ui";
+import { Card, CardContent, CardHeader, CardTitle } from "@ltex/ui";
 import {
   ORDER_STATUS_LABELS,
   QUALITY_LABELS,
@@ -121,7 +116,15 @@ async function getStats() {
   ]);
 
   // Build funnel data from ordersByStatus
-  const funnelOrder = ["draft", "pending", "confirmed", "processing", "shipped", "delivered", "cancelled"];
+  const funnelOrder = [
+    "draft",
+    "pending",
+    "confirmed",
+    "processing",
+    "shipped",
+    "delivered",
+    "cancelled",
+  ];
   const ordersByStatusMap = Object.fromEntries(
     ordersByStatus.map((g) => [g.status, g._count.id]),
   ) as Record<string, number>;
@@ -144,7 +147,10 @@ async function getStats() {
     })),
     recentOrders,
     ordersLast30Days: ordersLast30Days.map((d) => ({
-      day: new Date(d.day).toLocaleDateString("uk-UA", { day: "2-digit", month: "2-digit" }),
+      day: new Date(d.day).toLocaleDateString("uk-UA", {
+        day: "2-digit",
+        month: "2-digit",
+      }),
       count: Number(d.count),
       total: Number(d.total),
     })),
@@ -192,10 +198,15 @@ function BarChart({
           <div className="flex-1">
             <div
               className={`h-5 rounded ${BAR_COLORS[item.label] ?? "bg-green-500"} transition-all`}
-              style={{ width: `${(item.value / max) * 100}%`, minWidth: item.value > 0 ? "4px" : "0px" }}
+              style={{
+                width: `${(item.value / max) * 100}%`,
+                minWidth: item.value > 0 ? "4px" : "0px",
+              }}
             />
           </div>
-          <span className="w-10 text-right text-xs font-medium">{item.value}</span>
+          <span className="w-10 text-right text-xs font-medium">
+            {item.value}
+          </span>
         </div>
       ))}
     </div>
@@ -234,7 +245,10 @@ export default async function AdminDashboard() {
       value: stats.lotsCount,
       icon: Boxes,
       detail: Object.entries(stats.lotsByStatus)
-        .map(([status, count]) => `${LOT_STATUS_LABELS[status as LotStatus] ?? status}: ${count}`)
+        .map(
+          ([status, count]) =>
+            `${LOT_STATUS_LABELS[status as LotStatus] ?? status}: ${count}`,
+        )
         .join(", "),
     },
   ];
@@ -273,7 +287,10 @@ export default async function AdminDashboard() {
             ) : (
               <div className="flex items-end gap-1" style={{ height: 120 }}>
                 {stats.ordersLast30Days.map((d) => {
-                  const max = Math.max(...stats.ordersLast30Days.map((x) => x.count), 1);
+                  const max = Math.max(
+                    ...stats.ordersLast30Days.map((x) => x.count),
+                    1,
+                  );
                   const height = (d.count / max) * 100;
                   return (
                     <div
@@ -320,10 +337,12 @@ export default async function AdminDashboard() {
           </CardHeader>
           <CardContent>
             <BarChart
-              data={Object.entries(stats.lotsByStatus).map(([status, count]) => ({
-                label: status,
-                value: count,
-              }))}
+              data={Object.entries(stats.lotsByStatus).map(
+                ([status, count]) => ({
+                  label: status,
+                  value: count,
+                }),
+              )}
               labels={LOT_STATUS_LABELS as unknown as Record<string, string>}
             />
           </CardContent>

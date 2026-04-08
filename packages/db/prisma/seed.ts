@@ -40,56 +40,84 @@ interface LotData {
 
 const CATEGORIES = [
   {
-    slug: "odyag", name: "Одяг", children: [
-      { slug: "futbolky", name: "Футболки" }, { slug: "sorochky", name: "Сорочки" },
-      { slug: "svitshoty", name: "Світшоти" }, { slug: "tolstovky", name: "Толстовки" },
-      { slug: "svetry", name: "Светри" }, { slug: "kurtky", name: "Куртки" },
-      { slug: "palto", name: "Пальто" }, { slug: "zhylety", name: "Жилети" },
-      { slug: "dzhinsy", name: "Джинси" }, { slug: "shtany", name: "Штани" },
-      { slug: "shorty", name: "Шорти" }, { slug: "sportyvni-shtany", name: "Спортивні штани" },
-      { slug: "sukni", name: "Сукні" }, { slug: "spidnytsi", name: "Спідниці" },
-      { slug: "bluzy", name: "Блузи" }, { slug: "pizhamy", name: "Піжами" },
-      { slug: "bilyzna", name: "Білизна" }, { slug: "kupalniky", name: "Купальники" },
-      { slug: "kostyumy", name: "Костюми" }, { slug: "kombinezony", name: "Комбінезони" },
-      { slug: "verhniiy-odyag", name: "Верхній одяг" }, { slug: "dytiachyi-odyag", name: "Дитячий одяг" },
+    slug: "odyag",
+    name: "Одяг",
+    children: [
+      { slug: "futbolky", name: "Футболки" },
+      { slug: "sorochky", name: "Сорочки" },
+      { slug: "svitshoty", name: "Світшоти" },
+      { slug: "tolstovky", name: "Толстовки" },
+      { slug: "svetry", name: "Светри" },
+      { slug: "kurtky", name: "Куртки" },
+      { slug: "palto", name: "Пальто" },
+      { slug: "zhylety", name: "Жилети" },
+      { slug: "dzhinsy", name: "Джинси" },
+      { slug: "shtany", name: "Штани" },
+      { slug: "shorty", name: "Шорти" },
+      { slug: "sportyvni-shtany", name: "Спортивні штани" },
+      { slug: "sukni", name: "Сукні" },
+      { slug: "spidnytsi", name: "Спідниці" },
+      { slug: "bluzy", name: "Блузи" },
+      { slug: "pizhamy", name: "Піжами" },
+      { slug: "bilyzna", name: "Білизна" },
+      { slug: "kupalniky", name: "Купальники" },
+      { slug: "kostyumy", name: "Костюми" },
+      { slug: "kombinezony", name: "Комбінезони" },
+      { slug: "verhniiy-odyag", name: "Верхній одяг" },
+      { slug: "dytiachyi-odyag", name: "Дитячий одяг" },
       { slug: "inshe-odyag", name: "Інше" },
     ],
   },
   {
-    slug: "vzuttia", name: "Взуття", children: [
-      { slug: "krosivky", name: "Кросівки" }, { slug: "cherevyky", name: "Черевики" },
-      { slug: "choboty", name: "Чоботи" }, { slug: "tufli", name: "Туфлі" },
-      { slug: "sandali", name: "Сандалі" }, { slug: "shlopantsi", name: "Шльопанці" },
+    slug: "vzuttia",
+    name: "Взуття",
+    children: [
+      { slug: "krosivky", name: "Кросівки" },
+      { slug: "cherevyky", name: "Черевики" },
+      { slug: "choboty", name: "Чоботи" },
+      { slug: "tufli", name: "Туфлі" },
+      { slug: "sandali", name: "Сандалі" },
+      { slug: "shlopantsi", name: "Шльопанці" },
       { slug: "inshe-vzuttia", name: "Інше" },
     ],
   },
   {
-    slug: "aksesuary", name: "Аксесуари", children: [
-      { slug: "sumky", name: "Сумки" }, { slug: "remeni", name: "Ремені" },
+    slug: "aksesuary",
+    name: "Аксесуари",
+    children: [
+      { slug: "sumky", name: "Сумки" },
+      { slug: "remeni", name: "Ремені" },
       { slug: "inshe-aksesuary", name: "Інше" },
     ],
   },
   {
-    slug: "dim-ta-pobut", name: "Дім та побут", children: [
-      { slug: "postil", name: "Постіль" }, { slug: "shtory", name: "Штори" },
-      { slug: "rushnyky", name: "Рушники" }, { slug: "kovdry", name: "Ковдри" },
+    slug: "dim-ta-pobut",
+    name: "Дім та побут",
+    children: [
+      { slug: "postil", name: "Постіль" },
+      { slug: "shtory", name: "Штори" },
+      { slug: "rushnyky", name: "Рушники" },
+      { slug: "kovdry", name: "Ковдри" },
       { slug: "inshe-dim", name: "Інше" },
     ],
   },
   {
-    slug: "igrashky", name: "Іграшки", children: [
-      { slug: "miaki", name: "М'які" }, { slug: "plastykovi", name: "Пластикові" },
+    slug: "igrashky",
+    name: "Іграшки",
+    children: [
+      { slug: "miaki", name: "М'які" },
+      { slug: "plastykovi", name: "Пластикові" },
     ],
   },
   {
-    slug: "bric-a-brac", name: "Bric-a-Brac", children: [
-      { slug: "miks-bric", name: "Мікс" },
-    ],
+    slug: "bric-a-brac",
+    name: "Bric-a-Brac",
+    children: [{ slug: "miks-bric", name: "Мікс" }],
   },
   {
-    slug: "kosmetyka", name: "Косметика", children: [
-      { slug: "miks-kosmetyka", name: "Мікс" },
-    ],
+    slug: "kosmetyka",
+    name: "Косметика",
+    children: [{ slug: "miks-kosmetyka", name: "Мікс" }],
   },
 ];
 
@@ -130,7 +158,8 @@ async function main() {
   const productMap = new Map<string, string>(); // articleCode → product.id
 
   for (const p of productsData) {
-    const categoryId = categoryMap.get(p.subcategorySlug) || categoryMap.get(p.categorySlug);
+    const categoryId =
+      categoryMap.get(p.subcategorySlug) || categoryMap.get(p.categorySlug);
     if (!categoryId) {
       console.warn(`  ⚠️ No category for: ${p.name} (${p.subcategorySlug})`);
       continue;
@@ -189,7 +218,9 @@ async function main() {
             articleCode: p.articleCode,
           },
         });
-        console.warn(`  ⚠️ Duplicate code1C ${code1C}, saved without it: ${p.name}`);
+        console.warn(
+          `  ⚠️ Duplicate code1C ${code1C}, saved without it: ${p.name}`,
+        );
       } else {
         throw e;
       }

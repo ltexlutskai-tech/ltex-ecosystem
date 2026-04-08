@@ -90,7 +90,9 @@ export async function GET(request: NextRequest) {
     where: { customerId },
     include: {
       _count: { select: { items: true } },
-      shipments: { select: { trackingNumber: true, status: true, statusText: true } },
+      shipments: {
+        select: { trackingNumber: true, status: true, statusText: true },
+      },
       payments: { select: { amount: true, status: true } },
     },
     orderBy: { createdAt: "desc" },

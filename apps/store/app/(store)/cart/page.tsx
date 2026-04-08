@@ -75,9 +75,7 @@ export default function CartPage() {
         <p className="mt-2 text-gray-500">
           Ми зв&apos;яжемося з вами для підтвердження.
         </p>
-        <p className="mt-1 text-sm text-gray-400">
-          ID: {orderResult.orderId}
-        </p>
+        <p className="mt-1 text-sm text-gray-400">ID: {orderResult.orderId}</p>
         <div className="mt-6 flex gap-3">
           <Button asChild>
             <Link href="/catalog">Продовжити покупки</Link>

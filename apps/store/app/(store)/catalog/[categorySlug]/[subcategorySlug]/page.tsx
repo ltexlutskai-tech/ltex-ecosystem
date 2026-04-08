@@ -85,9 +85,7 @@ export default async function SubcategoryPage({ params, searchParams }: Props) {
       </div>
 
       {products.length === 0 ? (
-        <p className="mt-12 text-center text-gray-500">
-          Товарів не знайдено.
-        </p>
+        <p className="mt-12 text-center text-gray-500">Товарів не знайдено.</p>
       ) : (
         <div className="mt-6 grid gap-4 grid-cols-2 sm:grid-cols-3 lg:grid-cols-4">
           {products.map((product) => (

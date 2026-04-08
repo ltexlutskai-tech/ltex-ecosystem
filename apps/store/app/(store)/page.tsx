@@ -23,7 +23,7 @@ export default async function HomePage() {
         where: { categoryId: { in: allIds }, inStock: true },
       });
       return { ...cat, productCount };
-    })
+    }),
   );
   const jsonLd = {
     "@context": "https://schema.org",

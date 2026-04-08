@@ -17,14 +17,17 @@ export function AddToCartButton({ lot }: { lot: CartItem }) {
         className="text-green-700"
         aria-label={`Видалити ${lot.productName} з кошика`}
       >
-        <Check className="mr-1 h-3 w-3" aria-hidden="true" />
-        В кошику
+        <Check className="mr-1 h-3 w-3" aria-hidden="true" />В кошику
       </Button>
     );
   }
 
   return (
-    <Button size="sm" onClick={() => addItem(lot)} aria-label={`Додати ${lot.productName} до кошика`}>
+    <Button
+      size="sm"
+      onClick={() => addItem(lot)}
+      aria-label={`Додати ${lot.productName} до кошика`}
+    >
       <ShoppingCart className="mr-1 h-3 w-3" aria-hidden="true" />
       Додати
     </Button>

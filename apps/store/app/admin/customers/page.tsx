@@ -89,9 +89,7 @@ export default async function CustomersPage({
                   <td className="px-4 py-3">{customer.telegram ?? "-"}</td>
                   <td className="px-4 py-3">{customer.city ?? "-"}</td>
                   <td className="px-4 py-3">{customer._count.orders}</td>
-                  <td className="px-4 py-3">
-                    €{totalSpent.toFixed(2)}
-                  </td>
+                  <td className="px-4 py-3">€{totalSpent.toFixed(2)}</td>
                   <td className="px-4 py-3 font-mono text-xs">
                     {customer.code1C ?? "-"}
                   </td>

@@ -61,16 +61,13 @@ async function sendTelegramNotification(
   }
 }
 
-async function sendViberNotification(
-  order: OrderNotification,
-): Promise<void> {
+async function sendViberNotification(order: OrderNotification): Promise<void> {
   const authToken = process.env.VIBER_AUTH_TOKEN;
   const adminUserId = process.env.VIBER_ADMIN_USER_ID;
 
   if (!authToken || !adminUserId) return;
 
-  const siteUrl =
-    process.env.NEXT_PUBLIC_SITE_URL ?? "https://ltex.com.ua";
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://ltex.com.ua";
 
   const text = [
     `🛒 Нове замовлення!`,

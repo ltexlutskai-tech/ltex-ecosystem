@@ -65,7 +65,9 @@ export function CatalogScreen({ navigation }: CatalogScreenProps) {
         }
         setHasMore(pageNum < (data.totalPages ?? 1));
       } catch {
-        setError("Не вдалося завантажити товари. Потягніть вниз для оновлення.");
+        setError(
+          "Не вдалося завантажити товари. Потягніть вниз для оновлення.",
+        );
       }
     },
     [search, quality],
@@ -188,7 +190,9 @@ export function CatalogScreen({ navigation }: CatalogScreenProps) {
               </Text>
             </View>
           }
-          contentContainerStyle={products.length === 0 ? styles.emptyList : undefined}
+          contentContainerStyle={
+            products.length === 0 ? styles.emptyList : undefined
+          }
         />
       )}
     </View>

@@ -19,7 +19,9 @@ export async function GET(request: NextRequest) {
   const customer = await prisma.customer.findUnique({
     where: { id: customerId },
     include: {
-      _count: { select: { orders: true, favorites: true, videoSubscriptions: true } },
+      _count: {
+        select: { orders: true, favorites: true, videoSubscriptions: true },
+      },
     },
   });
 
@@ -62,7 +64,10 @@ export async function PUT(request: NextRequest) {
 
   const parsed = mobileProfileUpdateSchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Невірні дані" }, { status: 400 });
+    return NextResponse.json(
+      { error: parsed.error.issues[0]?.message ?? "Невірні дані" },
+      { status: 400 },
+    );
   }
   const { customerId, name, email, telegram, city } = parsed.data;
 

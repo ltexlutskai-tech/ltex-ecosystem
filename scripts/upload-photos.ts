@@ -44,11 +44,17 @@ const dryRun = args.includes("--dry-run");
 const skipExisting = args.includes("--skip-existing");
 const concurrencyArg = args.find((a) => a.startsWith("--concurrency"));
 const concurrency = concurrencyArg
-  ? parseInt(concurrencyArg.split("=")[1] ?? args[args.indexOf(concurrencyArg) + 1] ?? "5")
+  ? parseInt(
+      concurrencyArg.split("=")[1] ??
+        args[args.indexOf(concurrencyArg) + 1] ??
+        "5",
+    )
   : 5;
 
 if (!photosDir) {
-  console.error("Usage: npx tsx scripts/upload-photos.ts <photos-dir> [--dry-run] [--skip-existing] [--concurrency N]");
+  console.error(
+    "Usage: npx tsx scripts/upload-photos.ts <photos-dir> [--dry-run] [--skip-existing] [--concurrency N]",
+  );
   process.exit(1);
 }
 
@@ -76,7 +82,9 @@ const IMAGE_EXTS = new Set([".jpg", ".jpeg", ".png", ".webp", ".bmp", ".tiff"]);
  * 2. Назва товару (1567).jpg          → code=1567, position=1
  * 3. Назва товару (1567)_2.jpg        → code=1567, position=2
  */
-function parseFileName(fileName: string): { articleCode: string; position: number } | null {
+function parseFileName(
+  fileName: string,
+): { articleCode: string; position: number } | null {
   // Try pattern: (CODE) at the start
   const startMatch = fileName.match(/^\((\d+)\)\s+.+?(?:_(\d+))?\.\w+$/);
   if (startMatch) {
@@ -218,9 +226,7 @@ async function main() {
     select: { id: true, code1C: true, name: true },
   });
 
-  const productMap = new Map(
-    products.map((p) => [p.code1C!, p]),
-  );
+  const productMap = new Map(products.map((p) => [p.code1C!, p]));
 
   const notFound: string[] = [];
   for (const code of articleCodes) {
@@ -243,7 +249,9 @@ async function main() {
 
   if (dryRun) {
     console.log("\n--- DRY RUN завершено ---");
-    console.log(`Буде завантажено: ${parsed.length - notFound.reduce((sum, code) => sum + (grouped.get(code)?.length ?? 0), 0)} фото`);
+    console.log(
+      `Буде завантажено: ${parsed.length - notFound.reduce((sum, code) => sum + (grouped.get(code)?.length ?? 0), 0)} фото`,
+    );
     console.log(`Для ${products.length} товарів`);
     await prisma.$disconnect();
     return;
@@ -266,8 +274,8 @@ async function main() {
   let errors = 0;
   const errorDetails: string[] = [];
 
-  const entries = [...grouped.entries()].filter(
-    ([code]) => productMap.has(code),
+  const entries = [...grouped.entries()].filter(([code]) =>
+    productMap.has(code),
   );
 
   await processInBatches(entries, concurrency, async ([code, files], index) => {

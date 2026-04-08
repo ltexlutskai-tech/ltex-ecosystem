@@ -52,9 +52,7 @@ export function ImageUpload({ productId, images }: ImageUploadProps) {
                 alt={img.alt}
                 className="h-24 w-full rounded-md border object-cover"
               />
-              <form
-                action={deleteProductImage.bind(null, img.id, productId)}
-              >
+              <form action={deleteProductImage.bind(null, img.id, productId)}>
                 <button
                   type="submit"
                   className="absolute -right-1 -top-1 rounded-full bg-red-500 p-0.5 text-white opacity-0 transition group-hover:opacity-100"

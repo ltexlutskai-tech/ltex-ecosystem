@@ -61,11 +61,17 @@ export async function POST(request: NextRequest) {
   };
 
   if (!sessionId) {
-    return NextResponse.json({ error: "sessionId is required" }, { status: 400 });
+    return NextResponse.json(
+      { error: "sessionId is required" },
+      { status: 400 },
+    );
   }
 
   if (!Array.isArray(items)) {
-    return NextResponse.json({ error: "items must be an array" }, { status: 400 });
+    return NextResponse.json(
+      { error: "items must be an array" },
+      { status: 400 },
+    );
   }
 
   try {
@@ -94,7 +100,10 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ success: true });
   } catch {
-    return NextResponse.json({ error: "Failed to update cart" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Failed to update cart" },
+      { status: 500 },
+    );
   }
 }
 
@@ -109,7 +118,10 @@ export async function DELETE(request: NextRequest) {
   const { sessionId, lotId } = body as { sessionId: string; lotId: string };
 
   if (!sessionId || !lotId) {
-    return NextResponse.json({ error: "sessionId and lotId are required" }, { status: 400 });
+    return NextResponse.json(
+      { error: "sessionId and lotId are required" },
+      { status: 400 },
+    );
   }
 
   try {
@@ -124,6 +136,9 @@ export async function DELETE(request: NextRequest) {
 
     return NextResponse.json({ success: true });
   } catch {
-    return NextResponse.json({ error: "Failed to remove item" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Failed to remove item" },
+      { status: 500 },
+    );
   }
 }

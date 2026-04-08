@@ -29,7 +29,8 @@ const toastVariants = cva(
       variant: {
         default: "border bg-background text-foreground",
         success: "border-green-200 bg-green-50 text-green-900",
-        destructive: "destructive group border-destructive bg-destructive text-destructive-foreground",
+        destructive:
+          "destructive group border-destructive bg-destructive text-destructive-foreground",
       },
     },
     defaultVariants: {
@@ -66,8 +67,18 @@ const ToastClose = React.forwardRef<
     toast-close=""
     {...props}
   >
-    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+    <svg
+      className="h-4 w-4"
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      strokeWidth={2}
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M6 18L18 6M6 6l12 12"
+      />
     </svg>
   </ToastPrimitives.Close>
 ));

@@ -58,7 +58,9 @@ describe("generateSlug", () => {
   });
 
   it("generates correct slug for real product names", () => {
-    expect(generateSlug("Взуття жіноче зимове")).toBe("vzuttya-zhinoche-zymove");
+    expect(generateSlug("Взуття жіноче зимове")).toBe(
+      "vzuttya-zhinoche-zymove",
+    );
     expect(generateSlug("Іграшки дитячі")).toBe("ihrashky-dytyachi");
   });
 });

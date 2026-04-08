@@ -20,7 +20,10 @@ export async function POST(request: NextRequest) {
 
   const parsed = mobileAuthSchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Невірні дані" }, { status: 400 });
+    return NextResponse.json(
+      { error: parsed.error.issues[0]?.message ?? "Невірні дані" },
+      { status: 400 },
+    );
   }
 
   const { phone, name, telegram, city } = parsed.data;
@@ -31,7 +34,10 @@ export async function POST(request: NextRequest) {
 
     if (!customer) {
       if (!name) {
-        return NextResponse.json({ error: "Ім'я обов'язкове для реєстрації" }, { status: 400 });
+        return NextResponse.json(
+          { error: "Ім'я обов'язкове для реєстрації" },
+          { status: 400 },
+        );
       }
       customer = await prisma.customer.create({
         data: { name, phone, telegram, city },

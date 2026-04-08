@@ -11,7 +11,7 @@ export default async function RatesPage() {
   });
 
   // Group by currency pair, show latest
-  const latestByPair = new Map<string, typeof rates[number]>();
+  const latestByPair = new Map<string, (typeof rates)[number]>();
   for (const rate of rates) {
     const key = `${rate.currencyFrom}_${rate.currencyTo}`;
     if (!latestByPair.has(key)) {
@@ -42,10 +42,7 @@ export default async function RatesPage() {
           ) : (
             <div className="grid gap-4 sm:grid-cols-3">
               {Array.from(latestByPair.values()).map((rate) => (
-                <div
-                  key={rate.id}
-                  className="rounded-lg border p-4"
-                >
+                <div key={rate.id} className="rounded-lg border p-4">
                   <div className="text-lg font-bold">
                     {rate.currencyFrom} → {rate.currencyTo}
                   </div>
@@ -53,7 +50,8 @@ export default async function RatesPage() {
                     {rate.rate.toFixed(4)}
                   </div>
                   <div className="mt-1 text-xs text-gray-500">
-                    {new Date(rate.date).toLocaleDateString("uk-UA")} · {rate.source}
+                    {new Date(rate.date).toLocaleDateString("uk-UA")} ·{" "}
+                    {rate.source}
                   </div>
                 </div>
               ))}

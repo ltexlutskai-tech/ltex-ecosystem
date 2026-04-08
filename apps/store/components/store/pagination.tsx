@@ -6,7 +6,11 @@ interface PaginationProps {
   baseHref: string;
 }
 
-export function Pagination({ currentPage, totalPages, baseHref }: PaginationProps) {
+export function Pagination({
+  currentPage,
+  totalPages,
+  baseHref,
+}: PaginationProps) {
   if (totalPages <= 1) return null;
 
   const pages: number[] = [];
@@ -17,7 +21,10 @@ export function Pagination({ currentPage, totalPages, baseHref }: PaginationProp
   const separator = baseHref.includes("?") ? "&" : "?";
 
   return (
-    <nav className="flex items-center justify-center gap-1" aria-label="Pagination">
+    <nav
+      className="flex items-center justify-center gap-1"
+      aria-label="Pagination"
+    >
       {currentPage > 1 && (
         <Link
           href={`${baseHref}${separator}page=${currentPage - 1}`}
@@ -52,7 +59,9 @@ export function Pagination({ currentPage, totalPages, baseHref }: PaginationProp
       ))}
       {end < totalPages && (
         <>
-          {end < totalPages - 1 && <span className="px-1 text-gray-400">...</span>}
+          {end < totalPages - 1 && (
+            <span className="px-1 text-gray-400">...</span>
+          )}
           <Link
             href={`${baseHref}${separator}page=${totalPages}`}
             className="rounded-md border px-3 py-1 text-sm hover:bg-gray-50"

@@ -55,7 +55,11 @@ describe("sendPushNotification", () => {
       ),
     );
 
-    const result = await sendPushNotification("cust-1", "Нове замовлення", "Деталі");
+    const result = await sendPushNotification(
+      "cust-1",
+      "Нове замовлення",
+      "Деталі",
+    );
 
     expect(result.sent).toBe(2);
     expect(result.failed).toBe(0);
@@ -79,7 +83,11 @@ describe("sendPushNotification", () => {
         JSON.stringify({
           data: [
             { status: "ok", id: "receipt-1" },
-            { status: "error", message: "Device not registered", details: { error: "DeviceNotRegistered" } },
+            {
+              status: "error",
+              message: "Device not registered",
+              details: { error: "DeviceNotRegistered" },
+            },
           ],
         }),
         { status: 200 },
@@ -105,7 +113,11 @@ describe("sendPushNotification", () => {
       new Response(
         JSON.stringify({
           data: [
-            { status: "error", message: "Rate limit exceeded", details: { error: "TooManyRequests" } },
+            {
+              status: "error",
+              message: "Rate limit exceeded",
+              details: { error: "TooManyRequests" },
+            },
           ],
         }),
         { status: 200 },
@@ -124,7 +136,10 @@ describe("sendPushNotification", () => {
       { id: "t1", token: "ExponentPushToken[abc]" },
     ]);
     fetchSpy.mockResolvedValue(
-      new Response("Internal Server Error", { status: 500, statusText: "Internal Server Error" }),
+      new Response("Internal Server Error", {
+        status: 500,
+        statusText: "Internal Server Error",
+      }),
     );
 
     const result = await sendPushNotification("cust-1", "Title", "Body");
@@ -152,7 +167,9 @@ describe("sendPushNotification", () => {
       { id: "t1", token: "ExponentPushToken[abc]" },
     ]);
     fetchSpy.mockResolvedValue(
-      new Response(JSON.stringify({ data: [{ status: "ok" }] }), { status: 200 }),
+      new Response(JSON.stringify({ data: [{ status: "ok" }] }), {
+        status: 200,
+      }),
     );
 
     await sendPushNotification("cust-1", "Title", "Body", { orderId: "ord-1" });

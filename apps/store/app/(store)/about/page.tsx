@@ -1,5 +1,13 @@
 import type { Metadata } from "next";
-import { APP_NAME, CONTACTS, COUNTRIES, COUNTRY_LABELS, MIN_ORDER_KG, QUALITY_LEVELS, QUALITY_LABELS } from "@ltex/shared";
+import {
+  APP_NAME,
+  CONTACTS,
+  COUNTRIES,
+  COUNTRY_LABELS,
+  MIN_ORDER_KG,
+  QUALITY_LEVELS,
+  QUALITY_LABELS,
+} from "@ltex/shared";
 import { Breadcrumbs } from "@/components/store/breadcrumbs";
 import { Button } from "@ltex/ui";
 import { MapPin, Phone, Mail, MessageCircle } from "lucide-react";
@@ -19,8 +27,8 @@ export default function AboutPage() {
       <section className="mt-6">
         <h1 className="text-3xl font-bold sm:text-4xl">{APP_NAME}</h1>
         <p className="mt-3 max-w-2xl text-lg text-gray-600">
-          Ми — українська гуртова компанія, що спеціалізується на продажу
-          секонд хенду, стоку (нового надлишкового товару), іграшок та Bric-a-Brac.
+          Ми — українська гуртова компанія, що спеціалізується на продажу секонд
+          хенду, стоку (нового надлишкового товару), іграшок та Bric-a-Brac.
           Працюємо з покупцями по всій Україні від {MIN_ORDER_KG} кг.
         </p>
       </section>

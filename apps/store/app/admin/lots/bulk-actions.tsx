@@ -41,9 +41,7 @@ export function BulkActions({
 
   return (
     <div className="flex items-center gap-3 rounded-lg border bg-white p-3">
-      <span className="text-sm font-medium">
-        Вибрано: {selectedIds.length}
-      </span>
+      <span className="text-sm font-medium">Вибрано: {selectedIds.length}</span>
       <span className="text-sm text-gray-500">Змінити статус:</span>
       {LOT_STATUSES.map((s) => (
         <Button

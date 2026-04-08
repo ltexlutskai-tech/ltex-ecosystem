@@ -46,7 +46,9 @@ export async function POST(request: NextRequest) {
         where: { slug: p.categorySlug },
       });
       if (!category) {
-        errors.push(`Category not found: ${p.categorySlug} (product: ${p.code1C})`);
+        errors.push(
+          `Category not found: ${p.categorySlug} (product: ${p.code1C})`,
+        );
         continue;
       }
 
@@ -86,7 +88,9 @@ export async function POST(request: NextRequest) {
         },
       });
     } catch (err) {
-      errors.push(`Failed: ${p.code1C} — ${err instanceof Error ? err.message : "unknown"}`);
+      errors.push(
+        `Failed: ${p.code1C} — ${err instanceof Error ? err.message : "unknown"}`,
+      );
     }
   }
 

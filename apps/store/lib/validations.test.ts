@@ -28,12 +28,18 @@ describe("orderCustomerSchema", () => {
   });
 
   it("requires name", () => {
-    const result = orderCustomerSchema.safeParse({ ...validCustomer, name: "" });
+    const result = orderCustomerSchema.safeParse({
+      ...validCustomer,
+      name: "",
+    });
     expect(result.success).toBe(false);
   });
 
   it("requires phone min 10 chars", () => {
-    const result = orderCustomerSchema.safeParse({ ...validCustomer, phone: "123" });
+    const result = orderCustomerSchema.safeParse({
+      ...validCustomer,
+      phone: "123",
+    });
     expect(result.success).toBe(false);
   });
 
@@ -49,16 +55,24 @@ describe("orderItemSchema", () => {
   });
 
   it("requires positive price", () => {
-    expect(orderItemSchema.safeParse({ ...validItem, priceEur: 0 }).success).toBe(false);
-    expect(orderItemSchema.safeParse({ ...validItem, priceEur: -5 }).success).toBe(false);
+    expect(
+      orderItemSchema.safeParse({ ...validItem, priceEur: 0 }).success,
+    ).toBe(false);
+    expect(
+      orderItemSchema.safeParse({ ...validItem, priceEur: -5 }).success,
+    ).toBe(false);
   });
 
   it("requires positive weight", () => {
-    expect(orderItemSchema.safeParse({ ...validItem, weight: 0 }).success).toBe(false);
+    expect(orderItemSchema.safeParse({ ...validItem, weight: 0 }).success).toBe(
+      false,
+    );
   });
 
   it("requires integer quantity", () => {
-    expect(orderItemSchema.safeParse({ ...validItem, quantity: 1.5 }).success).toBe(false);
+    expect(
+      orderItemSchema.safeParse({ ...validItem, quantity: 1.5 }).success,
+    ).toBe(false);
   });
 });
 
@@ -127,19 +141,33 @@ describe("syncProductSchema", () => {
   });
 
   it("accepts empty string videoUrl", () => {
-    const result = syncProductSchema.safeParse({ ...validProduct, videoUrl: "" });
+    const result = syncProductSchema.safeParse({
+      ...validProduct,
+      videoUrl: "",
+    });
     expect(result.success).toBe(true);
   });
 
   it("rejects invalid videoUrl", () => {
-    const result = syncProductSchema.safeParse({ ...validProduct, videoUrl: "not-a-url" });
+    const result = syncProductSchema.safeParse({
+      ...validProduct,
+      videoUrl: "not-a-url",
+    });
     expect(result.success).toBe(false);
   });
 
   it("priceUnit must be kg or piece", () => {
-    expect(syncProductSchema.safeParse({ ...validProduct, priceUnit: "kg" }).success).toBe(true);
-    expect(syncProductSchema.safeParse({ ...validProduct, priceUnit: "piece" }).success).toBe(true);
-    expect(syncProductSchema.safeParse({ ...validProduct, priceUnit: "liter" }).success).toBe(false);
+    expect(
+      syncProductSchema.safeParse({ ...validProduct, priceUnit: "kg" }).success,
+    ).toBe(true);
+    expect(
+      syncProductSchema.safeParse({ ...validProduct, priceUnit: "piece" })
+        .success,
+    ).toBe(true);
+    expect(
+      syncProductSchema.safeParse({ ...validProduct, priceUnit: "liter" })
+        .success,
+    ).toBe(false);
   });
 
   it("requires code1C", () => {
@@ -161,12 +189,14 @@ describe("syncLotsSchema", () => {
   });
 
   it("accepts lot with all optional fields", () => {
-    const result = syncLotsSchema.safeParse([{
-      ...validLot,
-      quantity: 50,
-      status: "on_sale",
-      videoUrl: "https://youtube.com/watch?v=abc",
-    }]);
+    const result = syncLotsSchema.safeParse([
+      {
+        ...validLot,
+        quantity: 50,
+        status: "on_sale",
+        videoUrl: "https://youtube.com/watch?v=abc",
+      },
+    ]);
     expect(result.success).toBe(true);
   });
 
@@ -197,16 +227,20 @@ describe("syncRatesSchema", () => {
   });
 
   it("accepts rate with date and source", () => {
-    const result = syncRatesSchema.safeParse([{
-      ...validRate,
-      date: "2025-01-15T12:00:00Z",
-      source: "1c",
-    }]);
+    const result = syncRatesSchema.safeParse([
+      {
+        ...validRate,
+        date: "2025-01-15T12:00:00Z",
+        source: "1c",
+      },
+    ]);
     expect(result.success).toBe(true);
   });
 
   it("rejects invalid currency", () => {
-    const result = syncRatesSchema.safeParse([{ ...validRate, currencyFrom: "GBP" }]);
+    const result = syncRatesSchema.safeParse([
+      { ...validRate, currencyFrom: "GBP" },
+    ]);
     expect(result.success).toBe(false);
   });
 
@@ -216,7 +250,9 @@ describe("syncRatesSchema", () => {
   });
 
   it("rejects invalid date format", () => {
-    const result = syncRatesSchema.safeParse([{ ...validRate, date: "not-a-date" }]);
+    const result = syncRatesSchema.safeParse([
+      { ...validRate, date: "not-a-date" },
+    ]);
     expect(result.success).toBe(false);
   });
 });

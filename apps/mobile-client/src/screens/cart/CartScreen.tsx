@@ -138,7 +138,9 @@ export function CartScreen({ navigation, cart }: CartScreenProps) {
     } catch (error) {
       Alert.alert(
         "Помилка",
-        error instanceof Error ? error.message : "Не вдалось створити замовлення",
+        error instanceof Error
+          ? error.message
+          : "Не вдалось створити замовлення",
       );
     } finally {
       setSubmitting(false);
@@ -314,8 +316,14 @@ export function CartScreen({ navigation, cart }: CartScreenProps) {
                 onPress={() => setShowCheckout(true)}
                 disabled={!minWeightMet}
               >
-                <Ionicons name="checkmark-circle-outline" size={20} color="#fff" />
-                <Text style={styles.checkoutButtonText}>Оформити замовлення</Text>
+                <Ionicons
+                  name="checkmark-circle-outline"
+                  size={20}
+                  color="#fff"
+                />
+                <Text style={styles.checkoutButtonText}>
+                  Оформити замовлення
+                </Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.clearButton}

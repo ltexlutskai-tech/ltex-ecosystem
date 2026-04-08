@@ -43,7 +43,10 @@ export function ConfirmDelete({
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         {trigger ?? (
-          <button type="button" className="text-red-500 hover:underline text-sm">
+          <button
+            type="button"
+            className="text-red-500 hover:underline text-sm"
+          >
             Видалити
           </button>
         )}

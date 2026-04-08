@@ -43,7 +43,9 @@ export async function GET(request: NextRequest) {
 
       // Send initial connected event
       controller.enqueue(
-        encoder.encode(`event: connected\ndata: ${JSON.stringify({ customerId })}\n\n`)
+        encoder.encode(
+          `event: connected\ndata: ${JSON.stringify({ customerId })}\n\n`,
+        ),
       );
 
       // Poll for new messages
@@ -72,7 +74,9 @@ export async function GET(request: NextRequest) {
               createdAt: msg.createdAt,
             };
             controller.enqueue(
-              encoder.encode(`event: message\ndata: ${JSON.stringify(data)}\n\n`)
+              encoder.encode(
+                `event: message\ndata: ${JSON.stringify(data)}\n\n`,
+              ),
             );
             lastSeenCreatedAt = msg.createdAt;
           }
@@ -80,7 +84,9 @@ export async function GET(request: NextRequest) {
           if (closed) return;
           // Send error event but keep connection alive
           controller.enqueue(
-            encoder.encode(`event: error\ndata: ${JSON.stringify({ error: "poll_failed" })}\n\n`)
+            encoder.encode(
+              `event: error\ndata: ${JSON.stringify({ error: "poll_failed" })}\n\n`,
+            ),
           );
         }
       }, POLL_INTERVAL_MS);
@@ -102,7 +108,9 @@ export async function GET(request: NextRequest) {
           closed = true;
           try {
             controller.enqueue(
-              encoder.encode(`event: timeout\ndata: ${JSON.stringify({ reason: "max_duration" })}\n\n`)
+              encoder.encode(
+                `event: timeout\ndata: ${JSON.stringify({ reason: "max_duration" })}\n\n`,
+              ),
             );
             controller.close();
           } catch {

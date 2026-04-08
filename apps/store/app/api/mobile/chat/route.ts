@@ -20,7 +20,10 @@ export async function GET(request: NextRequest) {
   }
 
   const cursor = request.nextUrl.searchParams.get("cursor");
-  const limit = Math.min(parseInt(request.nextUrl.searchParams.get("limit") ?? "50"), 100);
+  const limit = Math.min(
+    parseInt(request.nextUrl.searchParams.get("limit") ?? "50"),
+    100,
+  );
 
   const messages = await prisma.chatMessage.findMany({
     where: {
@@ -45,7 +48,8 @@ export async function GET(request: NextRequest) {
       createdAt: m.createdAt,
     })),
     unreadCount,
-    nextCursor: messages.length === limit ? messages[messages.length - 1]?.id : null,
+    nextCursor:
+      messages.length === limit ? messages[messages.length - 1]?.id : null,
   });
 }
 
@@ -59,10 +63,15 @@ export async function POST(request: NextRequest) {
 
   const parsed = mobileChatMessageSchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Невірні дані" }, { status: 400 });
+    return NextResponse.json(
+      { error: parsed.error.issues[0]?.message ?? "Невірні дані" },
+      { status: 400 },
+    );
   }
   const { customerId, text, sender } = parsed.data;
-  const imageUrl = (body as Record<string, unknown>).imageUrl as string | undefined;
+  const imageUrl = (body as Record<string, unknown>).imageUrl as
+    | string
+    | undefined;
   const messageSender = sender;
 
   const message = await prisma.chatMessage.create({
@@ -86,13 +95,16 @@ export async function POST(request: NextRequest) {
     });
   }
 
-  return NextResponse.json({
-    id: message.id,
-    sender: message.sender,
-    text: message.text,
-    imageUrl: message.imageUrl,
-    createdAt: message.createdAt,
-  }, { status: 201 });
+  return NextResponse.json(
+    {
+      id: message.id,
+      sender: message.sender,
+      text: message.text,
+      imageUrl: message.imageUrl,
+      createdAt: message.createdAt,
+    },
+    { status: 201 },
+  );
 }
 
 export async function PUT(request: NextRequest) {

@@ -1,11 +1,7 @@
 import type { Metadata } from "next";
 import { prisma } from "@ltex/db";
 import { Badge } from "@ltex/ui";
-import {
-  LOT_STATUSES,
-  LOT_STATUS_LABELS,
-  type LotStatus,
-} from "@ltex/shared";
+import { LOT_STATUSES, LOT_STATUS_LABELS, type LotStatus } from "@ltex/shared";
 import Link from "next/link";
 import { Breadcrumbs } from "@/components/store/breadcrumbs";
 import { Pagination } from "@/components/store/pagination";
@@ -46,7 +42,12 @@ export default async function LotsPage({
       where,
       include: {
         product: {
-          select: { name: true, slug: true, quality: true, category: { select: { name: true } } },
+          select: {
+            name: true,
+            slug: true,
+            quality: true,
+            category: { select: { name: true } },
+          },
         },
       },
       orderBy: { updatedAt: "desc" },

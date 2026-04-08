@@ -80,7 +80,10 @@ export default async function LotsPage({
 
       {totalPages > 1 && (
         <div className="flex items-center justify-center gap-2">
-          {Array.from({ length: Math.min(totalPages, 20) }, (_, i) => i + 1).map((p) => {
+          {Array.from(
+            { length: Math.min(totalPages, 20) },
+            (_, i) => i + 1,
+          ).map((p) => {
             const searchP = new URLSearchParams();
             if (query) searchP.set("q", query);
             if (status) searchP.set("status", status);

@@ -82,7 +82,9 @@ export function SearchAutocomplete({
       switch (e.key) {
         case "ArrowDown":
           e.preventDefault();
-          setSelectedIndex((prev) => (prev < results.length - 1 ? prev + 1 : prev));
+          setSelectedIndex((prev) =>
+            prev < results.length - 1 ? prev + 1 : prev,
+          );
           break;
         case "ArrowUp":
           e.preventDefault();
@@ -90,7 +92,11 @@ export function SearchAutocomplete({
           break;
         case "Enter":
           e.preventDefault();
-          if (selectedIndex >= 0 && selectedIndex < results.length && results[selectedIndex]) {
+          if (
+            selectedIndex >= 0 &&
+            selectedIndex < results.length &&
+            results[selectedIndex]
+          ) {
             navigateToProduct(results[selectedIndex].slug);
           } else {
             navigateToCatalog();
@@ -107,7 +113,10 @@ export function SearchAutocomplete({
   // Close dropdown on outside click
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+      if (
+        containerRef.current &&
+        !containerRef.current.contains(e.target as Node)
+      ) {
         setIsOpen(false);
       }
     }

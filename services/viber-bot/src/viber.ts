@@ -69,7 +69,10 @@ export interface ViberRichMedia {
 
 // ─── API Methods ─────────────────────────────────────────────────────────────
 
-async function apiCall(method: string, body: Record<string, unknown>): Promise<unknown> {
+async function apiCall(
+  method: string,
+  body: Record<string, unknown>,
+): Promise<unknown> {
   const res = await fetch(`${API_BASE}/${method}`, {
     method: "POST",
     headers: {
@@ -131,7 +134,10 @@ export async function sendUrlMessage(
   });
 }
 
-export async function setWebhook(url: string, eventTypes?: string[]): Promise<void> {
+export async function setWebhook(
+  url: string,
+  eventTypes?: string[],
+): Promise<void> {
   await apiCall("set_webhook", {
     url,
     event_types: eventTypes ?? [
@@ -169,7 +175,7 @@ export function mainMenuKeyboard(): ViberKeyboard {
       {
         Columns: 3,
         Rows: 1,
-        Text: "<font color=\"#fff\"><b>🔍 Пошук</b></font>",
+        Text: '<font color="#fff"><b>🔍 Пошук</b></font>',
         ActionType: "reply",
         ActionBody: "menu:search",
         BgColor: "#16a34a",
@@ -180,7 +186,7 @@ export function mainMenuKeyboard(): ViberKeyboard {
       {
         Columns: 3,
         Rows: 1,
-        Text: "<font color=\"#fff\"><b>📦 Лоти</b></font>",
+        Text: '<font color="#fff"><b>📦 Лоти</b></font>',
         ActionType: "reply",
         ActionBody: "menu:lots",
         BgColor: "#2563eb",
@@ -191,7 +197,7 @@ export function mainMenuKeyboard(): ViberKeyboard {
       {
         Columns: 3,
         Rows: 1,
-        Text: "<font color=\"#fff\"><b>📂 Категорії</b></font>",
+        Text: '<font color="#fff"><b>📂 Категорії</b></font>',
         ActionType: "reply",
         ActionBody: "menu:categories",
         BgColor: "#7c3aed",
@@ -202,7 +208,7 @@ export function mainMenuKeyboard(): ViberKeyboard {
       {
         Columns: 3,
         Rows: 1,
-        Text: "<font color=\"#fff\"><b>📋 Замовлення</b></font>",
+        Text: '<font color="#fff"><b>📋 Замовлення</b></font>',
         ActionType: "reply",
         ActionBody: "menu:order",
         BgColor: "#d97706",
@@ -213,9 +219,11 @@ export function mainMenuKeyboard(): ViberKeyboard {
       {
         Columns: 3,
         Rows: 1,
-        Text: "<font color=\"#16a34a\"><b>🛍 Каталог</b></font>",
+        Text: '<font color="#16a34a"><b>🛍 Каталог</b></font>',
         ActionType: "open-url",
-        ActionBody: process.env.NEXT_PUBLIC_SITE_URL ?? "https://ltex.com.ua" + "/catalog",
+        ActionBody:
+          process.env.NEXT_PUBLIC_SITE_URL ??
+          "https://ltex.com.ua" + "/catalog",
         BgColor: "#e8f5e9",
         TextSize: "regular",
         TextHAlign: "center",
@@ -224,7 +232,7 @@ export function mainMenuKeyboard(): ViberKeyboard {
       {
         Columns: 3,
         Rows: 1,
-        Text: "<font color=\"#333\"><b>❓ Допомога</b></font>",
+        Text: '<font color="#333"><b>❓ Допомога</b></font>',
         ActionType: "reply",
         ActionBody: "menu:help",
         BgColor: "#e5e7eb",
@@ -266,7 +274,7 @@ export function qualityKeyboard(): ViberKeyboard {
       {
         Columns: 6,
         Rows: 1,
-        Text: "<font color=\"#999\">↩️ Головне меню</font>",
+        Text: '<font color="#999">↩️ Головне меню</font>',
         ActionType: "reply" as const,
         ActionBody: "menu:main",
         BgColor: "#f5f5f5",

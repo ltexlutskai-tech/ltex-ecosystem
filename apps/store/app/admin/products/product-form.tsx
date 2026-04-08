@@ -2,7 +2,12 @@
 
 import { Button, Input, Textarea } from "@ltex/ui";
 import { QUALITY_LEVELS, QUALITY_LABELS } from "@ltex/shared";
-import { SEASONS, SEASON_LABELS, PRICE_UNITS, PRICE_UNIT_LABELS } from "@ltex/shared";
+import {
+  SEASONS,
+  SEASON_LABELS,
+  PRICE_UNITS,
+  PRICE_UNIT_LABELS,
+} from "@ltex/shared";
 import { COUNTRIES, COUNTRY_LABELS } from "@ltex/shared";
 import { createProduct, updateProduct } from "./actions";
 import type { Product, Category } from "@ltex/db";
@@ -16,36 +21,74 @@ interface ProductFormProps {
 }
 
 export function ProductForm({ product, categories }: ProductFormProps) {
-  const action = product
-    ? updateProduct.bind(null, product.id)
-    : createProduct;
+  const action = product ? updateProduct.bind(null, product.id) : createProduct;
 
   return (
-    <form action={action} className="max-w-2xl space-y-4 rounded-lg border bg-white p-6">
+    <form
+      action={action}
+      className="max-w-2xl space-y-4 rounded-lg border bg-white p-6"
+    >
       <div className="grid gap-4 sm:grid-cols-2">
         <div>
-          <label htmlFor="prod-name" className="mb-1 block text-sm font-medium">Назва *</label>
-          <Input id="prod-name" name="name" defaultValue={product?.name ?? ""} required />
+          <label htmlFor="prod-name" className="mb-1 block text-sm font-medium">
+            Назва *
+          </label>
+          <Input
+            id="prod-name"
+            name="name"
+            defaultValue={product?.name ?? ""}
+            required
+          />
         </div>
         <div>
-          <label htmlFor="prod-slug" className="mb-1 block text-sm font-medium">Slug *</label>
-          <Input id="prod-slug" name="slug" defaultValue={product?.slug ?? ""} required />
+          <label htmlFor="prod-slug" className="mb-1 block text-sm font-medium">
+            Slug *
+          </label>
+          <Input
+            id="prod-slug"
+            name="slug"
+            defaultValue={product?.slug ?? ""}
+            required
+          />
         </div>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div>
-          <label htmlFor="prod-article" className="mb-1 block text-sm font-medium">Артикул</label>
-          <Input id="prod-article" name="articleCode" defaultValue={product?.articleCode ?? ""} />
+          <label
+            htmlFor="prod-article"
+            className="mb-1 block text-sm font-medium"
+          >
+            Артикул
+          </label>
+          <Input
+            id="prod-article"
+            name="articleCode"
+            defaultValue={product?.articleCode ?? ""}
+          />
         </div>
         <div>
-          <label htmlFor="prod-code1c" className="mb-1 block text-sm font-medium">Код 1С</label>
-          <Input id="prod-code1c" name="code1C" defaultValue={product?.code1C ?? ""} />
+          <label
+            htmlFor="prod-code1c"
+            className="mb-1 block text-sm font-medium"
+          >
+            Код 1С
+          </label>
+          <Input
+            id="prod-code1c"
+            name="code1C"
+            defaultValue={product?.code1C ?? ""}
+          />
         </div>
       </div>
 
       <div>
-        <label htmlFor="prod-category" className="mb-1 block text-sm font-medium">Категорія *</label>
+        <label
+          htmlFor="prod-category"
+          className="mb-1 block text-sm font-medium"
+        >
+          Категорія *
+        </label>
         <select
           id="prod-category"
           name="categoryId"
@@ -55,13 +98,17 @@ export function ProductForm({ product, categories }: ProductFormProps) {
         >
           <option value="">Виберіть...</option>
           {categories.map((c) => (
-            <option key={c.id} value={c.id}>{c.name}</option>
+            <option key={c.id} value={c.id}>
+              {c.name}
+            </option>
           ))}
         </select>
       </div>
 
       <div>
-        <label htmlFor="prod-desc" className="mb-1 block text-sm font-medium">Опис</label>
+        <label htmlFor="prod-desc" className="mb-1 block text-sm font-medium">
+          Опис
+        </label>
         <Textarea
           id="prod-desc"
           name="description"
@@ -72,7 +119,12 @@ export function ProductForm({ product, categories }: ProductFormProps) {
 
       <div className="grid gap-4 sm:grid-cols-3">
         <div>
-          <label htmlFor="prod-quality" className="mb-1 block text-sm font-medium">Якість *</label>
+          <label
+            htmlFor="prod-quality"
+            className="mb-1 block text-sm font-medium"
+          >
+            Якість *
+          </label>
           <select
             id="prod-quality"
             name="quality"
@@ -82,20 +134,39 @@ export function ProductForm({ product, categories }: ProductFormProps) {
           >
             <option value="">Виберіть...</option>
             {QUALITY_LEVELS.map((q) => (
-              <option key={q} value={q}>{QUALITY_LABELS[q]}</option>
+              <option key={q} value={q}>
+                {QUALITY_LABELS[q]}
+              </option>
             ))}
           </select>
         </div>
         <div>
-          <label htmlFor="prod-season" className="mb-1 block text-sm font-medium">Сезон</label>
-          <select id="prod-season" name="season" defaultValue={product?.season ?? ""} className={selectClass}>
+          <label
+            htmlFor="prod-season"
+            className="mb-1 block text-sm font-medium"
+          >
+            Сезон
+          </label>
+          <select
+            id="prod-season"
+            name="season"
+            defaultValue={product?.season ?? ""}
+            className={selectClass}
+          >
             {SEASONS.map((s) => (
-              <option key={s} value={s}>{SEASON_LABELS[s]}</option>
+              <option key={s} value={s}>
+                {SEASON_LABELS[s]}
+              </option>
             ))}
           </select>
         </div>
         <div>
-          <label htmlFor="prod-country" className="mb-1 block text-sm font-medium">Країна *</label>
+          <label
+            htmlFor="prod-country"
+            className="mb-1 block text-sm font-medium"
+          >
+            Країна *
+          </label>
           <select
             id="prod-country"
             name="country"
@@ -105,7 +176,9 @@ export function ProductForm({ product, categories }: ProductFormProps) {
           >
             <option value="">Виберіть...</option>
             {COUNTRIES.map((c) => (
-              <option key={c} value={c}>{COUNTRY_LABELS[c]}</option>
+              <option key={c} value={c}>
+                {COUNTRY_LABELS[c]}
+              </option>
             ))}
           </select>
         </div>
@@ -113,15 +186,29 @@ export function ProductForm({ product, categories }: ProductFormProps) {
 
       <div className="grid gap-4 sm:grid-cols-3">
         <div>
-          <label htmlFor="prod-unit" className="mb-1 block text-sm font-medium">Одиниця ціни</label>
-          <select id="prod-unit" name="priceUnit" defaultValue={product?.priceUnit ?? "kg"} className={selectClass}>
+          <label htmlFor="prod-unit" className="mb-1 block text-sm font-medium">
+            Одиниця ціни
+          </label>
+          <select
+            id="prod-unit"
+            name="priceUnit"
+            defaultValue={product?.priceUnit ?? "kg"}
+            className={selectClass}
+          >
             {PRICE_UNITS.map((u) => (
-              <option key={u} value={u}>{PRICE_UNIT_LABELS[u]}</option>
+              <option key={u} value={u}>
+                {PRICE_UNIT_LABELS[u]}
+              </option>
             ))}
           </select>
         </div>
         <div>
-          <label htmlFor="prod-weight" className="mb-1 block text-sm font-medium">Середня вага (кг)</label>
+          <label
+            htmlFor="prod-weight"
+            className="mb-1 block text-sm font-medium"
+          >
+            Середня вага (кг)
+          </label>
           <Input
             id="prod-weight"
             name="averageWeight"
@@ -131,8 +218,17 @@ export function ProductForm({ product, categories }: ProductFormProps) {
           />
         </div>
         <div>
-          <label htmlFor="prod-video" className="mb-1 block text-sm font-medium">YouTube URL</label>
-          <Input id="prod-video" name="videoUrl" defaultValue={product?.videoUrl ?? ""} />
+          <label
+            htmlFor="prod-video"
+            className="mb-1 block text-sm font-medium"
+          >
+            YouTube URL
+          </label>
+          <Input
+            id="prod-video"
+            name="videoUrl"
+            defaultValue={product?.videoUrl ?? ""}
+          />
         </div>
       </div>
 
@@ -149,9 +245,7 @@ export function ProductForm({ product, categories }: ProductFormProps) {
       </div>
 
       <div className="flex gap-2">
-        <Button type="submit">
-          {product ? "Зберегти" : "Створити"}
-        </Button>
+        <Button type="submit">{product ? "Зберегти" : "Створити"}</Button>
         <Button type="button" variant="outline" asChild>
           <a href="/admin/products">Скасувати</a>
         </Button>

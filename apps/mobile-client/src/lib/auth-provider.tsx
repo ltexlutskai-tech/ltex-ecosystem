@@ -19,7 +19,8 @@ async function loadAuth(): Promise<Partial<AuthState>> {
       return raw ? JSON.parse(raw) : {};
     }
     // Web fallback
-    const raw = typeof window !== "undefined" ? localStorage.getItem(STORAGE_KEY) : null;
+    const raw =
+      typeof window !== "undefined" ? localStorage.getItem(STORAGE_KEY) : null;
     return raw ? JSON.parse(raw) : {};
   } catch {
     return {};
@@ -79,7 +80,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const logout = useCallback(async () => {
-    setState({ customerId: null, customerName: null, phone: null, isLoading: false });
+    setState({
+      customerId: null,
+      customerName: null,
+      phone: null,
+      isLoading: false,
+    });
     await clearAuth();
   }, []);
 

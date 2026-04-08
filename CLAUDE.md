@@ -15,6 +15,7 @@ Contacts: Telegram @L_TEX, +380 67 671 05 15, +380 99 358 49 92, ltex.lutsk.ai@g
 All work from Phase 0 through Phase 5 (Session 3) is complete and merged into main.
 
 **IMPORTANT FOR NEW SESSIONS:** Do NOT re-audit or re-merge branches. All branches have been cleaned up — only `main` exists. The project is fully functional:
+
 - Supabase DB: 805 products, 725 lots, 49 categories seeded
 - Netlify: deploying from `main` at stalwart-dango-04a9b9.netlify.app
 - Site is LIVE and working (catalog, lots, cart, admin, API routes)
@@ -130,27 +131,27 @@ ltex-ecosystem/
 
 ### Database Schema (Prisma, 19 tables)
 
-| Table | Maps to 1C | Key fields |
-|-------|-----------|------------|
-| categories | Групи номенклатури | slug (unique), name, parentId (self-relation tree) |
-| products | Номенклатура | code1C, articleCode, slug, quality, season, priceUnit (kg/piece), averageWeight, videoUrl |
-| product_images | Зображення | productId, url, position, alt |
-| lots | Серії + ТовариНаСкладах | barcode (unique), weight, quantity, status (free/reserved/on_sale), priceEur |
-| prices | ЦіниНоменклатури | productId, priceType (wholesale/retail/akciya), currency, amount |
-| customers | Контрагенти | code1C, name, phone, email, telegram, city |
-| orders | ЗаказПокупателя | code1C, customerId, status, totalEur, exchangeRate |
-| order_items | Табличні секції | orderId, lotId, productId, priceEur, weight |
-| exchange_rates | КурсиВалют | currencyFrom, currencyTo, rate, date, source ("1c"/"manual") |
-| barcodes | ШтрихКоди | lotId, code, type |
-| carts | — | customerId (unique), sessionId (unique), items → CartItem[] |
-| cart_items | — | cartId, lotId, productId, priceEur, weight, quantity |
-| chat_messages | — | customerId, sender ("customer"/"manager"), text, isRead |
-| shipments | — | orderId, trackingNumber, carrier, status, statusText, estimatedDate |
-| video_subscriptions | — | customerId, productId (unique pair) |
-| push_tokens | — | customerId, token (unique), platform ("ios"/"android"/"web") |
-| payments | — | orderId, method, amount, currency, status, externalId, paidAt |
-| favorites | — | customerId, productId (unique pair) |
-| sync_log | — | entity, entityId, action, payload (JSON), syncedAt |
+| Table               | Maps to 1C              | Key fields                                                                                |
+| ------------------- | ----------------------- | ----------------------------------------------------------------------------------------- |
+| categories          | Групи номенклатури      | slug (unique), name, parentId (self-relation tree)                                        |
+| products            | Номенклатура            | code1C, articleCode, slug, quality, season, priceUnit (kg/piece), averageWeight, videoUrl |
+| product_images      | Зображення              | productId, url, position, alt                                                             |
+| lots                | Серії + ТовариНаСкладах | barcode (unique), weight, quantity, status (free/reserved/on_sale), priceEur              |
+| prices              | ЦіниНоменклатури        | productId, priceType (wholesale/retail/akciya), currency, amount                          |
+| customers           | Контрагенти             | code1C, name, phone, email, telegram, city                                                |
+| orders              | ЗаказПокупателя         | code1C, customerId, status, totalEur, exchangeRate                                        |
+| order_items         | Табличні секції         | orderId, lotId, productId, priceEur, weight                                               |
+| exchange_rates      | КурсиВалют              | currencyFrom, currencyTo, rate, date, source ("1c"/"manual")                              |
+| barcodes            | ШтрихКоди               | lotId, code, type                                                                         |
+| carts               | —                       | customerId (unique), sessionId (unique), items → CartItem[]                               |
+| cart_items          | —                       | cartId, lotId, productId, priceEur, weight, quantity                                      |
+| chat_messages       | —                       | customerId, sender ("customer"/"manager"), text, isRead                                   |
+| shipments           | —                       | orderId, trackingNumber, carrier, status, statusText, estimatedDate                       |
+| video_subscriptions | —                       | customerId, productId (unique pair)                                                       |
+| push_tokens         | —                       | customerId, token (unique), platform ("ios"/"android"/"web")                              |
+| payments            | —                       | orderId, method, amount, currency, status, externalId, paidAt                             |
+| favorites           | —                       | customerId, productId (unique pair)                                                       |
+| sync_log            | —                       | entity, entityId, action, payload (JSON), syncedAt                                        |
 
 ### Seed Data Stats (from real Excel files)
 
@@ -217,22 +218,26 @@ EXPO_PUBLIC_API_URL=       # (mobile) API base URL for Expo app
 ## Existing Systems (for reference)
 
 ### Existing Website (catalog-full repo)
+
 - 4 static HTML files with hardcoded JS arrays
 - ltexlutskai-tech/catalog-full — keep running until new store is ready
 
 ### Existing 1C System (Центральна 1С)
+
 - Custom config based on "Управління Торгівлею"
 - HTTP Service "Боти": POST /bots/ping, /bots/send, /bots/sendsecond, /bots/exchange
 - Exchange Plans: ОбмінССайтомТоварами, ОбмінССайтомЗамовленнями
 - 16 scheduled jobs including website sync, Viber integration
 
 ### 1C Integration Strategy
+
 - 1C exports JSON files (products.json, lots.json, rates.json) every 15 min
 - API Hub imports JSON via cron job, upserts into PostgreSQL
 - Orders flow back: website → API → JSON/webhook → 1C HTTP service
 - Existing exchange plans can be extended
 
 ### Existing Mobile App (MobileAgentLTEX v1.15.3)
+
 - By Intrata, for field sales agents
 - Syncs with central 1C via native protocol
 
@@ -252,18 +257,21 @@ EXPO_PUBLIC_API_URL=       # (mobile) API base URL for Expo app
 ### Infrastructure
 
 **Supabase** (project: `ltex-ecosystem`, region: Frankfurt eu-central-1):
+
 - URL: `auxrlweedivnffxjwvln.supabase.co`
 - DB: Healthy, 11 tables created via `prisma db push`
 - Storage: Empty (no buckets yet — photos not uploaded)
 - Auth: API keys configured (publishable + secret)
 
 **Netlify** (site: `stalwart-dango-04a9b9`):
+
 - URL: `stalwart-dango-04a9b9.netlify.app`
 - Deploys from GitHub, Next.js
 - Env vars configured: DATABASE_URL, DIRECT_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY, NEXT_PUBLIC_SUPABASE_URL
 - **NOTE**: Need to update deploy branch to `main`
 
 ### Prerequisites / remaining setup
+
 - [x] Create Supabase project → get DATABASE_URL, SUPABASE_URL, ANON_KEY
 - [x] Run `prisma db push` to create tables
 - [ ] Run `pnpm db:seed` to populate database with 805 products + 725 lots
@@ -280,11 +288,13 @@ EXPO_PUBLIC_API_URL=       # (mobile) API base URL for Expo app
 ### What was done in previous sessions
 
 #### 1. Cart persistence in DB (`c39e06b`)
+
 - Added `Cart` + `CartItem` Prisma models (sessionId for anonymous, customerId for auth)
 - `/api/cart` API route (GET/POST/DELETE)
 - CartProvider: localStorage + API sync on mount, merge strategy
 
 #### 2. Full-text search v2 (`c39e06b`)
+
 - GIN index on `to_tsvector` for products (name + description + article_code)
 - `pg_trgm` extension + trigram GIN index for fuzzy matching
 - `fullTextSearch()` with trigram fallback when tsvector returns 0 results
@@ -292,17 +302,20 @@ EXPO_PUBLIC_API_URL=       # (mobile) API base URL for Expo app
 - `SearchAutocomplete` component: debounced 300ms, keyboard nav, dropdown
 
 #### 3. Admin dashboard analytics (`c39e06b`)
+
 - Top-10 products by orders (raw SQL GROUP BY)
 - Order funnel chart (FunnelChart component)
 - Revenue line chart (SVG path, RevenueChart component)
 - New customers bar chart (NewCustomersChart component)
 
 #### 4. E2E tests with Playwright (`c39e06b`)
+
 - `playwright.config.ts` (Chromium only, webServer: dev)
 - 4 test suites: navigation (7), catalog (4), product (2), cart-checkout (4)
 - `test:e2e` script in root package.json
 
 #### 5. Telegram bot — Phase 3 (`194e619`)
+
 - `services/telegram-bot/` standalone service (polling + webhook modes)
 - `/api/telegram/webhook` API route
 - Commands: /start, /search, /lots, /order, /categories, /help
@@ -310,6 +323,7 @@ EXPO_PUBLIC_API_URL=       # (mobile) API base URL for Expo app
 - Callback query buttons for quality filters
 
 #### 6. Mobile client app — Phase 4 (`b697799`)
+
 - 7 new Prisma tables: chat_messages, shipments, video_subscriptions, push_tokens, payments, favorites
 - 8 mobile API routes: /api/mobile/{auth, profile, favorites, chat, shipments, notifications, payments, orders}
 - Expo React Native app: 13 screens (Login, Catalog, Product, Cart, Orders, OrderDetail, Chat, Profile, Shipments, + components)
@@ -317,6 +331,7 @@ EXPO_PUBLIC_API_URL=       # (mobile) API base URL for Expo app
 - Features: phone auth, product search, favorites, video subscriptions, Nova Poshta tracking, chat with manager, payment history
 
 #### 7. Viber bot (`25b5f97`)
+
 - `services/viber-bot/` standalone service (webhook only — Viber requirement)
 - `/api/viber/webhook` API route with HMAC-SHA256 signature verification
 - Same commands as Telegram: search, lots, orders, categories, help
@@ -327,21 +342,21 @@ EXPO_PUBLIC_API_URL=       # (mobile) API base URL for Expo app
 
 #### Project Completion Status: ~85% MVP
 
-| Component | Completion | Details |
-|-----------|-----------|---------|
-| Монорепо структура | 100% | Turborepo + pnpm, 3 packages, 2 apps, 2 services |
-| База даних | 100% | 19 таблиць, 805 products, 725 lots seeded |
-| Web Store | 100% | Каталог, пошук, кошик, checkout, SEO, PWA |
-| Admin Panel | 100% | Dashboard, CRUD, analytics, auth |
-| API Layer | 100% | 18 ендпоінтів, rate limiting, validation |
-| Telegram Bot | 100% | Повний функціонал + webhook + BotFather |
-| Viber Bot | 100% | Повний функціонал + нотифікації |
-| Mobile Client App | 80% | Екрани готові, потрібне тестування |
-| Тестування | 70% | 70 тестів (53 unit + 17 E2E), E2E вимкнені в CI |
-| 1С Інтеграція | 60% | API готовий, потрібна конфігурація 1С |
-| Deploy / Production | 60% | Netlify працює, webhooks + фото не налаштовані |
-| Mobile Agent App | 0% | Окрема сесія, потрібні скріншоти |
-| Warehouse App | 0% | Окрема сесія |
+| Component           | Completion | Details                                          |
+| ------------------- | ---------- | ------------------------------------------------ |
+| Монорепо структура  | 100%       | Turborepo + pnpm, 3 packages, 2 apps, 2 services |
+| База даних          | 100%       | 19 таблиць, 805 products, 725 lots seeded        |
+| Web Store           | 100%       | Каталог, пошук, кошик, checkout, SEO, PWA        |
+| Admin Panel         | 100%       | Dashboard, CRUD, analytics, auth                 |
+| API Layer           | 100%       | 18 ендпоінтів, rate limiting, validation         |
+| Telegram Bot        | 100%       | Повний функціонал + webhook + BotFather          |
+| Viber Bot           | 100%       | Повний функціонал + нотифікації                  |
+| Mobile Client App   | 80%        | Екрани готові, потрібне тестування               |
+| Тестування          | 70%        | 70 тестів (53 unit + 17 E2E), E2E вимкнені в CI  |
+| 1С Інтеграція       | 60%        | API готовий, потрібна конфігурація 1С            |
+| Deploy / Production | 60%        | Netlify працює, webhooks + фото не налаштовані   |
+| Mobile Agent App    | 0%         | Окрема сесія, потрібні скріншоти                 |
+| Warehouse App       | 0%         | Окрема сесія                                     |
 
 #### Stats: 161 файлів TS/TSX, 18,082 рядків коду, 28 комітів, 19 Prisma моделей, 18 API routes
 
@@ -354,7 +369,9 @@ EXPO_PUBLIC_API_URL=       # (mobile) API base URL for Expo app
 #### Автономні задачі (не потребують участі користувача)
 
 ##### Задача 1: Збільшити тестове покриття (зараз 70% → ціль 90%)
+
 Зараз: 53 unit тести (slug, price, validations). Немає тестів для ключової бізнес-логіки.
+
 - Додати unit тести для `lib/recommendations.ts` — getRecommendations(), getFrequentlyBoughtTogether()
   - Mock Prisma client, перевірити: фільтрація по категорії/якості, сортування по лотах, ліміт
 - Додати unit тести для `lib/notifications.ts` — sendTelegramNotification(), sendViberNotification(), notifyNewOrder()
@@ -371,12 +388,14 @@ EXPO_PUBLIC_API_URL=       # (mobile) API base URL for Expo app
 - **Ціль:** додати ~40-50 нових unit тестів
 
 ##### Задача 2: Покращити TypeScript strict mode і типізацію
+
 - Перевірити всі файли на `any` типи і замінити на правильні типи
 - Перевірити що `strict: true` в tsconfig.json для всіх packages
 - Виправити всі TypeScript warnings/errors якщо є
 - Переконатися що `pnpm typecheck` проходить без помилок
 
 ##### Задача 3: Покращити обробку помилок в API routes
+
 - Перевірити всі 18 API routes на консистентну обробку помилок
 - Додати proper HTTP status codes де відсутні (400, 401, 404, 429, 500)
 - Переконатися що всі routes повертають JSON з полем `error` при помилці
@@ -384,6 +403,7 @@ EXPO_PUBLIC_API_URL=       # (mobile) API base URL for Expo app
 - Додати request body size validation де відсутній
 
 ##### Задача 4: Покращити Mobile Client App
+
 - Додати proper error handling на всіх екранах (try/catch + user-friendly повідомлення)
 - Додати pull-to-refresh на CatalogScreen, OrdersScreen, ShipmentsScreen
 - Додати empty states (коли немає товарів, замовлень, повідомлень)
@@ -392,6 +412,7 @@ EXPO_PUBLIC_API_URL=       # (mobile) API base URL for Expo app
 - Додати expo-notifications реєстрацію push token при першому запуску
 
 ##### Задача 5: Accessibility (a11y) покращення
+
 - Додати `aria-label` на всі інтерактивні елементи без тексту (іконки, кнопки)
 - Перевірити keyboard navigation на всіх сторінках store
 - Додати `role` атрибути де потрібно (navigation, main, complementary)
@@ -400,6 +421,7 @@ EXPO_PUBLIC_API_URL=       # (mobile) API base URL for Expo app
 - Додати focus-visible стилі де відсутні
 
 ##### Задача 6: SEO та Performance оптимізація
+
 - Перевірити всі сторінки на наявність proper `<title>` та `<meta description>`
 - Додати `<meta>` для Open Graph зображень на category та product сторінках
 - Оптимізувати SQL запити в catalog.ts — перевірити N+1 проблеми, додати includes де потрібно
@@ -408,12 +430,14 @@ EXPO_PUBLIC_API_URL=       # (mobile) API base URL for Expo app
 - Перевірити sitemap.ts — чи всі продукти та категорії включені
 
 ##### Задача 7: CI/CD покращення
+
 - Увімкнути E2E тести в GitHub Actions (з mock DATABASE_URL або test DB)
 - Додати lint step в CI pipeline (зараз тільки typecheck + test + build)
 - Додати cache для pnpm store в CI для швидших builds
 - Додати перевірку розміру bundle (next build --analyze або similar)
 
 ##### Задача 8: Code quality та рефакторинг
+
 - Видалити невикористаний код (dead imports, unused variables)
 - Перевірити консистентність error messages (українською для UI, англійською для API)
 - Перевірити що всі Zod schemas в validations.ts покривають всі API routes
@@ -421,9 +445,11 @@ EXPO_PUBLIC_API_URL=       # (mobile) API base URL for Expo app
 - Перевірити що всі admin actions мають proper auth checks
 
 #### Порядок виконання: 1 → 2 → 8 → 3 → 4 → 5 → 6 → 7
+
 (Тести першими — вони виявлять баги; потім типізація; потім якість коду і API; mobile; a11y; SEO; CI останнім)
 
 #### Задачі що потребують участі користувача (НЕ для автономної сесії)
+
 - **Mobile Agent App** — потрібні скріншоти MobileAgentLTEX v1.15.3
 - **Warehouse App** — потрібні вимоги та скріншоти
 - **Інфраструктура** — запуск міграцій, реєстрація webhooks, завантаження фото (потрібен доступ до Supabase/Netlify)
@@ -431,6 +457,7 @@ EXPO_PUBLIC_API_URL=       # (mobile) API base URL for Expo app
 - **Кастомний домен** — ltex.com.ua (потрібен доступ до DNS)
 
 ## Tech Stack
+
 - Monorepo: Turborepo + pnpm 9.x
 - Language: TypeScript 5.x (strict)
 - Web: Next.js 15 (App Router) + React 19
@@ -444,6 +471,7 @@ EXPO_PUBLIC_API_URL=       # (mobile) API base URL for Expo app
 - Hosting: Netlify (stalwart-dango-04a9b9.netlify.app)
 
 ## Important Notes
+
 - Language: Ukrainian (primary), site lang="uk"
 - Currency: EUR for wholesale prices, UAH for display (rate from 1C)
 - Minimum order: від 10 кг

@@ -52,7 +52,12 @@ interface CategoryResult {
   name: string;
   slug: string;
   _count: { products: number };
-  children: { id: string; name: string; slug: string; _count: { products: number } }[];
+  children: {
+    id: string;
+    name: string;
+    slug: string;
+    _count: { products: number };
+  }[];
 }
 
 // ─── State: track users waiting for input ────────────────────────────────────
@@ -94,7 +99,8 @@ async function handleMessage(userId: string, text: string): Promise<void> {
   const trimmed = text.trim();
 
   // Check for menu button actions
-  if (trimmed === "menu:main" || trimmed === "/start") return handleStart(userId);
+  if (trimmed === "menu:main" || trimmed === "/start")
+    return handleStart(userId);
   if (trimmed === "menu:search") return handleSearchPrompt(userId);
   if (trimmed === "menu:lots") return handleLots(userId, "");
   if (trimmed === "menu:categories") return handleCategories(userId);
@@ -124,7 +130,11 @@ async function handleMessage(userId: string, text: string): Promise<void> {
     return handleSearch(userId, trimmed);
   }
 
-  await sendTextMessage(userId, "Оберіть дію з меню нижче або напишіть назву товару 🔍", mainMenuKeyboard());
+  await sendTextMessage(
+    userId,
+    "Оберіть дію з меню нижче або напишіть назву товару 🔍",
+    mainMenuKeyboard(),
+  );
 }
 
 // ─── /start (conversation_started + subscribed) ──────────────────────────────
@@ -153,8 +163,9 @@ async function handleSearchPrompt(userId: string): Promise<void> {
     BgColor: "#f5f5f5",
     Buttons: [
       {
-        Columns: 6, Rows: 1,
-        Text: "<font color=\"#999\">↩️ Головне меню</font>",
+        Columns: 6,
+        Rows: 1,
+        Text: '<font color="#999">↩️ Головне меню</font>',
         ActionType: "reply",
         ActionBody: "menu:main",
         BgColor: "#f5f5f5",
@@ -170,7 +181,11 @@ async function handleSearchPrompt(userId: string): Promise<void> {
 
 async function handleSearch(userId: string, query: string): Promise<void> {
   if (!query || query.length < 2) {
-    await sendTextMessage(userId, "Введіть запит для пошуку (мінімум 2 символи).", mainMenuKeyboard());
+    await sendTextMessage(
+      userId,
+      "Введіть запит для пошуку (мінімум 2 символи).",
+      mainMenuKeyboard(),
+    );
     return;
   }
 
@@ -192,16 +207,24 @@ async function handleSearch(userId: string, query: string): Promise<void> {
   });
 
   if (products.length === 0) {
-    await sendTextMessage(userId, `🔍 За запитом "${query}" нічого не знайдено.`, mainMenuKeyboard());
+    await sendTextMessage(
+      userId,
+      `🔍 За запитом "${query}" нічого не знайдено.`,
+      mainMenuKeyboard(),
+    );
     return;
   }
 
-  const lines = (products as ProductSearchResult[]).map((p: ProductSearchResult, i: number) => {
-    const price = p.prices[0]?.amount;
-    const priceStr = price ? `€${price.toFixed(2)}/${p.priceUnit === "kg" ? "кг" : "шт"}` : "";
-    const quality = QUALITY_LABELS[p.quality as QualityLevel] ?? p.quality;
-    return `${i + 1}. ${p.name}\n   ${quality} • ${priceStr} • ${p._count.lots} лотів\n   ${SITE_URL}/product/${p.slug}`;
-  });
+  const lines = (products as ProductSearchResult[]).map(
+    (p: ProductSearchResult, i: number) => {
+      const price = p.prices[0]?.amount;
+      const priceStr = price
+        ? `€${price.toFixed(2)}/${p.priceUnit === "kg" ? "кг" : "шт"}`
+        : "";
+      const quality = QUALITY_LABELS[p.quality as QualityLevel] ?? p.quality;
+      return `${i + 1}. ${p.name}\n   ${quality} • ${priceStr} • ${p._count.lots} лотів\n   ${SITE_URL}/product/${p.slug}`;
+    },
+  );
 
   const text = [
     `🔍 Результати для "${query}" (${products.length}):`,
@@ -214,8 +237,13 @@ async function handleSearch(userId: string, query: string): Promise<void> {
 
 // ─── Lots ────────────────────────────────────────────────────────────────────
 
-async function handleLots(userId: string, qualityFilter: string): Promise<void> {
-  const where: { status: string; product?: { quality: string } } = { status: "free" };
+async function handleLots(
+  userId: string,
+  qualityFilter: string,
+): Promise<void> {
+  const where: { status: string; product?: { quality: string } } = {
+    status: "free",
+  };
 
   if (qualityFilter) {
     const qualityKey = Object.entries(QUALITY_LABELS).find(
@@ -229,7 +257,11 @@ async function handleLots(userId: string, qualityFilter: string): Promise<void> 
   const [lots, total] = await Promise.all([
     prisma.lot.findMany({
       where,
-      include: { product: { select: { name: true, quality: true, priceUnit: true, slug: true } } },
+      include: {
+        product: {
+          select: { name: true, quality: true, priceUnit: true, slug: true },
+        },
+      },
       take: 10,
       orderBy: { createdAt: "desc" },
     }),
@@ -237,14 +269,22 @@ async function handleLots(userId: string, qualityFilter: string): Promise<void> 
   ]);
 
   if (lots.length === 0) {
-    await sendTextMessage(userId, "📦 Вільних лотів не знайдено.", qualityKeyboard());
+    await sendTextMessage(
+      userId,
+      "📦 Вільних лотів не знайдено.",
+      qualityKeyboard(),
+    );
     return;
   }
 
-  const lines = (lots as LotSearchResult[]).map((lot: LotSearchResult, i: number) => {
-    const quality = QUALITY_LABELS[lot.product.quality as QualityLevel] ?? lot.product.quality;
-    return `${i + 1}. ${lot.product.name}\n   ${quality} • ${lot.weight} кг • €${lot.priceEur.toFixed(2)}\n   Штрихкод: ${lot.barcode}`;
-  });
+  const lines = (lots as LotSearchResult[]).map(
+    (lot: LotSearchResult, i: number) => {
+      const quality =
+        QUALITY_LABELS[lot.product.quality as QualityLevel] ??
+        lot.product.quality;
+      return `${i + 1}. ${lot.product.name}\n   ${quality} • ${lot.weight} кг • €${lot.priceEur.toFixed(2)}\n   Штрихкод: ${lot.barcode}`;
+    },
+  );
 
   const text = [
     `📦 Вільні лоти${qualityFilter ? ` (${qualityFilter})` : ""}: ${total} шт`,
@@ -270,8 +310,9 @@ async function handleOrderPrompt(userId: string): Promise<void> {
     BgColor: "#f5f5f5",
     Buttons: [
       {
-        Columns: 6, Rows: 1,
-        Text: "<font color=\"#999\">↩️ Головне меню</font>",
+        Columns: 6,
+        Rows: 1,
+        Text: '<font color="#999">↩️ Головне меню</font>',
         ActionType: "reply",
         ActionBody: "menu:main",
         BgColor: "#f5f5f5",
@@ -293,10 +334,7 @@ async function handleOrder(userId: string, orderId: string): Promise<void> {
 
   const order = await prisma.order.findFirst({
     where: {
-      OR: [
-        { id: { startsWith: orderId } },
-        { code1C: orderId },
-      ],
+      OR: [{ id: { startsWith: orderId } }, { code1C: orderId }],
     },
     include: {
       customer: true,
@@ -305,22 +343,38 @@ async function handleOrder(userId: string, orderId: string): Promise<void> {
   });
 
   if (!order) {
-    await sendTextMessage(userId, `❌ Замовлення "${orderId}" не знайдено.`, mainMenuKeyboard());
+    await sendTextMessage(
+      userId,
+      `❌ Замовлення "${orderId}" не знайдено.`,
+      mainMenuKeyboard(),
+    );
     return;
   }
 
   const typedOrder = order as unknown as OrderResult;
-  const productIds = [...new Set(typedOrder.items.map((i: OrderResult["items"][number]) => i.productId))];
+  const productIds = [
+    ...new Set(
+      typedOrder.items.map((i: OrderResult["items"][number]) => i.productId),
+    ),
+  ];
   const products = await prisma.product.findMany({
     where: { id: { in: productIds } },
     select: { id: true, name: true },
   });
-  const productNames = new Map((products as { id: string; name: string }[]).map((p: { id: string; name: string }) => [p.id, p.name]));
-
-  const statusLabel = ORDER_STATUS_LABELS[typedOrder.status as OrderStatus] ?? typedOrder.status;
-  const itemLines = typedOrder.items.slice(0, 5).map(
-    (item: OrderResult["items"][number]) => `  • ${productNames.get(item.productId) ?? "?"} — ${item.weight} кг, €${item.priceEur.toFixed(2)}`,
+  const productNames = new Map(
+    (products as { id: string; name: string }[]).map(
+      (p: { id: string; name: string }) => [p.id, p.name],
+    ),
   );
+
+  const statusLabel =
+    ORDER_STATUS_LABELS[typedOrder.status as OrderStatus] ?? typedOrder.status;
+  const itemLines = typedOrder.items
+    .slice(0, 5)
+    .map(
+      (item: OrderResult["items"][number]) =>
+        `  • ${productNames.get(item.productId) ?? "?"} — ${item.weight} кг, €${item.priceEur.toFixed(2)}`,
+    );
   if (typedOrder.items.length > 5) {
     itemLines.push(`  ... та ще ${typedOrder.items.length - 5} позицій`);
   }
@@ -331,7 +385,9 @@ async function handleOrder(userId: string, orderId: string): Promise<void> {
     `Статус: ${statusLabel}`,
     `Клієнт: ${typedOrder.customer.name}`,
     `Сума: €${typedOrder.totalEur.toFixed(2)}`,
-    typedOrder.totalUah > 0 ? `Сума (UAH): ${typedOrder.totalUah.toFixed(2)} ₴` : "",
+    typedOrder.totalUah > 0
+      ? `Сума (UAH): ${typedOrder.totalUah.toFixed(2)} ₴`
+      : "",
     `Позицій: ${typedOrder.items.length}`,
     `Дата: ${new Date(typedOrder.createdAt).toLocaleDateString("uk-UA")}`,
     ``,

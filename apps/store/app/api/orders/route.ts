@@ -20,10 +20,7 @@ export async function POST(request: NextRequest) {
   try {
     body = await request.json();
   } catch {
-    return NextResponse.json(
-      { error: "Невалідний JSON" },
-      { status: 400 },
-    );
+    return NextResponse.json({ error: "Невалідний JSON" }, { status: 400 });
   }
 
   const parsed = orderSchema.safeParse(body);

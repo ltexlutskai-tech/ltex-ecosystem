@@ -11,13 +11,23 @@ export function CategoryForm({ categories }: { categories: Category[] }) {
         <label htmlFor="cat-name" className="mb-1 block text-sm font-medium">
           Назва *
         </label>
-        <Input id="cat-name" name="name" required placeholder="Назва категорії" />
+        <Input
+          id="cat-name"
+          name="name"
+          required
+          placeholder="Назва категорії"
+        />
       </div>
       <div>
         <label htmlFor="cat-slug" className="mb-1 block text-sm font-medium">
           Slug *
         </label>
-        <Input id="cat-slug" name="slug" required placeholder="nazva-kategorii" />
+        <Input
+          id="cat-slug"
+          name="slug"
+          required
+          placeholder="nazva-kategorii"
+        />
       </div>
       <div>
         <label htmlFor="cat-parent" className="mb-1 block text-sm font-medium">

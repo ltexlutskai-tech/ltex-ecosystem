@@ -57,13 +57,15 @@ export async function sendPushNotification(
   }
 
   // Build messages (one per token)
-  const messages: ExpoPushMessage[] = tokens.map((t: { id: string; token: string }) => ({
-    to: t.token,
-    title,
-    body,
-    sound: "default" as const,
-    ...(data && { data }),
-  }));
+  const messages: ExpoPushMessage[] = tokens.map(
+    (t: { id: string; token: string }) => ({
+      to: t.token,
+      title,
+      body,
+      sound: "default" as const,
+      ...(data && { data }),
+    }),
+  );
 
   try {
     const response = await fetch(EXPO_PUSH_URL, {
@@ -83,7 +85,7 @@ export async function sendPushNotification(
       return { sent: 0, failed: tokens.length, tickets: [] };
     }
 
-    const result = await response.json() as { data: ExpoPushTicket[] };
+    const result = (await response.json()) as { data: ExpoPushTicket[] };
     const tickets = result.data ?? [];
 
     // Deactivate tokens that are no longer valid
@@ -107,12 +109,14 @@ export async function sendPushNotification(
 
     // Batch-deactivate invalid tokens
     if (tokensToDeactivate.length > 0) {
-      await prisma.pushToken.updateMany({
-        where: { id: { in: tokensToDeactivate } },
-        data: { active: false },
-      }).catch((err: unknown) => {
-        console.error("Failed to deactivate invalid push tokens:", err);
-      });
+      await prisma.pushToken
+        .updateMany({
+          where: { id: { in: tokensToDeactivate } },
+          data: { active: false },
+        })
+        .catch((err: unknown) => {
+          console.error("Failed to deactivate invalid push tokens:", err);
+        });
     }
 
     return { sent, failed, tickets };

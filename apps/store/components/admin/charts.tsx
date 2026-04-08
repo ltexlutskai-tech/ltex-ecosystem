@@ -101,9 +101,13 @@ export function TopProductsTable({ data }: { data: TopProduct[] }) {
               {data.map((product, i) => (
                 <tr key={product.productId} className="border-b last:border-0">
                   <td className="py-1.5 text-muted-foreground">{i + 1}</td>
-                  <td className="py-1.5 max-w-[200px] truncate">{product.productName}</td>
+                  <td className="py-1.5 max-w-[200px] truncate">
+                    {product.productName}
+                  </td>
                   <td className="py-1.5 text-right">{product.orderCount}</td>
-                  <td className="py-1.5 text-right">{product.totalEur.toFixed(2)}</td>
+                  <td className="py-1.5 text-right">
+                    {product.totalEur.toFixed(2)}
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -132,8 +136,10 @@ export function RevenueChart({ data }: { data: DailyRevenue[] }) {
   const padding = 4;
 
   const points = data.map((d, i) => {
-    const x = padding + (i / Math.max(data.length - 1, 1)) * (width - padding * 2);
-    const y = height - padding - (d.revenue / maxRevenue) * (height - padding * 2);
+    const x =
+      padding + (i / Math.max(data.length - 1, 1)) * (width - padding * 2);
+    const y =
+      height - padding - (d.revenue / maxRevenue) * (height - padding * 2);
     return `${x},${y}`;
   });
 
@@ -150,15 +156,22 @@ export function RevenueChart({ data }: { data: DailyRevenue[] }) {
       <p className="mb-3 text-sm text-muted-foreground">
         Всього: {totalRevenue.toFixed(2)} &euro;
       </p>
-      <svg viewBox={`0 0 ${width} ${height}`} className="h-36 w-full" preserveAspectRatio="none">
+      <svg
+        viewBox={`0 0 ${width} ${height}`}
+        className="h-36 w-full"
+        preserveAspectRatio="none"
+      >
         <path d={areaD} fill="hsl(142 72% 29% / 0.1)" />
         <path d={pathD} fill="none" stroke="hsl(142 72% 29%)" strokeWidth="2" />
         {data.map((d, i) => {
-          const x = padding + (i / Math.max(data.length - 1, 1)) * (width - padding * 2);
-          const y = height - padding - (d.revenue / maxRevenue) * (height - padding * 2);
-          return (
-            <circle key={i} cx={x} cy={y} r="3" fill="hsl(142 72% 29%)" />
-          );
+          const x =
+            padding +
+            (i / Math.max(data.length - 1, 1)) * (width - padding * 2);
+          const y =
+            height -
+            padding -
+            (d.revenue / maxRevenue) * (height - padding * 2);
+          return <circle key={i} cx={x} cy={y} r="3" fill="hsl(142 72% 29%)" />;
         })}
       </svg>
     </div>

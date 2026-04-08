@@ -30,7 +30,10 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
   const product = await prisma.product.findUnique({
     where: { slug },
-    include: { category: true, images: { take: 1, orderBy: { position: "asc" } } },
+    include: {
+      category: true,
+      images: { take: 1, orderBy: { position: "asc" } },
+    },
   });
   if (!product) return {};
   const description = `${product.name} гуртом. Якість: ${QUALITY_LABELS[product.quality as QualityLevel] ?? product.quality}. ${product.description || "Секонд хенд та сток від L-TEX."}`;
@@ -69,7 +72,9 @@ export default async function ProductPage({ params }: Props) {
 
   if (!product) notFound();
 
-  const wholesalePrice = product.prices.find((p) => p.priceType === "wholesale");
+  const wholesalePrice = product.prices.find(
+    (p) => p.priceType === "wholesale",
+  );
   const salePrice = product.prices.find((p) => p.priceType === "akciya");
 
   const breadcrumbs = [
@@ -160,7 +165,10 @@ export default async function ProductPage({ params }: Props) {
               <span className="text-2xl font-bold text-red-600">
                 €{salePrice.amount.toFixed(2)}
                 <span className="text-sm font-normal">
-                  /{PRICE_UNIT_LABELS[product.priceUnit as keyof typeof PRICE_UNIT_LABELS]?.replace("€/", "") ?? product.priceUnit}
+                  /
+                  {PRICE_UNIT_LABELS[
+                    product.priceUnit as keyof typeof PRICE_UNIT_LABELS
+                  ]?.replace("€/", "") ?? product.priceUnit}
                 </span>
               </span>
             )}
@@ -183,7 +191,8 @@ export default async function ProductPage({ params }: Props) {
             <div className="rounded-lg border p-3">
               <span className="text-gray-500">Якість</span>
               <p className="font-medium">
-                {QUALITY_LABELS[product.quality as QualityLevel] ?? product.quality}
+                {QUALITY_LABELS[product.quality as QualityLevel] ??
+                  product.quality}
               </p>
             </div>
             <div className="rounded-lg border p-3">
@@ -195,13 +204,17 @@ export default async function ProductPage({ params }: Props) {
             <div className="rounded-lg border p-3">
               <span className="text-gray-500">Країна</span>
               <p className="font-medium">
-                {COUNTRY_LABELS[product.country as keyof typeof COUNTRY_LABELS] ?? product.country}
+                {COUNTRY_LABELS[
+                  product.country as keyof typeof COUNTRY_LABELS
+                ] ?? product.country}
               </p>
             </div>
             <div className="rounded-lg border p-3">
               <span className="text-gray-500">Од. ціни</span>
               <p className="font-medium">
-                {PRICE_UNIT_LABELS[product.priceUnit as keyof typeof PRICE_UNIT_LABELS] ?? product.priceUnit}
+                {PRICE_UNIT_LABELS[
+                  product.priceUnit as keyof typeof PRICE_UNIT_LABELS
+                ] ?? product.priceUnit}
               </p>
             </div>
             {product.averageWeight && (
@@ -215,7 +228,9 @@ export default async function ProductPage({ params }: Props) {
           {product.description && (
             <div>
               <h2 className="font-semibold">Опис</h2>
-              <p className="mt-1 text-sm text-gray-600">{product.description}</p>
+              <p className="mt-1 text-sm text-gray-600">
+                {product.description}
+              </p>
             </div>
           )}
 
@@ -275,9 +290,12 @@ export default async function ProductPage({ params }: Props) {
                     </td>
                     <td className="px-4 py-3">
                       <Badge
-                        variant={lot.status === "on_sale" ? "accent" : "secondary"}
+                        variant={
+                          lot.status === "on_sale" ? "accent" : "secondary"
+                        }
                       >
-                        {LOT_STATUS_LABELS[lot.status as LotStatus] ?? lot.status}
+                        {LOT_STATUS_LABELS[lot.status as LotStatus] ??
+                          lot.status}
                       </Badge>
                     </td>
                     <td className="px-4 py-3">

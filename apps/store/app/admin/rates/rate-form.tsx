@@ -37,7 +37,13 @@ export function RateForm() {
       </div>
       <div>
         <label className="mb-1 block text-sm font-medium">Курс</label>
-        <Input name="rate" type="number" step="0.0001" required placeholder="45.50" />
+        <Input
+          name="rate"
+          type="number"
+          step="0.0001"
+          required
+          placeholder="45.50"
+        />
       </div>
       <Button type="submit">Зберегти</Button>
     </form>

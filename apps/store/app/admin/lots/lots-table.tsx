@@ -89,12 +89,19 @@ export function LotsTable({ lots }: { lots: LotRow[] }) {
                 <td className="px-4 py-3">{lot.quantity}</td>
                 <td className="px-4 py-3">€{lot.priceEur.toFixed(2)}</td>
                 <td className="px-4 py-3">
-                  <Badge variant={statusColors[lot.status as LotStatus] ?? "secondary"}>
+                  <Badge
+                    variant={
+                      statusColors[lot.status as LotStatus] ?? "secondary"
+                    }
+                  >
                     {LOT_STATUS_LABELS[lot.status as LotStatus] ?? lot.status}
                   </Badge>
                 </td>
                 <td className="px-4 py-3">
-                  <LotStatusForm lotId={lot.id} currentStatus={lot.status as LotStatus} />
+                  <LotStatusForm
+                    lotId={lot.id}
+                    currentStatus={lot.status as LotStatus}
+                  />
                 </td>
               </tr>
             ))}

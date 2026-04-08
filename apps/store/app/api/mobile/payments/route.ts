@@ -22,13 +22,24 @@ export async function GET(request: NextRequest) {
   }
 
   if (!customerId) {
-    return NextResponse.json({ error: "customerId or orderId required" }, { status: 400 });
+    return NextResponse.json(
+      { error: "customerId or orderId required" },
+      { status: 400 },
+    );
   }
 
   const payments = await prisma.payment.findMany({
     where: { order: { customerId } },
     include: {
-      order: { select: { id: true, code1C: true, status: true, totalEur: true, totalUah: true } },
+      order: {
+        select: {
+          id: true,
+          code1C: true,
+          status: true,
+          totalEur: true,
+          totalUah: true,
+        },
+      },
     },
     orderBy: { createdAt: "desc" },
     take: 50,
@@ -64,7 +75,10 @@ export async function POST(request: NextRequest) {
 
   const parsed = mobilePaymentSchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Невірні дані" }, { status: 400 });
+    return NextResponse.json(
+      { error: parsed.error.issues[0]?.message ?? "Невірні дані" },
+      { status: 400 },
+    );
   }
   const { orderId, method, amount, currency, externalId } = parsed.data;
 
@@ -80,5 +94,8 @@ export async function POST(request: NextRequest) {
     },
   });
 
-  return NextResponse.json({ id: payment.id, status: payment.status }, { status: 201 });
+  return NextResponse.json(
+    { id: payment.id, status: payment.status },
+    { status: 201 },
+  );
 }

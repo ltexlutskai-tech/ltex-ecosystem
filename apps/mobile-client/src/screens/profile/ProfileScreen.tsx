@@ -328,7 +328,9 @@ export function ProfileScreen({ navigation }: ProfileScreenProps) {
             icon="receipt-outline"
             iconColor="#16a34a"
             title="Мої замовлення"
-            badge={stats.totalOrders > 0 ? String(stats.totalOrders) : undefined}
+            badge={
+              stats.totalOrders > 0 ? String(stats.totalOrders) : undefined
+            }
             onPress={() => navigation.navigate("OrdersTab")}
           />
           <View style={styles.menuDivider} />
@@ -337,9 +339,7 @@ export function ProfileScreen({ navigation }: ProfileScreenProps) {
             iconColor="#dc2626"
             title="Обране"
             badge={
-              stats.favoriteCount > 0
-                ? String(stats.favoriteCount)
-                : undefined
+              stats.favoriteCount > 0 ? String(stats.favoriteCount) : undefined
             }
             onPress={() => navigation.navigate("Favorites")}
           />

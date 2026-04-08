@@ -10,8 +10,8 @@ export function Footer() {
           <div>
             <h3 className="text-lg font-bold text-primary">{APP_NAME}</h3>
             <p className="mt-2 text-sm text-muted-foreground">
-              Гуртовий продаж секонд хенду, стоку, іграшок та Bric-a-Brac від
-              10 кг.
+              Гуртовий продаж секонд хенду, стоку, іграшок та Bric-a-Brac від 10
+              кг.
             </p>
           </div>
 

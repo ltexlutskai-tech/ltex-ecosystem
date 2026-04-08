@@ -19,7 +19,9 @@ export default function StoreLayout({
       </a>
       <div className="flex min-h-screen flex-col">
         <Header />
-        <main id="main-content" className="flex-1" role="main">{children}</main>
+        <main id="main-content" className="flex-1" role="main">
+          {children}
+        </main>
         <Footer />
       </div>
     </CartProvider>

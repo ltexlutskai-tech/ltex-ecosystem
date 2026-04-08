@@ -42,12 +42,16 @@ async function main(): Promise<void> {
     await setWebhook(webhookUrl);
     console.log("Viber bot webhook registered. Waiting for events...");
   } else {
-    console.log("No VIBER_WEBHOOK_URL set. Set it and restart to register webhook.");
+    console.log(
+      "No VIBER_WEBHOOK_URL set. Set it and restart to register webhook.",
+    );
     console.log("Viber does not support polling — webhook is required.");
   }
 }
 
-const isMainModule = process.argv[1]?.endsWith("index.ts") || process.argv[1]?.endsWith("index.js");
+const isMainModule =
+  process.argv[1]?.endsWith("index.ts") ||
+  process.argv[1]?.endsWith("index.js");
 if (isMainModule) {
   main();
 }

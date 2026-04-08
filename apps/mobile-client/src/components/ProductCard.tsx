@@ -94,7 +94,8 @@ export function ProductCard({ product, onPress }: ProductCardProps) {
 
 function lotWord(n: number): string {
   if (n % 10 === 1 && n % 100 !== 11) return "мішок";
-  if ([2, 3, 4].includes(n % 10) && ![12, 13, 14].includes(n % 100)) return "мішки";
+  if ([2, 3, 4].includes(n % 10) && ![12, 13, 14].includes(n % 100))
+    return "мішки";
   return "мішків";
 }
 

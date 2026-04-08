@@ -12,7 +12,7 @@ concurrency:
 
 jobs:
   ci:
-    name: Typecheck & Build
+    name: Lint, Typecheck, Test & Build
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
@@ -35,6 +35,9 @@ jobs:
       - name: Generate Prisma Client
         run: pnpm --filter @ltex/db exec prisma generate
 
+      - name: Lint (Prettier)
+        run: pnpm format:check
+
       - name: Test
         run: pnpm --filter @ltex/shared test && pnpm --filter @ltex/store test
 
@@ -43,8 +46,11 @@ jobs:
 
       - name: Build
         run: pnpm build
+        env:
+          DATABASE_URL: "postgresql://placeholder:placeholder@localhost:5432/placeholder"
 
-  # E2E tests (optional — requires DATABASE_URL)
+  # E2E tests — requires DATABASE_URL secret to be configured
+  # Uncomment when Supabase test DB or CI DB is available
   # e2e:
   #   name: E2E Tests
   #   runs-on: ubuntu-latest

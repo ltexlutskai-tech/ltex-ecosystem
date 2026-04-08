@@ -1,4 +1,10 @@
-import { prisma, type Prisma, type Product, type ProductImage, type Price } from "@ltex/db";
+import {
+  prisma,
+  type Prisma,
+  type Product,
+  type ProductImage,
+  type Price,
+} from "@ltex/db";
 
 interface CatalogParams {
   categoryId?: string;
@@ -20,9 +26,15 @@ type ProductWithRelations = Product & {
   _count: { lots: number };
 };
 
-type CatalogResult = { products: ProductWithRelations[]; total: number; totalPages: number };
+type CatalogResult = {
+  products: ProductWithRelations[];
+  total: number;
+  totalPages: number;
+};
 
-export async function getCatalogProducts(params: CatalogParams): Promise<CatalogResult> {
+export async function getCatalogProducts(
+  params: CatalogParams,
+): Promise<CatalogResult> {
   const {
     categoryId,
     categoryIds,
@@ -103,7 +115,9 @@ export async function getCatalogProducts(params: CatalogParams): Promise<Catalog
  * Falls back to trigram similarity if tsvector gives 0 results,
  * then to ILIKE as last resort.
  */
-async function fullTextSearch(params: CatalogParams & { q: string }): Promise<CatalogResult> {
+async function fullTextSearch(
+  params: CatalogParams & { q: string },
+): Promise<CatalogResult> {
   const {
     categoryId,
     categoryIds,
@@ -135,7 +149,9 @@ async function fullTextSearch(params: CatalogParams & { q: string }): Promise<Ca
   let paramIdx = 3;
 
   if (categoryIds && categoryIds.length > 0) {
-    const placeholders = categoryIds.map((_, i) => `$${paramIdx + i}`).join(", ");
+    const placeholders = categoryIds
+      .map((_, i) => `$${paramIdx + i}`)
+      .join(", ");
     filterConditions.push(`p.category_id IN (${placeholders})`);
     queryParams.push(...categoryIds);
     paramIdx += categoryIds.length;
@@ -194,7 +210,13 @@ async function fullTextSearch(params: CatalogParams & { q: string }): Promise<Ca
 
   // If tsvector + ILIKE gave 0 results, try trigram similarity fallback
   if (total === 0) {
-    return trigramFallbackSearch(q, filterConditions, queryParams.slice(2), page, perPage);
+    return trigramFallbackSearch(
+      q,
+      filterConditions,
+      queryParams.slice(2),
+      page,
+      perPage,
+    );
   }
 
   // Search query with relevance ranking
@@ -228,7 +250,10 @@ async function fullTextSearch(params: CatalogParams & { q: string }): Promise<Ca
 
   // Preserve relevance order
   const idOrder = new Map<string, number>(ids.map((id, i) => [id, i]));
-  products.sort((a: { id: string }, b: { id: string }) => (idOrder.get(a.id) ?? 0) - (idOrder.get(b.id) ?? 0));
+  products.sort(
+    (a: { id: string }, b: { id: string }) =>
+      (idOrder.get(a.id) ?? 0) - (idOrder.get(b.id) ?? 0),
+  );
 
   return { products, total, totalPages: Math.ceil(total / perPage) };
 }
@@ -288,7 +313,10 @@ async function trigramFallbackSearch(
     : [];
 
   const idOrder = new Map<string, number>(ids.map((id, i) => [id, i]));
-  products.sort((a: { id: string }, b: { id: string }) => (idOrder.get(a.id) ?? 0) - (idOrder.get(b.id) ?? 0));
+  products.sort(
+    (a: { id: string }, b: { id: string }) =>
+      (idOrder.get(a.id) ?? 0) - (idOrder.get(b.id) ?? 0),
+  );
 
   return { products, total, totalPages: Math.ceil(total / perPage) };
 }
@@ -305,7 +333,9 @@ export interface AutocompleteResult {
   rank: number;
 }
 
-export async function autocompleteSearch(query: string): Promise<AutocompleteResult[]> {
+export async function autocompleteSearch(
+  query: string,
+): Promise<AutocompleteResult[]> {
   if (!query || query.trim().length < 2) return [];
 
   const sanitized = query.replace(/[^\p{L}\p{N}\s'-]/gu, "").trim();
@@ -321,7 +351,12 @@ export async function autocompleteSearch(query: string): Promise<AutocompleteRes
   if (!words) return [];
 
   // Combine tsvector prefix matching + trigram similarity
-  const results: AutocompleteResult[] = await (prisma.$queryRawUnsafe as (query: string, ...values: (string | number)[]) => Promise<AutocompleteResult[]>)(
+  const results: AutocompleteResult[] = await (
+    prisma.$queryRawUnsafe as (
+      query: string,
+      ...values: (string | number)[]
+    ) => Promise<AutocompleteResult[]>
+  )(
     `SELECT DISTINCT ON (id) id, name, slug, quality, score AS rank FROM (
        SELECT id, name, slug, quality,
               ts_rank(to_tsvector('simple', name || ' ' || COALESCE(description, '') || ' ' || COALESCE(article_code, '')),
@@ -343,6 +378,9 @@ export async function autocompleteSearch(query: string): Promise<AutocompleteRes
   );
 
   // Re-sort by rank
-  results.sort((a: AutocompleteResult, b: AutocompleteResult) => Number(b.rank) - Number(a.rank));
+  results.sort(
+    (a: AutocompleteResult, b: AutocompleteResult) =>
+      Number(b.rank) - Number(a.rank),
+  );
   return results.slice(0, 5);
 }

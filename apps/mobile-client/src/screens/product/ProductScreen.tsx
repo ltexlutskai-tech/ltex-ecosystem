@@ -174,13 +174,10 @@ export function ProductScreen({ route, navigation }: ProductScreenProps) {
     });
   }, []);
 
-  const addToCart = useCallback(
-    (lot: LotItem) => {
-      setCart((prev) => ({ ...prev, [lot.id]: true }));
-      Alert.alert("Додано до кошика", `Мішок ${lot.barcode} (${lot.weight} кг)`);
-    },
-    [],
-  );
+  const addToCart = useCallback((lot: LotItem) => {
+    setCart((prev) => ({ ...prev, [lot.id]: true }));
+    Alert.alert("Додано до кошика", `Мішок ${lot.barcode} (${lot.weight} кг)`);
+  }, []);
 
   if (loading) {
     return (
@@ -202,7 +199,9 @@ export function ProductScreen({ route, navigation }: ProductScreenProps) {
   const qualityColor = QUALITY_COLORS[product.quality] ?? "#6b7280";
   const seasonLabel = SEASON_LABELS[product.season] ?? "";
   const priceUnitLabel = product.priceUnit === "kg" ? "€/кг" : "€/шт";
-  const wholesalePrice = product.prices?.find((p) => p.priceType === "wholesale");
+  const wholesalePrice = product.prices?.find(
+    (p) => p.priceType === "wholesale",
+  );
   const freeLots = product.lots?.filter((l) => l.status === "free") ?? [];
   const allLots = product.lots ?? [];
 
@@ -217,7 +216,11 @@ export function ProductScreen({ route, navigation }: ProductScreenProps) {
           showsHorizontalScrollIndicator={false}
           keyExtractor={(_, i) => String(i)}
           renderItem={({ item }) => (
-            <Image source={{ uri: item }} style={styles.productImage} resizeMode="cover" />
+            <Image
+              source={{ uri: item }}
+              style={styles.productImage}
+              resizeMode="cover"
+            />
           )}
           style={styles.imageList}
         />
@@ -312,7 +315,9 @@ export function ProductScreen({ route, navigation }: ProductScreenProps) {
               isSubscribed && styles.subscribeButtonTextActive,
             ]}
           >
-            {isSubscribed ? "Підписка на відео-огляди активна" : "Підписатись на відео-огляди"}
+            {isSubscribed
+              ? "Підписка на відео-огляди активна"
+              : "Підписатись на відео-огляди"}
           </Text>
         </TouchableOpacity>
       )}
@@ -335,12 +340,17 @@ export function ProductScreen({ route, navigation }: ProductScreenProps) {
                   <Text style={styles.lotSep}>·</Text>
                   <Text style={styles.lotDetail}>{lot.quantity} шт</Text>
                   <Text style={styles.lotSep}>·</Text>
-                  <Text style={styles.lotPrice}>{lot.priceEur.toFixed(2)} €</Text>
+                  <Text style={styles.lotPrice}>
+                    {lot.priceEur.toFixed(2)} €
+                  </Text>
                 </View>
                 <View
                   style={[
                     styles.lotStatusBadge,
-                    { backgroundColor: (LOT_STATUS_COLORS[lot.status] ?? "#6b7280") + "1a" },
+                    {
+                      backgroundColor:
+                        (LOT_STATUS_COLORS[lot.status] ?? "#6b7280") + "1a",
+                    },
                   ]}
                 >
                   <Text
@@ -411,10 +421,21 @@ const styles = StyleSheet.create({
     paddingTop: 16,
     gap: 8,
   },
-  productName: { flex: 1, fontSize: 20, fontWeight: "700", color: "#1f2937", lineHeight: 26 },
+  productName: {
+    flex: 1,
+    fontSize: 20,
+    fontWeight: "700",
+    color: "#1f2937",
+    lineHeight: 26,
+  },
   favoriteButton: { padding: 4 },
 
-  badgeRow: { flexDirection: "row", gap: 6, paddingHorizontal: 16, marginTop: 10 },
+  badgeRow: {
+    flexDirection: "row",
+    gap: 6,
+    paddingHorizontal: 16,
+    marginTop: 10,
+  },
   badge: { paddingHorizontal: 10, paddingVertical: 3, borderRadius: 6 },
   badgeText: { color: "#fff", fontSize: 12, fontWeight: "600" },
 
@@ -425,7 +446,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     marginTop: 12,
   },
-  detailText: { fontSize: 13, color: "#6b7280", paddingHorizontal: 16, marginTop: 4 },
+  detailText: {
+    fontSize: 13,
+    color: "#6b7280",
+    paddingHorizontal: 16,
+    marginTop: 4,
+  },
   descriptionText: {
     fontSize: 14,
     color: "#4b5563",
@@ -465,8 +491,18 @@ const styles = StyleSheet.create({
   subscribeButtonTextActive: { color: "#fff" },
 
   lotsSection: { marginTop: 20, paddingHorizontal: 16 },
-  sectionTitle: { fontSize: 16, fontWeight: "700", color: "#1f2937", marginBottom: 10 },
-  emptyLots: { fontSize: 14, color: "#9ca3af", textAlign: "center", paddingVertical: 20 },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#1f2937",
+    marginBottom: 10,
+  },
+  emptyLots: {
+    fontSize: 14,
+    color: "#9ca3af",
+    textAlign: "center",
+    paddingVertical: 20,
+  },
 
   lotCard: {
     flexDirection: "row",
@@ -482,7 +518,12 @@ const styles = StyleSheet.create({
   lotDetail: { fontSize: 13, color: "#6b7280" },
   lotSep: { fontSize: 13, color: "#d1d5db" },
   lotPrice: { fontSize: 13, fontWeight: "700", color: "#16a34a" },
-  lotStatusBadge: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 4, alignSelf: "flex-start" },
+  lotStatusBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 4,
+    alignSelf: "flex-start",
+  },
   lotStatusText: { fontSize: 11, fontWeight: "600" },
 
   lotActions: { flexDirection: "row", alignItems: "center", gap: 8 },

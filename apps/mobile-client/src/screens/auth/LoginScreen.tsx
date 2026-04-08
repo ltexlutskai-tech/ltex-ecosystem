@@ -33,7 +33,10 @@ export function LoginScreen() {
     try {
       await login(phone, isNew ? name : undefined);
     } catch (error) {
-      Alert.alert("Помилка", error instanceof Error ? error.message : "Не вдалось увійти");
+      Alert.alert(
+        "Помилка",
+        error instanceof Error ? error.message : "Не вдалось увійти",
+      );
     } finally {
       setLoading(false);
     }
@@ -83,7 +86,9 @@ export function LoginScreen() {
           {loading ? (
             <ActivityIndicator color="#fff" />
           ) : (
-            <Text style={styles.buttonText}>{isNew ? "Зареєструватися" : "Увійти"}</Text>
+            <Text style={styles.buttonText}>
+              {isNew ? "Зареєструватися" : "Увійти"}
+            </Text>
           )}
         </TouchableOpacity>
 
@@ -98,21 +103,38 @@ export function LoginScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#fff", justifyContent: "center", padding: 24 },
+  container: {
+    flex: 1,
+    backgroundColor: "#fff",
+    justifyContent: "center",
+    padding: 24,
+  },
   header: { alignItems: "center", marginBottom: 40 },
   logo: { fontSize: 36, fontWeight: "bold", color: "#16a34a" },
   subtitle: { fontSize: 14, color: "#666", textAlign: "center", marginTop: 8 },
   form: { gap: 12 },
   label: { fontSize: 14, fontWeight: "600", color: "#333" },
   input: {
-    borderWidth: 1, borderColor: "#ddd", borderRadius: 8,
-    paddingHorizontal: 16, paddingVertical: 12, fontSize: 16,
+    borderWidth: 1,
+    borderColor: "#ddd",
+    borderRadius: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    fontSize: 16,
   },
   button: {
-    backgroundColor: "#16a34a", borderRadius: 8,
-    paddingVertical: 14, alignItems: "center", marginTop: 8,
+    backgroundColor: "#16a34a",
+    borderRadius: 8,
+    paddingVertical: 14,
+    alignItems: "center",
+    marginTop: 8,
   },
   buttonDisabled: { opacity: 0.6 },
   buttonText: { color: "#fff", fontSize: 16, fontWeight: "600" },
-  switchText: { color: "#16a34a", textAlign: "center", marginTop: 12, fontSize: 14 },
+  switchText: {
+    color: "#16a34a",
+    textAlign: "center",
+    marginTop: 12,
+    fontSize: 14,
+  },
 });

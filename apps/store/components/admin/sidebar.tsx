@@ -2,7 +2,15 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { cn, Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger, SheetClose } from "@ltex/ui";
+import {
+  cn,
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+  SheetClose,
+} from "@ltex/ui";
 import {
   LayoutDashboard,
   ShoppingCart,
@@ -118,7 +126,10 @@ export function AdminSidebar() {
         </Link>
         <Sheet>
           <SheetTrigger asChild>
-            <button className="rounded-md p-2 hover:bg-gray-100" aria-label="Меню">
+            <button
+              className="rounded-md p-2 hover:bg-gray-100"
+              aria-label="Меню"
+            >
               <Menu className="h-5 w-5" />
             </button>
           </SheetTrigger>

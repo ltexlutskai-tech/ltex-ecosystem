@@ -42,7 +42,9 @@ export async function POST(request: NextRequest) {
         where: { articleCode: lot.articleCode },
       });
       if (!product) {
-        errors.push(`Product not found: ${lot.articleCode} (barcode: ${lot.barcode})`);
+        errors.push(
+          `Product not found: ${lot.articleCode} (barcode: ${lot.barcode})`,
+        );
         continue;
       }
 
@@ -76,7 +78,9 @@ export async function POST(request: NextRequest) {
         },
       });
     } catch (err) {
-      errors.push(`Failed: ${lot.barcode} — ${err instanceof Error ? err.message : "unknown"}`);
+      errors.push(
+        `Failed: ${lot.barcode} — ${err instanceof Error ? err.message : "unknown"}`,
+      );
     }
   }
 

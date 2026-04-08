@@ -15,18 +15,15 @@ async function registerTelegramWebhook() {
   const secret = process.env.TELEGRAM_WEBHOOK_SECRET || "";
   const url = `${SITE_URL}/api/telegram/webhook`;
 
-  const res = await fetch(
-    `https://api.telegram.org/bot${token}/setWebhook`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        url,
-        secret_token: secret || undefined,
-        allowed_updates: ["message", "callback_query", "inline_query"],
-      }),
-    }
-  );
+  const res = await fetch(`https://api.telegram.org/bot${token}/setWebhook`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      url,
+      secret_token: secret || undefined,
+      allowed_updates: ["message", "callback_query", "inline_query"],
+    }),
+  });
 
   const data = await res.json();
   if (data.ok) {
@@ -76,7 +73,9 @@ async function registerViberWebhook() {
 
 async function main() {
   if (!SITE_URL) {
-    console.error("❌ Set SITE_URL or NEXT_PUBLIC_SITE_URL environment variable");
+    console.error(
+      "❌ Set SITE_URL or NEXT_PUBLIC_SITE_URL environment variable",
+    );
     process.exit(1);
   }
 

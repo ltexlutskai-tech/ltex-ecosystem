@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@ltex/db";
-import { mobileNotificationTokenSchema, mobileVideoSubscriptionSchema } from "@/lib/validations";
+import {
+  mobileNotificationTokenSchema,
+  mobileVideoSubscriptionSchema,
+} from "@/lib/validations";
 
 /**
  * POST /api/mobile/notifications/register — Register push token
@@ -67,7 +70,10 @@ export async function POST(request: NextRequest) {
   if (action === "register_token") {
     const tokenParsed = mobileNotificationTokenSchema.safeParse(body);
     if (!tokenParsed.success) {
-      return NextResponse.json({ error: tokenParsed.error.issues[0]?.message ?? "Невірні дані" }, { status: 400 });
+      return NextResponse.json(
+        { error: tokenParsed.error.issues[0]?.message ?? "Невірні дані" },
+        { status: 400 },
+      );
     }
     const { customerId, token, platform } = tokenParsed.data;
 
@@ -84,7 +90,10 @@ export async function POST(request: NextRequest) {
   if (action === "subscribe_video") {
     const subParsed = mobileVideoSubscriptionSchema.safeParse(body);
     if (!subParsed.success) {
-      return NextResponse.json({ error: subParsed.error.issues[0]?.message ?? "Невірні дані" }, { status: 400 });
+      return NextResponse.json(
+        { error: subParsed.error.issues[0]?.message ?? "Невірні дані" },
+        { status: 400 },
+      );
     }
     const { customerId, productId } = subParsed.data;
 
@@ -124,9 +133,14 @@ export async function DELETE(request: NextRequest) {
 
   // Unsubscribe from video reviews
   if (action === "unsubscribe_video") {
-    const { customerId, productId } = body as { customerId: string; productId: string };
+    const { customerId, productId } = body as {
+      customerId: string;
+      productId: string;
+    };
     if (customerId && productId) {
-      await prisma.videoSubscription.deleteMany({ where: { customerId, productId } });
+      await prisma.videoSubscription.deleteMany({
+        where: { customerId, productId },
+      });
     }
     return NextResponse.json({ success: true });
   }

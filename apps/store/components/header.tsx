@@ -1,7 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { Button, Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger, SheetClose } from "@ltex/ui";
+import {
+  Button,
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+  SheetClose,
+} from "@ltex/ui";
 import { APP_NAME, CONTACTS } from "@ltex/shared";
 import { CartBadge } from "@/components/store/cart-badge";
 import { Menu, X } from "lucide-react";
@@ -42,7 +50,12 @@ export function Header() {
           >
             {CONTACTS.phones[0]}
           </a>
-          <Button variant="outline" size="sm" asChild className="hidden sm:inline-flex">
+          <Button
+            variant="outline"
+            size="sm"
+            asChild
+            className="hidden sm:inline-flex"
+          >
             <a
               href={`https://t.me/${CONTACTS.telegram.replace("@", "")}`}
               target="_blank"
@@ -55,7 +68,12 @@ export function Header() {
           {/* Mobile menu */}
           <Sheet>
             <SheetTrigger asChild>
-              <Button variant="ghost" size="icon" className="md:hidden" aria-label="Меню">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="md:hidden"
+                aria-label="Меню"
+              >
                 <Menu className="h-5 w-5" />
               </Button>
             </SheetTrigger>
@@ -65,7 +83,10 @@ export function Header() {
                   {APP_NAME}
                 </SheetTitle>
               </SheetHeader>
-              <nav aria-label="Мобільна навігація" className="mt-6 flex flex-col gap-4">
+              <nav
+                aria-label="Мобільна навігація"
+                className="mt-6 flex flex-col gap-4"
+              >
                 {NAV_LINKS.map((link) => (
                   <SheetClose key={link.href} asChild>
                     <Link

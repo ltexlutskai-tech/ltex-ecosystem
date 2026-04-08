@@ -58,7 +58,10 @@ export async function deleteProduct(id: string) {
   revalidatePath("/admin/products");
 }
 
-export async function uploadProductImage(productId: string, formData: FormData) {
+export async function uploadProductImage(
+  productId: string,
+  formData: FormData,
+) {
   const file = formData.get("file") as File;
   if (!file || file.size === 0) return;
 

@@ -22,7 +22,9 @@ interface NovaPoshtaStatus {
   RecipientAddress: string;
 }
 
-async function trackNovaPoshta(trackingNumber: string): Promise<NovaPoshtaStatus | null> {
+async function trackNovaPoshta(
+  trackingNumber: string,
+): Promise<NovaPoshtaStatus | null> {
   const apiKey = process.env.NOVA_POSHTA_API_KEY;
   if (!apiKey) return null;
 
@@ -58,7 +60,11 @@ export async function GET(request: NextRequest) {
   if (trackingNumber) {
     const shipment = await prisma.shipment.findFirst({
       where: { trackingNumber },
-      include: { order: { select: { id: true, code1C: true, status: true, totalEur: true } } },
+      include: {
+        order: {
+          select: { id: true, code1C: true, status: true, totalEur: true },
+        },
+      },
     });
 
     // Try to get fresh status from Nova Poshta
@@ -85,7 +91,8 @@ export async function GET(request: NextRequest) {
             carrier: shipment.carrier,
             status: npStatus?.StatusCode ?? shipment.status,
             statusText: npStatus?.Status ?? shipment.statusText,
-            estimatedDate: npStatus?.ScheduledDeliveryDate ?? shipment.estimatedDate,
+            estimatedDate:
+              npStatus?.ScheduledDeliveryDate ?? shipment.estimatedDate,
             recipientCity: shipment.recipientCity,
             recipientBranch: shipment.recipientBranch,
             order: shipment.order,
@@ -98,12 +105,19 @@ export async function GET(request: NextRequest) {
 
   // Get all shipments for customer
   if (!customerId) {
-    return NextResponse.json({ error: "customerId or trackingNumber required" }, { status: 400 });
+    return NextResponse.json(
+      { error: "customerId or trackingNumber required" },
+      { status: 400 },
+    );
   }
 
   const shipments = await prisma.shipment.findMany({
     where: { order: { customerId } },
-    include: { order: { select: { id: true, code1C: true, status: true, totalEur: true } } },
+    include: {
+      order: {
+        select: { id: true, code1C: true, status: true, totalEur: true },
+      },
+    },
     orderBy: { createdAt: "desc" },
   });
 
@@ -134,7 +148,10 @@ export async function POST(request: NextRequest) {
 
   const parsed = mobileShipmentCreateSchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Невірні дані" }, { status: 400 });
+    return NextResponse.json(
+      { error: parsed.error.issues[0]?.message ?? "Невірні дані" },
+      { status: 400 },
+    );
   }
   const { orderId, trackingNumber, carrier } = parsed.data;
   const rawBody = body as Record<string, unknown>;

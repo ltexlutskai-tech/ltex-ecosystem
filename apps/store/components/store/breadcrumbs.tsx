@@ -8,8 +8,16 @@ interface BreadcrumbItem {
 export function Breadcrumbs({ items }: { items: BreadcrumbItem[] }) {
   return (
     <nav aria-label="Breadcrumb" className="text-sm text-gray-500">
-      <ol className="flex flex-wrap items-center gap-1" itemScope itemType="https://schema.org/BreadcrumbList">
-        <li itemProp="itemListElement" itemScope itemType="https://schema.org/ListItem">
+      <ol
+        className="flex flex-wrap items-center gap-1"
+        itemScope
+        itemType="https://schema.org/BreadcrumbList"
+      >
+        <li
+          itemProp="itemListElement"
+          itemScope
+          itemType="https://schema.org/ListItem"
+        >
           <Link href="/" className="hover:text-green-700" itemProp="item">
             <span itemProp="name">Головна</span>
           </Link>
@@ -25,7 +33,11 @@ export function Breadcrumbs({ items }: { items: BreadcrumbItem[] }) {
           >
             <span className="text-gray-300">/</span>
             {item.href ? (
-              <Link href={item.href} className="hover:text-green-700" itemProp="item">
+              <Link
+                href={item.href}
+                className="hover:text-green-700"
+                itemProp="item"
+              >
                 <span itemProp="name">{item.label}</span>
               </Link>
             ) : (

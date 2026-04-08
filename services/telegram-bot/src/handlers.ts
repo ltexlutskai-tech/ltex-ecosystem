@@ -62,9 +62,12 @@ export async function handleMessage(message: TelegramMessage): Promise<void> {
 
   if (text.startsWith("/start")) return handleStart(chatId);
   if (text.startsWith("/help")) return handleHelp(chatId);
-  if (text.startsWith("/search")) return handleSearch(chatId, text.replace("/search", "").trim());
-  if (text.startsWith("/lots")) return handleLots(chatId, text.replace("/lots", "").trim());
-  if (text.startsWith("/order")) return handleOrder(chatId, text.replace("/order", "").trim());
+  if (text.startsWith("/search"))
+    return handleSearch(chatId, text.replace("/search", "").trim());
+  if (text.startsWith("/lots"))
+    return handleLots(chatId, text.replace("/lots", "").trim());
+  if (text.startsWith("/order"))
+    return handleOrder(chatId, text.replace("/order", "").trim());
   if (text.startsWith("/categories")) return handleCategories(chatId);
   if (text.startsWith("/")) return handleUnknown(chatId);
 
@@ -102,7 +105,10 @@ async function handleStart(chatId: number): Promise<void> {
         ],
         [
           { text: "📞 Контакти", url: `${SITE_URL}/contacts` },
-          { text: "💬 Telegram", url: `https://t.me/${CONTACTS.telegram.replace("@", "")}` },
+          {
+            text: "💬 Telegram",
+            url: `https://t.me/${CONTACTS.telegram.replace("@", "")}`,
+          },
         ],
       ],
     },
@@ -142,7 +148,10 @@ async function handleHelp(chatId: number): Promise<void> {
 
 async function handleSearch(chatId: number, query: string): Promise<void> {
   if (!query || query.length < 2) {
-    await sendMessage(chatId, "Введіть запит для пошуку (мінімум 2 символи).\nНаприклад: /search куртки");
+    await sendMessage(
+      chatId,
+      "Введіть запит для пошуку (мінімум 2 символи).\nНаприклад: /search куртки",
+    );
     return;
   }
 
@@ -164,20 +173,27 @@ async function handleSearch(chatId: number, query: string): Promise<void> {
   });
 
   if (products.length === 0) {
-    await sendMessage(chatId, `🔍 За запитом "<b>${escapeHtml(query)}</b>" нічого не знайдено.`);
+    await sendMessage(
+      chatId,
+      `🔍 За запитом "<b>${escapeHtml(query)}</b>" нічого не знайдено.`,
+    );
     return;
   }
 
-  const lines = (products as ProductSearchResult[]).map((p: ProductSearchResult, i: number) => {
-    const price = p.prices[0]?.amount;
-    const priceStr = price ? `€${price.toFixed(2)}/${p.priceUnit === "kg" ? "кг" : "шт"}` : "";
-    const quality = QUALITY_LABELS[p.quality as QualityLevel] ?? p.quality;
-    return [
-      `${i + 1}. <b>${escapeHtml(p.name)}</b>`,
-      `   ${quality} • ${priceStr} • ${p._count.lots} лотів`,
-      `   <a href="${SITE_URL}/product/${p.slug}">Детальніше →</a>`,
-    ].join("\n");
-  });
+  const lines = (products as ProductSearchResult[]).map(
+    (p: ProductSearchResult, i: number) => {
+      const price = p.prices[0]?.amount;
+      const priceStr = price
+        ? `€${price.toFixed(2)}/${p.priceUnit === "kg" ? "кг" : "шт"}`
+        : "";
+      const quality = QUALITY_LABELS[p.quality as QualityLevel] ?? p.quality;
+      return [
+        `${i + 1}. <b>${escapeHtml(p.name)}</b>`,
+        `   ${quality} • ${priceStr} • ${p._count.lots} лотів`,
+        `   <a href="${SITE_URL}/product/${p.slug}">Детальніше →</a>`,
+      ].join("\n");
+    },
+  );
 
   const text = [
     `🔍 Результати для "<b>${escapeHtml(query)}</b>" (${products.length}):`,
@@ -190,8 +206,13 @@ async function handleSearch(chatId: number, query: string): Promise<void> {
 
 // ─── /lots ───────────────────────────────────────────────────────────────────
 
-async function handleLots(chatId: number, qualityFilter: string): Promise<void> {
-  const where: { status: string; product?: { quality: string } } = { status: "free" };
+async function handleLots(
+  chatId: number,
+  qualityFilter: string,
+): Promise<void> {
+  const where: { status: string; product?: { quality: string } } = {
+    status: "free",
+  };
 
   // Map Ukrainian quality name to key
   if (qualityFilter) {
@@ -206,7 +227,11 @@ async function handleLots(chatId: number, qualityFilter: string): Promise<void> 
   const [lots, total] = await Promise.all([
     prisma.lot.findMany({
       where,
-      include: { product: { select: { name: true, quality: true, priceUnit: true, slug: true } } },
+      include: {
+        product: {
+          select: { name: true, quality: true, priceUnit: true, slug: true },
+        },
+      },
       take: 10,
       orderBy: { createdAt: "desc" },
     }),
@@ -218,14 +243,18 @@ async function handleLots(chatId: number, qualityFilter: string): Promise<void> 
     return;
   }
 
-  const lines = (lots as LotSearchResult[]).map((lot: LotSearchResult, i: number) => {
-    const quality = QUALITY_LABELS[lot.product.quality as QualityLevel] ?? lot.product.quality;
-    return [
-      `${i + 1}. <b>${escapeHtml(lot.product.name)}</b>`,
-      `   ${quality} • ${lot.weight} кг • €${lot.priceEur.toFixed(2)}`,
-      `   Штрихкод: <code>${lot.barcode}</code>`,
-    ].join("\n");
-  });
+  const lines = (lots as LotSearchResult[]).map(
+    (lot: LotSearchResult, i: number) => {
+      const quality =
+        QUALITY_LABELS[lot.product.quality as QualityLevel] ??
+        lot.product.quality;
+      return [
+        `${i + 1}. <b>${escapeHtml(lot.product.name)}</b>`,
+        `   ${quality} • ${lot.weight} кг • €${lot.priceEur.toFixed(2)}`,
+        `   Штрихкод: <code>${lot.barcode}</code>`,
+      ].join("\n");
+    },
+  );
 
   const text = [
     `📦 Вільні лоти${qualityFilter ? ` (${qualityFilter})` : ""}: ${total} шт`,
@@ -255,23 +284,26 @@ async function handleLots(chatId: number, qualityFilter: string): Promise<void> 
     ],
   };
 
-  await sendMessage(chatId, text, { replyMarkup: keyboard, disableWebPagePreview: true });
+  await sendMessage(chatId, text, {
+    replyMarkup: keyboard,
+    disableWebPagePreview: true,
+  });
 }
 
 // ─── /order ──────────────────────────────────────────────────────────────────
 
 async function handleOrder(chatId: number, orderId: string): Promise<void> {
   if (!orderId) {
-    await sendMessage(chatId, "Вкажіть ID замовлення.\nНаприклад: /order abc123");
+    await sendMessage(
+      chatId,
+      "Вкажіть ID замовлення.\nНаприклад: /order abc123",
+    );
     return;
   }
 
   const order = await prisma.order.findFirst({
     where: {
-      OR: [
-        { id: { startsWith: orderId } },
-        { code1C: orderId },
-      ],
+      OR: [{ id: { startsWith: orderId } }, { code1C: orderId }],
     },
     include: {
       customer: true,
@@ -280,23 +312,38 @@ async function handleOrder(chatId: number, orderId: string): Promise<void> {
   });
 
   if (!order) {
-    await sendMessage(chatId, `❌ Замовлення "<b>${escapeHtml(orderId)}</b>" не знайдено.`);
+    await sendMessage(
+      chatId,
+      `❌ Замовлення "<b>${escapeHtml(orderId)}</b>" не знайдено.`,
+    );
     return;
   }
 
   // Fetch product names for items
   const typedOrder = order as unknown as OrderResult;
-  const productIds = [...new Set(typedOrder.items.map((i: OrderResult["items"][number]) => i.productId))];
+  const productIds = [
+    ...new Set(
+      typedOrder.items.map((i: OrderResult["items"][number]) => i.productId),
+    ),
+  ];
   const products = await prisma.product.findMany({
     where: { id: { in: productIds } },
     select: { id: true, name: true },
   });
-  const productNames = new Map((products as { id: string; name: string }[]).map((p: { id: string; name: string }) => [p.id, p.name]));
-
-  const statusLabel = ORDER_STATUS_LABELS[typedOrder.status as OrderStatus] ?? typedOrder.status;
-  const itemLines = typedOrder.items.slice(0, 5).map(
-    (item: OrderResult["items"][number]) => `  • ${escapeHtml(productNames.get(item.productId) ?? "?")} — ${item.weight} кг, €${item.priceEur.toFixed(2)}`,
+  const productNames = new Map(
+    (products as { id: string; name: string }[]).map(
+      (p: { id: string; name: string }) => [p.id, p.name],
+    ),
   );
+
+  const statusLabel =
+    ORDER_STATUS_LABELS[typedOrder.status as OrderStatus] ?? typedOrder.status;
+  const itemLines = typedOrder.items
+    .slice(0, 5)
+    .map(
+      (item: OrderResult["items"][number]) =>
+        `  • ${escapeHtml(productNames.get(item.productId) ?? "?")} — ${item.weight} кг, €${item.priceEur.toFixed(2)}`,
+    );
   if (typedOrder.items.length > 5) {
     itemLines.push(`  ... та ще ${typedOrder.items.length - 5} позицій`);
   }
@@ -307,7 +354,9 @@ async function handleOrder(chatId: number, orderId: string): Promise<void> {
     `<b>Статус:</b> ${statusLabel}`,
     `<b>Клієнт:</b> ${escapeHtml(typedOrder.customer.name)}`,
     `<b>Сума:</b> €${typedOrder.totalEur.toFixed(2)}`,
-    typedOrder.totalUah > 0 ? `<b>Сума (UAH):</b> ${typedOrder.totalUah.toFixed(2)} ₴` : "",
+    typedOrder.totalUah > 0
+      ? `<b>Сума (UAH):</b> ${typedOrder.totalUah.toFixed(2)} ₴`
+      : "",
     `<b>Позицій:</b> ${typedOrder.items.length}`,
     `<b>Дата:</b> ${new Date(typedOrder.createdAt).toLocaleDateString("uk-UA")}`,
     ``,
@@ -342,7 +391,10 @@ async function handleCategories(chatId: number): Promise<void> {
 // ─── Unknown command ─────────────────────────────────────────────────────────
 
 async function handleUnknown(chatId: number): Promise<void> {
-  await sendMessage(chatId, "❓ Невідома команда. Натисніть /help для списку команд.");
+  await sendMessage(
+    chatId,
+    "❓ Невідома команда. Натисніть /help для списку команд.",
+  );
 }
 
 // ─── Callback Queries ────────────────────────────────────────────────────────
@@ -391,33 +443,42 @@ export async function handleInlineQuery(query: InlineQuery): Promise<void> {
     orderBy: { updatedAt: "desc" },
   });
 
-  const results: InlineQueryResult[] = (products as ProductSearchResult[]).map((p: ProductSearchResult) => {
-    const price = p.prices[0]?.amount;
-    const quality = QUALITY_LABELS[p.quality as QualityLevel] ?? p.quality;
-    const priceStr = price ? `€${price.toFixed(2)}/${p.priceUnit === "kg" ? "кг" : "шт"}` : "";
+  const results: InlineQueryResult[] = (products as ProductSearchResult[]).map(
+    (p: ProductSearchResult) => {
+      const price = p.prices[0]?.amount;
+      const quality = QUALITY_LABELS[p.quality as QualityLevel] ?? p.quality;
+      const priceStr = price
+        ? `€${price.toFixed(2)}/${p.priceUnit === "kg" ? "кг" : "шт"}`
+        : "";
 
-    return {
-      type: "article",
-      id: p.id,
-      title: p.name,
-      description: `${quality} • ${priceStr} • ${p._count.lots} лотів`,
-      input_message_content: {
-        message_text: [
-          `<b>${escapeHtml(p.name)}</b>`,
-          `${quality} • ${priceStr}`,
-          `Лотів: ${p._count.lots}`,
-          ``,
-          `<a href="${SITE_URL}/product/${p.slug}">Переглянути на сайті →</a>`,
-        ].join("\n"),
-        parse_mode: "HTML",
-      },
-      reply_markup: {
-        inline_keyboard: [
-          [{ text: "🔗 Відкрити на сайті", url: `${SITE_URL}/product/${p.slug}` }],
-        ],
-      },
-    };
-  });
+      return {
+        type: "article",
+        id: p.id,
+        title: p.name,
+        description: `${quality} • ${priceStr} • ${p._count.lots} лотів`,
+        input_message_content: {
+          message_text: [
+            `<b>${escapeHtml(p.name)}</b>`,
+            `${quality} • ${priceStr}`,
+            `Лотів: ${p._count.lots}`,
+            ``,
+            `<a href="${SITE_URL}/product/${p.slug}">Переглянути на сайті →</a>`,
+          ].join("\n"),
+          parse_mode: "HTML",
+        },
+        reply_markup: {
+          inline_keyboard: [
+            [
+              {
+                text: "🔗 Відкрити на сайті",
+                url: `${SITE_URL}/product/${p.slug}`,
+              },
+            ],
+          ],
+        },
+      };
+    },
+  );
 
   await answerInlineQuery(query.id, results);
 }

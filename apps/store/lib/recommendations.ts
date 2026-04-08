@@ -30,10 +30,7 @@ function productSelect() {
  * Get similar products: same category + quality first, then same category different quality.
  * Ordered by free lot count DESC so products with available lots appear first.
  */
-export async function getRecommendations(
-  productId: string,
-  limit = 6,
-) {
+export async function getRecommendations(productId: string, limit = 6) {
   const product = await prisma.product.findUnique({
     where: { id: productId },
     select: { categoryId: true, quality: true },
@@ -57,7 +54,10 @@ export async function getRecommendations(
   if (sameQuality.length >= limit) return sameQuality;
 
   // Fill remaining with same category, different quality
-  const existingIds = [productId, ...sameQuality.map((p: { id: string }) => p.id)];
+  const existingIds = [
+    productId,
+    ...sameQuality.map((p: { id: string }) => p.id),
+  ];
   const remaining = limit - sameQuality.length;
 
   const differentQuality = await prisma.product.findMany({
@@ -118,6 +118,7 @@ export async function getFrequentlyBoughtTogether(
     coProducts.map((c: { productId: string }, i: number) => [c.productId, i]),
   );
   return products.sort(
-    (a: { id: string }, b: { id: string }) => (orderMap.get(a.id) ?? 99) - (orderMap.get(b.id) ?? 99),
+    (a: { id: string }, b: { id: string }) =>
+      (orderMap.get(a.id) ?? 99) - (orderMap.get(b.id) ?? 99),
   );
 }

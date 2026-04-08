@@ -1,4 +1,10 @@
-export { APP_NAME, MIN_ORDER_KG, COUNTRIES, COUNTRY_LABELS, CONTACTS } from "./business";
+export {
+  APP_NAME,
+  MIN_ORDER_KG,
+  COUNTRIES,
+  COUNTRY_LABELS,
+  CONTACTS,
+} from "./business";
 export type { Country } from "./business";
 
 export { CURRENCIES, DEFAULT_CURRENCY, DISPLAY_CURRENCY } from "./currency";

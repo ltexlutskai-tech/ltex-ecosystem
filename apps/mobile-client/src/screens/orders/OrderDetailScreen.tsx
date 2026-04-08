@@ -96,7 +96,10 @@ interface OrderDetailScreenProps {
   };
 }
 
-export function OrderDetailScreen({ route, navigation }: OrderDetailScreenProps) {
+export function OrderDetailScreen({
+  route,
+  navigation,
+}: OrderDetailScreenProps) {
   const { orderId, orderCode } = route.params;
   const { customerId } = useAuth();
 
@@ -114,7 +117,9 @@ export function OrderDetailScreen({ route, navigation }: OrderDetailScreenProps)
     if (!customerId) return;
     try {
       const [orderData, paymentsData] = await Promise.all([
-        ordersApi.detail(customerId, orderId) as Promise<{ order: OrderDetail }>,
+        ordersApi.detail(customerId, orderId) as Promise<{
+          order: OrderDetail;
+        }>,
         paymentsApi.forOrder(orderId) as Promise<{ payments: PaymentInfo[] }>,
       ]);
       setOrder(orderData.order);
@@ -232,7 +237,7 @@ export function OrderDetailScreen({ route, navigation }: OrderDetailScreenProps)
               const isCurrent = index === currentStatusIndex;
               const label = ORDER_STATUS_LABELS[status] ?? status;
               const color = isCompleted
-                ? ORDER_STATUS_COLORS[status] ?? "#16a34a"
+                ? (ORDER_STATUS_COLORS[status] ?? "#16a34a")
                 : "#d1d5db";
 
               return (
@@ -255,7 +260,9 @@ export function OrderDetailScreen({ route, navigation }: OrderDetailScreenProps)
                           styles.timelineLine,
                           {
                             backgroundColor:
-                              index < currentStatusIndex ? "#16a34a" : "#e5e7eb",
+                              index < currentStatusIndex
+                                ? "#16a34a"
+                                : "#e5e7eb",
                           },
                         ]}
                       />
@@ -400,13 +407,15 @@ export function OrderDetailScreen({ route, navigation }: OrderDetailScreenProps)
                 <View style={styles.paymentLeft}>
                   <Ionicons
                     name={
-                      payment.status === "completed" || payment.status === "confirmed"
+                      payment.status === "completed" ||
+                      payment.status === "confirmed"
                         ? "checkmark-circle"
                         : "time"
                     }
                     size={20}
                     color={
-                      payment.status === "completed" || payment.status === "confirmed"
+                      payment.status === "completed" ||
+                      payment.status === "confirmed"
                         ? "#16a34a"
                         : "#d97706"
                     }

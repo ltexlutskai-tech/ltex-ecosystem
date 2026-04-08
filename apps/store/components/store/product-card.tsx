@@ -51,7 +51,8 @@ export function ProductCard({ product }: ProductCardProps) {
           </h3>
           <div className="mt-2 flex flex-wrap gap-1">
             <Badge variant="outline" className="text-xs">
-              {QUALITY_LABELS[product.quality as QualityLevel] ?? product.quality}
+              {QUALITY_LABELS[product.quality as QualityLevel] ??
+                product.quality}
             </Badge>
             {product.season && (
               <Badge variant="outline" className="text-xs">

@@ -74,7 +74,9 @@ function getSessionId(): string {
 
 async function fetchServerCart(sessionId: string): Promise<CartItem[]> {
   try {
-    const res = await fetch(`/api/cart?sessionId=${encodeURIComponent(sessionId)}`);
+    const res = await fetch(
+      `/api/cart?sessionId=${encodeURIComponent(sessionId)}`,
+    );
     if (!res.ok) return [];
     const data = await res.json();
     return data.items ?? [];

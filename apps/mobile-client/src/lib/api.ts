@@ -20,7 +20,10 @@ export class ApiError extends Error {
   }
 }
 
-export async function api<T = unknown>(path: string, options: ApiOptions = {}): Promise<T> {
+export async function api<T = unknown>(
+  path: string,
+  options: ApiOptions = {},
+): Promise<T> {
   const { method = "GET", body, params } = options;
 
   let url = `${API_URL}${path}`;
@@ -49,18 +52,26 @@ export async function api<T = unknown>(path: string, options: ApiOptions = {}): 
 // Auth
 export const authApi = {
   login: (phone: string, name?: string) =>
-    api<{ customerId: string; name: string; phone: string; isNew: boolean }>("/mobile/auth", {
-      method: "POST",
-      body: { phone, name },
-    }),
+    api<{ customerId: string; name: string; phone: string; isNew: boolean }>(
+      "/mobile/auth",
+      {
+        method: "POST",
+        body: { phone, name },
+      },
+    ),
 };
 
 // Profile
 export const profileApi = {
   get: (customerId: string) =>
     api("/mobile/profile", { params: { customerId } }),
-  update: (data: { customerId: string; name?: string; email?: string; telegram?: string; city?: string }) =>
-    api("/mobile/profile", { method: "PUT", body: data }),
+  update: (data: {
+    customerId: string;
+    name?: string;
+    email?: string;
+    telegram?: string;
+    city?: string;
+  }) => api("/mobile/profile", { method: "PUT", body: data }),
 };
 
 // Catalog (reuses existing store API)
@@ -68,7 +79,14 @@ export const catalogApi = {
   products: (params: Record<string, string>) =>
     api("/mobile/catalog" in {} ? "/mobile/catalog" : "/search", { params }),
   search: (q: string) =>
-    api<{ results: Array<{ id: string; name: string; slug: string; quality: string }> }>("/search", {
+    api<{
+      results: Array<{
+        id: string;
+        name: string;
+        slug: string;
+        quality: string;
+      }>;
+    }>("/search", {
       params: { q },
     }),
 };
@@ -78,9 +96,15 @@ export const favoritesApi = {
   list: (customerId: string) =>
     api("/mobile/favorites", { params: { customerId } }),
   add: (customerId: string, productId: string) =>
-    api("/mobile/favorites", { method: "POST", body: { customerId, productId } }),
+    api("/mobile/favorites", {
+      method: "POST",
+      body: { customerId, productId },
+    }),
   remove: (customerId: string, productId: string) =>
-    api("/mobile/favorites", { method: "DELETE", body: { customerId, productId } }),
+    api("/mobile/favorites", {
+      method: "DELETE",
+      body: { customerId, productId },
+    }),
 };
 
 // Orders
@@ -96,7 +120,10 @@ export const chatApi = {
   messages: (customerId: string, cursor?: string) =>
     api("/mobile/chat", { params: { customerId, ...(cursor && { cursor }) } }),
   send: (customerId: string, text: string, imageUrl?: string) =>
-    api("/mobile/chat", { method: "POST", body: { customerId, text, imageUrl } }),
+    api("/mobile/chat", {
+      method: "POST",
+      body: { customerId, text, imageUrl },
+    }),
   markRead: (customerId: string, upToMessageId?: string) =>
     api("/mobile/chat", { method: "PUT", body: { customerId, upToMessageId } }),
   /** Returns the full SSE stream URL for EventSource connection */

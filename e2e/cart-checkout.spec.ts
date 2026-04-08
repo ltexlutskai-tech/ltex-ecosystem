@@ -6,7 +6,10 @@ test.describe("Cart and Checkout", () => {
     await page.waitForLoadState("networkidle");
 
     // Find an "add to cart" button on lots page
-    const addButton = page.locator("button").filter({ hasText: /додати|кошик|add/i }).first();
+    const addButton = page
+      .locator("button")
+      .filter({ hasText: /додати|кошик|add/i })
+      .first();
     if (await addButton.isVisible({ timeout: 10_000 })) {
       await addButton.click();
 
@@ -15,9 +18,9 @@ test.describe("Cart and Checkout", () => {
       await page.waitForLoadState("networkidle");
 
       // Cart should have at least one item
-      const cartItems = page.locator("[data-testid='cart-item']").or(
-        page.locator("text=/кг|€/").first(),
-      );
+      const cartItems = page
+        .locator("[data-testid='cart-item']")
+        .or(page.locator("text=/кг|€/").first());
       await expect(cartItems).toBeVisible({ timeout: 5_000 });
     }
   });
@@ -34,7 +37,9 @@ test.describe("Cart and Checkout", () => {
     await page.waitForLoadState("networkidle");
 
     // Should show empty cart message
-    await expect(page.locator("text=/порожній|empty/i")).toBeVisible({ timeout: 5_000 });
+    await expect(page.locator("text=/порожній|empty/i")).toBeVisible({
+      timeout: 5_000,
+    });
   });
 
   test("cart validates minimum 10 kg order", async ({ page }) => {
@@ -73,7 +78,9 @@ test.describe("Cart and Checkout", () => {
     await page.waitForLoadState("networkidle");
 
     // Should show weight and price
-    await expect(page.locator("text=/12.*5.*кг/")).toBeVisible({ timeout: 5_000 });
+    await expect(page.locator("text=/12.*5.*кг/")).toBeVisible({
+      timeout: 5_000,
+    });
     await expect(page.locator("text=/5.*00/")).toBeVisible();
   });
 });

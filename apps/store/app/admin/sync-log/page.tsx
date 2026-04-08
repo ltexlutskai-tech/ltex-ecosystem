@@ -4,7 +4,10 @@ import { prisma } from "@ltex/db";
 import { Badge } from "@ltex/ui";
 import Link from "next/link";
 
-const actionColors: Record<string, "default" | "secondary" | "accent" | "outline"> = {
+const actionColors: Record<
+  string,
+  "default" | "secondary" | "accent" | "outline"
+> = {
   create: "default",
   update: "accent",
   upsert: "secondary",
@@ -115,7 +118,10 @@ export default async function SyncLogPage({
 
       {totalPages > 1 && (
         <div className="flex items-center justify-center gap-2">
-          {Array.from({ length: Math.min(totalPages, 10) }, (_, i) => i + 1).map((p) => (
+          {Array.from(
+            { length: Math.min(totalPages, 10) },
+            (_, i) => i + 1,
+          ).map((p) => (
             <Link
               key={p}
               href={`/admin/sync-log?${entity ? `entity=${entity}&` : ""}page=${p}`}

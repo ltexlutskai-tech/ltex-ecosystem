@@ -13,13 +13,22 @@ vi.mock("@ltex/db", () => ({
   },
 }));
 
-import { getRecommendations, getFrequentlyBoughtTogether } from "./recommendations";
+import {
+  getRecommendations,
+  getFrequentlyBoughtTogether,
+} from "./recommendations";
 import { prisma } from "@ltex/db";
 
-const mockProductFindUnique = prisma.product.findUnique as ReturnType<typeof vi.fn>;
+const mockProductFindUnique = prisma.product.findUnique as ReturnType<
+  typeof vi.fn
+>;
 const mockProductFindMany = prisma.product.findMany as ReturnType<typeof vi.fn>;
-const mockOrderItemFindMany = prisma.orderItem.findMany as ReturnType<typeof vi.fn>;
-const mockOrderItemGroupBy = prisma.orderItem.groupBy as ReturnType<typeof vi.fn>;
+const mockOrderItemFindMany = prisma.orderItem.findMany as ReturnType<
+  typeof vi.fn
+>;
+const mockOrderItemGroupBy = prisma.orderItem.groupBy as ReturnType<
+  typeof vi.fn
+>;
 
 const makeProduct = (id: string, name: string) => ({
   id,
@@ -103,7 +112,9 @@ describe("getRecommendations", () => {
     await getRecommendations("prod-1", 6);
 
     // First call: where.id should exclude prod-1
-    expect(mockProductFindMany.mock.calls[0]![0]!.where.id).toEqual({ not: "prod-1" });
+    expect(mockProductFindMany.mock.calls[0]![0]!.where.id).toEqual({
+      not: "prod-1",
+    });
   });
 
   it("respects custom limit parameter", async () => {
@@ -192,6 +203,8 @@ describe("getFrequentlyBoughtTogether", () => {
 
     await getFrequentlyBoughtTogether("prod-1");
 
-    expect(mockOrderItemGroupBy.mock.calls[0]![0]!.where.productId).toEqual({ not: "prod-1" });
+    expect(mockOrderItemGroupBy.mock.calls[0]![0]!.where.productId).toEqual({
+      not: "prod-1",
+    });
   });
 });

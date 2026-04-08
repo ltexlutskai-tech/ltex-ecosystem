@@ -60,12 +60,17 @@ export interface InlineQueryResult {
 }
 
 export interface InlineKeyboardMarkup {
-  inline_keyboard: Array<Array<{ text: string; url?: string; callback_data?: string }>>;
+  inline_keyboard: Array<
+    Array<{ text: string; url?: string; callback_data?: string }>
+  >;
 }
 
 // ─── API Methods ─────────────────────────────────────────────────────────────
 
-async function apiCall(method: string, params: Record<string, unknown> = {}): Promise<unknown> {
+async function apiCall(
+  method: string,
+  params: Record<string, unknown> = {},
+): Promise<unknown> {
   const res = await fetch(`${API_BASE}/${method}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -119,7 +124,10 @@ export async function answerInlineQuery(
 }
 
 export async function setWebhook(url: string): Promise<void> {
-  await apiCall("setWebhook", { url, allowed_updates: ["message", "callback_query", "inline_query"] });
+  await apiCall("setWebhook", {
+    url,
+    allowed_updates: ["message", "callback_query", "inline_query"],
+  });
   console.log(`Webhook set to: ${url}`);
 }
 

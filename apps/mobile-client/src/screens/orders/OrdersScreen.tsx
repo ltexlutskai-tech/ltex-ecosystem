@@ -210,8 +210,14 @@ export function OrdersScreen({ navigation }: OrdersScreenProps) {
         }
         ListEmptyComponent={
           <View style={styles.centered}>
-            <Ionicons name={error ? "alert-circle-outline" : "receipt-outline"} size={48} color={error ? "#dc2626" : "#d1d5db"} />
-            <Text style={styles.emptyTitle}>{error ?? "Замовлень поки немає"}</Text>
+            <Ionicons
+              name={error ? "alert-circle-outline" : "receipt-outline"}
+              size={48}
+              color={error ? "#dc2626" : "#d1d5db"}
+            />
+            <Text style={styles.emptyTitle}>
+              {error ?? "Замовлень поки немає"}
+            </Text>
             {!error && (
               <Text style={styles.emptyHint}>
                 Оформіть перше замовлення з каталогу

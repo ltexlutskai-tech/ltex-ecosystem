@@ -62,7 +62,10 @@ export async function POST(request: NextRequest) {
 
   const parsed = mobileFavoriteSchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Невірні дані" }, { status: 400 });
+    return NextResponse.json(
+      { error: parsed.error.issues[0]?.message ?? "Невірні дані" },
+      { status: 400 },
+    );
   }
   const { customerId, productId } = parsed.data;
 
@@ -85,7 +88,10 @@ export async function DELETE(request: NextRequest) {
 
   const parsed = mobileFavoriteSchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Невірні дані" }, { status: 400 });
+    return NextResponse.json(
+      { error: parsed.error.issues[0]?.message ?? "Невірні дані" },
+      { status: 400 },
+    );
   }
   const { customerId, productId } = parsed.data;
 

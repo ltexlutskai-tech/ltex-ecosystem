@@ -30,7 +30,9 @@ test.describe("Product page", () => {
       await expect(priceElement.first()).toBeVisible();
 
       // Check for breadcrumbs
-      const breadcrumbs = page.locator("nav[aria-label='breadcrumb'], [data-testid='breadcrumbs']");
+      const breadcrumbs = page.locator(
+        "nav[aria-label='breadcrumb'], [data-testid='breadcrumbs']",
+      );
       if (await breadcrumbs.isVisible()) {
         await expect(breadcrumbs).toBeVisible();
       }

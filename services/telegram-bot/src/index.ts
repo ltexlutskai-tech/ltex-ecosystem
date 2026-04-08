@@ -14,12 +14,12 @@
  * - NEXT_PUBLIC_SITE_URL — for product links (default: https://ltex.com.ua)
  */
 
+import { getUpdates, setWebhook, type TelegramUpdate } from "./telegram";
 import {
-  getUpdates,
-  setWebhook,
-  type TelegramUpdate,
-} from "./telegram";
-import { handleMessage, handleCallbackQuery, handleInlineQuery } from "./handlers";
+  handleMessage,
+  handleCallbackQuery,
+  handleInlineQuery,
+} from "./handlers";
 
 export { handleMessage, handleCallbackQuery, handleInlineQuery };
 export type { TelegramUpdate };
@@ -52,7 +52,9 @@ async function startPolling(): Promise<void> {
   const webhookUrl = process.env.TELEGRAM_WEBHOOK_URL;
   if (webhookUrl) {
     await setWebhook(webhookUrl);
-    console.log("Webhook mode — bot is ready. Updates will arrive via webhook.");
+    console.log(
+      "Webhook mode — bot is ready. Updates will arrive via webhook.",
+    );
     return;
   }
 
@@ -75,7 +77,9 @@ async function startPolling(): Promise<void> {
 }
 
 // Run if executed directly
-const isMainModule = process.argv[1]?.endsWith("index.ts") || process.argv[1]?.endsWith("index.js");
+const isMainModule =
+  process.argv[1]?.endsWith("index.ts") ||
+  process.argv[1]?.endsWith("index.js");
 if (isMainModule) {
   startPolling();
 }

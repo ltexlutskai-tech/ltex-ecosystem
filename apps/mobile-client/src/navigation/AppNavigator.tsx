@@ -156,7 +156,11 @@ function ProfileStackNavigator() {
       />
       <ProfileStackNav.Screen
         name="PaymentsHistory"
-        component={PlaceholderScreen("Історія оплат", "wallet-outline", "#0284c7")}
+        component={PlaceholderScreen(
+          "Історія оплат",
+          "wallet-outline",
+          "#0284c7",
+        )}
         options={{ title: "Історія оплат" }}
       />
     </ProfileStackNav.Navigator>
