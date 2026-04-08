@@ -49,23 +49,30 @@ jobs:
         env:
           DATABASE_URL: "postgresql://placeholder:placeholder@localhost:5432/placeholder"
 
-  # E2E tests — requires DATABASE_URL secret to be configured
-  # Uncomment when Supabase test DB or CI DB is available
-  # e2e:
-  #   name: E2E Tests
-  #   runs-on: ubuntu-latest
-  #   timeout-minutes: 15
-  #   needs: ci
-  #   steps:
-  #     - uses: actions/checkout@v4
-  #     - uses: pnpm/action-setup@v4
-  #     - uses: actions/setup-node@v4
-  #       with:
-  #         node-version: 20
-  #         cache: pnpm
-  #     - run: pnpm install --frozen-lockfile
-  #     - run: pnpm --filter @ltex/db exec prisma generate
-  #     - run: npx playwright install --with-deps chromium
-  #     - run: pnpm test:e2e
-  #       env:
-  #         DATABASE_URL: ${{ secrets.DATABASE_URL }}
+  e2e:
+    name: E2E Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: ci
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @ltex/db exec prisma generate
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+      - name: Run E2E tests
+        run: pnpm test:e2e
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        continue-on-error: true
+      - name: Warn if DATABASE_URL not configured
+        if: ${{ !env.HAS_DB }}
+        run: echo "::warning::E2E tests require DATABASE_URL secret. Configure it to enable E2E in CI."
+        env:
+          HAS_DB: ${{ secrets.DATABASE_URL != '' }}
