@@ -735,54 +735,69 @@ Turbo `"build": { "dependsOn": ["^build"] }` означає що build кожн�
 **IMPORTANT:** L-TEX НЕ приймає онлайн-оплати. Таблиця `payments` — тільки для відображення історії з 1С.
 **IMPORTANT:** CI тепер зелений (format + test + typecheck + build). НЕ ламати CI.
 
-#### Task 1: Create infrastructure SQL scripts
+**Скрипти що вже існують (НЕ перезаписувати):**
+- `scripts/upload-photos.ts` — завантаження фото в Supabase Storage (359 рядків, з sharp, dry-run, concurrency)
+- `scripts/register-webhooks.ts` — реєстрація Telegram + Viber webhooks (90 рядків)
+- `scripts/setup-storage.ts` — створення Storage bucket (53 рядки)
+- `scripts/deploy-checklist.md` — чеклист деплою
 
-Create `scripts/` directory with ready-to-run SQL scripts for Supabase:
+#### Task 1: Create SQL scripts for Supabase
 
-**a) `scripts/enable-rls.sql`** — Enable Row-Level Security on all 19 tables:
+**a) `scripts/enable-rls.sql`** — Enable Row-Level Security on all 19 tables + create basic RLS policies:
 ```sql
+-- Enable RLS on all tables
 ALTER TABLE categories ENABLE ROW LEVEL SECURITY;
 ALTER TABLE products ENABLE ROW LEVEL SECURITY;
--- ... all 19 tables
+-- ... all 19 tables (see Prisma schema models below)
+
+-- Public read policies (anon can SELECT)
+CREATE POLICY "Public read categories" ON categories FOR SELECT USING (true);
+CREATE POLICY "Public read products" ON products FOR SELECT USING (true);
+CREATE POLICY "Public read product_images" ON product_images FOR SELECT USING (true);
+CREATE POLICY "Public read lots" ON lots FOR SELECT USING (true);
+CREATE POLICY "Public read prices" ON prices FOR SELECT USING (true);
+CREATE POLICY "Public read exchange_rates" ON exchange_rates FOR SELECT USING (true);
+CREATE POLICY "Public read barcodes" ON barcodes FOR SELECT USING (true);
+
+-- Authenticated-only policies (service_role for write, auth for customer data)
+-- customers, orders, order_items, carts, cart_items, chat_messages,
+-- shipments, video_subscriptions, push_tokens, payments, favorites, sync_log
+-- → no public SELECT, only service_role can access
 ```
+
+All 19 Prisma models (mapped to snake_case table names):
+Category, Product, ProductImage, Lot, Barcode, Price, Customer, Order, OrderItem, ExchangeRate, Cart, CartItem, ChatMessage, Shipment, VideoSubscription, PushToken, Payment, Favorite, SyncLog
+
 Note: Prisma uses direct DATABASE_URL (bypasses RLS), so the site will continue working. RLS only blocks Supabase JS Client (anon key).
 
-**b) `scripts/fts-migration.sql`** — Copy the existing migration from `packages/db/prisma/migrations/20260406_fts_gin_trigram/migration.sql` into scripts/ for easy access. Verify the SQL is correct and add comments explaining what each index does.
+**b) `scripts/fts-migration.sql`** — Copy from `packages/db/prisma/migrations/20260406_fts_gin_trigram/migration.sql` into scripts/. Add Ukrainian comments explaining each index. This is for convenience — user will paste this into Supabase SQL Editor.
 
-#### Task 2: Create Supabase Storage upload script
+#### Task 2: Add `netlify.toml` configuration
 
-Create `scripts/upload-photos.ts`:
-- Read product images from a local directory (configurable path)
-- Upload to Supabase Storage bucket `product-images`
-- Update `product_images` table with uploaded URLs
-- Handle errors gracefully (skip failed uploads, log them)
-- Require `SUPABASE_SERVICE_ROLE_KEY` env var for storage access
+Create `netlify.toml` in project root:
+- `[build]`: command = `npx pnpm install --frozen-lockfile && npx pnpm build`, base = `.`, publish = `apps/store/.next`
+- `[build.environment]`: NODE_VERSION = `22`, PNPM_VERSION = `9`
+- `[[headers]]` for `/*`:
+  - `X-Frame-Options: DENY`
+  - `X-Content-Type-Options: nosniff`
+  - `Referrer-Policy: strict-origin-when-cross-origin`
+  - `Permissions-Policy: camera=(), microphone=(), geolocation=()`
+  - `X-XSS-Protection: 1; mode=block`
+- `[[redirects]]`: `/api/*` → 200 (proxy), force = true (for Netlify Functions if needed)
+- Check `apps/store/next.config.js` or `next.config.mjs` for the actual framework settings to ensure compatibility with Netlify's Next.js plugin
 
-This script will be run manually by the user after they create the storage bucket.
+**IMPORTANT**: Netlify uses `@netlify/plugin-nextjs` — the publish dir and build command must be compatible. Check existing Netlify settings first. If in doubt, keep build config minimal and rely on the plugin defaults.
 
-#### Task 3: Create webhook registration scripts
+#### Task 3: Add `/api/health` endpoint
 
-**a) `scripts/register-telegram-webhook.ts`:**
-- Register Telegram bot webhook URL using Bot API `setWebhook`
-- Set `secret_token` for verification
-- Require `TELEGRAM_BOT_TOKEN` and site URL as args
-- Print success/failure status
+Create `apps/store/app/api/health/route.ts`:
+- GET endpoint that returns `{ status: "ok", timestamp, version }` (read version from package.json)
+- Check DB connectivity: simple `SELECT 1` via Prisma
+- Return `{ status: "degraded", db: "unreachable" }` if DB is down (don't crash)
+- No auth required, no rate limiting
+- Useful for Netlify monitoring, uptime checks, and debugging deploy issues
 
-**b) `scripts/register-viber-webhook.ts`:**
-- Register Viber webhook using Viber REST API
-- Require `VIBER_AUTH_TOKEN` and webhook URL
-- Print success/failure status
-
-#### Task 4: Add `netlify.toml` configuration
-
-Create `netlify.toml` in project root with:
-- Build command (current Netlify UI setting, moved to code for reproducibility)
-- Publish directory
-- Node.js version pinned to 22
-- Security headers (X-Frame-Options, X-Content-Type-Options, Referrer-Policy, Permissions-Policy)
-- Redirect rules if needed (e.g., www → non-www)
-
-#### Task 5: Final CI + build verification
+#### Task 4: Final CI + build verification
 
 After all tasks:
 1. `pnpm format:check` — must pass
@@ -790,7 +805,9 @@ After all tasks:
 3. `pnpm typecheck` — must pass (0 errors)
 4. `pnpm build` — must pass
 
-Commit and push to feature branch.
+Format any new files: `pnpm format:write`
+
+Commit all changes and push to feature branch.
 
 #### Задачі що потребують участі користувача (НЕ для автономної сесії)
 
