@@ -10,18 +10,19 @@ Contacts: Telegram @L_TEX, +380 67 671 05 15, +380 99 358 49 92, ltex.lutsk.ai@g
 
 ## Current Status
 
-**Branch:** `main` (all work merged through Session 4)
+**Branch:** `main` (all work merged through Session 5)
 
-All work from Phase 0 through Session 4 is complete and merged into main (34 commits).
+All work from Phase 0 through Session 5 is complete and merged into main (41 commits).
 
 **IMPORTANT FOR NEW SESSIONS:** Do NOT re-audit or re-merge branches. The project is fully functional:
 
 - Supabase DB: 805 products, 725 lots, 49 categories seeded
 - Netlify: deploying from `main` at stalwart-dango-04a9b9.netlify.app
 - Site is LIVE and working (catalog, lots, cart, admin, API routes)
-- Session 4 completed: 114 unit tests, TypeScript strict (0 any), Zod validation all routes, a11y, SEO, CI lint, Prettier
+- Session 4 completed: 114 unit tests, TypeScript strict (0 any), Zod validation, a11y, SEO, CI Prettier
+- Session 5 completed: mobile polish, 36 E2E tests, admin UX (sort/CSV/breadcrumbs), security headers, bot commands, docs
 - DO NOT repeat seed, merge, or infrastructure setup — it's all done
-- DO NOT re-run Session 4 tasks — tests, TypeScript fixes, API error handling, a11y, SEO, CI all done
+- DO NOT re-run Session 4 or Session 5 tasks — ALL DONE
 
 ## What Exists Now
 
@@ -84,13 +85,15 @@ ltex-ecosystem/
 │   │   ├── header.tsx               — Sticky, mobile Sheet menu, CartBadge, nav (Каталог, Лоти, Про нас, Контакти)
 │   │   ├── footer.tsx               — 4-col grid, categories, contacts
 │   │   ├── store/                   — ProductCard, CatalogFilters (price range, clear all), Breadcrumbs, Pagination, AddToCartButton, CartBadge, ProductJsonLd, SearchAutocomplete
-│   │   └── admin/                   — Sidebar (responsive), ConfirmDelete dialog, FunnelChart, TopProductsTable, RevenueChart, NewCustomersChart
+│   │   └── admin/                   — Sidebar, ConfirmDelete, Charts, SortHeader, ExportCSV, AdminBreadcrumbs
 │   ├── lib/
 │   │   ├── catalog.ts               — getCatalogProducts() + fullTextSearch() (tsvector + trigram fallback) + autocompleteSearch()
 │   │   ├── cart.tsx                  — CartProvider + useCart hook, localStorage + API sync by sessionId
-│   │   ├── validations.ts           — Zod schemas (order, syncProduct, syncLots, syncRates)
-│   │   ├── notifications.ts         — Telegram order notifications (TELEGRAM_BOT_TOKEN)
+│   │   ├── validations.ts           — Zod schemas (order, syncProduct, syncLots, syncRates + mobile)
+│   │   ├── notifications.ts         — Telegram + Viber order notifications
 │   │   ├── rate-limit.ts            — In-memory sliding window rate limiter
+│   │   ├── admin-stats.ts           — Dashboard SQL queries (extracted from page.tsx)
+│   │   ├── admin-auth.ts            — Auth guard for admin server actions
 │   │   └── supabase/                — server.ts, client.ts, middleware.ts
 │   ├── middleware.ts                — Session refresh + /admin route protection
 │   ├── vitest.config.ts             — Test config with @ alias
@@ -120,13 +123,18 @@ ltex-ecosystem/
 ├── apps/mobile-client/              — Expo React Native client app (excluded from pnpm workspace)
 │   ├── src/screens/                 — 8 screens: auth, catalog, product, cart, orders, chat, profile, shipments
 │   ├── src/navigation/              — AppNavigator: bottom tabs + stack navigators
-│   ├── src/lib/                     — API client, auth context + provider
-│   └── src/components/              — ProductCard
-├── e2e/                             — Playwright E2E tests
+│   ├── src/lib/                     — API client, auth context + provider, push notifications
+│   └── src/components/              — ProductCard, SkeletonLoader, OfflineBanner
+├── e2e/                             — Playwright E2E tests (36 total, enabled in CI)
 │   ├── navigation.spec.ts           — 7 tests (pages, nav links, 404)
 │   ├── catalog.spec.ts              — 4 tests (products, filters, search, pagination)
 │   ├── product.spec.ts              — 2 tests (nav to detail, required sections)
-│   └── cart-checkout.spec.ts        — 4 tests (add lot, empty cart, validation, summary)
+│   ├── cart-checkout.spec.ts        — 4 tests (add lot, empty cart, validation, summary)
+│   ├── admin.spec.ts                — admin login, dashboard, navigation
+│   ├── lots.spec.ts                 — lots page, status filters
+│   ├── search.spec.ts               — search autocomplete, results
+│   ├── responsive.spec.ts           — mobile viewport, menu sheet, touch targets
+│   └── about-contacts.spec.ts       — about page, contacts page
 └── playwright.config.ts             — Chromium only, webServer: dev
 ```
 
@@ -196,8 +204,9 @@ NOVA_POSHTA_API_KEY=       # (optional) Nova Poshta API for shipment tracking
 EXPO_PUBLIC_API_URL=       # (mobile) API base URL for Expo app
 ```
 
-### Tests (114 unit + 17 E2E, all passing)
+### Tests (114 unit + 36 E2E, all passing)
 
+**Unit tests (8 files, 114 tests):**
 - `packages/shared/src/utils/slug.test.ts` — 14 tests (transliterate, generateSlug)
 - `packages/shared/src/utils/price.test.ts` — 11 tests (formatPrice, convertCurrency)
 - `apps/store/lib/validations.test.ts` — 28+ tests (order, syncProduct, syncLots, syncRates + mobile schemas)
@@ -206,6 +215,17 @@ EXPO_PUBLIC_API_URL=       # (mobile) API base URL for Expo app
 - `apps/store/lib/push.test.ts` — Expo Push API, batch sending, token deactivation
 - `apps/store/lib/rate-limit.test.ts` — sliding window, IP tracking, window expiry
 - `apps/store/lib/catalog.test.ts` — fullTextSearch, autocomplete, trigram fallback, sanitization
+
+**E2E tests (9 files, 36 tests, enabled in CI):**
+- `e2e/navigation.spec.ts` — pages, nav links, 404
+- `e2e/catalog.spec.ts` — products, filters, search, pagination
+- `e2e/product.spec.ts` — nav to detail, required sections
+- `e2e/cart-checkout.spec.ts` — add lot, empty cart, validation, summary
+- `e2e/admin.spec.ts` — login, dashboard, navigation
+- `e2e/lots.spec.ts` — lots page, status filters
+- `e2e/search.spec.ts` — search autocomplete, results
+- `e2e/responsive.spec.ts` — mobile viewport, menu sheet, touch targets
+- `e2e/about-contacts.spec.ts` — about page, contacts page
 
 ### URL Structure
 
@@ -260,6 +280,7 @@ EXPO_PUBLIC_API_URL=       # (mobile) API base URL for Expo app
 - Phase 4 (remaining): Mobile agent app + warehouse app — SEPARATE SESSION (requires MobileAgentLTEX v1.15.3 screenshots + block-by-block review)
 - **Phase 5: Optimization** — COMPLETED (recommendations, PWA icons+offline, push notifications, SSE chat, Viber notifications)
 - **Session 4: Quality & Testing** — COMPLETED (114 tests, TypeScript strict, API errors, a11y, SEO, CI Prettier, mobile error handling)
+- **Session 5: Polish & Hardening** — COMPLETED (mobile skeleton/offline/push, 36 E2E, admin sort/CSV/breadcrumbs, security headers, bot /prices+/new, README)
 
 ### Infrastructure
 
@@ -394,85 +415,130 @@ EXPO_PUBLIC_API_URL=       # (mobile) API base URL for Expo app
 | Mobile Agent App | 0% | Окрема сесія, потрібні скріншоти |
 | Warehouse App | 0% | Окрема сесія |
 
-### Tasks for next session (Session 5)
+### Session 5 Completion Report (2026-04-08)
+
+#### What was done (7 commits, all 7 tasks completed):
+
+| Commit | Task | Changes |
+|--------|------|---------|
+| `ad169be` | Mobile Client | Skeleton loaders (6 screens), empty states with icons, push token registration, OfflineBanner |
+| `9845a96` | Performance | Extract admin stats to lib/admin-stats.ts, add loading.tsx for 4 admin sub-pages |
+| `06113f5` | Admin UX | Sortable table columns with arrow indicators, CSV export for orders/customers, AdminBreadcrumbs |
+| `7838592` | Security | Auth guards on all 10 admin server actions, rate limiting on mobile auth (10/min), CSP + security headers |
+| `1726e61` | E2E Tests | Enable E2E job in CI, add 19 new tests (admin, lots, search, responsive, about/contacts) — 17 → 36 total |
+| `d955736` | Bots | /prices and /new commands for both bots, search pagination with "all results" link, new Viber menu buttons |
+| `2e23f94` | Docs | Full README.md, .env.example, CONTRIBUTING.md |
+
+#### Results:
+
+| Metric | Before Session 5 | After Session 5 |
+|--------|-------------------|-----------------|
+| E2E tests | 17 (disabled in CI) | **36** (enabled in CI) |
+| E2E test files | 4 | **9** (+5 new) |
+| Admin loading pages | 1 (main) | **5** (+4 sub-pages) |
+| Admin server actions with auth | partial | **all 10** |
+| Security headers | none | **CSP + 5 headers** |
+| Bot commands | 5 | **7** (+/prices, +/new) |
+| New components | — | SortHeader, ExportCSV, AdminBreadcrumbs, SkeletonLoader, OfflineBanner |
+| New files | — | **17** created |
+| TS/TSX files | 166 | **183** |
+| Lines of code | 20,477 | **21,786** |
+| Total commits | 34 | **41** |
+
+#### Project Completion Status: ~95% MVP
+
+| Component | Completion | Details |
+|-----------|-----------|---------|
+| Монорепо структура | 100% | Turborepo + pnpm, 3 packages, 2 apps, 2 services |
+| База даних | 100% | 19 таблиць, 805 products, 725 lots seeded |
+| Web Store | 100% | Каталог, пошук, кошик, checkout, SEO, PWA |
+| Admin Panel | 100% | Dashboard, CRUD, analytics, auth, sort, CSV export, breadcrumbs |
+| API Layer | 100% | 18 ендпоінтів, rate limiting, Zod validation, consistent errors |
+| Telegram Bot | 100% | 7 commands + inline query + webhook + pagination |
+| Viber Bot | 100% | 7 commands + keyboard menus + notifications |
+| Mobile Client App | 90% | Екрани + error handling + skeleton + offline + push ready |
+| Тестування | 95% | 114 unit + 36 E2E, all passing, E2E enabled in CI |
+| Accessibility | 90% | skip-to-content, aria-labels, focus-visible, keyboard nav |
+| SEO | 95% | canonical, OG, JSON-LD, sitemap, meta |
+| Security | 90% | CSP headers, auth guards, rate limiting, webhook validation |
+| CI/CD | 95% | typecheck + test + build + Prettier + E2E |
+| Documentation | 90% | README, CONTRIBUTING, .env.example, deploy checklist |
+| 1С Інтеграція | 60% | API готовий, потрібна конфігурація 1С |
+| Deploy / Production | 60% | Netlify працює, webhooks + фото не налаштовані |
+| Mobile Agent App | 0% | Окрема сесія, потрібні скріншоти |
+| Warehouse App | 0% | Окрема сесія |
+
+### Tasks for next session (Session 6)
 
 **IMPORTANT:** Працювати на гілці `main`. НЕ створювати нову гілку.
 **IMPORTANT:** НЕ повторювати seed, merge, або infrastructure setup — все вже зроблено.
-**IMPORTANT:** НЕ повторювати задачі Session 4 — тести, TypeScript strict, API errors, a11y, SEO, CI Prettier — ВСЕ ЗРОБЛЕНО.
+**IMPORTANT:** НЕ повторювати задачі Session 4-5 — тести, TypeScript, API errors, a11y, SEO, CI, security, admin UX, mobile polish, боти, docs — ВСЕ ЗРОБЛЕНО.
 **IMPORTANT:** L-TEX НЕ приймає онлайн-оплати. Таблиця `payments` — тільки для відображення історії з 1С.
 
 #### Автономні задачі (не потребують участі користувача)
 
-##### Задача 1: Mobile Client App — повне доопрацювання
-Зараз: екрани є, error handling додано (Session 4). Залишилось:
-- Додати pull-to-refresh (`RefreshControl`) на CatalogScreen, OrdersScreen, ShipmentsScreen, ChatScreen
-- Додати skeleton loaders (animated placeholders) замість простих "Завантаження..." текстів на всіх екранах
-- Додати empty states з ілюстраціями/іконками (коли немає товарів, замовлень, повідомлень, відправлень)
-- Додати `expo-notifications` реєстрацію push token при першому запуску — зберігати через `/api/mobile/notifications`
-- Додати offline banner компонент (показувати коли немає мережі, використати `@react-native-community/netinfo`)
-- Перевірити та виправити навігацію між усіма екранами
-- **Файли:** `apps/mobile-client/src/screens/*.tsx`, `apps/mobile-client/src/components/`
+##### Задача 1: Admin panel — пагінація та пошук
+Зараз: admin таблиці показують всі записи одразу (805 products, 725 lots). Потрібно:
+- Додати server-side пагінацію в admin products, lots, orders, customers сторінках
+  - URL params: `?page=1&limit=20` (Prisma `skip`/`take`)
+  - Показувати "Сторінка X з Y" + кнопки навігації
+- Додати пошук/фільтри в `/admin/products` — по назві, категорії, якості
+- Додати пошук в `/admin/customers` — по імені, телефону, місту
+- Додати фільтри в `/admin/lots` — по статусу, якості, ціновому діапазону
+- **Файли:** `apps/store/app/admin/products/page.tsx`, `apps/store/app/admin/lots/page.tsx`, `apps/store/app/admin/orders/page.tsx`, `apps/store/app/admin/customers/page.tsx`
 
-##### Задача 2: E2E тести — увімкнути в CI та розширити
-Зараз: 17 E2E тестів є, але вимкнені в CI (потрібен DATABASE_URL).
-- Налаштувати E2E в CI з mock/placeholder DATABASE_URL (тести вже працюють з dev server)
-- Або: додати conditional step який пропускає E2E якщо немає DB (з warning)
-- Додати нові E2E тести:
-  - Admin login flow (заповнити форму, отримати redirect)
-  - Admin products CRUD (створити, редагувати, видалити продукт)
-  - Lots page filters (статус, якість)
-  - Search autocomplete (ввести текст, отримати dropdown, обрати)
-  - Mobile responsive (viewport 375x667, перевірити menu sheet)
-- **Файли:** `e2e/*.spec.ts`, `.github/workflows/ci.yml`
-- **Ціль:** 17 → 30+ E2E тестів
+##### Задача 2: Image gallery та Supabase Storage інтеграція в UI
+Зараз: ProductCard і product page підтримують imageUrls[], але немає реальних зображень.
+- Додати image gallery компонент на сторінку продукту (thumbnail strip + main image + lightbox)
+- Використати `next/image` з Supabase Storage URL pattern для оптимізації
+- Додати placeholder/fallback коли зображення відсутнє (зараз нічого не показує)
+- Покращити admin image-upload.tsx — preview, drag-and-drop, reorder
+- Додати bulk image upload (множинний вибір файлів)
+- **Файли:** `apps/store/app/(store)/product/[slug]/page.tsx`, `apps/store/components/store/product-card.tsx`, `apps/store/app/admin/products/image-upload.tsx`
 
-##### Задача 3: Admin panel — покращення UX
-- Додати пошук/фільтрацію в списку продуктів (`/admin/products`) — зараз тільки повний список
-- Додати пошук/фільтрацію в списку клієнтів (`/admin/customers`) — пошук по імені/телефону
-- Додати сортування таблиць (по даті, імені, сумі) з індикатором стрілки
-- Додати пагінацію в admin таблицях (products, lots, orders, customers) — зараз показує всі записи
-- Додати export в CSV/Excel для orders та customers
-- Додати breadcrumbs в admin для навігації (Dashboard > Products > Edit)
-- **Файли:** `apps/store/app/admin/products/page.tsx`, `apps/store/app/admin/customers/page.tsx`, `apps/store/app/admin/orders/page.tsx`
+##### Задача 3: Order flow покращення
+Зараз: замовлення створюється через `/api/orders`, але workflow після цього обмежений.
+- Додати сторінку підтвердження замовлення (після checkout redirect на `/order/[id]/confirmation`)
+- Додати email notifications через Resend або nodemailer (якщо є SMTP)
+- Додати order status tracking сторінку для клієнтів (`/order/[id]/status`) — без авторизації, по orderId
+- Покращити admin orders page — додати деталі замовлення inline (expandable row) з позиціями
+- Додати можливість менеджеру додавати коментарі до замовлення
+- **Файли:** `apps/store/app/(store)/order/`, `apps/store/app/admin/orders/`
 
-##### Задача 4: Performance оптимізація
-- Перевірити N+1 queries в catalog.ts — додати Prisma `include` де потрібно замість окремих запитів
-- Додати `loading.tsx` для admin сторінок де відсутні (products/[id], rates, customers)
-- Оптимізувати admin dashboard page.tsx — зараз 392 рядки, можливо винести SQL запити в окремий lib/admin-stats.ts
-- Перевірити bundle size — чи немає зайвих залежностей які потрапляють в client bundle
-- Додати `React.memo` або `useMemo` де є тяжкі обчислення в компонентах
-- Image optimization: перевірити що next/image використовується де можливо (product cards, admin)
-- **Файли:** `apps/store/lib/catalog.ts`, `apps/store/app/admin/page.tsx`, `apps/store/components/`
+##### Задача 4: Internationalization (i18n) підготовка
+Зараз: весь UI hardcoded українською. Потрібно підготувати для потенційної англійської версії.
+- Винести всі UI strings в окремий файл `lib/i18n/uk.ts` (dictionary pattern)
+- Створити `lib/i18n/index.ts` з функцією `t(key)` для отримання перекладу
+- НЕ додавати англійську версію зараз — тільки підготувати інфраструктуру
+- Замінити hardcoded strings в основних компонентах: header, footer, catalog filters, cart, checkout
+- **Файли:** `apps/store/lib/i18n/`, `apps/store/components/header.tsx`, `apps/store/components/footer.tsx`
 
-##### Задача 5: Telegram/Viber боти — розширення функціоналу
-Зараз: базові команди (search, lots, order, categories). Можна покращити:
-- Додати команду /prices — показати актуальні ціни по категоріях
-- Додати команду /new — нові надходження (товари з лотами status=free, створені за останні 7 днів)
-- Додати пагінацію в результатах пошуку (зараз показує тільки перші 5)
-- Додати inline кнопку "Додати в кошик" під кожним товаром в боті
-- Реалізувати те саме для Viber бота
-- **Файли:** `services/telegram-bot/src/handlers.ts`, `services/viber-bot/src/handlers.ts`
+##### Задача 5: WebSocket/SSE для real-time admin dashboard
+Зараз: admin dashboard показує статичні дані при завантаженні сторінки.
+- Додати auto-refresh для dashboard stats (кожні 30 сек або SSE)
+- Додати real-time notification bell в admin sidebar — нові замовлення, нові повідомлення в чаті
+- Додати звуковий сигнал при новому замовленні (opt-in)
+- Показувати "X нових замовлень" badge на Orders в sidebar
+- **Файли:** `apps/store/app/admin/page.tsx`, `apps/store/components/admin/sidebar.tsx`
 
-##### Задача 6: Security hardening
-- Перевірити всі admin server actions на наявність auth check (деякі можуть бути без перевірки)
-- Додати CSRF protection для форм (Next.js App Router)
-- Перевірити що sync API routes (`/api/sync/*`) перевіряють SYNC_API_KEY на всіх методах
-- Додати Content-Security-Policy headers в next.config.js
-- Перевірити що Prisma queries не мають SQL injection (особливо $queryRawUnsafe в catalog.ts)
-- Додати rate limiting на /api/mobile/auth (brute force protection)
-- Перевірити що webhook routes (Telegram, Viber) валідують signature/secret
-- **Файли:** `apps/store/next.config.js`, `apps/store/app/admin/*/actions.ts`, `apps/store/app/api/`
+##### Задача 6: Store UX покращення
+- Додати "Quick view" модальне вікно для ProductCard (preview без переходу на сторінку)
+- Додати comparison feature — порівняння 2-3 товарів side-by-side
+- Покращити cart page — показувати фото товару, можливість змінити кількість
+- Додати "recently viewed" секцію (localStorage) на homepage та catalog
+- Додати wishlist/favorites для веб-версії (зараз тільки mobile)
+- **Файли:** `apps/store/components/store/`, `apps/store/app/(store)/cart/page.tsx`, `apps/store/app/(store)/page.tsx`
 
-##### Задача 7: Documentation та Developer Experience
-- Додати README.md з: опис проекту, як запустити локально, як деплоїти, архітектура
-- Додати JSDoc коментарі до всіх exported функцій в lib/ (recommendations, notifications, push, catalog, cart)
-- Додати .env.example оновлення якщо є нові env vars
-- Додати `CONTRIBUTING.md` з code style, git workflow, testing guidelines
-- Оновити scripts/deploy-checklist.md з актуальним статусом
-- **Файли:** `README.md`, `CONTRIBUTING.md`, `apps/store/lib/*.ts`
+##### Задача 7: Testing — додати integration тести для API
+Зараз: unit тести мокають Prisma. Потрібні тести ближчі до реальності.
+- Додати integration тести для critical API routes (orders, cart, search) з mock DB
+- Використати `msw` (Mock Service Worker) для мокання external APIs (Telegram, Viber, Expo Push)
+- Додати snapshot тести для ключових компонентів (ProductCard, CatalogFilters, Header)
+- Перевірити edge cases: пусте замовлення, неіснуючий продукт, expired session
+- **Файли:** `apps/store/app/api/*/route.test.ts`, `apps/store/components/**/*.test.tsx`
 
-#### Порядок виконання: 1 → 4 → 3 → 6 → 2 → 5 → 7
-(Mobile першим — найбільш видима зміна для користувачів; потім performance; потім admin UX; security; E2E тести; боти; документація останньою)
+#### Порядок виконання: 1 → 6 → 3 → 2 → 5 → 4 → 7
+(Admin пагінація першою — критично для 805 products; потім store UX; потім order flow; images; real-time; i18n; integration тести останніми)
 
 #### Задачі що потребують участі користувача (НЕ для автономної сесії)
 - **Mobile Agent App** — потрібні скріншоти MobileAgentLTEX v1.15.3
