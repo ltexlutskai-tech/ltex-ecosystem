@@ -15,6 +15,7 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "@/lib/auth";
 import { chatApi } from "@/lib/api";
+import { ChatSkeleton } from "@/components/SkeletonLoader";
 
 interface ChatMessage {
   id: string;
@@ -362,12 +363,7 @@ export function ChatScreen(_props: ChatScreenProps) {
   }
 
   if (loading) {
-    return (
-      <View style={styles.centered}>
-        <ActivityIndicator size="large" color="#16a34a" />
-        <Text style={styles.loadingText}>Завантаження чату...</Text>
-      </View>
-    );
+    return <ChatSkeleton />;
   }
 
   return (

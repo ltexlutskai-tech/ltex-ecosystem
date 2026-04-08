@@ -14,6 +14,7 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "@/lib/auth";
 import { catalogApi, favoritesApi, notificationsApi } from "@/lib/api";
+import { ProductSkeleton } from "@/components/SkeletonLoader";
 
 const QUALITY_LABELS: Record<string, string> = {
   extra: "Екстра",
@@ -180,11 +181,7 @@ export function ProductScreen({ route, navigation }: ProductScreenProps) {
   }, []);
 
   if (loading) {
-    return (
-      <View style={styles.centered}>
-        <ActivityIndicator size="large" color="#16a34a" />
-      </View>
-    );
+    return <ProductSkeleton />;
   }
 
   if (!product) {

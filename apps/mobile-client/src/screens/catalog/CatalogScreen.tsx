@@ -9,8 +9,10 @@ import {
   ActivityIndicator,
   RefreshControl,
 } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { catalogApi } from "@/lib/api";
 import { ProductCard, type ProductCardItem } from "@/components/ProductCard";
+import { CatalogSkeleton } from "@/components/SkeletonLoader";
 
 const QUALITY_FILTERS = [
   { key: "all", label: "Всі" },
@@ -150,10 +152,7 @@ export function CatalogScreen({ navigation }: CatalogScreenProps) {
 
       {/* Product list */}
       {loading ? (
-        <View style={styles.centered}>
-          <ActivityIndicator size="large" color="#16a34a" />
-          <Text style={styles.loadingText}>Завантаження каталогу...</Text>
-        </View>
+        <CatalogSkeleton />
       ) : error && products.length === 0 ? (
         <View style={styles.centered}>
           <Text style={styles.errorText}>{error}</Text>
@@ -184,6 +183,7 @@ export function CatalogScreen({ navigation }: CatalogScreenProps) {
           }
           ListEmptyComponent={
             <View style={styles.centered}>
+              <Ionicons name="search-outline" size={48} color="#d1d5db" />
               <Text style={styles.emptyText}>Товарів не знайдено</Text>
               <Text style={styles.emptyHint}>
                 Спробуйте змінити пошук або фільтри

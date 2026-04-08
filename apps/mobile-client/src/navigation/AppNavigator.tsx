@@ -11,7 +11,7 @@
  *   - Профіль (ProfileStack: Profile → Shipments, Favorites, Subscriptions, Payments)
  */
 
-import React from "react";
+import React, { useEffect } from "react";
 import { ActivityIndicator, View, StyleSheet } from "react-native";
 import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
@@ -20,6 +20,8 @@ import { Ionicons } from "@expo/vector-icons";
 
 import { useAuth } from "@/lib/auth";
 import { AuthProvider } from "@/lib/auth-provider";
+import { OfflineBanner } from "@/components/OfflineBanner";
+import { registerPushToken } from "@/lib/notifications";
 
 // Screens
 import { LoginScreen } from "@/screens/auth/LoginScreen";
@@ -238,6 +240,13 @@ const RootStack = createNativeStackNavigator();
 function RootNavigator() {
   const { customerId, isLoading } = useAuth();
 
+  // Register push token on first launch when logged in
+  useEffect(() => {
+    if (customerId) {
+      registerPushToken(customerId).catch(() => {});
+    }
+  }, [customerId]);
+
   if (isLoading) {
     return (
       <View style={styles.loadingContainer}>
@@ -247,17 +256,20 @@ function RootNavigator() {
   }
 
   return (
-    <RootStack.Navigator screenOptions={{ headerShown: false }}>
-      {customerId ? (
-        <RootStack.Screen name="Main" component={MainTabs} />
-      ) : (
-        <RootStack.Screen
-          name="Login"
-          component={LoginScreen}
-          options={{ animationTypeForReplace: "pop" }}
-        />
-      )}
-    </RootStack.Navigator>
+    <View style={{ flex: 1 }}>
+      <OfflineBanner />
+      <RootStack.Navigator screenOptions={{ headerShown: false }}>
+        {customerId ? (
+          <RootStack.Screen name="Main" component={MainTabs} />
+        ) : (
+          <RootStack.Screen
+            name="Login"
+            component={LoginScreen}
+            options={{ animationTypeForReplace: "pop" }}
+          />
+        )}
+      </RootStack.Navigator>
+    </View>
   );
 }
 

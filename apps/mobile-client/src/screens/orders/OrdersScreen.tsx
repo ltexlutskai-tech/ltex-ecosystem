@@ -11,6 +11,7 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "@/lib/auth";
 import { ordersApi } from "@/lib/api";
+import { OrdersSkeleton } from "@/components/SkeletonLoader";
 
 const ORDER_STATUS_LABELS: Record<string, string> = {
   pending: "Очікує",
@@ -183,12 +184,7 @@ export function OrdersScreen({ navigation }: OrdersScreenProps) {
   }
 
   if (loading) {
-    return (
-      <View style={styles.centered}>
-        <ActivityIndicator size="large" color="#16a34a" />
-        <Text style={styles.loadingText}>Завантаження замовлень...</Text>
-      </View>
-    );
+    return <OrdersSkeleton />;
   }
 
   return (

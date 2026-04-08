@@ -14,6 +14,7 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "@/lib/auth";
 import { shipmentsApi } from "@/lib/api";
+import { ShipmentsSkeleton } from "@/components/SkeletonLoader";
 
 interface Shipment {
   id: string;
@@ -292,12 +293,7 @@ export function ShipmentsScreen(_props: ShipmentsScreenProps) {
   }
 
   if (loading) {
-    return (
-      <View style={styles.centered}>
-        <ActivityIndicator size="large" color="#16a34a" />
-        <Text style={styles.loadingText}>Завантаження відправлень...</Text>
-      </View>
-    );
+    return <ShipmentsSkeleton />;
   }
 
   return (

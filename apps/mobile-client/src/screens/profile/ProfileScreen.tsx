@@ -13,6 +13,7 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "@/lib/auth";
 import { profileApi, ordersApi } from "@/lib/api";
+import { ProfileSkeleton } from "@/components/SkeletonLoader";
 
 interface ProfileData {
   id: string;
@@ -150,12 +151,7 @@ export function ProfileScreen({ navigation }: ProfileScreenProps) {
   }
 
   if (loading) {
-    return (
-      <View style={styles.centered}>
-        <ActivityIndicator size="large" color="#16a34a" />
-        <Text style={styles.loadingText}>Завантаження профілю...</Text>
-      </View>
-    );
+    return <ProfileSkeleton />;
   }
 
   if (!profile) {
