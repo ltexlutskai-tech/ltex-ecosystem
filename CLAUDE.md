@@ -309,6 +309,8 @@ EXPO_PUBLIC_API_URL=       # (mobile) API base URL for Expo app
 - **Session 6: Features & UX** — COMPLETED (admin pagination/filters, image gallery, order flow, i18n prep, real-time admin, store UX, integration tests)
 - **Session 7: i18n, Email, Analytics, SEO, Performance** — COMPLETED (i18n all pages, email lib, analytics dashboard, SEO JSON-LD, mobile guards+deep linking, infinite scroll, 161 tests)
 - **Session 8: CI Fix & Production Hardening** — COMPLETED (Prettier 37 files, TypeScript 41 errors, nodemailer, Prisma schema fix, env validation, fetch timeouts, CI all green)
+- **Session 9: Netlify Build Fix** — COMPLETED (Prisma generate in turbo pipeline, notFound() audit, packages/db/turbo.json)
+- **Session 10: Infrastructure Scripts** — COMPLETED (enable-rls.sql, fts-migration.sql, webhook scripts, netlify.toml, security headers)
 
 ### Infrastructure
 
@@ -728,10 +730,57 @@ Turbo `"build": { "dependsOn": ["^build"] }` означає що build кожн�
 | Змінено файлів | — | 3 файли |
 | Total commits | 45 | **46** |
 
-### Tasks for next session (Session 10)
+### Session 10 Completion Report (2026-04-08)
+
+#### Що зроблено (1 коміт `c088a5b`, всі 5 задач виконані):
+
+| Задача | Статус | Деталі |
+|--------|--------|--------|
+| 1. SQL скрипти | **ГОТОВО** | `scripts/enable-rls.sql` (19 таблиць + 7 публічних read policies) + `scripts/fts-migration.sql` (GIN + pg_trgm з коментарями) |
+| 2. Скрипт завантаження фото | **ГОТОВО** | Існуючий `scripts/upload-photos.ts` перевірений — відповідає вимогам |
+| 3. Скрипти реєстрації webhooks | **ГОТОВО** | `scripts/register-telegram-webhook.ts` + `scripts/register-viber-webhook.ts` |
+| 4. netlify.toml | **ГОТОВО** | Build config, Node 22, pnpm 9.15.4, security headers, кешування, www redirect |
+| 5. CI верифікація | **ГОТОВО** | Всі 4 кроки проходять |
+
+#### Створені скрипти:
+
+| Скрипт | Призначення | Запуск |
+|--------|-------------|--------|
+| `scripts/enable-rls.sql` | RLS на 19 таблицях + read policies | Supabase SQL Editor |
+| `scripts/fts-migration.sql` | GIN + trigram індекси для пошуку | Supabase SQL Editor |
+| `scripts/upload-photos.ts` | Завантаження фото в Supabase Storage | `npx tsx scripts/upload-photos.ts ./photos` |
+| `scripts/register-telegram-webhook.ts` | Реєстрація Telegram webhook | `TELEGRAM_BOT_TOKEN=xxx npx tsx scripts/register-telegram-webhook.ts` |
+| `scripts/register-viber-webhook.ts` | Реєстрація Viber webhook | `VIBER_AUTH_TOKEN=xxx npx tsx scripts/register-viber-webhook.ts` |
+
+#### Метрики:
+
+| Метрика | До Session 10 | Після Session 10 |
+|---------|---------------|-----------------|
+| Інфраструктурні скрипти | 1 (upload-photos) | **6** (+5 нових) |
+| netlify.toml | відсутній | **Створено** (build + headers + redirects) |
+| Нові файли | — | 6 файлів |
+| Змінено файлів | — | +370 рядків |
+| Total commits | 46 | **47** |
+
+### Branch Cleanup (pending)
+
+| Branch | Status |
+|--------|--------|
+| `claude/audit-ltex-ecosystem-cTLpW` | Merged, remote delete pending (GitHub UI) |
+| `claude/session-4-tasks-EV62w` | Merged, remote delete pending |
+| `claude/session-5-tasks-fcREm` | Merged, remote delete pending |
+| `claude/admin-gallery-orders-WDIWr` | Merged, remote delete pending |
+| `claude/add-i18n-email-analytics-Xz9Ua` | Merged, remote delete pending |
+| `claude/fix-ci-pipeline-mzwgS` | Merged, remote delete pending |
+| `claude/fix-netlify-prisma-build-JoYVE` | Merged, remote delete pending |
+| `claude/infrastructure-scripts-setup-J9zSf` | Merged, remote delete pending |
+
+**ACTION REQUIRED:** Delete 8 branches via GitHub UI.
+
+### Tasks for next session (Session 11)
 
 **IMPORTANT:** НЕ повторювати seed, merge, або infrastructure setup — все вже зроблено.
-**IMPORTANT:** НЕ повторювати задачі Session 4-9 — ВСЕ ЗРОБЛЕНО. Дивись completion reports вище.
+**IMPORTANT:** НЕ повторювати задачі Session 4-10 — ВСЕ ЗРОБЛЕНО. Дивись completion reports вище.
 **IMPORTANT:** L-TEX НЕ приймає онлайн-оплати. Таблиця `payments` — тільки для відображення історії з 1С.
 **IMPORTANT:** CI тепер зелений (format + test + typecheck + build). НЕ ламати CI.
 
@@ -740,78 +789,16 @@ Turbo `"build": { "dependsOn": ["^build"] }` означає що build кожн�
 - `scripts/register-webhooks.ts` — реєстрація Telegram + Viber webhooks (90 рядків)
 - `scripts/setup-storage.ts` — створення Storage bucket (53 рядки)
 - `scripts/deploy-checklist.md` — чеклист деплою
+- `scripts/enable-rls.sql` — RLS на 19 таблицях + 7 read policies
+- `scripts/fts-migration.sql` — GIN + trigram індекси
+- `scripts/register-telegram-webhook.ts` — реєстрація Telegram webhook
+- `scripts/register-viber-webhook.ts` — реєстрація Viber webhook
 
-#### Task 1: Create SQL scripts for Supabase
-
-**a) `scripts/enable-rls.sql`** — Enable Row-Level Security on all 19 tables + create basic RLS policies:
-```sql
--- Enable RLS on all tables
-ALTER TABLE categories ENABLE ROW LEVEL SECURITY;
-ALTER TABLE products ENABLE ROW LEVEL SECURITY;
--- ... all 19 tables (see Prisma schema models below)
-
--- Public read policies (anon can SELECT)
-CREATE POLICY "Public read categories" ON categories FOR SELECT USING (true);
-CREATE POLICY "Public read products" ON products FOR SELECT USING (true);
-CREATE POLICY "Public read product_images" ON product_images FOR SELECT USING (true);
-CREATE POLICY "Public read lots" ON lots FOR SELECT USING (true);
-CREATE POLICY "Public read prices" ON prices FOR SELECT USING (true);
-CREATE POLICY "Public read exchange_rates" ON exchange_rates FOR SELECT USING (true);
-CREATE POLICY "Public read barcodes" ON barcodes FOR SELECT USING (true);
-
--- Authenticated-only policies (service_role for write, auth for customer data)
--- customers, orders, order_items, carts, cart_items, chat_messages,
--- shipments, video_subscriptions, push_tokens, payments, favorites, sync_log
--- → no public SELECT, only service_role can access
-```
-
-All 19 Prisma models (mapped to snake_case table names):
-Category, Product, ProductImage, Lot, Barcode, Price, Customer, Order, OrderItem, ExchangeRate, Cart, CartItem, ChatMessage, Shipment, VideoSubscription, PushToken, Payment, Favorite, SyncLog
-
-Note: Prisma uses direct DATABASE_URL (bypasses RLS), so the site will continue working. RLS only blocks Supabase JS Client (anon key).
-
-**b) `scripts/fts-migration.sql`** — Copy from `packages/db/prisma/migrations/20260406_fts_gin_trigram/migration.sql` into scripts/. Add Ukrainian comments explaining each index. This is for convenience — user will paste this into Supabase SQL Editor.
-
-#### Task 2: Add `netlify.toml` configuration
-
-Create `netlify.toml` in project root:
-- `[build]`: command = `npx pnpm install --frozen-lockfile && npx pnpm build`, base = `.`, publish = `apps/store/.next`
-- `[build.environment]`: NODE_VERSION = `22`, PNPM_VERSION = `9`
-- `[[headers]]` for `/*`:
-  - `X-Frame-Options: DENY`
-  - `X-Content-Type-Options: nosniff`
-  - `Referrer-Policy: strict-origin-when-cross-origin`
-  - `Permissions-Policy: camera=(), microphone=(), geolocation=()`
-  - `X-XSS-Protection: 1; mode=block`
-- `[[redirects]]`: `/api/*` → 200 (proxy), force = true (for Netlify Functions if needed)
-- Check `apps/store/next.config.js` or `next.config.mjs` for the actual framework settings to ensure compatibility with Netlify's Next.js plugin
-
-**IMPORTANT**: Netlify uses `@netlify/plugin-nextjs` — the publish dir and build command must be compatible. Check existing Netlify settings first. If in doubt, keep build config minimal and rely on the plugin defaults.
-
-#### Task 3: Add `/api/health` endpoint
-
-Create `apps/store/app/api/health/route.ts`:
-- GET endpoint that returns `{ status: "ok", timestamp, version }` (read version from package.json)
-- Check DB connectivity: simple `SELECT 1` via Prisma
-- Return `{ status: "degraded", db: "unreachable" }` if DB is down (don't crash)
-- No auth required, no rate limiting
-- Useful for Netlify monitoring, uptime checks, and debugging deploy issues
-
-#### Task 4: Final CI + build verification
-
-After all tasks:
-1. `pnpm format:check` — must pass
-2. `pnpm test` — must pass (186+ tests)
-3. `pnpm typecheck` — must pass (0 errors)
-4. `pnpm build` — must pass
-
-Format any new files: `pnpm format:write`
-
-Commit all changes and push to feature branch.
+Session 11 tasks will be defined by the orchestrator.
 
 #### Задачі що потребують участі користувача (НЕ для автономної сесії)
 
-- **Видалити merged branches** — 7 branches через GitHub UI (див. Branch Cleanup вище)
+- **Видалити merged branches** — 8 branches через GitHub UI (див. Branch Cleanup вище)
 - **Увімкнути RLS** — запустити `scripts/enable-rls.sql` в Supabase SQL Editor
 - **Запустити FTS міграцію** — запустити `scripts/fts-migration.sql` в Supabase SQL Editor
 - **Запустити seed** — `pnpm db:seed` з правильним DATABASE_URL
