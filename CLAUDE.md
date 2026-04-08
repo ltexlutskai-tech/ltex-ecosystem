@@ -796,6 +796,52 @@ Turbo `"build": { "dependsOn": ["^build"] }` означає що build кожн�
 
 Session 11 tasks will be defined by the orchestrator.
 
+#### Task 1: Add `/api/health` endpoint
+
+Create `apps/store/app/api/health/route.ts`:
+- GET endpoint returning `{ status: "ok", timestamp, version }` (read version from package.json)
+- Check DB connectivity: simple `SELECT 1` via Prisma `$queryRaw`
+- Return `{ status: "degraded", db: "unreachable" }` if DB is down (don't crash)
+- No auth required, no rate limiting
+- Useful for Netlify monitoring, uptime checks, debugging deploy issues
+
+#### Task 2: Clean up `console.log` in production code
+
+There are ~77 `console.log`/`console.warn`/`console.error` statements across 12 production files (NOT test files).
+
+Rules:
+- **REMOVE** all `console.log` used for debugging (e.g., logging request data, query results)
+- **KEEP** `console.error` in catch blocks (error reporting is legitimate)
+- **KEEP** `console.warn` in `instrumentation.ts` (env validation warnings are intentional)
+- **KEEP** `console.log` in standalone scripts (`scripts/`, `services/telegram-bot/`, `services/viber-bot/`) — these run in CLI, not in Next.js
+- Do NOT add a logging library — just clean up unnecessary logs
+
+#### Task 3: Add `packages/db/turbo.json` build cache config
+
+Check if `packages/db/turbo.json` exists and has `"cache": false` for the build step. This was added in Session 9 but may have been lost in merge conflicts. Verify it's correct:
+```json
+{
+  "$schema": "https://turbo.build/schema.json",
+  "tasks": {
+    "build": {
+      "cache": false
+    }
+  }
+}
+```
+
+#### Task 4: Final CI + build verification
+
+After all tasks:
+1. `pnpm format:check` — must pass
+2. `pnpm test` — must pass (186+ tests)
+3. `pnpm typecheck` — must pass (0 errors)
+4. `pnpm build` — must pass
+
+Format any new files: `pnpm format:write`
+
+Commit and push to feature branch.
+
 #### Задачі що потребують участі користувача (НЕ для автономної сесії)
 
 - **Видалити merged branches** — 8 branches через GitHub UI (див. Branch Cleanup вище)
