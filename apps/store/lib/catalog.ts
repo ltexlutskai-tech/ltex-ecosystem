@@ -55,11 +55,13 @@ export async function getCatalogProducts(params: CatalogParams): Promise<Catalog
 
   // Price range filter
   if (priceMin !== undefined || priceMax !== undefined) {
+    const amountFilter: { gte?: number; lte?: number } = {};
+    if (priceMin !== undefined) amountFilter.gte = priceMin;
+    if (priceMax !== undefined) amountFilter.lte = priceMax;
     where.prices = {
       some: {
         priceType: "wholesale",
-        ...(priceMin !== undefined && { amount: { gte: priceMin } }),
-        ...(priceMax !== undefined && { amount: { lte: priceMax } }),
+        amount: amountFilter,
       },
     };
   }

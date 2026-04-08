@@ -15,6 +15,8 @@ interface Props {
   searchParams: Promise<Record<string, string | undefined>>;
 }
 
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://ltex.com.ua";
+
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { categorySlug } = await params;
   const category = await prisma.category.findUnique({
@@ -24,6 +26,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   return {
     title: `${category.name} — секонд хенд та сток гуртом`,
     description: `${category.name} гуртом від 10 кг. Секонд хенд, сток, оригінал з Англії, Німеччини, Канади, Польщі. L-TEX — доставка по Україні.`,
+    alternates: {
+      canonical: `${SITE_URL}/catalog/${categorySlug}`,
+    },
   };
 }
 

@@ -7,10 +7,15 @@ import { CatalogFilters } from "@/components/store/catalog-filters";
 import { Pagination } from "@/components/store/pagination";
 import { Breadcrumbs } from "@/components/store/breadcrumbs";
 
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://ltex.com.ua";
+
 export const metadata: Metadata = {
   title: "Каталог — секонд хенд, сток, іграшки гуртом",
   description:
     "Каталог товарів L-TEX: секонд хенд, сток, іграшки, Bric-a-Brac, взуття, аксесуари гуртом від 10 кг. Доставка по Україні.",
+  alternates: {
+    canonical: `${SITE_URL}/catalog`,
+  },
 };
 
 export default async function CatalogPage({

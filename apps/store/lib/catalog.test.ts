@@ -121,6 +121,17 @@ describe("getCatalogProducts", () => {
     expect(calledWhere.prices.some.amount.lte).toBe(50);
   });
 
+  it("applies both priceMin and priceMax filters together", async () => {
+    mockFindMany.mockResolvedValue([]);
+    mockCount.mockResolvedValue(0);
+
+    await getCatalogProducts({ priceMin: 5, priceMax: 50 });
+
+    const calledWhere = mockFindMany.mock.calls[0]![0]!.where;
+    expect(calledWhere.prices.some.priceType).toBe("wholesale");
+    expect(calledWhere.prices.some.amount).toEqual({ gte: 5, lte: 50 });
+  });
+
   it("sorts by name ascending", async () => {
     mockFindMany.mockResolvedValue([]);
     mockCount.mockResolvedValue(0);

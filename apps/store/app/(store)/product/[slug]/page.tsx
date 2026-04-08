@@ -24,16 +24,29 @@ interface Props {
   params: Promise<{ slug: string }>;
 }
 
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://ltex.com.ua";
+
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
   const product = await prisma.product.findUnique({
     where: { slug },
-    include: { category: true },
+    include: { category: true, images: { take: 1, orderBy: { position: "asc" } } },
   });
   if (!product) return {};
+  const description = `${product.name} гуртом. Якість: ${QUALITY_LABELS[product.quality as QualityLevel] ?? product.quality}. ${product.description || "Секонд хенд та сток від L-TEX."}`;
+  const imageUrl = product.images[0]?.url;
   return {
     title: `${product.name} — ${product.category.name}`,
-    description: `${product.name} гуртом. Якість: ${QUALITY_LABELS[product.quality as QualityLevel] ?? product.quality}. ${product.description || "Секонд хенд та сток від L-TEX."}`,
+    description,
+    alternates: {
+      canonical: `${SITE_URL}/product/${slug}`,
+    },
+    openGraph: {
+      title: product.name,
+      description,
+      url: `${SITE_URL}/product/${slug}`,
+      ...(imageUrl && { images: [{ url: imageUrl, alt: product.name }] }),
+    },
   };
 }
 
