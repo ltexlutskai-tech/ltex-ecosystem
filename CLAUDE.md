@@ -559,7 +559,7 @@ EXPO_PUBLIC_API_URL=       # (mobile) API base URL for Expo app
 | Accessibility | 90% | skip-to-content, aria-labels, focus-visible, keyboard nav |
 | SEO | 98% | canonical, OG, JSON-LD (5 types), hreflang, sitemap, meta |
 | Security | 90% | CSP headers, auth guards, rate limiting, webhook validation |
-| CI/CD | 95% | typecheck + test + build + Prettier + E2E |
+| CI/CD | **BROKEN** | Prettier (37 files), TypeScript (41 errors), Build (missing nodemailer) — see Session 8 tasks |
 | Performance | 90% | Infinite scroll, lazy images, bundle analyzer, ISR |
 | Documentation | 90% | README, CONTRIBUTING, .env.example, deploy checklist |
 | 1С Інтеграція | 60% | API готовий, потрібна конфігурація 1С |
@@ -567,18 +567,128 @@ EXPO_PUBLIC_API_URL=       # (mobile) API base URL for Expo app
 | Mobile Agent App | 0% | Окрема сесія, потрібні скріншоти |
 | Warehouse App | 0% | Окрема сесія |
 
+### Orchestrator Review (Session 8 Planning, 2026-04-08)
+
+#### CI Status: FAILING (all 3 steps fail)
+
+**1. Prettier (37 files)** — Session 7 code wasn't formatted before commit.
+- Fix: `pnpm format:write` then commit
+
+**2. TypeScript (41 errors across 10 files):**
+
+| File | Errors | Root Cause |
+|------|--------|------------|
+| `app/(store)/order/[id]/confirmation/page.tsx` | 8 | Prisma `include` uses wrong key (`product` instead of valid relation); missing `customer`, `items` on result type |
+| `app/(store)/order/[id]/status/page.tsx` | 9 | Same Prisma include issue + missing `shipments` relation |
+| `app/admin/orders/page.tsx` | 7 | Same Prisma include issue for `customer`, `items` |
+| `app/admin/orders/actions.ts` | 2 | Undefined variables `statusLabel`, `orderRef` in email call |
+| `app/(store)/compare/page.tsx` | 1 | `??` and `\|\|` mixed without parentheses |
+| `app/admin/products/image-upload.tsx` | 1 | Possible `undefined` passed to function |
+| `components/store/image-gallery.tsx` | 4 | `currentImage` possibly undefined |
+| `lib/email.ts` | 1 | `nodemailer` module not installed |
+| `lib/comparison.test.tsx` | 1 | Object possibly undefined |
+| `lib/recently-viewed.test.tsx` | 5 | Object possibly undefined |
+| `lib/wishlist.test.tsx` | 2 | Object possibly undefined |
+
+**3. Build** — fails because `nodemailer` is not installed as a dependency.
+- `lib/email.ts` imports `nodemailer` but it's not in `package.json`
+- Used by `app/admin/orders/actions.ts` and `app/api/orders/route.ts`
+
+#### Branch Cleanup
+
+| Branch | Status |
+|--------|--------|
+| `claude/audit-ltex-ecosystem-cTLpW` | Merged in main, remote delete pending (needs manual delete via GitHub UI) |
+| `claude/session-4-tasks-EV62w` | Merged in main, remote delete pending |
+| `claude/session-5-tasks-fcREm` | Merged in main, remote delete pending |
+| `claude/admin-gallery-orders-WDIWr` | Merged in main, remote delete pending |
+| `claude/project-status-analysis-9Qkj2` | Already deleted |
+| `claude/add-i18n-email-analytics-Xz9Ua` | Merged in main, remote delete pending |
+
+**ACTION REQUIRED:** Delete these 5 branches via GitHub Settings → Branches, or click "Delete branch" on merged PRs.
+
 ### Tasks for next session (Session 8)
 
-**IMPORTANT:** Працювати на гілці `main`. НЕ створювати нову гілку.
 **IMPORTANT:** НЕ повторювати seed, merge, або infrastructure setup — все вже зроблено.
 **IMPORTANT:** НЕ повторювати задачі Session 4-7 — ВСЕ ЗРОБЛЕНО. Дивись completion reports вище.
 **IMPORTANT:** L-TEX НЕ приймає онлайн-оплати. Таблиця `payments` — тільки для відображення історії з 1С.
 
-#### Автономні задачі (не потребують участі користувача)
+#### Задача 1: FIX CI — Prettier (CRITICAL, блокує деплой)
 
-Задачі Session 8 будуть визначені оркестратором після review поточного стану проекту.
+Run `pnpm format:write` to fix 37 files, then commit.
+
+#### Задача 2: FIX CI — TypeScript errors (CRITICAL, блокує деплой)
+
+Fix 41 TypeScript errors across 10 files. Specific fixes:
+
+**a) Install `nodemailer` + `@types/nodemailer`:**
+```bash
+pnpm --filter @ltex/store add nodemailer @types/nodemailer
+```
+
+**b) Fix Prisma `include` in 3 order-related pages:**
+- `app/(store)/order/[id]/confirmation/page.tsx` — fix include to use valid relations: `items: { include: { lot: true } }`, `customer: true` (NOT `product` — it doesn't exist on OrderItem)
+- `app/(store)/order/[id]/status/page.tsx` — same fix + add `shipments: true` include on the order query (NOT inside items)
+- `app/admin/orders/page.tsx` — same Prisma include fix
+
+Check `packages/db/prisma/schema.prisma` for the actual `OrderItem` relations before fixing — use correct relation names.
+
+**c) Fix `app/admin/orders/actions.ts`:**
+- `statusLabel` and `orderRef` are undefined — check how `sendOrderStatusEmail()` is called and define these variables properly
+
+**d) Fix `app/(store)/compare/page.tsx`:**
+- Add parentheses around mixed `??` / `||` expression on line 54
+
+**e) Fix undefined checks (5 files):**
+- `app/admin/products/image-upload.tsx:80` — add undefined guard
+- `components/store/image-gallery.tsx:51,52,112,113` — add `currentImage` null check or early return
+- `lib/comparison.test.tsx:92` — add non-null assertion or check
+- `lib/recently-viewed.test.tsx:44,45,85,86,109` — add non-null assertions
+- `lib/wishlist.test.tsx:53,78` — add non-null assertions
+
+#### Задача 3: FIX CI — Verify build passes
+
+After fixing tasks 1-2, run:
+```bash
+pnpm typecheck && pnpm build
+```
+Build currently fails due to `nodemailer` not being installed. After installing it (task 2a), build should pass.
+
+#### Задача 4: Production hardening — env validation
+
+Add runtime env validation at app startup (e.g., in `instrumentation.ts` or top of layout):
+- Warn (not crash) if optional env vars are missing: `TELEGRAM_BOT_TOKEN`, `VIBER_AUTH_TOKEN`, `NOVA_POSHTA_API_KEY`
+- Gracefully handle missing `SMTP_*` / `RESEND_API_KEY` in `lib/email.ts` — log warning instead of throwing
+
+#### Задача 5: Production hardening — error resilience
+
+- Ensure `lib/email.ts` doesn't crash the order flow if email sending fails (try/catch, log error, continue)
+- Ensure `lib/notifications.ts` doesn't crash if Telegram/Viber tokens are missing
+- Check all `fetch()` calls in API routes have proper timeout and error handling
+
+#### Задача 6: Admin orders Prisma query audit
+
+The Prisma `include` errors suggest the queries were written without matching the actual schema. Audit ALL Prisma queries in:
+- `app/admin/orders/page.tsx`
+- `app/(store)/order/[id]/confirmation/page.tsx`
+- `app/(store)/order/[id]/status/page.tsx`
+- `app/api/orders/route.ts`
+- `app/api/sync/orders/export/route.ts`
+
+Ensure all `include` statements match `schema.prisma` relations exactly.
+
+#### Задача 7: Final CI verification
+
+After all fixes:
+1. `pnpm format:check` — must pass
+2. `pnpm --filter @ltex/shared test && pnpm --filter @ltex/store test` — must pass (186 tests)
+3. `pnpm typecheck` — must pass (0 errors)
+4. `pnpm build` — must pass
+
+Commit all fixes together or in logical groups. Push to feature branch.
 
 #### Задачі що потребують участі користувача (НЕ для автономної сесії)
+- **Видалити merged branches** — 5 branches через GitHub UI (див. Branch Cleanup вище)
 - **Mobile Agent App** — потрібні скріншоти MobileAgentLTEX v1.15.3
 - **Warehouse App** — потрібні вимоги та скріншоти
 - **Інфраструктура** — запуск міграцій, реєстрація webhooks, завантаження фото (потрібен доступ до Supabase/Netlify)
