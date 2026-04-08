@@ -545,30 +545,30 @@ EXPO_PUBLIC_API_URL=       # (mobile) API base URL for Expo app
 
 #### Project Completion Status: ~98% MVP
 
-| Component           | Completion | Details                                                                                       |
-| ------------------- | ---------- | --------------------------------------------------------------------------------------------- |
-| Монорепо структура  | 100%       | Turborepo + pnpm, 3 packages, 2 apps, 2 services                                              |
-| База даних          | 100%       | 19 таблиць, 805 products, 725 lots seeded                                                     |
-| Web Store           | 100%       | Каталог, пошук, кошик, checkout, SEO, PWA, wishlist, compare, infinite scroll                 |
-| Admin Panel         | 100%       | Dashboard + analytics (8 charts, period filter), CRUD, sort/filter/paginate, CSV, real-time   |
-| API Layer           | 100%       | 20 ендпоінтів, rate limiting, Zod validation, consistent errors                               |
-| Telegram Bot        | 100%       | 7 commands + inline query + webhook + pagination                                              |
-| Viber Bot           | 100%       | 7 commands + keyboard menus + notifications                                                   |
-| Mobile Client App   | 95%        | Повний функціонал + auth guards + deep linking + splash screen                                |
-| Тестування          | 95%        | 161 unit + 36 E2E = 197, all passing, E2E enabled in CI                                       |
-| i18n                | 95%        | Dictionary (250 keys) + t() connected to all pages                                            |
-| Email               | 90%        | Dual transport (SMTP/Resend), needs env var configuration                                     |
-| Order Flow          | 95%        | Checkout → confirmation → status tracking → email → admin notes                               |
-| Accessibility       | 90%        | skip-to-content, aria-labels, focus-visible, keyboard nav                                     |
-| SEO                 | 98%        | canonical, OG, JSON-LD (5 types), hreflang, sitemap, meta                                     |
-| Security            | 90%        | CSP headers, auth guards, rate limiting, webhook validation                                   |
-| CI/CD               | 100%       | typecheck + test + build + Prettier — all green (fixed Session 8) |
-| Performance         | 90%        | Infinite scroll, lazy images, bundle analyzer, ISR                                            |
-| Documentation       | 90%        | README, CONTRIBUTING, .env.example, deploy checklist                                          |
-| 1С Інтеграція       | 60%        | API готовий, потрібна конфігурація 1С                                                         |
-| Deploy / Production | 60%        | Netlify працює, webhooks + фото не налаштовані                                                |
-| Mobile Agent App    | 0%         | Окрема сесія, потрібні скріншоти                                                              |
-| Warehouse App       | 0%         | Окрема сесія                                                                                  |
+| Component           | Completion | Details                                                                                     |
+| ------------------- | ---------- | ------------------------------------------------------------------------------------------- |
+| Монорепо структура  | 100%       | Turborepo + pnpm, 3 packages, 2 apps, 2 services                                            |
+| База даних          | 100%       | 19 таблиць, 805 products, 725 lots seeded                                                   |
+| Web Store           | 100%       | Каталог, пошук, кошик, checkout, SEO, PWA, wishlist, compare, infinite scroll               |
+| Admin Panel         | 100%       | Dashboard + analytics (8 charts, period filter), CRUD, sort/filter/paginate, CSV, real-time |
+| API Layer           | 100%       | 20 ендпоінтів, rate limiting, Zod validation, consistent errors                             |
+| Telegram Bot        | 100%       | 7 commands + inline query + webhook + pagination                                            |
+| Viber Bot           | 100%       | 7 commands + keyboard menus + notifications                                                 |
+| Mobile Client App   | 95%        | Повний функціонал + auth guards + deep linking + splash screen                              |
+| Тестування          | 95%        | 161 unit + 36 E2E = 197, all passing, E2E enabled in CI                                     |
+| i18n                | 95%        | Dictionary (250 keys) + t() connected to all pages                                          |
+| Email               | 90%        | Dual transport (SMTP/Resend), needs env var configuration                                   |
+| Order Flow          | 95%        | Checkout → confirmation → status tracking → email → admin notes                             |
+| Accessibility       | 90%        | skip-to-content, aria-labels, focus-visible, keyboard nav                                   |
+| SEO                 | 98%        | canonical, OG, JSON-LD (5 types), hreflang, sitemap, meta                                   |
+| Security            | 90%        | CSP headers, auth guards, rate limiting, webhook validation                                 |
+| CI/CD               | 100%       | typecheck + test + build + Prettier — all green (fixed Session 8)                           |
+| Performance         | 90%        | Infinite scroll, lazy images, bundle analyzer, ISR                                          |
+| Documentation       | 90%        | README, CONTRIBUTING, .env.example, deploy checklist                                        |
+| 1С Інтеграція       | 60%        | API готовий, потрібна конфігурація 1С                                                       |
+| Deploy / Production | 60%        | Netlify працює, webhooks + фото не налаштовані                                              |
+| Mobile Agent App    | 0%         | Окрема сесія, потрібні скріншоти                                                            |
+| Warehouse App       | 0%         | Окрема сесія                                                                                |
 
 ### Orchestrator Review (Session 8 Planning, 2026-04-08)
 
@@ -616,91 +616,91 @@ EXPO_PUBLIC_API_URL=       # (mobile) API base URL for Expo app
 
 #### Що зроблено (1 коміт `1a7292f`, всі 7 задач виконані):
 
-| Задача | Статус | Деталі |
-|--------|--------|--------|
-| 1. Prettier форматування | **ГОТОВО** | 37 файлів переформатовано |
-| 2. TypeScript помилки | **ГОТОВО** | 41+ помилка виправлена в 12 файлах |
-| 3. Перевірка build | **ГОТОВО** | Build проходить з placeholder DB |
-| 4. Валідація env | **ГОТОВО** | `instrumentation.ts` попереджає про відсутні env vars |
-| 5. Стійкість до помилок | **ГОТОВО** | 10с таймаути на fetch для Telegram/Viber/Resend API |
-| 6. Аудит Prisma запитів | **ГОТОВО** | Всі 11 файлів із запитами замовлень перевірені |
-| 7. Фінальна CI перевірка | **ГОТОВО** | Всі 4 кроки проходять |
+| Задача                   | Статус     | Деталі                                                |
+| ------------------------ | ---------- | ----------------------------------------------------- |
+| 1. Prettier форматування | **ГОТОВО** | 37 файлів переформатовано                             |
+| 2. TypeScript помилки    | **ГОТОВО** | 41+ помилка виправлена в 12 файлах                    |
+| 3. Перевірка build       | **ГОТОВО** | Build проходить з placeholder DB                      |
+| 4. Валідація env         | **ГОТОВО** | `instrumentation.ts` попереджає про відсутні env vars |
+| 5. Стійкість до помилок  | **ГОТОВО** | 10с таймаути на fetch для Telegram/Viber/Resend API   |
+| 6. Аудит Prisma запитів  | **ГОТОВО** | Всі 11 файлів із запитами замовлень перевірені        |
+| 7. Фінальна CI перевірка | **ГОТОВО** | Всі 4 кроки проходять                                 |
 
 #### Ключові виправлення:
 
-| Фікс | Файли |
-|------|-------|
-| Встановлено `nodemailer` + `@types/nodemailer` | `package.json`, `pnpm-lock.yaml` |
-| Додано зв'язок `product` до `OrderItem` в Prisma schema | `schema.prisma` |
-| Виправлено scope бага `statusLabel`/`orderRef` | `admin/orders/actions.ts` |
-| Виправлено пріоритет операторів `??`/`||` | `compare/page.tsx` |
-| Додано null guards для `currentImage` | `image-gallery.tsx` |
-| Виправлено non-null assertions в тестах | 3 тест-файли |
-| Експортовано інтерфейси admin-stats (TS4058) | `admin-stats.ts` |
-| Видалено `ssr: false` із Server Components | `layout.tsx`, `product-card.tsx` |
-| Додано `force-dynamic` на головну сторінку | `page.tsx` |
-| Додано `instrumentation.ts` для валідації env | Новий файл |
-| Додано fetch таймаути (10с) | `notifications.ts`, `email.ts` |
+| Фікс                                                    | Файли                            |
+| ------------------------------------------------------- | -------------------------------- | --- | ------------------ |
+| Встановлено `nodemailer` + `@types/nodemailer`          | `package.json`, `pnpm-lock.yaml` |
+| Додано зв'язок `product` до `OrderItem` в Prisma schema | `schema.prisma`                  |
+| Виправлено scope бага `statusLabel`/`orderRef`          | `admin/orders/actions.ts`        |
+| Виправлено пріоритет операторів `??`/`                  |                                  | `   | `compare/page.tsx` |
+| Додано null guards для `currentImage`                   | `image-gallery.tsx`              |
+| Виправлено non-null assertions в тестах                 | 3 тест-файли                     |
+| Експортовано інтерфейси admin-stats (TS4058)            | `admin-stats.ts`                 |
+| Видалено `ssr: false` із Server Components              | `layout.tsx`, `product-card.tsx` |
+| Додано `force-dynamic` на головну сторінку              | `page.tsx`                       |
+| Додано `instrumentation.ts` для валідації env           | Новий файл                       |
+| Додано fetch таймаути (10с)                             | `notifications.ts`, `email.ts`   |
 
 #### Результати CI:
 
-| Крок | Результат |
-|------|-----------|
-| `pnpm format:check` | **PASS** — всі файли відформатовані |
-| `pnpm test` | **PASS** — 186 тестів (25 shared + 161 store) |
-| `pnpm typecheck` | **PASS** — 0 помилок, 6/6 пакетів |
-| `pnpm build` | **PASS** — 33 маршрути скомпільовані |
+| Крок                | Результат                                     |
+| ------------------- | --------------------------------------------- |
+| `pnpm format:check` | **PASS** — всі файли відформатовані           |
+| `pnpm test`         | **PASS** — 186 тестів (25 shared + 161 store) |
+| `pnpm typecheck`    | **PASS** — 0 помилок, 6/6 пакетів             |
+| `pnpm build`        | **PASS** — 33 маршрути скомпільовані          |
 
 #### Метрики:
 
-| Метрика | До Session 8 | Після Session 8 |
-|---------|--------------|-----------------|
-| CI статус | ЗЛАМАНИЙ (3 кроки fail) | **ВСЕ ЗЕЛЕНЕ** (4/4 pass) |
-| TypeScript помилки | 41 | **0** |
-| Prettier проблеми | 37 файлів | **0** |
-| Build | FAIL (nodemailer) | **PASS** |
-| Новий файл | — | `instrumentation.ts` (env validation) |
-| Змінено файлів | — | 47 (+505/-385 рядків) |
-| Total commits | 44 | **45** |
+| Метрика            | До Session 8            | Після Session 8                       |
+| ------------------ | ----------------------- | ------------------------------------- |
+| CI статус          | ЗЛАМАНИЙ (3 кроки fail) | **ВСЕ ЗЕЛЕНЕ** (4/4 pass)             |
+| TypeScript помилки | 41                      | **0**                                 |
+| Prettier проблеми  | 37 файлів               | **0**                                 |
+| Build              | FAIL (nodemailer)       | **PASS**                              |
+| Новий файл         | —                       | `instrumentation.ts` (env validation) |
+| Змінено файлів     | —                       | 47 (+505/-385 рядків)                 |
+| Total commits      | 44                      | **45**                                |
 
 #### Статус проекту: ~99% MVP
 
-| Компонент | Завершеність | Деталі |
-|-----------|-------------|--------|
-| Монорепо структура | 100% | Turborepo + pnpm, 3 packages, 2 apps, 2 services |
-| База даних | 100% | 19 таблиць, 805 products, 725 lots seeded |
-| Web Store | 100% | Каталог, пошук, кошик, checkout, SEO, PWA, wishlist, compare, infinite scroll |
-| Admin Panel | 100% | Dashboard + analytics (8 charts), CRUD, sort/filter/paginate, CSV, real-time |
-| API Layer | 100% | 20 ендпоінтів, rate limiting, Zod validation, consistent errors |
-| Telegram Bot | 100% | 7 commands + inline query + webhook + pagination |
-| Viber Bot | 100% | 7 commands + keyboard menus + notifications |
-| Mobile Client App | 95% | Повний функціонал + auth guards + deep linking + splash screen |
-| Тестування | 95% | 186 unit + 36 E2E = 222, all passing |
-| i18n | 95% | Dictionary (250 keys) + t() connected to all pages |
-| Email | 95% | Dual transport (SMTP/Resend), graceful fallback if not configured |
-| Order Flow | 95% | Checkout → confirmation → status tracking → email → admin notes |
-| Accessibility | 90% | skip-to-content, aria-labels, focus-visible, keyboard nav |
-| SEO | 98% | canonical, OG, JSON-LD (5 types), hreflang, sitemap, meta |
-| Security | 95% | CSP headers, auth guards, rate limiting, webhook validation, fetch timeouts |
-| CI/CD | 100% | typecheck + test + build + Prettier — all green |
-| Performance | 90% | Infinite scroll, lazy images, bundle analyzer, ISR |
-| Production Hardening | 90% | Env validation, error resilience, fetch timeouts |
-| Documentation | 90% | README, CONTRIBUTING, .env.example, deploy checklist |
-| 1С Інтеграція | 60% | API готовий, потрібна конфігурація 1С |
-| Deploy / Production | 60% | Netlify працює, webhooks + фото не налаштовані |
-| Mobile Agent App | 0% | Окрема сесія, потрібні скріншоти |
-| Warehouse App | 0% | Окрема сесія |
+| Компонент            | Завершеність | Деталі                                                                        |
+| -------------------- | ------------ | ----------------------------------------------------------------------------- |
+| Монорепо структура   | 100%         | Turborepo + pnpm, 3 packages, 2 apps, 2 services                              |
+| База даних           | 100%         | 19 таблиць, 805 products, 725 lots seeded                                     |
+| Web Store            | 100%         | Каталог, пошук, кошик, checkout, SEO, PWA, wishlist, compare, infinite scroll |
+| Admin Panel          | 100%         | Dashboard + analytics (8 charts), CRUD, sort/filter/paginate, CSV, real-time  |
+| API Layer            | 100%         | 20 ендпоінтів, rate limiting, Zod validation, consistent errors               |
+| Telegram Bot         | 100%         | 7 commands + inline query + webhook + pagination                              |
+| Viber Bot            | 100%         | 7 commands + keyboard menus + notifications                                   |
+| Mobile Client App    | 95%          | Повний функціонал + auth guards + deep linking + splash screen                |
+| Тестування           | 95%          | 186 unit + 36 E2E = 222, all passing                                          |
+| i18n                 | 95%          | Dictionary (250 keys) + t() connected to all pages                            |
+| Email                | 95%          | Dual transport (SMTP/Resend), graceful fallback if not configured             |
+| Order Flow           | 95%          | Checkout → confirmation → status tracking → email → admin notes               |
+| Accessibility        | 90%          | skip-to-content, aria-labels, focus-visible, keyboard nav                     |
+| SEO                  | 98%          | canonical, OG, JSON-LD (5 types), hreflang, sitemap, meta                     |
+| Security             | 95%          | CSP headers, auth guards, rate limiting, webhook validation, fetch timeouts   |
+| CI/CD                | 100%         | typecheck + test + build + Prettier — all green                               |
+| Performance          | 90%          | Infinite scroll, lazy images, bundle analyzer, ISR                            |
+| Production Hardening | 90%          | Env validation, error resilience, fetch timeouts                              |
+| Documentation        | 90%          | README, CONTRIBUTING, .env.example, deploy checklist                          |
+| 1С Інтеграція        | 60%          | API готовий, потрібна конфігурація 1С                                         |
+| Deploy / Production  | 60%          | Netlify працює, webhooks + фото не налаштовані                                |
+| Mobile Agent App     | 0%           | Окрема сесія, потрібні скріншоти                                              |
+| Warehouse App        | 0%           | Окрема сесія                                                                  |
 
 ### Branch Cleanup (pending)
 
-| Branch | Status |
-|--------|--------|
-| `claude/audit-ltex-ecosystem-cTLpW` | Merged, remote delete pending (GitHub UI) |
-| `claude/session-4-tasks-EV62w` | Merged, remote delete pending |
-| `claude/session-5-tasks-fcREm` | Merged, remote delete pending |
-| `claude/admin-gallery-orders-WDIWr` | Merged, remote delete pending |
-| `claude/add-i18n-email-analytics-Xz9Ua` | Merged, remote delete pending |
-| `claude/fix-ci-pipeline-mzwgS` | Merged, remote delete pending |
+| Branch                                  | Status                                    |
+| --------------------------------------- | ----------------------------------------- |
+| `claude/audit-ltex-ecosystem-cTLpW`     | Merged, remote delete pending (GitHub UI) |
+| `claude/session-4-tasks-EV62w`          | Merged, remote delete pending             |
+| `claude/session-5-tasks-fcREm`          | Merged, remote delete pending             |
+| `claude/admin-gallery-orders-WDIWr`     | Merged, remote delete pending             |
+| `claude/add-i18n-email-analytics-Xz9Ua` | Merged, remote delete pending             |
+| `claude/fix-ci-pipeline-mzwgS`          | Merged, remote delete pending             |
 
 **ACTION REQUIRED:** Delete 6 branches via GitHub UI.
 
@@ -714,6 +714,7 @@ EXPO_PUBLIC_API_URL=       # (mobile) API base URL for Expo app
 #### Task 1: Fix Netlify build — Prisma generate (CRITICAL, blocks deploy)
 
 Netlify build fails with:
+
 ```
 app/(store)/catalog/[categorySlug]/page.tsx:58:43
 Type error: Parameter 'c' implicitly has an 'any' type.
@@ -725,10 +726,12 @@ Type error: Parameter 'c' implicitly has an 'any' type.
 Local CI passes because `pnpm --filter @ltex/db exec prisma generate` runs as a separate step.
 
 **Fix (choose one):**
+
 - **Option A (recommended):** Add `"build": "prisma generate"` to `packages/db/package.json` scripts. This way `turbo run build` will generate Prisma types as a dependency step.
 - **Option B:** Create `netlify.toml` with build command: `pnpm --filter @ltex/db exec prisma generate && turbo run build --filter @ltex/store`
 
 After fixing, verify locally:
+
 ```bash
 pnpm --filter @ltex/db run clean   # removes node_modules/.prisma
 pnpm build                          # must pass (generates Prisma first)
@@ -737,6 +740,7 @@ pnpm build                          # must pass (generates Prisma first)
 #### Task 2: Audit all `notFound()` narrowing (while you're there)
 
 Check all 6 files that use `notFound()` after Prisma queries. Ensure TypeScript narrows the type correctly after the `notFound()` call. Files:
+
 - `app/(store)/catalog/[categorySlug]/page.tsx:56`
 - `app/(store)/catalog/[categorySlug]/[subcategorySlug]/page.tsx:55`
 - `app/(store)/product/[slug]/page.tsx:87`
@@ -745,6 +749,7 @@ Check all 6 files that use `notFound()` after Prisma queries. Ensure TypeScript 
 - `app/admin/products/[id]/page.tsx:25`
 
 If narrowing doesn't work (because `notFound()` return type isn't recognized as `never`), add explicit type assertions or early returns:
+
 ```typescript
 if (!category) notFound();
 // If 'c' still has 'any' type, try:
@@ -755,6 +760,7 @@ if (!category) return notFound();
 #### Task 3: Final CI + build verification
 
 After fixes:
+
 1. `pnpm format:check` — must pass
 2. `pnpm test` — must pass (186 tests)
 3. `pnpm typecheck` — must pass (0 errors)
