@@ -1,10 +1,18 @@
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { Badge, Card, CardContent } from "@ltex/ui";
 import { QUALITY_LABELS, type QualityLevel } from "@ltex/shared";
 import { SEASON_LABELS } from "@ltex/shared";
-import { QuickViewButton } from "./quick-view";
 import { WishlistButton } from "./wishlist-button";
 import { ComparisonButton } from "./comparison-button";
+import { getDictionary } from "@/lib/i18n";
+
+const QuickViewButton = dynamic(
+  () => import("./quick-view").then((m) => m.QuickViewButton),
+  { ssr: false },
+);
+
+const dict = getDictionary();
 
 export interface ProductCardData {
   id?: string;
@@ -36,15 +44,16 @@ export function ProductCard({ product }: { product: ProductCardData }) {
                 src={firstImage.url}
                 alt={firstImage.alt || product.name}
                 className="h-full w-full object-cover transition-transform group-hover:scale-105"
+                loading="lazy"
               />
             ) : (
               <div className="flex h-full items-center justify-center text-gray-400">
-                {product.videoUrl ? "Video" : "Немає фото"}
+                {product.videoUrl ? "Video" : dict.catalog.noPhoto}
               </div>
             )}
             {product._count.lots > 0 && (
               <Badge className="absolute right-2 top-2" variant="secondary">
-                {product._count.lots} лотів
+                {product._count.lots} {dict.catalog.lots}
               </Badge>
             )}
           </div>
@@ -67,7 +76,7 @@ export function ProductCard({ product }: { product: ProductCardData }) {
               <p className="mt-2 text-lg font-bold text-green-700">
                 €{wholesalePrice.amount.toFixed(2)}
                 <span className="text-xs font-normal text-gray-500">
-                  /{product.priceUnit === "kg" ? "кг" : "шт"}
+                  /{product.priceUnit === "kg" ? dict.catalog.perKg : dict.catalog.perPiece}
                 </span>
               </p>
             )}

@@ -4,6 +4,7 @@ import { prisma } from "@ltex/db";
 import { ORDER_STATUSES, type OrderStatus } from "@ltex/shared";
 import { revalidatePath } from "next/cache";
 import { sendPushNotification } from "@/lib/push";
+import { sendOrderStatusEmail } from "@/lib/email";
 import { requireAdmin } from "@/lib/admin-auth";
 
 const STATUS_LABELS: Record<string, string> = {
@@ -24,7 +25,13 @@ export async function updateOrderStatus(orderId: string, status: OrderStatus) {
   const order = await prisma.order.update({
     where: { id: orderId },
     data: { status },
-    select: { id: true, code1C: true, customerId: true, totalEur: true },
+    select: {
+      id: true,
+      code1C: true,
+      customerId: true,
+      totalEur: true,
+      customer: { select: { name: true, email: true } },
+    },
   });
 
   // Send push notification to customer about status change
@@ -39,6 +46,18 @@ export async function updateOrderStatus(orderId: string, status: OrderStatus) {
     ).catch(() => {
       // Non-blocking — don't fail status update for push errors
     });
+  }
+
+  // Send status update email to customer
+  if (order.customer?.email) {
+    sendOrderStatusEmail({
+      orderId: order.id,
+      customerName: order.customer.name,
+      customerEmail: order.customer.email,
+      status,
+      statusLabel,
+      orderRef,
+    }).catch(() => {});
   }
 
   revalidatePath("/admin/orders");

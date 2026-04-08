@@ -6,6 +6,9 @@ import Link from "next/link";
 import { Breadcrumbs } from "@/components/store/breadcrumbs";
 import { Pagination } from "@/components/store/pagination";
 import { AddToCartButton } from "@/components/store/add-to-cart-button";
+import { getDictionary } from "@/lib/i18n";
+
+const dict = getDictionary();
 
 export const metadata: Metadata = {
   title: "Лоти (мішки) — секонд хенд та сток гуртом",
@@ -68,17 +71,19 @@ export default async function LotsPage({
 
   return (
     <div className="container mx-auto px-4 py-6">
-      <Breadcrumbs items={[{ label: "Лоти" }]} />
+      <Breadcrumbs items={[{ label: dict.nav.lots }]} />
 
-      <h1 className="mt-4 text-3xl font-bold">Лоти (мішки)</h1>
-      <p className="mt-1 text-gray-500">{total} лотів доступно</p>
+      <h1 className="mt-4 text-3xl font-bold">{dict.lots.title}</h1>
+      <p className="mt-1 text-gray-500">
+        {dict.lots.lotsAvailable.replace("{count}", String(total))}
+      </p>
 
       <div className="mt-4 flex flex-wrap gap-2">
         <Link
           href="/lots"
           className={`rounded-full border px-3 py-1 text-sm ${!status ? "border-green-500 bg-green-50 text-green-700" : "hover:border-green-500"}`}
         >
-          Доступні
+          {dict.lots.available}
         </Link>
         {LOT_STATUSES.map((s) => (
           <Link
@@ -96,30 +101,30 @@ export default async function LotsPage({
         <input
           name="q"
           defaultValue={query}
-          placeholder="Пошук по штрихкоду або назві..."
+          placeholder={dict.lots.searchPlaceholder}
           className="flex-1 rounded-md border px-3 py-2 text-sm sm:max-w-sm"
         />
         <button
           type="submit"
           className="rounded-md bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700"
         >
-          Шукати
+          {dict.lots.searchBtn}
         </button>
       </form>
 
       {lots.length === 0 ? (
-        <p className="mt-12 text-center text-gray-500">Лотів не знайдено.</p>
+        <p className="mt-12 text-center text-gray-500">{dict.lots.noResults}</p>
       ) : (
         <div className="mt-6 overflow-x-auto rounded-lg border">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b bg-gray-50 text-left text-gray-500">
-                <th className="px-4 py-3 font-medium">Штрихкод</th>
-                <th className="px-4 py-3 font-medium">Товар</th>
-                <th className="px-4 py-3 font-medium">Категорія</th>
-                <th className="px-4 py-3 font-medium">Вага</th>
-                <th className="px-4 py-3 font-medium">Ціна EUR</th>
-                <th className="px-4 py-3 font-medium">Статус</th>
+                <th className="px-4 py-3 font-medium">{dict.lots.barcode}</th>
+                <th className="px-4 py-3 font-medium">{dict.lots.product}</th>
+                <th className="px-4 py-3 font-medium">{dict.lots.category}</th>
+                <th className="px-4 py-3 font-medium">{dict.lots.weight}</th>
+                <th className="px-4 py-3 font-medium">{dict.lots.priceEur}</th>
+                <th className="px-4 py-3 font-medium">{dict.lots.status}</th>
                 <th className="px-4 py-3 font-medium"></th>
               </tr>
             </thead>
@@ -140,7 +145,7 @@ export default async function LotsPage({
                   <td className="px-4 py-3 text-gray-500">
                     {lot.product.category.name}
                   </td>
-                  <td className="px-4 py-3">{lot.weight} кг</td>
+                  <td className="px-4 py-3">{lot.weight} {dict.catalog.perKg}</td>
                   <td className="px-4 py-3 font-medium">
                     €{lot.priceEur.toFixed(2)}
                   </td>

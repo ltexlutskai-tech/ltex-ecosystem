@@ -20,7 +20,7 @@ export const uk = {
     allRights: "Усі права захищені.",
   },
 
-  // Catalog / Product
+  // Catalog / Product listing
   catalog: {
     title: "Каталог товарів",
     products: "товарів",
@@ -30,10 +30,37 @@ export const uk = {
     allSeasons: "Всі сезони",
     allCountries: "Всі країни",
     sortBy: "Сортування",
+    sortDefault: "За замовчуванням",
+    sortPriceAsc: "Ціна: від дешевих",
+    sortPriceDesc: "Ціна: від дорогих",
+    sortNameAsc: "Назва: А–Я",
+    sortNewest: "Найновіші",
     priceRange: "Ціна (EUR)",
+    priceLabel: "Ціна (€):",
+    priceFrom: "від",
+    priceTo: "до",
     clearFilters: "Скинути фільтри",
+    clearAllFilters: "Скинути всі фільтри",
     lots: "лотів",
     noPhoto: "Немає фото",
+    perKg: "кг",
+    perPiece: "шт",
+  },
+
+  // Lots page
+  lots: {
+    title: "Лоти (мішки)",
+    available: "Доступні",
+    lotsAvailable: "{count} лотів доступно",
+    searchPlaceholder: "Пошук по штрихкоду або назві...",
+    searchBtn: "Шукати",
+    noResults: "Лотів не знайдено.",
+    barcode: "Штрихкод",
+    product: "Товар",
+    category: "Категорія",
+    weight: "Вага",
+    priceEur: "Ціна EUR",
+    status: "Статус",
   },
 
   // Product detail
@@ -56,6 +83,8 @@ export const uk = {
     boughtTogether: "Часто купують разом",
     quickView: "Швидкий перегляд",
     details: "Детальніше",
+    noPhoto: "Немає фото",
+    allSeason: "Всесезон",
   },
 
   // Cart / Checkout
@@ -81,6 +110,14 @@ export const uk = {
     submit: "Оформити замовлення",
     submitting: "Оформлення...",
     networkError: "Помилка мережі",
+    inCart: "В кошику",
+    addToCart: "Додати",
+    removeFromCart: "Видалити {name} з кошика",
+    addToCartLabel: "Додати {name} до кошика",
+    continueShopping: "Продовжити покупки",
+    writeToTelegram: "Написати в Telegram",
+    orderPlaced: "Замовлення оформлено!",
+    weWillContact: "Ми зв'яжемося з вами для підтвердження.",
   },
 
   // Order
@@ -103,6 +140,10 @@ export const uk = {
     tracking: "Трекінг",
     estimatedDate: "Очікувана дата",
     backToCatalog: "Повернутися до каталогу",
+    commentLabel: "Коментар",
+    weight: "Вага",
+    sum: "Сума",
+    positions: "Позицій",
   },
 
   // Wishlist
@@ -123,6 +164,8 @@ export const uk = {
     compare: "Порівняти",
     addToCompare: "Порівняти",
     removeFromCompare: "Прибрати з порівняння",
+    productLabel: "Товар",
+    photo: "Фото",
   },
 
   // Recently Viewed
@@ -156,6 +199,88 @@ export const uk = {
     ],
     ctaTitle: "Є питання?",
     ctaDescription: "Зв'яжіться з нами через Telegram або по телефону",
+    lotsBtn: "Лоти (мішки)",
+  },
+
+  // About page
+  about: {
+    metaTitle: "Про нас — L-TEX",
+    heroText:
+      "Ми — українська гуртова компанія, що спеціалізується на продажу секонд хенду, стоку (нового надлишкового товару), іграшок та Bric-a-Brac. Працюємо з покупцями по всій Україні від {min} кг.",
+    whatWeSell: "Що ми продаємо",
+    qualityLevels: "Рівні якості",
+    qualityText:
+      "Весь товар сортується за рівнями якості для вашої зручності:",
+    supplierCountries: "Країни-постачальники",
+    supplierText: "Ми працюємо напряму з постачальниками з:",
+    whyUs: "Чому обирають нас",
+    whyUsReasons: [
+      "Відеоогляди на YouTube для кожного товару — бачите що купуєте",
+      "Мінімальне замовлення від 10 кг — зручно для малого бізнесу",
+      "Швидка відправка Новою Поштою та Делівері по всій Україні",
+      "Прозорі ціни в EUR з актуальним курсом",
+      "Широкий асортимент — від одягу до іграшок та Bric-a-Brac",
+      "Особистий підхід — консультація через Telegram",
+    ],
+    contactsTitle: "Контакти",
+    writeToTelegram: "Написати в Telegram",
+    goToCatalog: "Перейти до каталогу",
+    sellItems: [
+      {
+        title: "Секонд хенд",
+        desc: "Якісний одяг, взуття та аксесуари з Європи — сортований за якістю та сезоном.",
+      },
+      {
+        title: "Сток (Stock)",
+        desc: "Нові товари з надлишків виробництва та нерозпроданих колекцій. Ціна нижча від роздрібу.",
+      },
+      {
+        title: "Іграшки",
+        desc: "Дитячі іграшки гуртом — м'які, пластикові, настільні ігри та інше.",
+      },
+      {
+        title: "Bric-a-Brac",
+        desc: "Побутові товари, декор, посуд, кухонне приладдя та інші корисні дрібниці.",
+      },
+      {
+        title: "Взуття",
+        desc: "Жіноче, чоловіче та дитяче взуття — кросівки, черевики, босоніжки, чоботи.",
+      },
+      {
+        title: "Аксесуари",
+        desc: "Сумки, ремені, шарфи, головні убори та інші аксесуари.",
+      },
+    ],
+  },
+
+  // Contacts page
+  contacts: {
+    title: "Контакти",
+    subtitle:
+      "Зв'яжіться з нами для оформлення замовлення або консультації",
+    phoneTitle: "Телефон",
+    messengersTitle: "Месенджери",
+    emailTitle: "Email",
+    addressTitle: "Адреса",
+    workHours: "Працюємо: Пн-Пт 9:00–18:00, Сб 9:00–14:00",
+    wholesaleFrom: "Гуртовий продаж від 10 кг",
+    wholesaleDesc:
+      "Секонд хенд, сток, іграшки, Bric-a-Brac, косметика з Англії, Німеччини, Канади та Польщі. Доставка по всій Україні.",
+  },
+
+  // Error pages
+  errors: {
+    errorTitle: "Виникла помилка",
+    errorDefault: "Щось пішло не так. Спробуйте пізніше.",
+    tryAgain: "Спробувати знову",
+    toHome: "На головну",
+    notFound: "Сторінку не знайдено",
+    notFoundCode: "404",
+  },
+
+  // Breadcrumbs
+  breadcrumbs: {
+    home: "Головна",
   },
 
   // Common

@@ -3,6 +3,7 @@ import { prisma } from "@ltex/db";
 import { MIN_ORDER_KG } from "@ltex/shared";
 import { orderSchema } from "@/lib/validations";
 import { notifyNewOrder } from "@/lib/notifications";
+import { sendOrderConfirmationEmail } from "@/lib/email";
 import { rateLimit, getClientIp } from "@/lib/rate-limit";
 
 export async function POST(request: NextRequest) {
@@ -105,7 +106,7 @@ export async function POST(request: NextRequest) {
       return ord;
     });
 
-    // Send notification (non-blocking, doesn't affect response)
+    // Send notifications (non-blocking, doesn't affect response)
     notifyNewOrder({
       orderId: order.id,
       customerName: customer.name,
@@ -115,6 +116,19 @@ export async function POST(request: NextRequest) {
       itemCount: items.length,
       totalWeight,
     }).catch(() => {});
+
+    // Send confirmation email to customer (if email provided)
+    if (dbCustomer.email) {
+      sendOrderConfirmationEmail({
+        orderId: order.id,
+        customerName: customer.name,
+        customerEmail: dbCustomer.email,
+        totalEur,
+        totalUah,
+        itemCount: items.length,
+        totalWeight,
+      }).catch(() => {});
+    }
 
     return NextResponse.json({ orderId: order.id }, { status: 201 });
   } catch {

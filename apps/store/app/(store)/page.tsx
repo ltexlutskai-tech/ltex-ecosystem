@@ -3,6 +3,9 @@ import { APP_NAME, MIN_ORDER_KG, CONTACTS } from "@ltex/shared";
 import { prisma } from "@ltex/db";
 import Link from "next/link";
 import { RecentlyViewedSection } from "@/components/store/recently-viewed-section";
+import { getDictionary } from "@/lib/i18n";
+
+const dict = getDictionary();
 
 export const revalidate = 60;
 
@@ -49,16 +52,14 @@ export default async function HomePage() {
             {APP_NAME}
           </h1>
           <p className="mx-auto mt-4 max-w-2xl text-lg text-muted-foreground sm:text-xl">
-            Гуртовий продаж секонд хенду, стоку, іграшок та Bric-a-Brac від{" "}
-            {MIN_ORDER_KG} кг. Одяг, взуття, аксесуари з Англії, Німеччини,
-            Канади та Польщі.
+            {dict.home.heroDescription.replace("{min}", String(MIN_ORDER_KG))}
           </p>
           <div className="mt-8 flex justify-center gap-4">
             <Button size="lg" asChild>
-              <Link href="/catalog">Каталог</Link>
+              <Link href="/catalog">{dict.nav.catalog}</Link>
             </Button>
             <Button size="lg" variant="outline" asChild>
-              <Link href="/lots">Лоти (мішки)</Link>
+              <Link href="/lots">{dict.home.lotsBtn}</Link>
             </Button>
           </div>
         </div>
@@ -67,7 +68,7 @@ export default async function HomePage() {
       {/* Categories */}
       <section className="py-12">
         <div className="container mx-auto px-4">
-          <h2 className="text-2xl font-bold">Категорії товарів</h2>
+          <h2 className="text-2xl font-bold">{dict.home.categoriesTitle}</h2>
           <div className="mt-6 grid gap-4 grid-cols-2 sm:grid-cols-3 lg:grid-cols-4">
             {categories.map((cat) => (
               <Link
@@ -79,7 +80,7 @@ export default async function HomePage() {
                   {cat.name}
                 </h3>
                 <p className="mt-1 text-xs text-gray-500">
-                  {cat.productCount} товарів
+                  {cat.productCount} {dict.home.productsCount}
                 </p>
               </Link>
             ))}
@@ -91,24 +92,7 @@ export default async function HomePage() {
       <section className="border-t bg-gray-50 py-12">
         <div className="container mx-auto px-4">
           <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
-            {[
-              {
-                title: "Від 10 кг",
-                desc: "Мінімальне замовлення для гуртових покупців",
-              },
-              {
-                title: "4 країни",
-                desc: "Англія, Німеччина, Канада, Польща — якісний товар",
-              },
-              {
-                title: "Відеоогляди",
-                desc: "YouTube відео для кожного товару — бачите що купуєте",
-              },
-              {
-                title: "Швидка доставка",
-                desc: "Відправка по Україні Новою Поштою та Делівері",
-              },
-            ].map((f) => (
+            {dict.home.features.map((f) => (
               <div key={f.title} className="text-center">
                 <h3 className="text-lg font-semibold">{f.title}</h3>
                 <p className="mt-1 text-sm text-gray-500">{f.desc}</p>
@@ -124,9 +108,9 @@ export default async function HomePage() {
       {/* CTA */}
       <section className="py-12">
         <div className="container mx-auto px-4 text-center">
-          <h2 className="text-2xl font-bold">Є питання?</h2>
+          <h2 className="text-2xl font-bold">{dict.home.ctaTitle}</h2>
           <p className="mt-2 text-gray-500">
-            Зв&apos;яжіться з нами через Telegram або по телефону
+            {dict.home.ctaDescription}
           </p>
           <div className="mt-6 flex justify-center gap-4">
             <Button asChild>

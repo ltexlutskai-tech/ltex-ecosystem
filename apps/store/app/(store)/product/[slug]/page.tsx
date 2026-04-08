@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import dynamic from "next/dynamic";
 import { prisma } from "@ltex/db";
 import { notFound } from "next/navigation";
 import { Badge } from "@ltex/ui";
@@ -20,7 +21,18 @@ import {
   getFrequentlyBoughtTogether,
 } from "@/lib/recommendations";
 import { TrackProductView } from "@/components/store/track-product-view";
-import { ImageGallery } from "@/components/store/image-gallery";
+import { getDictionary } from "@/lib/i18n";
+
+const ImageGallery = dynamic(
+  () => import("@/components/store/image-gallery").then((m) => m.ImageGallery),
+  {
+    loading: () => (
+      <div className="aspect-[4/3] animate-pulse rounded-lg bg-gray-200" />
+    ),
+  },
+);
+
+const dict = getDictionary();
 
 interface Props {
   params: Promise<{ slug: string }>;
@@ -152,7 +164,7 @@ export default async function ProductPage({ params }: Props) {
             </div>
           ) : (
             <div className="flex aspect-[4/3] items-center justify-center rounded-lg border bg-gray-100 text-gray-400">
-              Немає фото
+              {dict.product.noPhoto}
             </div>
           )}
         </div>
@@ -163,7 +175,7 @@ export default async function ProductPage({ params }: Props) {
             <h1 className="text-2xl font-bold lg:text-3xl">{product.name}</h1>
             {product.articleCode && (
               <p className="mt-1 text-sm text-gray-500">
-                Артикул: {product.articleCode}
+                {dict.product.article}: {product.articleCode}
               </p>
             )}
           </div>
@@ -198,20 +210,20 @@ export default async function ProductPage({ params }: Props) {
           {/* Attributes */}
           <div className="grid grid-cols-2 gap-3 text-sm">
             <div className="rounded-lg border p-3">
-              <span className="text-gray-500">Якість</span>
+              <span className="text-gray-500">{dict.product.quality}</span>
               <p className="font-medium">
                 {QUALITY_LABELS[product.quality as QualityLevel] ??
                   product.quality}
               </p>
             </div>
             <div className="rounded-lg border p-3">
-              <span className="text-gray-500">Сезон</span>
+              <span className="text-gray-500">{dict.product.season}</span>
               <p className="font-medium">
-                {SEASON_LABELS[product.season] ?? "Всесезон"}
+                {SEASON_LABELS[product.season] ?? dict.product.allSeason}
               </p>
             </div>
             <div className="rounded-lg border p-3">
-              <span className="text-gray-500">Країна</span>
+              <span className="text-gray-500">{dict.product.country}</span>
               <p className="font-medium">
                 {COUNTRY_LABELS[
                   product.country as keyof typeof COUNTRY_LABELS
@@ -219,7 +231,7 @@ export default async function ProductPage({ params }: Props) {
               </p>
             </div>
             <div className="rounded-lg border p-3">
-              <span className="text-gray-500">Од. ціни</span>
+              <span className="text-gray-500">{dict.product.priceUnit}</span>
               <p className="font-medium">
                 {PRICE_UNIT_LABELS[
                   product.priceUnit as keyof typeof PRICE_UNIT_LABELS
@@ -228,7 +240,7 @@ export default async function ProductPage({ params }: Props) {
             </div>
             {product.averageWeight && (
               <div className="rounded-lg border p-3">
-                <span className="text-gray-500">Сер. вага</span>
+                <span className="text-gray-500">{dict.product.avgWeight}</span>
                 <p className="font-medium">{product.averageWeight} кг</p>
               </div>
             )}
@@ -236,7 +248,7 @@ export default async function ProductPage({ params }: Props) {
 
           {product.description && (
             <div>
-              <h2 className="font-semibold">Опис</h2>
+              <h2 className="font-semibold">{dict.product.description}</h2>
               <p className="mt-1 text-sm text-gray-600">
                 {product.description}
               </p>
@@ -251,7 +263,7 @@ export default async function ProductPage({ params }: Props) {
               rel="noopener noreferrer"
               className="inline-block text-sm text-green-700 underline"
             >
-              Дивитись відео-огляд
+              {dict.product.watchVideo}
             </a>
           )}
           {product.images.length > 0 && youtubeEmbed && (
@@ -272,17 +284,17 @@ export default async function ProductPage({ params }: Props) {
       {product.lots.length > 0 && (
         <div className="mt-10">
           <h2 className="text-xl font-bold">
-            Доступні лоти ({product.lots.length})
+            {dict.product.availableLots} ({product.lots.length})
           </h2>
           <div className="mt-4 overflow-x-auto rounded-lg border">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b bg-gray-50 text-left text-gray-500">
-                  <th className="px-4 py-3 font-medium">Штрихкод</th>
-                  <th className="px-4 py-3 font-medium">Вага (кг)</th>
-                  <th className="px-4 py-3 font-medium">К-сть</th>
-                  <th className="px-4 py-3 font-medium">Ціна EUR</th>
-                  <th className="px-4 py-3 font-medium">Статус</th>
+                  <th className="px-4 py-3 font-medium">{dict.product.barcode}</th>
+                  <th className="px-4 py-3 font-medium">{dict.product.weight}</th>
+                  <th className="px-4 py-3 font-medium">{dict.product.quantity}</th>
+                  <th className="px-4 py-3 font-medium">{dict.product.priceEur}</th>
+                  <th className="px-4 py-3 font-medium">{dict.product.status}</th>
                   <th className="px-4 py-3 font-medium"></th>
                 </tr>
               </thead>
@@ -348,7 +360,7 @@ async function RecommendationsSection({ productId }: { productId: string }) {
     <>
       {similar.length > 0 && (
         <div className="mt-10">
-          <h2 className="text-xl font-bold">Схожі товари</h2>
+          <h2 className="text-xl font-bold">{dict.product.similar}</h2>
           <div className="mt-4 grid grid-cols-2 gap-4 md:grid-cols-3">
             {similar.map((product) => (
               <ProductCard key={product.id} product={product} />
@@ -359,7 +371,7 @@ async function RecommendationsSection({ productId }: { productId: string }) {
 
       {boughtTogether.length > 0 && (
         <div className="mt-10">
-          <h2 className="text-xl font-bold">Часто купують разом</h2>
+          <h2 className="text-xl font-bold">{dict.product.boughtTogether}</h2>
           <div className="mt-4 grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
             {boughtTogether.map((product) => (
               <ProductCard key={product.id} product={product} />

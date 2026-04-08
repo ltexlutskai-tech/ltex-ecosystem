@@ -9,6 +9,8 @@ import { Breadcrumbs } from "@/components/store/breadcrumbs";
 
 export const revalidate = 60;
 
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://ltex.com.ua";
+
 interface Props {
   params: Promise<{ categorySlug: string; subcategorySlug: string }>;
   searchParams: Promise<Record<string, string | undefined>>;
@@ -21,9 +23,22 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     prisma.category.findUnique({ where: { slug: subcategorySlug } }),
   ]);
   if (!parent || !sub) return {};
+  const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://ltex.com.ua";
+  const description = `${sub.name} з категорії ${parent.name} гуртом від 10 кг. Секонд хенд, сток з Англії, Німеччини, Канади. L-TEX.`;
   return {
     title: `${sub.name} (${parent.name}) — секонд хенд та сток гуртом`,
-    description: `${sub.name} з категорії ${parent.name} гуртом від 10 кг. Секонд хенд, сток з Англії, Німеччини, Канади. L-TEX.`,
+    description,
+    alternates: {
+      canonical: `${SITE_URL}/catalog/${categorySlug}/${subcategorySlug}`,
+    },
+    openGraph: {
+      title: `${sub.name} — ${parent.name} — L-TEX`,
+      description,
+      url: `${SITE_URL}/catalog/${categorySlug}/${subcategorySlug}`,
+      siteName: "L-TEX",
+      locale: "uk_UA",
+      type: "website",
+    },
   };
 }
 
@@ -67,8 +82,23 @@ export default async function SubcategoryPage({ params, searchParams }: Props) {
     ? `${base}?${filterParams.toString()}`
     : base;
 
+  const breadcrumbJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: [
+      { "@type": "ListItem", position: 1, name: "Головна", item: SITE_URL },
+      { "@type": "ListItem", position: 2, name: "Каталог", item: `${SITE_URL}/catalog` },
+      { "@type": "ListItem", position: 3, name: parent.name, item: `${SITE_URL}/catalog/${categorySlug}` },
+      { "@type": "ListItem", position: 4, name: subcategory.name, item: `${SITE_URL}/catalog/${categorySlug}/${subcategorySlug}` },
+    ],
+  };
+
   return (
     <div className="container mx-auto px-4 py-6">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }}
+      />
       <Breadcrumbs
         items={[
           { label: "Каталог", href: "/catalog" },

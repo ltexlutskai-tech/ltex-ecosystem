@@ -1,11 +1,17 @@
+import dynamic from "next/dynamic";
 import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
 import { CartProvider } from "@/lib/cart";
 import { WishlistProvider } from "@/lib/wishlist";
 import { RecentlyViewedProvider } from "@/lib/recently-viewed";
 import { ComparisonProvider } from "@/lib/comparison";
-import { ComparisonBar } from "@/components/store/comparison-bar";
 import { ServiceWorkerRegister } from "@/components/sw-register";
+
+const ComparisonBar = dynamic(
+  () =>
+    import("@/components/store/comparison-bar").then((m) => m.ComparisonBar),
+  { ssr: false },
+);
 
 export default function StoreLayout({
   children,

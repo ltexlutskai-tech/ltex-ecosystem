@@ -6,6 +6,9 @@ import { QUALITY_LEVELS, QUALITY_LABELS } from "@ltex/shared";
 import { SEASONS, SEASON_LABELS } from "@ltex/shared";
 import { COUNTRIES, COUNTRY_LABELS } from "@ltex/shared";
 import { SearchAutocomplete } from "./search-autocomplete";
+import { getDictionary } from "@/lib/i18n";
+
+const dict = getDictionary();
 
 export function CatalogFilters() {
   const router = useRouter();
@@ -76,7 +79,7 @@ export function CatalogFilters() {
         <div className="w-full sm:w-60">
           <SearchAutocomplete
             defaultValue={searchParams.get("q") ?? ""}
-            placeholder="Пошук товарів..."
+            placeholder={dict.catalog.search}
           />
         </div>
 
@@ -85,7 +88,7 @@ export function CatalogFilters() {
           onChange={(e) => updateFilter("quality", e.target.value)}
           className="rounded-md border px-3 py-2 text-sm"
         >
-          <option value="">Всі якості</option>
+          <option value="">{dict.catalog.allQualities}</option>
           {QUALITY_LEVELS.map((q) => (
             <option key={q} value={q}>
               {QUALITY_LABELS[q]}
@@ -98,7 +101,7 @@ export function CatalogFilters() {
           onChange={(e) => updateFilter("season", e.target.value)}
           className="rounded-md border px-3 py-2 text-sm"
         >
-          <option value="">Всі сезони</option>
+          <option value="">{dict.catalog.allSeasons}</option>
           {SEASONS.filter((s) => s !== "").map((s) => (
             <option key={s} value={s}>
               {SEASON_LABELS[s]}
@@ -111,7 +114,7 @@ export function CatalogFilters() {
           onChange={(e) => updateFilter("country", e.target.value)}
           className="rounded-md border px-3 py-2 text-sm"
         >
-          <option value="">Всі країни</option>
+          <option value="">{dict.catalog.allCountries}</option>
           {COUNTRIES.map((c) => (
             <option key={c} value={c}>
               {COUNTRY_LABELS[c]}
@@ -124,22 +127,22 @@ export function CatalogFilters() {
           onChange={(e) => updateFilter("sort", e.target.value)}
           className="rounded-md border px-3 py-2 text-sm"
         >
-          <option value="">За замовчуванням</option>
-          <option value="price_asc">Ціна: від дешевих</option>
-          <option value="price_desc">Ціна: від дорогих</option>
-          <option value="name_asc">Назва: А–Я</option>
-          <option value="newest">Найновіші</option>
+          <option value="">{dict.catalog.sortDefault}</option>
+          <option value="price_asc">{dict.catalog.sortPriceAsc}</option>
+          <option value="price_desc">{dict.catalog.sortPriceDesc}</option>
+          <option value="name_asc">{dict.catalog.sortNameAsc}</option>
+          <option value="newest">{dict.catalog.sortNewest}</option>
         </select>
       </div>
 
       {/* Price range */}
       <div className="flex items-center gap-2">
-        <span className="text-sm text-gray-500">Ціна (€):</span>
+        <span className="text-sm text-gray-500">{dict.catalog.priceLabel}</span>
         <input
           type="number"
           value={priceMinValue}
           onChange={(e) => setPriceMinValue(e.target.value)}
-          placeholder="від"
+          placeholder={dict.catalog.priceFrom}
           min="0"
           step="0.5"
           className="w-24 rounded-md border px-2 py-1.5 text-sm"
@@ -152,7 +155,7 @@ export function CatalogFilters() {
           type="number"
           value={priceMaxValue}
           onChange={(e) => setPriceMaxValue(e.target.value)}
-          placeholder="до"
+          placeholder={dict.catalog.priceTo}
           min="0"
           step="0.5"
           className="w-24 rounded-md border px-2 py-1.5 text-sm"
@@ -173,7 +176,7 @@ export function CatalogFilters() {
           onClick={clearAll}
           className="text-sm text-red-600 underline hover:text-red-800"
         >
-          Скинути всі фільтри
+          {dict.catalog.clearAllFilters}
         </button>
       )}
     </div>

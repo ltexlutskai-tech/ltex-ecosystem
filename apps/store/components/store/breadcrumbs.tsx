@@ -1,4 +1,7 @@
 import Link from "next/link";
+import { getDictionary } from "@/lib/i18n";
+
+const dict = getDictionary();
 
 interface BreadcrumbItem {
   label: string;
@@ -19,7 +22,7 @@ export function Breadcrumbs({ items }: { items: BreadcrumbItem[] }) {
           itemType="https://schema.org/ListItem"
         >
           <Link href="/" className="hover:text-green-700" itemProp="item">
-            <span itemProp="name">Головна</span>
+            <span itemProp="name">{dict.breadcrumbs.home}</span>
           </Link>
           <meta itemProp="position" content="1" />
         </li>
