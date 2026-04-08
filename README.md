@@ -91,6 +91,7 @@ pnpm format:check
 Public-facing catalog with full-text search (tsvector + trigram fallback), product pages with YouTube video reviews, lots browser, shopping cart, and checkout.
 
 **Key URLs:**
+
 - `/catalog` — all products with filters and search
 - `/lots` — lots browser with status filters
 - `/product/[slug]` — product detail page
@@ -114,22 +115,23 @@ Same features as Telegram bot with rich keyboard menus. Webhook-only (Viber requ
 
 ## API Routes
 
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/api/cart` | GET/POST/DELETE | Server-side cart management |
-| `/api/orders` | POST | Create order (Zod validation, rate limiting) |
-| `/api/search` | GET | Autocomplete search (tsvector + trigram) |
-| `/api/sync/products` | POST | 1C product sync (Bearer auth) |
-| `/api/sync/lots` | POST | 1C lot sync (Bearer auth) |
-| `/api/sync/rates` | POST | 1C exchange rate sync (Bearer auth) |
-| `/api/sync/orders/export` | GET | Export orders for 1C |
-| `/api/mobile/*` | Various | Mobile app endpoints (auth, profile, favorites, chat, etc.) |
-| `/api/telegram/webhook` | POST | Telegram bot webhook |
-| `/api/viber/webhook` | POST | Viber bot webhook (HMAC-SHA256) |
+| Endpoint                  | Method          | Description                                                 |
+| ------------------------- | --------------- | ----------------------------------------------------------- |
+| `/api/cart`               | GET/POST/DELETE | Server-side cart management                                 |
+| `/api/orders`             | POST            | Create order (Zod validation, rate limiting)                |
+| `/api/search`             | GET             | Autocomplete search (tsvector + trigram)                    |
+| `/api/sync/products`      | POST            | 1C product sync (Bearer auth)                               |
+| `/api/sync/lots`          | POST            | 1C lot sync (Bearer auth)                                   |
+| `/api/sync/rates`         | POST            | 1C exchange rate sync (Bearer auth)                         |
+| `/api/sync/orders/export` | GET             | Export orders for 1C                                        |
+| `/api/mobile/*`           | Various         | Mobile app endpoints (auth, profile, favorites, chat, etc.) |
+| `/api/telegram/webhook`   | POST            | Telegram bot webhook                                        |
+| `/api/viber/webhook`      | POST            | Viber bot webhook (HMAC-SHA256)                             |
 
 ## Database
 
 19 tables managed by Prisma, seeded with real data:
+
 - 805 products (clothing, footwear, toys, accessories, bric-a-brac)
 - 725 lots (430 free, 265 on sale, 30 reserved)
 - 49 categories (tree structure with parent/child)

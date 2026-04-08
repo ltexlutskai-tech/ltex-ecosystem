@@ -54,6 +54,7 @@ async function sendTelegramNotification(
         parse_mode: "MarkdownV2",
         disable_web_page_preview: true,
       }),
+      signal: AbortSignal.timeout(10_000),
     });
   } catch {
     // Silently fail — don't break order flow for notification issues
@@ -93,6 +94,7 @@ async function sendViberNotification(order: OrderNotification): Promise<void> {
         type: "text",
         text,
       }),
+      signal: AbortSignal.timeout(10_000),
     });
   } catch {
     // Silently fail — don't break order flow for notification issues

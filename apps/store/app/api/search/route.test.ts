@@ -59,8 +59,20 @@ describe("Search API", () => {
   describe("Autocomplete results", () => {
     it("returns search results", async () => {
       mockAutocomplete.mockResolvedValue([
-        { id: "1", name: "Штани чоловічі", slug: "shtany-cholovichi", quality: "first", rank: 1 },
-        { id: "2", name: "Шторки", slug: "shtorky", quality: "stock", rank: 0.8 },
+        {
+          id: "1",
+          name: "Штани чоловічі",
+          slug: "shtany-cholovichi",
+          quality: "first",
+          rank: 1,
+        },
+        {
+          id: "2",
+          name: "Шторки",
+          slug: "shtorky",
+          quality: "stock",
+          rank: 0.8,
+        },
       ]);
 
       const results = await mockAutocomplete("шт");

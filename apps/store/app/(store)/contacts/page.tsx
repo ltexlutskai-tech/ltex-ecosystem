@@ -37,14 +37,14 @@ export default function ContactsPage() {
       <Breadcrumbs items={[{ label: dict.nav.contacts }]} />
 
       <h1 className="mt-4 text-3xl font-bold">{dict.contacts.title}</h1>
-      <p className="mt-2 text-gray-500">
-        {dict.contacts.subtitle}
-      </p>
+      <p className="mt-2 text-gray-500">{dict.contacts.subtitle}</p>
 
       <div className="mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg">{dict.contacts.phoneTitle}</CardTitle>
+            <CardTitle className="text-lg">
+              {dict.contacts.phoneTitle}
+            </CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
             {CONTACTS.phones.map((phone) => (
@@ -61,7 +61,9 @@ export default function ContactsPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg">{dict.contacts.messengersTitle}</CardTitle>
+            <CardTitle className="text-lg">
+              {dict.contacts.messengersTitle}
+            </CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
             <a
@@ -77,7 +79,9 @@ export default function ContactsPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg">{dict.contacts.emailTitle}</CardTitle>
+            <CardTitle className="text-lg">
+              {dict.contacts.emailTitle}
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <a
@@ -91,7 +95,9 @@ export default function ContactsPage() {
 
         <Card className="sm:col-span-2 lg:col-span-3">
           <CardHeader>
-            <CardTitle className="text-lg">{dict.contacts.addressTitle}</CardTitle>
+            <CardTitle className="text-lg">
+              {dict.contacts.addressTitle}
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <p className="text-lg">{CONTACTS.location}</p>
@@ -106,9 +112,7 @@ export default function ContactsPage() {
         <h2 className="text-xl font-bold text-green-800">
           {dict.contacts.wholesaleFrom}
         </h2>
-        <p className="mt-2 text-green-700">
-          {dict.contacts.wholesaleDesc}
-        </p>
+        <p className="mt-2 text-green-700">{dict.contacts.wholesaleDesc}</p>
       </div>
     </div>
   );

@@ -1,33 +1,33 @@
 import { prisma } from "@ltex/db";
 
-interface TopProduct {
+export interface TopProduct {
   productId: string;
   productName: string;
   orderCount: number;
   totalEur: number;
 }
 
-interface DailyRevenue {
+export interface DailyRevenue {
   date: Date;
   revenue: number;
 }
 
-interface DailyCustomers {
+export interface DailyCustomers {
   date: Date;
   count: number;
 }
 
-interface DailyAvgOrder {
+export interface DailyAvgOrder {
   date: Date;
   avgEur: number;
 }
 
-interface CategoryStat {
+export interface CategoryStat {
   categoryName: string;
   orderCount: number;
 }
 
-interface CityStat {
+export interface CityStat {
   city: string;
   customerCount: number;
 }
@@ -40,7 +40,9 @@ function getPeriodDate(period: Period): Date {
 }
 
 function getPeriodLabel(period: Period): string {
-  return { "7d": "7 днів", "30d": "30 днів", "90d": "90 днів", "1y": "рік" }[period];
+  return { "7d": "7 днів", "30d": "30 днів", "90d": "90 днів", "1y": "рік" }[
+    period
+  ];
 }
 
 export async function getAdminStats(period: Period = "30d") {
@@ -215,9 +217,10 @@ export async function getAdminStats(period: Period = "30d") {
     conversion: {
       carts: totalCarts,
       orders: ordersInPeriodCount,
-      rate: totalCarts > 0
-        ? Math.round((ordersInPeriodCount / totalCarts) * 100)
-        : 0,
+      rate:
+        totalCarts > 0
+          ? Math.round((ordersInPeriodCount / totalCarts) * 100)
+          : 0,
     },
   };
 }

@@ -3,6 +3,7 @@
 ## Development Setup
 
 1. Clone the repo and install dependencies:
+
    ```bash
    pnpm install
    ```
@@ -10,6 +11,7 @@
 2. Copy `.env.example` to `apps/store/.env.local` and fill in the values.
 
 3. Generate Prisma client:
+
    ```bash
    pnpm --filter @ltex/db exec prisma generate
    ```

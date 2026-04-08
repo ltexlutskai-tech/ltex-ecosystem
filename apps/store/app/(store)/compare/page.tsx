@@ -23,9 +23,7 @@ export default function ComparePage() {
       <div className="container mx-auto flex flex-col items-center px-4 py-16 text-center">
         <ArrowLeftRight className="h-12 w-12 text-gray-300" />
         <h1 className="mt-4 text-2xl font-bold">{dict.compare.title}</h1>
-        <p className="mt-2 text-gray-500">
-          {dict.compare.minItems}
-        </p>
+        <p className="mt-2 text-gray-500">{dict.compare.minItems}</p>
         <Button className="mt-6" asChild>
           <Link href="/catalog">{dict.cart.toCatalog}</Link>
         </Button>
@@ -37,8 +35,7 @@ export default function ComparePage() {
     {
       label: dict.product.quality,
       values: items.map(
-        (i) =>
-          QUALITY_LABELS[i.quality as QualityLevel] ?? i.quality,
+        (i) => QUALITY_LABELS[i.quality as QualityLevel] ?? i.quality,
       ),
     },
     {
@@ -52,7 +49,7 @@ export default function ComparePage() {
       values: items.map(
         (i) =>
           COUNTRY_LABELS[i.country as keyof typeof COUNTRY_LABELS] ??
-          i.country ||
+          i.country ??
           "-",
       ),
     },

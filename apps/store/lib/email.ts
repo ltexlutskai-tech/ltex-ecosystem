@@ -95,6 +95,7 @@ async function sendViaResend(
       subject,
       html,
     }),
+    signal: AbortSignal.timeout(10_000),
   });
 }
 

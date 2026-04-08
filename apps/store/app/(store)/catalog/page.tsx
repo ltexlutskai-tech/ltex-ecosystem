@@ -66,7 +66,9 @@ export default async function CatalogPage({
       <div className="mt-4 flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold">{dict.catalog.title}</h1>
-          <p className="mt-1 text-gray-500">{total} {dict.catalog.products}</p>
+          <p className="mt-1 text-gray-500">
+            {total} {dict.catalog.products}
+          </p>
         </div>
         <CatalogViewToggle currentView={view} />
       </div>

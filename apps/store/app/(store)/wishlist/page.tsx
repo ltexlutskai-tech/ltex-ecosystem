@@ -17,9 +17,7 @@ export default function WishlistPage() {
       <div className="container mx-auto flex flex-col items-center px-4 py-16 text-center">
         <Heart className="h-12 w-12 text-gray-300" />
         <h1 className="mt-4 text-2xl font-bold">{dict.wishlist.empty}</h1>
-        <p className="mt-2 text-gray-500">
-          {dict.wishlist.addHint}
-        </p>
+        <p className="mt-2 text-gray-500">{dict.wishlist.addHint}</p>
         <Button className="mt-6" asChild>
           <Link href="/catalog">{dict.cart.toCatalog}</Link>
         </Button>

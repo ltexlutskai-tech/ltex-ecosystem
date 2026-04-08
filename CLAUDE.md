@@ -218,6 +218,7 @@ EXPO_PUBLIC_API_URL=       # (mobile) API base URL for Expo app
 ### Tests (139 unit + 36 E2E, all passing)
 
 **Unit tests (12 files, 139 tests):**
+
 - `packages/shared/src/utils/slug.test.ts` — 14 tests (transliterate, generateSlug)
 - `packages/shared/src/utils/price.test.ts` — 11 tests (formatPrice, convertCurrency)
 - `apps/store/lib/validations.test.ts` — 28+ tests (order, syncProduct, syncLots, syncRates + mobile schemas)
@@ -232,6 +233,7 @@ EXPO_PUBLIC_API_URL=       # (mobile) API base URL for Expo app
 - `apps/store/lib/i18n/i18n.test.ts` — 16 tests (translation lookup, interpolation, missing keys)
 
 **E2E tests (9 files, 36 tests, enabled in CI):**
+
 - `e2e/navigation.spec.ts` — pages, nav links, 404
 - `e2e/catalog.spec.ts` — products, filters, search, pagination
 - `e2e/product.spec.ts` — nav to detail, required sections
@@ -395,215 +397,217 @@ EXPO_PUBLIC_API_URL=       # (mobile) API base URL for Expo app
 
 #### What was done (6 commits, all 8 tasks completed):
 
-| Commit | Changes |
-|--------|---------|
+| Commit    | Changes                                                                             |
+| --------- | ----------------------------------------------------------------------------------- |
 | `f8283a5` | +61 unit tests, TypeScript strict (0 `any`), Zod validation for 7 mobile API routes |
-| `76b59d7` | Consistent error handling: cart/search/auth routes, shared rate limiter |
-| `615230d` | Mobile client: error states on Catalog, Orders, Shipments screens |
-| `628bb43` | Accessibility: skip-to-content, aria-labels, focus-visible styles |
-| `ab9c80a` | SEO: canonical URLs, OG images, sitemap improvements + price range filter bugfix |
-| `701d5e0` | CI: Prettier lint step, `format:check` script, full codebase formatted |
+| `76b59d7` | Consistent error handling: cart/search/auth routes, shared rate limiter             |
+| `615230d` | Mobile client: error states on Catalog, Orders, Shipments screens                   |
+| `628bb43` | Accessibility: skip-to-content, aria-labels, focus-visible styles                   |
+| `ab9c80a` | SEO: canonical URLs, OG images, sitemap improvements + price range filter bugfix    |
+| `701d5e0` | CI: Prettier lint step, `format:check` script, full codebase formatted              |
 
 #### Results:
 
-| Metric | Before Session 4 | After Session 4 |
-|--------|-------------------|-----------------|
-| Unit tests | 53 | **114** (+61) |
-| Test files | 3 | **8** (+5 new) |
-| `any` types | unknown | **0** |
-| Zod schemas (mobile) | 0 | **10** |
-| API routes with consistent errors | partial | **all 18** |
-| CI steps | 3 | **4** (+Prettier) |
-| TS/TSX files | 161 | **166** |
-| Lines of code | 18,082 | **20,477** |
-| Total commits | 28 | **34** |
-| Bug fixed | — | price range filter (priceMin+priceMax) |
+| Metric                            | Before Session 4 | After Session 4                        |
+| --------------------------------- | ---------------- | -------------------------------------- |
+| Unit tests                        | 53               | **114** (+61)                          |
+| Test files                        | 3                | **8** (+5 new)                         |
+| `any` types                       | unknown          | **0**                                  |
+| Zod schemas (mobile)              | 0                | **10**                                 |
+| API routes with consistent errors | partial          | **all 18**                             |
+| CI steps                          | 3                | **4** (+Prettier)                      |
+| TS/TSX files                      | 161              | **166**                                |
+| Lines of code                     | 18,082           | **20,477**                             |
+| Total commits                     | 28               | **34**                                 |
+| Bug fixed                         | —                | price range filter (priceMin+priceMax) |
 
 #### Project Completion Status: ~92% MVP
 
-| Component | Completion | Details |
-|-----------|-----------|---------|
-| Монорепо структура | 100% | Turborepo + pnpm, 3 packages, 2 apps, 2 services |
-| База даних | 100% | 19 таблиць, 805 products, 725 lots seeded |
-| Web Store | 100% | Каталог, пошук, кошик, checkout, SEO, PWA |
-| Admin Panel | 100% | Dashboard, CRUD, analytics, auth |
-| API Layer | 100% | 18 ендпоінтів, rate limiting, Zod validation, consistent errors |
-| Telegram Bot | 100% | Повний функціонал + webhook + BotFather |
-| Viber Bot | 100% | Повний функціонал + нотифікації |
-| Mobile Client App | 85% | Екрани + error handling готові, потрібне тестування на пристрої |
-| Тестування | 90% | 114 unit + 17 E2E, all passing |
-| Accessibility | 90% | skip-to-content, aria-labels, focus-visible, keyboard nav |
-| SEO | 95% | canonical, OG, JSON-LD, sitemap, meta |
-| CI/CD | 90% | typecheck + test + build + Prettier lint |
-| 1С Інтеграція | 60% | API готовий, потрібна конфігурація 1С |
-| Deploy / Production | 60% | Netlify працює, webhooks + фото не налаштовані |
-| Mobile Agent App | 0% | Окрема сесія, потрібні скріншоти |
-| Warehouse App | 0% | Окрема сесія |
+| Component           | Completion | Details                                                         |
+| ------------------- | ---------- | --------------------------------------------------------------- |
+| Монорепо структура  | 100%       | Turborepo + pnpm, 3 packages, 2 apps, 2 services                |
+| База даних          | 100%       | 19 таблиць, 805 products, 725 lots seeded                       |
+| Web Store           | 100%       | Каталог, пошук, кошик, checkout, SEO, PWA                       |
+| Admin Panel         | 100%       | Dashboard, CRUD, analytics, auth                                |
+| API Layer           | 100%       | 18 ендпоінтів, rate limiting, Zod validation, consistent errors |
+| Telegram Bot        | 100%       | Повний функціонал + webhook + BotFather                         |
+| Viber Bot           | 100%       | Повний функціонал + нотифікації                                 |
+| Mobile Client App   | 85%        | Екрани + error handling готові, потрібне тестування на пристрої |
+| Тестування          | 90%        | 114 unit + 17 E2E, all passing                                  |
+| Accessibility       | 90%        | skip-to-content, aria-labels, focus-visible, keyboard nav       |
+| SEO                 | 95%        | canonical, OG, JSON-LD, sitemap, meta                           |
+| CI/CD               | 90%        | typecheck + test + build + Prettier lint                        |
+| 1С Інтеграція       | 60%        | API готовий, потрібна конфігурація 1С                           |
+| Deploy / Production | 60%        | Netlify працює, webhooks + фото не налаштовані                  |
+| Mobile Agent App    | 0%         | Окрема сесія, потрібні скріншоти                                |
+| Warehouse App       | 0%         | Окрема сесія                                                    |
 
 ### Session 5 Completion Report (2026-04-08)
 
 #### What was done (7 commits, all 7 tasks completed):
 
-| Commit | Task | Changes |
-|--------|------|---------|
-| `ad169be` | Mobile Client | Skeleton loaders (6 screens), empty states with icons, push token registration, OfflineBanner |
-| `9845a96` | Performance | Extract admin stats to lib/admin-stats.ts, add loading.tsx for 4 admin sub-pages |
-| `06113f5` | Admin UX | Sortable table columns with arrow indicators, CSV export for orders/customers, AdminBreadcrumbs |
-| `7838592` | Security | Auth guards on all 10 admin server actions, rate limiting on mobile auth (10/min), CSP + security headers |
-| `1726e61` | E2E Tests | Enable E2E job in CI, add 19 new tests (admin, lots, search, responsive, about/contacts) — 17 → 36 total |
-| `d955736` | Bots | /prices and /new commands for both bots, search pagination with "all results" link, new Viber menu buttons |
-| `2e23f94` | Docs | Full README.md, .env.example, CONTRIBUTING.md |
+| Commit    | Task          | Changes                                                                                                    |
+| --------- | ------------- | ---------------------------------------------------------------------------------------------------------- |
+| `ad169be` | Mobile Client | Skeleton loaders (6 screens), empty states with icons, push token registration, OfflineBanner              |
+| `9845a96` | Performance   | Extract admin stats to lib/admin-stats.ts, add loading.tsx for 4 admin sub-pages                           |
+| `06113f5` | Admin UX      | Sortable table columns with arrow indicators, CSV export for orders/customers, AdminBreadcrumbs            |
+| `7838592` | Security      | Auth guards on all 10 admin server actions, rate limiting on mobile auth (10/min), CSP + security headers  |
+| `1726e61` | E2E Tests     | Enable E2E job in CI, add 19 new tests (admin, lots, search, responsive, about/contacts) — 17 → 36 total   |
+| `d955736` | Bots          | /prices and /new commands for both bots, search pagination with "all results" link, new Viber menu buttons |
+| `2e23f94` | Docs          | Full README.md, .env.example, CONTRIBUTING.md                                                              |
 
 ### Session 6 Completion Report (2026-04-08)
 
 #### What was done (1 commit, all 7 tasks completed):
 
-| Task | Files | Key Changes |
-|------|-------|-------------|
-| Admin pagination | 6 modified, 3 new | AdminPagination, FilterSelect, PriceRangeFilter; category/quality filters on products; quality/price on lots; city search on customers |
-| Image gallery | 2 modified, 1 new | ImageGallery with thumbnail strip + lightbox; bulk upload + drag-reorder in admin; reorderProductImages action |
-| Order flow | 3 modified, 3 new | /order/[id]/confirmation, /order/[id]/status (timeline), expandable admin rows, addOrderNote for manager comments |
-| i18n prep | 2 modified, 3 new | lib/i18n/uk.ts dictionary (180 lines), t() with interpolation, header/footer updated |
-| Real-time admin | 2 modified, 4 new | /api/admin/stats, AutoRefresh (30s), NotificationBell (dropdown + sound), OrdersBadge on sidebar |
-| Store UX | 3 modified, 10 new | Quick view modal, wishlist (provider + button + badge + page), recently viewed (provider + section), comparison (max 3, bar + page) |
-| Integration tests | 0 modified, 4 new | 50 new tests: orders API (17), cart API (6), search API (11), i18n (16) |
+| Task              | Files              | Key Changes                                                                                                                            |
+| ----------------- | ------------------ | -------------------------------------------------------------------------------------------------------------------------------------- |
+| Admin pagination  | 6 modified, 3 new  | AdminPagination, FilterSelect, PriceRangeFilter; category/quality filters on products; quality/price on lots; city search on customers |
+| Image gallery     | 2 modified, 1 new  | ImageGallery with thumbnail strip + lightbox; bulk upload + drag-reorder in admin; reorderProductImages action                         |
+| Order flow        | 3 modified, 3 new  | /order/[id]/confirmation, /order/[id]/status (timeline), expandable admin rows, addOrderNote for manager comments                      |
+| i18n prep         | 2 modified, 3 new  | lib/i18n/uk.ts dictionary (180 lines), t() with interpolation, header/footer updated                                                   |
+| Real-time admin   | 2 modified, 4 new  | /api/admin/stats, AutoRefresh (30s), NotificationBell (dropdown + sound), OrdersBadge on sidebar                                       |
+| Store UX          | 3 modified, 10 new | Quick view modal, wishlist (provider + button + badge + page), recently viewed (provider + section), comparison (max 3, bar + page)    |
+| Integration tests | 0 modified, 4 new  | 50 new tests: orders API (17), cart API (6), search API (11), i18n (16)                                                                |
 
 #### Results:
 
-| Metric | Before Session 6 | After Session 6 |
-|--------|-------------------|-----------------|
-| Unit tests | 114 | **139** (+25) |
-| Test files | 12 | **16** (+4 new: orders, cart, search API + i18n) |
-| Store pages | 11 | **15** (+confirmation, status, compare, wishlist) |
-| Admin components | 8 | **14** (+pagination, filters, notification bell, orders badge, auto-refresh, detail row) |
-| Store components | 10 | **18** (+image gallery, quick view, wishlist, comparison, recently viewed) |
-| Context providers | 1 (cart) | **4** (+wishlist, recently-viewed, comparison) |
-| API routes | 18 | **19** (+/api/admin/stats) |
-| i18n strings | 0 | **180** (Ukrainian dictionary) |
-| New files | — | **28** created |
-| TS/TSX files | 183 | **212** |
-| Lines of code | 21,786 | **24,776** (+3,322) |
-| Total commits | 41 | **42** |
+| Metric            | Before Session 6 | After Session 6                                                                          |
+| ----------------- | ---------------- | ---------------------------------------------------------------------------------------- |
+| Unit tests        | 114              | **139** (+25)                                                                            |
+| Test files        | 12               | **16** (+4 new: orders, cart, search API + i18n)                                         |
+| Store pages       | 11               | **15** (+confirmation, status, compare, wishlist)                                        |
+| Admin components  | 8                | **14** (+pagination, filters, notification bell, orders badge, auto-refresh, detail row) |
+| Store components  | 10               | **18** (+image gallery, quick view, wishlist, comparison, recently viewed)               |
+| Context providers | 1 (cart)         | **4** (+wishlist, recently-viewed, comparison)                                           |
+| API routes        | 18               | **19** (+/api/admin/stats)                                                               |
+| i18n strings      | 0                | **180** (Ukrainian dictionary)                                                           |
+| New files         | —                | **28** created                                                                           |
+| TS/TSX files      | 183              | **212**                                                                                  |
+| Lines of code     | 21,786           | **24,776** (+3,322)                                                                      |
+| Total commits     | 41               | **42**                                                                                   |
 
 #### Project Completion Status: ~97% MVP
 
-| Component | Completion | Details |
-|-----------|-----------|---------|
-| Монорепо структура | 100% | Turborepo + pnpm, 3 packages, 2 apps, 2 services |
-| База даних | 100% | 19 таблиць, 805 products, 725 lots seeded |
-| Web Store | 100% | Каталог, пошук, кошик, checkout, SEO, PWA, wishlist, compare, recently viewed, quick view |
-| Admin Panel | 100% | Dashboard, CRUD, analytics, auth, sort/filter/paginate, CSV, real-time, notification bell |
-| API Layer | 100% | 19 ендпоінтів, rate limiting, Zod validation, consistent errors |
-| Telegram Bot | 100% | 7 commands + inline query + webhook + pagination |
-| Viber Bot | 100% | 7 commands + keyboard menus + notifications |
-| Mobile Client App | 90% | Екрани + error handling + skeleton + offline + push ready |
-| Тестування | 95% | 139 unit + 36 E2E, all passing, E2E enabled in CI |
-| Order Flow | 95% | Checkout → confirmation → status tracking, admin notes, expandable rows |
-| i18n | 80% | Dictionary + t() ready, header/footer done, other pages pending |
-| Accessibility | 90% | skip-to-content, aria-labels, focus-visible, keyboard nav |
-| SEO | 95% | canonical, OG, JSON-LD, sitemap, meta |
-| Security | 90% | CSP headers, auth guards, rate limiting, webhook validation |
-| CI/CD | 95% | typecheck + test + build + Prettier + E2E |
-| Documentation | 90% | README, CONTRIBUTING, .env.example, deploy checklist |
-| 1С Інтеграція | 60% | API готовий, потрібна конфігурація 1С |
-| Deploy / Production | 60% | Netlify працює, webhooks + фото не налаштовані |
-| Mobile Agent App | 0% | Окрема сесія, потрібні скріншоти |
-| Warehouse App | 0% | Окрема сесія |
+| Component           | Completion | Details                                                                                   |
+| ------------------- | ---------- | ----------------------------------------------------------------------------------------- |
+| Монорепо структура  | 100%       | Turborepo + pnpm, 3 packages, 2 apps, 2 services                                          |
+| База даних          | 100%       | 19 таблиць, 805 products, 725 lots seeded                                                 |
+| Web Store           | 100%       | Каталог, пошук, кошик, checkout, SEO, PWA, wishlist, compare, recently viewed, quick view |
+| Admin Panel         | 100%       | Dashboard, CRUD, analytics, auth, sort/filter/paginate, CSV, real-time, notification bell |
+| API Layer           | 100%       | 19 ендпоінтів, rate limiting, Zod validation, consistent errors                           |
+| Telegram Bot        | 100%       | 7 commands + inline query + webhook + pagination                                          |
+| Viber Bot           | 100%       | 7 commands + keyboard menus + notifications                                               |
+| Mobile Client App   | 90%        | Екрани + error handling + skeleton + offline + push ready                                 |
+| Тестування          | 95%        | 139 unit + 36 E2E, all passing, E2E enabled in CI                                         |
+| Order Flow          | 95%        | Checkout → confirmation → status tracking, admin notes, expandable rows                   |
+| i18n                | 80%        | Dictionary + t() ready, header/footer done, other pages pending                           |
+| Accessibility       | 90%        | skip-to-content, aria-labels, focus-visible, keyboard nav                                 |
+| SEO                 | 95%        | canonical, OG, JSON-LD, sitemap, meta                                                     |
+| Security            | 90%        | CSP headers, auth guards, rate limiting, webhook validation                               |
+| CI/CD               | 95%        | typecheck + test + build + Prettier + E2E                                                 |
+| Documentation       | 90%        | README, CONTRIBUTING, .env.example, deploy checklist                                      |
+| 1С Інтеграція       | 60%        | API готовий, потрібна конфігурація 1С                                                     |
+| Deploy / Production | 60%        | Netlify працює, webhooks + фото не налаштовані                                            |
+| Mobile Agent App    | 0%         | Окрема сесія, потрібні скріншоти                                                          |
+| Warehouse App       | 0%         | Окрема сесія                                                                              |
 
 ### Session 7 Completion Report (2026-04-08)
 
 #### What was done (1 commit, all 7 tasks completed):
 
-| Task | Key Changes |
-|------|-------------|
-| i18n | t() connected in all 15+ store pages/components, ~70 new dictionary keys in uk.ts |
-| Email | lib/email.ts — dual SMTP/Resend transport, order confirmation + status update HTML emails |
-| Analytics | Period filter (7d/30d/90d/1y), avg order chart, category pie chart, geography bar chart, conversion metric |
-| SEO | Organization JSON-LD, BreadcrumbList on category/subcategory, FAQ JSON-LD on about, hreflang tags |
-| Mobile | Auth guards on protected tabs, ltex:// deep linking, splash screen, universal links config |
-| Performance | @next/bundle-analyzer, infinite scroll with IntersectionObserver, lazy images, /api/catalog endpoint |
-| Tests | 22 new context provider tests (wishlist, comparison, recently-viewed), vitest JSX support |
+| Task        | Key Changes                                                                                                |
+| ----------- | ---------------------------------------------------------------------------------------------------------- |
+| i18n        | t() connected in all 15+ store pages/components, ~70 new dictionary keys in uk.ts                          |
+| Email       | lib/email.ts — dual SMTP/Resend transport, order confirmation + status update HTML emails                  |
+| Analytics   | Period filter (7d/30d/90d/1y), avg order chart, category pie chart, geography bar chart, conversion metric |
+| SEO         | Organization JSON-LD, BreadcrumbList on category/subcategory, FAQ JSON-LD on about, hreflang tags          |
+| Mobile      | Auth guards on protected tabs, ltex:// deep linking, splash screen, universal links config                 |
+| Performance | @next/bundle-analyzer, infinite scroll with IntersectionObserver, lazy images, /api/catalog endpoint       |
+| Tests       | 22 new context provider tests (wishlist, comparison, recently-viewed), vitest JSX support                  |
 
 #### Results:
 
-| Metric | Before Session 7 | After Session 7 |
-|--------|-------------------|-----------------|
-| Unit tests | 139 | **161** (+22) |
-| Test files | 16 | **19** (+3 context provider tests) |
-| i18n keys | 180 | **~250** (+70 new keys) |
-| Store pages with i18n | 2 (header/footer) | **15+** (all pages) |
-| Email templates | 0 | **2** (confirmation + status update) |
-| Admin analytics charts | 4 | **8** (+avg order, categories, geography, conversion) |
-| JSON-LD schemas | 2 | **5** (+Organization, BreadcrumbList, FAQ) |
-| New files | — | **7** created |
-| TS/TSX files | 212 | **219** |
-| Lines of code | 24,776 | **26,408** (+1,632) |
-| Total commits | 42 | **44** (incl. merge) |
+| Metric                 | Before Session 7  | After Session 7                                       |
+| ---------------------- | ----------------- | ----------------------------------------------------- |
+| Unit tests             | 139               | **161** (+22)                                         |
+| Test files             | 16                | **19** (+3 context provider tests)                    |
+| i18n keys              | 180               | **~250** (+70 new keys)                               |
+| Store pages with i18n  | 2 (header/footer) | **15+** (all pages)                                   |
+| Email templates        | 0                 | **2** (confirmation + status update)                  |
+| Admin analytics charts | 4                 | **8** (+avg order, categories, geography, conversion) |
+| JSON-LD schemas        | 2                 | **5** (+Organization, BreadcrumbList, FAQ)            |
+| New files              | —                 | **7** created                                         |
+| TS/TSX files           | 212               | **219**                                               |
+| Lines of code          | 24,776            | **26,408** (+1,632)                                   |
+| Total commits          | 42                | **44** (incl. merge)                                  |
 
 #### Project Completion Status: ~98% MVP
 
-| Component | Completion | Details |
-|-----------|-----------|---------|
-| Монорепо структура | 100% | Turborepo + pnpm, 3 packages, 2 apps, 2 services |
-| База даних | 100% | 19 таблиць, 805 products, 725 lots seeded |
-| Web Store | 100% | Каталог, пошук, кошик, checkout, SEO, PWA, wishlist, compare, infinite scroll |
-| Admin Panel | 100% | Dashboard + analytics (8 charts, period filter), CRUD, sort/filter/paginate, CSV, real-time |
-| API Layer | 100% | 20 ендпоінтів, rate limiting, Zod validation, consistent errors |
-| Telegram Bot | 100% | 7 commands + inline query + webhook + pagination |
-| Viber Bot | 100% | 7 commands + keyboard menus + notifications |
-| Mobile Client App | 95% | Повний функціонал + auth guards + deep linking + splash screen |
-| Тестування | 95% | 161 unit + 36 E2E = 197, all passing, E2E enabled in CI |
-| i18n | 95% | Dictionary (250 keys) + t() connected to all pages |
-| Email | 90% | Dual transport (SMTP/Resend), needs env var configuration |
-| Order Flow | 95% | Checkout → confirmation → status tracking → email → admin notes |
-| Accessibility | 90% | skip-to-content, aria-labels, focus-visible, keyboard nav |
-| SEO | 98% | canonical, OG, JSON-LD (5 types), hreflang, sitemap, meta |
-| Security | 90% | CSP headers, auth guards, rate limiting, webhook validation |
-| CI/CD | **BROKEN** | Prettier (37 files), TypeScript (41 errors), Build (missing nodemailer) — see Session 8 tasks |
-| Performance | 90% | Infinite scroll, lazy images, bundle analyzer, ISR |
-| Documentation | 90% | README, CONTRIBUTING, .env.example, deploy checklist |
-| 1С Інтеграція | 60% | API готовий, потрібна конфігурація 1С |
-| Deploy / Production | 60% | Netlify працює, webhooks + фото не налаштовані |
-| Mobile Agent App | 0% | Окрема сесія, потрібні скріншоти |
-| Warehouse App | 0% | Окрема сесія |
+| Component           | Completion | Details                                                                                       |
+| ------------------- | ---------- | --------------------------------------------------------------------------------------------- |
+| Монорепо структура  | 100%       | Turborepo + pnpm, 3 packages, 2 apps, 2 services                                              |
+| База даних          | 100%       | 19 таблиць, 805 products, 725 lots seeded                                                     |
+| Web Store           | 100%       | Каталог, пошук, кошик, checkout, SEO, PWA, wishlist, compare, infinite scroll                 |
+| Admin Panel         | 100%       | Dashboard + analytics (8 charts, period filter), CRUD, sort/filter/paginate, CSV, real-time   |
+| API Layer           | 100%       | 20 ендпоінтів, rate limiting, Zod validation, consistent errors                               |
+| Telegram Bot        | 100%       | 7 commands + inline query + webhook + pagination                                              |
+| Viber Bot           | 100%       | 7 commands + keyboard menus + notifications                                                   |
+| Mobile Client App   | 95%        | Повний функціонал + auth guards + deep linking + splash screen                                |
+| Тестування          | 95%        | 161 unit + 36 E2E = 197, all passing, E2E enabled in CI                                       |
+| i18n                | 95%        | Dictionary (250 keys) + t() connected to all pages                                            |
+| Email               | 90%        | Dual transport (SMTP/Resend), needs env var configuration                                     |
+| Order Flow          | 95%        | Checkout → confirmation → status tracking → email → admin notes                               |
+| Accessibility       | 90%        | skip-to-content, aria-labels, focus-visible, keyboard nav                                     |
+| SEO                 | 98%        | canonical, OG, JSON-LD (5 types), hreflang, sitemap, meta                                     |
+| Security            | 90%        | CSP headers, auth guards, rate limiting, webhook validation                                   |
+| CI/CD               | **BROKEN** | Prettier (37 files), TypeScript (41 errors), Build (missing nodemailer) — see Session 8 tasks |
+| Performance         | 90%        | Infinite scroll, lazy images, bundle analyzer, ISR                                            |
+| Documentation       | 90%        | README, CONTRIBUTING, .env.example, deploy checklist                                          |
+| 1С Інтеграція       | 60%        | API готовий, потрібна конфігурація 1С                                                         |
+| Deploy / Production | 60%        | Netlify працює, webhooks + фото не налаштовані                                                |
+| Mobile Agent App    | 0%         | Окрема сесія, потрібні скріншоти                                                              |
+| Warehouse App       | 0%         | Окрема сесія                                                                                  |
 
 ### Orchestrator Review (Session 8 Planning, 2026-04-08)
 
 #### CI Status: FAILING (all 3 steps fail)
 
 **1. Prettier (37 files)** — Session 7 code wasn't formatted before commit.
+
 - Fix: `pnpm format:write` then commit
 
 **2. TypeScript (41 errors across 10 files):**
 
-| File | Errors | Root Cause |
-|------|--------|------------|
-| `app/(store)/order/[id]/confirmation/page.tsx` | 8 | Prisma `include` uses wrong key (`product` instead of valid relation); missing `customer`, `items` on result type |
-| `app/(store)/order/[id]/status/page.tsx` | 9 | Same Prisma include issue + missing `shipments` relation |
-| `app/admin/orders/page.tsx` | 7 | Same Prisma include issue for `customer`, `items` |
-| `app/admin/orders/actions.ts` | 2 | Undefined variables `statusLabel`, `orderRef` in email call |
-| `app/(store)/compare/page.tsx` | 1 | `??` and `\|\|` mixed without parentheses |
-| `app/admin/products/image-upload.tsx` | 1 | Possible `undefined` passed to function |
-| `components/store/image-gallery.tsx` | 4 | `currentImage` possibly undefined |
-| `lib/email.ts` | 1 | `nodemailer` module not installed |
-| `lib/comparison.test.tsx` | 1 | Object possibly undefined |
-| `lib/recently-viewed.test.tsx` | 5 | Object possibly undefined |
-| `lib/wishlist.test.tsx` | 2 | Object possibly undefined |
+| File                                           | Errors | Root Cause                                                                                                        |
+| ---------------------------------------------- | ------ | ----------------------------------------------------------------------------------------------------------------- |
+| `app/(store)/order/[id]/confirmation/page.tsx` | 8      | Prisma `include` uses wrong key (`product` instead of valid relation); missing `customer`, `items` on result type |
+| `app/(store)/order/[id]/status/page.tsx`       | 9      | Same Prisma include issue + missing `shipments` relation                                                          |
+| `app/admin/orders/page.tsx`                    | 7      | Same Prisma include issue for `customer`, `items`                                                                 |
+| `app/admin/orders/actions.ts`                  | 2      | Undefined variables `statusLabel`, `orderRef` in email call                                                       |
+| `app/(store)/compare/page.tsx`                 | 1      | `??` and `\|\|` mixed without parentheses                                                                         |
+| `app/admin/products/image-upload.tsx`          | 1      | Possible `undefined` passed to function                                                                           |
+| `components/store/image-gallery.tsx`           | 4      | `currentImage` possibly undefined                                                                                 |
+| `lib/email.ts`                                 | 1      | `nodemailer` module not installed                                                                                 |
+| `lib/comparison.test.tsx`                      | 1      | Object possibly undefined                                                                                         |
+| `lib/recently-viewed.test.tsx`                 | 5      | Object possibly undefined                                                                                         |
+| `lib/wishlist.test.tsx`                        | 2      | Object possibly undefined                                                                                         |
 
 **3. Build** — fails because `nodemailer` is not installed as a dependency.
+
 - `lib/email.ts` imports `nodemailer` but it's not in `package.json`
 - Used by `app/admin/orders/actions.ts` and `app/api/orders/route.ts`
 
 #### Branch Cleanup
 
-| Branch | Status |
-|--------|--------|
-| `claude/audit-ltex-ecosystem-cTLpW` | Merged in main, remote delete pending (needs manual delete via GitHub UI) |
-| `claude/session-4-tasks-EV62w` | Merged in main, remote delete pending |
-| `claude/session-5-tasks-fcREm` | Merged in main, remote delete pending |
-| `claude/admin-gallery-orders-WDIWr` | Merged in main, remote delete pending |
-| `claude/project-status-analysis-9Qkj2` | Already deleted |
-| `claude/add-i18n-email-analytics-Xz9Ua` | Merged in main, remote delete pending |
+| Branch                                  | Status                                                                    |
+| --------------------------------------- | ------------------------------------------------------------------------- |
+| `claude/audit-ltex-ecosystem-cTLpW`     | Merged in main, remote delete pending (needs manual delete via GitHub UI) |
+| `claude/session-4-tasks-EV62w`          | Merged in main, remote delete pending                                     |
+| `claude/session-5-tasks-fcREm`          | Merged in main, remote delete pending                                     |
+| `claude/admin-gallery-orders-WDIWr`     | Merged in main, remote delete pending                                     |
+| `claude/project-status-analysis-9Qkj2`  | Already deleted                                                           |
+| `claude/add-i18n-email-analytics-Xz9Ua` | Merged in main, remote delete pending                                     |
 
 **ACTION REQUIRED:** Delete these 5 branches via GitHub Settings → Branches, or click "Delete branch" on merged PRs.
 
@@ -622,11 +626,13 @@ Run `pnpm format:write` to fix 37 files, then commit.
 Fix 41 TypeScript errors across 10 files. Specific fixes:
 
 **a) Install `nodemailer` + `@types/nodemailer`:**
+
 ```bash
 pnpm --filter @ltex/store add nodemailer @types/nodemailer
 ```
 
 **b) Fix Prisma `include` in 3 order-related pages:**
+
 - `app/(store)/order/[id]/confirmation/page.tsx` — fix include to use valid relations: `items: { include: { lot: true } }`, `customer: true` (NOT `product` — it doesn't exist on OrderItem)
 - `app/(store)/order/[id]/status/page.tsx` — same fix + add `shipments: true` include on the order query (NOT inside items)
 - `app/admin/orders/page.tsx` — same Prisma include fix
@@ -634,12 +640,15 @@ pnpm --filter @ltex/store add nodemailer @types/nodemailer
 Check `packages/db/prisma/schema.prisma` for the actual `OrderItem` relations before fixing — use correct relation names.
 
 **c) Fix `app/admin/orders/actions.ts`:**
+
 - `statusLabel` and `orderRef` are undefined — check how `sendOrderStatusEmail()` is called and define these variables properly
 
 **d) Fix `app/(store)/compare/page.tsx`:**
+
 - Add parentheses around mixed `??` / `||` expression on line 54
 
 **e) Fix undefined checks (5 files):**
+
 - `app/admin/products/image-upload.tsx:80` — add undefined guard
 - `components/store/image-gallery.tsx:51,52,112,113` — add `currentImage` null check or early return
 - `lib/comparison.test.tsx:92` — add non-null assertion or check
@@ -649,14 +658,17 @@ Check `packages/db/prisma/schema.prisma` for the actual `OrderItem` relations be
 #### Задача 3: FIX CI — Verify build passes
 
 After fixing tasks 1-2, run:
+
 ```bash
 pnpm typecheck && pnpm build
 ```
+
 Build currently fails due to `nodemailer` not being installed. After installing it (task 2a), build should pass.
 
 #### Задача 4: Production hardening — env validation
 
 Add runtime env validation at app startup (e.g., in `instrumentation.ts` or top of layout):
+
 - Warn (not crash) if optional env vars are missing: `TELEGRAM_BOT_TOKEN`, `VIBER_AUTH_TOKEN`, `NOVA_POSHTA_API_KEY`
 - Gracefully handle missing `SMTP_*` / `RESEND_API_KEY` in `lib/email.ts` — log warning instead of throwing
 
@@ -669,6 +681,7 @@ Add runtime env validation at app startup (e.g., in `instrumentation.ts` or top 
 #### Задача 6: Admin orders Prisma query audit
 
 The Prisma `include` errors suggest the queries were written without matching the actual schema. Audit ALL Prisma queries in:
+
 - `app/admin/orders/page.tsx`
 - `app/(store)/order/[id]/confirmation/page.tsx`
 - `app/(store)/order/[id]/status/page.tsx`
@@ -680,6 +693,7 @@ Ensure all `include` statements match `schema.prisma` relations exactly.
 #### Задача 7: Final CI verification
 
 After all fixes:
+
 1. `pnpm format:check` — must pass
 2. `pnpm --filter @ltex/shared test && pnpm --filter @ltex/store test` — must pass (186 tests)
 3. `pnpm typecheck` — must pass (0 errors)
@@ -688,6 +702,7 @@ After all fixes:
 Commit all fixes together or in logical groups. Push to feature branch.
 
 #### Задачі що потребують участі користувача (НЕ для автономної сесії)
+
 - **Видалити merged branches** — 5 branches через GitHub UI (див. Branch Cleanup вище)
 - **Mobile Agent App** — потрібні скріншоти MobileAgentLTEX v1.15.3
 - **Warehouse App** — потрібні вимоги та скріншоти
@@ -700,6 +715,7 @@ Commit all fixes together or in logical groups. Push to feature branch.
 ### Session Types
 
 **Orchestrator** — управляє проектом, НЕ кодить:
+
 - Review та merge feature branches в main
 - Видалення merged branches
 - Перевірка CI/deploy статусу
@@ -707,6 +723,7 @@ Commit all fixes together or in logical groups. Push to feature branch.
 - Планування задач для worker-сесій
 
 **Worker** — кодить, НЕ управляє:
+
 - Виконує задачі з "Tasks for next session" в CLAUDE.md
 - Автоматично створює feature branch (це нормально)
 - Пушить результат на свою гілку
@@ -735,19 +752,19 @@ Orchestrator: review → merge → cleanup → новий план
 
 ### Infrastructure Status (потребує доступу користувача)
 
-| Задача | Статус | Що потрібно |
-|--------|--------|-------------|
-| Netlify deploy branch = main | DONE | — |
-| Netlify env: DATABASE_URL, SUPABASE | DONE | — |
-| Netlify env: NEXT_PUBLIC_SITE_URL | PENDING | Додати в Netlify Dashboard |
-| Netlify env: SYNC_API_KEY | PENDING | `openssl rand -hex 32`, додати в Netlify + 1С |
-| Netlify env: TELEGRAM_BOT_TOKEN + CHAT_ID | PENDING | Від @BotFather |
-| Netlify env: VIBER_AUTH_TOKEN | PENDING | З partners.viber.com |
-| FTS migration (GIN + trigram indexes) | PENDING | Запустити SQL в Supabase SQL Editor |
-| Supabase Storage bucket (product-images) | PENDING | Створити в Supabase Dashboard |
-| Завантажити фото продуктів | PENDING | `npx tsx scripts/upload-photos.ts` |
-| Зареєструвати webhooks ботів | PENDING | `npx tsx scripts/register-webhooks.ts` |
-| Кастомний домен ltex.com.ua | PENDING | DNS налаштування |
+| Задача                                    | Статус  | Що потрібно                                   |
+| ----------------------------------------- | ------- | --------------------------------------------- |
+| Netlify deploy branch = main              | DONE    | —                                             |
+| Netlify env: DATABASE_URL, SUPABASE       | DONE    | —                                             |
+| Netlify env: NEXT_PUBLIC_SITE_URL         | PENDING | Додати в Netlify Dashboard                    |
+| Netlify env: SYNC_API_KEY                 | PENDING | `openssl rand -hex 32`, додати в Netlify + 1С |
+| Netlify env: TELEGRAM_BOT_TOKEN + CHAT_ID | PENDING | Від @BotFather                                |
+| Netlify env: VIBER_AUTH_TOKEN             | PENDING | З partners.viber.com                          |
+| FTS migration (GIN + trigram indexes)     | PENDING | Запустити SQL в Supabase SQL Editor           |
+| Supabase Storage bucket (product-images)  | PENDING | Створити в Supabase Dashboard                 |
+| Завантажити фото продуктів                | PENDING | `npx tsx scripts/upload-photos.ts`            |
+| Зареєструвати webhooks ботів              | PENDING | `npx tsx scripts/register-webhooks.ts`        |
+| Кастомний домен ltex.com.ua               | PENDING | DNS налаштування                              |
 
 ## Tech Stack
 

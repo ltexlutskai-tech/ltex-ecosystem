@@ -32,10 +32,7 @@ export function WishlistButton({ product, size = "sm" }: WishlistButtonProps) {
       }`}
       aria-label={inWishlist ? "Видалити з обраного" : "Додати до обраного"}
     >
-      <Heart
-        className={iconSize}
-        fill={inWishlist ? "currentColor" : "none"}
-      />
+      <Heart className={iconSize} fill={inWishlist ? "currentColor" : "none"} />
     </button>
   );
 }

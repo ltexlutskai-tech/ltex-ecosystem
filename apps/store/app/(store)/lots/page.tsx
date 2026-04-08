@@ -145,7 +145,9 @@ export default async function LotsPage({
                   <td className="px-4 py-3 text-gray-500">
                     {lot.product.category.name}
                   </td>
-                  <td className="px-4 py-3">{lot.weight} {dict.catalog.perKg}</td>
+                  <td className="px-4 py-3">
+                    {lot.weight} {dict.catalog.perKg}
+                  </td>
                   <td className="px-4 py-3 font-medium">
                     €{lot.priceEur.toFixed(2)}
                   </td>

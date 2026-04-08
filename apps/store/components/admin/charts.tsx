@@ -202,8 +202,7 @@ export function AvgOrderChart({
   }
 
   const maxAvg = Math.max(...data.map((d) => d.avgEur), 1);
-  const overallAvg =
-    data.reduce((s, d) => s + d.avgEur, 0) / data.length;
+  const overallAvg = data.reduce((s, d) => s + d.avgEur, 0) / data.length;
   const width = 400;
   const height = 150;
   const padding = 4;
@@ -211,8 +210,7 @@ export function AvgOrderChart({
   const points = data.map((d, i) => {
     const x =
       padding + (i / Math.max(data.length - 1, 1)) * (width - padding * 2);
-    const y =
-      height - padding - (d.avgEur / maxAvg) * (height - padding * 2);
+    const y = height - padding - (d.avgEur / maxAvg) * (height - padding * 2);
     return `${x},${y}`;
   });
   const pathD = `M ${points.join(" L ")}`;
@@ -234,12 +232,8 @@ export function AvgOrderChart({
             padding +
             (i / Math.max(data.length - 1, 1)) * (width - padding * 2);
           const y =
-            height -
-            padding -
-            (d.avgEur / maxAvg) * (height - padding * 2);
-          return (
-            <circle key={i} cx={x} cy={y} r="3" fill="hsl(220 72% 50%)" />
-          );
+            height - padding - (d.avgEur / maxAvg) * (height - padding * 2);
+          return <circle key={i} cx={x} cy={y} r="3" fill="hsl(220 72% 50%)" />;
         })}
       </svg>
     </div>
@@ -254,8 +248,14 @@ interface CategoryStat {
 }
 
 const PIE_COLORS = [
-  "#16a34a", "#2563eb", "#7c3aed", "#ea580c", "#0891b2",
-  "#db2777", "#ca8a04", "#4f46e5",
+  "#16a34a",
+  "#2563eb",
+  "#7c3aed",
+  "#ea580c",
+  "#0891b2",
+  "#db2777",
+  "#ca8a04",
+  "#4f46e5",
 ];
 
 export function CategoryPieChart({
@@ -293,7 +293,12 @@ export function CategoryPieChart({
     const largeArc = angle > Math.PI ? 1 : 0;
 
     const path = `M ${center} ${center} L ${x1} ${y1} A ${radius} ${radius} 0 ${largeArc} 1 ${x2} ${y2} Z`;
-    return { path, color: PIE_COLORS[i % PIE_COLORS.length], name: d.categoryName, count: d.orderCount };
+    return {
+      path,
+      color: PIE_COLORS[i % PIE_COLORS.length],
+      name: d.categoryName,
+      count: d.orderCount,
+    };
   });
 
   return (
@@ -302,7 +307,13 @@ export function CategoryPieChart({
       <div className="flex items-start gap-4">
         <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
           {slices.map((s, i) => (
-            <path key={i} d={s.path} fill={s.color} stroke="#fff" strokeWidth="1" />
+            <path
+              key={i}
+              d={s.path}
+              fill={s.color}
+              stroke="#fff"
+              strokeWidth="1"
+            />
           ))}
         </svg>
         <div className="space-y-1 text-xs">

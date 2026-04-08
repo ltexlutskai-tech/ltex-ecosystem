@@ -20,7 +20,8 @@ export function AddToCartButton({ lot }: { lot: CartItem }) {
         className="text-green-700"
         aria-label={`${dict.cart.removeFromCart.replace("{name}", lot.productName)}`}
       >
-        <Check className="mr-1 h-3 w-3" aria-hidden="true" />{dict.cart.inCart}
+        <Check className="mr-1 h-3 w-3" aria-hidden="true" />
+        {dict.cart.inCart}
       </Button>
     );
   }

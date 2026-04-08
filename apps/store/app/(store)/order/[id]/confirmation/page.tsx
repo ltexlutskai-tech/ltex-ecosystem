@@ -1,10 +1,7 @@
 import { prisma } from "@ltex/db";
 import { notFound } from "next/navigation";
 import { Badge, Button } from "@ltex/ui";
-import {
-  ORDER_STATUS_LABELS,
-  type OrderStatus,
-} from "@ltex/shared";
+import { ORDER_STATUS_LABELS, type OrderStatus } from "@ltex/shared";
 import Link from "next/link";
 import { CONTACTS } from "@ltex/shared";
 import { getDictionary } from "@/lib/i18n";
@@ -42,9 +39,7 @@ export default async function OrderConfirmationPage({ params }: Props) {
         <h1 className="mt-4 text-2xl font-bold text-green-700">
           {dict.order.confirmed}
         </h1>
-        <p className="mt-2 text-gray-500">
-          {dict.order.confirmMessage}
-        </p>
+        <p className="mt-2 text-gray-500">{dict.order.confirmMessage}</p>
       </div>
 
       <div className="mx-auto mt-8 max-w-2xl rounded-lg border bg-white p-6">
@@ -81,18 +76,20 @@ export default async function OrderConfirmationPage({ params }: Props) {
                 <th className="pb-2 font-medium">{dict.cart.product}</th>
                 <th className="pb-2 font-medium">{dict.cart.barcode}</th>
                 <th className="pb-2 font-medium">{dict.cart.weight}</th>
-                <th className="pb-2 text-right font-medium">{dict.cart.priceEur}</th>
+                <th className="pb-2 text-right font-medium">
+                  {dict.cart.priceEur}
+                </th>
               </tr>
             </thead>
             <tbody>
               {order.items.map((item) => (
                 <tr key={item.id} className="border-b">
                   <td className="py-2">{item.product.name}</td>
-                  <td className="py-2 font-mono text-xs">
-                    {item.lot.barcode}
-                  </td>
+                  <td className="py-2 font-mono text-xs">{item.lot.barcode}</td>
                   <td className="py-2">{item.weight} кг</td>
-                  <td className="py-2 text-right">€{item.priceEur.toFixed(2)}</td>
+                  <td className="py-2 text-right">
+                    €{item.priceEur.toFixed(2)}
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -118,7 +115,8 @@ export default async function OrderConfirmationPage({ params }: Props) {
 
         {order.notes && (
           <div className="mt-4 rounded-md bg-gray-50 p-3 text-sm">
-            <span className="font-medium">{dict.order.commentLabel}:</span> {order.notes}
+            <span className="font-medium">{dict.order.commentLabel}:</span>{" "}
+            {order.notes}
           </div>
         )}
       </div>
@@ -128,7 +126,9 @@ export default async function OrderConfirmationPage({ params }: Props) {
           <Link href="/catalog">{dict.order.continueShopping}</Link>
         </Button>
         <Button variant="outline" asChild>
-          <Link href={`/order/${order.id}/status`}>{dict.order.trackStatus}</Link>
+          <Link href={`/order/${order.id}/status`}>
+            {dict.order.trackStatus}
+          </Link>
         </Button>
         <Button variant="outline" asChild>
           <a

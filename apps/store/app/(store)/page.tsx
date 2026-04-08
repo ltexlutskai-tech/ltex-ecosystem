@@ -7,6 +7,7 @@ import { getDictionary } from "@/lib/i18n";
 
 const dict = getDictionary();
 
+export const dynamic = "force-dynamic";
 export const revalidate = 60;
 
 export default async function HomePage() {
@@ -109,9 +110,7 @@ export default async function HomePage() {
       <section className="py-12">
         <div className="container mx-auto px-4 text-center">
           <h2 className="text-2xl font-bold">{dict.home.ctaTitle}</h2>
-          <p className="mt-2 text-gray-500">
-            {dict.home.ctaDescription}
-          </p>
+          <p className="mt-2 text-gray-500">{dict.home.ctaDescription}</p>
           <div className="mt-6 flex justify-center gap-4">
             <Button asChild>
               <a

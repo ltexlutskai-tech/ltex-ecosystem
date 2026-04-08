@@ -34,10 +34,11 @@ export async function updateOrderStatus(orderId: string, status: OrderStatus) {
     },
   });
 
+  const statusLabel = STATUS_LABELS[status] ?? status;
+  const orderRef = order.code1C ?? order.id.slice(0, 8);
+
   // Send push notification to customer about status change
   if (order.customerId) {
-    const statusLabel = STATUS_LABELS[status] ?? status;
-    const orderRef = order.code1C ?? order.id.slice(0, 8);
     sendPushNotification(
       order.customerId,
       "Статус замовлення оновлено",

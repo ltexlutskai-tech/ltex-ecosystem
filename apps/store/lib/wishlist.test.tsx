@@ -50,7 +50,7 @@ describe("useWishlist", () => {
     act(() => result.current.addItem(mockItem));
 
     expect(result.current.items).toHaveLength(1);
-    expect(result.current.items[0].productId).toBe("p1");
+    expect(result.current.items[0]!.productId).toBe("p1");
     expect(result.current.itemCount).toBe(1);
   });
 
@@ -75,7 +75,7 @@ describe("useWishlist", () => {
     act(() => result.current.removeItem("p1"));
 
     expect(result.current.items).toHaveLength(1);
-    expect(result.current.items[0].productId).toBe("p2");
+    expect(result.current.items[0]!.productId).toBe("p2");
   });
 
   it("checks if item is in wishlist", () => {

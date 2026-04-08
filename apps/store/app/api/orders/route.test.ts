@@ -144,9 +144,27 @@ describe("Order API", () => {
       const multiOrder = {
         ...validOrder,
         items: [
-          { lotId: "lot-1", productId: "prod-1", priceEur: 30, weight: 6, quantity: 1 },
-          { lotId: "lot-2", productId: "prod-2", priceEur: 25, weight: 5, quantity: 1 },
-          { lotId: "lot-3", productId: "prod-1", priceEur: 20, weight: 4, quantity: 1 },
+          {
+            lotId: "lot-1",
+            productId: "prod-1",
+            priceEur: 30,
+            weight: 6,
+            quantity: 1,
+          },
+          {
+            lotId: "lot-2",
+            productId: "prod-2",
+            priceEur: 25,
+            weight: 5,
+            quantity: 1,
+          },
+          {
+            lotId: "lot-3",
+            productId: "prod-1",
+            priceEur: 20,
+            weight: 4,
+            quantity: 1,
+          },
         ],
       };
       const result = orderSchema.safeParse(multiOrder);

@@ -2,7 +2,11 @@ export const dynamic = "force-dynamic";
 
 import { prisma } from "@ltex/db";
 import { Badge, Button } from "@ltex/ui";
-import { QUALITY_LABELS, QUALITY_LEVELS, type QualityLevel } from "@ltex/shared";
+import {
+  QUALITY_LABELS,
+  QUALITY_LEVELS,
+  type QualityLevel,
+} from "@ltex/shared";
 import Link from "next/link";
 import { DeleteProductButton } from "./delete-button";
 import { AdminBreadcrumbs } from "@/components/admin/breadcrumbs";

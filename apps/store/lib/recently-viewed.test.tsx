@@ -1,9 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { renderHook, act } from "@testing-library/react";
-import {
-  RecentlyViewedProvider,
-  useRecentlyViewed,
-} from "./recently-viewed";
+import { RecentlyViewedProvider, useRecentlyViewed } from "./recently-viewed";
 
 beforeEach(() => {
   localStorage.clear();
@@ -41,8 +38,8 @@ describe("useRecentlyViewed", () => {
     );
 
     expect(result.current.items).toHaveLength(1);
-    expect(result.current.items[0].slug).toBe("product-1");
-    expect(result.current.items[0].viewedAt).toBeGreaterThan(0);
+    expect(result.current.items[0]!.slug).toBe("product-1");
+    expect(result.current.items[0]!.viewedAt).toBeGreaterThan(0);
   });
 
   it("moves re-viewed item to front", () => {
@@ -82,8 +79,8 @@ describe("useRecentlyViewed", () => {
     );
 
     expect(result.current.items).toHaveLength(2);
-    expect(result.current.items[0].slug).toBe("product-1");
-    expect(result.current.items[1].slug).toBe("product-2");
+    expect(result.current.items[0]!.slug).toBe("product-1");
+    expect(result.current.items[1]!.slug).toBe("product-2");
   });
 
   it("limits to MAX_ITEMS (12)", () => {
@@ -106,7 +103,7 @@ describe("useRecentlyViewed", () => {
 
     expect(result.current.items).toHaveLength(12);
     // Most recent should be first
-    expect(result.current.items[0].slug).toBe("product-14");
+    expect(result.current.items[0]!.slug).toBe("product-14");
   });
 
   it("persists to localStorage", () => {

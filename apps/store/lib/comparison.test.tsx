@@ -89,7 +89,7 @@ describe("useComparison", () => {
     act(() => result.current.removeItem("1"));
 
     expect(result.current.items).toHaveLength(1);
-    expect(result.current.items[0].productId).toBe("2");
+    expect(result.current.items[0]!.productId).toBe("2");
   });
 
   it("checks if item is in comparison", () => {
@@ -123,9 +123,7 @@ describe("useComparison", () => {
 
     act(() => result.current.addItem(createItem("1")));
 
-    const stored = JSON.parse(
-      localStorage.getItem("ltex-comparison") ?? "[]",
-    );
+    const stored = JSON.parse(localStorage.getItem("ltex-comparison") ?? "[]");
     expect(stored).toHaveLength(1);
   });
 });

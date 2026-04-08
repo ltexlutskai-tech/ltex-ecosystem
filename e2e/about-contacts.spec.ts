@@ -20,9 +20,7 @@ test.describe("Contacts page", () => {
     await expect(page.locator("h1")).toBeVisible();
 
     // Should show phone numbers
-    await expect(
-      page.locator("text=/\\+380|067|099/").first(),
-    ).toBeVisible();
+    await expect(page.locator("text=/\\+380|067|099/").first()).toBeVisible();
   });
 
   test("contacts page has Telegram link", async ({ page }) => {

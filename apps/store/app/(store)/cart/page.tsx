@@ -60,7 +60,10 @@ export default function CartPage() {
         router.push(`/order/${data.orderId}/confirmation`);
         return;
       } else {
-        setOrderResult({ success: false, error: data.error ?? dict.common.error });
+        setOrderResult({
+          success: false,
+          error: data.error ?? dict.common.error,
+        });
       }
     } catch {
       setOrderResult({ success: false, error: dict.cart.networkError });
@@ -76,9 +79,7 @@ export default function CartPage() {
         <h1 className="mt-4 text-2xl font-bold text-green-700">
           {dict.cart.orderPlaced}
         </h1>
-        <p className="mt-2 text-gray-500">
-          {dict.cart.weWillContact}
-        </p>
+        <p className="mt-2 text-gray-500">{dict.cart.weWillContact}</p>
         <p className="mt-1 text-sm text-gray-400">ID: {orderResult.orderId}</p>
         <div className="mt-6 flex gap-3">
           <Button asChild>
@@ -125,7 +126,9 @@ export default function CartPage() {
                   <th className="px-4 py-3 font-medium">{dict.cart.product}</th>
                   <th className="px-4 py-3 font-medium">{dict.cart.barcode}</th>
                   <th className="px-4 py-3 font-medium">{dict.cart.weight}</th>
-                  <th className="px-4 py-3 font-medium">{dict.cart.priceEur}</th>
+                  <th className="px-4 py-3 font-medium">
+                    {dict.cart.priceEur}
+                  </th>
                   <th className="px-4 py-3"></th>
                 </tr>
               </thead>
@@ -138,7 +141,9 @@ export default function CartPage() {
                     <td className="px-4 py-3 font-mono text-xs">
                       {item.barcode}
                     </td>
-                    <td className="px-4 py-3">{item.weight} {dict.catalog.perKg}</td>
+                    <td className="px-4 py-3">
+                      {item.weight} {dict.catalog.perKg}
+                    </td>
                     <td className="px-4 py-3">€{item.priceEur.toFixed(2)}</td>
                     <td className="px-4 py-3">
                       <button
@@ -176,7 +181,9 @@ export default function CartPage() {
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-500">{dict.cart.totalWeight}:</span>
-                <span className="font-medium">{totalWeight.toFixed(1)} {dict.catalog.perKg}</span>
+                <span className="font-medium">
+                  {totalWeight.toFixed(1)} {dict.catalog.perKg}
+                </span>
               </div>
               <div className="flex justify-between border-t pt-2">
                 <span className="font-semibold">{dict.cart.total}:</span>

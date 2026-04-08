@@ -3,10 +3,7 @@
 import { useState } from "react";
 import { ChevronDown, ChevronRight, MessageSquare } from "lucide-react";
 import { Badge, Button } from "@ltex/ui";
-import {
-  ORDER_STATUS_LABELS,
-  type OrderStatus,
-} from "@ltex/shared";
+import { ORDER_STATUS_LABELS, type OrderStatus } from "@ltex/shared";
 import { OrderStatusForm } from "./order-status-form";
 import { addOrderNote } from "./actions";
 import { toast } from "@ltex/ui";

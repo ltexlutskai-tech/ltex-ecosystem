@@ -30,7 +30,12 @@ import { OrdersBadge } from "./orders-badge";
 
 const navItems = [
   { href: "/admin", label: "Дашборд", icon: LayoutDashboard },
-  { href: "/admin/orders", label: "Замовлення", icon: ShoppingCart, badge: true },
+  {
+    href: "/admin/orders",
+    label: "Замовлення",
+    icon: ShoppingCart,
+    badge: true,
+  },
   { href: "/admin/products", label: "Товари", icon: Package },
   { href: "/admin/lots", label: "Лоти", icon: Boxes },
   { href: "/admin/customers", label: "Клієнти", icon: Users },

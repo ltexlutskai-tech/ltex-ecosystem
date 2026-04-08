@@ -87,9 +87,24 @@ export default async function SubcategoryPage({ params, searchParams }: Props) {
     "@type": "BreadcrumbList",
     itemListElement: [
       { "@type": "ListItem", position: 1, name: "Головна", item: SITE_URL },
-      { "@type": "ListItem", position: 2, name: "Каталог", item: `${SITE_URL}/catalog` },
-      { "@type": "ListItem", position: 3, name: parent.name, item: `${SITE_URL}/catalog/${categorySlug}` },
-      { "@type": "ListItem", position: 4, name: subcategory.name, item: `${SITE_URL}/catalog/${categorySlug}/${subcategorySlug}` },
+      {
+        "@type": "ListItem",
+        position: 2,
+        name: "Каталог",
+        item: `${SITE_URL}/catalog`,
+      },
+      {
+        "@type": "ListItem",
+        position: 3,
+        name: parent.name,
+        item: `${SITE_URL}/catalog/${categorySlug}`,
+      },
+      {
+        "@type": "ListItem",
+        position: 4,
+        name: subcategory.name,
+        item: `${SITE_URL}/catalog/${categorySlug}/${subcategorySlug}`,
+      },
     ],
   };
 

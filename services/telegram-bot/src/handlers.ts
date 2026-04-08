@@ -204,8 +204,12 @@ async function handleSearch(chatId: number, query: string): Promise<void> {
     `🔍 Результати для "<b>${escapeHtml(query)}</b>" (${products.length}${hasMore ? "+" : ""}):`,
     ``,
     ...lines,
-    hasMore ? `\n<i>Показано перші 10. Уточніть запит для точніших результатів.</i>` : "",
-  ].filter(Boolean).join("\n");
+    hasMore
+      ? `\n<i>Показано перші 10. Уточніть запит для точніших результатів.</i>`
+      : "",
+  ]
+    .filter(Boolean)
+    .join("\n");
 
   const keyboard: InlineKeyboardMarkup | undefined = hasMore
     ? {

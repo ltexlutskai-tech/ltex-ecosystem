@@ -67,9 +67,7 @@ const organizationJsonLd = {
     availableLanguage: ["Ukrainian"],
   },
   email: CONTACTS.email,
-  sameAs: [
-    `https://t.me/${CONTACTS.telegram.replace("@", "")}`,
-  ],
+  sameAs: [`https://t.me/${CONTACTS.telegram.replace("@", "")}`],
 };
 
 export default function RootLayout({

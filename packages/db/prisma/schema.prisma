@@ -52,6 +52,7 @@ model Product {
   images             ProductImage[]
   lots               Lot[]
   prices             Price[]
+  orderItems         OrderItem[]
   cartItems          CartItem[]
   videoSubscriptions VideoSubscription[]
   favorites          Favorite[]
@@ -193,8 +194,9 @@ model OrderItem {
   weight    Float
   quantity  Int    @default(1)
 
-  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  lot   Lot   @relation(fields: [lotId], references: [id])
+  order   Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  lot     Lot     @relation(fields: [lotId], references: [id])
+  product Product @relation(fields: [productId], references: [id])
 
   @@index([orderId])
   @@map("order_items")

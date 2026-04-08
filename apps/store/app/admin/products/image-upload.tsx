@@ -77,6 +77,7 @@ export function ImageUpload({ productId, images }: ImageUploadProps) {
     }
     const reordered = [...images];
     const [moved] = reordered.splice(draggedIndex, 1);
+    if (!moved) return;
     reordered.splice(targetIndex, 0, moved);
     const ids = reordered.map((img) => img.id);
     setDraggedIndex(null);

@@ -121,7 +121,11 @@ export default async function OrderStatusPage({ params }: Props) {
                   {dict.order.tracking}:{" "}
                   <span className="font-mono">{s.trackingNumber}</span>
                 </p>
-                {s.statusText && <p>{dict.product.status}: {s.statusText}</p>}
+                {s.statusText && (
+                  <p>
+                    {dict.product.status}: {s.statusText}
+                  </p>
+                )}
                 {s.estimatedDate && (
                   <p>
                     {dict.order.estimatedDate}:{" "}

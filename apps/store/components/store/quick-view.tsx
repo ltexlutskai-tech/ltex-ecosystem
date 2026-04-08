@@ -9,11 +9,7 @@ import {
   Badge,
   Button,
 } from "@ltex/ui";
-import {
-  QUALITY_LABELS,
-  SEASON_LABELS,
-  type QualityLevel,
-} from "@ltex/shared";
+import { QUALITY_LABELS, SEASON_LABELS, type QualityLevel } from "@ltex/shared";
 import { Eye } from "lucide-react";
 import Link from "next/link";
 

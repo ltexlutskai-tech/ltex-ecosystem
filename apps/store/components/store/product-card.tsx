@@ -1,16 +1,11 @@
-import dynamic from "next/dynamic";
 import Link from "next/link";
 import { Badge, Card, CardContent } from "@ltex/ui";
 import { QUALITY_LABELS, type QualityLevel } from "@ltex/shared";
 import { SEASON_LABELS } from "@ltex/shared";
 import { WishlistButton } from "./wishlist-button";
 import { ComparisonButton } from "./comparison-button";
+import { QuickViewButton } from "./quick-view";
 import { getDictionary } from "@/lib/i18n";
-
-const QuickViewButton = dynamic(
-  () => import("./quick-view").then((m) => m.QuickViewButton),
-  { ssr: false },
-);
 
 const dict = getDictionary();
 
@@ -76,7 +71,10 @@ export function ProductCard({ product }: { product: ProductCardData }) {
               <p className="mt-2 text-lg font-bold text-green-700">
                 €{wholesalePrice.amount.toFixed(2)}
                 <span className="text-xs font-normal text-gray-500">
-                  /{product.priceUnit === "kg" ? dict.catalog.perKg : dict.catalog.perPiece}
+                  /
+                  {product.priceUnit === "kg"
+                    ? dict.catalog.perKg
+                    : dict.catalog.perPiece}
                 </span>
               </p>
             )}

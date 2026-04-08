@@ -114,11 +114,7 @@ export function ShipmentsSkeleton() {
             <SkeletonBox width={120} height={14} />
             <SkeletonBox width={80} height={22} borderRadius={6} />
           </View>
-          <SkeletonBox
-            width="60%"
-            height={20}
-            style={{ marginTop: 10 }}
-          />
+          <SkeletonBox width="60%" height={20} style={{ marginTop: 10 }} />
           <View style={{ gap: 6, marginTop: 12 }}>
             <SkeletonBox width="100%" height={14} />
             <SkeletonBox width="80%" height={14} />
@@ -182,12 +178,7 @@ export function ProductSkeleton() {
         <SkeletonBox width="100%" height={42} borderRadius={10} />
         <SkeletonBox width="50%" height={18} style={{ marginTop: 8 }} />
         {[1, 2, 3].map((i) => (
-          <SkeletonBox
-            key={i}
-            width="100%"
-            height={64}
-            borderRadius={10}
-          />
+          <SkeletonBox key={i} width="100%" height={64} borderRadius={10} />
         ))}
       </View>
     </View>
@@ -200,27 +191,15 @@ export function ProfileSkeleton() {
       {/* Header */}
       <View style={skeletonStyles.profileHeader}>
         <SkeletonBox width={72} height={72} borderRadius={36} />
-        <SkeletonBox
-          width={140}
-          height={20}
-          style={{ marginTop: 12 }}
-        />
-        <SkeletonBox
-          width={120}
-          height={14}
-          style={{ marginTop: 6 }}
-        />
+        <SkeletonBox width={140} height={20} style={{ marginTop: 12 }} />
+        <SkeletonBox width={120} height={14} style={{ marginTop: 6 }} />
       </View>
       {/* Stats */}
       <View style={skeletonStyles.statsRow}>
         {[1, 2, 3].map((i) => (
           <View key={i} style={skeletonStyles.statBox}>
             <SkeletonBox width={50} height={22} />
-            <SkeletonBox
-              width={60}
-              height={12}
-              style={{ marginTop: 6 }}
-            />
+            <SkeletonBox width={60} height={12} style={{ marginTop: 6 }} />
           </View>
         ))}
       </View>

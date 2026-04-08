@@ -1,10 +1,7 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import {
-  Dialog,
-  DialogContent,
-} from "@ltex/ui";
+import { Dialog, DialogContent } from "@ltex/ui";
 import { ChevronLeft, ChevronRight, X, ZoomIn } from "lucide-react";
 
 interface GalleryImage {
@@ -38,7 +35,7 @@ export function ImageGallery({ images, productName }: ImageGalleryProps) {
     );
   }
 
-  const currentImage = images[selectedIndex];
+  const currentImage = images[selectedIndex]!;
 
   return (
     <div className="space-y-3">

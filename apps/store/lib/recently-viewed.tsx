@@ -41,22 +41,19 @@ export function RecentlyViewedProvider({ children }: { children: ReactNode }) {
     } catch {}
   }, []);
 
-  const addItem = useCallback(
-    (item: Omit<RecentlyViewedItem, "viewedAt">) => {
-      setItems((prev) => {
-        const filtered = prev.filter((i) => i.slug !== item.slug);
-        const updated = [
-          { ...item, viewedAt: Date.now() },
-          ...filtered,
-        ].slice(0, MAX_ITEMS);
-        try {
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-        } catch {}
-        return updated;
-      });
-    },
-    [],
-  );
+  const addItem = useCallback((item: Omit<RecentlyViewedItem, "viewedAt">) => {
+    setItems((prev) => {
+      const filtered = prev.filter((i) => i.slug !== item.slug);
+      const updated = [{ ...item, viewedAt: Date.now() }, ...filtered].slice(
+        0,
+        MAX_ITEMS,
+      );
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
+  }, []);
 
   return (
     <RecentlyViewedContext.Provider value={{ items, addItem }}>

@@ -290,11 +290,21 @@ export default async function ProductPage({ params }: Props) {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b bg-gray-50 text-left text-gray-500">
-                  <th className="px-4 py-3 font-medium">{dict.product.barcode}</th>
-                  <th className="px-4 py-3 font-medium">{dict.product.weight}</th>
-                  <th className="px-4 py-3 font-medium">{dict.product.quantity}</th>
-                  <th className="px-4 py-3 font-medium">{dict.product.priceEur}</th>
-                  <th className="px-4 py-3 font-medium">{dict.product.status}</th>
+                  <th className="px-4 py-3 font-medium">
+                    {dict.product.barcode}
+                  </th>
+                  <th className="px-4 py-3 font-medium">
+                    {dict.product.weight}
+                  </th>
+                  <th className="px-4 py-3 font-medium">
+                    {dict.product.quantity}
+                  </th>
+                  <th className="px-4 py-3 font-medium">
+                    {dict.product.priceEur}
+                  </th>
+                  <th className="px-4 py-3 font-medium">
+                    {dict.product.status}
+                  </th>
                   <th className="px-4 py-3 font-medium"></th>
                 </tr>
               </thead>

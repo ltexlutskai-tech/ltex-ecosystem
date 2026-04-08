@@ -101,9 +101,7 @@ export default function AboutPage() {
       {/* Quality levels */}
       <section className="mt-10">
         <h2 className="text-2xl font-bold">{dict.about.qualityLevels}</h2>
-        <p className="mt-2 text-gray-600">
-          {dict.about.qualityText}
-        </p>
+        <p className="mt-2 text-gray-600">{dict.about.qualityText}</p>
         <div className="mt-4 flex flex-wrap gap-2">
           {QUALITY_LEVELS.map((q) => (
             <span
@@ -119,9 +117,7 @@ export default function AboutPage() {
       {/* Countries */}
       <section className="mt-10">
         <h2 className="text-2xl font-bold">{dict.about.supplierCountries}</h2>
-        <p className="mt-2 text-gray-600">
-          {dict.about.supplierText}
-        </p>
+        <p className="mt-2 text-gray-600">{dict.about.supplierText}</p>
         <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {COUNTRIES.map((c) => (
             <div
