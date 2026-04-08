@@ -11,58 +11,85 @@ import {
 import { Breadcrumbs } from "@/components/store/breadcrumbs";
 import { Button } from "@ltex/ui";
 import { MapPin, Phone, Mail, MessageCircle } from "lucide-react";
+import { getDictionary } from "@/lib/i18n";
+
+const dict = getDictionary();
 
 export const metadata: Metadata = {
-  title: "Про нас — L-TEX",
+  title: dict.about.metaTitle,
   description:
     "L-TEX — український гуртовий склад секонд хенду, стоку, іграшок та Bric-a-Brac. Піддубці, Волинь. Працюємо з 2015 року.",
+};
+
+const faqJsonLd = {
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  mainEntity: [
+    {
+      "@type": "Question",
+      name: "Що таке секонд хенд гуртом?",
+      acceptedAnswer: {
+        "@type": "Answer",
+        text: "Секонд хенд гуртом — це продаж вживаного одягу, взуття та аксесуарів великими партіями (від 10 кг). L-TEX пропонує товар з Англії, Німеччини, Канади та Польщі, відсортований за якістю.",
+      },
+    },
+    {
+      "@type": "Question",
+      name: "Яке мінімальне замовлення в L-TEX?",
+      acceptedAnswer: {
+        "@type": "Answer",
+        text: "Мінімальне замовлення — від 10 кг. Це зручно для малого бізнесу, магазинів секонд хенду та підприємців.",
+      },
+    },
+    {
+      "@type": "Question",
+      name: "Як здійснюється доставка?",
+      acceptedAnswer: {
+        "@type": "Answer",
+        text: "Доставка здійснюється Новою Поштою та Делівері по всій Україні. Відправка протягом 1-2 робочих днів після підтвердження замовлення.",
+      },
+    },
+    {
+      "@type": "Question",
+      name: "Що таке сток (Stock)?",
+      acceptedAnswer: {
+        "@type": "Answer",
+        text: "Сток — це нові товари з надлишків виробництва та нерозпроданих колекцій. Вони ніколи не були у вжитку, але ціна значно нижча від роздрібу.",
+      },
+    },
+    {
+      "@type": "Question",
+      name: "Які рівні якості існують?",
+      acceptedAnswer: {
+        "@type": "Answer",
+        text: "L-TEX пропонує 6 рівнів якості: Екстра (найкраща якість), Крем, 1й сорт, 2й сорт, Сток (новий) та Мікс. Кожен лот має відеоогляд на YouTube.",
+      },
+    },
+  ],
 };
 
 export default function AboutPage() {
   return (
     <div className="container mx-auto px-4 py-6">
-      <Breadcrumbs items={[{ label: "Про нас" }]} />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }}
+      />
+      <Breadcrumbs items={[{ label: dict.nav.about }]} />
 
       {/* Hero */}
       <section className="mt-6">
         <h1 className="text-3xl font-bold sm:text-4xl">{APP_NAME}</h1>
         <p className="mt-3 max-w-2xl text-lg text-gray-600">
-          Ми — українська гуртова компанія, що спеціалізується на продажу секонд
-          хенду, стоку (нового надлишкового товару), іграшок та Bric-a-Brac.
-          Працюємо з покупцями по всій Україні від {MIN_ORDER_KG} кг.
+          {dict.about.heroText.replace("{min}", String(MIN_ORDER_KG))}
         </p>
       </section>
 
       {/* What we sell */}
       <section className="mt-10">
-        <h2 className="text-2xl font-bold">Що ми продаємо</h2>
+        <h2 className="text-2xl font-bold">{dict.about.whatWeSell}</h2>
         <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {[
-            {
-              title: "Секонд хенд",
-              desc: "Якісний одяг, взуття та аксесуари з Європи — сортований за якістю та сезоном.",
-            },
-            {
-              title: "Сток (Stock)",
-              desc: "Нові товари з надлишків виробництва та нерозпроданих колекцій. Ціна нижча від роздрібу.",
-            },
-            {
-              title: "Іграшки",
-              desc: "Дитячі іграшки гуртом — м'які, пластикові, настільні ігри та інше.",
-            },
-            {
-              title: "Bric-a-Brac",
-              desc: "Побутові товари, декор, посуд, кухонне приладдя та інші корисні дрібниці.",
-            },
-            {
-              title: "Взуття",
-              desc: "Жіноче, чоловіче та дитяче взуття — кросівки, черевики, босоніжки, чоботи.",
-            },
-            {
-              title: "Аксесуари",
-              desc: "Сумки, ремені, шарфи, головні убори та інші аксесуари.",
-            },
-          ].map((item) => (
+          {dict.about.sellItems.map((item) => (
             <div key={item.title} className="rounded-lg border p-4">
               <h3 className="font-semibold text-green-700">{item.title}</h3>
               <p className="mt-1 text-sm text-gray-600">{item.desc}</p>
@@ -73,9 +100,9 @@ export default function AboutPage() {
 
       {/* Quality levels */}
       <section className="mt-10">
-        <h2 className="text-2xl font-bold">Рівні якості</h2>
+        <h2 className="text-2xl font-bold">{dict.about.qualityLevels}</h2>
         <p className="mt-2 text-gray-600">
-          Весь товар сортується за рівнями якості для вашої зручності:
+          {dict.about.qualityText}
         </p>
         <div className="mt-4 flex flex-wrap gap-2">
           {QUALITY_LEVELS.map((q) => (
@@ -91,9 +118,9 @@ export default function AboutPage() {
 
       {/* Countries */}
       <section className="mt-10">
-        <h2 className="text-2xl font-bold">Країни-постачальники</h2>
+        <h2 className="text-2xl font-bold">{dict.about.supplierCountries}</h2>
         <p className="mt-2 text-gray-600">
-          Ми працюємо напряму з постачальниками з:
+          {dict.about.supplierText}
         </p>
         <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {COUNTRIES.map((c) => (
@@ -110,16 +137,9 @@ export default function AboutPage() {
 
       {/* Why us */}
       <section className="mt-10">
-        <h2 className="text-2xl font-bold">Чому обирають нас</h2>
+        <h2 className="text-2xl font-bold">{dict.about.whyUs}</h2>
         <div className="mt-4 grid gap-4 sm:grid-cols-2">
-          {[
-            "Відеоогляди на YouTube для кожного товару — бачите що купуєте",
-            "Мінімальне замовлення від 10 кг — зручно для малого бізнесу",
-            "Швидка відправка Новою Поштою та Делівері по всій Україні",
-            "Прозорі ціни в EUR з актуальним курсом",
-            "Широкий асортимент — від одягу до іграшок та Bric-a-Brac",
-            "Особистий підхід — консультація через Telegram",
-          ].map((text) => (
+          {dict.about.whyUsReasons.map((text) => (
             <div key={text} className="flex gap-2">
               <span className="mt-0.5 text-green-600">&#10003;</span>
               <span className="text-gray-700">{text}</span>
@@ -130,7 +150,7 @@ export default function AboutPage() {
 
       {/* Contact */}
       <section className="mt-10 rounded-lg bg-green-50 p-6">
-        <h2 className="text-2xl font-bold">Контакти</h2>
+        <h2 className="text-2xl font-bold">{dict.about.contactsTitle}</h2>
         <div className="mt-4 grid gap-4 sm:grid-cols-2">
           <div className="flex items-center gap-3">
             <MapPin className="h-5 w-5 text-green-600" />
@@ -176,11 +196,11 @@ export default function AboutPage() {
               target="_blank"
               rel="noopener noreferrer"
             >
-              Написати в Telegram
+              {dict.about.writeToTelegram}
             </a>
           </Button>
           <Button variant="outline" asChild>
-            <a href="/catalog">Перейти до каталогу</a>
+            <a href="/catalog">{dict.about.goToCatalog}</a>
           </Button>
         </div>
       </section>

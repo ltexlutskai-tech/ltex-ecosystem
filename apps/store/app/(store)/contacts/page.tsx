@@ -2,6 +2,9 @@ import type { Metadata } from "next";
 import { APP_NAME, CONTACTS } from "@ltex/shared";
 import { Card, CardContent, CardHeader, CardTitle } from "@ltex/ui";
 import { Breadcrumbs } from "@/components/store/breadcrumbs";
+import { getDictionary } from "@/lib/i18n";
+
+const dict = getDictionary();
 
 export const metadata: Metadata = {
   title: "Контакти — L-TEX секонд хенд та сток гуртом",
@@ -31,17 +34,17 @@ export default function ContactsPage() {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
-      <Breadcrumbs items={[{ label: "Контакти" }]} />
+      <Breadcrumbs items={[{ label: dict.nav.contacts }]} />
 
-      <h1 className="mt-4 text-3xl font-bold">Контакти</h1>
+      <h1 className="mt-4 text-3xl font-bold">{dict.contacts.title}</h1>
       <p className="mt-2 text-gray-500">
-        Зв&apos;яжіться з нами для оформлення замовлення або консультації
+        {dict.contacts.subtitle}
       </p>
 
       <div className="mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg">Телефон</CardTitle>
+            <CardTitle className="text-lg">{dict.contacts.phoneTitle}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
             {CONTACTS.phones.map((phone) => (
@@ -58,7 +61,7 @@ export default function ContactsPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg">Месенджери</CardTitle>
+            <CardTitle className="text-lg">{dict.contacts.messengersTitle}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
             <a
@@ -74,7 +77,7 @@ export default function ContactsPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg">Email</CardTitle>
+            <CardTitle className="text-lg">{dict.contacts.emailTitle}</CardTitle>
           </CardHeader>
           <CardContent>
             <a
@@ -88,12 +91,12 @@ export default function ContactsPage() {
 
         <Card className="sm:col-span-2 lg:col-span-3">
           <CardHeader>
-            <CardTitle className="text-lg">Адреса</CardTitle>
+            <CardTitle className="text-lg">{dict.contacts.addressTitle}</CardTitle>
           </CardHeader>
           <CardContent>
             <p className="text-lg">{CONTACTS.location}</p>
             <p className="mt-2 text-sm text-gray-500">
-              Працюємо: Пн-Пт 9:00–18:00, Сб 9:00–14:00
+              {dict.contacts.workHours}
             </p>
           </CardContent>
         </Card>
@@ -101,11 +104,10 @@ export default function ContactsPage() {
 
       <div className="mt-12 rounded-lg border bg-green-50 p-8 text-center">
         <h2 className="text-xl font-bold text-green-800">
-          Гуртовий продаж від 10 кг
+          {dict.contacts.wholesaleFrom}
         </h2>
         <p className="mt-2 text-green-700">
-          Секонд хенд, сток, іграшки, Bric-a-Brac, косметика з Англії,
-          Німеччини, Канади та Польщі. Доставка по всій Україні.
+          {dict.contacts.wholesaleDesc}
         </p>
       </div>
     </div>

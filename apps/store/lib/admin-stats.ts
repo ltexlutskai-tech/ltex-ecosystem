@@ -17,8 +17,34 @@ interface DailyCustomers {
   count: number;
 }
 
-export async function getAdminStats() {
-  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+interface DailyAvgOrder {
+  date: Date;
+  avgEur: number;
+}
+
+interface CategoryStat {
+  categoryName: string;
+  orderCount: number;
+}
+
+interface CityStat {
+  city: string;
+  customerCount: number;
+}
+
+export type Period = "7d" | "30d" | "90d" | "1y";
+
+function getPeriodDate(period: Period): Date {
+  const days = { "7d": 7, "30d": 30, "90d": 90, "1y": 365 }[period];
+  return new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+}
+
+function getPeriodLabel(period: Period): string {
+  return { "7d": "7 днів", "30d": "30 днів", "90d": "90 днів", "1y": "рік" }[period];
+}
+
+export async function getAdminStats(period: Period = "30d") {
+  const periodDate = getPeriodDate(period);
 
   const [
     ordersCount,
@@ -29,10 +55,14 @@ export async function getAdminStats() {
     lotsByStatus,
     productsByQuality,
     recentOrders,
-    ordersLast30Days,
+    ordersInPeriod,
     topProducts,
-    revenueLast30Days,
-    newCustomersLast30Days,
+    revenueInPeriod,
+    newCustomersInPeriod,
+    avgOrderInPeriod,
+    topCategories,
+    topCities,
+    conversionData,
   ] = await Promise.all([
     prisma.order.count(),
     prisma.order.groupBy({
@@ -63,7 +93,7 @@ export async function getAdminStats() {
              COUNT(*)::bigint as count,
              COALESCE(SUM(total_eur), 0) as total
       FROM orders
-      WHERE created_at >= NOW() - INTERVAL '30 days'
+      WHERE created_at >= ${periodDate}
       GROUP BY DATE(created_at)
       ORDER BY day ASC
     `,
@@ -73,24 +103,66 @@ export async function getAdminStats() {
               ROUND(SUM(oi.price_eur * oi.quantity)::numeric, 2)::float AS "totalEur"
        FROM order_items oi
        JOIN products p ON p.id = oi.product_id
+       JOIN orders o ON o.id = oi.order_id
+       WHERE o.created_at >= $1
        GROUP BY oi.product_id, p.name
        ORDER BY "orderCount" DESC
        LIMIT 10`,
+      periodDate,
     ),
     prisma.$queryRawUnsafe<DailyRevenue[]>(
       `SELECT DATE(created_at) AS date,
               ROUND(SUM(total_eur)::numeric, 2)::float AS revenue
        FROM orders WHERE created_at >= $1 AND status != 'cancelled'
        GROUP BY DATE(created_at) ORDER BY date`,
-      thirtyDaysAgo,
+      periodDate,
     ),
     prisma.$queryRawUnsafe<DailyCustomers[]>(
       `SELECT DATE(created_at) AS date, COUNT(*)::int AS count
        FROM customers WHERE created_at >= $1
        GROUP BY DATE(created_at) ORDER BY date`,
-      thirtyDaysAgo,
+      periodDate,
     ),
+    // Average order value per day
+    prisma.$queryRawUnsafe<DailyAvgOrder[]>(
+      `SELECT DATE(created_at) AS date,
+              ROUND(AVG(total_eur)::numeric, 2)::float AS "avgEur"
+       FROM orders WHERE created_at >= $1 AND status != 'cancelled'
+       GROUP BY DATE(created_at) ORDER BY date`,
+      periodDate,
+    ),
+    // Top categories by orders
+    prisma.$queryRawUnsafe<CategoryStat[]>(
+      `SELECT c.name AS "categoryName",
+              COUNT(DISTINCT oi.order_id)::int AS "orderCount"
+       FROM order_items oi
+       JOIN products p ON p.id = oi.product_id
+       JOIN categories c ON c.id = p.category_id
+       JOIN orders o ON o.id = oi.order_id
+       WHERE o.created_at >= $1
+       GROUP BY c.name
+       ORDER BY "orderCount" DESC
+       LIMIT 8`,
+      periodDate,
+    ),
+    // Top cities by customers
+    prisma.$queryRawUnsafe<CityStat[]>(
+      `SELECT COALESCE(city, 'Не вказано') AS city,
+              COUNT(*)::int AS "customerCount"
+       FROM customers
+       WHERE city IS NOT NULL AND city != ''
+       GROUP BY city
+       ORDER BY "customerCount" DESC
+       LIMIT 10`,
+    ),
+    // Conversion: carts vs orders
+    Promise.all([
+      prisma.cart.count(),
+      prisma.order.count({ where: { createdAt: { gte: periodDate } } }),
+    ]),
   ]);
+
+  const [totalCarts, ordersInPeriodCount] = conversionData;
 
   // Build funnel data from ordersByStatus
   const funnelOrder = [
@@ -110,6 +182,8 @@ export async function getAdminStats() {
     .map((status) => ({ status, count: ordersByStatusMap[status] ?? 0 }));
 
   return {
+    period,
+    periodLabel: getPeriodLabel(period),
     ordersCount,
     ordersByStatus: ordersByStatusMap,
     totalRevenue: totalRevenue._sum.totalEur ?? 0,
@@ -123,7 +197,7 @@ export async function getAdminStats() {
       count: g._count.id,
     })),
     recentOrders,
-    ordersLast30Days: ordersLast30Days.map((d) => ({
+    ordersLast30Days: ordersInPeriod.map((d) => ({
       day: new Date(d.day).toLocaleDateString("uk-UA", {
         day: "2-digit",
         month: "2-digit",
@@ -133,7 +207,17 @@ export async function getAdminStats() {
     })),
     topProducts,
     funnelData,
-    revenueLast30Days,
-    newCustomersLast30Days,
+    revenueLast30Days: revenueInPeriod,
+    newCustomersLast30Days: newCustomersInPeriod,
+    avgOrderByDay: avgOrderInPeriod,
+    topCategories,
+    topCities,
+    conversion: {
+      carts: totalCarts,
+      orders: ordersInPeriodCount,
+      rate: totalCarts > 0
+        ? Math.round((ordersInPeriodCount / totalCarts) * 100)
+        : 0,
+    },
   };
 }

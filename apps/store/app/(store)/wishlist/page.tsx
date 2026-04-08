@@ -5,6 +5,9 @@ import { Button, Card, CardContent, Badge } from "@ltex/ui";
 import { QUALITY_LABELS, type QualityLevel } from "@ltex/shared";
 import { useWishlist } from "@/lib/wishlist";
 import { Heart, Trash2 } from "lucide-react";
+import { getDictionary } from "@/lib/i18n";
+
+const dict = getDictionary();
 
 export default function WishlistPage() {
   const { items, removeItem } = useWishlist();
@@ -13,12 +16,12 @@ export default function WishlistPage() {
     return (
       <div className="container mx-auto flex flex-col items-center px-4 py-16 text-center">
         <Heart className="h-12 w-12 text-gray-300" />
-        <h1 className="mt-4 text-2xl font-bold">Список обраного порожній</h1>
+        <h1 className="mt-4 text-2xl font-bold">{dict.wishlist.empty}</h1>
         <p className="mt-2 text-gray-500">
-          Натисніть на серце на картці товару, щоб додати його сюди
+          {dict.wishlist.addHint}
         </p>
         <Button className="mt-6" asChild>
-          <Link href="/catalog">До каталогу</Link>
+          <Link href="/catalog">{dict.cart.toCatalog}</Link>
         </Button>
       </div>
     );
@@ -27,7 +30,7 @@ export default function WishlistPage() {
   return (
     <div className="container mx-auto px-4 py-6">
       <h1 className="text-2xl font-bold">
-        Обране ({items.length})
+        {dict.wishlist.title} ({items.length})
       </h1>
 
       <div className="mt-6 grid gap-4 grid-cols-2 sm:grid-cols-3 lg:grid-cols-4">
@@ -44,7 +47,7 @@ export default function WishlistPage() {
                     />
                   ) : (
                     <div className="flex h-full items-center justify-center text-gray-400">
-                      Немає фото
+                      {dict.catalog.noPhoto}
                     </div>
                   )}
                 </div>

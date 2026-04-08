@@ -8,6 +8,9 @@ import {
 } from "@ltex/shared";
 import Link from "next/link";
 import { CheckCircle, Circle, Clock } from "lucide-react";
+import { getDictionary } from "@/lib/i18n";
+
+const dict = getDictionary();
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -51,9 +54,9 @@ export default async function OrderStatusPage({ params }: Props) {
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="mx-auto max-w-2xl">
-        <h1 className="text-2xl font-bold">Стан замовлення</h1>
+        <h1 className="text-2xl font-bold">{dict.order.statusTitle}</h1>
         <p className="mt-1 text-sm text-gray-500">
-          Замовлення: {order.code1C ?? order.id.slice(0, 8)}
+          {dict.order.orderId}: {order.code1C ?? order.id.slice(0, 8)}
         </p>
 
         {/* Status timeline */}
@@ -64,7 +67,7 @@ export default async function OrderStatusPage({ params }: Props) {
                 {ORDER_STATUS_LABELS.cancelled}
               </Badge>
               <p className="mt-2 text-sm text-red-700">
-                Це замовлення було скасовано
+                {dict.order.cancelled}
               </p>
             </div>
           ) : (
@@ -97,7 +100,7 @@ export default async function OrderStatusPage({ params }: Props) {
                       {isCurrent && (
                         <p className="text-xs text-gray-500">
                           <Clock className="mr-1 inline h-3 w-3" />
-                          Поточний статус
+                          {dict.order.currentStatus}
                         </p>
                       )}
                     </div>
@@ -111,17 +114,17 @@ export default async function OrderStatusPage({ params }: Props) {
         {/* Shipment info */}
         {order.shipments.length > 0 && (
           <div className="mt-8 rounded-lg border p-4">
-            <h2 className="font-bold">Доставка</h2>
+            <h2 className="font-bold">{dict.order.delivery}</h2>
             {order.shipments.map((s) => (
               <div key={s.id} className="mt-2 text-sm">
                 <p>
-                  Трекінг:{" "}
+                  {dict.order.tracking}:{" "}
                   <span className="font-mono">{s.trackingNumber}</span>
                 </p>
-                {s.statusText && <p>Статус: {s.statusText}</p>}
+                {s.statusText && <p>{dict.product.status}: {s.statusText}</p>}
                 {s.estimatedDate && (
                   <p>
-                    Очікувана дата:{" "}
+                    {dict.order.estimatedDate}:{" "}
                     {new Date(s.estimatedDate).toLocaleDateString("uk-UA")}
                   </p>
                 )}
@@ -132,22 +135,22 @@ export default async function OrderStatusPage({ params }: Props) {
 
         {/* Order summary */}
         <div className="mt-8 rounded-lg border p-4">
-          <h2 className="font-bold">Деталі</h2>
+          <h2 className="font-bold">{dict.order.details}</h2>
           <div className="mt-3 space-y-1 text-sm">
             <p>
-              <span className="text-gray-500">Клієнт:</span>{" "}
+              <span className="text-gray-500">{dict.order.client}:</span>{" "}
               {order.customer.name}
             </p>
             <p>
-              <span className="text-gray-500">Позицій:</span>{" "}
+              <span className="text-gray-500">{dict.order.positions}:</span>{" "}
               {order.items.length}
             </p>
             <p>
-              <span className="text-gray-500">Вага:</span>{" "}
+              <span className="text-gray-500">{dict.order.weight}:</span>{" "}
               {order.items.reduce((s, i) => s + i.weight, 0).toFixed(1)} кг
             </p>
             <p>
-              <span className="text-gray-500">Сума:</span> €
+              <span className="text-gray-500">{dict.order.sum}:</span> €
               {order.totalEur.toFixed(2)}
               {order.totalUah > 0 && (
                 <span className="text-gray-400">
@@ -157,7 +160,7 @@ export default async function OrderStatusPage({ params }: Props) {
               )}
             </p>
             <p>
-              <span className="text-gray-500">Дата:</span>{" "}
+              <span className="text-gray-500">{dict.order.date}:</span>{" "}
               {new Date(order.createdAt).toLocaleDateString("uk-UA")}
             </p>
           </div>
@@ -165,7 +168,7 @@ export default async function OrderStatusPage({ params }: Props) {
 
         <div className="mt-6 text-center">
           <Button variant="outline" asChild>
-            <Link href="/catalog">Повернутися до каталогу</Link>
+            <Link href="/catalog">{dict.order.backToCatalog}</Link>
           </Button>
         </div>
       </div>

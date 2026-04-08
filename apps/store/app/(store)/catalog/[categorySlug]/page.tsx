@@ -23,11 +23,20 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     where: { slug: categorySlug },
   });
   if (!category) return {};
+  const description = `${category.name} гуртом від 10 кг. Секонд хенд, сток, оригінал з Англії, Німеччини, Канади, Польщі. L-TEX — доставка по Україні.`;
   return {
     title: `${category.name} — секонд хенд та сток гуртом`,
-    description: `${category.name} гуртом від 10 кг. Секонд хенд, сток, оригінал з Англії, Німеччини, Канади, Польщі. L-TEX — доставка по Україні.`,
+    description,
     alternates: {
       canonical: `${SITE_URL}/catalog/${categorySlug}`,
+    },
+    openGraph: {
+      title: `${category.name} — L-TEX`,
+      description,
+      url: `${SITE_URL}/catalog/${categorySlug}`,
+      siteName: "L-TEX",
+      locale: "uk_UA",
+      type: "website",
     },
   };
 }
@@ -76,8 +85,37 @@ export default async function CategoryPage({ params, searchParams }: Props) {
     ? `/catalog/${categorySlug}?${filterParams.toString()}`
     : `/catalog/${categorySlug}`;
 
+  const breadcrumbJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: [
+      {
+        "@type": "ListItem",
+        position: 1,
+        name: "Головна",
+        item: SITE_URL,
+      },
+      {
+        "@type": "ListItem",
+        position: 2,
+        name: "Каталог",
+        item: `${SITE_URL}/catalog`,
+      },
+      {
+        "@type": "ListItem",
+        position: 3,
+        name: category.name,
+        item: `${SITE_URL}/catalog/${categorySlug}`,
+      },
+    ],
+  };
+
   return (
     <div className="container mx-auto px-4 py-6">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }}
+      />
       <Breadcrumbs
         items={[
           { label: "Каталог", href: "/catalog" },

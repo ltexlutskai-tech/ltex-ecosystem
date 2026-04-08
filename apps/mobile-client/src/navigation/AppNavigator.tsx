@@ -2,21 +2,27 @@
  * Main app navigator for L-TEX mobile client.
  *
  * Structure:
- * - Not logged in → LoginScreen
- * - Logged in → Bottom Tabs:
- *   - Каталог (CatalogStack: Catalog → ProductDetail)
- *   - Кошик (CartStack: Cart)
- *   - Замовлення (OrdersStack: Orders → OrderDetail)
- *   - Чат (ChatStack: Chat)
- *   - Профіль (ProfileStack: Profile → Shipments, Favorites, Subscriptions, Payments)
+ * - Bottom Tabs (always accessible):
+ *   - Каталог (CatalogStack: Catalog -> ProductDetail) — public
+ *   - Кошик (CartStack: Cart) — public
+ *   - Замовлення (OrdersStack: Orders -> OrderDetail) — requires auth
+ *   - Чат (ChatStack: Chat) — requires auth
+ *   - Профіль (ProfileStack: Profile -> Shipments, Favorites, Subscriptions, Payments) — requires auth
+ *
+ * Auth guard: protected tabs redirect to LoginScreen if not authenticated.
+ * Deep linking: ltex://product/[slug], ltex://order/[id], ltex://catalog
  */
 
 import React, { useEffect } from "react";
-import { ActivityIndicator, View, StyleSheet } from "react-native";
-import { NavigationContainer } from "@react-navigation/native";
+import { ActivityIndicator, View, Text, StyleSheet } from "react-native";
+import {
+  NavigationContainer,
+  type LinkingOptions,
+} from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { Ionicons } from "@expo/vector-icons";
+import * as Linking from "expo-linking";
 
 import { useAuth } from "@/lib/auth";
 import { AuthProvider } from "@/lib/auth-provider";
@@ -64,6 +70,25 @@ type ProfileStackParamList = {
   PaymentsHistory: undefined;
 };
 
+// ─── Auth Guard ─────────────────────────────────────────────────────────────
+
+/**
+ * HOC that wraps a stack navigator with an auth guard.
+ * If the user is not authenticated, shows the LoginScreen instead.
+ */
+function withAuthGuard(
+  WrappedNavigator: React.ComponentType,
+  tabName: string,
+): React.ComponentType {
+  return function AuthGuardedNavigator() {
+    const { customerId } = useAuth();
+    if (!customerId) {
+      return <LoginScreen />;
+    }
+    return <WrappedNavigator />;
+  };
+}
+
 // ─── Stack Navigators ────────────────────────────────────────────────────────
 
 const CatalogStackNav = createNativeStackNavigator<CatalogStackParamList>();
@@ -98,7 +123,7 @@ function CartStackNavigator() {
 }
 
 const OrdersStackNav = createNativeStackNavigator<OrdersStackParamList>();
-function OrdersStackNavigator() {
+function OrdersStackNavigatorInner() {
   return (
     <OrdersStackNav.Navigator screenOptions={defaultScreenOptions}>
       <OrdersStackNav.Screen
@@ -114,9 +139,13 @@ function OrdersStackNavigator() {
     </OrdersStackNav.Navigator>
   );
 }
+const OrdersStackNavigator = withAuthGuard(
+  OrdersStackNavigatorInner,
+  "замовлення",
+);
 
 const ChatStackNav = createNativeStackNavigator();
-function ChatStackNavigator() {
+function ChatStackNavigatorInner() {
   return (
     <ChatStackNav.Navigator screenOptions={defaultScreenOptions}>
       <ChatStackNav.Screen
@@ -127,9 +156,10 @@ function ChatStackNavigator() {
     </ChatStackNav.Navigator>
   );
 }
+const ChatStackNavigator = withAuthGuard(ChatStackNavigatorInner, "чат");
 
 const ProfileStackNav = createNativeStackNavigator<ProfileStackParamList>();
-function ProfileStackNavigator() {
+function ProfileStackNavigatorInner() {
   return (
     <ProfileStackNav.Navigator screenOptions={defaultScreenOptions}>
       <ProfileStackNav.Screen
@@ -168,6 +198,54 @@ function ProfileStackNavigator() {
     </ProfileStackNav.Navigator>
   );
 }
+const ProfileStackNavigator = withAuthGuard(
+  ProfileStackNavigatorInner,
+  "профіль",
+);
+
+// ─── Deep Linking Configuration ─────────────────────────────────────────────
+
+const prefix = Linking.createURL("/");
+
+const linking: LinkingOptions<Record<string, unknown>> = {
+  prefixes: [prefix, "ltex://"],
+  config: {
+    screens: {
+      Main: {
+        screens: {
+          CatalogTab: {
+            screens: {
+              CatalogList: "catalog",
+              ProductDetail: "product/:slug",
+            },
+          },
+          CartTab: {
+            screens: {
+              CartMain: "cart",
+            },
+          },
+          OrdersTab: {
+            screens: {
+              OrdersList: "orders",
+              OrderDetail: "order/:orderId",
+            },
+          },
+          ChatTab: {
+            screens: {
+              ChatMain: "chat",
+            },
+          },
+          ProfileTab: {
+            screens: {
+              ProfileMain: "profile",
+              Shipments: "shipments",
+            },
+          },
+        },
+      },
+    },
+  },
+};
 
 // ─── Bottom Tabs ─────────────────────────────────────────────────────────────
 
@@ -233,6 +311,24 @@ function MainTabs() {
   );
 }
 
+// ─── Splash / Loading Screen ────────────────────────────────────────────────
+
+function SplashScreen() {
+  return (
+    <View style={styles.splashContainer}>
+      <Text style={styles.splashLogo}>L-TEX</Text>
+      <Text style={styles.splashTagline}>
+        Секонд хенд, сток, іграшки{"\n"}гуртом від 10 кг
+      </Text>
+      <ActivityIndicator
+        size="large"
+        color="#fff"
+        style={styles.splashSpinner}
+      />
+    </View>
+  );
+}
+
 // ─── Root Navigator ──────────────────────────────────────────────────────────
 
 const RootStack = createNativeStackNavigator();
@@ -240,7 +336,7 @@ const RootStack = createNativeStackNavigator();
 function RootNavigator() {
   const { customerId, isLoading } = useAuth();
 
-  // Register push token on first launch when logged in
+  // Register push token when logged in
   useEffect(() => {
     if (customerId) {
       registerPushToken(customerId).catch(() => {});
@@ -248,26 +344,14 @@ function RootNavigator() {
   }, [customerId]);
 
   if (isLoading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={BRAND_COLOR} />
-      </View>
-    );
+    return <SplashScreen />;
   }
 
   return (
     <View style={{ flex: 1 }}>
       <OfflineBanner />
       <RootStack.Navigator screenOptions={{ headerShown: false }}>
-        {customerId ? (
-          <RootStack.Screen name="Main" component={MainTabs} />
-        ) : (
-          <RootStack.Screen
-            name="Login"
-            component={LoginScreen}
-            options={{ animationTypeForReplace: "pop" }}
-          />
-        )}
+        <RootStack.Screen name="Main" component={MainTabs} />
       </RootStack.Navigator>
     </View>
   );
@@ -278,7 +362,7 @@ function RootNavigator() {
 export function AppNavigator() {
   return (
     <AuthProvider>
-      <NavigationContainer>
+      <NavigationContainer linking={linking} fallback={<SplashScreen />}>
         <RootNavigator />
       </NavigationContainer>
     </AuthProvider>
@@ -307,12 +391,31 @@ function PlaceholderScreen(
 }
 
 const styles = StyleSheet.create({
-  loadingContainer: {
+  // Splash / Loading
+  splashContainer: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "#fff",
+    backgroundColor: BRAND_COLOR,
   },
+  splashLogo: {
+    fontSize: 48,
+    fontWeight: "bold",
+    color: "#fff",
+    letterSpacing: 2,
+  },
+  splashTagline: {
+    fontSize: 14,
+    color: "rgba(255,255,255,0.85)",
+    textAlign: "center",
+    marginTop: 12,
+    lineHeight: 20,
+  },
+  splashSpinner: {
+    marginTop: 32,
+  },
+
+  // Placeholder
   placeholderContainer: {
     flex: 1,
     justifyContent: "center",

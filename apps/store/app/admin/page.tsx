@@ -14,8 +14,13 @@ import {
   TopProductsTable,
   RevenueChart,
   NewCustomersChart,
+  AvgOrderChart,
+  CategoryPieChart,
+  GeographyChart,
+  ConversionCard,
+  PeriodFilter,
 } from "@/components/admin/charts";
-import { getAdminStats } from "@/lib/admin-stats";
+import { getAdminStats, type Period } from "@/lib/admin-stats";
 import { AutoRefresh } from "@/components/admin/auto-refresh";
 
 const BAR_COLORS: Record<string, string> = {
@@ -70,8 +75,19 @@ function BarChart({
   );
 }
 
-export default async function AdminDashboard() {
-  const stats = await getAdminStats();
+const VALID_PERIODS: Period[] = ["7d", "30d", "90d", "1y"];
+
+export default async function AdminDashboard({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | undefined>>;
+}) {
+  const params = await searchParams;
+  const period: Period = VALID_PERIODS.includes(params.period as Period)
+    ? (params.period as Period)
+    : "30d";
+
+  const stats = await getAdminStats(period);
 
   const cards = [
     {
@@ -113,7 +129,11 @@ export default async function AdminDashboard() {
   return (
     <div className="space-y-6">
       <AutoRefresh intervalMs={30_000} />
-      <h1 className="text-2xl font-bold">Дашборд</h1>
+
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold">Дашборд</h1>
+        <PeriodFilter currentPeriod={period} />
+      </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {cards.map((card) => (
@@ -132,12 +152,13 @@ export default async function AdminDashboard() {
         ))}
       </div>
 
-      {/* Charts Row 1: Existing */}
+      {/* Charts Row 1: Orders, Quality, Lots */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {/* Orders last 30 days */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg">Замовлення (30 днів)</CardTitle>
+            <CardTitle className="text-lg">
+              Замовлення ({stats.periodLabel})
+            </CardTitle>
           </CardHeader>
           <CardContent>
             {stats.ordersLast30Days.length === 0 ? (
@@ -172,7 +193,6 @@ export default async function AdminDashboard() {
           </CardContent>
         </Card>
 
-        {/* Quality distribution */}
         <Card>
           <CardHeader>
             <CardTitle className="text-lg">Товари за якістю</CardTitle>
@@ -188,7 +208,6 @@ export default async function AdminDashboard() {
           </CardContent>
         </Card>
 
-        {/* Lots by status */}
         <Card>
           <CardHeader>
             <CardTitle className="text-lg">Лоти за статусом</CardTitle>
@@ -207,13 +226,30 @@ export default async function AdminDashboard() {
         </Card>
       </div>
 
-      {/* Charts Row 2: Funnel + Revenue */}
-      <div className="grid gap-4 md:grid-cols-2">
+      {/* Charts Row 2: Funnel + Revenue + Avg Order */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         <FunnelChart data={stats.funnelData} />
         <RevenueChart data={stats.revenueLast30Days} />
+        <AvgOrderChart
+          data={stats.avgOrderByDay}
+          periodLabel={stats.periodLabel}
+        />
       </div>
 
-      {/* Charts Row 3: Top products + New customers */}
+      {/* Charts Row 3: Categories + Geography + Conversion */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <CategoryPieChart
+          data={stats.topCategories}
+          periodLabel={stats.periodLabel}
+        />
+        <GeographyChart data={stats.topCities} />
+        <ConversionCard
+          data={stats.conversion}
+          periodLabel={stats.periodLabel}
+        />
+      </div>
+
+      {/* Charts Row 4: Top products + New customers */}
       <div className="grid gap-4 md:grid-cols-2">
         <TopProductsTable data={stats.topProducts} />
         <NewCustomersChart data={stats.newCustomersLast30Days} />

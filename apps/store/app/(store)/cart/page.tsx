@@ -7,6 +7,9 @@ import { MIN_ORDER_KG, CONTACTS } from "@ltex/shared";
 import { useCart } from "@/lib/cart";
 import { Trash2, ShoppingCart } from "lucide-react";
 import Link from "next/link";
+import { getDictionary } from "@/lib/i18n";
+
+const dict = getDictionary();
 
 export default function CartPage() {
   const { items, removeItem, clearCart, totalWeight, totalEur, itemCount } =
@@ -57,10 +60,10 @@ export default function CartPage() {
         router.push(`/order/${data.orderId}/confirmation`);
         return;
       } else {
-        setOrderResult({ success: false, error: data.error ?? "Помилка" });
+        setOrderResult({ success: false, error: data.error ?? dict.common.error });
       }
     } catch {
-      setOrderResult({ success: false, error: "Помилка мережі" });
+      setOrderResult({ success: false, error: dict.cart.networkError });
     } finally {
       setSubmitting(false);
     }
@@ -71,15 +74,15 @@ export default function CartPage() {
       <div className="container mx-auto flex flex-col items-center px-4 py-16 text-center">
         <div className="text-4xl">&#10003;</div>
         <h1 className="mt-4 text-2xl font-bold text-green-700">
-          Замовлення оформлено!
+          {dict.cart.orderPlaced}
         </h1>
         <p className="mt-2 text-gray-500">
-          Ми зв&apos;яжемося з вами для підтвердження.
+          {dict.cart.weWillContact}
         </p>
         <p className="mt-1 text-sm text-gray-400">ID: {orderResult.orderId}</p>
         <div className="mt-6 flex gap-3">
           <Button asChild>
-            <Link href="/catalog">Продовжити покупки</Link>
+            <Link href="/catalog">{dict.cart.continueShopping}</Link>
           </Button>
           <Button variant="outline" asChild>
             <a
@@ -87,7 +90,7 @@ export default function CartPage() {
               target="_blank"
               rel="noopener noreferrer"
             >
-              Написати в Telegram
+              {dict.cart.writeToTelegram}
             </a>
           </Button>
         </div>
@@ -99,10 +102,10 @@ export default function CartPage() {
     return (
       <div className="container mx-auto flex flex-col items-center px-4 py-16 text-center">
         <ShoppingCart className="h-12 w-12 text-gray-300" />
-        <h1 className="mt-4 text-2xl font-bold">Кошик порожній</h1>
-        <p className="mt-2 text-gray-500">Додайте лоти з каталогу</p>
+        <h1 className="mt-4 text-2xl font-bold">{dict.cart.empty}</h1>
+        <p className="mt-2 text-gray-500">{dict.cart.addFromCatalog}</p>
         <Button className="mt-6" asChild>
-          <Link href="/catalog">До каталогу</Link>
+          <Link href="/catalog">{dict.cart.toCatalog}</Link>
         </Button>
       </div>
     );
@@ -110,7 +113,7 @@ export default function CartPage() {
 
   return (
     <div className="container mx-auto px-4 py-6">
-      <h1 className="text-2xl font-bold">Кошик</h1>
+      <h1 className="text-2xl font-bold">{dict.cart.title}</h1>
 
       <div className="mt-6 grid gap-8 lg:grid-cols-3">
         {/* Items */}
@@ -119,10 +122,10 @@ export default function CartPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b bg-gray-50 text-left text-gray-500">
-                  <th className="px-4 py-3 font-medium">Товар</th>
-                  <th className="px-4 py-3 font-medium">Штрихкод</th>
-                  <th className="px-4 py-3 font-medium">Вага</th>
-                  <th className="px-4 py-3 font-medium">Ціна EUR</th>
+                  <th className="px-4 py-3 font-medium">{dict.cart.product}</th>
+                  <th className="px-4 py-3 font-medium">{dict.cart.barcode}</th>
+                  <th className="px-4 py-3 font-medium">{dict.cart.weight}</th>
+                  <th className="px-4 py-3 font-medium">{dict.cart.priceEur}</th>
                   <th className="px-4 py-3"></th>
                 </tr>
               </thead>
@@ -135,7 +138,7 @@ export default function CartPage() {
                     <td className="px-4 py-3 font-mono text-xs">
                       {item.barcode}
                     </td>
-                    <td className="px-4 py-3">{item.weight} кг</td>
+                    <td className="px-4 py-3">{item.weight} {dict.catalog.perKg}</td>
                     <td className="px-4 py-3">€{item.priceEur.toFixed(2)}</td>
                     <td className="px-4 py-3">
                       <button
@@ -156,7 +159,7 @@ export default function CartPage() {
               onClick={clearCart}
               className="text-red-500 hover:underline"
             >
-              Очистити кошик
+              {dict.cart.clearCart}
             </button>
           </div>
         </div>
@@ -164,19 +167,19 @@ export default function CartPage() {
         {/* Order form */}
         <div>
           <div className="rounded-lg border bg-white p-6">
-            <h2 className="text-lg font-bold">Підсумок</h2>
+            <h2 className="text-lg font-bold">{dict.cart.summary}</h2>
 
             <div className="mt-4 space-y-2 text-sm">
               <div className="flex justify-between">
-                <span className="text-gray-500">Лотів:</span>
+                <span className="text-gray-500">{dict.cart.lotsCount}:</span>
                 <span className="font-medium">{itemCount}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-gray-500">Загальна вага:</span>
-                <span className="font-medium">{totalWeight.toFixed(1)} кг</span>
+                <span className="text-gray-500">{dict.cart.totalWeight}:</span>
+                <span className="font-medium">{totalWeight.toFixed(1)} {dict.catalog.perKg}</span>
               </div>
               <div className="flex justify-between border-t pt-2">
-                <span className="font-semibold">Сума:</span>
+                <span className="font-semibold">{dict.cart.total}:</span>
                 <span className="text-lg font-bold text-green-700">
                   €{totalEur.toFixed(2)}
                 </span>
@@ -185,15 +188,16 @@ export default function CartPage() {
 
             {!isMinWeight && (
               <p className="mt-3 rounded-md bg-amber-50 p-2 text-xs text-amber-700">
-                Мінімальне замовлення — від {MIN_ORDER_KG} кг. Зараз:{" "}
-                {totalWeight.toFixed(1)} кг
+                {dict.cart.minWeight
+                  .replace("{min}", String(MIN_ORDER_KG))
+                  .replace("{current}", totalWeight.toFixed(1))}
               </p>
             )}
 
             <form onSubmit={handleSubmit} className="mt-6 space-y-3">
               <div>
                 <label className="mb-1 block text-sm font-medium">
-                  Ім&apos;я / Назва *
+                  {dict.cart.name} *
                 </label>
                 <input
                   value={customerName}
@@ -205,7 +209,7 @@ export default function CartPage() {
               </div>
               <div>
                 <label className="mb-1 block text-sm font-medium">
-                  Телефон *
+                  {dict.cart.phone} *
                 </label>
                 <input
                   value={customerPhone}
@@ -218,7 +222,7 @@ export default function CartPage() {
               </div>
               <div>
                 <label className="mb-1 block text-sm font-medium">
-                  Telegram
+                  {dict.cart.telegram}
                 </label>
                 <input
                   value={customerTelegram}
@@ -229,7 +233,7 @@ export default function CartPage() {
               </div>
               <div>
                 <label className="mb-1 block text-sm font-medium">
-                  Коментар
+                  {dict.cart.comment}
                 </label>
                 <textarea
                   value={notes}
@@ -248,7 +252,7 @@ export default function CartPage() {
                 className="w-full"
                 disabled={!isMinWeight || submitting}
               >
-                {submitting ? "Оформлення..." : "Оформити замовлення"}
+                {submitting ? dict.cart.submitting : dict.cart.submit}
               </Button>
             </form>
           </div>

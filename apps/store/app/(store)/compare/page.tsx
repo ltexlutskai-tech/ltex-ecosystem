@@ -11,6 +11,9 @@ import {
 } from "@ltex/shared";
 import { useComparison } from "@/lib/comparison";
 import { ArrowLeftRight, Trash2 } from "lucide-react";
+import { getDictionary } from "@/lib/i18n";
+
+const dict = getDictionary();
 
 export default function ComparePage() {
   const { items, removeItem, clearAll } = useComparison();
@@ -19,12 +22,12 @@ export default function ComparePage() {
     return (
       <div className="container mx-auto flex flex-col items-center px-4 py-16 text-center">
         <ArrowLeftRight className="h-12 w-12 text-gray-300" />
-        <h1 className="mt-4 text-2xl font-bold">Порівняння товарів</h1>
+        <h1 className="mt-4 text-2xl font-bold">{dict.compare.title}</h1>
         <p className="mt-2 text-gray-500">
-          Додайте мінімум 2 товари для порівняння
+          {dict.compare.minItems}
         </p>
         <Button className="mt-6" asChild>
-          <Link href="/catalog">До каталогу</Link>
+          <Link href="/catalog">{dict.cart.toCatalog}</Link>
         </Button>
       </div>
     );
@@ -32,20 +35,20 @@ export default function ComparePage() {
 
   const rows: { label: string; values: string[] }[] = [
     {
-      label: "Якість",
+      label: dict.product.quality,
       values: items.map(
         (i) =>
           QUALITY_LABELS[i.quality as QualityLevel] ?? i.quality,
       ),
     },
     {
-      label: "Сезон",
+      label: dict.product.season,
       values: items.map(
-        (i) => SEASON_LABELS[i.season] ?? "Всесезон",
+        (i) => SEASON_LABELS[i.season] ?? dict.product.allSeason,
       ),
     },
     {
-      label: "Країна",
+      label: dict.product.country,
       values: items.map(
         (i) =>
           COUNTRY_LABELS[i.country as keyof typeof COUNTRY_LABELS] ??
@@ -54,7 +57,7 @@ export default function ComparePage() {
       ),
     },
     {
-      label: "Од. ціни",
+      label: dict.product.priceUnit,
       values: items.map(
         (i) =>
           PRICE_UNIT_LABELS[i.priceUnit as keyof typeof PRICE_UNIT_LABELS] ??
@@ -62,7 +65,7 @@ export default function ComparePage() {
       ),
     },
     {
-      label: "Ціна EUR",
+      label: dict.product.priceEur,
       values: items.map((i) =>
         i.priceEur !== null ? `€${i.priceEur.toFixed(2)}` : "-",
       ),
@@ -72,12 +75,12 @@ export default function ComparePage() {
   return (
     <div className="container mx-auto px-4 py-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Порівняння товарів</h1>
+        <h1 className="text-2xl font-bold">{dict.compare.title}</h1>
         <button
           onClick={clearAll}
           className="text-sm text-red-500 hover:underline"
         >
-          Очистити все
+          {dict.compare.clearAll}
         </button>
       </div>
 
@@ -86,7 +89,7 @@ export default function ComparePage() {
           <thead>
             <tr className="border-b">
               <th className="w-32 px-4 py-3 text-left font-medium text-gray-500">
-                Товар
+                {dict.compare.productLabel}
               </th>
               {items.map((item) => (
                 <th key={item.productId} className="px-4 py-3">
@@ -100,7 +103,7 @@ export default function ComparePage() {
                         />
                       ) : (
                         <div className="flex h-full items-center justify-center text-gray-400">
-                          Фото
+                          {dict.compare.photo}
                         </div>
                       )}
                     </div>

@@ -8,17 +8,55 @@
     "userInterfaceStyle": "light",
     "scheme": "ltex",
     "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
       "backgroundColor": "#16a34a"
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "ua.com.ltex.client"
+      "bundleIdentifier": "ua.com.ltex.client",
+      "associatedDomains": ["applinks:ltex.com.ua"],
+      "infoPlist": {
+        "CFBundleURLTypes": [
+          {
+            "CFBundleURLSchemes": ["ltex"]
+          }
+        ]
+      }
     },
     "android": {
       "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#16a34a"
       },
-      "package": "ua.com.ltex.client"
+      "package": "ua.com.ltex.client",
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "ltex"
+            },
+            {
+              "scheme": "https",
+              "host": "ltex.com.ua",
+              "pathPrefix": "/product"
+            },
+            {
+              "scheme": "https",
+              "host": "ltex.com.ua",
+              "pathPrefix": "/order"
+            },
+            {
+              "scheme": "https",
+              "host": "ltex.com.ua",
+              "pathPrefix": "/catalog"
+            }
+          ],
+          "category": ["BROWSABLE", "DEFAULT"]
+        }
+      ]
     },
     "plugins": [
       "expo-router",
@@ -29,7 +67,8 @@
           "icon": "./assets/notification-icon.png",
           "color": "#16a34a"
         }
-      ]
+      ],
+      "expo-linking"
     ],
     "extra": {
       "apiUrl": "https://ltex.com.ua/api",
