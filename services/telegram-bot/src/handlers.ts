@@ -69,6 +69,8 @@ export async function handleMessage(message: TelegramMessage): Promise<void> {
   if (text.startsWith("/order"))
     return handleOrder(chatId, text.replace("/order", "").trim());
   if (text.startsWith("/categories")) return handleCategories(chatId);
+  if (text.startsWith("/prices")) return handlePrices(chatId);
+  if (text.startsWith("/new")) return handleNewArrivals(chatId);
   if (text.startsWith("/")) return handleUnknown(chatId);
 
   // Plain text = search
@@ -89,6 +91,8 @@ async function handleStart(chatId: number): Promise<void> {
     `<b>Команди:</b>`,
     `/search &lt;запит&gt; — пошук товарів`,
     `/lots — доступні лоти (мішки)`,
+    `/prices — актуальні ціни по категоріях`,
+    `/new — нові надходження за 7 днів`,
     `/order &lt;ID&gt; — статус замовлення`,
     `/categories — категорії товарів`,
     `/help — допомога`,
@@ -195,13 +199,31 @@ async function handleSearch(chatId: number, query: string): Promise<void> {
     },
   );
 
+  const hasMore = products.length === 10;
   const text = [
-    `🔍 Результати для "<b>${escapeHtml(query)}</b>" (${products.length}):`,
+    `🔍 Результати для "<b>${escapeHtml(query)}</b>" (${products.length}${hasMore ? "+" : ""}):`,
     ``,
     ...lines,
-  ].join("\n");
+    hasMore ? `\n<i>Показано перші 10. Уточніть запит для точніших результатів.</i>` : "",
+  ].filter(Boolean).join("\n");
 
-  await sendMessage(chatId, text, { disableWebPagePreview: true });
+  const keyboard: InlineKeyboardMarkup | undefined = hasMore
+    ? {
+        inline_keyboard: [
+          [
+            {
+              text: "🔗 Всі результати на сайті",
+              url: `${SITE_URL}/catalog?q=${encodeURIComponent(query)}`,
+            },
+          ],
+        ],
+      }
+    : undefined;
+
+  await sendMessage(chatId, text, {
+    disableWebPagePreview: true,
+    replyMarkup: keyboard,
+  });
 }
 
 // ─── /lots ───────────────────────────────────────────────────────────────────
@@ -383,6 +405,99 @@ async function handleCategories(chatId: number): Promise<void> {
     ...lines,
     ``,
     `<a href="${SITE_URL}/catalog">Переглянути каталог →</a>`,
+  ].join("\n");
+
+  await sendMessage(chatId, text, { disableWebPagePreview: true });
+}
+
+// ─── /prices ────────────────────────────────────────────────────────────────
+
+async function handlePrices(chatId: number): Promise<void> {
+  const categories = await prisma.category.findMany({
+    where: { parentId: null },
+    include: {
+      products: {
+        where: { inStock: true },
+        include: { prices: { where: { priceType: "wholesale" }, take: 1 } },
+        take: 100,
+      },
+    },
+    orderBy: { position: "asc" },
+  });
+
+  const lines: string[] = [];
+  for (const cat of categories as Array<{
+    name: string;
+    products: { prices: { amount: number }[]; priceUnit: string }[];
+  }>) {
+    const prices = cat.products
+      .map((p) => p.prices[0]?.amount)
+      .filter((a): a is number => a !== undefined);
+    if (prices.length === 0) continue;
+    const min = Math.min(...prices);
+    const max = Math.max(...prices);
+    const unit = cat.products[0]?.priceUnit === "piece" ? "шт" : "кг";
+    lines.push(
+      `<b>${escapeHtml(cat.name)}</b>: €${min.toFixed(2)} — €${max.toFixed(2)}/${unit}`,
+    );
+  }
+
+  const text = [
+    `💰 <b>Актуальні ціни по категоріях:</b>`,
+    ``,
+    ...lines,
+    ``,
+    `Ціни оптові від 10 кг.`,
+    `<a href="${SITE_URL}/catalog">Повний каталог →</a>`,
+  ].join("\n");
+
+  await sendMessage(chatId, text, { disableWebPagePreview: true });
+}
+
+// ─── /new ───────────────────────────────────────────────────────────────────
+
+async function handleNewArrivals(chatId: number): Promise<void> {
+  const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+
+  const products = await prisma.product.findMany({
+    where: {
+      inStock: true,
+      lots: { some: { status: "free", createdAt: { gte: sevenDaysAgo } } },
+    },
+    include: {
+      prices: { where: { priceType: "wholesale" }, take: 1 },
+      _count: { select: { lots: { where: { status: "free" } } } },
+    },
+    take: 10,
+    orderBy: { updatedAt: "desc" },
+  });
+
+  if (products.length === 0) {
+    await sendMessage(chatId, "📭 За останні 7 днів нових надходжень немає.");
+    return;
+  }
+
+  const lines = (products as ProductSearchResult[]).map(
+    (p: ProductSearchResult, i: number) => {
+      const price = p.prices[0]?.amount;
+      const priceStr = price
+        ? `€${price.toFixed(2)}/${p.priceUnit === "kg" ? "кг" : "шт"}`
+        : "";
+      const quality = QUALITY_LABELS[p.quality as QualityLevel] ?? p.quality;
+      return [
+        `${i + 1}. <b>${escapeHtml(p.name)}</b>`,
+        `   ${quality} • ${priceStr} • ${p._count.lots} вільних лотів`,
+        `   <a href="${SITE_URL}/product/${p.slug}">Детальніше →</a>`,
+      ].join("\n");
+    },
+  );
+
+  const text = [
+    `🆕 <b>Нові надходження (7 днів):</b>`,
+    ``,
+    ...lines,
+    ``,
+    `<a href="${SITE_URL}/catalog?sort=newest">Всі новинки на сайті →</a>`,
   ].join("\n");
 
   await sendMessage(chatId, text, { disableWebPagePreview: true });

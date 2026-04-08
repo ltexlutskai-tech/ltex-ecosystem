@@ -219,11 +219,33 @@ export function mainMenuKeyboard(): ViberKeyboard {
       {
         Columns: 3,
         Rows: 1,
+        Text: '<font color="#fff"><b>💰 Ціни</b></font>',
+        ActionType: "reply",
+        ActionBody: "menu:prices",
+        BgColor: "#0284c7",
+        TextSize: "regular",
+        TextHAlign: "center",
+        TextVAlign: "middle",
+      },
+      {
+        Columns: 3,
+        Rows: 1,
+        Text: '<font color="#fff"><b>🆕 Новинки</b></font>',
+        ActionType: "reply",
+        ActionBody: "menu:new",
+        BgColor: "#dc2626",
+        TextSize: "regular",
+        TextHAlign: "center",
+        TextVAlign: "middle",
+      },
+      {
+        Columns: 3,
+        Rows: 1,
         Text: '<font color="#16a34a"><b>🛍 Каталог</b></font>',
         ActionType: "open-url",
         ActionBody:
-          process.env.NEXT_PUBLIC_SITE_URL ??
-          "https://ltex.com.ua" + "/catalog",
+          (process.env.NEXT_PUBLIC_SITE_URL ?? "https://ltex.com.ua") +
+          "/catalog",
         BgColor: "#e8f5e9",
         TextSize: "regular",
         TextHAlign: "center",

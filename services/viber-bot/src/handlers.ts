@@ -105,6 +105,8 @@ async function handleMessage(userId: string, text: string): Promise<void> {
   if (trimmed === "menu:lots") return handleLots(userId, "");
   if (trimmed === "menu:categories") return handleCategories(userId);
   if (trimmed === "menu:order") return handleOrderPrompt(userId);
+  if (trimmed === "menu:prices") return handlePrices(userId);
+  if (trimmed === "menu:new") return handleNewArrivals(userId);
   if (trimmed === "menu:help") return handleHelp(userId);
 
   // Quality filter from keyboard
@@ -414,6 +416,97 @@ async function handleCategories(userId: string): Promise<void> {
     ...lines,
     ``,
     `Каталог: ${SITE_URL}/catalog`,
+  ].join("\n");
+
+  await sendTextMessage(userId, text, mainMenuKeyboard());
+}
+
+// ─── Prices ─────────────────────────────────────────────────────────────────
+
+async function handlePrices(userId: string): Promise<void> {
+  const categories = await prisma.category.findMany({
+    where: { parentId: null },
+    include: {
+      products: {
+        where: { inStock: true },
+        include: { prices: { where: { priceType: "wholesale" }, take: 1 } },
+        take: 100,
+      },
+    },
+    orderBy: { position: "asc" },
+  });
+
+  const lines: string[] = [];
+  for (const cat of categories as Array<{
+    name: string;
+    products: { prices: { amount: number }[]; priceUnit: string }[];
+  }>) {
+    const prices = cat.products
+      .map((p) => p.prices[0]?.amount)
+      .filter((a): a is number => a !== undefined);
+    if (prices.length === 0) continue;
+    const min = Math.min(...prices);
+    const max = Math.max(...prices);
+    const unit = cat.products[0]?.priceUnit === "piece" ? "шт" : "кг";
+    lines.push(`${cat.name}: €${min.toFixed(2)} — €${max.toFixed(2)}/${unit}`);
+  }
+
+  const text = [
+    `💰 Актуальні ціни по категоріях:`,
+    ``,
+    ...lines,
+    ``,
+    `Ціни оптові від 10 кг.`,
+    `Каталог: ${SITE_URL}/catalog`,
+  ].join("\n");
+
+  await sendTextMessage(userId, text, mainMenuKeyboard());
+}
+
+// ─── New Arrivals ───────────────────────────────────────────────────────────
+
+async function handleNewArrivals(userId: string): Promise<void> {
+  const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+
+  const products = await prisma.product.findMany({
+    where: {
+      inStock: true,
+      lots: { some: { status: "free", createdAt: { gte: sevenDaysAgo } } },
+    },
+    include: {
+      prices: { where: { priceType: "wholesale" }, take: 1 },
+      _count: { select: { lots: { where: { status: "free" } } } },
+    },
+    take: 10,
+    orderBy: { updatedAt: "desc" },
+  });
+
+  if (products.length === 0) {
+    await sendTextMessage(
+      userId,
+      "📭 За останні 7 днів нових надходжень немає.",
+      mainMenuKeyboard(),
+    );
+    return;
+  }
+
+  const lines = (products as ProductSearchResult[]).map(
+    (p: ProductSearchResult, i: number) => {
+      const price = p.prices[0]?.amount;
+      const priceStr = price
+        ? `€${price.toFixed(2)}/${p.priceUnit === "kg" ? "кг" : "шт"}`
+        : "";
+      const quality = QUALITY_LABELS[p.quality as QualityLevel] ?? p.quality;
+      return `${i + 1}. ${p.name}\n   ${quality} • ${priceStr} • ${p._count.lots} вільних лотів\n   ${SITE_URL}/product/${p.slug}`;
+    },
+  );
+
+  const text = [
+    `🆕 Нові надходження (7 днів):`,
+    ``,
+    ...lines,
+    ``,
+    `Всі новинки: ${SITE_URL}/catalog?sort=newest`,
   ].join("\n");
 
   await sendTextMessage(userId, text, mainMenuKeyboard());
