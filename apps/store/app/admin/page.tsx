@@ -16,6 +16,7 @@ import {
   NewCustomersChart,
 } from "@/components/admin/charts";
 import { getAdminStats } from "@/lib/admin-stats";
+import { AutoRefresh } from "@/components/admin/auto-refresh";
 
 const BAR_COLORS: Record<string, string> = {
   free: "bg-green-500",
@@ -111,6 +112,7 @@ export default async function AdminDashboard() {
 
   return (
     <div className="space-y-6">
+      <AutoRefresh intervalMs={30_000} />
       <h1 className="text-2xl font-bold">Дашборд</h1>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">

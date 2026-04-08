@@ -120,3 +120,21 @@ export async function deleteProductImage(imageId: string, productId: string) {
 
   revalidatePath(`/admin/products/${productId}`);
 }
+
+export async function reorderProductImages(
+  productId: string,
+  imageIds: string[],
+) {
+  await requireAdmin();
+
+  await prisma.$transaction(
+    imageIds.map((id, index) =>
+      prisma.productImage.update({
+        where: { id },
+        data: { position: index },
+      }),
+    ),
+  );
+
+  revalidatePath(`/admin/products/${productId}`);
+}

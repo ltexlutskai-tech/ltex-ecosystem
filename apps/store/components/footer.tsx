@@ -1,6 +1,9 @@
 import Link from "next/link";
 import { Separator } from "@ltex/ui";
 import { APP_NAME, CONTACTS, CATEGORIES } from "@ltex/shared";
+import { getDictionary } from "@/lib/i18n";
+
+const dict = getDictionary();
 
 export function Footer() {
   return (
@@ -10,13 +13,12 @@ export function Footer() {
           <div>
             <h3 className="text-lg font-bold text-primary">{APP_NAME}</h3>
             <p className="mt-2 text-sm text-muted-foreground">
-              Гуртовий продаж секонд хенду, стоку, іграшок та Bric-a-Brac від 10
-              кг.
+              {dict.footer.description}
             </p>
           </div>
 
           <div>
-            <h4 className="font-semibold">Категорії</h4>
+            <h4 className="font-semibold">{dict.footer.categories}</h4>
             <ul className="mt-2 space-y-1">
               {CATEGORIES.map((cat) => (
                 <li key={cat.slug}>
@@ -32,14 +34,14 @@ export function Footer() {
           </div>
 
           <div>
-            <h4 className="font-semibold">Навігація</h4>
+            <h4 className="font-semibold">{dict.footer.navigation}</h4>
             <ul className="mt-2 space-y-1">
               <li>
                 <Link
                   href="/catalog"
                   className="text-sm text-muted-foreground hover:text-foreground"
                 >
-                  Каталог
+                  {dict.nav.catalog}
                 </Link>
               </li>
               <li>
@@ -47,7 +49,7 @@ export function Footer() {
                   href="/lots"
                   className="text-sm text-muted-foreground hover:text-foreground"
                 >
-                  Лоти (мішки)
+                  {dict.nav.lots} (мішки)
                 </Link>
               </li>
               <li>
@@ -55,14 +57,14 @@ export function Footer() {
                   href="/contacts"
                   className="text-sm text-muted-foreground hover:text-foreground"
                 >
-                  Контакти
+                  {dict.nav.contacts}
                 </Link>
               </li>
             </ul>
           </div>
 
           <div>
-            <h4 className="font-semibold">Контакти</h4>
+            <h4 className="font-semibold">{dict.footer.contactsTitle}</h4>
             <ul className="mt-2 space-y-1 text-sm text-muted-foreground">
               {CONTACTS.phones.map((phone) => (
                 <li key={phone}>
@@ -100,7 +102,8 @@ export function Footer() {
         <Separator className="my-8" />
 
         <p className="text-center text-sm text-muted-foreground">
-          &copy; {new Date().getFullYear()} {APP_NAME}. Усі права захищені.
+          &copy; {new Date().getFullYear()} {APP_NAME}.{" "}
+          {dict.footer.allRights}
         </p>
       </div>
     </footer>

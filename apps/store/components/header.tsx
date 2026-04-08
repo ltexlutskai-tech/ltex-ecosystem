@@ -12,13 +12,17 @@ import {
 } from "@ltex/ui";
 import { APP_NAME, CONTACTS } from "@ltex/shared";
 import { CartBadge } from "@/components/store/cart-badge";
+import { WishlistBadge } from "@/components/store/wishlist-badge";
 import { Menu, X } from "lucide-react";
+import { getDictionary } from "@/lib/i18n";
+
+const dict = getDictionary();
 
 const NAV_LINKS = [
-  { href: "/catalog", label: "Каталог" },
-  { href: "/lots", label: "Лоти" },
-  { href: "/about", label: "Про нас" },
-  { href: "/contacts", label: "Контакти" },
+  { href: "/catalog", label: dict.nav.catalog },
+  { href: "/lots", label: dict.nav.lots },
+  { href: "/about", label: dict.nav.about },
+  { href: "/contacts", label: dict.nav.contacts },
 ] as const;
 
 export function Header() {
@@ -43,6 +47,7 @@ export function Header() {
         </div>
 
         <div className="flex items-center gap-4">
+          <WishlistBadge />
           <CartBadge />
           <a
             href={`tel:${CONTACTS.phones[0]?.replace(/\s/g, "")}`}
@@ -72,7 +77,7 @@ export function Header() {
                 variant="ghost"
                 size="icon"
                 className="md:hidden"
-                aria-label="Меню"
+                aria-label={dict.nav.menu}
               >
                 <Menu className="h-5 w-5" />
               </Button>
@@ -102,7 +107,7 @@ export function Header() {
                     href="/cart"
                     className="text-lg font-medium transition-colors hover:text-primary"
                   >
-                    Кошик
+                    {dict.nav.cart}
                   </Link>
                 </SheetClose>
               </nav>

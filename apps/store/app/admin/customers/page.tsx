@@ -5,6 +5,7 @@ import Link from "next/link";
 import { AdminBreadcrumbs } from "@/components/admin/breadcrumbs";
 import { SortHeader } from "@/components/admin/sort-header";
 import { ExportCsvButton } from "@/components/admin/export-csv";
+import { AdminPagination } from "@/components/admin/pagination";
 
 export default async function CustomersPage({
   searchParams,
@@ -30,6 +31,7 @@ export default async function CustomersPage({
           { phone: { contains: query, mode: "insensitive" as const } },
           { email: { contains: query, mode: "insensitive" as const } },
           { telegram: { contains: query, mode: "insensitive" as const } },
+          { city: { contains: query, mode: "insensitive" as const } },
         ],
       }
     : {};
@@ -60,11 +62,23 @@ export default async function CustomersPage({
   const totalPages = Math.ceil(total / perPage);
   const baseParams = new URLSearchParams();
   if (query) baseParams.set("q", query);
+  if (sort !== "updatedAt") {
+    baseParams.set("sort", sort);
+    baseParams.set("dir", dir);
+  }
 
   function sortUrl(field: string) {
     const sp = new URLSearchParams(baseParams);
     sp.set("sort", field);
     sp.set("dir", sort === field && dir === "asc" ? "desc" : "asc");
+    sp.delete("page");
+    return `/admin/customers?${sp.toString()}`;
+  }
+
+  function pageHref(p: number) {
+    const sp = new URLSearchParams(baseParams);
+    if (p > 1) sp.set("page", String(p));
+    else sp.delete("page");
     return `/admin/customers?${sp.toString()}`;
   }
 
@@ -105,8 +119,8 @@ export default async function CustomersPage({
         <input
           name="q"
           defaultValue={query}
-          placeholder="Пошук по імені, телефону, email, Telegram..."
-          className="flex-1 rounded-md border px-3 py-2 text-sm"
+          placeholder="Пошук по імені, телефону, місту, email, Telegram..."
+          className="min-w-[200px] flex-1 rounded-md border px-3 py-2 text-sm"
         />
         <button
           type="submit"
@@ -114,6 +128,14 @@ export default async function CustomersPage({
         >
           Шукати
         </button>
+        {query && (
+          <Link
+            href="/admin/customers"
+            className="rounded-md border px-3 py-2 text-sm text-red-600 hover:bg-red-50"
+          >
+            Скинути
+          </Link>
+        )}
       </form>
 
       <div className="overflow-x-auto rounded-lg border bg-white">
@@ -143,43 +165,45 @@ export default async function CustomersPage({
             </tr>
           </thead>
           <tbody>
-            {customers.map((customer) => {
-              const totalSpent = customer.orders.reduce(
-                (sum, o) => sum + o.totalEur,
-                0,
-              );
-              return (
-                <tr key={customer.id} className="border-b hover:bg-gray-50">
-                  <td className="px-4 py-3 font-medium">{customer.name}</td>
-                  <td className="px-4 py-3">{customer.phone ?? "-"}</td>
-                  <td className="px-4 py-3">{customer.email ?? "-"}</td>
-                  <td className="px-4 py-3">{customer.telegram ?? "-"}</td>
-                  <td className="px-4 py-3">{customer.city ?? "-"}</td>
-                  <td className="px-4 py-3">{customer._count.orders}</td>
-                  <td className="px-4 py-3">€{totalSpent.toFixed(2)}</td>
-                  <td className="px-4 py-3 font-mono text-xs">
-                    {customer.code1C ?? "-"}
-                  </td>
-                </tr>
-              );
-            })}
+            {customers.length === 0 ? (
+              <tr>
+                <td colSpan={8} className="px-4 py-8 text-center text-gray-500">
+                  Клієнтів не знайдено
+                </td>
+              </tr>
+            ) : (
+              customers.map((customer) => {
+                const totalSpent = customer.orders.reduce(
+                  (sum, o) => sum + o.totalEur,
+                  0,
+                );
+                return (
+                  <tr key={customer.id} className="border-b hover:bg-gray-50">
+                    <td className="px-4 py-3 font-medium">{customer.name}</td>
+                    <td className="px-4 py-3">{customer.phone ?? "-"}</td>
+                    <td className="px-4 py-3">{customer.email ?? "-"}</td>
+                    <td className="px-4 py-3">{customer.telegram ?? "-"}</td>
+                    <td className="px-4 py-3">{customer.city ?? "-"}</td>
+                    <td className="px-4 py-3">{customer._count.orders}</td>
+                    <td className="px-4 py-3">€{totalSpent.toFixed(2)}</td>
+                    <td className="px-4 py-3 font-mono text-xs">
+                      {customer.code1C ?? "-"}
+                    </td>
+                  </tr>
+                );
+              })
+            )}
           </tbody>
         </table>
       </div>
 
-      {totalPages > 1 && (
-        <div className="flex items-center justify-center gap-2">
-          {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
-            <Link
-              key={p}
-              href={`/admin/customers?${query ? `q=${query}&` : ""}${sort !== "updatedAt" ? `sort=${sort}&dir=${dir}&` : ""}page=${p}`}
-              className={`rounded-md border px-3 py-1 text-sm ${p === page ? "bg-green-50 text-green-700 border-green-200" : "hover:bg-gray-50"}`}
-            >
-              {p}
-            </Link>
-          ))}
-        </div>
-      )}
+      <AdminPagination
+        page={page}
+        totalPages={totalPages}
+        total={total}
+        baseHref="/admin/customers"
+        buildHref={pageHref}
+      />
     </div>
   );
 }

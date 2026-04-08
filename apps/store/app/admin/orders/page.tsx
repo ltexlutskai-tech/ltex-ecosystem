@@ -1,17 +1,17 @@
 export const dynamic = "force-dynamic";
 
 import { prisma } from "@ltex/db";
-import { Badge } from "@ltex/ui";
 import {
   ORDER_STATUSES,
   ORDER_STATUS_LABELS,
   type OrderStatus,
 } from "@ltex/shared";
 import Link from "next/link";
-import { OrderStatusForm } from "./order-status-form";
 import { AdminBreadcrumbs } from "@/components/admin/breadcrumbs";
 import { SortHeader } from "@/components/admin/sort-header";
 import { ExportCsvButton } from "@/components/admin/export-csv";
+import { AdminPagination } from "@/components/admin/pagination";
+import { OrderDetailRow } from "./order-detail-row";
 
 const statusColors: Record<
   OrderStatus,
@@ -56,7 +56,12 @@ export default async function OrdersPage({
       where,
       include: {
         customer: true,
-        _count: { select: { items: true } },
+        items: {
+          include: {
+            product: { select: { name: true } },
+            lot: { select: { barcode: true } },
+          },
+        },
       },
       orderBy,
       skip: (page - 1) * perPage,
@@ -68,22 +73,33 @@ export default async function OrdersPage({
   const totalPages = Math.ceil(total / perPage);
   const baseParams = new URLSearchParams();
   if (status) baseParams.set("status", status);
+  if (sort !== "createdAt") {
+    baseParams.set("sort", sort);
+    baseParams.set("dir", dir);
+  }
 
   function sortUrl(field: string) {
     const sp = new URLSearchParams(baseParams);
     sp.set("sort", field);
     sp.set("dir", sort === field && dir === "asc" ? "desc" : "asc");
+    sp.delete("page");
+    return `/admin/orders?${sp.toString()}`;
+  }
+
+  function pageHref(p: number) {
+    const sp = new URLSearchParams(baseParams);
+    if (p > 1) sp.set("page", String(p));
+    else sp.delete("page");
     return `/admin/orders?${sp.toString()}`;
   }
 
   const csvData = orders.map((o) => ({
     code: o.code1C ?? o.id.slice(0, 8),
     customer: o.customer.name,
-    status:
-      ORDER_STATUS_LABELS[o.status as OrderStatus] ?? o.status,
+    status: ORDER_STATUS_LABELS[o.status as OrderStatus] ?? o.status,
     totalEur: o.totalEur.toFixed(2),
     totalUah: o.totalUah.toFixed(2),
-    items: o._count.items,
+    items: o.items.length,
     date: new Date(o.createdAt).toLocaleDateString("uk-UA"),
   }));
 
@@ -92,7 +108,7 @@ export default async function OrdersPage({
       <AdminBreadcrumbs items={[{ label: "Замовлення" }]} />
 
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Замовлення</h1>
+        <h1 className="text-2xl font-bold">Замовлення ({total})</h1>
         <ExportCsvButton
           data={csvData}
           filename="orders"
@@ -111,15 +127,15 @@ export default async function OrdersPage({
       <div className="flex flex-wrap gap-2">
         <Link
           href="/admin/orders"
-          className={`rounded-md border px-3 py-1 text-sm ${!status ? "bg-green-50 text-green-700 border-green-200" : "hover:bg-gray-50"}`}
+          className={`rounded-md border px-3 py-1 text-sm ${!status ? "border-green-200 bg-green-50 text-green-700" : "hover:bg-gray-50"}`}
         >
-          Всі ({total})
+          Всі
         </Link>
         {ORDER_STATUSES.map((s) => (
           <Link
             key={s}
             href={`/admin/orders?status=${s}`}
-            className={`rounded-md border px-3 py-1 text-sm ${status === s ? "bg-green-50 text-green-700 border-green-200" : "hover:bg-gray-50"}`}
+            className={`rounded-md border px-3 py-1 text-sm ${status === s ? "border-green-200 bg-green-50 text-green-700" : "hover:bg-gray-50"}`}
           >
             {ORDER_STATUS_LABELS[s]}
           </Link>
@@ -133,6 +149,7 @@ export default async function OrdersPage({
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b bg-gray-50 text-left text-gray-500">
+                <th className="w-8 px-4 py-3"></th>
                 <th className="px-4 py-3 font-medium">Код</th>
                 <th className="px-4 py-3 font-medium">Клієнт</th>
                 <th className="px-4 py-3 font-medium">Статус</th>
@@ -157,53 +174,45 @@ export default async function OrdersPage({
             </thead>
             <tbody>
               {orders.map((order) => (
-                <tr key={order.id} className="border-b hover:bg-gray-50">
-                  <td className="px-4 py-3 font-mono text-xs">
-                    {order.code1C ?? order.id.slice(0, 8)}
-                  </td>
-                  <td className="px-4 py-3">{order.customer.name}</td>
-                  <td className="px-4 py-3">
-                    <Badge
-                      variant={
-                        statusColors[order.status as OrderStatus] ?? "secondary"
-                      }
-                    >
-                      {ORDER_STATUS_LABELS[order.status as OrderStatus] ??
-                        order.status}
-                    </Badge>
-                  </td>
-                  <td className="px-4 py-3">€{order.totalEur.toFixed(2)}</td>
-                  <td className="px-4 py-3">₴{order.totalUah.toFixed(2)}</td>
-                  <td className="px-4 py-3">{order._count.items}</td>
-                  <td className="px-4 py-3">
-                    {new Date(order.createdAt).toLocaleDateString("uk-UA")}
-                  </td>
-                  <td className="px-4 py-3">
-                    <OrderStatusForm
-                      orderId={order.id}
-                      currentStatus={order.status as OrderStatus}
-                    />
-                  </td>
-                </tr>
+                <OrderDetailRow
+                  key={order.id}
+                  order={{
+                    id: order.id,
+                    code1C: order.code1C,
+                    status: order.status,
+                    totalEur: order.totalEur,
+                    totalUah: order.totalUah,
+                    notes: order.notes,
+                    createdAt: order.createdAt.toISOString(),
+                    customerName: order.customer.name,
+                    customerPhone: order.customer.phone,
+                    itemCount: order.items.length,
+                    items: order.items.map((item) => ({
+                      id: item.id,
+                      productName: item.product.name,
+                      barcode: item.lot.barcode,
+                      weight: item.weight,
+                      priceEur: item.priceEur,
+                      quantity: item.quantity,
+                    })),
+                  }}
+                  statusColor={
+                    statusColors[order.status as OrderStatus] ?? "secondary"
+                  }
+                />
               ))}
             </tbody>
           </table>
         </div>
       )}
 
-      {totalPages > 1 && (
-        <div className="flex items-center justify-center gap-2">
-          {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
-            <Link
-              key={p}
-              href={`/admin/orders?${status ? `status=${status}&` : ""}${sort !== "createdAt" ? `sort=${sort}&dir=${dir}&` : ""}page=${p}`}
-              className={`rounded-md border px-3 py-1 text-sm ${p === page ? "bg-green-50 text-green-700 border-green-200" : "hover:bg-gray-50"}`}
-            >
-              {p}
-            </Link>
-          ))}
-        </div>
-      )}
+      <AdminPagination
+        page={page}
+        totalPages={totalPages}
+        total={total}
+        baseHref="/admin/orders"
+        buildHref={pageHref}
+      />
     </div>
   );
 }

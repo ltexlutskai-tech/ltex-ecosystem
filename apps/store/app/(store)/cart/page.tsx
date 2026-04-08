@@ -53,8 +53,9 @@ export default function CartPage() {
 
       const data = await res.json();
       if (res.ok) {
-        setOrderResult({ success: true, orderId: data.orderId });
         clearCart();
+        router.push(`/order/${data.orderId}/confirmation`);
+        return;
       } else {
         setOrderResult({ success: false, error: data.error ?? "Помилка" });
       }

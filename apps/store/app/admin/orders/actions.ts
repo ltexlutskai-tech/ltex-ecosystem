@@ -44,3 +44,14 @@ export async function updateOrderStatus(orderId: string, status: OrderStatus) {
   revalidatePath("/admin/orders");
   revalidatePath("/admin");
 }
+
+export async function addOrderNote(orderId: string, notes: string) {
+  await requireAdmin();
+
+  await prisma.order.update({
+    where: { id: orderId },
+    data: { notes },
+  });
+
+  revalidatePath("/admin/orders");
+}

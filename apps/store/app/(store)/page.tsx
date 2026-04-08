@@ -2,6 +2,7 @@ import { Button } from "@ltex/ui";
 import { APP_NAME, MIN_ORDER_KG, CONTACTS } from "@ltex/shared";
 import { prisma } from "@ltex/db";
 import Link from "next/link";
+import { RecentlyViewedSection } from "@/components/store/recently-viewed-section";
 
 export const revalidate = 60;
 
@@ -116,6 +117,9 @@ export default async function HomePage() {
           </div>
         </div>
       </section>
+
+      {/* Recently Viewed */}
+      <RecentlyViewedSection />
 
       {/* CTA */}
       <section className="py-12">

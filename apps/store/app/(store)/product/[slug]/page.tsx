@@ -19,6 +19,8 @@ import {
   getRecommendations,
   getFrequentlyBoughtTogether,
 } from "@/lib/recommendations";
+import { TrackProductView } from "@/components/store/track-product-view";
+import { ImageGallery } from "@/components/store/image-gallery";
 
 interface Props {
   params: Promise<{ slug: string }>;
@@ -112,6 +114,14 @@ export default async function ProductPage({ params }: Props) {
 
   return (
     <div className="container mx-auto px-4 py-6">
+      <TrackProductView
+        slug={product.slug}
+        name={product.name}
+        quality={product.quality}
+        imageUrl={product.images[0]?.url ?? null}
+        priceEur={wholesalePrice?.amount ?? null}
+        priceUnit={product.priceUnit}
+      />
       <ProductJsonLd
         product={product}
         price={wholesalePrice?.amount}
@@ -123,14 +133,13 @@ export default async function ProductPage({ params }: Props) {
         {/* Images */}
         <div className="space-y-3">
           {product.images.length > 0 ? (
-            product.images.map((img) => (
-              <img
-                key={img.id}
-                src={img.url}
-                alt={img.alt || product.name}
-                className="w-full rounded-lg border object-cover"
-              />
-            ))
+            <ImageGallery
+              images={product.images.map((img) => ({
+                url: img.url,
+                alt: img.alt || product.name,
+              }))}
+              productName={product.name}
+            />
           ) : youtubeEmbed ? (
             <div className="aspect-video w-full overflow-hidden rounded-lg border">
               <iframe
