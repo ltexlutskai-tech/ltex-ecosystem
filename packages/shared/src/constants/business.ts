@@ -13,6 +13,9 @@ export const COUNTRY_LABELS: Record<Country, string> = {
 
 export const CONTACTS = {
   telegram: "@L_TEX",
+  telegramGroup: "https://t.me/LTEX_Second",
+  viberGroup:
+    "https://invite.viber.com/?g2=AQA%2Fxgye6%2BDx3El3Qybx4jkoK8aeVPb7x8On05U2OUZu92jUbrIS16QpCXAnJXHq",
   phones: ["+380 67 671 05 15", "+380 99 358 49 92"],
   email: "ltex.lutsk.ai@gmail.com",
   location: "Піддубці, Луцький район, Волинська область",

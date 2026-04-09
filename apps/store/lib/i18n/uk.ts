@@ -3,11 +3,20 @@ export const uk = {
   nav: {
     catalog: "Каталог",
     lots: "Лоти",
+    new: "Новинки",
+    sale: "Акції",
     about: "Про нас",
     contacts: "Контакти",
     cart: "Кошик",
     wishlist: "Обране",
     menu: "Меню",
+  },
+
+  // Header
+  header: {
+    viberGroup: "Viber група",
+    telegramGroup: "Telegram група",
+    searchPlaceholder: "Пошук товарів...",
   },
 
   // Footer
