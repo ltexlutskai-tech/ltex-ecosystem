@@ -197,6 +197,14 @@ export const uk = {
     title: "Нещодавно переглянуті",
   },
 
+  // Top / Featured products page
+  top: {
+    title: "Топ товарів",
+    heading: "Топ товарів",
+    description: "Кращі пропозиції — відібрано вручну",
+    empty: "Топ товарів ще не обрано",
+  },
+
   // Homepage
   home: {
     heroDescription:
@@ -338,6 +346,18 @@ export const uk = {
       isActive: "Активний",
     },
     empty: "Банерів ще немає",
+  },
+
+  // Admin — featured products
+  featured: {
+    title: "Топ товарів",
+    description: "Оберіть до 12 товарів для головної сторінки",
+    count: "Обрано",
+    searchPlaceholder: "Пошук товару для додавання...",
+    add: "Додати",
+    remove: "Видалити",
+    note: "Нотатка",
+    empty: "Ще нічого не обрано",
   },
 } as const;
 

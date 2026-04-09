@@ -57,6 +57,7 @@ model Product {
   cartItems          CartItem[]
   videoSubscriptions VideoSubscription[]
   favorites          Favorite[]
+  featuredEntry      FeaturedProduct?
 
   @@index([categoryId])
   @@index([quality])
@@ -370,6 +371,20 @@ model SyncLog {
   @@index([entity, entityId])
   @@index([syncedAt])
   @@map("sync_log")
+}
+
+// ─── Featured Products (homepage "Топ товарів", admin-curated) ──────────────
+
+model FeaturedProduct {
+  id        String   @id @default(cuid())
+  productId String   @unique @map("product_id")
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  position  Int      @default(0)
+  note      String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([position])
+  @@map("featured_products")
 }
 
 // ─── Banners (homepage carousel, admin-managed) ─────────────────────────────
