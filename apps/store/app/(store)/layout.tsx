@@ -6,6 +6,7 @@ import { RecentlyViewedProvider } from "@/lib/recently-viewed";
 import { ComparisonProvider } from "@/lib/comparison";
 import { ServiceWorkerRegister } from "@/components/sw-register";
 import { ComparisonBar } from "@/components/store/comparison-bar";
+import { PromoStripe } from "@/components/store/promo-stripe";
 import { UmamiTracker } from "@/components/analytics/umami";
 import { AnalyticsClickTracker } from "@/components/analytics/click-tracker";
 
@@ -29,6 +30,7 @@ export default function StoreLayout({
               Перейти до основного вмісту
             </a>
             <div className="flex min-h-screen flex-col">
+              <PromoStripe />
               <Header />
               <main id="main-content" className="flex-1" role="main">
                 {children}

@@ -25,6 +25,7 @@ import {
   Menu,
   Image,
   Star,
+  Megaphone,
 } from "lucide-react";
 import { signOut } from "@/app/admin/actions";
 import { NotificationBell } from "./notification-bell";
@@ -44,6 +45,7 @@ const navItems = [
   { href: "/admin/categories", label: "Категорії", icon: FolderTree },
   { href: "/admin/banners", label: "Банери", icon: Image },
   { href: "/admin/featured", label: "Топ товарів", icon: Star },
+  { href: "/admin/promo", label: "Гаряча пропозиція", icon: Megaphone },
   { href: "/admin/rates", label: "Курси валют", icon: ArrowLeftRight },
   { href: "/admin/sync-log", label: "Журнал синхр.", icon: FileText },
 ];

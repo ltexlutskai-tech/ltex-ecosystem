@@ -404,3 +404,18 @@ model Banner {
   @@index([isActive, position])
   @@map("banners")
 }
+
+// ─── Promo Stripe (sticky "Гаряча пропозиція" banner, single-row) ──────────
+
+model PromoStripe {
+  id        String   @id @default(cuid())
+  text      String
+  ctaLabel  String?
+  ctaHref   String?
+  bgColor   String   @default("#dc2626")
+  textColor String   @default("#ffffff")
+  isActive  Boolean  @default(false)
+  updatedAt DateTime @updatedAt
+
+  @@map("promo_stripe")
+}

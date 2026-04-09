@@ -366,6 +366,21 @@ export const uk = {
     note: "Нотатка",
     empty: "Ще нічого не обрано",
   },
+
+  // Admin — promo stripe
+  promoStripe: {
+    title: "Гаряча пропозиція",
+    fields: {
+      text: "Текст",
+      ctaLabel: "Текст кнопки",
+      ctaHref: "Посилання",
+      bgColor: "Колір фону",
+      textColor: "Колір тексту",
+      isActive: "Увімкнути показ на сайті",
+    },
+    save: "Зберегти",
+    preview: "Попередній перегляд",
+  },
 } as const;
 
 export type Dictionary = typeof uk;
