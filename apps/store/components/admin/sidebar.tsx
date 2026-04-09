@@ -23,6 +23,7 @@ import {
   FileText,
   LogOut,
   Menu,
+  Image,
 } from "lucide-react";
 import { signOut } from "@/app/admin/actions";
 import { NotificationBell } from "./notification-bell";
@@ -40,6 +41,7 @@ const navItems = [
   { href: "/admin/lots", label: "Лоти", icon: Boxes },
   { href: "/admin/customers", label: "Клієнти", icon: Users },
   { href: "/admin/categories", label: "Категорії", icon: FolderTree },
+  { href: "/admin/banners", label: "Банери", icon: Image },
   { href: "/admin/rates", label: "Курси валют", icon: ArrowLeftRight },
   { href: "/admin/sync-log", label: "Журнал синхр.", icon: FileText },
 ];

@@ -371,3 +371,21 @@ model SyncLog {
   @@index([syncedAt])
   @@map("sync_log")
 }
+
+// ─── Banners (homepage carousel, admin-managed) ─────────────────────────────
+
+model Banner {
+  id         String   @id @default(cuid())
+  title      String
+  subtitle   String?
+  imageUrl   String
+  ctaLabel   String?
+  ctaHref    String?
+  position   Int      @default(0)
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([isActive, position])
+  @@map("banners")
+}

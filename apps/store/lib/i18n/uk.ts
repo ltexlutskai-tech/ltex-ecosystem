@@ -322,6 +322,23 @@ export const uk = {
     records: "записів",
     skipToContent: "Перейти до основного вмісту",
   },
+
+  // Admin — banners
+  banners: {
+    title: "Банери",
+    create: "Додати банер",
+    edit: "Редагувати банер",
+    fields: {
+      title: "Заголовок",
+      subtitle: "Підзаголовок",
+      image: "Зображення",
+      ctaLabel: "Текст кнопки",
+      ctaHref: "Посилання кнопки",
+      position: "Позиція",
+      isActive: "Активний",
+    },
+    empty: "Банерів ще немає",
+  },
 } as const;
 
 export type Dictionary = typeof uk;
