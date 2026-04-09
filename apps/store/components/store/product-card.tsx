@@ -21,13 +21,32 @@ export interface ProductCardData {
   images: { url: string; alt: string }[];
   _count: { lots: number };
   prices: { amount: number; currency: string; priceType: string }[];
+  createdAt?: Date | string | null;
 }
 
-export function ProductCard({ product }: { product: ProductCardData }) {
+const NEW_BADGE_WINDOW_MS = 14 * 24 * 60 * 60 * 1000;
+
+export function ProductCard({
+  product,
+  isNew,
+  hasSale,
+}: {
+  product: ProductCardData;
+  isNew?: boolean;
+  hasSale?: boolean;
+}) {
   const wholesalePrice = product.prices.find(
     (p) => p.priceType === "wholesale",
   );
   const firstImage = product.images[0];
+
+  const computedIsNew =
+    isNew ??
+    (product.createdAt
+      ? Date.now() - new Date(product.createdAt).getTime() < NEW_BADGE_WINDOW_MS
+      : false);
+  const computedHasSale =
+    hasSale ?? product.prices.some((p) => p.priceType === "akciya");
 
   return (
     <div className="group relative">
@@ -44,6 +63,20 @@ export function ProductCard({ product }: { product: ProductCardData }) {
             ) : (
               <div className="flex h-full items-center justify-center text-gray-400">
                 {product.videoUrl ? "Video" : dict.catalog.noPhoto}
+              </div>
+            )}
+            {(computedIsNew || computedHasSale) && (
+              <div className="absolute left-2 top-2 z-10 flex flex-col gap-1">
+                {computedIsNew && (
+                  <span className="rounded bg-blue-600 px-2 py-0.5 text-xs font-bold text-white">
+                    NEW
+                  </span>
+                )}
+                {computedHasSale && (
+                  <span className="rounded bg-red-600 px-2 py-0.5 text-xs font-bold text-white">
+                    SALE
+                  </span>
+                )}
               </div>
             )}
             {product._count.lots > 0 && (

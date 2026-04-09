@@ -56,6 +56,22 @@ export const uk = {
     perPiece: "шт",
   },
 
+  // New arrivals page
+  newPage: {
+    title: "Новинки",
+    heading: "Нові надходження",
+    description: "Щойно розмитнені партії — перші у наявності",
+    empty: "Наразі немає нових товарів",
+  },
+
+  // Sale / Discounts page
+  sale: {
+    title: "Акції та знижки",
+    heading: "Акції",
+    description: "Товари зі знижкою — обмежена кількість",
+    empty: "Наразі немає активних акцій",
+  },
+
   // Lots page
   lots: {
     title: "Лоти (мішки)",
