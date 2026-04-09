@@ -154,6 +154,7 @@ export function SearchAutocomplete({
         aria-autocomplete="list"
         aria-expanded={isOpen}
         role="combobox"
+        data-analytics="search-submit"
       />
 
       {isOpen && results.length > 0 && (

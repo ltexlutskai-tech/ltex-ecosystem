@@ -50,7 +50,10 @@ export function ProductCard({
 
   return (
     <div className="group relative">
-      <Link href={`/product/${product.slug}`}>
+      <Link
+        href={`/product/${product.slug}`}
+        data-analytics="product-card-click"
+      >
         <Card className="h-full overflow-hidden transition-shadow hover:shadow-md">
           <div className="relative aspect-[4/3] bg-gray-100">
             {firstImage ? (

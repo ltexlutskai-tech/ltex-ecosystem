@@ -30,6 +30,7 @@ export function AddToCartButton({ lot }: { lot: CartItem }) {
     <Button
       size="sm"
       onClick={() => addItem(lot)}
+      data-analytics="add-to-cart"
       aria-label={`${dict.cart.addToCartLabel.replace("{name}", lot.productName)}`}
     >
       <ShoppingCart className="mr-1 h-3 w-3" aria-hidden="true" />

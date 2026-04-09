@@ -6,6 +6,8 @@ import { RecentlyViewedProvider } from "@/lib/recently-viewed";
 import { ComparisonProvider } from "@/lib/comparison";
 import { ServiceWorkerRegister } from "@/components/sw-register";
 import { ComparisonBar } from "@/components/store/comparison-bar";
+import { UmamiTracker } from "@/components/analytics/umami";
+import { AnalyticsClickTracker } from "@/components/analytics/click-tracker";
 
 export default function StoreLayout({
   children,
@@ -18,6 +20,8 @@ export default function StoreLayout({
         <RecentlyViewedProvider>
           <ComparisonProvider>
             <ServiceWorkerRegister />
+            <UmamiTracker />
+            <AnalyticsClickTracker />
             <a
               href="#main-content"
               className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[100] focus:rounded focus:bg-primary focus:px-4 focus:py-2 focus:text-primary-foreground focus:outline-none"

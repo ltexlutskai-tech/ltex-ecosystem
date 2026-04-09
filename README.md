@@ -140,6 +140,19 @@ Same features as Telegram bot with rich keyboard menus. Webhook-only (Viber requ
 
 The web store deploys to Netlify from the `main` branch. See `.env.example` for required environment variables.
 
+## Analytics
+
+### Umami Analytics (optional)
+
+Cookieless analytics. Set these env vars to enable:
+
+- `NEXT_PUBLIC_UMAMI_SCRIPT_URL` — URL of your Umami tracker script (e.g. `https://analytics.example.com/script.js`)
+- `NEXT_PUBLIC_UMAMI_WEBSITE_ID` — UUID of your website in Umami dashboard
+
+When both are set, the tracker loads on public store pages only (not admin). Custom events fire automatically for elements with `data-analytics="event-name"` attributes — see `components/analytics/click-tracker.tsx`.
+
+Tracked events: `product-card-click`, `add-to-cart`, `search-submit`, `wishlist-toggle`, `header-nav-new`, `header-nav-sale`, `header-viber-group`, `header-telegram-group`.
+
 ## License
 
 Private — L-TEX internal project.

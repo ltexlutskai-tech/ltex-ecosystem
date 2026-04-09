@@ -27,6 +27,7 @@ export function WishlistButton({ product, size = "sm" }: WishlistButtonProps) {
   return (
     <button
       onClick={toggle}
+      data-analytics="wishlist-toggle"
       className={`rounded-full bg-white/90 p-2 shadow-md transition-colors hover:bg-white ${
         inWishlist ? "text-red-500" : "text-gray-400 hover:text-red-400"
       }`}
