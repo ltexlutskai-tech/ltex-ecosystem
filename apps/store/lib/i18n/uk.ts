@@ -216,6 +216,12 @@ export const uk = {
   home: {
     heroDescription:
       "Гуртовий продаж секонд хенду, стоку, іграшок та Bric-a-Brac від {min} кг. Одяг, взуття, аксесуари з Англії, Німеччини, Канади та Польщі.",
+    featuredTitle: "Топ товарів",
+    saleTitle: "Акції",
+    newTitle: "Новинки",
+    seeAllFeatured: "Усі топи",
+    seeAllSale: "Усі акції",
+    seeAllNew: "Усі новинки",
     categoriesTitle: "Категорії товарів",
     productsCount: "товарів",
     features: [
