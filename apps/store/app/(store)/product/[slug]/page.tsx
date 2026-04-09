@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import dynamic from "next/dynamic";
 import { prisma } from "@ltex/db";
 import { notFound } from "next/navigation";
@@ -354,8 +355,27 @@ export default async function ProductPage({ params }: Props) {
         </div>
       )}
 
-      {/* Recommendations */}
-      <RecommendationsSection productId={product.id} />
+      {/* Recommendations — streamed separately so the product detail renders
+          immediately without waiting on the similar/bought-together queries. */}
+      <Suspense fallback={<RecommendationsSkeleton />}>
+        <RecommendationsSection productId={product.id} />
+      </Suspense>
+    </div>
+  );
+}
+
+function RecommendationsSkeleton() {
+  return (
+    <div className="mt-10">
+      <div className="h-6 w-40 animate-pulse rounded bg-gray-200" />
+      <div className="mt-4 grid grid-cols-2 gap-4 md:grid-cols-3">
+        {Array.from({ length: 3 }).map((_, i) => (
+          <div
+            key={i}
+            className="aspect-[4/3] animate-pulse rounded-lg bg-gray-200"
+          />
+        ))}
+      </div>
     </div>
   );
 }
