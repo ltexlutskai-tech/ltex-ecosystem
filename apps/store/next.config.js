@@ -9,6 +9,21 @@ const nextConfig = {
   // Monorepo: trace files from the repo root so pnpm workspace packages are
   // picked up by Netlify's serverless bundle.
   outputFileTracingRoot: path.join(__dirname, "../../"),
+  // Explicitly include the Prisma query engine binaries in every route's
+  // trace so Netlify's Lambda bundler always ships them alongside the
+  // serverless function. Without this, the engine .node file can be missed
+  // by automatic file tracing (since it's loaded via `require` from inside
+  // the external @prisma/client package), and runtime fails with
+  // PrismaClientInitializationError "could not locate the Query Engine".
+  outputFileTracingIncludes: {
+    "/**/*": [
+      "../../node_modules/.pnpm/@prisma+client*/node_modules/.prisma/client/libquery_engine-*.so.node",
+      "../../node_modules/.pnpm/@prisma+client*/node_modules/.prisma/client/schema.prisma",
+      "../../node_modules/.pnpm/@prisma+client*/node_modules/@prisma/client/**/*",
+      "../../node_modules/.pnpm/@prisma+client*/node_modules/.prisma/client/**/*",
+      "../../packages/db/prisma/schema.prisma",
+    ],
+  },
   // Load Prisma as an external package at runtime (prevents webpack from
   // bundling the .node native binding, which the loader can't find later).
   serverExternalPackages: ["@prisma/client", ".prisma/client", "prisma"],

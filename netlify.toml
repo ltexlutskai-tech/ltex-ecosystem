@@ -2,8 +2,11 @@
 # Site: stalwart-dango-04a9b9.netlify.app
 
 [build]
-  # Build the store app via Turborepo (runs prisma generate → next build)
-  command = "pnpm install --frozen-lockfile && pnpm build --filter=@ltex/store..."
+  # Build the store app via Turborepo. We explicitly run `prisma generate`
+  # BEFORE the turbo pipeline so the query engine binary (including the
+  # rhel-openssl-3.0.x target required by Netlify Lambda) is always fresh,
+  # even if Netlify's build cache is reused across deploys.
+  command = "pnpm install --frozen-lockfile && pnpm --filter @ltex/db exec prisma generate && pnpm build --filter=@ltex/store..."
   publish = "apps/store/.next"
   # Base directory (monorepo root)
   base = "/"
