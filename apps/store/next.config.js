@@ -30,6 +30,10 @@ const nextConfig = {
         hostname: "*.supabase.co",
         pathname: "/storage/v1/object/public/**",
       },
+      {
+        protocol: "https",
+        hostname: "i.ytimg.com",
+      },
     ],
   },
   async headers() {
@@ -64,7 +68,7 @@ const nextConfig = {
               "default-src 'self'",
               "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
               "style-src 'self' 'unsafe-inline'",
-              "img-src 'self' data: blob: https://*.supabase.co https://img.youtube.com",
+              "img-src 'self' data: blob: https://*.supabase.co https://img.youtube.com https://i.ytimg.com",
               "font-src 'self'",
               "connect-src 'self' https://*.supabase.co",
               "frame-src https://www.youtube.com https://youtube.com",

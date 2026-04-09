@@ -197,6 +197,13 @@ export const uk = {
     title: "Нещодавно переглянуті",
   },
 
+  // Video Reviews
+  videoReviews: {
+    heading: "Відеоогляди тижня",
+    seeAll: "Усі товари",
+    watch: "Дивитися огляд",
+  },
+
   // Top / Featured products page
   top: {
     title: "Топ товарів",
