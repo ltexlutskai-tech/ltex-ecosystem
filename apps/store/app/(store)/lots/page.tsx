@@ -10,6 +10,8 @@ import { getDictionary } from "@/lib/i18n";
 
 const dict = getDictionary();
 
+export const revalidate = 60;
+
 export const metadata: Metadata = {
   title: "Лоти (мішки) — секонд хенд та сток гуртом",
   description:

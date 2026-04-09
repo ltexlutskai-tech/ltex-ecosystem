@@ -34,6 +34,8 @@ const ImageGallery = dynamic(
 
 const dict = getDictionary();
 
+export const revalidate = 300;
+
 interface Props {
   params: Promise<{ slug: string }>;
 }

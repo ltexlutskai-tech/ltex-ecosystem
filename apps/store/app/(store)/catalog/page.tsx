@@ -13,6 +13,8 @@ import { getDictionary } from "@/lib/i18n";
 const dict = getDictionary();
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://ltex.com.ua";
 
+export const revalidate = 60;
+
 export const metadata: Metadata = {
   title: "Каталог — секонд хенд, сток, іграшки гуртом",
   description:

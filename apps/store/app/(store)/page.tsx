@@ -7,10 +7,9 @@ import { getDictionary } from "@/lib/i18n";
 
 const dict = getDictionary();
 
-export const dynamic = "force-dynamic";
 export const revalidate = 60;
 
-export default async function HomePage() {
+async function loadHomeData() {
   const parentCategories = await prisma.category.findMany({
     where: { parentId: null },
     include: {
@@ -19,17 +18,38 @@ export default async function HomePage() {
     orderBy: { position: "asc" },
   });
 
-  // Count products in each parent category (including subcategories)
-  const categories = await Promise.all(
-    parentCategories.map(async (cat) => {
-      const childIds = cat.children.map((c) => c.id);
-      const allIds = [cat.id, ...childIds];
-      const productCount = await prisma.product.count({
-        where: { categoryId: { in: allIds }, inStock: true },
-      });
-      return { ...cat, productCount };
-    }),
+  // One query: counts per category id (for both parents and children)
+  const counts = await prisma.product.groupBy({
+    by: ["categoryId"],
+    where: { inStock: true },
+    _count: { _all: true },
+  });
+
+  return { parentCategories, counts };
+}
+
+export default async function HomePage() {
+  // DB may be unreachable at build-time prerender (e.g. CI with placeholder
+  // DATABASE_URL). Fall back to empty data; ISR will populate real data on
+  // the first production request and revalidate every 60s after.
+  const { parentCategories, counts } = await loadHomeData().catch(
+    () =>
+      ({ parentCategories: [], counts: [] }) as Awaited<
+        ReturnType<typeof loadHomeData>
+      >,
   );
+
+  const countByCategoryId = new Map(
+    counts.map((c) => [c.categoryId, c._count._all]),
+  );
+
+  const categories = parentCategories.map((cat) => {
+    const childIds = cat.children.map((c) => c.id);
+    const productCount =
+      (countByCategoryId.get(cat.id) ?? 0) +
+      childIds.reduce((sum, id) => sum + (countByCategoryId.get(id) ?? 0), 0);
+    return { ...cat, productCount };
+  });
   const jsonLd = {
     "@context": "https://schema.org",
     "@type": "WebSite",
