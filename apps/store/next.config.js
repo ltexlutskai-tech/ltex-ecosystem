@@ -1,9 +1,27 @@
+const path = require("path");
+const { PrismaPlugin } = require("@prisma/nextjs-monorepo-workaround-plugin");
 const withBundleAnalyzer = require("@next/bundle-analyzer")({
   enabled: process.env.ANALYZE === "true",
 });
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Monorepo: trace files from the repo root so pnpm workspace packages are
+  // picked up by Netlify's serverless bundle.
+  outputFileTracingRoot: path.join(__dirname, "../../"),
+  // Load Prisma as an external package at runtime (prevents webpack from
+  // bundling the .node native binding, which the loader can't find later).
+  serverExternalPackages: ["@prisma/client", ".prisma/client", "prisma"],
+  // Prisma ships its query engine as a `.node` native binary that Next.js
+  // output file tracing misses in a pnpm monorepo. PrismaPlugin copies the
+  // required engine next to the bundled server output so it resolves at
+  // runtime on Netlify Lambda (rhel-openssl-3.0.x).
+  webpack: (config, { isServer }) => {
+    if (isServer) {
+      config.plugins = [...(config.plugins || []), new PrismaPlugin()];
+    }
+    return config;
+  },
   transpilePackages: ["@ltex/ui", "@ltex/shared", "@ltex/db"],
   images: {
     remotePatterns: [
