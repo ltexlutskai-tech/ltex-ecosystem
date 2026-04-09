@@ -19,6 +19,20 @@ export function BannerForm({ banner }: BannerFormProps) {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    // Hard limit matching next.config.js serverActions.bodySizeLimit (10 MB).
+    // Fail fast on the client so the user sees a clear message instead of
+    // Next.js's opaque "unexpected response" when the request body is rejected.
+    const MAX_SIZE_BYTES = 10 * 1024 * 1024;
+    if (file.size > MAX_SIZE_BYTES) {
+      toast({
+        title: "Файл завеликий",
+        description: `Розмір зображення — ${(file.size / 1024 / 1024).toFixed(1)} MB. Максимум 10 MB. Стисніть через squoosh.app або збережіть у JPG ~80% якості.`,
+        variant: "destructive",
+      });
+      if (fileRef.current) fileRef.current.value = "";
+      return;
+    }
+
     setUploading(true);
     try {
       const formData = new FormData();

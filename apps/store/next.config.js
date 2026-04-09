@@ -27,6 +27,16 @@ const nextConfig = {
   // Load Prisma as an external package at runtime (prevents webpack from
   // bundling the .node native binding, which the loader can't find later).
   serverExternalPackages: ["@prisma/client", ".prisma/client", "prisma"],
+  // Server Actions default body limit is 1 MB, which is too small for admin
+  // image uploads (banners, product photos). High-res AI-generated banners
+  // (1920×600 JPG/PNG) can easily be 2-5 MB. Bump the limit to 10 MB so
+  // uploads don't fail at the framework level with the opaque
+  // "An unexpected response was received from the server" error.
+  experimental: {
+    serverActions: {
+      bodySizeLimit: "10mb",
+    },
+  },
   // Prisma ships its query engine as a `.node` native binary that Next.js
   // output file tracing misses in a pnpm monorepo. PrismaPlugin copies the
   // required engine next to the bundled server output so it resolves at
