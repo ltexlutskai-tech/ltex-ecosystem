@@ -12,19 +12,25 @@ Contacts: Telegram @L_TEX, +380 67 671 05 15, +380 99 358 49 92, ltex.lutsk.ai@g
 
 **Branch:** `main` (all work merged through Session 7)
 
-All work from Phase 0 through Session 7 is complete and merged into main (44 commits).
+All work from Phase 0 through Session 14 is complete and merged into main.
 
 **IMPORTANT FOR NEW SESSIONS:** Do NOT re-audit or re-merge branches. The project is fully functional:
 
-- Supabase DB: 805 products, 725 lots, 49 categories seeded
+- Supabase DB: 805 products, 725 lots, 49 categories seeded + Wave 1 tables (banners, featured_products, promo_stripe) created manually via SQL Editor
 - Netlify: deploying from `main` at stalwart-dango-04a9b9.netlify.app
-- Site is LIVE and working (catalog, lots, cart, admin, API routes)
+- Site is LIVE and working (catalog, lots, cart, admin, API routes, new /new + /sale + /top pages, banner carousel, featured section, video reviews)
 - Session 4 completed: 114 unit tests, TypeScript strict (0 any), Zod validation, a11y, SEO, CI Prettier
 - Session 5 completed: mobile polish, 36 E2E tests, admin UX (sort/CSV/breadcrumbs), security headers, bot commands, docs
 - Session 6 completed: admin pagination/filters, image gallery, order flow, i18n, real-time admin, store UX (quick view/wishlist/comparison/recently viewed), integration tests
 - Session 7 completed: i18n all pages, email notifications, analytics dashboard, SEO structured data, mobile auth guards + deep linking, performance (infinite scroll, bundle analyzer), context provider tests
+- Session 8: CI fix + production hardening (Prettier, TypeScript strict, nodemailer, env validation, fetch timeouts)
+- Session 9: Netlify Prisma generate fix (packages/db turbo.json + build script)
+- Session 10: Infrastructure scripts (RLS, FTS migrations, webhook registration, netlify.toml)
+- Session 13: Performance fixes (ISR on homepage/catalog/lots/product, homepage N+1 collapse to single groupBy)
+- **Session 14: Wave 1 feature expansion (header overhaul, /new + /sale, banners admin, featured products, Umami, video carousel, promo stripe) + Wave 2 homepage restructure (BannerCarousel, 9 sections, single Promise.all of 7 queries) + emergency Netlify fix (outputFileTracingIncludes для Prisma engine на Lambda). Added 3 Prisma models: Banner, FeaturedProduct, PromoStripe.**
 - DO NOT repeat seed, merge, or infrastructure setup — it's all done
-- DO NOT re-run Session 4, 5, 6, or 7 tasks — ALL DONE
+- DO NOT re-run Session 4-14 tasks — ALL DONE
+- DO NOT touch `next.config.js` `outputFileTracingIncludes` / `PrismaPlugin` / `serverExternalPackages` — critical for Netlify Lambda runtime
 
 ## What Exists Now
 
@@ -804,6 +810,99 @@ Worker додав `loadHomeData()` helper + `.catch(() => ({ parentCategories: [
 - Найбільший виграш — eliminated the 7-round-trip count waterfall
 - `/catalog`, `/lots`, `/product/[slug]` лишились `ƒ` (Dynamic) через `searchParams`/`params`, але ISR тепер кешує конкретні URL+query комбінації після першого запиту
 
+### Session 14 Completion Report (2026-04-09)
+
+Сесія була великою: Wave 1 (7 feature-задач) + Wave 1 Prisma schema migration + Wave 2 (homepage restructure) + emergency Netlify fix. Структура була orchestrator + паралельні worker-сесії.
+
+#### Wave 1 — Feature expansion (ukrstock.com-style overhaul)
+
+Мета: наблизити сайт до конкурентів (ukrstock.com) — додати банери, featured products, NEW/SALE розділи, promo stripe, video reviews, global search.
+
+| Commit    | Task                                            | Ключові зміни                                                                                                                                                                                                                |
+| --------- | ----------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `a5077c0` | **Task 1** — Header overhaul                    | Viber/Telegram group links, NEW/SALE навігація, global search field (connected to autocomplete API), оновлений макет header                                                                                                  |
+| `e53f6c9` | **Task 2** — /new + /sale routes                | Публічні сторінки `/new` (останні 30 днів по `createdAt`) і `/sale` (товари з `priceType: akciya`), NEW/SALE badges на ProductCard                                                                                           |
+| `025af73` | **Task 3** — Banners admin                      | Нова Prisma модель `Banner`, admin CRUD (`/admin/banners`), upload в Supabase Storage bucket `product-images/banners/`, drag-upload UI, isActive toggle, position sorting                                                    |
+| `1514dae` | **Task 4** — Featured products                  | Нова Prisma модель `FeaturedProduct` (`onDelete: Cascade`), admin curation page (`/admin/featured`), публічна сторінка `/top`, `getFeaturedProducts()` helper                                                                |
+| `dca65d9` | **Task 5** — Umami analytics                    | `<UmamiTracker>` client component (cookieless, `data-website-id` env var), `<AnalyticsClickTracker>` з global click listener на `[data-analytics]` елементах, data-analytics атрибути на ~30 key CTAs                        |
+| `b45201b` | **Task 6** — Video reviews carousel             | `<VideoReviewsCarousel>` client component (scrollable row з YouTube thumbnails), `getVideoReviewProducts()` тягне 12 випадкових продуктів з `videoUrl`, CSP `img-src` оновлено на `https://i.ytimg.com`                      |
+| `0005e56` | **Task 7** — Promo stripe ("Гаряча пропозиція") | Нова Prisma модель `PromoStripe` (single-row pattern: `findFirst` + update/create), admin сторінка `/admin/promo`, `<PromoStripe>` server component у `(store)/layout.tsx` (рендериться на всіх сторінках), `.catch()` guard |
+
+#### Wave 1 Prisma migration (user action)
+
+| Commit    | Файл                       | Опис                                                                                                                   |
+| --------- | -------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `c8f9471` | `scripts/wave1-schema.sql` | Згенеровано через `prisma migrate diff --from-empty --to-schema-datamodel`, створює 3 таблиці з `IF NOT EXISTS` guards |
+
+User виконав SQL в Supabase SQL Editor (verified via screenshot). 3 таблиці `featured_products`, `banners`, `promo_stripe` створені в Supabase.
+
+#### Wave 2 — Homepage restructure
+
+| Commit    | Task                 | Ключові зміни                                                                                                                                                                                                                                                                                                                                                                                |
+| --------- | -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `cdef86d` | Homepage restructure | Нова `<BannerCarousel>` client component (auto-rotate 6s, dots, prev/next arrows, `next/image` з `priority` для LCP). Переписано `app/(store)/page.tsx` на 9 секцій: banners → hero fallback → featured → sale → new → categories → video reviews → recently viewed → features → CTA. Єдиний `Promise.all` з 7 паралельних запитів + `.catch()` fallback. ISR збережено (`revalidate = 60`). |
+
+**Відхилення worker-а (accepted):** Додав `loadHomeData()` helper + `.catch()` fallback бо без цього CI build падав через placeholder `DATABASE_URL` — Next.js 15 пре-рендерить `/` статично при білді і не тягне DB. Prod (Netlify має справжній DATABASE_URL) отримує реальні дані.
+
+#### Emergency Netlify fix — Production Prisma engine error
+
+**Проблема:** Після Wave 2 deploy на Netlify кожен запит головної падав з `PrismaClientInitializationError: "Prisma Client could not locate the Query Engine for runtime 'rhel-openssl-3.0.x'"`. Сайт був повністю зламаний у проді.
+
+**Діагностика:**
+
+- `binaryTargets = ["native", "rhel-openssl-3.0.x"]` у `schema.prisma` — вже був (з Session 9)
+- `PrismaPlugin` у `next.config.js` — вже був (з Session 9)
+- Engine generate-ився локально коректно (`libquery_engine-rhel-openssl-3.0.x.so.node` присутній у `.next/server/chunks/`)
+- `.nft.json` trace включав engine
+- **Але:** Prisma runtime loader шукає engine у дефолтних локаціях (біля JS-файлу, `node_modules/.prisma/client`), а не в `.next/server/chunks/`. PrismaPlugin копіював engine тільки в `chunks/`, не біля кожного `page.js`. Netlify's Lambda bundler не шипив engine туди, де Prisma його шукав.
+
+**Fix (commit `d6b8197`):**
+
+| Файл                        | Зміна                                                                                                                                                                                                                                                           |
+| --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `apps/store/next.config.js` | Додано `outputFileTracingIncludes` з глобом на `libquery_engine-*.so.node` + `.prisma/client/**` для паттерну `/**/*`. Next.js тепер копіює rhel+debian engines напряму біля кожного `page.js` у `.next/server/app/**` — де Prisma їх і шукає за замовчуванням. |
+| `netlify.toml`              | Додано явний крок `pnpm --filter @ltex/db exec prisma generate` перед `pnpm build`, щоб engine регенерувався завжди, навіть при Netlify build cache reuse.                                                                                                      |
+
+**Верифікація локально:** `.next/server/app/(store)/libquery_engine-rhel-openssl-3.0.x.so.node` тепер існує біля `page.js`. CI: format + typecheck + 186 tests + build — все зелене. User підтвердив що сайт ожив після redeploy (admin login page рендериться).
+
+#### Додаткові покращення під час сесії
+
+- `2f80cdc` — `perf(product): stream recommendations via Suspense` — обгорнуто `<RecommendationsSection>` у Suspense з skeleton fallback, 4-5 query round trips для similar products стрімляться після основного контенту.
+
+#### Результати CI (локально):
+
+| Крок                | Результат                                     |
+| ------------------- | --------------------------------------------- |
+| `pnpm format:check` | **PASS**                                      |
+| `pnpm typecheck`    | **PASS** — 7/7 пакетів, 0 помилок             |
+| `pnpm turbo test`   | **PASS** — 186 тестів (25 shared + 161 store) |
+| `pnpm build`        | **PASS** — всі маршрути скомпільовані         |
+
+#### Метрики:
+
+| Метрика                    | До Session 14 | Після Session 14                                                                                |
+| -------------------------- | ------------- | ----------------------------------------------------------------------------------------------- |
+| Prisma моделей             | 19            | **22** (+Banner, FeaturedProduct, PromoStripe)                                                  |
+| Admin сторінки             | base          | **+4** (banners, featured, promo, + ukr nav: Топ товарів / Банери / Гаряча пропозиція)          |
+| Store public routes        | base          | **+3** (/new, /sale, /top)                                                                      |
+| Homepage sections          | 5             | **9** (banners → featured → sale → new → categories → video → recently viewed → features → CTA) |
+| Analytics integration      | None          | **Umami tracker** + global click listener                                                       |
+| Carousels/дінамічні блоки  | 0             | **2** (BannerCarousel, VideoReviewsCarousel)                                                    |
+| CI статус                  | Green         | **Green (зберегли)**                                                                            |
+| Production Netlify         | WORKING       | **BROKEN → FIXED** (binary target + file tracing)                                               |
+| Total commits (Session 14) | —             | **10** (a5077c0 → d6b8197, включно з 2f80cdc)                                                   |
+
+#### Wave 1 branches (pending remote delete через GitHub UI):
+
+- `claude/feat-header-overhaul-h7k3m`
+- `claude/feat-new-sale-routes-h5rJR`
+- `claude/feat-banners-admin-KAM0m`
+- `claude/feat-featured-products-Mv7it`
+- `claude/feat-analytics-umami-d0duN`
+- `claude/feat-video-reviews-carousel-ivIvs`
+- `claude/feat-promo-stripe-9cziy`
+- `claude/feat-homepage-restructure-s8lG5` (Wave 2)
+
 ### Branch Cleanup (pending)
 
 | Branch                                      | Status                                      |
@@ -817,18 +916,45 @@ Worker додав `loadHomeData()` helper + `.catch(() => ({ parentCategories: [
 | `claude/fix-netlify-prisma-build-JoYVE`     | Merged, remote delete pending               |
 | `claude/infrastructure-scripts-setup-J9zSf` | Merged, remote delete pending               |
 | `claude/performance-fixes-session-13-3ievW` | Merged, remote delete pending (403 via CLI) |
+| `claude/feat-header-overhaul-h7k3m`         | Merged (Wave 1), remote delete pending      |
+| `claude/feat-new-sale-routes-h5rJR`         | Merged (Wave 1), remote delete pending      |
+| `claude/feat-banners-admin-KAM0m`           | Merged (Wave 1), remote delete pending      |
+| `claude/feat-featured-products-Mv7it`       | Merged (Wave 1), remote delete pending      |
+| `claude/feat-analytics-umami-d0duN`         | Merged (Wave 1), remote delete pending      |
+| `claude/feat-video-reviews-carousel-ivIvs`  | Merged (Wave 1), remote delete pending      |
+| `claude/feat-promo-stripe-9cziy`            | Merged (Wave 1), remote delete pending      |
+| `claude/feat-homepage-restructure-s8lG5`    | Merged (Wave 2), remote delete pending      |
 
-**ACTION REQUIRED:** Delete 9 branches via GitHub UI.
+**ACTION REQUIRED:** Delete 17 branches via GitHub UI (Settings → Branches, or click "Delete branch" on merged PRs).
 
 ### Tasks for next session
 
 **IMPORTANT:** НЕ повторювати seed, merge, або infrastructure setup — все вже зроблено.
-**IMPORTANT:** НЕ повторювати задачі Session 4-13 — ВСЕ ЗРОБЛЕНО. Дивись completion reports вище.
+**IMPORTANT:** НЕ повторювати задачі Session 4-14 — ВСЕ ЗРОБЛЕНО. Дивись completion reports вище.
 **IMPORTANT:** L-TEX НЕ приймає онлайн-оплати. Таблиця `payments` — тільки для відображення історії з 1С.
 **IMPORTANT:** CI зелений (format + test + typecheck + build). НЕ ламати CI.
-**IMPORTANT:** Site is LIVE on Netlify at stalwart-dango-04a9b9.netlify.app. Session 13 ISR фікси задеплоєні (commit 685e0e2). Після Netlify deploy треба перевірити швидкість завантаження головної/каталогу/лотів/продукту в prod.
+**IMPORTANT:** Site is LIVE на Netlify at stalwart-dango-04a9b9.netlify.app. Session 14 emergency Prisma fix задеплоєний (commit `d6b8197`). User підтвердив що admin login page рендериться.
+**IMPORTANT:** Wave 1+2 features готові: banners, featured products, promo stripe, /new, /sale, /top, video carousel, Umami analytics, global search у header. Всі CRUD-и в admin panel працюють.
+**IMPORTANT:** НЕ чіпати `next.config.js` `outputFileTracingIncludes` або `PrismaPlugin` — це критично для Netlify runtime.
 
-Немає активних задач для worker-сесії. Orchestrator чекає на фідбек від користувача після Netlify deploy (швидкість завантаження сторінок) або на нові вимоги.
+Немає активних задач для worker-сесії. Orchestrator чекає на фідбек від користувача по:
+
+1. **Контент для банерів** — user планує згенерувати 2 банери через AI (ChatGPT/Gemini image gen) з промптом, виданим у поточній сесії. Теми: "широкий асортимент кросівок" + "акційні пропозиції квітня". Коли банери будуть — user завантажить їх через `/admin/banners` (drag-upload працює). Якщо щось зламається під час завантаження — новий worker-fix.
+2. **Умaмi analytics** — у `NEXT_PUBLIC_UMAMI_WEBSITE_ID` і `NEXT_PUBLIC_UMAMI_SCRIPT_URL` env vars поки нічого немає. User має підняти Umami instance (self-host або umami.is cloud) і додати env vars у Netlify Dashboard, щоб click-tracking почав працювати в prod. Без цього компонент `<UmamiTracker>` просто нічого не рендерить (graceful noop).
+3. **Featured products / Promo stripe** — user має зайти в `/admin/featured` та `/admin/promo` і наповнити контентом (інакше на головній буде пусто: featured section просто не покажеться, promo stripe теж).
+4. **Фідбек про швидкість** — Session 13 ISR fixes + Session 14 Wave 2 single-Promise.all (7 queries) + Netlify fix задеплоєні. Потрібно перевірити в prod: швидкість головної, каталогу, лотів, продукту.
+5. **Branch cleanup** — 17 merged branches чекають manual delete через GitHub UI (CLI віддавав 403).
+
+#### Довгі pending задачі (потребують участі користувача, НЕ для автономної worker-сесії)
+
+- Увімкнути RLS — запустити `scripts/enable-rls.sql` в Supabase SQL Editor
+- Запустити FTS міграцію — запустити `scripts/fts-migration.sql` в Supabase SQL Editor
+- Створити Storage bucket `product-images` в Supabase Dashboard (якщо ще немає — banners upload вже юзає subfolder `banners/`, але bucket має існувати)
+- Завантажити фото продуктів — `npx tsx scripts/upload-photos.ts` (після створення bucket)
+- Netlify env vars: `NEXT_PUBLIC_SITE_URL`, `SYNC_API_KEY`, `TELEGRAM_BOT_TOKEN`+`TELEGRAM_CHAT_ID`, `VIBER_AUTH_TOKEN`, `NEXT_PUBLIC_UMAMI_WEBSITE_ID`+`NEXT_PUBLIC_UMAMI_SCRIPT_URL`
+- Telegram/Viber webhooks — запустити скрипти реєстрації
+- 1С інтеграція — налаштування на стороні 1С
+- Кастомний домен — ltex.com.ua (DNS + Netlify)
 
 ### Tasks for next session — previous (Session 13 plan, archived)
 
