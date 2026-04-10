@@ -10,14 +10,15 @@ Contacts: Telegram @L_TEX, +380 67 671 05 15, +380 99 358 49 92, ltex.lutsk.ai@g
 
 ## Current Status
 
-**Branch:** `main` (all work merged through Session 7)
+**Branch:** `main` (all work merged through Session 14; Session 15 on `claude/review-claude-md-WPY04` pending merge)
 
-All work from Phase 0 through Session 14 is complete and merged into main.
+All work from Phase 0 through Session 14 is complete and merged into main. Session 15 (self-hosting migration) is on feature branch.
 
 **IMPORTANT FOR NEW SESSIONS:** Do NOT re-audit or re-merge branches. The project is fully functional:
 
 - Supabase DB: 805 products, 725 lots, 49 categories seeded + Wave 1 tables (banners, featured_products, promo_stripe) created manually via SQL Editor
-- Netlify: deploying from `main` at stalwart-dango-04a9b9.netlify.app
+- **MIGRATING** from Netlify to self-hosted Windows Server 2022 (i5-9600K, 32GB RAM, static IP, 107 Mbit symmetric)
+- Netlify still active at stalwart-dango-04a9b9.netlify.app (will be deprecated after self-hosting is verified)
 - Site is LIVE and working (catalog, lots, cart, admin, API routes, new /new + /sale + /top pages, banner carousel, featured section, video reviews)
 - Session 4 completed: 114 unit tests, TypeScript strict (0 any), Zod validation, a11y, SEO, CI Prettier
 - Session 5 completed: mobile polish, 36 E2E tests, admin UX (sort/CSV/breadcrumbs), security headers, bot commands, docs
@@ -28,6 +29,7 @@ All work from Phase 0 through Session 14 is complete and merged into main.
 - Session 10: Infrastructure scripts (RLS, FTS migrations, webhook registration, netlify.toml)
 - Session 13: Performance fixes (ISR on homepage/catalog/lots/product, homepage N+1 collapse to single groupBy)
 - **Session 14: Wave 1 feature expansion (header overhaul, /new + /sale, banners admin, featured products, Umami, video carousel, promo stripe) + Wave 2 homepage restructure (BannerCarousel, 9 sections, single Promise.all of 7 queries) + emergency Netlify fix (outputFileTracingIncludes для Prisma engine на Lambda). Added 3 Prisma models: Banner, FeaturedProduct, PromoStripe.**
+- **Session 15: Self-hosting migration — standalone output, Prisma Windows target, singleton fix, Image optimization, React cache() dedup, unstable_cache homepage, PM2/Caddy/deploy configs, DEPLOYMENT.md guide**
 - DO NOT repeat seed, merge, or infrastructure setup — it's all done
 - DO NOT re-run Session 4-14 tasks — ALL DONE
 - DO NOT touch `next.config.js` `outputFileTracingIncludes` / `PrismaPlugin` / `serverExternalPackages` — critical for Netlify Lambda runtime
@@ -927,14 +929,72 @@ User виконав SQL в Supabase SQL Editor (verified via screenshot). 3 та
 
 **ACTION REQUIRED:** Delete 17 branches via GitHub UI (Settings → Branches, or click "Delete branch" on merged PRs).
 
+### Session 15 Completion Report (2026-04-10)
+
+#### Що зроблено (3 коміти, міграція на self-hosting):
+
+| Commit    | Task                        | Ключові зміни                                                                                                     |
+| --------- | --------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `11c147b` | Infrastructure migration    | Видалено PrismaPlugin, outputFileTracingIncludes, serverExternalPackages. Додано `output: 'standalone'`. Prisma binaryTargets: native + windows + debian-openssl-3.0.x. Fix singleton для production. netlify.toml deprecated |
+| `dfb8072` | Code optimizations          | `<img>` → `<Image>` в ProductCard (WebP/AVIF, responsive sizes). React `cache()` dedup на product page (2→1 query). `unstable_cache` для homepage даних |
+| `6dd7d46` | Infrastructure configs      | ecosystem.config.js (PM2), Caddyfile (reverse proxy + auto-SSL), scripts/deploy.ps1 (PowerShell deploy), DEPLOYMENT.md (покрокова інструкція) |
+
+#### Серверні характеристики (self-hosting target):
+
+| Параметр | Значення |
+|----------|----------|
+| OS | Windows Server 2022 Datacenter |
+| CPU | Intel i5-9600K @ 3.7GHz, 6 ядер |
+| RAM | 32 ГБ |
+| Диски | C: 146GB, D: 300GB, E: 931GB (777GB вільно) |
+| IP | 194.187.154.162 (статична) |
+| Інтернет | 107 Мбіт symmetric (WestNet) |
+| Ping | 12мс, Jitter: 0мс |
+
+#### Результати CI:
+
+| Крок                | Результат                                     |
+| ------------------- | --------------------------------------------- |
+| `pnpm format:check` | **PASS**                                      |
+| `pnpm -r typecheck` | **PASS** — 6/6 пакетів, 0 помилок             |
+| `pnpm -r test`      | **PASS** — 186 тестів (25 shared + 161 store) |
+| `pnpm build`        | **PASS** — standalone output створений        |
+
+#### Файли змінені/створені:
+
+| Файл | Тип | Зміна |
+|------|-----|-------|
+| `apps/store/next.config.js` | Modified | -PrismaPlugin, -outputFileTracingIncludes, -serverExternalPackages, +output:'standalone' |
+| `packages/db/prisma/schema.prisma` | Modified | binaryTargets: native + windows + debian-openssl-3.0.x |
+| `packages/db/src/index.ts` | Modified | Singleton кешується і в production |
+| `netlify.toml` | Modified | Deprecated header |
+| `apps/store/components/store/product-card.tsx` | Modified | `<img>` → `<Image>` |
+| `apps/store/app/(store)/product/[slug]/page.tsx` | Modified | React `cache()` dedup |
+| `apps/store/app/(store)/page.tsx` | Modified | `unstable_cache` |
+| `ecosystem.config.js` | **NEW** | PM2 config |
+| `Caddyfile` | **NEW** | Reverse proxy + auto-SSL |
+| `scripts/deploy.ps1` | **NEW** | PowerShell deploy script |
+| `DEPLOYMENT.md` | **NEW** | Setup guide |
+
+#### Очікуване прискорення після міграції:
+
+| Сторінка | Netlify (зараз) | Self-hosted (після) |
+|----------|-----------------|---------------------|
+| Homepage | 2-5с (cold: 5с+) | ~200-400мс стабільно |
+| Product | 2-3.5с | ~100-250мс |
+| Catalog | 2-3с | ~150-300мс |
+| DB latency | ~30мс (Frankfurt) | ~1мс (localhost) |
+| Cold starts | Кожні 60с idle | Ніколи |
+
 ### Tasks for next session
 
 **IMPORTANT:** НЕ повторювати seed, merge, або infrastructure setup — все вже зроблено.
-**IMPORTANT:** НЕ повторювати задачі Session 4-14 — ВСЕ ЗРОБЛЕНО. Дивись completion reports вище.
+**IMPORTANT:** НЕ повторювати задачі Session 4-15 — ВСЕ ЗРОБЛЕНО. Дивись completion reports вище.
 **IMPORTANT:** L-TEX НЕ приймає онлайн-оплати. Таблиця `payments` — тільки для відображення історії з 1С.
 **IMPORTANT:** CI зелений (format + test + typecheck + build). НЕ ламати CI.
-**IMPORTANT:** Site is LIVE на Netlify at stalwart-dango-04a9b9.netlify.app. Session 14 emergency Prisma fix задеплоєний (commit `d6b8197`). User підтвердив що admin login page рендериться.
+**IMPORTANT:** Session 15 branch `claude/review-claude-md-WPY04` готовий до merge в main (3 коміти, CI green).
 **IMPORTANT:** Wave 1+2 features готові: banners, featured products, promo stripe, /new, /sale, /top, video carousel, Umami analytics, global search у header. Всі CRUD-и в admin panel працюють.
+**IMPORTANT:** DO NOT touch `output: 'standalone'` in next.config.js — critical for self-hosted deployment.
 **IMPORTANT:** НЕ чіпати `next.config.js` `outputFileTracingIncludes` або `PrismaPlugin` — це критично для Netlify runtime.
 
 Немає активних задач для worker-сесії. Orchestrator чекає на фідбек від користувача по:
