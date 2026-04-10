@@ -1,3 +1,4 @@
+import { unstable_cache } from "next/cache";
 import { Button } from "@ltex/ui";
 import { APP_NAME, MIN_ORDER_KG, CONTACTS } from "@ltex/shared";
 import { prisma } from "@ltex/db";
@@ -14,76 +15,80 @@ const dict = getDictionary();
 
 export const revalidate = 60;
 
-async function loadHomeData() {
-  const [
-    parentCategories,
-    counts,
-    banners,
-    featured,
-    newProducts,
-    saleProducts,
-    videoProducts,
-  ] = await Promise.all([
-    prisma.category.findMany({
-      where: { parentId: null },
-      include: { children: { select: { id: true } } },
-      orderBy: { position: "asc" },
-    }),
-    prisma.product.groupBy({
-      by: ["categoryId"],
-      where: { inStock: true },
-      _count: { _all: true },
-    }),
-    prisma.banner.findMany({
-      where: { isActive: true },
-      orderBy: { position: "asc" },
-    }),
-    getFeaturedProducts(12),
-    prisma.product.findMany({
-      where: { inStock: true },
-      orderBy: { createdAt: "desc" },
-      take: 8,
-      include: {
-        images: { take: 1, orderBy: { position: "asc" } },
-        prices: {
-          where: { priceType: { in: ["wholesale", "akciya"] } },
-          take: 5,
+const getCachedHomeData = unstable_cache(
+  async () => {
+    const [
+      parentCategories,
+      counts,
+      banners,
+      featured,
+      newProducts,
+      saleProducts,
+      videoProducts,
+    ] = await Promise.all([
+      prisma.category.findMany({
+        where: { parentId: null },
+        include: { children: { select: { id: true } } },
+        orderBy: { position: "asc" },
+      }),
+      prisma.product.groupBy({
+        by: ["categoryId"],
+        where: { inStock: true },
+        _count: { _all: true },
+      }),
+      prisma.banner.findMany({
+        where: { isActive: true },
+        orderBy: { position: "asc" },
+      }),
+      getFeaturedProducts(12),
+      prisma.product.findMany({
+        where: { inStock: true },
+        orderBy: { createdAt: "desc" },
+        take: 8,
+        include: {
+          images: { take: 1, orderBy: { position: "asc" } },
+          prices: {
+            where: { priceType: { in: ["wholesale", "akciya"] } },
+            take: 5,
+          },
+          _count: { select: { lots: true } },
         },
-        _count: { select: { lots: true } },
-      },
-    }),
-    prisma.product.findMany({
-      where: { inStock: true, prices: { some: { priceType: "akciya" } } },
-      orderBy: { updatedAt: "desc" },
-      take: 8,
-      include: {
-        images: { take: 1, orderBy: { position: "asc" } },
-        prices: {
-          where: { priceType: { in: ["wholesale", "akciya"] } },
-          take: 5,
+      }),
+      prisma.product.findMany({
+        where: { inStock: true, prices: { some: { priceType: "akciya" } } },
+        orderBy: { updatedAt: "desc" },
+        take: 8,
+        include: {
+          images: { take: 1, orderBy: { position: "asc" } },
+          prices: {
+            where: { priceType: { in: ["wholesale", "akciya"] } },
+            take: 5,
+          },
+          _count: { select: { lots: true } },
         },
-        _count: { select: { lots: true } },
-      },
-    }),
-    getVideoReviewProducts(12),
-  ]);
+      }),
+      getVideoReviewProducts(12),
+    ]);
 
-  return {
-    parentCategories,
-    counts,
-    banners,
-    featured,
-    newProducts,
-    saleProducts,
-    videoProducts,
-  };
-}
+    return {
+      parentCategories,
+      counts,
+      banners,
+      featured,
+      newProducts,
+      saleProducts,
+      videoProducts,
+    };
+  },
+  ["home-data"],
+  { revalidate: 60, tags: ["home"] },
+);
 
 export default async function HomePage() {
   // DB may be unreachable at build-time prerender (e.g. CI with placeholder
   // DATABASE_URL). Fall back to empty data; ISR will populate real data on
   // the first production request and revalidate every 60s after.
-  const data = await loadHomeData().catch(
+  const data = await getCachedHomeData().catch(
     () =>
       ({
         parentCategories: [],
@@ -93,7 +98,7 @@ export default async function HomePage() {
         newProducts: [],
         saleProducts: [],
         videoProducts: [],
-      }) as Awaited<ReturnType<typeof loadHomeData>>,
+      }) as Awaited<ReturnType<typeof getCachedHomeData>>,
   );
 
   const countByCategoryId = new Map(
