@@ -1,0 +1,30 @@
+# L-TEX reverse proxy configuration.
+# Caddy automatically provisions and renews TLS certificates via Let's Encrypt.
+#
+# Usage (Windows):
+#   caddy run --config E:\ltex-ecosystem\Caddyfile
+#
+# Before first run, ensure DNS A record for ltex.com.ua points to server IP
+# and ports 80 + 443 are forwarded through the router.
+
+ltex.com.ua {
+    reverse_proxy localhost:3000
+
+    # Compress responses
+    encode gzip zstd
+
+    # Security headers (complement Next.js headers)
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "DENY"
+    }
+
+    # Cache static assets aggressively
+    @static path /_next/static/*
+    header @static Cache-Control "public, max-age=31536000, immutable"
+
+    # Cache images
+    @images path /_next/image/*
+    header @images Cache-Control "public, max-age=86400"
+}
