@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { Badge, Card, CardContent } from "@ltex/ui";
 import { QUALITY_LABELS, type QualityLevel } from "@ltex/shared";
 import { SEASON_LABELS } from "@ltex/shared";
@@ -57,11 +58,12 @@ export function ProductCard({
         <Card className="h-full overflow-hidden transition-shadow hover:shadow-md">
           <div className="relative aspect-[4/3] bg-gray-100">
             {firstImage ? (
-              <img
+              <Image
                 src={firstImage.url}
                 alt={firstImage.alt || product.name}
-                className="h-full w-full object-cover transition-transform group-hover:scale-105"
-                loading="lazy"
+                fill
+                sizes="(max-width: 768px) 50vw, (max-width: 1024px) 33vw, 25vw"
+                className="object-cover transition-transform group-hover:scale-105"
               />
             ) : (
               <div className="flex h-full items-center justify-center text-gray-400">

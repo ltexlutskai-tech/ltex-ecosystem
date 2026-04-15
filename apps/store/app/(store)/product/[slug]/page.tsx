@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Suspense } from "react";
+import { cache, Suspense } from "react";
 import dynamic from "next/dynamic";
 import { prisma } from "@ltex/db";
 import { notFound } from "next/navigation";
@@ -37,6 +37,22 @@ const dict = getDictionary();
 
 export const revalidate = 300;
 
+const getProduct = cache(async (slug: string) => {
+  return prisma.product.findUnique({
+    where: { slug },
+    include: {
+      category: { include: { parent: true } },
+      images: { orderBy: { position: "asc" } },
+      prices: true,
+      lots: {
+        where: { status: { in: ["free", "on_sale"] } },
+        orderBy: { createdAt: "desc" },
+        take: 50,
+      },
+    },
+  });
+});
+
 interface Props {
   params: Promise<{ slug: string }>;
 }
@@ -45,13 +61,7 @@ const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://ltex.com.ua";
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
-  const product = await prisma.product.findUnique({
-    where: { slug },
-    include: {
-      category: true,
-      images: { take: 1, orderBy: { position: "asc" } },
-    },
-  });
+  const product = await getProduct(slug);
   if (!product) return {};
   const description = `${product.name} гуртом. Якість: ${QUALITY_LABELS[product.quality as QualityLevel] ?? product.quality}. ${product.description || "Секонд хенд та сток від L-TEX."}`;
   const imageUrl = product.images[0]?.url;
@@ -72,21 +82,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function ProductPage({ params }: Props) {
   const { slug } = await params;
-
-  const product = await prisma.product.findUnique({
-    where: { slug },
-    include: {
-      category: { include: { parent: true } },
-      images: { orderBy: { position: "asc" } },
-      prices: true,
-      lots: {
-        where: { status: { in: ["free", "on_sale"] } },
-        orderBy: { createdAt: "desc" },
-        take: 50,
-      },
-    },
-  });
-
+  const product = await getProduct(slug);
   if (!product) notFound();
 
   const wholesalePrice = product.prices.find(
