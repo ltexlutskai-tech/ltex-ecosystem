@@ -353,10 +353,18 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Bot not configured" }, { status: 503 });
   }
 
-  // Verify secret (optional: check X-Telegram-Bot-Api-Secret-Token header)
-  const secret = request.headers.get("x-telegram-bot-api-secret-token");
+  // Require the webhook secret to be configured. Without it we cannot verify
+  // that the request actually came from Telegram, so we refuse to process it.
   const expectedSecret = process.env.TELEGRAM_WEBHOOK_SECRET;
-  if (expectedSecret && secret !== expectedSecret) {
+  if (!expectedSecret) {
+    console.error("TELEGRAM_WEBHOOK_SECRET is not configured");
+    return NextResponse.json(
+      { error: "Webhook not configured" },
+      { status: 503 },
+    );
+  }
+  const secret = request.headers.get("x-telegram-bot-api-secret-token");
+  if (secret !== expectedSecret) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
