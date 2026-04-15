@@ -1,20 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@ltex/db";
 import { mobileProfileUpdateSchema } from "@/lib/validations";
+import { requireMobileSession } from "@/lib/mobile-auth";
 
 /**
- * GET /api/mobile/profile?customerId=xxx
- * Returns full customer profile with stats.
+ * GET /api/mobile/profile — current customer profile with stats.
+ * PUT /api/mobile/profile — update fields of the current customer.
  *
- * PUT /api/mobile/profile
- * Body: { customerId, name?, email?, telegram?, city?, notes? }
- * Updates customer profile.
+ * Auth: Bearer <mobile token>. customerId is derived from the token, never from the body.
  */
 export async function GET(request: NextRequest) {
-  const customerId = request.nextUrl.searchParams.get("customerId");
-  if (!customerId) {
-    return NextResponse.json({ error: "customerId required" }, { status: 400 });
-  }
+  const session = requireMobileSession(request);
+  if (session instanceof NextResponse) return session;
+  const { customerId } = session;
 
   const customer = await prisma.customer.findUnique({
     where: { id: customerId },
@@ -55,6 +53,10 @@ export async function GET(request: NextRequest) {
 }
 
 export async function PUT(request: NextRequest) {
+  const session = requireMobileSession(request);
+  if (session instanceof NextResponse) return session;
+  const { customerId } = session;
+
   let body: unknown;
   try {
     body = await request.json();
@@ -62,14 +64,18 @@ export async function PUT(request: NextRequest) {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  const parsed = mobileProfileUpdateSchema.safeParse(body);
+  // Ignore any customerId from the body; schema still validates other fields.
+  const parsed = mobileProfileUpdateSchema.safeParse({
+    ...(body as Record<string, unknown>),
+    customerId,
+  });
   if (!parsed.success) {
     return NextResponse.json(
       { error: parsed.error.issues[0]?.message ?? "Невірні дані" },
       { status: 400 },
     );
   }
-  const { customerId, name, email, telegram, city } = parsed.data;
+  const { name, email, telegram, city } = parsed.data;
 
   const data: Record<string, string | null> = {};
   if (name) data.name = name;

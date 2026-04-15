@@ -4,28 +4,20 @@ import {
   mobileNotificationTokenSchema,
   mobileVideoSubscriptionSchema,
 } from "@/lib/validations";
+import { requireMobileSession } from "@/lib/mobile-auth";
 
 /**
- * POST /api/mobile/notifications/register — Register push token
- * Body: { customerId, token, platform: "ios"|"android"|"web" }
+ * Mobile notifications & video subscriptions. customerId is always derived from the bearer token.
  *
- * DELETE /api/mobile/notifications/register — Unregister push token
- * Body: { token }
- *
- * POST /api/mobile/notifications/subscribe-video — Subscribe to video reviews
- * Body: { customerId, productId }
- *
- * DELETE /api/mobile/notifications/subscribe-video — Unsubscribe
- * Body: { customerId, productId }
- *
- * GET /api/mobile/notifications?customerId=xxx — Get subscriptions
+ * GET    /api/mobile/notifications — list push tokens + video subscriptions
+ * POST   /api/mobile/notifications { action: "register_token" | "subscribe_video", ... }
+ * DELETE /api/mobile/notifications { action: "unregister_token" | "unsubscribe_video", ... }
  */
 
 export async function GET(request: NextRequest) {
-  const customerId = request.nextUrl.searchParams.get("customerId");
-  if (!customerId) {
-    return NextResponse.json({ error: "customerId required" }, { status: 400 });
-  }
+  const session = requireMobileSession(request);
+  if (session instanceof NextResponse) return session;
+  const { customerId } = session;
 
   const [pushTokens, videoSubscriptions] = await Promise.all([
     prisma.pushToken.findMany({
@@ -57,6 +49,10 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const session = requireMobileSession(request);
+  if (session instanceof NextResponse) return session;
+  const { customerId } = session;
+
   let body: Record<string, unknown>;
   try {
     body = await request.json();
@@ -68,14 +64,17 @@ export async function POST(request: NextRequest) {
 
   // Register push token
   if (action === "register_token") {
-    const tokenParsed = mobileNotificationTokenSchema.safeParse(body);
+    const tokenParsed = mobileNotificationTokenSchema.safeParse({
+      ...body,
+      customerId,
+    });
     if (!tokenParsed.success) {
       return NextResponse.json(
         { error: tokenParsed.error.issues[0]?.message ?? "Невірні дані" },
         { status: 400 },
       );
     }
-    const { customerId, token, platform } = tokenParsed.data;
+    const { token, platform } = tokenParsed.data;
 
     const pushToken = await prisma.pushToken.upsert({
       where: { token },
@@ -88,14 +87,17 @@ export async function POST(request: NextRequest) {
 
   // Subscribe to video reviews
   if (action === "subscribe_video") {
-    const subParsed = mobileVideoSubscriptionSchema.safeParse(body);
+    const subParsed = mobileVideoSubscriptionSchema.safeParse({
+      ...body,
+      customerId,
+    });
     if (!subParsed.success) {
       return NextResponse.json(
         { error: subParsed.error.issues[0]?.message ?? "Невірні дані" },
         { status: 400 },
       );
     }
-    const { customerId, productId } = subParsed.data;
+    const { productId } = subParsed.data;
 
     const subscription = await prisma.videoSubscription.upsert({
       where: { customerId_productId: { customerId, productId } },
@@ -110,6 +112,10 @@ export async function POST(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
+  const session = requireMobileSession(request);
+  if (session instanceof NextResponse) return session;
+  const { customerId } = session;
+
   let body: Record<string, unknown>;
   try {
     body = await request.json();
@@ -119,12 +125,12 @@ export async function DELETE(request: NextRequest) {
 
   const action = body.action as string;
 
-  // Unregister push token
+  // Unregister push token — scoped to this customer
   if (action === "unregister_token") {
     const token = body.token as string;
     if (token) {
       await prisma.pushToken.updateMany({
-        where: { token },
+        where: { token, customerId },
         data: { active: false },
       });
     }
@@ -133,11 +139,9 @@ export async function DELETE(request: NextRequest) {
 
   // Unsubscribe from video reviews
   if (action === "unsubscribe_video") {
-    const { customerId, productId } = body as {
-      customerId: string;
-      productId: string;
-    };
-    if (customerId && productId) {
+    const productId =
+      typeof body.productId === "string" ? body.productId : undefined;
+    if (productId) {
       await prisma.videoSubscription.deleteMany({
         where: { customerId, productId },
       });

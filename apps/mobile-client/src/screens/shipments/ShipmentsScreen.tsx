@@ -76,7 +76,7 @@ export function ShipmentsScreen(_props: ShipmentsScreenProps) {
     if (!customerId) return;
     try {
       setError(null);
-      const data = (await shipmentsApi.list(customerId)) as {
+      const data = (await shipmentsApi.list()) as {
         shipments: Shipment[];
       };
       setShipments(data.shipments ?? []);

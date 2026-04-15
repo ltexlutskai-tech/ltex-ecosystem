@@ -81,20 +81,19 @@ export const mobileFavoriteSchema = z.object({
 });
 
 export const mobileChatMessageSchema = z.object({
+  text: z.string().min(1, "Повідомлення не може бути порожнім").max(5000),
+  imageUrl: z.string().url().max(2048).optional().nullable(),
+});
+
+export const adminChatReplySchema = z.object({
   customerId: z.string().min(1),
   text: z.string().min(1, "Повідомлення не може бути порожнім").max(5000),
-  sender: z.enum(["customer", "manager"]).default("customer"),
+  imageUrl: z.string().url().max(2048).optional().nullable(),
 });
 
 export const mobileChatReadSchema = z.object({
   customerId: z.string().min(1),
   messageIds: z.array(z.string().min(1)).min(1),
-});
-
-export const mobileShipmentCreateSchema = z.object({
-  orderId: z.string().min(1),
-  trackingNumber: z.string().min(1).max(100),
-  carrier: z.string().min(1).max(100).default("nova_poshta"),
 });
 
 export const mobileNotificationTokenSchema = z.object({
@@ -106,12 +105,4 @@ export const mobileNotificationTokenSchema = z.object({
 export const mobileVideoSubscriptionSchema = z.object({
   customerId: z.string().min(1),
   productId: z.string().min(1),
-});
-
-export const mobilePaymentSchema = z.object({
-  orderId: z.string().min(1),
-  method: z.enum(["cash", "card", "bank_transfer", "online"]),
-  amount: z.number().positive(),
-  currency: z.string().default("UAH"),
-  externalId: z.string().optional(),
 });

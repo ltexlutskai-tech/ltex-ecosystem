@@ -384,34 +384,37 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Bot not configured" }, { status: 503 });
   }
 
-  // Verify signature
+  // Viber always signs callbacks with the bot auth token. Reject any request
+  // that lacks a valid HMAC-SHA256 signature — unsigned callbacks are never OK.
   const signature = request.headers.get("x-viber-content-signature");
-  if (signature) {
-    const body = await request.text();
-    const expectedSig = crypto
-      .createHmac("sha256", AUTH_TOKEN)
-      .update(body)
-      .digest("hex");
-    if (signature !== expectedSig) {
-      return NextResponse.json({ error: "Invalid signature" }, { status: 403 });
-    }
-    var event = JSON.parse(body) as {
-      event: string;
-      sender?: { id: string; name?: string };
-      user?: { id: string; name?: string };
-      message?: { text?: string };
-    };
-  } else {
-    try {
-      var event = (await request.json()) as {
-        event: string;
-        sender?: { id: string; name?: string };
-        user?: { id: string; name?: string };
-        message?: { text?: string };
-      };
-    } catch {
-      return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
-    }
+  if (!signature) {
+    return NextResponse.json({ error: "Missing signature" }, { status: 403 });
+  }
+
+  const body = await request.text();
+  const expectedSig = crypto
+    .createHmac("sha256", AUTH_TOKEN)
+    .update(body)
+    .digest("hex");
+  const providedBuf = Buffer.from(signature, "hex");
+  const expectedBuf = Buffer.from(expectedSig, "hex");
+  if (
+    providedBuf.length !== expectedBuf.length ||
+    !crypto.timingSafeEqual(providedBuf, expectedBuf)
+  ) {
+    return NextResponse.json({ error: "Invalid signature" }, { status: 403 });
+  }
+
+  let event: {
+    event: string;
+    sender?: { id: string; name?: string };
+    user?: { id: string; name?: string };
+    message?: { text?: string };
+  };
+  try {
+    event = JSON.parse(body);
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
   try {

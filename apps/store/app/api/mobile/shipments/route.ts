@@ -1,16 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@ltex/db";
-import { mobileShipmentCreateSchema } from "@/lib/validations";
+import { requireMobileSession } from "@/lib/mobile-auth";
 
 /**
- * GET /api/mobile/shipments?customerId=xxx
- * Returns all shipments for the customer's orders.
+ * Mobile shipments. customerId is always derived from the bearer token.
  *
- * GET /api/mobile/shipments?trackingNumber=xxx
- * Track a specific shipment via Nova Poshta API.
+ * GET /api/mobile/shipments — all shipments for the authenticated customer.
+ * GET /api/mobile/shipments?trackingNumber=xxx — track a specific shipment (must belong to the
+ *     authenticated customer). Refreshes status from Nova Poshta.
  *
- * POST /api/mobile/shipments — create shipment (admin/manager)
- * Body: { orderId, trackingNumber, carrier?, recipientCity?, recipientBranch? }
+ * Shipment creation is an admin/1C responsibility — not exposed via mobile API anymore.
  */
 
 const NOVA_POSHTA_API = "https://api.novaposhta.ua/v2.0/json/";
@@ -53,13 +52,16 @@ async function trackNovaPoshta(
 }
 
 export async function GET(request: NextRequest) {
-  const customerId = request.nextUrl.searchParams.get("customerId");
+  const session = requireMobileSession(request);
+  if (session instanceof NextResponse) return session;
+  const { customerId } = session;
+
   const trackingNumber = request.nextUrl.searchParams.get("trackingNumber");
 
-  // Track specific shipment
+  // Track specific shipment — must belong to the authenticated customer
   if (trackingNumber) {
     const shipment = await prisma.shipment.findFirst({
-      where: { trackingNumber },
+      where: { trackingNumber, order: { customerId } },
       include: {
         order: {
           select: { id: true, code1C: true, status: true, totalEur: true },
@@ -67,9 +69,16 @@ export async function GET(request: NextRequest) {
       },
     });
 
+    if (!shipment) {
+      return NextResponse.json(
+        { error: "Shipment not found" },
+        { status: 404 },
+      );
+    }
+
     // Try to get fresh status from Nova Poshta
     const npStatus = await trackNovaPoshta(trackingNumber);
-    if (npStatus && shipment) {
+    if (npStatus) {
       await prisma.shipment.update({
         where: { id: shipment.id },
         data: {
@@ -84,33 +93,24 @@ export async function GET(request: NextRequest) {
     }
 
     return NextResponse.json({
-      shipment: shipment
-        ? {
-            id: shipment.id,
-            trackingNumber: shipment.trackingNumber,
-            carrier: shipment.carrier,
-            status: npStatus?.StatusCode ?? shipment.status,
-            statusText: npStatus?.Status ?? shipment.statusText,
-            estimatedDate:
-              npStatus?.ScheduledDeliveryDate ?? shipment.estimatedDate,
-            recipientCity: shipment.recipientCity,
-            recipientBranch: shipment.recipientBranch,
-            order: shipment.order,
-            lastCheckedAt: new Date(),
-          }
-        : null,
+      shipment: {
+        id: shipment.id,
+        trackingNumber: shipment.trackingNumber,
+        carrier: shipment.carrier,
+        status: npStatus?.StatusCode ?? shipment.status,
+        statusText: npStatus?.Status ?? shipment.statusText,
+        estimatedDate:
+          npStatus?.ScheduledDeliveryDate ?? shipment.estimatedDate,
+        recipientCity: shipment.recipientCity,
+        recipientBranch: shipment.recipientBranch,
+        order: shipment.order,
+        lastCheckedAt: new Date(),
+      },
       novaPoshtaStatus: npStatus,
     });
   }
 
-  // Get all shipments for customer
-  if (!customerId) {
-    return NextResponse.json(
-      { error: "customerId or trackingNumber required" },
-      { status: 400 },
-    );
-  }
-
+  // List all shipments for the customer
   const shipments = await prisma.shipment.findMany({
     where: { order: { customerId } },
     include: {
@@ -136,42 +136,4 @@ export async function GET(request: NextRequest) {
       createdAt: s.createdAt,
     })),
   });
-}
-
-export async function POST(request: NextRequest) {
-  let body: unknown;
-  try {
-    body = await request.json();
-  } catch {
-    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
-  }
-
-  const parsed = mobileShipmentCreateSchema.safeParse(body);
-  if (!parsed.success) {
-    return NextResponse.json(
-      { error: parsed.error.issues[0]?.message ?? "Невірні дані" },
-      { status: 400 },
-    );
-  }
-  const { orderId, trackingNumber, carrier } = parsed.data;
-  const rawBody = body as Record<string, unknown>;
-  const recipientCity = rawBody.recipientCity as string | undefined;
-  const recipientBranch = rawBody.recipientBranch as string | undefined;
-
-  const shipment = await prisma.shipment.upsert({
-    where: { orderId_trackingNumber: { orderId, trackingNumber } },
-    create: {
-      orderId,
-      trackingNumber,
-      carrier: carrier ?? "nova_poshta",
-      recipientCity: recipientCity ?? null,
-      recipientBranch: recipientBranch ?? null,
-    },
-    update: {
-      recipientCity: recipientCity ?? undefined,
-      recipientBranch: recipientBranch ?? undefined,
-    },
-  });
-
-  return NextResponse.json({ id: shipment.id }, { status: 201 });
 }

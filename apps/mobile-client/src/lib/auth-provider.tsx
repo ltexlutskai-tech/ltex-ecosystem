@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { AuthContext, type AuthState } from "./auth";
-import { authApi } from "./api";
+import { authApi, setApiToken } from "./api";
 
 // SecureStore import (lazy to support web)
 let SecureStore: typeof import("expo-secure-store") | null = null;
@@ -53,15 +53,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     customerId: null,
     customerName: null,
     phone: null,
+    token: null,
     isLoading: true,
   });
 
   useEffect(() => {
     loadAuth().then((saved) => {
+      const token = (saved.token as string) ?? null;
+      setApiToken(token);
       setState({
         customerId: (saved.customerId as string) ?? null,
         customerName: (saved.customerName as string) ?? null,
         phone: (saved.phone as string) ?? null,
+        token,
         isLoading: false,
       });
     });
@@ -73,17 +77,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       customerId: result.customerId,
       customerName: result.name,
       phone: result.phone,
+      token: result.token,
       isLoading: false,
     };
+    setApiToken(result.token);
     setState(newState);
     await saveAuth(newState);
   }, []);
 
   const logout = useCallback(async () => {
+    setApiToken(null);
     setState({
       customerId: null,
       customerName: null,
       phone: null,
+      token: null,
       isLoading: false,
     });
     await clearAuth();

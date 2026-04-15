@@ -7,6 +7,7 @@ import { randomBytes } from "crypto";
 import { z } from "zod";
 import { createClient as createSupabaseAdmin } from "@/lib/supabase/server";
 import { requireAdmin } from "@/lib/admin-auth";
+import { validateImageFile, InvalidImageError } from "@/lib/validate-image";
 
 const bannerSchema = z.object({
   title: z.string().min(1, "Заголовок обов'язковий").max(200),
@@ -64,19 +65,27 @@ export async function uploadBannerImage(
 ): Promise<{ url: string }> {
   await requireAdmin();
   const file = formData.get("file") as File | null;
-  if (!file || file.size === 0) {
+  if (!file) {
     throw new Error("Файл не надано");
+  }
+
+  // Sniff actual bytes — file.name extension and file.type are attacker-controlled.
+  let validated;
+  try {
+    validated = await validateImageFile(file, { maxBytes: 10 * 1024 * 1024 });
+  } catch (err) {
+    if (err instanceof InvalidImageError) throw new Error(err.message);
+    throw err;
   }
 
   const supabase = await createSupabaseAdmin();
 
-  const ext = (file.name.split(".").pop() ?? "jpg").toLowerCase();
   const id = randomBytes(12).toString("hex");
-  const fileName = `banners/${id}.${ext}`;
+  const fileName = `banners/${id}.${validated.type}`;
 
   const { error } = await supabase.storage
     .from("product-images")
-    .upload(fileName, file, { contentType: file.type });
+    .upload(fileName, file, { contentType: validated.mime });
 
   if (error) {
     throw new Error(`Upload failed: ${error.message}`);

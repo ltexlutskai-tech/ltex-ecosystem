@@ -56,7 +56,7 @@ export function ProfileScreen({ navigation }: ProfileScreenProps) {
   const fetchProfile = useCallback(async () => {
     if (!customerId) return;
     try {
-      const data = (await profileApi.get(customerId)) as ProfileData;
+      const data = (await profileApi.get()) as ProfileData;
       setProfile(data);
       setEditName(data.name ?? "");
       setEditEmail(data.email ?? "");
@@ -103,7 +103,6 @@ export function ProfileScreen({ navigation }: ProfileScreenProps) {
     setSaving(true);
     try {
       await profileApi.update({
-        customerId,
         name: editName.trim(),
         email: editEmail.trim() || undefined,
         telegram: editTelegram.trim() || undefined,

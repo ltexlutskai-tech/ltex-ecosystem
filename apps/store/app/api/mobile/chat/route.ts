@@ -1,23 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@ltex/db";
-import { sendPushNotification } from "@/lib/push";
 import { mobileChatMessageSchema } from "@/lib/validations";
+import { requireMobileSession } from "@/lib/mobile-auth";
 
 /**
- * GET /api/mobile/chat?customerId=xxx&cursor=xxx&limit=50
- * Returns chat messages (newest first, paginated by cursor).
+ * GET  /api/mobile/chat?cursor=xxx&limit=50 — chat messages (newest first, cursor-paginated)
+ * POST /api/mobile/chat — send a message (sender is forced to "customer" server-side)
+ *                         body: { text, imageUrl? }
+ * PUT  /api/mobile/chat — mark manager messages read
+ *                         body: { upToMessageId? }
  *
- * POST /api/mobile/chat ��� send a message
- * Body: { customerId, text, imageUrl? }
- *
- * PUT /api/mobile/chat — mark messages as read
- * Body: { customerId, upToMessageId }
+ * Auth: Bearer <mobile token>. customerId is derived from the token, never the body.
  */
 export async function GET(request: NextRequest) {
-  const customerId = request.nextUrl.searchParams.get("customerId");
-  if (!customerId) {
-    return NextResponse.json({ error: "customerId required" }, { status: 400 });
-  }
+  const session = requireMobileSession(request);
+  if (session instanceof NextResponse) return session;
+  const { customerId } = session;
 
   const cursor = request.nextUrl.searchParams.get("cursor");
   const limit = Math.min(
@@ -54,6 +52,10 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const session = requireMobileSession(request);
+  if (session instanceof NextResponse) return session;
+  const { customerId } = session;
+
   let body: unknown;
   try {
     body = await request.json();
@@ -68,32 +70,16 @@ export async function POST(request: NextRequest) {
       { status: 400 },
     );
   }
-  const { customerId, text, sender } = parsed.data;
-  const imageUrl = (body as Record<string, unknown>).imageUrl as
-    | string
-    | undefined;
-  const messageSender = sender;
+  const { text, imageUrl } = parsed.data;
 
   const message = await prisma.chatMessage.create({
     data: {
       customerId,
-      sender: messageSender,
-      text: text?.trim() ?? "",
+      sender: "customer", // always server-side; client cannot impersonate manager
+      text: text.trim(),
       imageUrl: imageUrl ?? null,
     },
   });
-
-  // When a manager sends a message, push-notify the customer
-  if (messageSender === "manager") {
-    sendPushNotification(
-      customerId,
-      "Нове повідомлення від менеджера",
-      text?.trim() ?? "Нове повідомлення",
-      { type: "chat", customerId },
-    ).catch(() => {
-      // Non-blocking — don't fail the response for push errors
-    });
-  }
 
   return NextResponse.json(
     {
@@ -108,6 +94,10 @@ export async function POST(request: NextRequest) {
 }
 
 export async function PUT(request: NextRequest) {
+  const session = requireMobileSession(request);
+  if (session instanceof NextResponse) return session;
+  const { customerId } = session;
+
   let body: Record<string, unknown>;
   try {
     body = await request.json();
@@ -115,18 +105,14 @@ export async function PUT(request: NextRequest) {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  const { customerId, upToMessageId } = body as {
-    customerId: string;
-    upToMessageId: string;
-  };
-
-  if (!customerId) {
-    return NextResponse.json({ error: "customerId required" }, { status: 400 });
-  }
+  const upToMessageId =
+    typeof body.upToMessageId === "string" ? body.upToMessageId : undefined;
 
   // Mark all manager messages as read up to the given message
   const targetMessage = upToMessageId
-    ? await prisma.chatMessage.findUnique({ where: { id: upToMessageId } })
+    ? await prisma.chatMessage.findFirst({
+        where: { id: upToMessageId, customerId },
+      })
     : null;
 
   await prisma.chatMessage.updateMany({

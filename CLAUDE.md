@@ -933,23 +933,23 @@ User виконав SQL в Supabase SQL Editor (verified via screenshot). 3 та
 
 #### Що зроблено (3 коміти, міграція на self-hosting):
 
-| Commit    | Task                        | Ключові зміни                                                                                                     |
-| --------- | --------------------------- | ----------------------------------------------------------------------------------------------------------------- |
-| `11c147b` | Infrastructure migration    | Видалено PrismaPlugin, outputFileTracingIncludes, serverExternalPackages. Додано `output: 'standalone'`. Prisma binaryTargets: native + windows + debian-openssl-3.0.x. Fix singleton для production. netlify.toml deprecated |
-| `dfb8072` | Code optimizations          | `<img>` → `<Image>` в ProductCard (WebP/AVIF, responsive sizes). React `cache()` dedup на product page (2→1 query). `unstable_cache` для homepage даних |
-| `6dd7d46` | Infrastructure configs      | ecosystem.config.js (PM2), Caddyfile (reverse proxy + auto-SSL), scripts/deploy.ps1 (PowerShell deploy), DEPLOYMENT.md (покрокова інструкція) |
+| Commit    | Task                     | Ключові зміни                                                                                                                                                                                                                 |
+| --------- | ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `11c147b` | Infrastructure migration | Видалено PrismaPlugin, outputFileTracingIncludes, serverExternalPackages. Додано `output: 'standalone'`. Prisma binaryTargets: native + windows + debian-openssl-3.0.x. Fix singleton для production. netlify.toml deprecated |
+| `dfb8072` | Code optimizations       | `<img>` → `<Image>` в ProductCard (WebP/AVIF, responsive sizes). React `cache()` dedup на product page (2→1 query). `unstable_cache` для homepage даних                                                                       |
+| `6dd7d46` | Infrastructure configs   | ecosystem.config.js (PM2), Caddyfile (reverse proxy + auto-SSL), scripts/deploy.ps1 (PowerShell deploy), DEPLOYMENT.md (покрокова інструкція)                                                                                 |
 
 #### Серверні характеристики (self-hosting target):
 
-| Параметр | Значення |
-|----------|----------|
-| OS | Windows Server 2022 Datacenter |
-| CPU | Intel i5-9600K @ 3.7GHz, 6 ядер |
-| RAM | 32 ГБ |
-| Диски | C: 146GB, D: 300GB, E: 931GB (777GB вільно) |
-| IP | 194.187.154.162 (статична) |
-| Інтернет | 107 Мбіт symmetric (WestNet) |
-| Ping | 12мс, Jitter: 0мс |
+| Параметр | Значення                                    |
+| -------- | ------------------------------------------- |
+| OS       | Windows Server 2022 Datacenter              |
+| CPU      | Intel i5-9600K @ 3.7GHz, 6 ядер             |
+| RAM      | 32 ГБ                                       |
+| Диски    | C: 146GB, D: 300GB, E: 931GB (777GB вільно) |
+| IP       | 194.187.154.162 (статична)                  |
+| Інтернет | 107 Мбіт symmetric (WestNet)                |
+| Ping     | 12мс, Jitter: 0мс                           |
 
 #### Результати CI:
 
@@ -962,29 +962,29 @@ User виконав SQL в Supabase SQL Editor (verified via screenshot). 3 та
 
 #### Файли змінені/створені:
 
-| Файл | Тип | Зміна |
-|------|-----|-------|
-| `apps/store/next.config.js` | Modified | -PrismaPlugin, -outputFileTracingIncludes, -serverExternalPackages, +output:'standalone' |
-| `packages/db/prisma/schema.prisma` | Modified | binaryTargets: native + windows + debian-openssl-3.0.x |
-| `packages/db/src/index.ts` | Modified | Singleton кешується і в production |
-| `netlify.toml` | Modified | Deprecated header |
-| `apps/store/components/store/product-card.tsx` | Modified | `<img>` → `<Image>` |
-| `apps/store/app/(store)/product/[slug]/page.tsx` | Modified | React `cache()` dedup |
-| `apps/store/app/(store)/page.tsx` | Modified | `unstable_cache` |
-| `ecosystem.config.js` | **NEW** | PM2 config |
-| `Caddyfile` | **NEW** | Reverse proxy + auto-SSL |
-| `scripts/deploy.ps1` | **NEW** | PowerShell deploy script |
-| `DEPLOYMENT.md` | **NEW** | Setup guide |
+| Файл                                             | Тип      | Зміна                                                                                    |
+| ------------------------------------------------ | -------- | ---------------------------------------------------------------------------------------- |
+| `apps/store/next.config.js`                      | Modified | -PrismaPlugin, -outputFileTracingIncludes, -serverExternalPackages, +output:'standalone' |
+| `packages/db/prisma/schema.prisma`               | Modified | binaryTargets: native + windows + debian-openssl-3.0.x                                   |
+| `packages/db/src/index.ts`                       | Modified | Singleton кешується і в production                                                       |
+| `netlify.toml`                                   | Modified | Deprecated header                                                                        |
+| `apps/store/components/store/product-card.tsx`   | Modified | `<img>` → `<Image>`                                                                      |
+| `apps/store/app/(store)/product/[slug]/page.tsx` | Modified | React `cache()` dedup                                                                    |
+| `apps/store/app/(store)/page.tsx`                | Modified | `unstable_cache`                                                                         |
+| `ecosystem.config.js`                            | **NEW**  | PM2 config                                                                               |
+| `Caddyfile`                                      | **NEW**  | Reverse proxy + auto-SSL                                                                 |
+| `scripts/deploy.ps1`                             | **NEW**  | PowerShell deploy script                                                                 |
+| `DEPLOYMENT.md`                                  | **NEW**  | Setup guide                                                                              |
 
 #### Очікуване прискорення після міграції:
 
-| Сторінка | Netlify (зараз) | Self-hosted (після) |
-|----------|-----------------|---------------------|
-| Homepage | 2-5с (cold: 5с+) | ~200-400мс стабільно |
-| Product | 2-3.5с | ~100-250мс |
-| Catalog | 2-3с | ~150-300мс |
-| DB latency | ~30мс (Frankfurt) | ~1мс (localhost) |
-| Cold starts | Кожні 60с idle | Ніколи |
+| Сторінка    | Netlify (зараз)   | Self-hosted (після)  |
+| ----------- | ----------------- | -------------------- |
+| Homepage    | 2-5с (cold: 5с+)  | ~200-400мс стабільно |
+| Product     | 2-3.5с            | ~100-250мс           |
+| Catalog     | 2-3с              | ~150-300мс           |
+| DB latency  | ~30мс (Frankfurt) | ~1мс (localhost)     |
+| Cold starts | Кожні 60с idle    | Ніколи               |
 
 ### Tasks for next session
 
@@ -1016,7 +1016,9 @@ User виконав SQL в Supabase SQL Editor (verified via screenshot). 3 та
 1. Додати endpoint `/api/mobile/auth/token` що видає короткоживучий JWT токен (або session token) при успішному login (phone + OTP або phone + password).
 2. Створити helper `lib/mobile-auth.ts`:
    ```typescript
-   export async function verifyMobileToken(request: NextRequest): Promise<{ customerId: string } | null> {
+   export async function verifyMobileToken(
+     request: NextRequest,
+   ): Promise<{ customerId: string } | null> {
      const auth = request.headers.get("authorization");
      if (!auth?.startsWith("Bearer ")) return null;
      const token = auth.slice(7);
@@ -1026,7 +1028,8 @@ User виконав SQL в Supabase SQL Editor (verified via screenshot). 3 та
 3. Всі `/api/mobile/*` routes (окрім `/auth`) мають починатися з:
    ```typescript
    const session = await verifyMobileToken(request);
-   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+   if (!session)
+     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
    // Use session.customerId, IGNORE customerId from request body/query
    ```
 4. Оновити Expo app `apps/mobile-client/src/lib/api.ts` щоб зберігати токен і додавати в headers.
@@ -1034,6 +1037,7 @@ User виконав SQL в Supabase SQL Editor (verified via screenshot). 3 та
 6. Написати тести для `verifyMobileToken` + оновити існуючі тести `/api/mobile/*`.
 
 **Файли:**
+
 - Новий: `apps/store/lib/mobile-auth.ts` + `apps/store/lib/mobile-auth.test.ts`
 - Новий: `apps/store/app/api/mobile/auth/token/route.ts` (якщо ще немає — перевірити існуючий `/api/mobile/auth`)
 - Змінити: всі `apps/store/app/api/mobile/*/route.ts`
@@ -1044,14 +1048,18 @@ User виконав SQL в Supabase SQL Editor (verified via screenshot). 3 та
 **Проблема:** `/api/admin/stats` приймає GET без перевірки — викриває бізнес-аналітику (замовлення, виручку, клієнтів).
 
 **Fix:**
+
 ```typescript
 // apps/store/app/api/admin/stats/route.ts
 import { createClient } from "@/lib/supabase/server";
 
 export async function GET(request: NextRequest) {
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user)
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   // ... rest of handler
 }
 ```
@@ -1063,11 +1071,15 @@ export async function GET(request: NextRequest) {
 **Проблема:** Telegram і Viber webhook routes мають "optional" перевірку підпису — якщо env var не встановлена, запит приймається без перевірки.
 
 **Fix 1 — Telegram** (`apps/store/app/api/telegram/webhook/route.ts`):
+
 ```typescript
 const expectedSecret = process.env.TELEGRAM_WEBHOOK_SECRET;
 if (!expectedSecret) {
   console.error("TELEGRAM_WEBHOOK_SECRET not configured");
-  return NextResponse.json({ error: "Webhook not configured" }, { status: 503 });
+  return NextResponse.json(
+    { error: "Webhook not configured" },
+    { status: 503 },
+  );
 }
 const secret = request.headers.get("x-telegram-bot-api-secret-token");
 if (secret !== expectedSecret) {
@@ -1077,9 +1089,11 @@ if (secret !== expectedSecret) {
 
 **Fix 2 — Viber** (`apps/store/app/api/viber/webhook/route.ts`):
 Видалити fallback-гілку `} else { /* accept unsigned */ }`. Якщо немає підпису — 403 завжди:
+
 ```typescript
 const signature = request.headers.get("x-viber-content-signature");
-if (!signature) return NextResponse.json({ error: "Missing signature" }, { status: 403 });
+if (!signature)
+  return NextResponse.json({ error: "Missing signature" }, { status: 403 });
 // ... rest (verify HMAC, parse body)
 ```
 
@@ -1088,7 +1102,9 @@ if (!signature) return NextResponse.json({ error: "Missing signature" }, { statu
 **Проблема:** `uploadBannerImage()` і `uploadProductImage()` перевіряють тільки extension з імені файлу. Атакуючий може залити shell.jpg який насправді .exe.
 
 **Fix:**
+
 1. Додати helper `lib/validate-image.ts`:
+
    ```typescript
    const MAGIC_BYTES = {
      jpeg: [0xff, 0xd8, 0xff],
@@ -1097,11 +1113,14 @@ if (!signature) return NextResponse.json({ error: "Missing signature" }, { statu
      gif: [0x47, 0x49, 0x46, 0x38],
    };
 
-   export async function validateImageFile(file: File): Promise<"jpeg" | "png" | "webp" | "gif" | null> {
+   export async function validateImageFile(
+     file: File,
+   ): Promise<"jpeg" | "png" | "webp" | "gif" | null> {
      const bytes = new Uint8Array(await file.slice(0, 12).arrayBuffer());
      // Check magic bytes, return detected type or null
    }
    ```
+
 2. Використовувати в `admin/banners/actions.ts` і `admin/products/actions.ts`:
    ```typescript
    const detected = await validateImageFile(file);
@@ -1124,6 +1143,7 @@ if (!signature) return NextResponse.json({ error: "Missing signature" }, { statu
 ### Task 7: Оновити .env.example і DEPLOYMENT.md
 
 Додати нові required env vars:
+
 - `MOBILE_JWT_SECRET` — згенерувати через `openssl rand -hex 32`
 - `TELEGRAM_WEBHOOK_SECRET` — перемістити з optional в required
 - Уточнити що `VIBER_AUTH_TOKEN` обов'язкова для безпеки webhook
@@ -1142,6 +1162,7 @@ if (!signature) return NextResponse.json({ error: "Missing signature" }, { statu
 ### Commit strategy
 
 Розбити на окремі коміти:
+
 1. `feat(security): add JWT-based mobile API authentication`
 2. `feat(security): require auth on admin stats endpoint`
 3. `fix(security): make webhook signature verification mandatory`
@@ -1165,15 +1186,15 @@ git push -u origin claude/security-hardening-session-16
 
 ### Довідка — Security audit findings summary
 
-| # | Severity | File | Issue |
-|---|----------|------|-------|
-| 1 | CRITICAL | `/api/mobile/*` | Немає auth, будь-хто може читати/писати дані будь-якого customer |
-| 2 | CRITICAL | `/api/admin/stats` | Немає auth, викриває бізнес-аналітику |
-| 3 | CRITICAL | `/api/mobile/shipments` POST | Без auth — фейкові відправлення |
-| 4 | CRITICAL | `/api/mobile/chat` POST | `sender` контролюється клієнтом |
-| 5 | HIGH | `admin/banners/actions.ts`, `admin/products/actions.ts` | File upload без magic bytes check |
-| 6 | HIGH | `/api/telegram/webhook` | Optional secret verification |
-| 7 | HIGH | `/api/viber/webhook` | Fallback до unsigned requests |
+| #   | Severity | File                                                    | Issue                                                            |
+| --- | -------- | ------------------------------------------------------- | ---------------------------------------------------------------- |
+| 1   | CRITICAL | `/api/mobile/*`                                         | Немає auth, будь-хто може читати/писати дані будь-якого customer |
+| 2   | CRITICAL | `/api/admin/stats`                                      | Немає auth, викриває бізнес-аналітику                            |
+| 3   | CRITICAL | `/api/mobile/shipments` POST                            | Без auth — фейкові відправлення                                  |
+| 4   | CRITICAL | `/api/mobile/chat` POST                                 | `sender` контролюється клієнтом                                  |
+| 5   | HIGH     | `admin/banners/actions.ts`, `admin/products/actions.ts` | File upload без magic bytes check                                |
+| 6   | HIGH     | `/api/telegram/webhook`                                 | Optional secret verification                                     |
+| 7   | HIGH     | `/api/viber/webhook`                                    | Fallback до unsigned requests                                    |
 
 **Безпечне (не чіпати):** Sync API (Bearer auth), SQL injection (Prisma параметризує), command injection (немає), env vars (серверні).
 
