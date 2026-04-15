@@ -1,10 +1,15 @@
 import { NextRequest } from "next/server";
 import { prisma } from "@ltex/db";
+import { verifyMobileToken, verifyMobileTokenString } from "@/lib/mobile-auth";
 
 /**
- * GET /api/mobile/chat/stream?customerId=xxx
+ * GET /api/mobile/chat/stream
  *
  * Server-Sent Events endpoint for real-time chat messages.
+ *
+ * Auth: Bearer <token> via Authorization header OR ?token=<...> query param
+ *       (EventSource in the browser cannot set custom headers, so query is supported).
+ *
  * Polls the DB every 3 seconds for new messages and sends them as SSE events.
  * Sends a heartbeat every 15 seconds to keep the connection alive.
  * Times out after 5 minutes (client should reconnect).
@@ -15,13 +20,18 @@ const HEARTBEAT_INTERVAL_MS = 15_000;
 const TIMEOUT_MS = 5 * 60 * 1_000; // 5 minutes
 
 export async function GET(request: NextRequest) {
-  const customerId = request.nextUrl.searchParams.get("customerId");
-  if (!customerId) {
-    return new Response(JSON.stringify({ error: "customerId required" }), {
-      status: 400,
+  let session = verifyMobileToken(request);
+  if (!session) {
+    const qsToken = request.nextUrl.searchParams.get("token");
+    if (qsToken) session = verifyMobileTokenString(qsToken);
+  }
+  if (!session) {
+    return new Response(JSON.stringify({ error: "Unauthorized" }), {
+      status: 401,
       headers: { "Content-Type": "application/json" },
     });
   }
+  const { customerId } = session;
 
   const encoder = new TextEncoder();
   let closed = false;

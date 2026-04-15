@@ -54,7 +54,7 @@ export function ChatScreen(_props: ChatScreenProps) {
     async (loadCursor?: string, prepend = false) => {
       if (!customerId) return;
       try {
-        const data = (await chatApi.messages(customerId, loadCursor)) as {
+        const data = (await chatApi.messages(loadCursor)) as {
           messages: ChatMessage[];
           nextCursor: string | null;
         };
@@ -79,7 +79,7 @@ export function ChatScreen(_props: ChatScreenProps) {
             (m) => m.sender === "manager" && !m.isRead,
           );
           if (unreadManagerMsg) {
-            chatApi.markRead(customerId, unreadManagerMsg.id).catch(() => {});
+            chatApi.markRead(unreadManagerMsg.id).catch(() => {});
           }
         }
       } catch {
@@ -100,7 +100,7 @@ export function ChatScreen(_props: ChatScreenProps) {
     }
 
     try {
-      const url = chatApi.streamUrl(customerId);
+      const url = chatApi.streamUrl();
       const es = new EventSource(url);
       eventSourceRef.current = es;
 
@@ -123,7 +123,7 @@ export function ChatScreen(_props: ChatScreenProps) {
 
           // Auto-mark manager messages as read while chat is open
           if (msg.sender === "manager" && !msg.isRead) {
-            chatApi.markRead(customerId, msg.id).catch(() => {});
+            chatApi.markRead(msg.id).catch(() => {});
           }
         } catch {
           // Ignore parse errors
@@ -240,7 +240,7 @@ export function ChatScreen(_props: ChatScreenProps) {
     setMessages((prev) => [optimisticMessage, ...prev]);
 
     try {
-      const data = (await chatApi.send(customerId, trimmed)) as {
+      const data = (await chatApi.send(trimmed)) as {
         message: ChatMessage;
       };
       setMessages((prev) =>
