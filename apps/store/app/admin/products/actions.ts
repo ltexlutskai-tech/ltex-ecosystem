@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient as createSupabaseAdmin } from "@/lib/supabase/server";
 import { requireAdmin } from "@/lib/admin-auth";
+import { validateImageFile, InvalidImageError } from "@/lib/validate-image";
 
 export async function createProduct(formData: FormData) {
   await requireAdmin();
@@ -68,16 +69,24 @@ export async function uploadProductImage(
 ) {
   await requireAdmin();
   const file = formData.get("file") as File;
-  if (!file || file.size === 0) return;
+  if (!file) return;
+
+  // Sniff actual bytes — file.name extension and file.type are attacker-controlled.
+  let validated;
+  try {
+    validated = await validateImageFile(file, { maxBytes: 5 * 1024 * 1024 });
+  } catch (err) {
+    if (err instanceof InvalidImageError) throw new Error(err.message);
+    throw err;
+  }
 
   const supabase = await createSupabaseAdmin();
 
-  const ext = file.name.split(".").pop();
-  const fileName = `${productId}/${Date.now()}.${ext}`;
+  const fileName = `${productId}/${Date.now()}.${validated.type}`;
 
   const { error } = await supabase.storage
     .from("product-images")
-    .upload(fileName, file, { contentType: file.type });
+    .upload(fileName, file, { contentType: validated.mime });
 
   if (error) throw new Error(`Upload failed: ${error.message}`);
 
