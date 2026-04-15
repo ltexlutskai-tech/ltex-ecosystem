@@ -992,12 +992,194 @@ User виконав SQL в Supabase SQL Editor (verified via screenshot). 3 та
 **IMPORTANT:** НЕ повторювати задачі Session 4-15 — ВСЕ ЗРОБЛЕНО. Дивись completion reports вище.
 **IMPORTANT:** L-TEX НЕ приймає онлайн-оплати. Таблиця `payments` — тільки для відображення історії з 1С.
 **IMPORTANT:** CI зелений (format + test + typecheck + build). НЕ ламати CI.
-**IMPORTANT:** Session 15 branch `claude/review-claude-md-WPY04` готовий до merge в main (3 коміти, CI green).
+**IMPORTANT:** Session 15 branch `claude/review-claude-md-WPY04` готовий до merge в main (4 коміти, CI green).
 **IMPORTANT:** Wave 1+2 features готові: banners, featured products, promo stripe, /new, /sale, /top, video carousel, Umami analytics, global search у header. Всі CRUD-и в admin panel працюють.
 **IMPORTANT:** DO NOT touch `output: 'standalone'` in next.config.js — critical for self-hosted deployment.
-**IMPORTANT:** НЕ чіпати `next.config.js` `outputFileTracingIncludes` або `PrismaPlugin` — це критично для Netlify runtime.
+**IMPORTANT:** Security audit виявив CRITICAL issues — ОБОВ'ЯЗКОВО виправити перед deploy на власний сервер (див. Session 16 tasks нижче).
 
-Немає активних задач для worker-сесії. Orchestrator чекає на фідбек від користувача по:
+---
+
+## Session 16 — Security Hardening (HIGH PRIORITY — перед deploy на self-hosted сервер)
+
+**Контекст:** Проект готується до переїзду з Netlify на власний Windows Server (де вже працює 1С). Security audit (2026-04-15) виявив критичні проблеми з автентифікацією на публічних API. Без цих фіксів виставляти сервер в інтернет небезпечно — атакуючий може отримати доступ до клієнтських даних, а в гіршому випадку — до сервера де працює 1С.
+
+**Branch:** Створити `claude/security-hardening-session-16` від main (після merge Session 15).
+
+**Обов'язкова умова:** НЕ ламати CI. Після кожної зміни: `pnpm format:check && pnpm -r typecheck && pnpm -r test`.
+
+### Task 1: Автентифікація на Mobile API (CRITICAL)
+
+**Проблема:** `/api/mobile/profile`, `/orders`, `/favorites`, `/shipments`, `/chat`, `/payments`, `/notifications` приймають `customerId` як query/body параметр без жодної перевірки. Атакуючий може перебрати customerId і отримати замовлення/профілі/платежі будь-якого клієнта.
+
+**Fix:**
+
+1. Додати endpoint `/api/mobile/auth/token` що видає короткоживучий JWT токен (або session token) при успішному login (phone + OTP або phone + password).
+2. Створити helper `lib/mobile-auth.ts`:
+   ```typescript
+   export async function verifyMobileToken(request: NextRequest): Promise<{ customerId: string } | null> {
+     const auth = request.headers.get("authorization");
+     if (!auth?.startsWith("Bearer ")) return null;
+     const token = auth.slice(7);
+     // Verify JWT signed with MOBILE_JWT_SECRET env var, return { customerId } or null
+   }
+   ```
+3. Всі `/api/mobile/*` routes (окрім `/auth`) мають починатися з:
+   ```typescript
+   const session = await verifyMobileToken(request);
+   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+   // Use session.customerId, IGNORE customerId from request body/query
+   ```
+4. Оновити Expo app `apps/mobile-client/src/lib/api.ts` щоб зберігати токен і додавати в headers.
+5. Додати нову env var `MOBILE_JWT_SECRET` в `.env.example`.
+6. Написати тести для `verifyMobileToken` + оновити існуючі тести `/api/mobile/*`.
+
+**Файли:**
+- Новий: `apps/store/lib/mobile-auth.ts` + `apps/store/lib/mobile-auth.test.ts`
+- Новий: `apps/store/app/api/mobile/auth/token/route.ts` (якщо ще немає — перевірити існуючий `/api/mobile/auth`)
+- Змінити: всі `apps/store/app/api/mobile/*/route.ts`
+- Змінити: `apps/mobile-client/src/lib/api.ts`
+
+### Task 2: Автентифікація на Admin API (CRITICAL)
+
+**Проблема:** `/api/admin/stats` приймає GET без перевірки — викриває бізнес-аналітику (замовлення, виручку, клієнтів).
+
+**Fix:**
+```typescript
+// apps/store/app/api/admin/stats/route.ts
+import { createClient } from "@/lib/supabase/server";
+
+export async function GET(request: NextRequest) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  // ... rest of handler
+}
+```
+
+Те саме застосувати до БУДЬ-ЯКОГО `/api/admin/*` route, якщо знайдеш такі.
+
+### Task 3: Обов'язкова верифікація webhooks (HIGH)
+
+**Проблема:** Telegram і Viber webhook routes мають "optional" перевірку підпису — якщо env var не встановлена, запит приймається без перевірки.
+
+**Fix 1 — Telegram** (`apps/store/app/api/telegram/webhook/route.ts`):
+```typescript
+const expectedSecret = process.env.TELEGRAM_WEBHOOK_SECRET;
+if (!expectedSecret) {
+  console.error("TELEGRAM_WEBHOOK_SECRET not configured");
+  return NextResponse.json({ error: "Webhook not configured" }, { status: 503 });
+}
+const secret = request.headers.get("x-telegram-bot-api-secret-token");
+if (secret !== expectedSecret) {
+  return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+}
+```
+
+**Fix 2 — Viber** (`apps/store/app/api/viber/webhook/route.ts`):
+Видалити fallback-гілку `} else { /* accept unsigned */ }`. Якщо немає підпису — 403 завжди:
+```typescript
+const signature = request.headers.get("x-viber-content-signature");
+if (!signature) return NextResponse.json({ error: "Missing signature" }, { status: 403 });
+// ... rest (verify HMAC, parse body)
+```
+
+### Task 4: File upload — перевірка magic bytes (HIGH)
+
+**Проблема:** `uploadBannerImage()` і `uploadProductImage()` перевіряють тільки extension з імені файлу. Атакуючий може залити shell.jpg який насправді .exe.
+
+**Fix:**
+1. Додати helper `lib/validate-image.ts`:
+   ```typescript
+   const MAGIC_BYTES = {
+     jpeg: [0xff, 0xd8, 0xff],
+     png: [0x89, 0x50, 0x4e, 0x47],
+     webp: [0x52, 0x49, 0x46, 0x46], // "RIFF" + check "WEBP" at offset 8
+     gif: [0x47, 0x49, 0x46, 0x38],
+   };
+
+   export async function validateImageFile(file: File): Promise<"jpeg" | "png" | "webp" | "gif" | null> {
+     const bytes = new Uint8Array(await file.slice(0, 12).arrayBuffer());
+     // Check magic bytes, return detected type or null
+   }
+   ```
+2. Використовувати в `admin/banners/actions.ts` і `admin/products/actions.ts`:
+   ```typescript
+   const detected = await validateImageFile(file);
+   if (!detected) return { error: "Недійсний формат зображення" };
+   const fileName = `banners/${id}.${detected}`; // use detected type, not user-provided
+   ```
+3. Перевіряти розмір файлу (max 10 МБ для банерів, 5 МБ для продуктів).
+4. Додати тести для `validateImageFile`.
+
+### Task 5: Chat sender — визначати серверно (MEDIUM)
+
+**Проблема:** `/api/mobile/chat` POST приймає `sender: "customer" | "manager"` з тіла запиту. Атакуючий може слати повідомлення від імені менеджера.
+
+**Fix:** Після додавання mobile auth (Task 1), визначати sender завжди як `"customer"` (якщо юзер автентифікований через mobile token) або `"manager"` (якщо через Supabase admin auth). Ніколи не брати з body.
+
+### Task 6: Chat — Admin auth для відповіді менеджера (MEDIUM)
+
+Якщо є окремий endpoint для відповідей менеджера — захистити через Supabase auth. Якщо немає — створити `/api/admin/chat/reply` з Supabase auth + force `sender = "manager"`.
+
+### Task 7: Оновити .env.example і DEPLOYMENT.md
+
+Додати нові required env vars:
+- `MOBILE_JWT_SECRET` — згенерувати через `openssl rand -hex 32`
+- `TELEGRAM_WEBHOOK_SECRET` — перемістити з optional в required
+- Уточнити що `VIBER_AUTH_TOKEN` обов'язкова для безпеки webhook
+
+### Verification checklist
+
+- [ ] `pnpm format:check` — PASS
+- [ ] `pnpm -r typecheck` — 0 errors
+- [ ] `pnpm -r test` — всі тести пройшли (включно з новими)
+- [ ] Нові тести: `mobile-auth.test.ts`, `validate-image.test.ts`
+- [ ] Всі `/api/mobile/*` routes повертають 401 без auth header (перевірити manual або через тест)
+- [ ] `/api/admin/stats` повертає 401 без Supabase session
+- [ ] Telegram/Viber webhooks повертають 401/403 при відсутності/невірному підписі
+- [ ] File upload відхиляє не-зображення (наприклад, текстовий файл перейменований в .jpg)
+
+### Commit strategy
+
+Розбити на окремі коміти:
+1. `feat(security): add JWT-based mobile API authentication`
+2. `feat(security): require auth on admin stats endpoint`
+3. `fix(security): make webhook signature verification mandatory`
+4. `feat(security): validate uploaded images by magic bytes`
+5. `fix(security): determine chat sender server-side from auth`
+6. `docs(security): update .env.example and DEPLOYMENT.md`
+
+### Push
+
+```
+git push -u origin claude/security-hardening-session-16
+```
+
+### Out of scope (НЕ робити)
+
+- Не переписувати існуючу Supabase auth на custom — admin login працює, не чіпати
+- Не додавати Windows-specific захист (окремий user, firewall rules) — це задачі для deploy, не для коду
+- Не додавати Cloudflare WAF — це user-action на рівні DNS
+- Не міняти rate-limiting значення — існуючий rate-limiter достатній
+- НЕ чіпати `$queryRawUnsafe` в catalog.ts — параметри передаються через `$1, $2...`, безпечно
+
+### Довідка — Security audit findings summary
+
+| # | Severity | File | Issue |
+|---|----------|------|-------|
+| 1 | CRITICAL | `/api/mobile/*` | Немає auth, будь-хто може читати/писати дані будь-якого customer |
+| 2 | CRITICAL | `/api/admin/stats` | Немає auth, викриває бізнес-аналітику |
+| 3 | CRITICAL | `/api/mobile/shipments` POST | Без auth — фейкові відправлення |
+| 4 | CRITICAL | `/api/mobile/chat` POST | `sender` контролюється клієнтом |
+| 5 | HIGH | `admin/banners/actions.ts`, `admin/products/actions.ts` | File upload без magic bytes check |
+| 6 | HIGH | `/api/telegram/webhook` | Optional secret verification |
+| 7 | HIGH | `/api/viber/webhook` | Fallback до unsigned requests |
+
+**Безпечне (не чіпати):** Sync API (Bearer auth), SQL injection (Prisma параметризує), command injection (немає), env vars (серверні).
+
+---
+
+Немає інших активних задач для worker-сесії. Orchestrator чекає на фідбек від користувача по:
 
 1. **Контент для банерів** — user планує згенерувати 2 банери через AI (ChatGPT/Gemini image gen) з промптом, виданим у поточній сесії. Теми: "широкий асортимент кросівок" + "акційні пропозиції квітня". Коли банери будуть — user завантажить їх через `/admin/banners` (drag-upload працює). Якщо щось зламається під час завантаження — новий worker-fix.
 2. **Умaмi analytics** — у `NEXT_PUBLIC_UMAMI_WEBSITE_ID` і `NEXT_PUBLIC_UMAMI_SCRIPT_URL` env vars поки нічого немає. User має підняти Umami instance (self-host або umami.is cloud) і додати env vars у Netlify Dashboard, щоб click-tracking почав працювати в prod. Без цього компонент `<UmamiTracker>` просто нічого не рендерить (graceful noop).
