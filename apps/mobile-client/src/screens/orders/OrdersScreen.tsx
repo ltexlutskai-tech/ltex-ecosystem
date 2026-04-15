@@ -71,7 +71,7 @@ export function OrdersScreen({ navigation }: OrdersScreenProps) {
     if (!customerId) return;
     try {
       setError(null);
-      const data = (await ordersApi.list(customerId)) as {
+      const data = (await ordersApi.list()) as {
         orders: OrderSummary[];
       };
       setOrders(data.orders ?? []);

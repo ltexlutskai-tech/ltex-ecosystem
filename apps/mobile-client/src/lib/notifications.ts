@@ -10,9 +10,7 @@ Notifications.setNotificationHandler({
   }),
 });
 
-export async function registerPushToken(
-  customerId: string,
-): Promise<string | null> {
+export async function registerPushToken(): Promise<string | null> {
   try {
     const { status: existingStatus } =
       await Notifications.getPermissionsAsync();
@@ -31,7 +29,7 @@ export async function registerPushToken(
     const token = tokenData.data;
     const platform = Platform.OS === "ios" ? "ios" : "android";
 
-    await notificationsApi.registerToken(customerId, token, platform);
+    await notificationsApi.registerToken(token, platform);
 
     return token;
   } catch {

@@ -1,17 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@ltex/db";
+import { requireMobileSession } from "@/lib/mobile-auth";
 
 /**
- * GET /api/mobile/orders?customerId=xxx — Full order history with items, shipments, payments
- * GET /api/mobile/orders?customerId=xxx&orderId=yyy — Single order detail
+ * GET /api/mobile/orders — full order history for the authenticated customer.
+ * GET /api/mobile/orders?orderId=yyy — single order detail.
+ *
+ * Auth: Bearer <mobile token>. customerId is derived from the token, never from the query.
  */
 export async function GET(request: NextRequest) {
-  const customerId = request.nextUrl.searchParams.get("customerId");
-  const orderId = request.nextUrl.searchParams.get("orderId");
+  const session = requireMobileSession(request);
+  if (session instanceof NextResponse) return session;
+  const { customerId } = session;
 
-  if (!customerId) {
-    return NextResponse.json({ error: "customerId required" }, { status: 400 });
-  }
+  const orderId = request.nextUrl.searchParams.get("orderId");
 
   // Single order detail
   if (orderId) {

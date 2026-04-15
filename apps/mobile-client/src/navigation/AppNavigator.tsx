@@ -339,7 +339,7 @@ function RootNavigator() {
   // Register push token when logged in
   useEffect(() => {
     if (customerId) {
-      registerPushToken(customerId).catch(() => {});
+      registerPushToken().catch(() => {});
     }
   }, [customerId]);
 

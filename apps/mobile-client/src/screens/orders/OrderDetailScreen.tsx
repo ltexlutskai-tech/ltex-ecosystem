@@ -117,7 +117,7 @@ export function OrderDetailScreen({
     if (!customerId) return;
     try {
       const [orderData, paymentsData] = await Promise.all([
-        ordersApi.detail(customerId, orderId) as Promise<{
+        ordersApi.detail(orderId) as Promise<{
           order: OrderDetail;
         }>,
         paymentsApi.forOrder(orderId) as Promise<{ payments: PaymentInfo[] }>,
@@ -131,7 +131,7 @@ export function OrderDetailScreen({
         orderData.order.status === "delivered"
       ) {
         try {
-          const shipData = (await shipmentsApi.list(customerId)) as {
+          const shipData = (await shipmentsApi.list()) as {
             shipments: ShipmentInfo[];
           };
           // Filter shipments for this order

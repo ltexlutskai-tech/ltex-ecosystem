@@ -9,6 +9,7 @@ export interface AuthState {
   customerId: string | null;
   customerName: string | null;
   phone: string | null;
+  token: string | null;
   isLoading: boolean;
 }
 

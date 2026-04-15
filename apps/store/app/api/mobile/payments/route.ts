@@ -1,31 +1,37 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@ltex/db";
-import { mobilePaymentSchema } from "@/lib/validations";
+import { requireMobileSession } from "@/lib/mobile-auth";
 
 /**
- * GET /api/mobile/payments?customerId=xxx — Payment history
- * GET /api/mobile/payments?orderId=xxx — Payments for specific order
+ * GET /api/mobile/payments — payment history for the authenticated customer.
+ * GET /api/mobile/payments?orderId=xxx — payments for a specific order (must belong to the customer).
  *
- * POST /api/mobile/payments — Record a payment
- * Body: { orderId, method, amount, currency?, externalId? }
+ * Auth: Bearer <mobile token>. customerId is derived from the token, never from the query.
+ *
+ * Payment creation is handled by 1C/admin — L-TEX does not accept online payments.
  */
 export async function GET(request: NextRequest) {
-  const customerId = request.nextUrl.searchParams.get("customerId");
+  const session = requireMobileSession(request);
+  if (session instanceof NextResponse) return session;
+  const { customerId } = session;
+
   const orderId = request.nextUrl.searchParams.get("orderId");
 
   if (orderId) {
+    // Ensure the order belongs to the authenticated customer
+    const order = await prisma.order.findFirst({
+      where: { id: orderId, customerId },
+      select: { id: true },
+    });
+    if (!order) {
+      return NextResponse.json({ error: "Order not found" }, { status: 404 });
+    }
+
     const payments = await prisma.payment.findMany({
       where: { orderId },
       orderBy: { createdAt: "desc" },
     });
     return NextResponse.json({ payments });
-  }
-
-  if (!customerId) {
-    return NextResponse.json(
-      { error: "customerId or orderId required" },
-      { status: 400 },
-    );
   }
 
   const payments = await prisma.payment.findMany({
@@ -63,39 +69,4 @@ export async function GET(request: NextRequest) {
     })),
     totalPaid,
   });
-}
-
-export async function POST(request: NextRequest) {
-  let body: unknown;
-  try {
-    body = await request.json();
-  } catch {
-    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
-  }
-
-  const parsed = mobilePaymentSchema.safeParse(body);
-  if (!parsed.success) {
-    return NextResponse.json(
-      { error: parsed.error.issues[0]?.message ?? "Невірні дані" },
-      { status: 400 },
-    );
-  }
-  const { orderId, method, amount, currency, externalId } = parsed.data;
-
-  const payment = await prisma.payment.create({
-    data: {
-      orderId,
-      method,
-      amount,
-      currency: currency ?? "UAH",
-      externalId: externalId ?? null,
-      status: method === "online" ? "pending" : "completed",
-      paidAt: method !== "online" ? new Date() : null,
-    },
-  });
-
-  return NextResponse.json(
-    { id: payment.id, status: payment.status },
-    { status: 201 },
-  );
 }

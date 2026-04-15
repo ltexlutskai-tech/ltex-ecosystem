@@ -2,14 +2,15 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@ltex/db";
 import { mobileAuthSchema } from "@/lib/validations";
 import { rateLimit, getClientIp } from "@/lib/rate-limit";
+import { signMobileToken, MOBILE_TOKEN_TTL_SECONDS } from "@/lib/mobile-auth";
 
 /**
  * POST /api/mobile/auth — Register or login by phone.
  * Body: { phone, name?, telegram?, city? }
- * Returns: { customerId, name, phone, isNew }
+ * Returns: { customerId, name, phone, isNew, token, tokenExpiresIn }
  *
  * In production, this should verify via SMS OTP.
- * For now, upserts customer by phone number.
+ * For now, upserts customer by phone number and issues a session token.
  */
 export async function POST(request: NextRequest) {
   // Rate limit: 10 auth requests per minute per IP (brute force protection)
@@ -64,6 +65,14 @@ export async function POST(request: NextRequest) {
       });
     }
 
+    const token = signMobileToken(customer.id);
+    if (!token) {
+      return NextResponse.json(
+        { error: "Auth not configured" },
+        { status: 503 },
+      );
+    }
+
     return NextResponse.json({
       customerId: customer.id,
       name: customer.name,
@@ -72,6 +81,8 @@ export async function POST(request: NextRequest) {
       telegram: customer.telegram,
       city: customer.city,
       isNew,
+      token,
+      tokenExpiresIn: MOBILE_TOKEN_TTL_SECONDS,
     });
   } catch {
     return NextResponse.json({ error: "Server error" }, { status: 500 });

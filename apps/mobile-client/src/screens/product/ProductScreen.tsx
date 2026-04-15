@@ -138,10 +138,10 @@ export function ProductScreen({ route, navigation }: ProductScreenProps) {
     setFavoriteLoading(true);
     try {
       if (isFavorite) {
-        await favoritesApi.remove(customerId, product.id);
+        await favoritesApi.remove(product.id);
         setIsFavorite(false);
       } else {
-        await favoritesApi.add(customerId, product.id);
+        await favoritesApi.add(product.id);
         setIsFavorite(true);
       }
     } catch {
@@ -156,10 +156,10 @@ export function ProductScreen({ route, navigation }: ProductScreenProps) {
     setSubscribeLoading(true);
     try {
       if (isSubscribed) {
-        await notificationsApi.unsubscribeVideo(customerId, product.id);
+        await notificationsApi.unsubscribeVideo(product.id);
         setIsSubscribed(false);
       } else {
-        await notificationsApi.subscribeVideo(customerId, product.id);
+        await notificationsApi.subscribeVideo(product.id);
         setIsSubscribed(true);
       }
     } catch {

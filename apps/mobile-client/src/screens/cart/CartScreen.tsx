@@ -98,7 +98,7 @@ export function CartScreen({ navigation, cart }: CartScreenProps) {
         weight: item.weight,
       }));
 
-      await ordersApi.list(customerId); // Verify customer exists
+      await ordersApi.list(); // Verify customer exists
       // Submit order via the orders API
       const response = await fetch(
         `${process.env.EXPO_PUBLIC_API_URL ?? "https://ltex.com.ua/api"}/orders`,
