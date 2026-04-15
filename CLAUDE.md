@@ -995,7 +995,163 @@ User виконав SQL в Supabase SQL Editor (verified via screenshot). 3 та
 **IMPORTANT:** Session 15 branch `claude/review-claude-md-WPY04` готовий до merge в main (4 коміти, CI green).
 **IMPORTANT:** Wave 1+2 features готові: banners, featured products, promo stripe, /new, /sale, /top, video carousel, Umami analytics, global search у header. Всі CRUD-и в admin panel працюють.
 **IMPORTANT:** DO NOT touch `output: 'standalone'` in next.config.js — critical for self-hosted deployment.
-**IMPORTANT:** Session 16 Security Hardening COMPLETE — всі CRITICAL/HIGH issues виправлені. Безпечно розгортати на self-hosted сервер.
+**IMPORTANT:** Session 16 Security Hardening COMPLETE — початкові CRITICAL/HIGH issues виправлені.
+**IMPORTANT:** Session 17 Pre-Deploy Audit (2026-04-16) виявив 4 нові MUST-FIX issues. ПЕРЕД DEPLOY виконати Session 17 задачі (див. нижче).
+
+---
+
+## Session 17 — Pre-Deploy Security Fixes (MUST FIX перед розгортанням)
+
+**Контекст:** Повний аудит безпеки (2026-04-16) пройшовся по 18 категоріях і знайшов 13 проблем. 4 з них блокують deploy, решта — recommended/nice-to-have. Цю задачу робить одна нова worker-сесія.
+
+**Branch:** Створити `claude/session-17-pre-deploy-fixes` від main.
+
+**Обов'язкова умова:** НЕ ламати CI. Після кожної зміни: `pnpm format:check && pnpm -r typecheck && pnpm -r test`.
+
+### Task 1: Додати auth guard на lot status actions (CRITICAL — 5 хв)
+
+**Проблема:** `apps/store/app/admin/lots/actions.ts` має функції `updateLotStatus()` і `bulkUpdateLotStatus()` БЕЗ `requireAdmin()`. Атакуючий може викликати їх напряму (через server action endpoint) і змінювати інвентар.
+
+**Fix:**
+
+Прочитай файл спершу. Потім додай `await requireAdmin();` як першу строчку у ОБИДВІ функції:
+
+```typescript
+export async function updateLotStatus(lotId: string, status: LotStatus) {
+  await requireAdmin(); // ← ДОДАТИ
+  if (!LOT_STATUSES.includes(status)) {
+    throw new Error(`Invalid status: ${status}`);
+  }
+  // ... решта без змін
+}
+
+export async function bulkUpdateLotStatus(lotIds: string[], status: LotStatus) {
+  await requireAdmin(); // ← ДОДАТИ
+  // ... решта без змін
+}
+```
+
+Перевір що `requireAdmin` імпортований з `@/lib/admin-auth`. Якщо ні — додай імпорт.
+
+### Task 2: Валідувати ctaHref у promo schema (HIGH — 5 хв)
+
+**Проблема:** `apps/store/app/admin/promo/actions.ts` приймає `ctaHref` як довільний рядок до 500 символів. Адмін (або атакуючий що скомпрометував адмін-акаунт) може задати `javascript:fetch('/api/orders').then(...)` — XSS на кожному відвідувачі головної.
+
+**Fix:**
+
+У Zod schema поле `ctaHref` замість просто `.string().max(500)` зроби:
+
+```typescript
+ctaHref: z
+  .string()
+  .max(500)
+  .refine(
+    (url) => {
+      if (!url) return true;
+      // Relative path starting with / OR absolute http(s):// URL
+      return url.startsWith("/") || /^https?:\/\//.test(url);
+    },
+    { message: "URL має починатись з / або http(s)://" }
+  )
+  .optional()
+  .nullable(),
+```
+
+Це блокує `javascript:`, `data:`, `file:`, `vbscript:` тощо. Відносні шляхи (`/new`, `/sale`) і зовнішні HTTPS (`https://t.me/...`) працюють.
+
+### Task 3: Startup-валідація MOBILE_JWT_SECRET (HIGH — 10 хв)
+
+**Проблема:** Якщо env var встановлена у слабке значення (`"test"`, `"secret"`), JWT легко брутфорситься. `lib/mobile-auth.ts` відкидає запити, але система не зупиняється на старті.
+
+**Fix:**
+
+Прочитай `apps/store/instrumentation.ts` (вже існує — там зараз env-валідація). Додай у нього перевірку:
+
+```typescript
+// У блок де перевіряються env vars у production:
+if (process.env.NODE_ENV === "production") {
+  const mobileSecret = process.env.MOBILE_JWT_SECRET;
+  if (!mobileSecret || mobileSecret.length < 32) {
+    throw new Error(
+      "MOBILE_JWT_SECRET must be at least 32 characters. " +
+        "Generate with: openssl rand -hex 32",
+    );
+  }
+
+  const syncKey = process.env.SYNC_API_KEY;
+  if (!syncKey || syncKey.length < 32) {
+    throw new Error(
+      "SYNC_API_KEY must be at least 32 characters. " +
+        "Generate with: openssl rand -hex 32",
+    );
+  }
+}
+```
+
+**IMPORTANT:** Робити це тільки в production. У CI/dev `process.env.NODE_ENV !== "production"`, тому перевірка пропускається — CI не впаде.
+
+Також прочитай `instrumentation.ts` — можливо там вже щось є схоже. Якщо так — додай у той самий блок.
+
+### Task 4: Додати тести startup-валідації (10 хв)
+
+Додай тести для перевірки startup-валідації у `apps/store/instrumentation.test.ts` (створити якщо немає). Тестуй сценарії:
+
+- Валідна env (32+ chars) → OK
+- Коротка MOBILE_JWT_SECRET → throw
+- Коротка SYNC_API_KEY → throw
+- Відсутня MOBILE_JWT_SECRET → throw
+- Не production → не throw
+
+Якщо важко тестувати `register()` напряму (бо це Next.js hook) — винеси логіку валідації в окрему функцію `validateProductionSecrets()` в тому ж файлі і експортуй її. Тестуй функцію.
+
+### Verification checklist
+
+- [ ] `pnpm format:check` — PASS
+- [ ] `pnpm -r typecheck` — 0 errors
+- [ ] `pnpm -r test` — всі тести + нові тести пройшли
+- [ ] Manual check: спробуй запустити `MOBILE_JWT_SECRET=short NODE_ENV=production pnpm start` — має впасти з помилкою
+
+### Commit strategy
+
+3 окремих коміти:
+
+1. `fix(security): add auth guard to lot status server actions`
+2. `fix(security): validate ctaHref URL format in promo stripe schema`
+3. `feat(security): startup validation for MOBILE_JWT_SECRET and SYNC_API_KEY length`
+
+### Push
+
+```
+git push -u origin claude/session-17-pre-deploy-fixes
+```
+
+### Out of scope для цієї сесії (НЕ робити)
+
+Ці задачі залишаються для майбутніх сесій, не блокують deploy:
+
+- **CSP hardening** (усунути `unsafe-inline`/`unsafe-eval`) — складне, 2-3 години, реальний XSS-ризик низький (немає user HTML rendering). Окрема сесія коли буде час.
+- **Mobile SSE token у query param** — стосується тільки mobile client коли він буде в production. Зараз не exposed.
+- **X-Forwarded-For spoofing** — налаштовується в Caddyfile, не в коді. Під час deploy перевіримо Caddy config.
+- **Telegram secret startup validation** — схоже на Task 3 але для optional bot. Якщо user не використовує Telegram — не потрібно.
+- **Error logging audit** — оптимізація, не вразливість.
+- **revalidatePath() cleanup** — performance, не security.
+
+### Резюме пріоритетів
+
+| #   | Severity | Реальний ризик                                   | Priority |
+| --- | -------- | ------------------------------------------------ | -------- |
+| 1   | CRITICAL | Admin actions без auth = будь-хто ламає інвентар | MUST FIX |
+| 2   | HIGH     | XSS через скомпрометованого адміна               | MUST FIX |
+| 3   | HIGH     | Слабкий JWT secret → imperson клієнтів           | MUST FIX |
+| 4   | HIGH     | Слабкий SYNC_API_KEY → експорт всіх замовлень    | MUST FIX |
+
+Після цих фіксів — **безпечно розгортати на self-hosted сервер**.
+
+---
+
+### Tasks for next session (Session 18+ — після deploy)
+
+Нижче стара планова секція, яка залишилась. Релевантно після успішного deploy:
 
 ---
 
