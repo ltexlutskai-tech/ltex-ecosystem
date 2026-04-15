@@ -995,11 +995,78 @@ User виконав SQL в Supabase SQL Editor (verified via screenshot). 3 та
 **IMPORTANT:** Session 15 branch `claude/review-claude-md-WPY04` готовий до merge в main (4 коміти, CI green).
 **IMPORTANT:** Wave 1+2 features готові: banners, featured products, promo stripe, /new, /sale, /top, video carousel, Umami analytics, global search у header. Всі CRUD-и в admin panel працюють.
 **IMPORTANT:** DO NOT touch `output: 'standalone'` in next.config.js — critical for self-hosted deployment.
-**IMPORTANT:** Security audit виявив CRITICAL issues — ОБОВ'ЯЗКОВО виправити перед deploy на власний сервер (див. Session 16 tasks нижче).
+**IMPORTANT:** Session 16 Security Hardening COMPLETE — всі CRITICAL/HIGH issues виправлені. Безпечно розгортати на self-hosted сервер.
 
 ---
 
-## Session 16 — Security Hardening (HIGH PRIORITY — перед deploy на self-hosted сервер)
+## Session 16 Completion Report (2026-04-15) — Security Hardening
+
+**Контекст:** Перед міграцією з Netlify на self-hosted Windows Server (де вже працює 1С) — виконано повне security hardening. Security audit виявив CRITICAL/HIGH issues з автентифікацією. Всі виправлені.
+
+**Branch:** `claude/security-hardening-LHrQ7` merged в main (commit `0d0ad88`).
+
+### Що зроблено (6 комітів):
+
+| Commit    | Task                                                    | Ключові зміни                                                                                                                                                                       |
+| --------- | ------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `a5850bf` | feat(security): JWT-based mobile API auth               | Новий `lib/mobile-auth.ts` (JWT + `MOBILE_JWT_SECRET`). Bearer token на всіх `/api/mobile/*`. `customerId` тепер з signed token, не з client. Оновлено Expo app.                    |
+| `5b9ab2a` | feat(security): require auth on admin stats             | Supabase session check на `/api/admin/stats`. 401 без auth.                                                                                                                         |
+| `1230316` | fix(security): mandatory webhook signature verification | Telegram: 503 якщо `TELEGRAM_WEBHOOK_SECRET` не встановлений. Viber: 403 якщо немає підпису (прибрано fallback).                                                                    |
+| `814ebc1` | feat(security): validate uploads by magic bytes         | Новий `lib/validate-image.ts` (magic bytes check для JPEG/PNG/WebP/GIF). Banner/product uploads відхиляють не-зображення. MIME derived server-side.                                 |
+| `ae4566c` | fix(security): server-side chat sender + admin reply    | `/api/mobile/chat` POST: sender force = `"customer"`. Новий `/api/admin/chat/reply` з Supabase auth + push notify. Видалено unsafe mobile POSTs для shipments + payments (1C-only). |
+| `8f30afe` | docs(security): update .env.example and DEPLOYMENT.md   | Додано `MOBILE_JWT_SECRET`, `TELEGRAM_WEBHOOK_SECRET` (required), уточнено `VIBER_AUTH_TOKEN` (required).                                                                           |
+
+### Key protections added:
+
+- **Mobile API** — Bearer token required на всіх `/api/mobile/*`. `customerId` береться тільки з signed token. Neможливо перебрати customerId і отримати чужі дані.
+- **Admin API** — `/api/admin/stats` і `/api/admin/chat/reply` вимагають Supabase session.
+- **Webhooks** — Telegram/Viber відхиляють unsigned requests. No fallback to accepting plain requests.
+- **File uploads** — Magic bytes sniff відхиляє перейменовані executables. Extension + MIME derived server-side, не з client.
+- **Chat** — customer повідомлення force `sender="customer"`. Manager replies йдуть через окремий auth-protected admin endpoint.
+- **1C-only flows** — `/api/mobile/shipments` POST і `/api/mobile/payments` POST видалені. Shipments/payments створюються тільки через 1C sync.
+
+### Нові файли (5):
+
+| Файл                                           | Тип | Призначення                             |
+| ---------------------------------------------- | --- | --------------------------------------- |
+| `apps/store/lib/mobile-auth.ts`                | New | JWT verification helper для mobile API  |
+| `apps/store/lib/mobile-auth.test.ts`           | New | 12 тестів для mobile auth               |
+| `apps/store/lib/validate-image.ts`             | New | Magic bytes validator + size limits     |
+| `apps/store/lib/validate-image.test.ts`        | New | 14 тестів для image validation          |
+| `apps/store/app/api/admin/chat/reply/route.ts` | New | Admin endpoint для відповідей менеджера |
+
+### Результати CI:
+
+| Крок                | Результат                                                    |
+| ------------------- | ------------------------------------------------------------ |
+| `pnpm format:check` | **PASS**                                                     |
+| `pnpm -r typecheck` | **PASS** — 6/6 пакетів, 0 помилок                            |
+| `pnpm -r test`      | **PASS** — **212 тестів** (25 shared + 187 store, +26 нових) |
+
+### Метрики:
+
+| Метрика                  | До Session 16 | Після Session 16                                            |
+| ------------------------ | ------------- | ----------------------------------------------------------- |
+| Unit tests               | 186           | **212** (+26: mobile-auth 12, validate-image 14)            |
+| CRITICAL security issues | 4             | **0**                                                       |
+| HIGH security issues     | 3             | **0**                                                       |
+| Нові env vars (required) | —             | `MOBILE_JWT_SECRET` + `TELEGRAM_WEBHOOK_SECRET` обов'язкові |
+| Lines changed            | —             | +1055/-400 (35 файлів)                                      |
+| Total commits            | 50            | **57**                                                      |
+
+### Безпечно тепер розгортати на self-hosted сервер:
+
+- ✅ Mobile endpoints не можуть бути використані для enumeration/injection
+- ✅ Admin endpoints потребують auth
+- ✅ Webhooks приймають тільки підписані запити
+- ✅ File uploads валідовані на вміст, не тільки ім'я
+- ✅ Chat messages не можна підробити від імені менеджера
+
+**NEXT:** User може запустити deploy згідно `DEPLOYMENT.md`.
+
+---
+
+## Session 16 — Security Hardening (ARCHIVED — планування виконано)
 
 **Контекст:** Проект готується до переїзду з Netlify на власний Windows Server (де вже працює 1С). Security audit (2026-04-15) виявив критичні проблеми з автентифікацією на публічних API. Без цих фіксів виставляти сервер в інтернет небезпечно — атакуючий може отримати доступ до клієнтських даних, а в гіршому випадку — до сервера де працює 1С.
 
