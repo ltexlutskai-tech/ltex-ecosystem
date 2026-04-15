@@ -9,7 +9,19 @@ import { requireAdmin } from "@/lib/admin-auth";
 const schema = z.object({
   text: z.string().min(1).max(300),
   ctaLabel: z.string().max(100).optional().nullable(),
-  ctaHref: z.string().max(500).optional().nullable(),
+  ctaHref: z
+    .string()
+    .max(500)
+    .refine(
+      (url) => {
+        if (!url) return true;
+        // Allow relative paths starting with / or absolute http(s):// URLs only
+        return url.startsWith("/") || /^https?:\/\//.test(url);
+      },
+      { message: "URL має починатись з / або http(s)://" },
+    )
+    .optional()
+    .nullable(),
   bgColor: z
     .string()
     .regex(/^#[0-9a-fA-F]{6}$/)
