@@ -1,10 +1,12 @@
 "use server";
 
+import { requireAdmin } from "@/lib/admin-auth";
 import { prisma } from "@ltex/db";
 import { LOT_STATUSES, type LotStatus } from "@ltex/shared";
 import { revalidatePath } from "next/cache";
 
 export async function updateLotStatus(lotId: string, status: LotStatus) {
+  await requireAdmin();
   if (!LOT_STATUSES.includes(status)) {
     throw new Error(`Invalid status: ${status}`);
   }
@@ -19,6 +21,7 @@ export async function updateLotStatus(lotId: string, status: LotStatus) {
 }
 
 export async function bulkUpdateLotStatus(lotIds: string[], status: LotStatus) {
+  await requireAdmin();
   if (!LOT_STATUSES.includes(status)) {
     throw new Error(`Invalid status: ${status}`);
   }
