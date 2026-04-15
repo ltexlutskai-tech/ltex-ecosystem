@@ -996,11 +996,119 @@ User виконав SQL в Supabase SQL Editor (verified via screenshot). 3 та
 **IMPORTANT:** Wave 1+2 features готові: banners, featured products, promo stripe, /new, /sale, /top, video carousel, Umami analytics, global search у header. Всі CRUD-и в admin panel працюють.
 **IMPORTANT:** DO NOT touch `output: 'standalone'` in next.config.js — critical for self-hosted deployment.
 **IMPORTANT:** Session 16 Security Hardening COMPLETE — початкові CRITICAL/HIGH issues виправлені.
-**IMPORTANT:** Session 17 Pre-Deploy Audit (2026-04-16) виявив 4 нові MUST-FIX issues. ПЕРЕД DEPLOY виконати Session 17 задачі (див. нижче).
+**IMPORTANT:** Session 17 Pre-Deploy Security Fixes COMPLETE — всі 4 MUST-FIX issues виправлені. Безпечно розгортати на self-hosted сервер.
 
 ---
 
-## Session 17 — Pre-Deploy Security Fixes (MUST FIX перед розгортанням)
+## Session 17 Completion Report (2026-04-16) — Pre-Deploy Security Fixes
+
+**Контекст:** Повний аудит безпеки (2026-04-16) пройшовся по 18 категоріях, знайшов 13 проблем. 4 з них були блокерами deploy. Виправлено всі 4.
+
+**Branch:** `claude/pre-deploy-security-fixes-T9QLJ` merged в main (commit `97832f7`).
+
+### Що зроблено (3 коміти):
+
+| Commit    | Task                                                                             | Ключові зміни                                                                                                                                                                              |
+| --------- | -------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `0df9dfe` | fix(security): add auth guard to lot status server actions                       | `await requireAdmin()` додано у `updateLotStatus()` та `bulkUpdateLotStatus()` в `apps/store/app/admin/lots/actions.ts`                                                                    |
+| `351226c` | fix(security): validate ctaHref URL format in promo stripe schema                | Zod `.refine()` блокує `javascript:`, `data:`, `file:`, `vbscript:`. Дозволено тільки `/...` (relative) або `http(s)://...` (absolute)                                                     |
+| `6a5652a` | feat(security): startup validation for MOBILE_JWT_SECRET and SYNC_API_KEY length | Нова функція `validateProductionSecrets()` в `instrumentation.ts` — throw у production якщо secret відсутній або < 32 chars. 8 нових unit-тестів (prod/dev, missing/short/valid для обох). |
+
+### Закриті загрози
+
+| #   | Severity | Загроза                                                                        | Статус    |
+| --- | -------- | ------------------------------------------------------------------------------ | --------- |
+| 1   | CRITICAL | Admin lot status actions без auth → будь-хто міг змінювати інвентар            | **FIXED** |
+| 2   | HIGH     | Promo `ctaHref` приймав `javascript:` URL → XSS при compromised admin          | **FIXED** |
+| 3   | HIGH     | `MOBILE_JWT_SECRET` короткий/відсутній → імперсонація клієнтів у mobile API    | **FIXED** |
+| 4   | HIGH     | `SYNC_API_KEY` короткий/відсутній → експорт всіх замовлень через `/api/sync/*` | **FIXED** |
+
+### Результати CI:
+
+| Крок                | Результат                                                   |
+| ------------------- | ----------------------------------------------------------- |
+| `pnpm format:check` | **PASS**                                                    |
+| `pnpm -r typecheck` | **PASS** — 6/6 пакетів, 0 помилок                           |
+| `pnpm -r test`      | **PASS** — **220 тестів** (25 shared + 195 store, +8 нових) |
+
+### Метрики:
+
+| Метрика                  | До Session 17 | Після Session 17                     |
+| ------------------------ | ------------- | ------------------------------------ |
+| Unit tests               | 212           | **220** (+8: instrumentation 8)      |
+| MUST-FIX security issues | 4             | **0**                                |
+| Нові файли               | —             | `apps/store/instrumentation.test.ts` |
+| Змінено файлів           | —             | 4 (+131/-1 рядків)                   |
+
+### Відкладено як post-deploy (не блокери)
+
+Нижче задачі залишаються для майбутніх сесій після успішного deploy. Вони не блокують розгортання, бо реальний ризик низький або вимагає специфічного сценарію:
+
+- **CSP hardening** — усунути `unsafe-inline`/`unsafe-eval` з `next.config.js`. Складне (2-3 години, potentially breaks hot reload), реальний XSS-ризик LOW у проекті (немає user HTML rendering через `dangerouslySetInnerHTML`).
+- **Mobile SSE token у query param** — `apps/mobile-client/src/lib/api.ts` передає токен через `?token=` у URL. Стосується тільки mobile client коли він буде в production. Зараз mobile app не deploy-нутий.
+- **X-Forwarded-For spoofing** — `lib/rate-limit.ts` довіряє першому IP з заголовка. Виправляється в Caddyfile (strip untrusted headers), не в коді. Перевірити під час deploy.
+- **Telegram webhook secret startup validation** — схоже на Session 17 Task 3, але для optional bot. Якщо бот не використовується — не потрібно.
+- **Console error logging audit** — перевірити `console.error` патерни на витік даних. Optimization, не security.
+- **revalidatePath() cleanup** — оптимізація кешування, не security.
+
+**NEXT:** Безпечно запускати deploy на self-hosted Windows Server згідно `DEPLOYMENT.md`.
+
+---
+
+### Session 18+ — Recommended Post-Deploy Tasks (NOT blocking)
+
+Задачі нижче не блокують розгортання. Виконати після успішного deploy, коли буде час.
+
+#### Task A: CSP hardening (прибрати `unsafe-inline`/`unsafe-eval`)
+
+**Файл:** `apps/store/next.config.js` (headers → Content-Security-Policy)
+
+Поточний CSP має `script-src 'self' 'unsafe-inline' 'unsafe-eval'` і `style-src 'self' 'unsafe-inline'`. Це ослаблює захист від XSS, але реальний ризик LOW у проекті, бо немає `dangerouslySetInnerHTML` з user input.
+
+Fix: реалізувати nonce-based CSP через middleware. Непросто (~2-3 години), може зачепити hot reload у dev. Робити окремою сесією з тестами у браузері.
+
+#### Task B: Mobile SSE token — короткоживучий session ID
+
+**Файл:** `apps/mobile-client/src/lib/api.ts`, `apps/store/app/api/mobile/chat/stream/route.ts`
+
+Зараз mobile client передає JWT токен через query parameter у URL для SSE. Токен з'являється в серверних логах, історії браузера, Referer. Після 30 днів TTL атакуючий може імперсонувати клієнта.
+
+Fix: Новий endpoint `POST /api/mobile/chat/stream-init` що повертає короткоживучий `sessionId` (5-min TTL). SSE тоді приймає `?sessionId=...` замість `?token=...`. Робити коли mobile app буде готовий до production.
+
+#### Task C: Caddy X-Forwarded-For trust config
+
+**Файл:** `Caddyfile`
+
+Rate limiter читає перший IP з `X-Forwarded-For`. Якщо Caddy не стрипає incoming header, атакуючий може підроблювати IP через `X-Forwarded-For: 192.168.1.1`. Перевірити у production: надіслати кілька запитів з fake header і подивитися чи rate limit обходиться.
+
+Fix у Caddyfile:
+
+```
+ltex.com.ua {
+    reverse_proxy localhost:3000 {
+        header_up X-Real-IP {http.request.remote.host}
+        header_up -X-Forwarded-For
+    }
+}
+```
+
+І в коді `lib/rate-limit.ts` — preferити `x-real-ip` перед `x-forwarded-for`.
+
+#### Task D: Telegram webhook secret startup validation
+
+Аналогічно Session 17 Task 3, але для optional bot. Якщо `TELEGRAM_BOT_TOKEN` встановлений, то `TELEGRAM_WEBHOOK_SECRET` обов'язковий і має бути 32+ chars. Додати в `instrumentation.ts`.
+
+#### Task E: Console error logging audit
+
+Пошукати `console.error` патерни з template strings типу `console.error(\`Error: ${error.message}\`)`. Замінити на `console.error("Error", { context })` щоб уникнути потенційного витоку PII у production logs.
+
+#### Task F: revalidatePath() optimization
+
+Багато admin actions викликають `revalidatePath("/")` після оновлень що не впливають на homepage. Аудит які actions які routes реально revalidate. Performance, не security.
+
+---
+
+## Session 17 — Pre-Deploy Security Fixes (ARCHIVED — планування виконано)
 
 **Контекст:** Повний аудит безпеки (2026-04-16) пройшовся по 18 категоріях і знайшов 13 проблем. 4 з них блокують deploy, решта — recommended/nice-to-have. Цю задачу робить одна нова worker-сесія.
 
@@ -1146,12 +1254,6 @@ git push -u origin claude/session-17-pre-deploy-fixes
 | 4   | HIGH     | Слабкий SYNC_API_KEY → експорт всіх замовлень    | MUST FIX |
 
 Після цих фіксів — **безпечно розгортати на self-hosted сервер**.
-
----
-
-### Tasks for next session (Session 18+ — після deploy)
-
-Нижче стара планова секція, яка залишилась. Релевантно після успішного deploy:
 
 ---
 
