@@ -3,7 +3,37 @@
  * Warns about missing optional env vars so operators know
  * which features are disabled in the current deployment.
  */
+
+/**
+ * Validate that critical secrets meet minimum strength requirements.
+ * Throws in production if secrets are missing or too short.
+ * Exported for testability.
+ */
+export function validateProductionSecrets(
+  env: NodeJS.ProcessEnv = process.env,
+) {
+  if (env.NODE_ENV !== "production") return;
+
+  const mobileSecret = env.MOBILE_JWT_SECRET;
+  if (!mobileSecret || mobileSecret.length < 32) {
+    throw new Error(
+      "MOBILE_JWT_SECRET must be at least 32 characters. " +
+        "Generate with: openssl rand -hex 32",
+    );
+  }
+
+  const syncKey = env.SYNC_API_KEY;
+  if (!syncKey || syncKey.length < 32) {
+    throw new Error(
+      "SYNC_API_KEY must be at least 32 characters. " +
+        "Generate with: openssl rand -hex 32",
+    );
+  }
+}
+
 export function register() {
+  validateProductionSecrets();
+
   const optional: { key: string; feature: string }[] = [
     { key: "TELEGRAM_BOT_TOKEN", feature: "Telegram order notifications" },
     { key: "TELEGRAM_CHAT_ID", feature: "Telegram order notifications" },
