@@ -96,17 +96,39 @@ NEXT_PUBLIC_SITE_URL=https://ltex.com.ua
 # Sync API (generate: openssl rand -hex 32)
 SYNC_API_KEY=your-sync-api-key
 
-# Optional: Telegram notifications
+# Mobile API auth — REQUIRED if /api/mobile/* is exposed.
+# Signs short-lived session tokens. Must be at least 32 chars.
+# Generate: openssl rand -hex 32
+MOBILE_JWT_SECRET=your-mobile-jwt-secret
+
+# Telegram bot — TELEGRAM_WEBHOOK_SECRET is REQUIRED if the webhook is exposed.
+# Without it /api/telegram/webhook returns 503. Generate: openssl rand -hex 32
 # TELEGRAM_BOT_TOKEN=
 # TELEGRAM_CHAT_ID=
+# TELEGRAM_WEBHOOK_SECRET=
 
-# Optional: Viber bot
+# Viber bot — VIBER_AUTH_TOKEN is REQUIRED if /api/viber/webhook is exposed.
+# The webhook enforces HMAC-SHA256 signature verification on every request.
 # VIBER_AUTH_TOKEN=
 
 # Optional: Umami analytics
 # NEXT_PUBLIC_UMAMI_WEBSITE_ID=
 # NEXT_PUBLIC_UMAMI_SCRIPT_URL=
 ```
+
+### Security — required before exposing the server
+
+- `MOBILE_JWT_SECRET`, `SYNC_API_KEY`, `TELEGRAM_WEBHOOK_SECRET`, and
+  `VIBER_AUTH_TOKEN` must be set to strong random values if the corresponding
+  endpoints (`/api/mobile/*`, `/api/sync/*`, `/api/telegram/webhook`,
+  `/api/viber/webhook`) are reachable from the internet. The routes refuse
+  unsigned/unauthenticated traffic and return 401/403/503.
+- All mobile API endpoints require `Authorization: Bearer <token>` obtained
+  from `POST /api/mobile/auth`. `customerId` is always taken from the token —
+  client-supplied values are ignored.
+- File uploads (banners, product images) sniff the first bytes and reject
+  anything that is not a real JPEG / PNG / WEBP / GIF, regardless of the
+  file name or `Content-Type` the client sends.
 
 ### 2.2 Install, generate, build
 
