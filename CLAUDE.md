@@ -10,29 +10,30 @@ Contacts: Telegram @L_TEX, +380 67 671 05 15, +380 99 358 49 92, ltex.lutsk.ai@g
 
 ## Current Status
 
-**Branch:** `main` (all work merged through Session 14; Session 15 on `claude/review-claude-md-WPY04` pending merge)
+**Branch:** `main` (all work through Session 17 merged). Session 18 = infrastructure on live server (no code commits). Session 18 audit lives on `claude/audit-ltex-project-bdZol`.
 
-All work from Phase 0 through Session 14 is complete and merged into main. Session 15 (self-hosting migration) is on feature branch.
+**L-TEX website is LIVE on self-hosted Windows Server:** https://new.ltex.com.ua (Cloudflare Tunnel)
 
-**IMPORTANT FOR NEW SESSIONS:** Do NOT re-audit or re-merge branches. The project is fully functional:
+**IMPORTANT FOR NEW SESSIONS:** Do NOT re-audit, do NOT re-merge branches, do NOT re-run Sessions 0-18 work. Read completion reports below first. The project is fully functional:
 
-- Supabase DB: 805 products, 725 lots, 49 categories seeded + Wave 1 tables (banners, featured_products, promo_stripe) created manually via SQL Editor
-- **MIGRATING** from Netlify to self-hosted Windows Server 2022 (i5-9600K, 32GB RAM, static IP, 107 Mbit symmetric)
-- Netlify still active at stalwart-dango-04a9b9.netlify.app (will be deprecated after self-hosting is verified)
-- Site is LIVE and working (catalog, lots, cart, admin, API routes, new /new + /sale + /top pages, banner carousel, featured section, video reviews)
-- Session 4 completed: 114 unit tests, TypeScript strict (0 any), Zod validation, a11y, SEO, CI Prettier
-- Session 5 completed: mobile polish, 36 E2E tests, admin UX (sort/CSV/breadcrumbs), security headers, bot commands, docs
-- Session 6 completed: admin pagination/filters, image gallery, order flow, i18n, real-time admin, store UX (quick view/wishlist/comparison/recently viewed), integration tests
-- Session 7 completed: i18n all pages, email notifications, analytics dashboard, SEO structured data, mobile auth guards + deep linking, performance (infinite scroll, bundle analyzer), context provider tests
-- Session 8: CI fix + production hardening (Prettier, TypeScript strict, nodemailer, env validation, fetch timeouts)
-- Session 9: Netlify Prisma generate fix (packages/db turbo.json + build script)
-- Session 10: Infrastructure scripts (RLS, FTS migrations, webhook registration, netlify.toml)
-- Session 13: Performance fixes (ISR on homepage/catalog/lots/product, homepage N+1 collapse to single groupBy)
-- **Session 14: Wave 1 feature expansion (header overhaul, /new + /sale, banners admin, featured products, Umami, video carousel, promo stripe) + Wave 2 homepage restructure (BannerCarousel, 9 sections, single Promise.all of 7 queries) + emergency Netlify fix (outputFileTracingIncludes для Prisma engine на Lambda). Added 3 Prisma models: Banner, FeaturedProduct, PromoStripe.**
-- **Session 15: Self-hosting migration — standalone output, Prisma Windows target, singleton fix, Image optimization, React cache() dedup, unstable_cache homepage, PM2/Caddy/deploy configs, DEPLOYMENT.md guide**
-- DO NOT repeat seed, merge, or infrastructure setup — it's all done
-- DO NOT re-run Session 4-14 tasks — ALL DONE
-- DO NOT touch `next.config.js` `outputFileTracingIncludes` / `PrismaPlugin` / `serverExternalPackages` — critical for Netlify Lambda runtime
+- **Live production:** `https://new.ltex.com.ua` via Cloudflare Tunnel `ltex-prod` (UUID `1b604cd0-1beb-4b0a-897f-93d67e58357f`), running on Windows Server 2022 (i5-9600K, 32GB, 107 Mbit symmetric)
+- **DNS:** `ltex.com.ua` moved from Hostiq NS → Cloudflare NS (`fiona` + `trey`). Hostiq still hosts email/cPanel (all non-web records stay DNS-only)
+- **Netlify** deployment `stalwart-dango-04a9b9.netlify.app` deprecated but still accessible (fallback if self-hosted fails)
+- **DB:** Supabase PostgreSQL (Frankfurt) AND local PostgreSQL 16 on `E:\PostgreSQL\16` — both have 805 products, 725 lots, 49 categories. Next.js self-hosted reads from local PG via `DATABASE_URL` in `E:\ltex-ecosystem\apps\store\.env`
+- **Auto-start:** cloudflared + PostgreSQL as Windows services (both AUTO_START); PM2 via Scheduled Task "PM2 Resurrect" (AtStartup + 60s delay, S4U logon as Тарас)
+- **PM2 policy:** `restart_delay: 5000`, `min_uptime: "30s"`, `max_restarts: 50` in `ecosystem.config.js`
+- **Monitoring:** UptimeRobot Free, 3 monitors (`/`, `/catalog`, `/admin/login`), 5-min interval, email alerts
+- **Backups:** Daily `pg_dump -Fc` at 03:00 via Scheduled Task "L-TEX Daily Backup" → `E:\ltex-backups\ltex_YYYY-MM-DD_HH-mm.backup`, 14-day retention. Script: `E:\ltex-scripts\backup-db.ps1`
+- **Cold-boot reboot test:** NOT YET DONE (1С operators were active). Schedule at next night window.
+- Session 4-14 features: full catalog, cart, checkout, admin, 2 bots, mobile client, Wave 1 (banners/featured/promo/new/sale/top), Wave 2 homepage restructure
+- Session 15: self-hosting migration prep (standalone output, Prisma Windows target, singleton, PM2/Caddy/deploy configs, DEPLOYMENT.md)
+- Session 16-17: security hardening — all CRITICAL/HIGH vulns fixed (mobile auth JWT, webhook secrets, image magic bytes, lot status auth, promo URL validation, prod secret validation)
+- Session 18: live Cloudflare Tunnel deployment + autostart + monitoring + backups (no code changes, only server config)
+- DO NOT repeat seed, merge, or infrastructure setup — all done
+- DO NOT re-run Session 4-18 tasks — all DONE
+- DO NOT touch `output: 'standalone'` in `apps/store/next.config.js` — critical for self-hosted standalone build
+- DO NOT change PM2 Windows Task or cloudflared service binPath — they took work to fix
+- **You cannot SSH to the server. It's Windows, user runs PowerShell locally. Guide them step-by-step via chat if infra work needed.**
 
 ## What Exists Now
 
@@ -986,17 +987,50 @@ User виконав SQL в Supabase SQL Editor (verified via screenshot). 3 та
 | DB latency  | ~30мс (Frankfurt) | ~1мс (localhost)     |
 | Cold starts | Кожні 60с idle    | Ніколи               |
 
-### Tasks for next session
+### Tasks for next session (for Orchestrator 2.1)
 
-**IMPORTANT:** НЕ повторювати seed, merge, або infrastructure setup — все вже зроблено.
-**IMPORTANT:** НЕ повторювати задачі Session 4-15 — ВСЕ ЗРОБЛЕНО. Дивись completion reports вище.
-**IMPORTANT:** L-TEX НЕ приймає онлайн-оплати. Таблиця `payments` — тільки для відображення історії з 1С.
-**IMPORTANT:** CI зелений (format + test + typecheck + build). НЕ ламати CI.
-**IMPORTANT:** Session 15 branch `claude/review-claude-md-WPY04` готовий до merge в main (4 коміти, CI green).
-**IMPORTANT:** Wave 1+2 features готові: banners, featured products, promo stripe, /new, /sale, /top, video carousel, Umami analytics, global search у header. Всі CRUD-и в admin panel працюють.
-**IMPORTANT:** DO NOT touch `output: 'standalone'` in next.config.js — critical for self-hosted deployment.
-**IMPORTANT:** Session 16 Security Hardening COMPLETE — початкові CRITICAL/HIGH issues виправлені.
-**IMPORTANT:** Session 17 Pre-Deploy Security Fixes COMPLETE — всі 4 MUST-FIX issues виправлені. Безпечно розгортати на self-hosted сервер.
+**Ground rules (ALL IMPORTANT):**
+- НЕ повторювати Sessions 0-18 — дивись completion reports вище
+- НЕ ламати CI (format + test + typecheck + build)
+- НЕ чіпати `output: 'standalone'` у `apps/store/next.config.js`
+- НЕ чіпати PM2 Scheduled Task і cloudflared service binPath на сервері
+- L-TEX НЕ приймає онлайн-оплати — `payments` таблиця тільки для історії з 1С
+- Orchestrator планує, worker кодить. Orchestrator МЕРДЖИТЬ, worker — НЕ МЕРДЖИТЬ
+- Писати українською (primary), terminology може бути англійською
+
+**Priority queue (ordered by business impact):**
+
+**P0 — Блокери комерційного запуску:**
+1. **Контент:** банери (2-3 для carousel), фото 805 продуктів у Supabase Storage, featured products (12 шт в `/admin/featured`), promo stripe текст, Umami site setup + env vars. Потребує участі користувача + можливо worker для automation upload скриптів.
+2. **1С sync end-to-end test:** продукт → сайт → замовлення → 1С і назад. Статус API готовий з Session 10, потребує конфігурації з боку 1С.
+3. **Cold-boot reboot test:** планувати на нічне вікно. 15 хв роботи. Підтверджує production readiness.
+
+**P1 — Важливо для stability:**
+4. **External backup:** script додає copy у `D:\ltex-backups-mirror\` або rclone до cloud (~1 год).
+5. **Health endpoint:** `GET /api/health` → `{ db: "ok", timestamp }` з DB ping. Перенаправити UptimeRobot на нього замість HTML. Code change + redeploy, ~30 хв.
+6. **Caddy X-Forwarded-For trust** (з Session 17 deferred списку) — Caddy поки не активний у проді, tunnel йде напряму. Але якщо в майбутньому додаємо Caddy як reverse proxy, треба налаштувати trust headers.
+
+**P2 — Optimizations:**
+7. **CSP hardening** — видалити `unsafe-inline`/`unsafe-eval` через nonce middleware (~2-3 год).
+8. **CLAUDE.md refactor** — розбити на `docs/ARCHITECTURE.md`, `HISTORY.md`, `CONVENTIONS.md`, `SESSION_TASKS.md`. Файл 1850+ рядків, некеровано. Топ-рекомендація з PROJECT_AUDIT.
+9. **Mobile SSE token** — коли mobile app буде deploy-нутий (поки не в продакшні).
+10. **revalidatePath() audit** — performance optimization.
+
+**Інфраструктура що потребує юзер-дії (orchestrator не може зробити):**
+- Увімкнути RLS у Supabase (`scripts/enable-rls.sql`)
+- FTS міграція (`scripts/fts-migration.sql`)
+- Supabase Storage bucket `product-images` якщо ще немає
+- Завантажити фото `scripts/upload-photos.ts`
+- Netlify env vars (якщо ще використовується): `NEXT_PUBLIC_SITE_URL`, `SYNC_API_KEY`, `TELEGRAM_BOT_TOKEN`+`CHAT_ID`, `VIBER_AUTH_TOKEN`, Umami env vars
+- Telegram/Viber webhooks через `scripts/register-*.ts`
+- Реальний cold-boot reboot тест (вночі)
+- Контент: банери, фото, featured/promo заповнити
+
+**Branches merged/pending cleanup (від Session 15-17):**
+- `claude/review-claude-md-WPY04` (Session 15) — merged
+- `claude/security-hardening-LHrQ7` (Session 16) — merged
+- `claude/pre-deploy-security-fixes-T9QLJ` (Session 17) — merged
+- `claude/audit-ltex-project-bdZol` (Session 18 audit) — on remote, NOT merged (archive only), містить `PROJECT_AUDIT_2026-04-18.md`
 
 ---
 
@@ -1052,6 +1086,61 @@ User виконав SQL в Supabase SQL Editor (verified via screenshot). 3 та
 - **revalidatePath() cleanup** — оптимізація кешування, не security.
 
 **NEXT:** Безпечно запускати deploy на self-hosted Windows Server згідно `DEPLOYMENT.md`.
+
+---
+
+## Session 18 Completion Report (2026-04-22) — Live Deployment + Infrastructure Hardening
+
+**Контекст:** Перший вихід у інтернет з self-hosted Windows Server. Переведення DNS з Hostiq на Cloudflare. Створення постійного домену через Cloudflare Tunnel. Повний стек автостарту, моніторингу, бекапів.
+
+**Branch:** жодних код-комітів. Вся робота — конфігурація на сервері. Окрема гілка `claude/audit-ltex-project-bdZol` містить `PROJECT_AUDIT_2026-04-18.md` (695 рядків аналізу стану проекту).
+
+### Що зроблено (infra only, на сервері)
+
+| Area               | Зміна                                                                                                                                           |
+| ------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| DNS                | `ltex.com.ua` NS: `dns1/2.hostiq.ua` → `fiona.ns.cloudflare.com` + `trey.ns.cloudflare.com`. Всі MX/SPF/DKIM/DMARC/CalDAV/cPanel збережені як DNS-only (не проксовані Cloudflare). Тільки `@` та `www` — Proxied. |
+| Cloudflare Tunnel  | Named tunnel `ltex-prod` (UUID `1b604cd0-1beb-4b0a-897f-93d67e58357f`). CNAME `new.ltex.com.ua` → `*.cfargotunnel.com`. cloudflared registered as Windows service with explicit `--config` в `binPath` (через `sc.exe config`, бо `cloudflared service install` не пропустив аргумент). Конфіг у `C:\Windows\System32\config\systemprofile\.cloudflared\` (SYSTEM profile) — cert.pem, config.yml, credentials JSON. |
+| PM2 autostart      | Scheduled Task "PM2 Resurrect" — trigger AtStartup + 60s delay (щоб PostgreSQL встиг підняти). S4U logon as Тарас (без пароля). Виконує `C:\Users\Тарас\AppData\Roaming\npm\pm2.cmd resurrect`. |
+| PM2 config         | `E:\ltex-ecosystem\ecosystem.config.js`: додано `restart_delay: 5000`, `min_uptime: "30s"`, `max_restarts: 50`. `pm2 save` → dump записаний у `C:\Users\Тарас\.pm2\dump.pm2`. |
+| PostgreSQL         | Вже був AUTO_START (Automatic). Version 16, data at `E:\PostgreSQL\16\data`. Service name: `postgresql-x64-16`. DB: `ltex_ecosystem`, user: `ltex`. |
+| Monitoring         | UptimeRobot Free tier (50 monitors limit). 3 active monitors: `new.ltex.com.ua`, `/admin/login`, `/catalog`. 5-min HTTP checks. Email alerts to L-TEX gmail. |
+| Backups            | Script `E:\ltex-scripts\backup-db.ps1` — читає `DATABASE_URL` з `.env` parse-ом, використовує `pg_dump -Fc`, ротує файли >14 днів, логує у `E:\ltex-backups\backup.log`. Task "L-TEX Daily Backup" daily @ 03:00 (S4U). Тест ran успішно двічі, 169 КБ compressed (805+725+49 rows). |
+
+### Проблеми що виникали і як вирішили
+
+1. **cloudflared quick tunnel → named tunnel:** Quick tunnel (random `*.trycloudflare.com`) використовувався для першого тесту, потім замінений на named.
+2. **Cloudflare cert download failed:** Браузер завантажив cert.pem у `Downloads/`, довелось вручну перемістити у `%USERPROFILE%\.cloudflared\cert.pem`.
+3. **Windows service no args:** `cloudflared service install` не пропускав `--config` flag. Fix: `sc.exe config cloudflared binPath= '"C:\...cloudflared.exe" tunnel --config "C:\...config.yml" run'`.
+4. **Cyrillic username "Тарас":** Working but config path in YAML must match exactly. Copy-pasting `\` paths in PowerShell worked fine.
+5. **First cold-boot test failed (502 Bad Gateway):** After real reboot, PM2 was empty. Root cause: task trigger had no delay → ran before PostgreSQL ready → Next.js crashed → PM2 gave up after default 16 restart attempts. Fix: 60s delay on trigger + PM2 restart_delay/min_uptime/max_restarts.
+6. **Restart-Computer blocked:** Other RDP sessions (1С operators). Scheduled real reboot for night window.
+
+### Scheduled Tasks на сервері
+
+```
+\PM2 Resurrect       | AtStartup +60s delay | S4U as Тарас | pm2 resurrect
+\L-TEX Daily Backup  | Daily 03:00          | S4U as Тарас | powershell backup-db.ps1
+```
+
+### Залишилось (НЕ зроблено)
+
+- **Cold-boot reboot test** — потрібне нічне вікно коли 1С неактивне. Use `shutdown /r /f /t 60`.
+- **External backup** — бекапи на E: диску, якщо диск помре — втрата всього. Потрібно copy в `D:\` або OneDrive/rclone S3.
+- **Health endpoint `/api/health`** — UptimeRobot пінгує HTML. Кращий endpoint який перевіряє DB connectivity (30 хв код-задача, вимагає redeploy).
+
+### Метрики
+
+| Метрика                    | До Session 18 | Після Session 18                             |
+| -------------------------- | ------------- | -------------------------------------------- |
+| Live production URL        | Netlify only  | `new.ltex.com.ua` (self-hosted Cloudflare)   |
+| Auto-start services        | Partial       | Full (cloudflared + PM2 + PG)                |
+| External monitoring        | None          | UptimeRobot 3 monitors + email               |
+| DB backups                 | None          | Daily 03:00, 14-day retention                |
+| Зафіксований downtime рівень | Unknown     | 100% uptime detectable (5-min granularity)   |
+| CLAUDE.md рядків           | 1783          | ~1850 (+67 for Session 18 report)            |
+
+**Broker Note:** Netlify site still live — works as fallback. If self-hosted breaks, швидко перемкнути DNS можна поверненням A-запису `@` на Netlify IP. Бекапи на локальному диску — single point of failure (задача для Session 19+).
 
 ---
 
