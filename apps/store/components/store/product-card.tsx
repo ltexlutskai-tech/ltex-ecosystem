@@ -5,6 +5,7 @@ import { QUALITY_LABELS, type QualityLevel } from "@ltex/shared";
 import { SEASON_LABELS } from "@ltex/shared";
 import { WishlistButton } from "./wishlist-button";
 import { ComparisonButton } from "./comparison-button";
+import { CompareCheckbox } from "./compare-checkbox";
 import { QuickViewButton } from "./quick-view";
 import { getDictionary } from "@/lib/i18n";
 
@@ -148,6 +149,25 @@ export function ProductCard({
         />
       </div>
       <QuickViewButton product={product} />
+      <div
+        className={`absolute right-2 z-20 ${
+          product._count.lots > 0 ? "top-10" : "top-2"
+        }`}
+      >
+        <CompareCheckbox
+          product={{
+            productId: product.id ?? product.slug,
+            slug: product.slug,
+            name: product.name,
+            quality: product.quality,
+            season: product.season,
+            priceUnit: product.priceUnit,
+            country: product.country,
+            imageUrl: firstImage?.url ?? null,
+            priceEur: wholesalePrice?.amount ?? null,
+          }}
+        />
+      </div>
     </div>
   );
 }

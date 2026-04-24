@@ -212,6 +212,43 @@ describe("getCatalogProducts", () => {
     );
   });
 
+  it("applies subcategorySlug filter via category relation", async () => {
+    mockFindMany.mockResolvedValue([]);
+    mockCount.mockResolvedValue(0);
+
+    await getCatalogProducts({
+      categoryIds: ["cat-1", "cat-2"],
+      subcategorySlug: "dytyachyj-odyah",
+    });
+
+    const calledWhere = mockFindMany.mock.calls[0]![0]!.where;
+    // subcategorySlug takes precedence over categoryIds
+    expect(calledWhere.category).toEqual({ slug: "dytyachyj-odyah" });
+    expect(calledWhere.categoryId).toBeUndefined();
+  });
+
+  it("applies inStockOnly filter via lots relation", async () => {
+    mockFindMany.mockResolvedValue([]);
+    mockCount.mockResolvedValue(0);
+
+    await getCatalogProducts({ inStockOnly: true });
+
+    const calledWhere = mockFindMany.mock.calls[0]![0]!.where;
+    expect(calledWhere.lots).toEqual({
+      some: { status: { in: ["free", "on_sale"] } },
+    });
+  });
+
+  it("does not add lots filter when inStockOnly is false", async () => {
+    mockFindMany.mockResolvedValue([]);
+    mockCount.mockResolvedValue(0);
+
+    await getCatalogProducts({ inStockOnly: false });
+
+    const calledWhere = mockFindMany.mock.calls[0]![0]!.where;
+    expect(calledWhere.lots).toBeUndefined();
+  });
+
   it("delegates to fullTextSearch when query is provided", async () => {
     // When q is provided, it uses $queryRawUnsafe for full-text search
     mockQueryRaw
