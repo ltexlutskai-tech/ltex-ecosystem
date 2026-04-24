@@ -1404,3 +1404,90 @@ The biggest win is Fix 1 — eliminating the 7-round-trip waterfall on the homep
 - **Telegram/Viber webhooks** — запустити скрипти реєстрації
 - **1С інтеграція** — налаштування на стороні 1С
 - **Кастомний домен** — ltex.com.ua (DNS + Netlify)
+
+---
+
+## Session 19 Completion Report (2026-04-24) — CLAUDE.md Decomposition
+
+**Мета:** розбити 1872-рядковий CLAUDE.md на логічні файли, зменшити onboarding cost для worker-сесій.
+
+**Результат:**
+
+- `CLAUDE.md`: 1872 → 116 рядків (overview + navigation table до docs/)
+- `docs/ARCHITECTURE.md`: 251 рядків (file tree + DB schema + tech stack) — створив worker
+- `docs/HISTORY.md`: 1406 рядків (Sessions 4-18 completion reports + archived plans) — створив orchestrator
+- `docs/CONVENTIONS.md`: 74 рядки (do-not-touch rules, existing systems) — створив orchestrator
+- `docs/SESSION_TASKS.md`: 171 рядок (priority queue P0-P3 + marketplace gap analysis) — створив orchestrator
+
+**Виконання:**
+
+Worker запущений з `docs/SESSION_19_DECOMPOSITION.md` specom. Створив `docs/ARCHITECTURE.md` + запушив, потім впав з API timeout. Orchestrator перехопив завдання, склав 3 залишкові файли через `sed` (копіпаста з оригіналу 1:1, без переписувань своїми словами) і переписав CLAUDE.md у короткий overview.
+
+**Content preserved:** 100% з оригінального CLAUDE.md, жоден рядок не втрачено — лише структурно реорганізовано.
+
+**Коміти:**
+
+- `d1ff43b wip: partial CLAUDE.md decomposition` (worker)
+- `d1b881d docs: complete CLAUDE.md decomposition (HISTORY/CONVENTIONS/SESSION_TASKS)` (orchestrator)
+- `1bdeca0 Merge Session 19: decompose CLAUDE.md into docs/ structure`
+
+**CI:** format check green; typecheck/test/build — на GitHub Actions (локально `node_modules` не встановлений у orchestrator environment).
+
+**Branch cleanup:** merged branch `claude/session-19-decompose-claude-md-aVDw6` — pending видалення через GitHub UI (CLI дає 403).
+
+---
+
+## Session 20 Completion Report (2026-04-24) — B2B UX Essentials
+
+**Мета:** 6 marketplace-UX покращень на основі gap analysis vs Kasta / Rozetka / Optom.com.ua (spec у `docs/SESSION_20_B2B_UX.md`).
+
+**Результат:** 18 files changed, 880 insertions. 228 тестів passing (+5 нових).
+
+**Нові файли:**
+
+- `apps/store/components/store/compare-checkbox.tsx` — checkbox на product card (max 3 items)
+- `apps/store/components/store/share-buttons.tsx` + test — copy link / Viber / Telegram / Facebook
+- `apps/store/components/store/social-icons.tsx` — inline SVG brand marks (lucide-react не має)
+- `apps/store/app/(store)/terms/page.tsx` — Умови використання (placeholder)
+- `apps/store/app/(store)/privacy/page.tsx` — Політика конфіденційності (placeholder)
+- `apps/store/app/(store)/returns/page.tsx` — Повернення та обмін (placeholder)
+
+**Оновлені:**
+
+- `product-card.tsx` — інтегрований `CompareCheckbox`
+- `catalog-filters.tsx` — subcategory `<select>` + "Тільки в наявності" toggle
+- `catalog.ts` — `subcategorySlug` + `inStockOnly` параметри в `getCatalogProducts` і `fullTextSearch`
+- `catalog/[categorySlug]/page.tsx` — передає children у filters
+- `product/[slug]/page.tsx` — ShareButtons + Delivery info card
+- `footer.tsx` — нова колонка "Інформація" (Terms/Privacy/Returns) + 4 social icons row
+- `sitemap.ts` — +3 legal URL
+- `i18n/uk.ts` — +122 рядки нових ключів (compare, share, delivery, terms, privacy, returns, catalogFilters)
+
+**Hard rules дотримано:**
+
+- `next.config.js` — не чіпав
+- `package.json` / `pnpm-lock.yaml` — немає нових dependencies
+- `schema.prisma` / API routes — не чіпав
+- i18n-дисципліна — всі strings у `uk.ts`
+
+**Placeholder-и для user review:**
+
+- Terms/Privacy/Returns — TODO коментарі "погодити з юристом"
+- Footer social handles — placeholder URLs (facebook.com/ltex etc.), TODO замінити на реальні коли створені акаунти
+
+**Коміти (3):**
+
+- `d92d51d feat(catalog): compare checkboxes + subcategory + in-stock filters`
+- `af6cec3 feat(product): share buttons + delivery info block`
+- `a458c6e feat(legal): Terms/Privacy/Returns pages + footer social icons`
+- `84f8d64 Merge Session 20: B2B UX essentials`
+
+**CI:** format + typecheck + test (228 passing) + build — all green на voркері.
+
+**Branch cleanup:** `claude/session-20-b2b-ux-essentials-4FwyD` — pending видалення через GitHub UI.
+
+**Наступне:**
+
+- Session 21 — Customer Account + Order History (потребує рішення A: auth flow)
+- Session 22 — Bulk Ordering (потребує рішення C/D: volume discount policy, quote request)
+- Session 23 — Content & Trust Marketing (потребує рішення F/G/H: соц-handles, testimonials, stats)

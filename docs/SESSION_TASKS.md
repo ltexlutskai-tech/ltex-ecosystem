@@ -51,16 +51,11 @@
 
 Базується на research B2B e-commerce best practices 2026 + inventory поточного стану. Див. notes in chat 2026-04-24.
 
-### Session 20: B2B UX Essentials (~4-6 год, worker)
+### Session 20: B2B UX Essentials — ✅ DONE (2026-04-24)
 
-| #   | Задача                                                    | Файли                                                                 |
-| --- | --------------------------------------------------------- | --------------------------------------------------------------------- |
-| 18  | Compare checkboxes на `ProductCard` у каталозі            | `components/store/product-card.tsx`, `catalog/page.tsx`               |
-| 19  | Filter: subcategory + in-stock toggle                     | `catalog-filters.tsx`, `catalog/page.tsx`                             |
-| 20  | Share buttons на product (copy link, Viber, Telegram, FB) | `product/[slug]/page.tsx`, новий `share-buttons.tsx`                  |
-| 21  | Terms / Privacy / Returns окремі сторінки                 | нові `(store)/terms/page.tsx`, `privacy/page.tsx`, `returns/page.tsx` |
-| 22  | Social icons у footer (FB, Instagram, YouTube)            | `footer.tsx`                                                          |
-| 23  | Delivery info block на product page (не тільки FAQ)       | `product/[slug]/page.tsx`                                             |
+Див. `docs/HISTORY.md` → Session 20 Completion Report.
+Merged in `84f8d64`. 18 files, 880 insertions, 228 tests passing.
+Follow-up (user-action): заповнити real content Terms/Privacy/Returns, замінити social handles на реальні.
 
 ### Session 21: Customer Account + Order History (~6-8 год, worker)
 
@@ -109,11 +104,11 @@
 
 ## P3 — Process / docs
 
-| #   | Задача                                                                    | Тип                 | Статус                          |
-| --- | ------------------------------------------------------------------------- | ------------------- | ------------------------------- |
-| 45  | Розбити CLAUDE.md на ARCHITECTURE / HISTORY / CONVENTIONS / SESSION_TASKS | worker              | ✅ **IN PROGRESS** (Session 19) |
-| 46  | Runbook `docs/RUNBOOK.md` — що робити якщо Caddy/PM2/cloudflared падає    | orchestrator + user | PENDING                         |
-| 47  | Staging environment (VM або docker compose)                               | user + worker       | 1 день                          |
+| #   | Задача                                                                    | Тип                 | Статус                           |
+| --- | ------------------------------------------------------------------------- | ------------------- | -------------------------------- |
+| 45  | Розбити CLAUDE.md на ARCHITECTURE / HISTORY / CONVENTIONS / SESSION_TASKS | worker              | ✅ DONE (Session 19, 2026-04-24) |
+| 46  | Runbook `docs/RUNBOOK.md` — що робити якщо Caddy/PM2/cloudflared падає    | orchestrator + user | PENDING                          |
+| 47  | Staging environment (VM або docker compose)                               | user + worker       | 1 день                           |
 
 ---
 
