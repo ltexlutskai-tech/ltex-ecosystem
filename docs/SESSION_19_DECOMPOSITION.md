@@ -23,6 +23,7 @@
 10. Tech stack (стабільне)
 
 Проблеми:
+
 - Новий worker може пропустити щось критичне серед 1783 рядків
 - Git-diff на оновлення статусу псується через великий файл
 - Історія сесій 4-17 займає ~60% файлу, але потрібна рідко
@@ -79,9 +80,11 @@ ltex-ecosystem/
 # L-TEX Ecosystem — Project Context
 
 ## Business Overview
+
 <повний блок 1:1 як зараз, рядки 1-9>
 
 ## Current Status (2026-04-22)
+
 - Branch: main
 - Site LIVE: https://new.ltex.com.ua (Cloudflare Tunnel + Windows Server)
 - Netlify deprecated: stalwart-dango-04a9b9.netlify.app (fallback)
@@ -91,14 +94,14 @@ ltex-ecosystem/
 
 ## Quick Navigation
 
-| Документ | Коли читати |
-|----------|-------------|
-| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Tech stack, file tree, integrations, DB schema |
-| [docs/HISTORY.md](docs/HISTORY.md) | Що робилось у Sessions 4-18 |
-| [docs/CONVENTIONS.md](docs/CONVENTIONS.md) | Do-not-touch list, technical decisions |
-| [docs/SESSION_TASKS.md](docs/SESSION_TASKS.md) | Що треба зробити далі |
-| [DEPLOYMENT.md](DEPLOYMENT.md) | Як деплоїти на Windows Server |
-| [PROJECT_AUDIT_2026-04-18.md](PROJECT_AUDIT_2026-04-18.md) | Повний audit snapshot |
+| Документ                                                   | Коли читати                                    |
+| ---------------------------------------------------------- | ---------------------------------------------- |
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)               | Tech stack, file tree, integrations, DB schema |
+| [docs/HISTORY.md](docs/HISTORY.md)                         | Що робилось у Sessions 4-18                    |
+| [docs/CONVENTIONS.md](docs/CONVENTIONS.md)                 | Do-not-touch list, technical decisions         |
+| [docs/SESSION_TASKS.md](docs/SESSION_TASKS.md)             | Що треба зробити далі                          |
+| [DEPLOYMENT.md](DEPLOYMENT.md)                             | Як деплоїти на Windows Server                  |
+| [PROJECT_AUDIT_2026-04-18.md](PROJECT_AUDIT_2026-04-18.md) | Повний audit snapshot                          |
 
 ## Critical Rules for All Sessions
 
@@ -109,12 +112,15 @@ ltex-ecosystem/
 5. L-TEX НЕ приймає онлайн-оплати — таблиця `payments` тільки для відображення з 1С.
 
 ## Orchestrator / Worker Workflow
+
 <повний блок Orchestration Workflow з поточного CLAUDE.md, рядки 1588-1622>
 
 ## Tech Stack
+
 <повний блок Tech Stack з поточного CLAUDE.md, рядки 1761-1773>
 
 ## Important Notes
+
 <повний блок Important Notes з поточного CLAUDE.md, рядки 1775-1783>
 ```
 
@@ -160,6 +166,7 @@ ltex-ecosystem/
 **Status:** Complete (детальний звіт ще не задокументовано orchestrator-ом)
 
 **Ключові зміни:**
+
 - Cloudflare Tunnel для https://new.ltex.com.ua
 - PM2 Scheduled Task з 60s delay для автостарту
 - Daily PostgreSQL backup до E:\ltex-backups\ з 14-day retention
@@ -195,6 +202,7 @@ ltex-ecosystem/
 Поточні + найближчі задачі. Базуватися на аудиті `PROJECT_AUDIT_2026-04-18.md` §6 та §11.
 
 Секції:
+
 - **P0 Blockers** (контент, 1С verify, smoke test) — з таблицею (з CLAUDE.md current state)
 - **P1 Important** (Umami, Email, RLS, FTS, log rotation)
 - **P2 Post-deploy security** (CSP, Mobile SSE, X-Forwarded-For, Telegram webhook validation, console audit)
@@ -227,6 +235,7 @@ git checkout -b claude/session-19-decompose-claude-md
 ### Крок 2: Створити нові файли
 
 Послідовно створи:
+
 1. `docs/ARCHITECTURE.md` — копіювати відповідні блоки з CLAUDE.md
 2. `docs/HISTORY.md` — все що "Session X Completion Report" + Orchestrator Review
 3. `docs/CONVENTIONS.md` — IMPORTANT rules, existing systems, 1C strategy, infrastructure
