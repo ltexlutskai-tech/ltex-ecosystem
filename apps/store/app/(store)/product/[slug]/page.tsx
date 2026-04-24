@@ -13,10 +13,12 @@ import {
   type QualityLevel,
   type LotStatus,
 } from "@ltex/shared";
+import { Package, Truck, Clock, Scale } from "lucide-react";
 import { Breadcrumbs } from "@/components/store/breadcrumbs";
 import { AddToCartButton } from "@/components/store/add-to-cart-button";
 import { ProductJsonLd } from "@/components/store/product-json-ld";
 import { ProductCard } from "@/components/store/product-card";
+import { ShareButtons } from "@/components/store/share-buttons";
 import {
   getRecommendations,
   getFrequentlyBoughtTogether,
@@ -276,6 +278,11 @@ export default async function ProductPage({ params }: Props) {
               />
             </div>
           )}
+
+          <ShareButtons
+            url={`${SITE_URL}/product/${product.slug}`}
+            title={product.name}
+          />
         </div>
       </div>
 
@@ -350,6 +357,40 @@ export default async function ProductPage({ params }: Props) {
           </div>
         </div>
       )}
+
+      <section className="mt-10 rounded-lg border bg-muted/30 p-6">
+        <h3 className="mb-4 text-xl font-semibold">{dict.delivery.title}</h3>
+        <ul className="space-y-2 text-sm text-gray-700">
+          <li className="flex items-start gap-2">
+            <Package
+              className="mt-0.5 h-4 w-4 shrink-0 text-primary"
+              aria-hidden="true"
+            />
+            <span>{dict.delivery.novaPoshta}</span>
+          </li>
+          <li className="flex items-start gap-2">
+            <Truck
+              className="mt-0.5 h-4 w-4 shrink-0 text-primary"
+              aria-hidden="true"
+            />
+            <span>{dict.delivery.ownDelivery}</span>
+          </li>
+          <li className="flex items-start gap-2">
+            <Clock
+              className="mt-0.5 h-4 w-4 shrink-0 text-primary"
+              aria-hidden="true"
+            />
+            <span>{dict.delivery.leadTime}</span>
+          </li>
+          <li className="flex items-start gap-2">
+            <Scale
+              className="mt-0.5 h-4 w-4 shrink-0 text-primary"
+              aria-hidden="true"
+            />
+            <span>{dict.delivery.minimumOrder}</span>
+          </li>
+        </ul>
+      </section>
 
       {/* Recommendations — streamed separately so the product detail renders
           immediately without waiting on the similar/bought-together queries. */}

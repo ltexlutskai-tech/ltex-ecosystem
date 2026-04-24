@@ -126,4 +126,19 @@ describe("useComparison", () => {
     const stored = JSON.parse(localStorage.getItem("ltex-comparison") ?? "[]");
     expect(stored).toHaveLength(1);
   });
+
+  it("supports toggle-like flow: add then remove via isInComparison", () => {
+    const { result } = renderHook(() => useComparison(), {
+      wrapper: ComparisonProvider,
+    });
+
+    const item = createItem("toggle-1");
+    act(() => result.current.addItem(item));
+    expect(result.current.isInComparison(item.productId)).toBe(true);
+    expect(result.current.itemCount).toBe(1);
+
+    act(() => result.current.removeItem(item.productId));
+    expect(result.current.isInComparison(item.productId)).toBe(false);
+    expect(result.current.itemCount).toBe(0);
+  });
 });

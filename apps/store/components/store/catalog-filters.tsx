@@ -10,7 +10,16 @@ import { getDictionary } from "@/lib/i18n";
 
 const dict = getDictionary();
 
-export function CatalogFilters() {
+export interface SubcategoryOption {
+  slug: string;
+  name: string;
+}
+
+export function CatalogFilters({
+  subcategories,
+}: {
+  subcategories?: SubcategoryOption[];
+} = {}) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -71,7 +80,9 @@ export function CatalogFilters() {
     searchParams.get("country") ||
     searchParams.get("sort") ||
     searchParams.get("priceMin") ||
-    searchParams.get("priceMax");
+    searchParams.get("priceMax") ||
+    searchParams.get("sub") ||
+    searchParams.get("inStock");
 
   return (
     <div className="space-y-3">
@@ -133,6 +144,34 @@ export function CatalogFilters() {
           <option value="name_asc">{dict.catalog.sortNameAsc}</option>
           <option value="newest">{dict.catalog.sortNewest}</option>
         </select>
+
+        {subcategories && subcategories.length > 0 && (
+          <select
+            aria-label={dict.catalog.subcategory}
+            value={searchParams.get("sub") ?? ""}
+            onChange={(e) => updateFilter("sub", e.target.value)}
+            className="rounded-md border px-3 py-2 text-sm"
+          >
+            <option value="">{dict.catalog.subcategoryAll}</option>
+            {subcategories.map((sub) => (
+              <option key={sub.slug} value={sub.slug}>
+                {sub.name}
+              </option>
+            ))}
+          </select>
+        )}
+
+        <label className="flex cursor-pointer items-center gap-2 rounded-md border px-3 py-2 text-sm">
+          <input
+            type="checkbox"
+            checked={searchParams.get("inStock") === "true"}
+            onChange={(e) =>
+              updateFilter("inStock", e.target.checked ? "true" : "")
+            }
+            className="h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-1 focus:ring-green-500"
+          />
+          {dict.catalog.inStockOnly}
+        </label>
       </div>
 
       {/* Price range */}

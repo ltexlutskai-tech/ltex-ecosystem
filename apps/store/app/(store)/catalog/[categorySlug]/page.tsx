@@ -61,8 +61,17 @@ export default async function CategoryPage({ params, searchParams }: Props) {
   const priceMin = sp.priceMin ? parseFloat(sp.priceMin) : undefined;
   const priceMax = sp.priceMax ? parseFloat(sp.priceMax) : undefined;
 
+  // Validate the subcategory slug against actual children to avoid silent
+  // empty results when an unknown slug is pinned in the URL.
+  const subcategorySlug =
+    sp.sub && category.children.some((c) => c.slug === sp.sub)
+      ? sp.sub
+      : undefined;
+  const inStockOnly = sp.inStock === "true";
+
   const { products, total, totalPages } = await getCatalogProducts({
     categoryIds,
+    subcategorySlug,
     quality: sp.quality,
     season: sp.season,
     country: sp.country,
@@ -70,6 +79,7 @@ export default async function CategoryPage({ params, searchParams }: Props) {
     sort: sp.sort,
     priceMin: priceMin && !isNaN(priceMin) ? priceMin : undefined,
     priceMax: priceMax && !isNaN(priceMax) ? priceMax : undefined,
+    inStockOnly,
     page,
   });
 
@@ -81,6 +91,8 @@ export default async function CategoryPage({ params, searchParams }: Props) {
   if (sp.sort) filterParams.set("sort", sp.sort);
   if (sp.priceMin) filterParams.set("priceMin", sp.priceMin);
   if (sp.priceMax) filterParams.set("priceMax", sp.priceMax);
+  if (subcategorySlug) filterParams.set("sub", subcategorySlug);
+  if (inStockOnly) filterParams.set("inStock", "true");
   const baseHref = filterParams.toString()
     ? `/catalog/${categorySlug}?${filterParams.toString()}`
     : `/catalog/${categorySlug}`;
@@ -141,7 +153,12 @@ export default async function CategoryPage({ params, searchParams }: Props) {
       )}
 
       <div className="mt-6">
-        <CatalogFilters />
+        <CatalogFilters
+          subcategories={category.children.map((c) => ({
+            slug: c.slug,
+            name: c.name,
+          }))}
+        />
       </div>
 
       {products.length === 0 ? (

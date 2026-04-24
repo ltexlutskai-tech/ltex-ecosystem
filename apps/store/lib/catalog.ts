@@ -9,6 +9,7 @@ import {
 interface CatalogParams {
   categoryId?: string;
   categoryIds?: string[];
+  subcategorySlug?: string;
   quality?: string;
   season?: string;
   country?: string;
@@ -16,6 +17,7 @@ interface CatalogParams {
   sort?: string;
   priceMin?: number;
   priceMax?: number;
+  inStockOnly?: boolean;
   page?: number;
   perPage?: number;
 }
@@ -38,6 +40,7 @@ export async function getCatalogProducts(
   const {
     categoryId,
     categoryIds,
+    subcategorySlug,
     quality,
     season,
     country,
@@ -45,6 +48,7 @@ export async function getCatalogProducts(
     sort,
     priceMin,
     priceMax,
+    inStockOnly,
     page = 1,
     perPage = 24,
   } = params;
@@ -56,7 +60,11 @@ export async function getCatalogProducts(
 
   const where: Prisma.ProductWhereInput = { inStock: true };
 
-  if (categoryIds && categoryIds.length > 0) {
+  // subcategorySlug narrows to an exact sub-category; it takes precedence
+  // over categoryIds so that "вибрана підкатегорія" wins over the parent tree.
+  if (subcategorySlug) {
+    where.category = { slug: subcategorySlug };
+  } else if (categoryIds && categoryIds.length > 0) {
     where.categoryId = { in: categoryIds };
   } else if (categoryId) {
     where.categoryId = categoryId;
@@ -64,6 +72,10 @@ export async function getCatalogProducts(
   if (quality) where.quality = quality;
   if (season) where.season = season;
   if (country) where.country = country;
+
+  if (inStockOnly) {
+    where.lots = { some: { status: { in: ["free", "on_sale"] } } };
+  }
 
   // Price range filter
   if (priceMin !== undefined || priceMax !== undefined) {
@@ -121,12 +133,14 @@ async function fullTextSearch(
   const {
     categoryId,
     categoryIds,
+    subcategorySlug,
     quality,
     season,
     country,
     q,
     priceMin,
     priceMax,
+    inStockOnly,
     page = 1,
     perPage = 24,
   } = params;
@@ -148,7 +162,13 @@ async function fullTextSearch(
   const queryParams: (string | number)[] = [words, `%${q}%`];
   let paramIdx = 3;
 
-  if (categoryIds && categoryIds.length > 0) {
+  if (subcategorySlug) {
+    filterConditions.push(
+      `EXISTS (SELECT 1 FROM categories c WHERE c.id = p.category_id AND c.slug = $${paramIdx})`,
+    );
+    queryParams.push(subcategorySlug);
+    paramIdx++;
+  } else if (categoryIds && categoryIds.length > 0) {
     const placeholders = categoryIds
       .map((_, i) => `$${paramIdx + i}`)
       .join(", ");
@@ -188,6 +208,11 @@ async function fullTextSearch(
     );
     queryParams.push(priceMax);
     paramIdx++;
+  }
+  if (inStockOnly) {
+    filterConditions.push(
+      `EXISTS (SELECT 1 FROM lots l WHERE l.product_id = p.id AND l.status IN ('free', 'on_sale'))`,
+    );
   }
 
   const filterClause = filterConditions.join(" AND ");
