@@ -35,24 +35,24 @@
 
 Git історія зберігає 66 комітів, починаючи з `aa80927` (2026-04-08, Session 4 completion). Сесії 0-3 (Phase 0-3: моно-репо + store MVP + admin + боти + mobile app) відбулися **до** створення цього git-репо — вся інформація про них в CLAUDE.md. Timeline нижче сфокусований на **git-видимій історії**.
 
-| № | Дата | Що зроблено (коротко) | Коміти | Ключові метрики |
-|---|------|----------------------|--------|-----------------|
-| 0-3 | pre-2026-04-08 | Foundation + Store MVP + Admin + Sync API + Telegram/Viber bots + Mobile client (Expo) | **не у git** | 19 Prisma таблиць, 805 products seeded |
-| 4 | 2026-04-08 | Unit testing + TS strict + Zod validation + a11y/SEO + Prettier у CI | `aa80927`..`701d5e0` (6) | Tests 53→114, 0 `any`, 8 test files |
-| 5 | 2026-04-08 | Mobile polish (skeleton/offline/push), 19 нових E2E, admin UX (sort/CSV/breadcrumbs), CSP headers, bot commands | 7 commits | E2E 17→36, README + CONTRIBUTING |
-| 6 | 2026-04-08 | Admin pagination/filters, ImageGallery, order confirmation/status, i18n dict (180 ключів), real-time admin stats, wishlist/compare/recently-viewed | 1 squashed | Tests 114→139, 28 нових файлів, +3,322 LOC |
-| 7 | 2026-04-08 | i18n підключений до всіх сторінок, email (SMTP/Resend), analytics dashboard (8 charts), JSON-LD Organization/Breadcrumb/FAQ, mobile auth guards, infinite scroll, bundle analyzer | 1 squashed | Tests 139→161, 250 i18n keys |
-| 8 | 2026-04-08 | CI repair: Prettier 37 files, 41 TS errors, nodemailer install, instrumentation.ts env validation, 10s fetch timeouts | `1a7292f` | CI всі 4 кроки PASS |
-| 9 | 2026-04-08 | Netlify Prisma generate fix (`packages/db/turbo.json`) | `95d623b` | `"build": "prisma generate"` у db |
-| 10 | 2026-04-08 | Infrastructure scripts: enable-rls.sql, fts-migration.sql, register-telegram/viber-webhook.ts, netlify.toml | `c088a5b` | 6 нових scripts |
-| 11 | 2026-04-09 | `/api/health` endpoint + CLAUDE.md cleanup | `ebc6774` | +1 route |
-| 12 | 2026-04-09 | (documentation-only) — infrastructure step-by-step | `8fbb8e7` | — |
-| 13 | 2026-04-09 | ISR на homepage/catalog/lots/product + homepage N+1 count → single groupBy | `685e0e2` | Homepage 8 queries → 2 queries |
-| 14 | 2026-04-09 | **Wave 1** (header overhaul, /new /sale, banners admin, featured products, Umami, video carousel, promo stripe) + **Wave 2** (9-section homepage restructure, single Promise.all) + **emergency Netlify fix** (outputFileTracingIncludes для Prisma engine) | 10 commits | +3 Prisma моделі (Banner, FeaturedProduct, PromoStripe), 4 нові admin pages, 3 нові store routes |
-| 15 | 2026-04-10 | Self-hosting migration: `output:'standalone'`, Prisma Windows binaryTarget, singleton fix, `<Image>` optimization, React `cache()` dedup, `unstable_cache` homepage, PM2/Caddy/deploy.ps1/DEPLOYMENT.md | 3 commits | +4 infrastructure files |
-| 16 | 2026-04-15 | **Security hardening (CRITICAL):** JWT-based mobile API auth (`MOBILE_JWT_SECRET`), admin stats auth, mandatory webhook signatures, magic-bytes image validation, server-side chat sender, admin reply endpoint | 6 commits | Tests 186→212 (+26), 4 CRITICAL + 3 HIGH closed |
-| 17 | 2026-04-15 | **Pre-deploy security fixes:** auth guard на lot actions, ctaHref URL validation, startup validation MOBILE_JWT_SECRET/SYNC_API_KEY length | 3 commits | Tests 212→220 (+8), 4 MUST-FIX closed |
-| 18 (поточна) | 2026-04-18 | Аудит проекту (цей документ) | 0 | — |
+| №            | Дата           | Що зроблено (коротко)                                                                                                                                                                                                                                       | Коміти                   | Ключові метрики                                                                                  |
+| ------------ | -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------ | ------------------------------------------------------------------------------------------------ |
+| 0-3          | pre-2026-04-08 | Foundation + Store MVP + Admin + Sync API + Telegram/Viber bots + Mobile client (Expo)                                                                                                                                                                      | **не у git**             | 19 Prisma таблиць, 805 products seeded                                                           |
+| 4            | 2026-04-08     | Unit testing + TS strict + Zod validation + a11y/SEO + Prettier у CI                                                                                                                                                                                        | `aa80927`..`701d5e0` (6) | Tests 53→114, 0 `any`, 8 test files                                                              |
+| 5            | 2026-04-08     | Mobile polish (skeleton/offline/push), 19 нових E2E, admin UX (sort/CSV/breadcrumbs), CSP headers, bot commands                                                                                                                                             | 7 commits                | E2E 17→36, README + CONTRIBUTING                                                                 |
+| 6            | 2026-04-08     | Admin pagination/filters, ImageGallery, order confirmation/status, i18n dict (180 ключів), real-time admin stats, wishlist/compare/recently-viewed                                                                                                          | 1 squashed               | Tests 114→139, 28 нових файлів, +3,322 LOC                                                       |
+| 7            | 2026-04-08     | i18n підключений до всіх сторінок, email (SMTP/Resend), analytics dashboard (8 charts), JSON-LD Organization/Breadcrumb/FAQ, mobile auth guards, infinite scroll, bundle analyzer                                                                           | 1 squashed               | Tests 139→161, 250 i18n keys                                                                     |
+| 8            | 2026-04-08     | CI repair: Prettier 37 files, 41 TS errors, nodemailer install, instrumentation.ts env validation, 10s fetch timeouts                                                                                                                                       | `1a7292f`                | CI всі 4 кроки PASS                                                                              |
+| 9            | 2026-04-08     | Netlify Prisma generate fix (`packages/db/turbo.json`)                                                                                                                                                                                                      | `95d623b`                | `"build": "prisma generate"` у db                                                                |
+| 10           | 2026-04-08     | Infrastructure scripts: enable-rls.sql, fts-migration.sql, register-telegram/viber-webhook.ts, netlify.toml                                                                                                                                                 | `c088a5b`                | 6 нових scripts                                                                                  |
+| 11           | 2026-04-09     | `/api/health` endpoint + CLAUDE.md cleanup                                                                                                                                                                                                                  | `ebc6774`                | +1 route                                                                                         |
+| 12           | 2026-04-09     | (documentation-only) — infrastructure step-by-step                                                                                                                                                                                                          | `8fbb8e7`                | —                                                                                                |
+| 13           | 2026-04-09     | ISR на homepage/catalog/lots/product + homepage N+1 count → single groupBy                                                                                                                                                                                  | `685e0e2`                | Homepage 8 queries → 2 queries                                                                   |
+| 14           | 2026-04-09     | **Wave 1** (header overhaul, /new /sale, banners admin, featured products, Umami, video carousel, promo stripe) + **Wave 2** (9-section homepage restructure, single Promise.all) + **emergency Netlify fix** (outputFileTracingIncludes для Prisma engine) | 10 commits               | +3 Prisma моделі (Banner, FeaturedProduct, PromoStripe), 4 нові admin pages, 3 нові store routes |
+| 15           | 2026-04-10     | Self-hosting migration: `output:'standalone'`, Prisma Windows binaryTarget, singleton fix, `<Image>` optimization, React `cache()` dedup, `unstable_cache` homepage, PM2/Caddy/deploy.ps1/DEPLOYMENT.md                                                     | 3 commits                | +4 infrastructure files                                                                          |
+| 16           | 2026-04-15     | **Security hardening (CRITICAL):** JWT-based mobile API auth (`MOBILE_JWT_SECRET`), admin stats auth, mandatory webhook signatures, magic-bytes image validation, server-side chat sender, admin reply endpoint                                             | 6 commits                | Tests 186→212 (+26), 4 CRITICAL + 3 HIGH closed                                                  |
+| 17           | 2026-04-15     | **Pre-deploy security fixes:** auth guard на lot actions, ctaHref URL validation, startup validation MOBILE_JWT_SECRET/SYNC_API_KEY length                                                                                                                  | 3 commits                | Tests 212→220 (+8), 4 MUST-FIX closed                                                            |
+| 18 (поточна) | 2026-04-18     | Аудит проекту (цей документ)                                                                                                                                                                                                                                | 0                        | —                                                                                                |
 
 **Загальні метрики git:** 66 commits, 61 non-merge + 5 merge, 4 гілки (main, поточна audit, + 2 remote refs). 19 feat, 10 fix, 4 perf, 25 docs, 5 security.
 
@@ -76,43 +76,43 @@ Git історія зберігає 66 комітів, починаючи з `aa
 
 ### 3.2 Заплановано → Реалізовано → Відхилення
 
-| Заплановано | Реалізовано | Відхилення | Причина |
-|-------------|-------------|------------|---------|
-| Foundation (Phase 0) | Turborepo + pnpm + 3 packages + 2 apps | — | Чітке попадання в план |
-| Store MVP (Phase 1) | Повний каталог + FTS + cart + checkout + SEO + PWA | Додано Wave 1/2: banners, featured, /new, /sale, /top, video carousel, Umami, promo stripe | Session 14 — реакція на конкурентів (ukrstock.com) |
-| Admin panel (Phase 2) | Повноцінний Dashboard + 7 CRUD модулів + analytics | Додано: real-time stats (30s refresh), notification bell, pagination/filters на всьому, CSV export, sortable columns | Session 5-6 покращення UX |
-| 1C інтеграція (Phase 2) | API готовий (`/api/sync/products`, `/lots`, `/rates`, `/orders/export`) | **Не налаштовано на стороні 1С** | Потребує участі бухгалтерії / 1С-спеціаліста |
-| Telegram bot (Phase 3) | 7 commands + inline query + webhook + pagination | Додано /prices, /new (Session 5) | Невелике розширення |
-| Viber bot (Phase 3b) | 7 commands + keyboards | — | План реалізовано |
-| Mobile client (Phase 4) | 9 екранів + auth + offline + push + deep linking | JWT auth додано пізніше (Session 16) | Security retrofit |
-| **Mobile agent app** (Phase 4) | **Не зроблено** | Блоковано відсутністю скріншотів MobileAgentLTEX v1.15.3 | Планувалося separate session |
-| **Warehouse app** (Phase 4) | **Не зроблено** | Не розпочинали | Separate session |
-| Phase 5 (Optimization) | Recommendations, PWA, push, SSE chat, Viber notifications | — | План реалізовано |
+| Заплановано                    | Реалізовано                                                             | Відхилення                                                                                                           | Причина                                            |
+| ------------------------------ | ----------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------- |
+| Foundation (Phase 0)           | Turborepo + pnpm + 3 packages + 2 apps                                  | —                                                                                                                    | Чітке попадання в план                             |
+| Store MVP (Phase 1)            | Повний каталог + FTS + cart + checkout + SEO + PWA                      | Додано Wave 1/2: banners, featured, /new, /sale, /top, video carousel, Umami, promo stripe                           | Session 14 — реакція на конкурентів (ukrstock.com) |
+| Admin panel (Phase 2)          | Повноцінний Dashboard + 7 CRUD модулів + analytics                      | Додано: real-time stats (30s refresh), notification bell, pagination/filters на всьому, CSV export, sortable columns | Session 5-6 покращення UX                          |
+| 1C інтеграція (Phase 2)        | API готовий (`/api/sync/products`, `/lots`, `/rates`, `/orders/export`) | **Не налаштовано на стороні 1С**                                                                                     | Потребує участі бухгалтерії / 1С-спеціаліста       |
+| Telegram bot (Phase 3)         | 7 commands + inline query + webhook + pagination                        | Додано /prices, /new (Session 5)                                                                                     | Невелике розширення                                |
+| Viber bot (Phase 3b)           | 7 commands + keyboards                                                  | —                                                                                                                    | План реалізовано                                   |
+| Mobile client (Phase 4)        | 9 екранів + auth + offline + push + deep linking                        | JWT auth додано пізніше (Session 16)                                                                                 | Security retrofit                                  |
+| **Mobile agent app** (Phase 4) | **Не зроблено**                                                         | Блоковано відсутністю скріншотів MobileAgentLTEX v1.15.3                                                             | Планувалося separate session                       |
+| **Warehouse app** (Phase 4)    | **Не зроблено**                                                         | Не розпочинали                                                                                                       | Separate session                                   |
+| Phase 5 (Optimization)         | Recommendations, PWA, push, SSE chat, Viber notifications               | —                                                                                                                    | План реалізовано                                   |
 
 ### 3.3 Що було ДОДАНО не з плану
 
-| Додавання | Сесія | Виправдано? |
-|-----------|-------|-------------|
-| 220 unit + 36 E2E тестів (плану тестування не було) | 4-7, 16-17 | **ТАК.** Критично для регресу на 18K LOC. Без тестів ризик ломати при кожній зміні |
-| i18n infrastructure (250 ключів) | 6-7 | **ТАК з застереженням.** Добре зроблено, але ціль на майбутні мови, зараз сайт тільки українською. Не критично зараз |
-| Wave 1/2 homepage overhaul | 14 | **ТАК.** Прямий бізнес-запит — наздогнати конкурентів |
-| Умami analytics tracker + global click listener | 14 | Нейтрально — Umami instance не налаштований, компонент — noop. Код є, користі поки 0 |
-| Self-hosting migration (Netlify → Windows Server) | 15 | **Спірно.** Великий operational overhead. Плюси: немає cold starts, локальна DB latency ~1мс. Мінуси: single point of failure, немає CDN, потрібен monitoring/backup stack. Netlify був би простішим |
-| Security hardening rounds 16-17 | 16-17 | **ТАК.** Безальтернативно перед self-hosted. Без цього експонувати не можна |
-| BannerCarousel, VideoReviewsCarousel (client components) | 14 | Нейтрально — красиво, але SEO важливіше текстового hero |
+| Додавання                                                | Сесія      | Виправдано?                                                                                                                                                                                          |
+| -------------------------------------------------------- | ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 220 unit + 36 E2E тестів (плану тестування не було)      | 4-7, 16-17 | **ТАК.** Критично для регресу на 18K LOC. Без тестів ризик ломати при кожній зміні                                                                                                                   |
+| i18n infrastructure (250 ключів)                         | 6-7        | **ТАК з застереженням.** Добре зроблено, але ціль на майбутні мови, зараз сайт тільки українською. Не критично зараз                                                                                 |
+| Wave 1/2 homepage overhaul                               | 14         | **ТАК.** Прямий бізнес-запит — наздогнати конкурентів                                                                                                                                                |
+| Умami analytics tracker + global click listener          | 14         | Нейтрально — Umami instance не налаштований, компонент — noop. Код є, користі поки 0                                                                                                                 |
+| Self-hosting migration (Netlify → Windows Server)        | 15         | **Спірно.** Великий operational overhead. Плюси: немає cold starts, локальна DB latency ~1мс. Мінуси: single point of failure, немає CDN, потрібен monitoring/backup stack. Netlify був би простішим |
+| Security hardening rounds 16-17                          | 16-17      | **ТАК.** Безальтернативно перед self-hosted. Без цього експонувати не можна                                                                                                                          |
+| BannerCarousel, VideoReviewsCarousel (client components) | 14         | Нейтрально — красиво, але SEO важливіше текстового hero                                                                                                                                              |
 
 ### 3.4 Що було в плані але НЕ зроблено
 
-| Пункт плану | Стан | Чому не зроблено |
-|-------------|------|------------------|
-| Mobile agent app (field sales) | 0% | Потрібні скріншоти legacy MobileAgentLTEX, окрема сесія з користувачем |
-| Warehouse app | 0% | Окрема сесія, не запланована |
-| Реальна 1С інтеграція (не тільки API) | 60% (є API, немає налаштування у 1С) | Потрібна участь бухгалтера/1С-адміна |
-| Фото продуктів у Supabase Storage | 0% (bucket може не існувати) | Не завантажено, немає фотографій 805 SKU |
-| FTS міграція (GIN + pg_trgm) | Скрипт є, не запущений | Користувач має виконати SQL у Supabase SQL Editor |
-| RLS на всіх таблицях | Скрипт є, не запущений | Те саме |
-| Production monitoring/alerting | 0% | Не планувалося як окрема задача |
-| Автоматичні бекапи local PostgreSQL | 0% | Не планувалося, але критично для self-hosted |
+| Пункт плану                           | Стан                                 | Чому не зроблено                                                       |
+| ------------------------------------- | ------------------------------------ | ---------------------------------------------------------------------- |
+| Mobile agent app (field sales)        | 0%                                   | Потрібні скріншоти legacy MobileAgentLTEX, окрема сесія з користувачем |
+| Warehouse app                         | 0%                                   | Окрема сесія, не запланована                                           |
+| Реальна 1С інтеграція (не тільки API) | 60% (є API, немає налаштування у 1С) | Потрібна участь бухгалтера/1С-адміна                                   |
+| Фото продуктів у Supabase Storage     | 0% (bucket може не існувати)         | Не завантажено, немає фотографій 805 SKU                               |
+| FTS міграція (GIN + pg_trgm)          | Скрипт є, не запущений               | Користувач має виконати SQL у Supabase SQL Editor                      |
+| RLS на всіх таблицях                  | Скрипт є, не запущений               | Те саме                                                                |
+| Production monitoring/alerting        | 0%                                   | Не планувалося як окрема задача                                        |
+| Автоматичні бекапи local PostgreSQL   | 0%                                   | Не планувалося, але критично для self-hosted                           |
 
 ---
 
@@ -154,24 +154,24 @@ ltex-ecosystem (Turborepo + pnpm 9.15.4)
 
 ### 4.2 Стек і версії
 
-| Шар | Технологія | Версія |
-|-----|-----------|--------|
-| Monorepo | Turborepo + pnpm | 2.3.3 / 9.15.4 |
-| Runtime | Node.js | ≥20 (deploy: 22 LTS) |
-| Language | TypeScript | 5.7.2 (strict, 0 `any`) |
-| Web framework | Next.js | 15.1.6 (App Router, `output: 'standalone'`) |
-| UI | React | 19.0.0 |
-| Styling | Tailwind CSS | 3.4.17 + shadcn/ui + Radix |
-| Database | PostgreSQL | (Supabase Frankfurt, мігрує на local 16) |
-| ORM | Prisma | 6.2.1 |
-| Auth (admin) | Supabase Auth | `@supabase/ssr` 0.10.0 |
-| Auth (mobile) | Custom HMAC JWT | `apps/store/lib/mobile-auth.ts` |
-| Testing | Vitest + Playwright | 4.1.2 / 1.59.1 |
-| Image optimization | sharp | 0.34.5 |
-| Email | nodemailer OR Resend | 8.0.5 / — |
-| Bundle analysis | @next/bundle-analyzer | 16.2.2 |
-| Validation | Zod | 4.3.6 |
-| Mobile | Expo RN | — (версії в mobile-client/package.json) |
+| Шар                | Технологія            | Версія                                      |
+| ------------------ | --------------------- | ------------------------------------------- |
+| Monorepo           | Turborepo + pnpm      | 2.3.3 / 9.15.4                              |
+| Runtime            | Node.js               | ≥20 (deploy: 22 LTS)                        |
+| Language           | TypeScript            | 5.7.2 (strict, 0 `any`)                     |
+| Web framework      | Next.js               | 15.1.6 (App Router, `output: 'standalone'`) |
+| UI                 | React                 | 19.0.0                                      |
+| Styling            | Tailwind CSS          | 3.4.17 + shadcn/ui + Radix                  |
+| Database           | PostgreSQL            | (Supabase Frankfurt, мігрує на local 16)    |
+| ORM                | Prisma                | 6.2.1                                       |
+| Auth (admin)       | Supabase Auth         | `@supabase/ssr` 0.10.0                      |
+| Auth (mobile)      | Custom HMAC JWT       | `apps/store/lib/mobile-auth.ts`             |
+| Testing            | Vitest + Playwright   | 4.1.2 / 1.59.1                              |
+| Image optimization | sharp                 | 0.34.5                                      |
+| Email              | nodemailer OR Resend  | 8.0.5 / —                                   |
+| Bundle analysis    | @next/bundle-analyzer | 16.2.2                                      |
+| Validation         | Zod                   | 4.3.6                                       |
+| Mobile             | Expo RN               | — (версії в mobile-client/package.json)     |
 
 ### 4.3 Деплой-топологія (станом на 2026-04-18)
 
@@ -205,16 +205,16 @@ ltex-ecosystem (Turborepo + pnpm 9.15.4)
 
 ### 4.4 Інтеграції (статус)
 
-| Інтеграція | Код готовий | Налаштовано | Примітка |
-|------------|-------------|-------------|----------|
-| 1С (sync API) | ✅ 4 routes | ❌ | Потрібна конфігурація HTTP Service на стороні 1С (Центральна 1С) |
-| Telegram bot | ✅ | ❓ | Залежить від `TELEGRAM_BOT_TOKEN`+`TELEGRAM_WEBHOOK_SECRET` env |
-| Viber bot | ✅ | ❓ | Залежить від `VIBER_AUTH_TOKEN` |
-| Nova Poshta tracking | ✅ | ❓ | `NOVA_POSHTA_API_KEY` |
-| Umami analytics | ✅ (tracker + click listener) | ❌ | `NEXT_PUBLIC_UMAMI_*` env vars порожні — compонент no-op |
-| Email (SMTP/Resend) | ✅ | ❌ | Обидва провайдери в env vars порожні — order email disabled |
-| Supabase Storage (фото) | ✅ (upload helpers) | ❌ | Bucket, фото не завантажені |
-| Expo push notifications | ✅ | ❓ | Залежить від mobile app deployment |
+| Інтеграція              | Код готовий                   | Налаштовано | Примітка                                                         |
+| ----------------------- | ----------------------------- | ----------- | ---------------------------------------------------------------- |
+| 1С (sync API)           | ✅ 4 routes                   | ❌          | Потрібна конфігурація HTTP Service на стороні 1С (Центральна 1С) |
+| Telegram bot            | ✅                            | ❓          | Залежить від `TELEGRAM_BOT_TOKEN`+`TELEGRAM_WEBHOOK_SECRET` env  |
+| Viber bot               | ✅                            | ❓          | Залежить від `VIBER_AUTH_TOKEN`                                  |
+| Nova Poshta tracking    | ✅                            | ❓          | `NOVA_POSHTA_API_KEY`                                            |
+| Umami analytics         | ✅ (tracker + click listener) | ❌          | `NEXT_PUBLIC_UMAMI_*` env vars порожні — compонент no-op         |
+| Email (SMTP/Resend)     | ✅                            | ❌          | Обидва провайдери в env vars порожні — order email disabled      |
+| Supabase Storage (фото) | ✅ (upload helpers)           | ❌          | Bucket, фото не завантажені                                      |
+| Expo push notifications | ✅                            | ❓          | Залежить від mobile app deployment                               |
 
 ---
 
@@ -243,13 +243,13 @@ ltex-ecosystem (Turborepo + pnpm 9.15.4)
 
 ### 5.3 API Layer — 100% (22 route.ts)
 
-| Група | Routes | Особливості |
-|-------|--------|-------------|
-| Public | `/api/cart`, `/api/orders`, `/api/search`, `/api/catalog`, `/api/health` | Rate limit (5/min orders, 20/min search) |
-| Sync (1C) | `/api/sync/products`, `/lots`, `/rates`, `/orders/export` | Bearer `SYNC_API_KEY`, Zod, revalidatePath |
-| Mobile | `/api/mobile/{auth, profile, favorites, chat, chat/stream, shipments, notifications, payments, orders}` | JWT HMAC from Session 16 |
-| Admin | `/api/admin/stats`, `/api/admin/chat/reply` | Supabase session required |
-| Webhooks | `/api/telegram/webhook`, `/api/viber/webhook` | Mandatory signatures (Session 16) |
+| Група     | Routes                                                                                                  | Особливості                                |
+| --------- | ------------------------------------------------------------------------------------------------------- | ------------------------------------------ |
+| Public    | `/api/cart`, `/api/orders`, `/api/search`, `/api/catalog`, `/api/health`                                | Rate limit (5/min orders, 20/min search)   |
+| Sync (1C) | `/api/sync/products`, `/lots`, `/rates`, `/orders/export`                                               | Bearer `SYNC_API_KEY`, Zod, revalidatePath |
+| Mobile    | `/api/mobile/{auth, profile, favorites, chat, chat/stream, shipments, notifications, payments, orders}` | JWT HMAC from Session 16                   |
+| Admin     | `/api/admin/stats`, `/api/admin/chat/reply`                                                             | Supabase session required                  |
+| Webhooks  | `/api/telegram/webhook`, `/api/viber/webhook`                                                           | Mandatory signatures (Session 16)          |
 
 **Ключові файли:** `apps/store/app/api/orders/route.ts` (Zod + transactions + notifications), `apps/store/lib/mobile-auth.ts`, `apps/store/lib/rate-limit.ts` (in-memory sliding window).
 
@@ -448,7 +448,7 @@ Expo RN, 9 screens (Login, Catalog, Cart, Orders, OrderDetail, Chat, Profile, Sh
 
 ### 8.5 Process risks
 
-19. **CLAUDE.md = 1783 рядки, 140 KB.** Документ, який мусять читати *всі* worker sessions, зростає експоненційно. Новий worker може пропустити щось критичне. Потрібне розділення на `ARCHITECTURE.md`, `HISTORY.md`, `TASKS.md`, `CONVENTIONS.md`.
+19. **CLAUDE.md = 1783 рядки, 140 KB.** Документ, який мусять читати _всі_ worker sessions, зростає експоненційно. Новий worker може пропустити щось критичне. Потрібне розділення на `ARCHITECTURE.md`, `HISTORY.md`, `TASKS.md`, `CONVENTIONS.md`.
 
 20. **Knowledge concentration.** CLAUDE.md — single source of truth. Якщо воно буде пошкоджене або втрачене, restart зайняв би тижні.
 
@@ -474,41 +474,41 @@ Expo RN, 9 screens (Login, Catalog, Cart, Orders, OrderDetail, Chat, Profile, Sh
 
 ### 9.1 Наздогнали (Wave 1 ціль)
 
-| Фіча | L-TEX | ukrstock.com (типове) |
-|------|-------|----------------------|
-| Banner carousel на homepage | ✅ auto-rotate, admin CRUD | ✅ |
-| Featured products | ✅ `/top` + admin curation | ✅ |
-| /new + /sale розділи | ✅ | ✅ |
-| Global search у header | ✅ autocomplete (300ms debounce) | ✅ |
-| Промо-смуга (sticky) | ✅ PromoStripe model + admin | ✅ |
-| Video reviews | ✅ 767/805 products, YouTube carousel | Partial |
-| Wishlist + Compare + Recently viewed | ✅ (localStorage) | ✅ (usually) |
-| Mobile menu (Sheet) | ✅ | ✅ |
-| JSON-LD Product/Organization/Breadcrumb | ✅ | Varies |
+| Фіча                                    | L-TEX                                 | ukrstock.com (типове) |
+| --------------------------------------- | ------------------------------------- | --------------------- |
+| Banner carousel на homepage             | ✅ auto-rotate, admin CRUD            | ✅                    |
+| Featured products                       | ✅ `/top` + admin curation            | ✅                    |
+| /new + /sale розділи                    | ✅                                    | ✅                    |
+| Global search у header                  | ✅ autocomplete (300ms debounce)      | ✅                    |
+| Промо-смуга (sticky)                    | ✅ PromoStripe model + admin          | ✅                    |
+| Video reviews                           | ✅ 767/805 products, YouTube carousel | Partial               |
+| Wishlist + Compare + Recently viewed    | ✅ (localStorage)                     | ✅ (usually)          |
+| Mobile menu (Sheet)                     | ✅                                    | ✅                    |
+| JSON-LD Product/Organization/Breadcrumb | ✅                                    | Varies                |
 
 ### 9.2 Перевага L-TEX
 
-| Фіча | L-TEX | ukrstock.com |
-|------|-------|--------------|
-| Native mobile app | ✅ Expo (RN) готовий | ❌ web-only (зазвичай) |
-| Telegram + Viber bots | ✅ обидва + inline query | ❌ (зазвичай тільки чат) |
-| Video on every lot | ✅ YouTube per lot | Rare |
-| Full-text search + trigram fuzzy | ✅ PostgreSQL tsvector | Basic |
-| ISR-кешована homepage | ✅ | — |
-| SSE real-time chat | ✅ `/api/mobile/chat/stream` | — |
-| Nova Poshta tracking | ✅ API integration | Partial |
+| Фіча                             | L-TEX                        | ukrstock.com             |
+| -------------------------------- | ---------------------------- | ------------------------ |
+| Native mobile app                | ✅ Expo (RN) готовий         | ❌ web-only (зазвичай)   |
+| Telegram + Viber bots            | ✅ обидва + inline query     | ❌ (зазвичай тільки чат) |
+| Video on every lot               | ✅ YouTube per lot           | Rare                     |
+| Full-text search + trigram fuzzy | ✅ PostgreSQL tsvector       | Basic                    |
+| ISR-кешована homepage            | ✅                           | —                        |
+| SSE real-time chat               | ✅ `/api/mobile/chat/stream` | —                        |
+| Nova Poshta tracking             | ✅ API integration           | Partial                  |
 
 ### 9.3 Чого немає / відстаємо
 
-| Фіча | L-TEX | ukrstock.com |
-|------|-------|--------------|
-| Контент (фото 805 SKU) | ❌ | ✅ роками збирали |
-| SEO authority / backlinks | 0 (новий домен) | Високий |
-| Blog / статті / гайди | ❌ | ✅ (часто є) |
-| Онлайн-оплата | ❌ (business decision) | ✅ |
-| Reviews / ratings customers | ❌ | ✅ |
-| Програма лояльності / промокоди | ❌ | ✅ |
-| Traffic | 0 | Великий |
+| Фіча                            | L-TEX                  | ukrstock.com      |
+| ------------------------------- | ---------------------- | ----------------- |
+| Контент (фото 805 SKU)          | ❌                     | ✅ роками збирали |
+| SEO authority / backlinks       | 0 (новий домен)        | Високий           |
+| Blog / статті / гайди           | ❌                     | ✅ (часто є)      |
+| Онлайн-оплата                   | ❌ (business decision) | ✅                |
+| Reviews / ratings customers     | ❌                     | ✅                |
+| Програма лояльності / промокоди | ❌                     | ✅                |
+| Traffic                         | 0                      | Великий           |
 
 **Висновок:** Код-паритет з ukrstock. Бізнес-паритет — ні, бо немає contentу і трафіку. Технічна перемога без бізнес-перемоги — 50% роботи.
 
@@ -518,25 +518,25 @@ Expo RN, 9 screens (Login, Catalog, Cart, Orders, OrderDetail, Chat, Profile, Sh
 
 ### 10.1 Lines of Code
 
-| Пакет/папка | LOC |
-|-------------|-----|
-| `apps/store/app/` | 10,902 |
-| `apps/store/components/` | 3,153 |
-| `apps/store/lib/` | ~3,500 (estimated, включено в 28,480 total) |
-| `apps/mobile-client/src/` | 5,942 |
-| `services/telegram-bot/` + `services/viber-bot/` | 1,798 |
-| `packages/` (shared + db + ui) | 1,703 |
-| **Сумарно .ts/.tsx** | **~28,480** |
+| Пакет/папка                                      | LOC                                         |
+| ------------------------------------------------ | ------------------------------------------- |
+| `apps/store/app/`                                | 10,902                                      |
+| `apps/store/components/`                         | 3,153                                       |
+| `apps/store/lib/`                                | ~3,500 (estimated, включено в 28,480 total) |
+| `apps/mobile-client/src/`                        | 5,942                                       |
+| `services/telegram-bot/` + `services/viber-bot/` | 1,798                                       |
+| `packages/` (shared + db + ui)                   | 1,703                                       |
+| **Сумарно .ts/.tsx**                             | **~28,480**                                 |
 
 **Файлів .ts/.tsx:** 239 (без node_modules, .next, dist).
 
 ### 10.2 Тести
 
-| Тип | Файлів | Тестів |
-|-----|--------|--------|
-| Unit (Vitest) | 17 | **220** |
-| E2E (Playwright) | 9 | **36** |
-| **Сумарно** | **26** | **256** |
+| Тип              | Файлів | Тестів  |
+| ---------------- | ------ | ------- |
+| Unit (Vitest)    | 17     | **220** |
+| E2E (Playwright) | 9      | **36**  |
+| **Сумарно**      | **26** | **256** |
 
 Покриття по областях: validations (28), catalog (21), rate-limit (27), mobile-auth (13), validate-image (14), i18n (19), API integration (34), context providers (22), shared utils (25), інше (17).
 
@@ -548,28 +548,28 @@ Expo RN, 9 screens (Login, Catalog, Cart, Orders, OrderDetail, Chat, Profile, Sh
 
 ### 10.4 API та сторінки
 
-| Категорія | Кількість |
-|-----------|-----------|
-| API routes (route.ts) | 22 |
-| Store pages (public) | 12 |
-| Admin pages | 12 + 3 підсторінки (new/edit) = 15 |
-| Mobile screens | 9 |
-| UI components (shadcn) | 13 |
+| Категорія              | Кількість                          |
+| ---------------------- | ---------------------------------- |
+| API routes (route.ts)  | 22                                 |
+| Store pages (public)   | 12                                 |
+| Admin pages            | 12 + 3 підсторінки (new/edit) = 15 |
+| Mobile screens         | 9                                  |
+| UI components (shadcn) | 13                                 |
 
 ### 10.5 Git метрики
 
-| Метрика | Значення |
-|---------|----------|
-| Total commits (all branches) | 66 |
-| Merges | 5 |
-| Non-merge commits | 61 |
-| Feat | 19 |
-| Fix | 10 |
-| Perf | 4 |
-| Docs | 25 |
-| Security | 5 |
-| Branches (active) | 4 (main, audit, 2 remote refs) |
-| Timespan | 2026-04-08 → 2026-04-15 (7 днів git, ~17 сесій) |
+| Метрика                      | Значення                                        |
+| ---------------------------- | ----------------------------------------------- |
+| Total commits (all branches) | 66                                              |
+| Merges                       | 5                                               |
+| Non-merge commits            | 61                                              |
+| Feat                         | 19                                              |
+| Fix                          | 10                                              |
+| Perf                         | 4                                               |
+| Docs                         | 25                                              |
+| Security                     | 5                                               |
+| Branches (active)            | 4 (main, audit, 2 remote refs)                  |
+| Timespan                     | 2026-04-08 → 2026-04-15 (7 днів git, ~17 сесій) |
 
 ### 10.6 Bundle size
 
@@ -577,11 +577,11 @@ Expo RN, 9 screens (Login, Catalog, Cart, Orders, OrderDetail, Chat, Profile, Sh
 
 ### 10.7 Env vars
 
-| Тип | Кількість |
-|-----|-----------|
+| Тип                   | Кількість                                                                                      |
+| --------------------- | ---------------------------------------------------------------------------------------------- |
 | REQUIRED (production) | 6 (DATABASE_URL, DIRECT_URL, SUPABASE URL+ANON_KEY, SITE_URL, SYNC_API_KEY, MOBILE_JWT_SECRET) |
-| Required-if-exposed | 3 (TELEGRAM_WEBHOOK_SECRET, VIBER_AUTH_TOKEN + залежні token) |
-| Optional | 7 (Nova Poshta, SMTP, Resend, Umami × 2, Expo, Telegram Chat ID) |
+| Required-if-exposed   | 3 (TELEGRAM_WEBHOOK_SECRET, VIBER_AUTH_TOKEN + залежні token)                                  |
+| Optional              | 7 (Nova Poshta, SMTP, Resend, Umami × 2, Expo, Telegram Chat ID)                               |
 
 ---
 
@@ -686,10 +686,3 @@ pg_dump -U ltex ltex_ecosystem | gzip > E:\backups\ltex-$(Get-Date -Format yyyyM
 **Кінець звіту.** 12 розділів, ~25 сторінок, 12,000+ слів.
 
 Технічний стан — сильний. Бізнес-стан — потребує доопрацювання контенту й операційних процедур. Не затягуйте: код без фото й без 1С — це готель без гостей.
-
-
-
-
-
-
-
