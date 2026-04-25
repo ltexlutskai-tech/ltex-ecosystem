@@ -6,33 +6,53 @@ import {
   FacebookIcon,
   InstagramIcon,
   YoutubeIcon,
+  TikTokIcon,
+  ViberIcon,
 } from "@/components/store/social-icons";
+import { NewsletterForm } from "@/components/store/newsletter-form";
 import { getDictionary } from "@/lib/i18n";
 
 const dict = getDictionary();
 
-// TODO(L-TEX social): замінити placeholder-handles (ltex) на реальні profile URLs
-// після створення офіційних акаунтів на Facebook / Instagram / YouTube.
 const SOCIAL_LINKS = [
   {
-    href: "https://facebook.com/ltex",
-    label: "Facebook",
-    Icon: FacebookIcon,
+    href: "https://t.me/LTEX_Second",
+    label: "Telegram (Second + Stock)",
+    Icon: Send,
   },
   {
-    href: "https://instagram.com/ltex",
+    href: "https://t.me/LTEX_Bric",
+    label: "Telegram (Bric-a-Brac)",
+    Icon: Send,
+  },
+  {
+    href: "https://bit.ly/4ahemp4",
+    label: "Viber",
+    Icon: ViberIcon,
+  },
+  {
+    href: "https://instagram.com/ltex_secondopt",
     label: "Instagram",
     Icon: InstagramIcon,
   },
   {
-    href: "https://youtube.com/@ltex",
+    href: "https://www.facebook.com/groups/984605345078238",
+    label: "Facebook",
+    Icon: FacebookIcon,
+  },
+  {
+    href: "https://www.tiktok.com/@ltex.second.opt",
+    label: "TikTok",
+    Icon: TikTokIcon,
+  },
+  {
+    href: "https://youtube.com/@l-tex_second_stok",
     label: "YouTube",
     Icon: YoutubeIcon,
   },
 ] as const;
 
 export function Footer() {
-  const telegramUrl = `https://t.me/${CONTACTS.telegram.replace("@", "")}`;
   return (
     <footer className="border-t bg-secondary/50" role="contentinfo">
       <div className="container mx-auto px-4 py-12">
@@ -46,18 +66,7 @@ export function Footer() {
             <h4 className="mt-6 font-semibold">
               {dict.footerExtra.socialTitle}
             </h4>
-            <ul className="mt-2 flex items-center gap-2">
-              <li>
-                <a
-                  href={telegramUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  aria-label={dict.footerExtra.telegram}
-                  className="inline-flex h-9 w-9 items-center justify-center rounded-full border bg-background text-muted-foreground transition-colors hover:border-primary hover:text-primary"
-                >
-                  <Send className="h-4 w-4" aria-hidden="true" />
-                </a>
-              </li>
+            <ul className="mt-2 flex flex-wrap items-center gap-2">
               {SOCIAL_LINKS.map(({ href, label, Icon }) => (
                 <li key={label}>
                   <a
@@ -65,6 +74,7 @@ export function Footer() {
                     target="_blank"
                     rel="noopener noreferrer"
                     aria-label={label}
+                    title={label}
                     className="inline-flex h-9 w-9 items-center justify-center rounded-full border bg-background text-muted-foreground transition-colors hover:border-primary hover:text-primary"
                   >
                     <Icon className="h-4 w-4" aria-hidden="true" />
@@ -184,6 +194,12 @@ export function Footer() {
               <li className="pt-1">{CONTACTS.location}</li>
             </ul>
           </div>
+        </div>
+
+        <Separator className="my-8" />
+
+        <div className="mx-auto max-w-xl">
+          <NewsletterForm />
         </div>
 
         <Separator className="my-8" />

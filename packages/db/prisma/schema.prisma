@@ -405,6 +405,21 @@ model Banner {
   @@map("banners")
 }
 
+// ─── Newsletter Subscribers (footer signup) ─────────────────────────────────
+
+model NewsletterSubscriber {
+  id             String    @id @default(uuid())
+  email          String    @unique
+  phone          String?
+  subscribedAt   DateTime  @default(now()) @map("subscribed_at")
+  unsubscribedAt DateTime? @map("unsubscribed_at")
+  source         String?
+  confirmedAt    DateTime? @map("confirmed_at")
+
+  @@index([subscribedAt])
+  @@map("newsletter_subscribers")
+}
+
 // ─── Promo Stripe (sticky "Гаряча пропозиція" banner, single-row) ──────────
 
 model PromoStripe {
