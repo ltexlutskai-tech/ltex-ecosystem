@@ -5,6 +5,7 @@ import { prisma } from "@ltex/db";
 import Link from "next/link";
 import { RecentlyViewedSection } from "@/components/store/recently-viewed-section";
 import { BannerCarousel } from "@/components/store/banner-carousel";
+import { CategoriesCarousel } from "@/components/store/categories-carousel";
 import { VideoReviewsCarousel } from "@/components/store/video-reviews-carousel";
 import { TestimonialsSlider } from "@/components/store/testimonials-slider";
 import { ProductCard } from "@/components/store/product-card";
@@ -222,27 +223,16 @@ export default async function HomePage() {
           </section>
         )}
 
-        {/* 5. Categories grid */}
+        {/* 5. Categories carousel */}
         {categories.length > 0 && (
-          <section className="mt-12">
-            <h2 className="text-2xl font-bold">{dict.home.categoriesTitle}</h2>
-            <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-              {categories.map((cat) => (
-                <Link
-                  key={cat.slug}
-                  href={`/catalog/${cat.slug}`}
-                  className="group rounded-lg border p-4 transition-colors hover:border-green-500 hover:bg-green-50"
-                >
-                  <h3 className="font-semibold group-hover:text-green-700">
-                    {cat.name}
-                  </h3>
-                  <p className="mt-1 text-xs text-gray-500">
-                    {cat.productCount} {dict.home.productsCount}
-                  </p>
-                </Link>
-              ))}
-            </div>
-          </section>
+          <CategoriesCarousel
+            categories={categories.map((cat) => ({
+              id: cat.id,
+              slug: cat.slug,
+              name: cat.name,
+              productCount: cat.productCount,
+            }))}
+          />
         )}
 
         {/* 6. Video reviews carousel */}

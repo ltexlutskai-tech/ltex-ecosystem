@@ -237,6 +237,13 @@ export const uk = {
     seeAllNew: "Усі новинки",
     categoriesTitle: "Категорії товарів",
     productsCount: "товарів",
+    categoriesCarousel: {
+      title: "Категорії товарів",
+      aria: "Карусель категорій товарів",
+      prev: "Попередня категорія",
+      next: "Наступна категорія",
+      goToSlide: "Перейти до слайду {n}",
+    },
     ctaTitle: "Є питання?",
     ctaDescription: "Зв'яжіться з нами через Telegram або по телефону",
     lotsBtn: "Лоти (мішки)",
