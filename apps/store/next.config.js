@@ -11,6 +11,18 @@ const nextConfig = {
   // Monorepo: trace files from the repo root so pnpm workspace packages are
   // included in the standalone output.
   outputFileTracingRoot: path.join(__dirname, "../../"),
+  // Prisma engine binaries are loaded via dynamic require at runtime, so
+  // Next.js static trace doesn't pick them up. Force-include the .node engines
+  // + schema.prisma so PrismaClient works in the standalone bundle. Without
+  // this, cold-start PM2 fails with PrismaClientInitializationError
+  // ("Query Engine for runtime windows" not found).
+  outputFileTracingIncludes: {
+    "*": [
+      "../../node_modules/.pnpm/@prisma+client@*/node_modules/.prisma/client/*.node",
+      "../../node_modules/.pnpm/@prisma+client@*/node_modules/.prisma/client/schema.prisma",
+      "../../node_modules/.pnpm/@prisma+client@*/node_modules/@prisma/client/runtime/*.node",
+    ],
+  },
   // Server Actions default body limit is 1 MB, which is too small for admin
   // image uploads (banners, product photos). High-res AI-generated banners
   // (1920×600 JPG/PNG) can easily be 2-5 MB. Bump the limit to 10 MB so
