@@ -1,12 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { z } from "zod";
 import { prisma } from "@ltex/db";
 import { rateLimit, getClientIp } from "@/lib/rate-limit";
-
-export const newsletterSubscribeSchema = z.object({
-  email: z.string().email("Невірний email").max(200),
-  source: z.enum(["footer", "checkout", "manual"]).optional(),
-});
+import { newsletterSubscribeSchema } from "@/lib/newsletter-schema";
 
 export async function POST(request: NextRequest) {
   const ip = getClientIp(request);

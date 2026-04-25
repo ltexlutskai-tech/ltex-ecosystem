@@ -15,7 +15,8 @@ vi.mock("@/lib/rate-limit", () => ({
   getClientIp: vi.fn().mockReturnValue("127.0.0.1"),
 }));
 
-import { POST, newsletterSubscribeSchema } from "./route";
+import { POST } from "./route";
+import { newsletterSubscribeSchema } from "@/lib/newsletter-schema";
 import { prisma } from "@ltex/db";
 import { rateLimit } from "@/lib/rate-limit";
 
