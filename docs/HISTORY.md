@@ -1535,3 +1535,30 @@ Worker запущений з `docs/SESSION_19_DECOMPOSITION.md` specom. Ство
 - `cf0580c Merge Session 23: trust content & marketing`
 
 **Branch cleanup:** `claude/session-23-trust-content-CysjA` — pending видалення через GitHub UI.
+
+---
+
+## Session 24 Completion Report (2026-04-25) — Homepage Cleanup
+
+**Мета:** прибрати 3 непотрібні секції з homepage за user feedback (фокус на каталозі, не на маркетингових блоках).
+
+**Результат:** 8 files changed, +6 / -317 lines. CI green (format + typecheck 6/6 + 211 store tests + 25 shared + build).
+
+**Видалено:**
+
+- Section "Прямі постачання з Європи та Канади" (countries carousel, GB/DE/CA/PL)
+- Section "L-TEX у цифрах" (company stats з counter animation)
+- Section з 4 features ("Від 10 кг / 4 країни / Відеоогляди / Швидка доставка")
+- Files: `countries-carousel.tsx` + test, `company-stats.tsx`, `use-counter.ts` + test
+- i18n keys: `countries.*`, `stats.*`, `home.features.*`
+
+**Залишилось на homepage:** BannerCarousel → Featured → Sale → New → Categories grid (поки) → Videos → RecentlyViewed → Testimonials → CTA.
+
+**Коміти:**
+
+- `92a263f refactor(homepage): remove countries / stats / features-bar sections`
+- `c2f81d6 Merge Session 24: homepage cleanup (3 sections removed)`
+
+**Branch cleanup:** `claude/session-24-homepage-cleanup-ZEdUZ` — pending видалення через GitHub UI.
+
+**Наступне:** Session 25 — categories grid → carousel з gradient + lucide icon, 6s auto-rotate.
