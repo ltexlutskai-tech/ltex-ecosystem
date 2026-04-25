@@ -96,11 +96,6 @@ describe("i18n", () => {
       expect(uk.wishlist.empty).toBeTruthy();
     });
 
-    it("has compare section", () => {
-      expect(uk.compare.title).toBeTruthy();
-      expect(uk.compare.clearAll).toBeTruthy();
-    });
-
     it("has common section", () => {
       expect(uk.common.loading).toBeTruthy();
       expect(uk.common.error).toBeTruthy();

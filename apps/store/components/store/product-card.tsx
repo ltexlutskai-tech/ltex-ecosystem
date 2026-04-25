@@ -4,8 +4,6 @@ import { Badge, Card, CardContent } from "@ltex/ui";
 import { QUALITY_LABELS, type QualityLevel } from "@ltex/shared";
 import { SEASON_LABELS } from "@ltex/shared";
 import { WishlistButton } from "./wishlist-button";
-import { ComparisonButton } from "./comparison-button";
-import { CompareCheckbox } from "./compare-checkbox";
 import { QuickViewButton } from "./quick-view";
 import { getDictionary } from "@/lib/i18n";
 
@@ -117,7 +115,7 @@ export function ProductCard({
       </Link>
 
       {/* Overlay buttons */}
-      <div className="absolute right-2 top-10 flex flex-col gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+      <div className="absolute right-2 top-2 z-20 flex flex-col gap-1 opacity-0 transition-opacity group-hover:opacity-100">
         <WishlistButton
           product={{
             productId: product.id ?? product.slug,
@@ -129,36 +127,8 @@ export function ProductCard({
             priceUnit: product.priceUnit,
           }}
         />
-        <ComparisonButton
-          product={{
-            productId: product.id ?? product.slug,
-            slug: product.slug,
-            name: product.name,
-            quality: product.quality,
-            season: product.season,
-            priceUnit: product.priceUnit,
-            country: product.country,
-            imageUrl: firstImage?.url ?? null,
-            priceEur: wholesalePrice?.amount ?? null,
-          }}
-        />
       </div>
       <QuickViewButton product={product} />
-      <div className="absolute right-2 top-2 z-20">
-        <CompareCheckbox
-          product={{
-            productId: product.id ?? product.slug,
-            slug: product.slug,
-            name: product.name,
-            quality: product.quality,
-            season: product.season,
-            priceUnit: product.priceUnit,
-            country: product.country,
-            imageUrl: firstImage?.url ?? null,
-            priceEur: wholesalePrice?.amount ?? null,
-          }}
-        />
-      </div>
     </div>
   );
 }
