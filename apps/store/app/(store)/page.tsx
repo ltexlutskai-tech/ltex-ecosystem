@@ -6,8 +6,6 @@ import Link from "next/link";
 import { RecentlyViewedSection } from "@/components/store/recently-viewed-section";
 import { BannerCarousel } from "@/components/store/banner-carousel";
 import { VideoReviewsCarousel } from "@/components/store/video-reviews-carousel";
-import { CountriesCarousel } from "@/components/store/countries-carousel";
-import { CompanyStats } from "@/components/store/company-stats";
 import { TestimonialsSlider } from "@/components/store/testimonials-slider";
 import { ProductCard } from "@/components/store/product-card";
 import { getFeaturedProducts } from "@/lib/featured";
@@ -247,39 +245,19 @@ export default async function HomePage() {
           </section>
         )}
 
-        {/* 6. Countries / Suppliers */}
-        <CountriesCarousel />
-
-        {/* 7. Company stats with counter animation */}
-        <CompanyStats />
-
-        {/* 8. Video reviews carousel */}
+        {/* 6. Video reviews carousel */}
         <VideoReviewsCarousel products={data.videoProducts} />
 
-        {/* 9. Recently viewed */}
+        {/* 7. Recently viewed */}
         <RecentlyViewedSection />
       </div>
 
-      {/* 8. Features */}
-      <section className="border-t bg-gray-50 py-12">
-        <div className="container mx-auto px-4">
-          <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
-            {dict.home.features.map((f) => (
-              <div key={f.title} className="text-center">
-                <h3 className="text-lg font-semibold">{f.title}</h3>
-                <p className="mt-1 text-sm text-gray-500">{f.desc}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* 10. Testimonials */}
+      {/* 8. Testimonials */}
       <div className="container mx-auto px-4">
         <TestimonialsSlider />
       </div>
 
-      {/* 11. CTA */}
+      {/* 9. CTA */}
       <section className="py-12">
         <div className="container mx-auto px-4 text-center">
           <h2 className="text-2xl font-bold">{dict.home.ctaTitle}</h2>

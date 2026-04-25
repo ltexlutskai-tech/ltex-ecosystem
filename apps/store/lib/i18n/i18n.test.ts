@@ -108,10 +108,9 @@ describe("i18n", () => {
       expect(uk.common.next).toBeTruthy();
     });
 
-    it("has home section with features array", () => {
+    it("has home section", () => {
       expect(uk.home.heroDescription).toBeTruthy();
-      expect(uk.home.features).toBeInstanceOf(Array);
-      expect(uk.home.features.length).toBe(4);
+      expect(uk.home.ctaTitle).toBeTruthy();
     });
   });
 });
