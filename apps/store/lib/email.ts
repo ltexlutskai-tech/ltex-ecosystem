@@ -9,6 +9,7 @@
  */
 
 import { APP_NAME, CONTACTS } from "@ltex/shared";
+import { getDictionary } from "@/lib/i18n";
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://ltex.com.ua";
 
@@ -179,6 +180,48 @@ export async function sendOrderConfirmationEmail(
     </p>`;
 
   await sendEmail(data.customerEmail, subject, baseLayout(content));
+}
+
+export async function sendWelcomeNewsletterEmail(email: string): Promise<void> {
+  const dict = getDictionary();
+  const { subject, heading, body } = dict.newsletter.welcomeEmail;
+
+  if (!isEmailConfigured()) {
+    console.info(
+      `[L-TEX] Email provider not configured — welcome newsletter email skipped for ${email} (subject: "${subject}").`,
+    );
+    return;
+  }
+
+  const paragraphs = body
+    .split("\n\n")
+    .map(
+      (chunk) =>
+        `<p style="color:#374151;line-height:1.6;margin:0 0 12px">${chunk
+          .split("\n")
+          .map((line) =>
+            line
+              .replace(/&/g, "&amp;")
+              .replace(/</g, "&lt;")
+              .replace(/>/g, "&gt;"),
+          )
+          .join("<br>")}</p>`,
+    )
+    .join("");
+
+  const content = `
+    <h2 style="margin:0 0 16px;color:#16a34a;font-size:18px">${heading}</h2>
+    ${paragraphs}
+    <div style="text-align:center;margin:24px 0">
+      <a href="${SITE_URL}/catalog" style="display:inline-block;background:#16a34a;color:#fff;text-decoration:none;padding:12px 24px;border-radius:6px;font-weight:600">
+        Переглянути асортимент
+      </a>
+    </div>
+    <p style="color:#9ca3af;font-size:13px;text-align:center">
+      Зв'яжіться з нами: Telegram <a href="https://t.me/${CONTACTS.telegram.replace("@", "")}" style="color:#16a34a">${CONTACTS.telegram}</a>
+    </p>`;
+
+  await sendEmail(email, subject, baseLayout(content));
 }
 
 export async function sendOrderStatusEmail(

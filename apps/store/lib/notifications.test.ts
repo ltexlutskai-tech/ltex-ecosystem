@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { notifyNewOrder } from "./notifications";
+import { notifyNewOrder, notifyNewsletterSubscribe } from "./notifications";
 
 const mockOrder = {
   orderId: "order-123",
@@ -168,5 +168,87 @@ describe("notifyNewOrder", () => {
     // Should escape _ and ( and )
     expect(text).toContain("Test\\_User");
     expect(text).toContain("\\(special\\)");
+  });
+});
+
+describe("notifyNewsletterSubscribe", () => {
+  let fetchSpy: ReturnType<typeof vi.spyOn>;
+  let infoSpy: ReturnType<typeof vi.spyOn>;
+  let warnSpy: ReturnType<typeof vi.spyOn>;
+
+  const payload = {
+    email: "user@example.com",
+    source: "footer",
+    subscribedAt: new Date("2026-04-25T12:00:00Z"),
+  };
+
+  beforeEach(() => {
+    fetchSpy = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValue(
+        new Response(JSON.stringify({ ok: true }), { status: 200 }),
+      );
+    infoSpy = vi.spyOn(console, "info").mockImplementation(() => {});
+    warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    fetchSpy.mockRestore();
+    infoSpy.mockRestore();
+    warnSpy.mockRestore();
+    vi.unstubAllEnvs();
+  });
+
+  it("posts to Telegram when both env vars set", async () => {
+    vi.stubEnv("TELEGRAM_BOT_TOKEN", "bot-token");
+    vi.stubEnv("NEWSLETTER_TELEGRAM_CHAT_ID", "newsletter-chat-id");
+
+    await notifyNewsletterSubscribe(payload);
+
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchSpy.mock.calls[0]!;
+    expect(url).toBe("https://api.telegram.org/botbot-token/sendMessage");
+    const body = JSON.parse((init as RequestInit).body as string);
+    expect(body.chat_id).toBe("newsletter-chat-id");
+    expect(body.text).toContain("Нова підписка на новинки");
+    expect(body.text).toContain("user@example.com");
+    expect(body.text).toContain("footer");
+  });
+
+  it("skips when NEWSLETTER_TELEGRAM_CHAT_ID is missing", async () => {
+    vi.stubEnv("TELEGRAM_BOT_TOKEN", "bot-token");
+    vi.stubEnv("NEWSLETTER_TELEGRAM_CHAT_ID", "");
+
+    await notifyNewsletterSubscribe(payload);
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(infoSpy).toHaveBeenCalled();
+  });
+
+  it("skips when TELEGRAM_BOT_TOKEN is missing", async () => {
+    vi.stubEnv("TELEGRAM_BOT_TOKEN", "");
+    vi.stubEnv("NEWSLETTER_TELEGRAM_CHAT_ID", "newsletter-chat-id");
+
+    await notifyNewsletterSubscribe(payload);
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("does not throw on network failure", async () => {
+    vi.stubEnv("TELEGRAM_BOT_TOKEN", "bot-token");
+    vi.stubEnv("NEWSLETTER_TELEGRAM_CHAT_ID", "newsletter-chat-id");
+    fetchSpy.mockRejectedValueOnce(new Error("network"));
+
+    await expect(notifyNewsletterSubscribe(payload)).resolves.toBeUndefined();
+    expect(warnSpy).toHaveBeenCalled();
+  });
+
+  it("warns on non-OK response", async () => {
+    vi.stubEnv("TELEGRAM_BOT_TOKEN", "bot-token");
+    vi.stubEnv("NEWSLETTER_TELEGRAM_CHAT_ID", "newsletter-chat-id");
+    fetchSpy.mockResolvedValueOnce(
+      new Response("Bad request", { status: 400 }),
+    );
+
+    await notifyNewsletterSubscribe(payload);
+    expect(warnSpy).toHaveBeenCalled();
   });
 });

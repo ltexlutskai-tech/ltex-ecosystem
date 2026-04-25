@@ -2,6 +2,21 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@ltex/db";
 import { rateLimit, getClientIp } from "@/lib/rate-limit";
 import { newsletterSubscribeSchema } from "@/lib/newsletter-schema";
+import { notifyNewsletterSubscribe } from "@/lib/notifications";
+import { sendWelcomeNewsletterEmail } from "@/lib/email";
+
+function fireNewsletterNotifications(payload: {
+  email: string;
+  source: string;
+  subscribedAt: Date;
+}): void {
+  void notifyNewsletterSubscribe(payload).catch((e) =>
+    console.error("[L-TEX] notifyNewsletterSubscribe failed:", e),
+  );
+  void sendWelcomeNewsletterEmail(payload.email).catch((e) =>
+    console.error("[L-TEX] sendWelcomeNewsletterEmail failed:", e),
+  );
+}
 
 export async function POST(request: NextRequest) {
   const ip = getClientIp(request);
@@ -37,18 +52,28 @@ export async function POST(request: NextRequest) {
       where: { email },
     });
     if (existing) {
-      // Re-subscribe if previously unsubscribed.
       if (existing.unsubscribedAt) {
-        await prisma.newsletterSubscriber.update({
+        // Re-subscribe — treat as a new active subscription for notifications.
+        const updated = await prisma.newsletterSubscriber.update({
           where: { email },
           data: { unsubscribedAt: null, subscribedAt: new Date() },
+        });
+        fireNewsletterNotifications({
+          email: updated.email,
+          source: updated.source ?? source,
+          subscribedAt: updated.subscribedAt,
         });
       }
       return NextResponse.json({ ok: true, alreadySubscribed: true });
     }
 
-    await prisma.newsletterSubscriber.create({
+    const created = await prisma.newsletterSubscriber.create({
       data: { email, source },
+    });
+    fireNewsletterNotifications({
+      email: created.email,
+      source: created.source ?? source,
+      subscribedAt: created.subscribedAt,
     });
 
     return NextResponse.json({ ok: true }, { status: 201 });
