@@ -1491,3 +1491,47 @@ Worker запущений з `docs/SESSION_19_DECOMPOSITION.md` specom. Ство
 - Session 21 — Customer Account + Order History (потребує рішення A: auth flow)
 - Session 22 — Bulk Ordering (потребує рішення C/D: volume discount policy, quote request)
 - Session 23 — Content & Trust Marketing (потребує рішення F/G/H: соц-handles, testimonials, stats)
+
+---
+
+## Session 23 Completion Report (2026-04-25) — Trust Content & Marketing
+
+**Мета:** 5 trust signals для marketplace credibility (spec у `docs/SESSION_23_TRUST_CONTENT.md`).
+
+**Результат:** 16 files changed, 859 insertions. 217 tests passing (+8 new).
+
+**Single commit `1edea27`:** worker свідомо об'єднав 3 заплановані commit-и в один, бо footer.tsx, page.tsx і i18n/uk.ts чіпались усіма tasks — splitting вимагав би крихких intermediate станів.
+
+**Deliverables:**
+
+| Task                              | Файли                                                                                                                                                                                   |
+| --------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Real social handles (7 каналів)   | `social-icons.tsx` (+TikTok +Viber SVG), `footer.tsx` (real URLs)                                                                                                                       |
+| Countries carousel                | `countries-carousel.tsx` + test, `(store)/page.tsx` (між categories і video reviews)                                                                                                    |
+| Company stats з counter animation | `lib/use-counter.ts` (IntersectionObserver) + test, `company-stats.tsx`, на homepage після countries                                                                                    |
+| Testimonials slider               | `lib/testimonials.ts` (5 hardcoded з TODO), `testimonials-slider.tsx` (auto-rotate 6s + Google link), перед CTA                                                                         |
+| Newsletter signup                 | Prisma `NewsletterSubscriber` model + migration `20260425_newsletter_subscribers`, `/api/newsletter` POST (rate-limit 5/IP/hr, Zod, re-subscribe-aware), `newsletter-form.tsx` у footer |
+
+**i18n:** +33 нові ключі у `uk.ts` (countries, stats, testimonials, newsletter, social).
+
+**DB migration:** `20260425_newsletter_subscribers` — треба запустити `pnpm --filter @ltex/db exec prisma migrate deploy` на сервері перед deploy.
+
+**Out of scope (deferred):**
+
+- Google Places API integration (manual hardcode тільки)
+- Double opt-in confirm email
+- Unsubscribe link / page
+- Email broadcast (чекає на email provider — P1 #9)
+- Admin newsletter page (optional, skipped)
+
+**Hard rules:** дотримано. Не чіпав next.config.js, не додав deps, не зломав mobile API.
+
+**Prisma engine fix (orchestrator hotfix):** комміт `7ab3445` додав outputFileTracingIncludes у `next.config.js` + Prisma engine copy step у `deploy.ps1` — тепер cold-start PM2 не падає з PrismaClientInitializationError.
+
+**Коміти:**
+
+- `1edea27 feat(content): trust signals — countries, stats, testimonials, newsletter, social` (worker)
+- `7ab3445 fix(deploy): include Prisma engine in standalone build + copy fallback` (orchestrator hotfix)
+- `cf0580c Merge Session 23: trust content & marketing`
+
+**Branch cleanup:** `claude/session-23-trust-content-CysjA` — pending видалення через GitHub UI.

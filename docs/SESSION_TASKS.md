@@ -91,21 +91,12 @@ Follow-up (user-action): заповнити real content Terms/Privacy/Returns, 
 
 **Notification flow:** НЕ Telegram (рішення user-а 2026-04-24). Замість цього — admin notification bell + system ChatMessage у mobile chat для logged-in клієнтів. Email — коли provider налаштований (P1 #9).
 
-### Session 23: Content & Trust Marketing (~4-5 год, worker + user content)
+### Session 23: Content & Trust Marketing — ✅ DONE (2026-04-25)
 
-**Spec:** `docs/SESSION_23_TRUST_CONTENT.md`
-
-| #   | Задача                                                                                                          |
-| --- | --------------------------------------------------------------------------------------------------------------- |
-| 37  | Замінити placeholder social handles на 7 реальних URL (Telegram×2, Viber, Instagram, Facebook, TikTok, YouTube) |
-| 38  | Countries carousel на homepage (England/Germany/Canada/Poland)                                                  |
-| 39  | Company stats block ("11+ років, 500+ клієнтів, 4 країни") з counter animation                                  |
-| 40  | Testimonials slider (5 hardcoded з Google reviews + link на review page)                                        |
-| 41  | Newsletter signup у footer + DB модель NewsletterSubscriber                                                     |
-| 42  | Blog / articles (deferred — окрема велика сесія, потребує content strategy)                                     |
-
-**Stats:** 11+ років, **3000+ клієнтів** (підтверджено user-ом), 4 країни-постачальники.
-**Testimonials:** placeholder спочатку, реальні Google reviews (https://share.google/agHbowjiDBGRAdue6) user скопіює пост-deploy.
+Див. `docs/HISTORY.md` → Session 23 Completion Report.
+Merged in `cf0580c`. 16 files, 859 insertions, 217 tests passing.
+**Server action required:** `pnpm --filter @ltex/db exec prisma migrate deploy` для нової NewsletterSubscriber таблиці.
+Follow-up (user-action): real Google reviews текст замість TODO, Blog/articles — окрема велика сесія.
 
 ---
 
