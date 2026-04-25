@@ -6,6 +6,9 @@ import Link from "next/link";
 import { RecentlyViewedSection } from "@/components/store/recently-viewed-section";
 import { BannerCarousel } from "@/components/store/banner-carousel";
 import { VideoReviewsCarousel } from "@/components/store/video-reviews-carousel";
+import { CountriesCarousel } from "@/components/store/countries-carousel";
+import { CompanyStats } from "@/components/store/company-stats";
+import { TestimonialsSlider } from "@/components/store/testimonials-slider";
 import { ProductCard } from "@/components/store/product-card";
 import { getFeaturedProducts } from "@/lib/featured";
 import { getVideoReviewProducts } from "@/lib/video-reviews";
@@ -244,10 +247,16 @@ export default async function HomePage() {
           </section>
         )}
 
-        {/* 6. Video reviews carousel */}
+        {/* 6. Countries / Suppliers */}
+        <CountriesCarousel />
+
+        {/* 7. Company stats with counter animation */}
+        <CompanyStats />
+
+        {/* 8. Video reviews carousel */}
         <VideoReviewsCarousel products={data.videoProducts} />
 
-        {/* 7. Recently viewed */}
+        {/* 9. Recently viewed */}
         <RecentlyViewedSection />
       </div>
 
@@ -265,7 +274,12 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {/* 9. CTA */}
+      {/* 10. Testimonials */}
+      <div className="container mx-auto px-4">
+        <TestimonialsSlider />
+      </div>
+
+      {/* 11. CTA */}
       <section className="py-12">
         <div className="container mx-auto px-4 text-center">
           <h2 className="text-2xl font-bold">{dict.home.ctaTitle}</h2>

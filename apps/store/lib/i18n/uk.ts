@@ -435,6 +435,39 @@ export const uk = {
     minimumOrder: "Мінімальне замовлення — від 10 кг",
   },
 
+  // Countries (suppliers)
+  countries: {
+    title: "Прямі постачання з Європи та Канади",
+    subtitle: "Працюємо безпосередньо з постачальниками — без посередників",
+    gb: { name: "Англія", description: "Якісний оригінал" },
+    de: { name: "Німеччина", description: "Європейські бренди" },
+    ca: { name: "Канада", description: "Перевірена якість" },
+    pl: { name: "Польща", description: "Швидка логістика" },
+  },
+
+  // Company stats
+  stats: {
+    title: "L-TEX у цифрах",
+    yearsLabel: "на ринку (з 2015)",
+    customersLabel: "постійних клієнтів",
+    countriesLabel: "країни-постачальники",
+  },
+
+  // Testimonials
+  testimonials: {
+    title: "Відгуки клієнтів",
+    allReviews: "Всі відгуки на Google",
+  },
+
+  // Newsletter
+  newsletter: {
+    title: "Підписка на новинки",
+    placeholder: "Ваш email",
+    cta: "Підписатись",
+    success: "Дякуємо! Ми додали ваш email до розсилки.",
+    error: "Не вдалося підписатись. Спробуйте пізніше.",
+  },
+
   // Footer: legal + social
   footerExtra: {
     infoTitle: "Інформація",
