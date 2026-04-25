@@ -171,6 +171,7 @@ git push -u origin claude/session-29-remove-comparison
 ```
 
 Завершити повідомленням orchestrator-у з:
+
 - Branch name
 - Test count delta (224 → ?)
 - Чи `dict.compare` мав хвости в інших файлах (notify якщо так)

@@ -58,7 +58,9 @@ interface CatalogLayoutToggleProps {
   currentLayout: "grid" | "list";
 }
 
-export function CatalogLayoutToggle({ currentLayout }: CatalogLayoutToggleProps) {
+export function CatalogLayoutToggle({
+  currentLayout,
+}: CatalogLayoutToggleProps) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -213,6 +215,7 @@ function ProductCardList({ product, ...overlayProps }: Props) {
 ### Task 4: Catalog page wiring
 
 **Файли:**
+
 - `apps/store/app/(store)/catalog/page.tsx`
 - `apps/store/app/(store)/catalog/[categorySlug]/page.tsx`
 
@@ -354,6 +357,7 @@ git push -u origin claude/session-31-grid-list-layout-toggle
 ```
 
 Завершити повідомленням orchestrator-у з:
+
 - Branch name
 - Test count delta
 - Чи `view=infinite` URL все ще acessible через manual типу

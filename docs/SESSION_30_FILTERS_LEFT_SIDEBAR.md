@@ -117,7 +117,11 @@ export function CatalogSidebar({
 
       {/* Mobile drawer */}
       {open && (
-        <div className="fixed inset-0 z-50 lg:hidden" role="dialog" aria-modal="true">
+        <div
+          className="fixed inset-0 z-50 lg:hidden"
+          role="dialog"
+          aria-modal="true"
+        >
           <div
             className="absolute inset-0 bg-black/40"
             onClick={() => setOpen(false)}
@@ -156,6 +160,7 @@ export function CatalogSidebar({
 ### Task 3: Update catalog pages to use sidebar layout
 
 **Файли:**
+
 - `apps/store/app/(store)/catalog/page.tsx`
 - `apps/store/app/(store)/catalog/[categorySlug]/page.tsx`
 
@@ -292,6 +297,7 @@ git push -u origin claude/session-30-filters-left-sidebar
 ```
 
 Завершити повідомленням orchestrator-у з:
+
 - Branch name
 - Чи Sheet з shadcn вдалось переюзати чи зроблено manual drawer
 - Скріншот спроможність (worker — write a 2-line описання очікуваного візуалу для orchestrator manual smoke)

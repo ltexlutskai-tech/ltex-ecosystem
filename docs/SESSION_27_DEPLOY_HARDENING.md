@@ -12,9 +12,11 @@
 Після деплоїв S24+S25+S26 (homepage refactor) виявилось 2 повторювані проблеми у `scripts/deploy.ps1`:
 
 1. **Turbo build hang** — `pnpm build --filter=@ltex/store...` через корінь часом «залипає» у Windows PowerShell на кроці компіляції (turbo daemon + buffer issue). Доводилось вбивати node, чистити `.next`, і запускати **прямий** build:
+
    ```powershell
    pnpm --filter @ltex/store run build 2>&1 | Tee-Object -FilePath build.log
    ```
+
    А потім `.\scripts\deploy.ps1 -SkipBuild -SkipInstall`.
 
 2. **`.env` не синхронізується у standalone** — Next.js `output: 'standalone'` створює окреме дерево у `apps/store/.next/standalone/apps/store/`, і там потрібен **свій** `.env` (інакше `process.env.TELEGRAM_BOT_TOKEN` etc. порожні). Ми це виявили коли newsletter Telegram не приходив, поки руками не зробили:
@@ -234,6 +236,7 @@ git push -u origin claude/session-27-deploy-hardening
 ```
 
 Завершити повідомленням orchestrator-у:
+
 - Branch name
 - Чи Task 5 (health check) було додано чи пропущено
 - Чи non-ASCII grep чистий
