@@ -57,33 +57,55 @@
 Merged in `84f8d64`. 18 files, 880 insertions, 228 tests passing.
 Follow-up (user-action): заповнити real content Terms/Privacy/Returns, замінити social handles на реальні.
 
-### Session 21: Customer Account + Order History (~6-8 год, worker)
+### Session 21: Customer Auth + Quick Registration (~6-8 год, worker)
 
-| #   | Задача                                                         | Файли                                                                   |
-| --- | -------------------------------------------------------------- | ----------------------------------------------------------------------- |
-| 24  | Web signup/login (phone-based, reuse `lib/mobile-auth.ts` JWT) | нові `(store)/login/page.tsx`, `register/page.tsx`, `api/auth/route.ts` |
-| 25  | Profile dashboard                                              | нові `(store)/account/page.tsx`, `account/orders/page.tsx`              |
-| 26  | Order history + quick reorder                                  | `account/orders/page.tsx`, `lib/reorder.ts`                             |
-| 27  | Saved addresses (single → multiple)                            | DB schema (extend Customer), `account/addresses/page.tsx`               |
+**Spec:** `docs/SESSION_21_CUSTOMER_AUTH.md`
+**Auth flow (рішення A1):** phone + OTP (Telegram bot як primary delivery, mock fallback; SMS provider — окрема сесія)
+**Реєстрація (рішення B):** швидка форма (ім'я, телефон, область, місто) → запис у Customer → 1С sync щоб менеджер дозаповнив у своїй карті клієнта.
 
-### Session 22: Bulk Ordering Features (~4-6 год, worker)
+| #   | Задача                                                         |
+| --- | -------------------------------------------------------------- |
+| 24  | DB: extend Customer + new OtpCode model                        |
+| 25  | OTP generation + Telegram bot delivery + mock fallback         |
+| 26  | API routes (request-otp, verify-otp, register, logout, me)     |
+| 27  | `/login` + `/register` pages з 2-step OTP flow                 |
+| 28  | `/account/*` dashboard + middleware auth guard                 |
+| 29  | Quick reorder з order history                                  |
+| 30  | `/api/sync/customers` для 1С (web-self-register → 1С менеджер) |
 
-| #   | Задача                                                                 | Файли                                                |
-| --- | ---------------------------------------------------------------------- | ---------------------------------------------------- |
-| 28  | Quote request form (для custom bulk outside standard MOQ)              | новий `(store)/quote/page.tsx`, `api/quote/route.ts` |
-| 29  | CSV bulk upload barcodes → cart                                        | `cart/page.tsx`, `lib/bulk-upload.ts`                |
-| 30  | Volume discount display (ЯКЩО політика існує — потребує рішення L-TEX) | `product/[slug]/page.tsx`, `cart/page.tsx`           |
-| 31  | Stock % / availability indicator на product card                       | `product-card.tsx`, `lib/catalog.ts`                 |
+**BLOCKER:** SMS provider — поки використовуємо Telegram OTP + mock; SMS-fly додається окремо.
 
-### Session 23: Content & Trust Marketing (~4 год, worker + user content)
+### Session 22: Quote Request System (~4-5 год, worker)
 
-| #   | Задача                                                            |
-| --- | ----------------------------------------------------------------- |
-| 32  | Brands / countries carousel на homepage                           |
-| 33  | Company stats block ("X років, Y клієнтів, Z країн")              |
-| 34  | Customer testimonials slider                                      |
-| 35  | Newsletter signup у footer                                        |
-| 36  | Blog / articles (окрема велика сесія — потребує content strategy) |
+**Spec:** `docs/SESSION_22_QUOTE_REQUEST.md`
+**Бізнес-рішення:** volume discount UI (C3) — НЕ робимо, тільки через менеджера. Quote Request (D1) — ТАК. CSV upload (E) — НЕ робимо.
+
+| #   | Задача                                                               |
+| --- | -------------------------------------------------------------------- |
+| 31  | DB: new Quote model + QuoteStatus enum                               |
+| 32  | `/api/quote` POST з Zod + rate limit + Telegram notify до менеджера  |
+| 33  | `/quote` page form + CTA links з homepage / catalog / product        |
+| 34  | `/admin/quotes` management page (filter, respond, status workflow)   |
+| 35  | Stock indicator на ProductCard (out-of-stock / last lot / low stock) |
+| 36  | `docs/SYNC_QUOTES_1C.md` — документація sync API (без реалізації)    |
+
+**BLOCKER:** Telegram chat_id для quote notification — потрібно env `QUOTE_NOTIFICATION_TELEGRAM_CHAT_ID`.
+
+### Session 23: Content & Trust Marketing (~4-5 год, worker + user content)
+
+**Spec:** `docs/SESSION_23_TRUST_CONTENT.md`
+
+| #   | Задача                                                                                                          |
+| --- | --------------------------------------------------------------------------------------------------------------- |
+| 37  | Замінити placeholder social handles на 7 реальних URL (Telegram×2, Viber, Instagram, Facebook, TikTok, YouTube) |
+| 38  | Countries carousel на homepage (England/Germany/Canada/Poland)                                                  |
+| 39  | Company stats block ("11+ років, 500+ клієнтів, 4 країни") з counter animation                                  |
+| 40  | Testimonials slider (5 hardcoded з Google reviews + link на review page)                                        |
+| 41  | Newsletter signup у footer + DB модель NewsletterSubscriber                                                     |
+| 42  | Blog / articles (deferred — окрема велика сесія, потребує content strategy)                                     |
+
+**BLOCKER:** число "500+ клієнтів" — потрібно реальне число від user-а (або зробити "Сотні клієнтів").
+**BLOCKER:** 5 топ-Google-відгуків — placeholder спочатку, реальні testimonials user додасть post-deploy.
 
 ---
 
