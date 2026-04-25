@@ -3,7 +3,7 @@ import { prisma } from "@ltex/db";
 import { notFound } from "next/navigation";
 import { getCatalogProducts } from "@/lib/catalog";
 import { ProductCard } from "@/components/store/product-card";
-import { CatalogFilters } from "@/components/store/catalog-filters";
+import { CatalogSidebar } from "@/components/store/catalog-sidebar";
 import { Pagination } from "@/components/store/pagination";
 import { Breadcrumbs } from "@/components/store/breadcrumbs";
 
@@ -125,26 +125,30 @@ export default async function SubcategoryPage({ params, searchParams }: Props) {
       <h1 className="mt-4 text-3xl font-bold">{subcategory.name}</h1>
       <p className="mt-1 text-gray-500">{total} товарів</p>
 
-      <div className="mt-6">
-        <CatalogFilters />
-      </div>
+      <div className="mt-6 flex flex-col gap-6 lg:flex-row">
+        <CatalogSidebar />
 
-      {products.length === 0 ? (
-        <p className="mt-12 text-center text-gray-500">Товарів не знайдено.</p>
-      ) : (
-        <div className="mt-6 grid gap-4 grid-cols-2 sm:grid-cols-3 lg:grid-cols-4">
-          {products.map((product) => (
-            <ProductCard key={product.id} product={product} />
-          ))}
+        <div className="min-w-0 flex-1">
+          {products.length === 0 ? (
+            <p className="mt-12 text-center text-gray-500">
+              Товарів не знайдено.
+            </p>
+          ) : (
+            <div className="grid gap-4 grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4">
+              {products.map((product) => (
+                <ProductCard key={product.id} product={product} />
+              ))}
+            </div>
+          )}
+
+          <div className="mt-8">
+            <Pagination
+              currentPage={page}
+              totalPages={totalPages}
+              baseHref={baseHref}
+            />
+          </div>
         </div>
-      )}
-
-      <div className="mt-8">
-        <Pagination
-          currentPage={page}
-          totalPages={totalPages}
-          baseHref={baseHref}
-        />
       </div>
     </div>
   );
