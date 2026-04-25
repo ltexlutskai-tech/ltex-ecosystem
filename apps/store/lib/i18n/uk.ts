@@ -183,18 +183,6 @@ export const uk = {
     removeFromWishlist: "Видалити з обраного",
   },
 
-  // Comparison
-  compare: {
-    title: "Порівняння товарів",
-    minItems: "Додайте мінімум 2 товари для порівняння",
-    clearAll: "Очистити все",
-    compare: "Порівняти",
-    addToCompare: "Порівняти",
-    removeFromCompare: "Прибрати з порівняння",
-    productLabel: "Товар",
-    photo: "Фото",
-  },
-
   // Recently Viewed
   recentlyViewed: {
     title: "Нещодавно переглянуті",
