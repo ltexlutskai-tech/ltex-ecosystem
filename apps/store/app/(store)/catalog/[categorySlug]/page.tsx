@@ -7,6 +7,7 @@ import { ProductCard } from "@/components/store/product-card";
 import { CatalogSidebar } from "@/components/store/catalog-sidebar";
 import { Pagination } from "@/components/store/pagination";
 import { Breadcrumbs } from "@/components/store/breadcrumbs";
+import { CatalogLayoutToggle } from "@/components/store/catalog-layout-toggle";
 
 export const revalidate = 60;
 
@@ -45,6 +46,7 @@ export default async function CategoryPage({ params, searchParams }: Props) {
   const { categorySlug } = await params;
   const sp = await searchParams;
   const page = parseInt(sp.page ?? "1", 10);
+  const layout: "grid" | "list" = sp.layout === "list" ? "list" : "grid";
 
   const category = await prisma.category.findUnique({
     where: { slug: categorySlug },
@@ -135,8 +137,13 @@ export default async function CategoryPage({ params, searchParams }: Props) {
         ]}
       />
 
-      <h1 className="mt-4 text-3xl font-bold">{category.name}</h1>
-      <p className="mt-1 text-gray-500">{total} товарів</p>
+      <div className="mt-4 flex items-center justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold">{category.name}</h1>
+          <p className="mt-1 text-gray-500">{total} товарів</p>
+        </div>
+        <CatalogLayoutToggle currentLayout={layout} />
+      </div>
 
       {category.children.length > 0 && (
         <div className="mt-4 flex flex-wrap gap-2">
@@ -165,10 +172,16 @@ export default async function CategoryPage({ params, searchParams }: Props) {
             <p className="mt-12 text-center text-gray-500">
               Товарів не знайдено.
             </p>
+          ) : layout === "list" ? (
+            <div className="flex flex-col gap-4">
+              {products.map((product) => (
+                <ProductCard key={product.id} product={product} mode="list" />
+              ))}
+            </div>
           ) : (
             <div className="grid gap-4 grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4">
               {products.map((product) => (
-                <ProductCard key={product.id} product={product} />
+                <ProductCard key={product.id} product={product} mode="grid" />
               ))}
             </div>
           )}

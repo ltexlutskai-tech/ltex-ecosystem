@@ -7,7 +7,7 @@ import { CatalogSidebar } from "@/components/store/catalog-sidebar";
 import { Pagination } from "@/components/store/pagination";
 import { Breadcrumbs } from "@/components/store/breadcrumbs";
 import { InfiniteScrollCatalog } from "@/components/store/infinite-scroll-catalog";
-import { CatalogViewToggle } from "@/components/store/catalog-view-toggle";
+import { CatalogLayoutToggle } from "@/components/store/catalog-layout-toggle";
 import { getDictionary } from "@/lib/i18n";
 
 const dict = getDictionary();
@@ -32,6 +32,7 @@ export default async function CatalogPage({
   const params = await searchParams;
   const page = parseInt(params.page ?? "1", 10);
   const view = params.view ?? "pagination";
+  const layout: "grid" | "list" = params.layout === "list" ? "list" : "grid";
 
   const priceMin = params.priceMin ? parseFloat(params.priceMin) : undefined;
   const priceMax = params.priceMax ? parseFloat(params.priceMax) : undefined;
@@ -63,6 +64,8 @@ export default async function CatalogPage({
     ? `/catalog?${filterParams.toString()}`
     : "/catalog";
 
+  // `?view=infinite` is retained as a URL-only feature; UI toggle was
+  // replaced in S31 by the grid/list layout toggle.
   const isInfiniteScroll = view === "infinite";
 
   return (
@@ -76,7 +79,7 @@ export default async function CatalogPage({
             {total} {dict.catalog.products}
           </p>
         </div>
-        <CatalogViewToggle currentView={view} />
+        <CatalogLayoutToggle currentLayout={layout} />
       </div>
 
       <div className="mt-4 flex flex-wrap gap-2">
@@ -106,14 +109,31 @@ export default async function CatalogPage({
               totalPages={totalPages}
               perPage={24}
               filterParams={filterParams.toString()}
+              layout={layout}
             />
           ) : (
             <>
-              <div className="grid gap-4 grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4">
-                {products.map((product) => (
-                  <ProductCard key={product.id} product={product} />
-                ))}
-              </div>
+              {layout === "list" ? (
+                <div className="flex flex-col gap-4">
+                  {products.map((product) => (
+                    <ProductCard
+                      key={product.id}
+                      product={product}
+                      mode="list"
+                    />
+                  ))}
+                </div>
+              ) : (
+                <div className="grid gap-4 grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4">
+                  {products.map((product) => (
+                    <ProductCard
+                      key={product.id}
+                      product={product}
+                      mode="grid"
+                    />
+                  ))}
+                </div>
+              )}
               <div className="mt-8">
                 <Pagination
                   currentPage={page}
