@@ -1599,3 +1599,47 @@ Worker запущений з `docs/SESSION_19_DECOMPOSITION.md` specom. Ство
 **Branch cleanup:** `claude/session-25-categories-carousel-R4woT` — pending видалення через GitHub UI.
 
 **Наступне:** Session 26 — newsletter notifications (admin bell + Telegram + welcome email render).
+
+---
+
+## Session 26 Completion Report (2026-04-25) — Newsletter Notifications
+
+**Мета:** активувати newsletter signup — Telegram + admin bell + welcome email render (per ecosystem chat 2026-04-25).
+
+**Результат:** 8 files changed, +360 / -12. CI green: 227 store tests (+9), format + typecheck (6/6) + build.
+
+**Architecture:**
+
+- **Helper:** `fireNewsletterNotifications()` (DRY для new + re-subscribe paths)
+- **Fire-and-forget:** `void` + `.catch()` на обох notifications — не блокує 201/200 response
+- **Тільки при активній підписці:** existing-active path silent, new-subscribe + re-subscribe-of-unsubscribed → fire all 3
+
+**Discoveries:**
+
+- `lib/email.ts` вже існував з SMTP+Resend abstraction (`isEmailConfigured()` + `baseLayout()` + `sendEmail()`). Worker reused — додав `sendWelcomeNewsletterEmail()` поряд з existing order helpers, не створив окремий файл.
+- Admin notification mechanism: `components/admin/notification-bell.tsx` polling `/api/admin/stats` every 30s — extended endpoint + component щоб показати newsletter count alongside pending orders / unread messages.
+
+**Files:**
+
+- `lib/notifications.ts`: +`notifyNewsletterSubscribe()` (51 lines) — Telegram via `NEWSLETTER_TELEGRAM_CHAT_ID`, no-op якщо unset, 10s timeout
+- `lib/email.ts`: +`sendWelcomeNewsletterEmail()` (43 lines) — render via i18n, no-op якщо `!isEmailConfigured()`
+- `lib/i18n/uk.ts`: +`newsletter.welcomeEmail.{subject,heading,body}` (15 lines)
+- `app/api/admin/stats/route.ts`: +`newSubscribersToday` field (count where `subscribedAt >= now-24h AND unsubscribedAt IS NULL`)
+- `components/admin/notification-bell.tsx`: +counter row "Нові підписники (24г)" з зеленим бейджем
+- `app/api/newsletter/route.ts`: extract `fireNewsletterNotifications()` helper, fires on new + re-subscribe-of-unsubscribed
+- `lib/notifications.test.ts`: +5 tests (env present/missing для обох vars, network reject, non-OK status)
+- `app/api/newsletter/route.test.ts`: +4 tests (notification call counts, both reject paths still return 201/200)
+
+**User action required для production:**
+
+- Server env вже має `NEWSLETTER_TELEGRAM_CHAT_ID` (додано до deploy 2026-04-25). PM2 restart з `--update-env` потрібен.
+- Email provider не налаштований — welcome email log only ("Email provider not configured — welcome newsletter email skipped"). Activate коли P1 #9 буде зроблено.
+
+**Коміти:**
+
+- `9fb4f70 feat(newsletter): notifications on subscribe (admin bell + Telegram + email render)`
+- `b7c7b13 Merge Session 26: newsletter notifications`
+
+**Branch cleanup:** `claude/session-26-newsletter-notifications` — pending видалення через GitHub UI.
+
+**Homepage refactor готовий до production deploy:** S24 (cleanup) + S25 (categories carousel) + S26 (newsletter active) — три merged сесії, один deploy на сервер.
