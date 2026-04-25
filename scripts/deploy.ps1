@@ -72,7 +72,7 @@ if ($PrismaSrc) {
     }
     Write-Host "  Engine copied to $($PrismaDests.Length) standalone locations" -ForegroundColor Gray
 } else {
-    Write-Host "  WARN: Prisma engine not found in node_modules — skipping" -ForegroundColor Yellow
+    Write-Host "  WARN: Prisma engine not found in node_modules - skipping" -ForegroundColor Yellow
 }
 
 # 7. Restart PM2
