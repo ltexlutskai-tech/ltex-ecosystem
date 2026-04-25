@@ -7,12 +7,14 @@ import Link from "next/link";
 interface Stats {
   pendingOrders: number;
   unreadMessages: number;
+  newSubscribersToday?: number;
 }
 
 export function NotificationBell() {
   const [stats, setStats] = useState<Stats>({
     pendingOrders: 0,
     unreadMessages: 0,
+    newSubscribersToday: 0,
   });
   const [soundEnabled, setSoundEnabled] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
@@ -43,7 +45,8 @@ export function NotificationBell() {
     return () => clearInterval(timer);
   }, [fetchStats]);
 
-  const total = stats.pendingOrders + stats.unreadMessages;
+  const newSubscribers = stats.newSubscribersToday ?? 0;
+  const total = stats.pendingOrders + stats.unreadMessages + newSubscribers;
 
   return (
     <div className="relative">
@@ -108,6 +111,14 @@ export function NotificationBell() {
                   </span>
                 )}
               </Link>
+              <div className="flex items-center justify-between px-4 py-2 text-sm">
+                <span>Нові підписники (24г)</span>
+                {newSubscribers > 0 && (
+                  <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">
+                    {newSubscribers}
+                  </span>
+                )}
+              </div>
             </div>
             {total === 0 && (
               <p className="px-4 py-3 text-center text-xs text-gray-400">

@@ -23,16 +23,25 @@ export async function GET(request: NextRequest) {
 
   // Simple stats (for auto-refresh notification bell)
   if (!fullStats) {
-    const [pendingOrders, unreadMessages] = await Promise.all([
-      prisma.order.count({ where: { status: "pending" } }),
-      prisma.chatMessage.count({
-        where: { sender: "customer", isRead: false },
-      }),
-    ]);
+    const dayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const [pendingOrders, unreadMessages, newSubscribersToday] =
+      await Promise.all([
+        prisma.order.count({ where: { status: "pending" } }),
+        prisma.chatMessage.count({
+          where: { sender: "customer", isRead: false },
+        }),
+        prisma.newsletterSubscriber.count({
+          where: {
+            subscribedAt: { gte: dayAgo },
+            unsubscribedAt: null,
+          },
+        }),
+      ]);
 
     return NextResponse.json({
       pendingOrders,
       unreadMessages,
+      newSubscribersToday,
       timestamp: Date.now(),
     });
   }
