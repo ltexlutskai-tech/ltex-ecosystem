@@ -32,26 +32,43 @@
 
 1. **НЕ ламати CI** — повний pipeline green
 2. **НЕ дозволяти спам** — rate limit 3 quote requests / IP / годину
-3. **Notification до менеджера** — Telegram chat (потребує chat_id, див. Open questions)
-4. **НЕ зберігати ціни на frontend** — тільки category + estimatedQuantity + notes
-5. **Quote create НЕ замовлення** — окрема таблиця `Quote`, не `Order`
-6. **Тести обов'язкові** — Zod validation, rate limit, 1С sync
+3. **Notification до менеджера** — через **existing admin notification bell** (`apps/store/components/admin/notification-bell.tsx`) + chat у mobile-client (manager бачить quote як новий ChatMessage з `senderRole: 'system'`)
+4. **НЕ Telegram notification** — рішення user-а 2026-04-24: всі quote-запити мають бути у внутрішній додаток L-TEX (admin panel + mobile chat), не у зовнішній Telegram
+5. **НЕ зберігати ціни на frontend** — тільки category + estimatedQuantity + notes
+6. **Quote create НЕ замовлення** — окрема таблиця `Quote`, не `Order`. Але має option для admin "Convert to Order" коли клієнт погодився на запропоновану ціну
+7. **Тести обов'язкові** — Zod validation, rate limit, notification trigger
 
 ---
 
-## Open questions (BLOCK — питати orchestrator)
+## Notification flow (підтверджено user-ом 2026-04-24)
 
-1. **Куди надсилати notifications quote-request-ів?**
-   - Telegram chat ID — який саме? (manager personal chat? group chat?)
-   - Email — до якого менеджера / групи?
-   - 1С — створювати запис у "Лідах" одразу?
-   - **Рекомендація:** додати у env `QUOTE_NOTIFICATION_TELEGRAM_CHAT_ID` — user задасть значення.
+**Без Telegram!** Quote приходить у L-TEX-internal tools:
 
-2. **Status workflow для quote:**
-   - `pending` (created) → `quoted` (manager replied with price) → `accepted` (customer ok) → `converted_to_order`
-   - Чи `rejected` / `expired`?
+1. **Admin notification bell** — increment counter; коли менеджер логіниться в `/admin` — бачить badge "X нових quote-запитів"
+2. **Admin page `/admin/quotes`** — list з filter pending/quoted/accepted; новий quote має highlight badge "NEW"
+3. **Chat у mobile-client app для клієнта** — створюється ChatMessage з system message: "Ваш запит #N отримано. Менеджер зв'яжеться протягом 24 годин"; клієнт може додати уточнення у відповідь
+4. **(Future, S22+):** push notification на manager mobile app коли він буде створений (Phase 4 Mobile Agent — окрема сесія)
+5. **Email до менеджера** — коли email provider налаштований (P1 task #9), додати email notification — але не блокує цю сесію (тільки `lib/notifications.ts` extension з no-op якщо email disabled)
 
-3. **TTL quote:** як довго quote дійсний? 7 днів? 30 днів?
+**Realtime для admin:**
+
+- Admin panel вже має `AutoRefresh` (30s) з `apps/store/components/admin/auto-refresh.tsx` — він підхопить новий quote через GET `/api/admin/stats`
+- Розширити stats payload: додати `pendingQuotesCount` поряд з `pendingOrdersCount`
+
+---
+
+## Status workflow
+
+```
+pending  →  quoted  →  accepted  →  converted_to_order
+                ↓
+             rejected
+                ↓
+             expired (30 days TTL після creation)
+```
+
+- TTL: 30 днів (auto-mark expired через cron або lazy check на read)
+- Прийняті, але не converted протягом 7 днів — можна посилати reminder менеджеру
 
 ---
 
@@ -127,10 +144,13 @@ Steps:
 3. Phone normalize via `lib/phone.ts`
 4. Якщо logged-in (cookie) — set customerId
 5. INSERT Quote
-6. Trigger Telegram notification до менеджера через `lib/notifications.ts` (extend з `notifyManagerQuote(quote)`)
+6. **Internal notifications** (НЕ Telegram):
+   - Increment `Quote pending count` для admin notification bell
+   - Якщо logged-in customer — створити ChatMessage у chat для customer (system message "Ваш запит отримано")
+   - Email до менеджера якщо email provider налаштовано (no-op якщо ні)
 7. Return quoteId
 
-**Тести:** `apps/store/lib/__tests__/quote-route.test.ts` — 8 tests (success, rate limit, validation errors, normalization, notification call, customer-bound vs guest).
+**Тести:** `apps/store/lib/__tests__/quote-route.test.ts` — 8 tests (success, rate limit, validation errors, normalization, notification trigger, customer-bound vs guest, chat message creation).
 
 ---
 

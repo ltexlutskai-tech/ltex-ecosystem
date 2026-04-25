@@ -102,12 +102,12 @@ const SUPPLIER_COUNTRIES = [
 ```ts
 const STATS = [
   { value: 11, suffix: "+ років", label: "на ринку (з 2015)" },
-  { value: 500, suffix: "+", label: "постійних клієнтів" },
+  { value: 3000, suffix: "+", label: "постійних клієнтів" },
   { value: 4, suffix: "", label: "країни-постачальники" },
 ];
 ```
 
-**ВАЖЛИВО:** значення `500+ клієнтів` — orchestrator потребує підтвердження від user-а. Якщо невідомо — показати "Сотні клієнтів по Україні" без числа.
+**Підтверджено user-ом 2026-04-24:** "3000+ постійних клієнтів". Counter animation 0 → 3000 за 1.5s виглядатиме впечатляюче.
 
 **Animation:** кожне число анімується від 0 до final value за 1.5s при scroll into view (використати Intersection Observer + simple counter hook). Без додаткових deps.
 

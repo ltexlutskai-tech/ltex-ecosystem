@@ -73,7 +73,7 @@ Follow-up (user-action): заповнити real content Terms/Privacy/Returns, 
 | 29  | Quick reorder з order history                                  |
 | 30  | `/api/sync/customers` для 1С (web-self-register → 1С менеджер) |
 
-**BLOCKER:** SMS provider — поки використовуємо Telegram OTP + mock; SMS-fly додається окремо.
+**SMS provider:** SMSClub.mobi (підтверджено user-ом 2026-04-24). Worker додає `lib/sms-client.ts` + env `SMSCLUB_TOKEN`, `SMSCLUB_FROM`. User задає token на сервері перед deploy.
 
 ### Session 22: Quote Request System (~4-5 год, worker)
 
@@ -89,7 +89,7 @@ Follow-up (user-action): заповнити real content Terms/Privacy/Returns, 
 | 35  | Stock indicator на ProductCard (out-of-stock / last lot / low stock) |
 | 36  | `docs/SYNC_QUOTES_1C.md` — документація sync API (без реалізації)    |
 
-**BLOCKER:** Telegram chat_id для quote notification — потрібно env `QUOTE_NOTIFICATION_TELEGRAM_CHAT_ID`.
+**Notification flow:** НЕ Telegram (рішення user-а 2026-04-24). Замість цього — admin notification bell + system ChatMessage у mobile chat для logged-in клієнтів. Email — коли provider налаштований (P1 #9).
 
 ### Session 23: Content & Trust Marketing (~4-5 год, worker + user content)
 
@@ -104,8 +104,8 @@ Follow-up (user-action): заповнити real content Terms/Privacy/Returns, 
 | 41  | Newsletter signup у footer + DB модель NewsletterSubscriber                                                     |
 | 42  | Blog / articles (deferred — окрема велика сесія, потребує content strategy)                                     |
 
-**BLOCKER:** число "500+ клієнтів" — потрібно реальне число від user-а (або зробити "Сотні клієнтів").
-**BLOCKER:** 5 топ-Google-відгуків — placeholder спочатку, реальні testimonials user додасть post-deploy.
+**Stats:** 11+ років, **3000+ клієнтів** (підтверджено user-ом), 4 країни-постачальники.
+**Testimonials:** placeholder спочатку, реальні Google reviews (https://share.google/agHbowjiDBGRAdue6) user скопіює пост-deploy.
 
 ---
 

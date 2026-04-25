@@ -39,19 +39,34 @@ L-TEX поки не має customer auth для веб-сайту. Mobile API м
 
 ---
 
-## Open questions (BLOCK — питати orchestrator перед стартом)
+## SMS Provider (підтверджено user-ом 2026-04-24)
 
-1. **SMS provider** — який? Варіанти:
-   - **TurboSMS** (UA-based, ~$0.03/SMS, є API)
-   - **Twilio / Vonage** (global, дорожче)
-   - **Telegram bot OTP** — переюзати наш існуючий `services/telegram-bot/`, посилати код у Telegram користувача якщо він пише `/start` боту. Безкоштовно. Але потребує що клієнт перший раз відкрив бота.
-   - **Hybrid:** Telegram OTP як primary (free), SMS як fallback (treba paid provider)
-   - **Mock SMS на dev/staging** — для початку код виводити в admin notification-і; SMS додати потім
+**SMS provider:** [SMSClub](https://smsclub.mobi/) — український provider, REST API.
 
-   **Рекомендація orchestrator:** почати з **Mock + Telegram OTP** (zero cost, працює зараз), додати SMS-fly як task у Session 22+. Це не блокує MVP бо більшість B2B клієнтів L-TEX мають Telegram (підтверджено через існуючий bot).
+**Інтеграція:**
 
-2. **OTP TTL** — рекомендую 5 хвилин, 6 цифр.
-3. **Rate limit на OTP запити** — 1 OTP / phone / 60 секунд, 5 OTP / phone / годину.
+1. Зареєструватись на smsclub.mobi (user робить — або вже є акаунт)
+2. Отримати API token + sender alpha-name (зазвичай "L-TEX" або "LTEX")
+3. Додати env vars:
+   - `SMSCLUB_TOKEN` — Bearer token з smsclub dashboard
+   - `SMSCLUB_FROM` — alpha-name відправника (e.g. "L-TEX")
+4. Worker має дослідити поточний SMSClub API (https://smsclub.mobi/uk/instructions/api-rest) і написати `apps/store/lib/sms-client.ts` з функцією `sendSms(phone: string, text: string)`
+5. Endpoint: SMSClub HTTP API (REST POST з JSON body)
+6. У `apps/store/lib/otp.ts` після Session 21 task 2 — використовувати SMS як **primary** delivery, Telegram bot OTP як fallback (якщо у Customer вже є telegramChatId), mock тільки для dev/test environment
+
+**Startup validation:** додати у `apps/store/instrumentation.ts` перевірку що `SMSCLUB_TOKEN` присутній у production. Якщо ні — warning, але не throw (дозволити mock-режим для staging).
+
+**Rate limit & cost guard:** SMS платний (~$0.03/SMS). Жорсткий rate limit: 1 SMS / phone / 60sec, 5 / phone / годину, 50 / phone / день — щоб уникнути abuse.
+
+**Тести:** mock SMSClub HTTP виклики через `vi.fn()` — НЕ дзвонити реальний API у CI.
+
+---
+
+## Other Open questions (BLOCK — питати orchestrator перед стартом)
+
+1. **OTP TTL** — рекомендую 5 хвилин, 6 цифр (підтвердити з orchestrator або прийняти default).
+2. **Rate limit на OTP запити** — 1 OTP / phone / 60 секунд, 5 OTP / phone / годину.
+3. **Telegram OTP fallback** — якщо у Customer.telegramChatId немає — одразу SMS через SMSClub (без mock-fallback у production).
 
 ---
 
@@ -105,19 +120,21 @@ export async function verifyOtp(phone: string, code: string): Promise<boolean>;
 **Реалізація:**
 
 1. `requestOtp(phone)`:
-   - Check rate limit (1/min/phone, 5/hour/phone)
+   - Check rate limit (1/min/phone, 5/hour/phone, 50/day/phone)
    - Generate 6-digit code
    - bcrypt-hash, save до `OtpCode` з TTL 5min
-   - Спробувати delivery через Telegram bot:
-     - якщо у Customer.telegramChatId є — посилаємо через `services/telegram-bot/` (нове API endpoint у bot service: `POST /send-otp`)
-     - якщо ні — fallback на mock (для dev: log; для prod: notification у admin Telegram chat для менеджера що передасть вручну)
+   - Delivery priority:
+     1. **SMS через SMSClub** (primary) — `lib/sms-client.ts` `sendSms(phone, "L-TEX код: ${code}. Дійсний 5 хв.")`
+     2. **Telegram bot fallback** — якщо SMS API недоступний АБО якщо у Customer.telegramChatId є (швидше) — посилаємо через `services/telegram-bot/` (нове endpoint у bot service: `POST /send-otp`)
+     3. **Mock** — тільки якщо `NODE_ENV !== 'production'`: log у консоль + admin notification bell
+   - Set OtpCode.channel залежно від реального delivery
 2. `verifyOtp(phone, code)`:
    - Знайти найновіший unused OtpCode для phone
    - Перевірити expiresAt
    - Inc attempts; якщо >=5 — invalidate
    - bcrypt.compare → mark consumedAt; повернути true
 
-**Тести:** `apps/store/lib/otp.test.ts` — 8+ tests (rate limit, expiry, max attempts, success).
+**Тести:** `apps/store/lib/otp.test.ts` — 10+ tests (rate limit, expiry, max attempts, success, SMS mock, Telegram fallback, channel selection).
 
 ---
 
