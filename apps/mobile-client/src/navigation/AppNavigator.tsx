@@ -1,20 +1,26 @@
 /**
  * Main app navigator for L-TEX mobile client.
  *
- * Structure:
- * - Bottom Tabs (always accessible):
- *   - Каталог (CatalogStack: Catalog -> ProductDetail) — public
+ * Structure (S33 Rozetka-style restructure):
+ * - Bottom Tabs (4 tabs):
+ *   - Головна (HomeStack: HomeMain -> Catalog/ProductDetail/Lots/Wishlist/Notifications) — public
+ *   - Пошук (SearchStack: SearchMain -> ProductDetail) — public
  *   - Кошик (CartStack: Cart) — public
- *   - Замовлення (OrdersStack: Orders -> OrderDetail) — requires auth
- *   - Чат (ChatStack: Chat) — requires auth
- *   - Профіль (ProfileStack: Profile -> Shipments, Favorites, Subscriptions, Payments) — requires auth
+ *   - Ще (MoreStack: MoreMain -> Profile/Orders/Chat/Shipments/...) — auth-guarded
  *
- * Auth guard: protected tabs redirect to LoginScreen if not authenticated.
- * Deep linking: ltex://product/[slug], ltex://order/[id], ltex://catalog
+ * Floating chat button (MessengerFab) bottom-right above tab bar.
+ * Auth guard: MoreStack redirects to LoginScreen if not authenticated.
+ * Deep linking: ltex://product/[slug], ltex://order/[id], ltex://catalog, ltex://search, ltex://more
  */
 
 import React, { useEffect } from "react";
-import { ActivityIndicator, View, Text, StyleSheet } from "react-native";
+import {
+  ActivityIndicator,
+  TouchableOpacity,
+  View,
+  Text,
+  StyleSheet,
+} from "react-native";
 import {
   NavigationContainer,
   type LinkingOptions,
@@ -27,10 +33,14 @@ import * as Linking from "expo-linking";
 import { useAuth } from "@/lib/auth";
 import { AuthProvider } from "@/lib/auth-provider";
 import { OfflineBanner } from "@/components/OfflineBanner";
+import { MessengerFab } from "@/components/MessengerFab";
 import { registerPushToken } from "@/lib/notifications";
 
 // Screens
 import { LoginScreen } from "@/screens/auth/LoginScreen";
+import { HomeScreen } from "@/screens/home/HomeScreen";
+import { SearchScreen } from "@/screens/search/SearchScreen";
+import { MoreScreen } from "@/screens/more/MoreScreen";
 import { CatalogScreen } from "@/screens/catalog/CatalogScreen";
 import { ProductScreen } from "@/screens/product/ProductScreen";
 import { CartScreen } from "@/screens/cart/CartScreen";
@@ -39,6 +49,9 @@ import { OrderDetailScreen } from "@/screens/orders/OrderDetailScreen";
 import { ChatScreen } from "@/screens/chat/ChatScreen";
 import { ProfileScreen } from "@/screens/profile/ProfileScreen";
 import { ShipmentsScreen } from "@/screens/shipments/ShipmentsScreen";
+import { NotificationsScreen } from "@/screens/notifications/NotificationsScreen";
+import { WishlistScreen } from "@/screens/wishlist/WishlistScreen";
+import { LotsScreen } from "@/screens/lots/LotsScreen";
 
 const BRAND_COLOR = "#16a34a";
 
@@ -52,22 +65,30 @@ const defaultScreenOptions = {
 
 // ─── Type declarations for navigation params ───────────────────────────────
 
-type CatalogStackParamList = {
-  CatalogList: undefined;
+type HomeStackParamList = {
+  HomeMain: undefined;
+  Catalog: undefined;
+  ProductDetail: { productId: string; slug: string; name: string };
+  Lots: undefined;
+  Wishlist: undefined;
+  Notifications: undefined;
+};
+
+type SearchStackParamList = {
+  SearchMain: { q?: string } | undefined;
   ProductDetail: { productId: string; slug: string; name: string };
 };
 
-type OrdersStackParamList = {
-  OrdersList: undefined;
+type MoreStackParamList = {
+  MoreMain: undefined;
+  Profile: undefined;
+  Orders: undefined;
   OrderDetail: { orderId: string; orderCode: string };
-};
-
-type ProfileStackParamList = {
-  ProfileMain: undefined;
+  Chat: undefined;
   Shipments: undefined;
-  Favorites: undefined;
   Subscriptions: undefined;
   PaymentsHistory: undefined;
+  Favorites: undefined;
 };
 
 // ─── Auth Guard ─────────────────────────────────────────────────────────────
@@ -78,7 +99,6 @@ type ProfileStackParamList = {
  */
 function withAuthGuard(
   WrappedNavigator: React.ComponentType,
-  tabName: string,
 ): React.ComponentType {
   return function AuthGuardedNavigator() {
     const { customerId } = useAuth();
@@ -91,21 +111,74 @@ function withAuthGuard(
 
 // ─── Stack Navigators ────────────────────────────────────────────────────────
 
-const CatalogStackNav = createNativeStackNavigator<CatalogStackParamList>();
-function CatalogStackNavigator() {
+const HomeStackNav = createNativeStackNavigator<HomeStackParamList>();
+function HomeStackNavigator() {
   return (
-    <CatalogStackNav.Navigator screenOptions={defaultScreenOptions}>
-      <CatalogStackNav.Screen
-        name="CatalogList"
+    <HomeStackNav.Navigator screenOptions={defaultScreenOptions}>
+      <HomeStackNav.Screen
+        name="HomeMain"
+        component={HomeScreen}
+        options={({ navigation }) => ({
+          title: "L-TEX",
+          headerRight: () => (
+            <TouchableOpacity
+              onPress={() => navigation.navigate("Notifications")}
+              style={styles.headerIconButton}
+              accessibilityLabel="Сповіщення"
+            >
+              <Ionicons
+                name="notifications-outline"
+                size={22}
+                color={BRAND_COLOR}
+              />
+            </TouchableOpacity>
+          ),
+        })}
+      />
+      <HomeStackNav.Screen
+        name="Catalog"
         component={CatalogScreen}
         options={{ title: "Каталог" }}
       />
-      <CatalogStackNav.Screen
+      <HomeStackNav.Screen
         name="ProductDetail"
         component={ProductScreen as React.ComponentType<any>}
         options={{ title: "Товар" }}
       />
-    </CatalogStackNav.Navigator>
+      <HomeStackNav.Screen
+        name="Lots"
+        component={LotsScreen}
+        options={{ title: "Лоти" }}
+      />
+      <HomeStackNav.Screen
+        name="Wishlist"
+        component={WishlistScreen}
+        options={{ title: "Обране" }}
+      />
+      <HomeStackNav.Screen
+        name="Notifications"
+        component={NotificationsScreen}
+        options={{ title: "Сповіщення" }}
+      />
+    </HomeStackNav.Navigator>
+  );
+}
+
+const SearchStackNav = createNativeStackNavigator<SearchStackParamList>();
+function SearchStackNavigator() {
+  return (
+    <SearchStackNav.Navigator screenOptions={defaultScreenOptions}>
+      <SearchStackNav.Screen
+        name="SearchMain"
+        component={SearchScreen}
+        options={{ title: "Пошук" }}
+      />
+      <SearchStackNav.Screen
+        name="ProductDetail"
+        component={ProductScreen as React.ComponentType<any>}
+        options={{ title: "Товар" }}
+      />
+    </SearchStackNav.Navigator>
   );
 }
 
@@ -122,62 +195,41 @@ function CartStackNavigator() {
   );
 }
 
-const OrdersStackNav = createNativeStackNavigator<OrdersStackParamList>();
-function OrdersStackNavigatorInner() {
+const MoreStackNav = createNativeStackNavigator<MoreStackParamList>();
+function MoreStackNavigatorInner() {
   return (
-    <OrdersStackNav.Navigator screenOptions={defaultScreenOptions}>
-      <OrdersStackNav.Screen
-        name="OrdersList"
+    <MoreStackNav.Navigator screenOptions={defaultScreenOptions}>
+      <MoreStackNav.Screen
+        name="MoreMain"
+        component={MoreScreen}
+        options={{ title: "Ще" }}
+      />
+      <MoreStackNav.Screen
+        name="Profile"
+        component={ProfileScreen as React.ComponentType<any>}
+        options={{ title: "Профіль" }}
+      />
+      <MoreStackNav.Screen
+        name="Orders"
         component={OrdersScreen}
         options={{ title: "Замовлення" }}
       />
-      <OrdersStackNav.Screen
+      <MoreStackNav.Screen
         name="OrderDetail"
         component={OrderDetailScreen as React.ComponentType<any>}
         options={{ title: "Деталі замовлення" }}
       />
-    </OrdersStackNav.Navigator>
-  );
-}
-const OrdersStackNavigator = withAuthGuard(
-  OrdersStackNavigatorInner,
-  "замовлення",
-);
-
-const ChatStackNav = createNativeStackNavigator();
-function ChatStackNavigatorInner() {
-  return (
-    <ChatStackNav.Navigator screenOptions={defaultScreenOptions}>
-      <ChatStackNav.Screen
-        name="ChatMain"
+      <MoreStackNav.Screen
+        name="Chat"
         component={ChatScreen}
         options={{ title: "Чат з менеджером" }}
       />
-    </ChatStackNav.Navigator>
-  );
-}
-const ChatStackNavigator = withAuthGuard(ChatStackNavigatorInner, "чат");
-
-const ProfileStackNav = createNativeStackNavigator<ProfileStackParamList>();
-function ProfileStackNavigatorInner() {
-  return (
-    <ProfileStackNav.Navigator screenOptions={defaultScreenOptions}>
-      <ProfileStackNav.Screen
-        name="ProfileMain"
-        component={ProfileScreen as React.ComponentType<any>}
-        options={{ title: "Профіль" }}
-      />
-      <ProfileStackNav.Screen
+      <MoreStackNav.Screen
         name="Shipments"
         component={ShipmentsScreen}
         options={{ title: "Відправлення" }}
       />
-      <ProfileStackNav.Screen
-        name="Favorites"
-        component={PlaceholderScreen("Обране", "heart-outline", "#dc2626")}
-        options={{ title: "Обране" }}
-      />
-      <ProfileStackNav.Screen
+      <MoreStackNav.Screen
         name="Subscriptions"
         component={PlaceholderScreen(
           "Підписки на відео-огляди",
@@ -186,7 +238,7 @@ function ProfileStackNavigatorInner() {
         )}
         options={{ title: "Підписки" }}
       />
-      <ProfileStackNav.Screen
+      <MoreStackNav.Screen
         name="PaymentsHistory"
         component={PlaceholderScreen(
           "Історія оплат",
@@ -195,13 +247,15 @@ function ProfileStackNavigatorInner() {
         )}
         options={{ title: "Історія оплат" }}
       />
-    </ProfileStackNav.Navigator>
+      <MoreStackNav.Screen
+        name="Favorites"
+        component={PlaceholderScreen("Обране", "heart-outline", "#dc2626")}
+        options={{ title: "Обране" }}
+      />
+    </MoreStackNav.Navigator>
   );
 }
-const ProfileStackNavigator = withAuthGuard(
-  ProfileStackNavigatorInner,
-  "профіль",
-);
+const MoreStackNavigator = withAuthGuard(MoreStackNavigatorInner);
 
 // ─── Deep Linking Configuration ─────────────────────────────────────────────
 
@@ -213,10 +267,19 @@ const linking: LinkingOptions<Record<string, unknown>> = {
     screens: {
       Main: {
         screens: {
-          CatalogTab: {
+          HomeTab: {
             screens: {
-              CatalogList: "catalog",
+              HomeMain: "",
+              Catalog: "catalog",
               ProductDetail: "product/:slug",
+              Lots: "lots",
+              Wishlist: "wishlist",
+              Notifications: "notifications",
+            },
+          },
+          SearchTab: {
+            screens: {
+              SearchMain: "search",
             },
           },
           CartTab: {
@@ -224,20 +287,13 @@ const linking: LinkingOptions<Record<string, unknown>> = {
               CartMain: "cart",
             },
           },
-          OrdersTab: {
+          MoreTab: {
             screens: {
-              OrdersList: "orders",
+              MoreMain: "more",
+              Profile: "profile",
+              Orders: "orders",
               OrderDetail: "order/:orderId",
-            },
-          },
-          ChatTab: {
-            screens: {
-              ChatMain: "chat",
-            },
-          },
-          ProfileTab: {
-            screens: {
-              ProfileMain: "profile",
+              Chat: "chat",
               Shipments: "shipments",
             },
           },
@@ -252,11 +308,10 @@ const linking: LinkingOptions<Record<string, unknown>> = {
 const Tab = createBottomTabNavigator();
 
 const TAB_ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
-  CatalogTab: "grid-outline",
+  HomeTab: "home-outline",
+  SearchTab: "search-outline",
   CartTab: "cart-outline",
-  OrdersTab: "receipt-outline",
-  ChatTab: "chatbubbles-outline",
-  ProfileTab: "person-outline",
+  MoreTab: "ellipsis-horizontal-outline",
 };
 
 function MainTabs() {
@@ -283,9 +338,14 @@ function MainTabs() {
       })}
     >
       <Tab.Screen
-        name="CatalogTab"
-        component={CatalogStackNavigator}
-        options={{ tabBarLabel: "Каталог" }}
+        name="HomeTab"
+        component={HomeStackNavigator}
+        options={{ tabBarLabel: "Головна" }}
+      />
+      <Tab.Screen
+        name="SearchTab"
+        component={SearchStackNavigator}
+        options={{ tabBarLabel: "Пошук" }}
       />
       <Tab.Screen
         name="CartTab"
@@ -293,19 +353,9 @@ function MainTabs() {
         options={{ tabBarLabel: "Кошик" }}
       />
       <Tab.Screen
-        name="OrdersTab"
-        component={OrdersStackNavigator}
-        options={{ tabBarLabel: "Замовлення" }}
-      />
-      <Tab.Screen
-        name="ChatTab"
-        component={ChatStackNavigator}
-        options={{ tabBarLabel: "Чат" }}
-      />
-      <Tab.Screen
-        name="ProfileTab"
-        component={ProfileStackNavigator}
-        options={{ tabBarLabel: "Профіль" }}
+        name="MoreTab"
+        component={MoreStackNavigator}
+        options={{ tabBarLabel: "Ще" }}
       />
     </Tab.Navigator>
   );
@@ -353,6 +403,7 @@ function RootNavigator() {
       <RootStack.Navigator screenOptions={{ headerShown: false }}>
         <RootStack.Screen name="Main" component={MainTabs} />
       </RootStack.Navigator>
+      <MessengerFab />
     </View>
   );
 }
@@ -413,6 +464,11 @@ const styles = StyleSheet.create({
   },
   splashSpinner: {
     marginTop: 32,
+  },
+
+  // Header
+  headerIconButton: {
+    paddingHorizontal: 12,
   },
 
   // Placeholder
