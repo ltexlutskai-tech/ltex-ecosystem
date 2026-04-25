@@ -10,6 +10,7 @@ interface InfiniteScrollCatalogProps {
   totalPages: number;
   perPage: number;
   filterParams: string;
+  layout?: "grid" | "list";
 }
 
 export function InfiniteScrollCatalog({
@@ -18,6 +19,7 @@ export function InfiniteScrollCatalog({
   totalPages,
   perPage,
   filterParams,
+  layout = "grid",
 }: InfiniteScrollCatalogProps) {
   const [products, setProducts] = useState<ProductCardData[]>(initialProducts);
   const [page, setPage] = useState(1);
@@ -74,11 +76,27 @@ export function InfiniteScrollCatalog({
 
   return (
     <>
-      <div className="grid gap-4 grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4">
-        {products.map((product) => (
-          <ProductCard key={product.id ?? product.slug} product={product} />
-        ))}
-      </div>
+      {layout === "list" ? (
+        <div className="flex flex-col gap-4">
+          {products.map((product) => (
+            <ProductCard
+              key={product.id ?? product.slug}
+              product={product}
+              mode="list"
+            />
+          ))}
+        </div>
+      ) : (
+        <div className="grid gap-4 grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4">
+          {products.map((product) => (
+            <ProductCard
+              key={product.id ?? product.slug}
+              product={product}
+              mode="grid"
+            />
+          ))}
+        </div>
+      )}
 
       {/* Sentinel element for intersection observer */}
       <div ref={sentinelRef} className="mt-4 flex justify-center py-4">
