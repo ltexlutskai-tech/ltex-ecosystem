@@ -4,7 +4,7 @@ import { prisma } from "@ltex/db";
 import { notFound } from "next/navigation";
 import { getCatalogProducts } from "@/lib/catalog";
 import { ProductCard } from "@/components/store/product-card";
-import { CatalogFilters } from "@/components/store/catalog-filters";
+import { CatalogSidebar } from "@/components/store/catalog-sidebar";
 import { Pagination } from "@/components/store/pagination";
 import { Breadcrumbs } from "@/components/store/breadcrumbs";
 
@@ -152,31 +152,35 @@ export default async function CategoryPage({ params, searchParams }: Props) {
         </div>
       )}
 
-      <div className="mt-6">
-        <CatalogFilters
+      <div className="mt-6 flex flex-col gap-6 lg:flex-row">
+        <CatalogSidebar
           subcategories={category.children.map((c) => ({
             slug: c.slug,
             name: c.name,
           }))}
         />
-      </div>
 
-      {products.length === 0 ? (
-        <p className="mt-12 text-center text-gray-500">Товарів не знайдено.</p>
-      ) : (
-        <div className="mt-6 grid gap-4 grid-cols-2 sm:grid-cols-3 lg:grid-cols-4">
-          {products.map((product) => (
-            <ProductCard key={product.id} product={product} />
-          ))}
+        <div className="min-w-0 flex-1">
+          {products.length === 0 ? (
+            <p className="mt-12 text-center text-gray-500">
+              Товарів не знайдено.
+            </p>
+          ) : (
+            <div className="grid gap-4 grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4">
+              {products.map((product) => (
+                <ProductCard key={product.id} product={product} />
+              ))}
+            </div>
+          )}
+
+          <div className="mt-8">
+            <Pagination
+              currentPage={page}
+              totalPages={totalPages}
+              baseHref={baseHref}
+            />
+          </div>
         </div>
-      )}
-
-      <div className="mt-8">
-        <Pagination
-          currentPage={page}
-          totalPages={totalPages}
-          baseHref={baseHref}
-        />
       </div>
     </div>
   );

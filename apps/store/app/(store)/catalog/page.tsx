@@ -3,7 +3,7 @@ import Link from "next/link";
 import { CATEGORIES } from "@ltex/shared";
 import { getCatalogProducts } from "@/lib/catalog";
 import { ProductCard } from "@/components/store/product-card";
-import { CatalogFilters } from "@/components/store/catalog-filters";
+import { CatalogSidebar } from "@/components/store/catalog-sidebar";
 import { Pagination } from "@/components/store/pagination";
 import { Breadcrumbs } from "@/components/store/breadcrumbs";
 import { InfiniteScrollCatalog } from "@/components/store/infinite-scroll-catalog";
@@ -91,38 +91,40 @@ export default async function CatalogPage({
         ))}
       </div>
 
-      <div className="mt-6">
-        <CatalogFilters />
-      </div>
+      <div className="mt-6 flex flex-col gap-6 lg:flex-row">
+        <CatalogSidebar />
 
-      {products.length === 0 ? (
-        <p className="mt-12 text-center text-gray-500">
-          {dict.catalog.noResults}
-        </p>
-      ) : isInfiniteScroll ? (
-        <InfiniteScrollCatalog
-          initialProducts={products}
-          total={total}
-          totalPages={totalPages}
-          perPage={24}
-          filterParams={filterParams.toString()}
-        />
-      ) : (
-        <>
-          <div className="mt-6 grid gap-4 grid-cols-2 sm:grid-cols-3 lg:grid-cols-4">
-            {products.map((product) => (
-              <ProductCard key={product.id} product={product} />
-            ))}
-          </div>
-          <div className="mt-8">
-            <Pagination
-              currentPage={page}
+        <div className="min-w-0 flex-1">
+          {products.length === 0 ? (
+            <p className="mt-12 text-center text-gray-500">
+              {dict.catalog.noResults}
+            </p>
+          ) : isInfiniteScroll ? (
+            <InfiniteScrollCatalog
+              initialProducts={products}
+              total={total}
               totalPages={totalPages}
-              baseHref={baseHref}
+              perPage={24}
+              filterParams={filterParams.toString()}
             />
-          </div>
-        </>
-      )}
+          ) : (
+            <>
+              <div className="grid gap-4 grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4">
+                {products.map((product) => (
+                  <ProductCard key={product.id} product={product} />
+                ))}
+              </div>
+              <div className="mt-8">
+                <Pagination
+                  currentPage={page}
+                  totalPages={totalPages}
+                  baseHref={baseHref}
+                />
+              </div>
+            </>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
