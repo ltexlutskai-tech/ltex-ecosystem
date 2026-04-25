@@ -14,36 +14,37 @@ param(
 
 $ErrorActionPreference = "Stop"
 $RepoRoot = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
+$TotalSteps = 8
 
 Write-Host "=== L-TEX Deploy ===" -ForegroundColor Green
 Set-Location $RepoRoot
 
 # 1. Pull latest code
-Write-Host "`n[1/5] Pulling latest code..." -ForegroundColor Cyan
+Write-Host "`n[1/$TotalSteps] Pulling latest code..." -ForegroundColor Cyan
 git pull origin main
 
 # 2. Install dependencies
 if (-not $SkipInstall) {
-    Write-Host "`n[2/5] Installing dependencies..." -ForegroundColor Cyan
+    Write-Host "`n[2/$TotalSteps] Installing dependencies..." -ForegroundColor Cyan
     pnpm install --frozen-lockfile
 } else {
-    Write-Host "`n[2/5] Skipping install (--SkipInstall)" -ForegroundColor Yellow
+    Write-Host "`n[2/$TotalSteps] Skipping install (--SkipInstall)" -ForegroundColor Yellow
 }
 
 # 3. Generate Prisma client
-Write-Host "`n[3/5] Generating Prisma client..." -ForegroundColor Cyan
+Write-Host "`n[3/$TotalSteps] Generating Prisma client..." -ForegroundColor Cyan
 pnpm --filter @ltex/db exec prisma generate
 
-# 4. Build
+# 4. Build (direct pnpm filter bypasses turbo daemon which hangs on Windows).
 if (-not $SkipBuild) {
-    Write-Host "`n[4/5] Building store..." -ForegroundColor Cyan
-    pnpm build --filter=@ltex/store...
+    Write-Host "`n[4/$TotalSteps] Building store..." -ForegroundColor Cyan
+    pnpm --filter @ltex/store run build
 } else {
-    Write-Host "`n[4/5] Skipping build (--SkipBuild)" -ForegroundColor Yellow
+    Write-Host "`n[4/$TotalSteps] Skipping build (--SkipBuild)" -ForegroundColor Yellow
 }
 
 # 5. Copy standalone static + public files
-Write-Host "`n[5/6] Copying static assets to standalone..." -ForegroundColor Cyan
+Write-Host "`n[5/$TotalSteps] Copying static assets to standalone..." -ForegroundColor Cyan
 $StandalonePath = "apps\store\.next\standalone\apps\store"
 if (Test-Path "apps\store\.next\static") {
     Copy-Item -Recurse -Force "apps\store\.next\static" "$StandalonePath\.next\static"
@@ -56,7 +57,7 @@ if (Test-Path "apps\store\public") {
 # Without this, cold-start PM2 fails with PrismaClientInitializationError
 # ("Query Engine for runtime windows" not found). next.config.js already has
 # outputFileTracingIncludes for Prisma, but we copy here too as belt-and-braces.
-Write-Host "`n[6/7] Copying Prisma engine to standalone..." -ForegroundColor Cyan
+Write-Host "`n[6/$TotalSteps] Copying Prisma engine to standalone..." -ForegroundColor Cyan
 $PrismaSrc = Get-ChildItem -Path "node_modules\.pnpm" -Recurse -Filter "query_engine-windows.dll.node" -ErrorAction SilentlyContinue | Select-Object -First 1
 if ($PrismaSrc) {
     $PrismaSrcDir = Split-Path $PrismaSrc.FullName -Parent
@@ -75,15 +76,35 @@ if ($PrismaSrc) {
     Write-Host "  WARN: Prisma engine not found in node_modules - skipping" -ForegroundColor Yellow
 }
 
-# 7. Restart PM2
-Write-Host "`n[7/7] Restarting PM2..." -ForegroundColor Cyan
+# 7. Sync .env into standalone tree (Next.js standalone has its own apps/store/
+# at runtime and needs its own .env there). The source .env is gitignored and
+# managed manually on the server; this step only copies an existing file.
+Write-Host "`n[7/$TotalSteps] Syncing .env to standalone..." -ForegroundColor Cyan
+$EnvSrc = "apps\store\.env"
+$EnvDst = "apps\store\.next\standalone\apps\store\.env"
+if (Test-Path $EnvSrc) {
+    $StandaloneAppDir = Split-Path $EnvDst -Parent
+    if (-not (Test-Path $StandaloneAppDir)) {
+        Write-Host "  WARN: standalone dir $StandaloneAppDir does not exist - did build fail?" -ForegroundColor Yellow
+    } else {
+        Copy-Item -Force $EnvSrc $EnvDst
+        Write-Host "  Copied .env to $EnvDst" -ForegroundColor Gray
+    }
+} else {
+    Write-Host "  WARN: $EnvSrc not found - skipping (server will run with stale env)" -ForegroundColor Yellow
+}
+
+# 8. Restart PM2 (--update-env forces re-read of .env; pm2 save persists state
+# so the Scheduled Task "PM2 Resurrect" can restore it after reboot).
+Write-Host "`n[8/$TotalSteps] Restarting PM2..." -ForegroundColor Cyan
 $pm2List = pm2 jlist 2>$null | ConvertFrom-Json -ErrorAction SilentlyContinue
 $isRunning = $pm2List | Where-Object { $_.name -eq "ltex-store" }
 if ($isRunning) {
-    pm2 restart ltex-store
+    pm2 restart ltex-store --update-env
 } else {
     pm2 start ecosystem.config.js
 }
+pm2 save
 
 Write-Host "`n=== Deploy complete! ===" -ForegroundColor Green
 Write-Host "Check status: pm2 status"
