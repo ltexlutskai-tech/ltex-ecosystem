@@ -1562,3 +1562,40 @@ Worker запущений з `docs/SESSION_19_DECOMPOSITION.md` specom. Ство
 **Branch cleanup:** `claude/session-24-homepage-cleanup-ZEdUZ` — pending видалення через GitHub UI.
 
 **Наступне:** Session 25 — categories grid → carousel з gradient + lucide icon, 6s auto-rotate.
+
+---
+
+## Session 25 Completion Report (2026-04-25) — Categories Carousel
+
+**Мета:** замінити static categories grid на horizontal scroll-snap carousel з gradient + lucide icon (per user 2026-04-25, render preview підтверджений).
+
+**Результат:** 6 files changed, +384 / -20. CI green: 218 store tests (+7), format + typecheck (6/6) + build.
+
+**Реальні DB категорії (top-level):** 7 шт. — `odyag`, `vzuttia`, `aksesuary`, `dim-ta-pobut`, `igrashky`, `bric-a-brac`, `kosmetyka`. Spec mapping використовував placeholder slug-и (zhinky / choloviky) — worker замінив на реальні + додав `Sofa` для bric-a-brac, `Gem + fuchsia` для kosmetyka.
+
+**Layout choice:** scroll-snap track замість `transform: translateX` — native mobile swipe + responsive widths (`w-[66%] sm:w-[33%] md:w-[25%]`) без JS resize listener. Arrows + dots використовують `scrollTo` для jump.
+
+**Files:**
+
+- `apps/store/components/store/categories-carousel.tsx` (194) + test (99)
+- `apps/store/lib/category-display.ts` (55) — slug → icon/gradient
+- `apps/store/lib/pluralize.ts` (19) — Ukrainian noun plurals (1/2-4/5+)
+- Modified: `app/(store)/page.tsx` (categories grid → CategoriesCarousel), `lib/i18n/uk.ts` (+`home.categoriesCarousel.*`)
+
+**A11y:** aria-label, keyboard ← → nav, role="tab" on dots, button aria-label-нуто.
+
+**Behavior:**
+
+- Desktop: 4 cards visible
+- Tablet: 3 cards
+- Mobile: 1.5 cards (peek next), native swipe
+- Auto-rotate 6 сек, pause on hover, restart on user interaction
+
+**Коміти:**
+
+- `87a31f6 feat(homepage): replace categories grid with auto-rotating carousel`
+- `b7513cf Merge Session 25: categories grid → auto-rotating carousel`
+
+**Branch cleanup:** `claude/session-25-categories-carousel-R4woT` — pending видалення через GitHub UI.
+
+**Наступне:** Session 26 — newsletter notifications (admin bell + Telegram + welcome email render).
