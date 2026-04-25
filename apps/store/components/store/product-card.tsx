@@ -129,7 +129,7 @@ export function ProductCard({
       </Link>
 
       {/* Overlay buttons */}
-      <div className="absolute right-2 top-2 z-20 flex flex-col gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+      <div className="absolute right-2 top-2 z-20 flex flex-col gap-1 opacity-100 sm:opacity-0 sm:transition-opacity sm:group-hover:opacity-100">
         <WishlistButton
           product={{
             productId: product.id ?? product.slug,
@@ -240,7 +240,7 @@ function ProductCardList({
         </Card>
       </Link>
 
-      <div className="absolute right-2 top-2 z-20 flex flex-col gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+      <div className="absolute right-2 top-2 z-20 flex flex-col gap-1 opacity-100 sm:opacity-0 sm:transition-opacity sm:group-hover:opacity-100">
         <WishlistButton
           product={{
             productId: product.id ?? product.slug,
