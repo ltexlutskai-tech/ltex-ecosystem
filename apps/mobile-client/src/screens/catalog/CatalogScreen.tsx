@@ -10,19 +10,14 @@ import {
   RefreshControl,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { catalogApi } from "@/lib/api";
-import { ProductCard, type ProductCardItem } from "@/components/ProductCard";
+import { catalogApi, type WebCatalogProduct } from "@/lib/api";
+import { ProductCard } from "@/components/ProductCard";
 import { CatalogSkeleton } from "@/components/SkeletonLoader";
-
-const QUALITY_FILTERS = [
-  { key: "all", label: "Всі" },
-  { key: "extra", label: "Екстра" },
-  { key: "cream", label: "Крем" },
-  { key: "first", label: "1й сорт" },
-  { key: "second", label: "2й сорт" },
-  { key: "stock", label: "Сток" },
-  { key: "mix", label: "Мікс" },
-] as const;
+import {
+  CatalogFilterSheet,
+  countActiveFilters,
+  type CatalogFilters,
+} from "@/components/CatalogFilterSheet";
 
 interface CatalogScreenProps {
   navigation: {
@@ -30,34 +25,50 @@ interface CatalogScreenProps {
   };
 }
 
+/**
+ * Build the params object passed to /api/catalog from the local filter state.
+ * The API expects all values as strings (URLSearchParams).
+ */
+function buildQueryParams(
+  filters: CatalogFilters,
+  page: number,
+): Record<string, string> {
+  const params: Record<string, string> = {
+    page: String(page),
+    limit: "20",
+  };
+  if (filters.q && filters.q.trim()) params.q = filters.q.trim();
+  if (filters.quality) params.quality = filters.quality;
+  if (filters.season) params.season = filters.season;
+  if (filters.country) params.country = filters.country;
+  if (filters.sort) params.sort = filters.sort;
+  if (filters.priceMin !== undefined)
+    params.priceMin = String(filters.priceMin);
+  if (filters.priceMax !== undefined)
+    params.priceMax = String(filters.priceMax);
+  if (filters.inStock) params.inStock = "true";
+  return params;
+}
+
 export function CatalogScreen({ navigation }: CatalogScreenProps) {
-  const [products, setProducts] = useState<ProductCardItem[]>([]);
+  const [products, setProducts] = useState<WebCatalogProduct[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [search, setSearch] = useState("");
-  const [quality, setQuality] = useState("all");
+  const [filters, setFilters] = useState<CatalogFilters>({});
+  // Search bar (in header) is wired straight into filters.q for instant feedback.
+  const [searchInput, setSearchInput] = useState("");
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [filterSheetOpen, setFilterSheetOpen] = useState(false);
 
   const fetchProducts = useCallback(
     async (pageNum: number, isRefresh = false) => {
       try {
         setError(null);
-        const params: Record<string, string> = {
-          page: String(pageNum),
-          limit: "20",
-        };
-        if (search.trim()) params.q = search.trim();
-        if (quality !== "all") params.quality = quality;
-
-        const data = (await catalogApi.products(params)) as {
-          products: ProductCardItem[];
-          total: number;
-          page: number;
-          totalPages: number;
-        };
+        const params = buildQueryParams(filters, pageNum);
+        const data = await catalogApi.products(params);
 
         const fetched = data.products ?? [];
         if (isRefresh || pageNum === 1) {
@@ -72,14 +83,25 @@ export function CatalogScreen({ navigation }: CatalogScreenProps) {
         );
       }
     },
-    [search, quality],
+    [filters],
   );
 
   useEffect(() => {
     setPage(1);
     setLoading(true);
     fetchProducts(1).finally(() => setLoading(false));
-  }, [search, quality, fetchProducts]);
+  }, [filters, fetchProducts]);
+
+  // Debounce search input → filters.q
+  useEffect(() => {
+    const trimmed = searchInput.trim();
+    const current = filters.q ?? "";
+    if (trimmed === current) return;
+    const id = setTimeout(() => {
+      setFilters((prev) => ({ ...prev, q: trimmed || undefined }));
+    }, 350);
+    return () => clearTimeout(id);
+  }, [searchInput, filters.q]);
 
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -98,7 +120,7 @@ export function CatalogScreen({ navigation }: CatalogScreenProps) {
   }, [loadingMore, hasMore, page, fetchProducts]);
 
   const handleProductPress = useCallback(
-    (product: ProductCardItem) => {
+    (product: WebCatalogProduct) => {
       navigation.navigate("ProductDetail", {
         productId: product.id,
         slug: product.slug,
@@ -108,49 +130,50 @@ export function CatalogScreen({ navigation }: CatalogScreenProps) {
     [navigation],
   );
 
+  const handleApplyFilters = useCallback((next: CatalogFilters) => {
+    setFilters(next);
+    setSearchInput(next.q ?? "");
+  }, []);
+
+  const activeCount = countActiveFilters(filters);
+
   return (
     <View style={styles.container}>
-      {/* Search bar */}
-      <View style={styles.searchContainer}>
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Пошук товарів..."
-          placeholderTextColor="#9ca3af"
-          value={search}
-          onChangeText={setSearch}
-          returnKeyType="search"
-          clearButtonMode="while-editing"
-        />
+      {/* Header: search input + filter button */}
+      <View style={styles.headerRow}>
+        <View style={styles.searchInputWrap}>
+          <Ionicons
+            name="search"
+            size={16}
+            color="#9ca3af"
+            style={styles.searchIcon}
+          />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Пошук товарів..."
+            placeholderTextColor="#9ca3af"
+            value={searchInput}
+            onChangeText={setSearchInput}
+            returnKeyType="search"
+            clearButtonMode="while-editing"
+          />
+        </View>
+        <TouchableOpacity
+          style={styles.filterButton}
+          onPress={() => setFilterSheetOpen(true)}
+          accessibilityLabel="Відкрити фільтри"
+          activeOpacity={0.7}
+        >
+          <Ionicons name="options-outline" size={22} color="#1f2937" />
+          {activeCount > 0 ? (
+            <View style={styles.filterBadge}>
+              <Text style={styles.filterBadgeText}>{activeCount}</Text>
+            </View>
+          ) : null}
+        </TouchableOpacity>
       </View>
 
-      {/* Quality filter chips */}
-      <FlatList
-        data={QUALITY_FILTERS}
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        keyExtractor={(item) => item.key}
-        contentContainerStyle={styles.filtersContainer}
-        renderItem={({ item }) => (
-          <TouchableOpacity
-            style={[
-              styles.filterChip,
-              quality === item.key && styles.filterChipActive,
-            ]}
-            onPress={() => setQuality(item.key)}
-          >
-            <Text
-              style={[
-                styles.filterChipText,
-                quality === item.key && styles.filterChipTextActive,
-              ]}
-            >
-              {item.label}
-            </Text>
-          </TouchableOpacity>
-        )}
-      />
-
-      {/* Product list */}
+      {/* Product grid */}
       {loading ? (
         <CatalogSkeleton />
       ) : error && products.length === 0 ? (
@@ -161,8 +184,12 @@ export function CatalogScreen({ navigation }: CatalogScreenProps) {
         <FlatList
           data={products}
           keyExtractor={(item) => item.id}
+          numColumns={2}
+          columnWrapperStyle={styles.row}
           renderItem={({ item }) => (
-            <ProductCard product={item} onPress={handleProductPress} />
+            <View style={styles.cardWrapper}>
+              <ProductCard product={item} onPress={handleProductPress} />
+            </View>
           )}
           refreshControl={
             <RefreshControl
@@ -191,10 +218,17 @@ export function CatalogScreen({ navigation }: CatalogScreenProps) {
             </View>
           }
           contentContainerStyle={
-            products.length === 0 ? styles.emptyList : undefined
+            products.length === 0 ? styles.emptyList : styles.listContent
           }
         />
       )}
+
+      <CatalogFilterSheet
+        visible={filterSheetOpen}
+        onClose={() => setFilterSheetOpen(false)}
+        initialFilters={filters}
+        onApply={handleApplyFilters}
+      />
     </View>
   );
 }
@@ -204,56 +238,78 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#f9fafb",
   },
-  searchContainer: {
-    paddingHorizontal: 16,
+  headerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 12,
     paddingTop: 12,
     paddingBottom: 8,
   },
-  searchInput: {
+  searchInputWrap: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
     backgroundColor: "#fff",
     borderWidth: 1,
     borderColor: "#e5e7eb",
     borderRadius: 10,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    fontSize: 15,
+    paddingHorizontal: 12,
+  },
+  searchIcon: {
+    marginRight: 6,
+  },
+  searchInput: {
+    flex: 1,
+    paddingVertical: 9,
+    fontSize: 14,
     color: "#1f2937",
   },
-  filtersContainer: {
-    paddingHorizontal: 16,
-    paddingBottom: 8,
-    gap: 8,
-  },
-  filterChip: {
-    paddingHorizontal: 14,
-    paddingVertical: 6,
-    borderRadius: 20,
-    backgroundColor: "#fff",
+  filterButton: {
+    width: 42,
+    height: 42,
+    borderRadius: 10,
     borderWidth: 1,
     borderColor: "#e5e7eb",
+    backgroundColor: "#fff",
+    alignItems: "center",
+    justifyContent: "center",
+    position: "relative",
   },
-  filterChipActive: {
+  filterBadge: {
+    position: "absolute",
+    top: -4,
+    right: -4,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
     backgroundColor: "#16a34a",
-    borderColor: "#16a34a",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 4,
   },
-  filterChipText: {
-    fontSize: 13,
-    color: "#4b5563",
-    fontWeight: "500",
-  },
-  filterChipTextActive: {
+  filterBadgeText: {
     color: "#fff",
+    fontSize: 10,
+    fontWeight: "700",
+  },
+  row: {
+    gap: 8,
+    paddingHorizontal: 12,
+  },
+  cardWrapper: {
+    flex: 1,
+  },
+  listContent: {
+    paddingTop: 4,
+    paddingBottom: 24,
+    gap: 8,
   },
   centered: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
     padding: 24,
-  },
-  loadingText: {
-    marginTop: 12,
-    fontSize: 14,
-    color: "#6b7280",
   },
   emptyText: {
     fontSize: 16,
