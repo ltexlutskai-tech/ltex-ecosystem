@@ -94,7 +94,7 @@ export function LoginScreen() {
 
         <TouchableOpacity onPress={() => setIsNew(!isNew)}>
           <Text style={styles.switchText}>
-            {isNew ? "В��е є акаунт? Увійти" : "Новий клієнт? Зареєструватися"}
+            {isNew ? "Вже є акаунт? Увійти" : "Новий клієнт? Зареєструватися"}
           </Text>
         </TouchableOpacity>
       </View>

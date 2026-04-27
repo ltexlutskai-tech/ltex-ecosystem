@@ -109,7 +109,7 @@ export function CartScreen({ navigation, cart: cartProp }: CartScreenProps) {
       await ordersApi.list(); // Verify customer exists
       // Submit order via the orders API
       const response = await fetch(
-        `${process.env.EXPO_PUBLIC_API_URL ?? "https://ltex.com.ua/api"}/orders`,
+        `${process.env.EXPO_PUBLIC_API_URL ?? "https://new.ltex.com.ua/api"}/orders`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },

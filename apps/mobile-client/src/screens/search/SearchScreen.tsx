@@ -22,7 +22,7 @@ export function SearchScreen() {
     }
     try {
       const res = await fetch(
-        `${process.env.EXPO_PUBLIC_API_URL ?? ""}/api/search?q=${encodeURIComponent(q)}`,
+        `${process.env.EXPO_PUBLIC_API_URL ?? "https://new.ltex.com.ua/api"}/search?q=${encodeURIComponent(q)}`,
       );
       if (!res.ok) return;
       const data = await res.json();
