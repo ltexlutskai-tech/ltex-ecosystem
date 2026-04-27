@@ -1,44 +1,13 @@
 import React from "react";
 import { View, Text, TouchableOpacity, Image, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import type { WebCatalogProduct } from "@/lib/api";
+import { QUALITY_LABELS, SEASON_LABELS } from "@/lib/labels";
 
-// Inline label maps (mobile-client cannot import @ltex/shared — workspace excluded)
-const QUALITY_LABELS: Record<string, string> = {
-  extra: "Екстра",
-  cream: "Крем",
-  first: "1й сорт",
-  second: "2й сорт",
-  stock: "Сток",
-  mix: "Мікс",
-};
-
-const SEASON_LABELS: Record<string, string> = {
-  winter: "Зима",
-  summer: "Літо",
-  demiseason: "Демісезон",
-  "": "Всесезон",
-};
+// Re-export so existing imports from "@/components/ProductCard" still work.
+export type { WebCatalogProduct } from "@/lib/api";
 
 const NEW_BADGE_WINDOW_MS = 14 * 24 * 60 * 60 * 1000;
-
-/**
- * Shape returned by the /api/catalog endpoint (web parity).
- * Mirrors `ProductCardData` from apps/store/components/store/product-card.tsx.
- */
-export interface WebCatalogProduct {
-  id: string;
-  slug: string;
-  name: string;
-  quality: string;
-  season: string;
-  priceUnit: "kg" | "piece" | string;
-  country: string;
-  videoUrl: string | null;
-  images: { url: string; alt: string }[];
-  _count: { lots: number };
-  prices: { amount: number; currency: string; priceType: string }[];
-  createdAt?: string | null;
-}
 
 interface ProductCardProps {
   product: WebCatalogProduct;
@@ -107,11 +76,12 @@ export function ProductCard({
           </View>
         )}
 
-        {/* Wishlist heart — top-right */}
+        {/* Wishlist heart — top-right.
+            React Native does not bubble Touchable events to outer Touchables,
+            so the parent card press is not triggered when this is tapped. */}
         <TouchableOpacity
           style={styles.heartButton}
-          onPress={(e) => {
-            e.stopPropagation?.();
+          onPress={() => {
             onWishlistToggle?.(product);
           }}
           hitSlop={8}

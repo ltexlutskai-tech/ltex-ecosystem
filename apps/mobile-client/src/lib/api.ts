@@ -104,9 +104,36 @@ export const profileApi = {
 };
 
 // Catalog (reuses existing store API)
+
+/**
+ * Shape returned by `GET /api/catalog` — must mirror `ProductCardData`
+ * from apps/store/components/store/product-card.tsx so the mobile UI is paritetic.
+ */
+export interface WebCatalogProduct {
+  id: string;
+  slug: string;
+  name: string;
+  quality: string;
+  season: string;
+  priceUnit: "kg" | "piece" | string;
+  country: string;
+  videoUrl: string | null;
+  images: { url: string; alt: string }[];
+  _count: { lots: number };
+  prices: { amount: number; currency: string; priceType: string }[];
+  createdAt?: string | null;
+}
+
+export interface CatalogResponse {
+  products: WebCatalogProduct[];
+  total: number;
+  totalPages: number;
+  page: number;
+}
+
 export const catalogApi = {
   products: (params: Record<string, string>) =>
-    api("/catalog", { params, skipAuth: true }),
+    api<CatalogResponse>("/catalog", { params, skipAuth: true }),
   search: (q: string) =>
     api<{
       results: Array<{
