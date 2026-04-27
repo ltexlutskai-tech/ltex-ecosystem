@@ -67,8 +67,7 @@
           "icon": "./assets/notification-icon.png",
           "color": "#16a34a"
         }
-      ],
-      "expo-linking"
+      ]
     ],
     "extra": {
       "apiUrl": "https://ltex.com.ua/api",
