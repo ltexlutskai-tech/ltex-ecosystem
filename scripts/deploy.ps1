@@ -38,22 +38,15 @@ pnpm --filter @ltex/db exec prisma generate
 # 4. Build (direct pnpm filter bypasses turbo daemon which hangs on Windows).
 if (-not $SkipBuild) {
     Write-Host "`n[4/$TotalSteps] Building store..." -ForegroundColor Cyan
-    # Redirect through cmd /c rather than a PowerShell pipeline. Next.js
-    # block-buffers stdout when the parent is PowerShell (no TTY, and PS
-    # holds the pipe handle until the child exits), so the build appears
-    # to hang after the "serverActions" experiment line. cmd's > redirect
-    # hands the file handle straight to the child process and lets it
-    # flush normally. S37 tried Tee-Object and it did NOT fix the hang;
-    # this approach is what worked during S38 recovery.
-    $BuildLog = Join-Path $RepoRoot "build.log"
-    if (Test-Path $BuildLog) { Remove-Item $BuildLog -Force }
-    cmd /c "pnpm --filter @ltex/store run build > `"$BuildLog`" 2>&1"
-    $BuildExit = $LASTEXITCODE
-    if (Test-Path $BuildLog) {
-        Get-Content $BuildLog | Write-Host
-    }
-    if ($BuildExit -ne 0) {
-        Write-Host "  ERROR: build failed (exit $BuildExit) - see $BuildLog" -ForegroundColor Red
+    # Call pnpm directly. Earlier attempts (S37 Tee-Object, S39 cmd /c
+    # redirect) tried to capture the build log to disk, but both wedged
+    # the pipeline: pnpm.cmd already shells out through cmd.exe to spawn
+    # node, and stacking another redirect or PS pipeline on top kept
+    # next.js's stdout buffered until process exit. The plain invocation
+    # streams to the live console and finishes in seconds.
+    pnpm --filter @ltex/store run build
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "  ERROR: build failed (exit $LASTEXITCODE)" -ForegroundColor Red
         exit 1
     }
 } else {
