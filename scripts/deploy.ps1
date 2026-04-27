@@ -38,7 +38,16 @@ pnpm --filter @ltex/db exec prisma generate
 # 4. Build (direct pnpm filter bypasses turbo daemon which hangs on Windows).
 if (-not $SkipBuild) {
     Write-Host "`n[4/$TotalSteps] Building store..." -ForegroundColor Cyan
-    pnpm --filter @ltex/store run build
+    # Tee-Object forces line-buffered stdout so Next.js compiler output
+    # appears in real time. Without the pipe, PowerShell block-buffers the
+    # output and the build appears to hang indefinitely after printing the
+    # "serverActions" experiment line.
+    $BuildLog = Join-Path $RepoRoot "build.log"
+    pnpm --filter @ltex/store run build 2>&1 | Tee-Object -FilePath $BuildLog
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "  ERROR: build failed - see $BuildLog" -ForegroundColor Red
+        exit 1
+    }
 } else {
     Write-Host "`n[4/$TotalSteps] Skipping build (--SkipBuild)" -ForegroundColor Yellow
 }
@@ -97,12 +106,31 @@ if (Test-Path $EnvSrc) {
 # 8. Restart PM2 (--update-env forces re-read of .env; pm2 save persists state
 # so the Scheduled Task "PM2 Resurrect" can restore it after reboot).
 Write-Host "`n[8/$TotalSteps] Restarting PM2..." -ForegroundColor Cyan
-$pm2List = pm2 jlist 2>$null | ConvertFrom-Json -ErrorAction SilentlyContinue
-$isRunning = $pm2List | Where-Object { $_.name -eq "ltex-store" }
+
+# Wake the PM2 daemon if it's not running. `pm2 ping` is cheap and idempotent;
+# if the daemon is dead it spawns a new one. This avoids the "first jlist
+# returns startup banner instead of JSON" race that breaks ConvertFrom-Json.
+pm2 ping > $null 2>&1
+
+# pm2 jlist can return non-JSON friendly text when the daemon is starting
+# (e.g. after Stop-Process node, fresh checkout, or cold boot). Guard the
+# JSON parse so we degrade to a fresh start rather than crashing the script.
+$isRunning = $false
+try {
+    $rawList = pm2 jlist 2>$null
+    if ($rawList -and $rawList -match '^\s*\[') {
+        $pm2List = $rawList | ConvertFrom-Json -ErrorAction Stop
+        $isRunning = [bool]($pm2List | Where-Object { $_.name -eq "ltex-store" })
+    }
+} catch {
+    Write-Host "  PM2 daemon state unclear, will start fresh" -ForegroundColor Yellow
+    $isRunning = $false
+}
+
 if ($isRunning) {
     pm2 restart ltex-store --update-env
 } else {
-    pm2 start ecosystem.config.js
+    pm2 start ecosystem.config.js --update-env
 }
 pm2 save
 

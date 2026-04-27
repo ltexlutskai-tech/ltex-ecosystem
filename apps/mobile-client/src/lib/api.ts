@@ -3,7 +3,8 @@
  * All requests go to the Next.js API routes.
  */
 
-const API_URL = process.env.EXPO_PUBLIC_API_URL ?? "https://new.ltex.com.ua/api";
+const API_URL =
+  process.env.EXPO_PUBLIC_API_URL ?? "https://new.ltex.com.ua/api";
 
 interface ApiOptions {
   method?: "GET" | "POST" | "PUT" | "DELETE";
