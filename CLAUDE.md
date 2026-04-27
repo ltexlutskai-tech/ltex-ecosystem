@@ -10,7 +10,7 @@ Contacts: Telegram @L_TEX, +380 67 671 05 15, +380 99 358 49 92, ltex.lutsk.ai@g
 
 ## Current Status
 
-**Branch:** `main` (all work through **Session 39** merged).
+**Branch:** `main` (all work through **Session 34** merged).
 
 **L-TEX website is LIVE on self-hosted Windows Server:** https://new.ltex.com.ua (Cloudflare Tunnel)
 
@@ -23,7 +23,7 @@ Contacts: Telegram @L_TEX, +380 67 671 05 15, +380 99 358 49 92, ltex.lutsk.ai@g
 - **Backups:** Daily `pg_dump -Fc` at 03:00 → `E:\ltex-backups\` (14-day retention).
 - **CI green:** 243 unit + 36 E2E tests, TypeScript strict, 0 `any`.
 - **Security:** Sessions 16-17 закрили 4 CRITICAL + 3 HIGH вразливості перед self-hosted deploy.
-- **Mobile client (Expo SDK 52):** working — Home (S33), 4-tab nav, Catalog 2-column grid + bottom-sheet filter (S38), wishlist persistence + saved-products screen (S39), points to `https://new.ltex.com.ua/api`. QuickView / push notifications screen / chat unread badge / mobile home banners&recommendations — pending.
+- **Mobile client (Expo SDK 52):** working — Home з banners + 3 product rails (S34), 4-tab nav, Catalog 2-column grid + bottom-sheet filter (S38), wishlist persistence + saved-products screen (S39), points to `https://new.ltex.com.ua/api`. QuickView / push notifications screen / chat unread badge — pending. **Native APK не distributed** — користувачі поки скачують лише PWA з веб-сайту.
 
 ### Session log (recent)
 
@@ -33,6 +33,8 @@ Contacts: Telegram @L_TEX, +380 67 671 05 15, +380 99 358 49 92, ltex.lutsk.ai@g
 - **S37** deploy.ps1 hardening v2 (Tee-Object pipe + PM2 try/catch + pm2 ping). PM2 daemon resilience verified end-to-end. Tee-Object thesis для buffering — невірний (S39 закрив).
 - **S38** mobile catalog parity with web (ProductCard 4:3 + NEW/SALE + wishlist heart UI, bottom-sheet `CatalogFilterSheet` with all web filters, FlatList numColumns=2). Done by background worker subagent in ~10 min.
 - **S39** deploy step 4 fix + wishlist persistence. **Both prior buffering theses (S37 Tee-Object, "real fix is cmd /c") були хибними** — direct `pnpm --filter @ltex/store run build` працює як треба. Не додавати редирект у крок [4/8] жодного типу. Mobile wishlist: SecureStore-backed (100-item cap), fire-and-forget mirror у `/api/mobile/favorites` коли logged in, WishlistScreen — 2-col grid.
+- **S34** mobile home banners + 3 product rails (Топ / Акції / Новинки). Single-shot `/api/mobile/home` endpoint (60s ISR), pure-RN BannerCarousel (rgba overlay, no expo-linear-gradient dep) + HorizontalProductRail. Endpoint live, банери на сайті — pending admin upload (P0 #4).
+- **Регресія S34→S40:** другий поспіль deploy висне на [4/8] бо PM2 cluster тримає lock на `.next/cache`. Workaround: `taskkill /F /IM node.exe` між deploy-ями. Spec у `docs/SESSION_40_DEPLOY_PM2_NODE_LOCK.md`.
 
 **IMPORTANT FOR NEW SESSIONS:** Do NOT re-audit or re-merge branches. Проект повністю функціональний. Читай `docs/HISTORY.md` для деталей попередніх сесій.
 

@@ -1701,3 +1701,42 @@ Worker запущений з `docs/SESSION_19_DECOMPOSITION.md` specom. Ство
 - Server: `.\scripts\deploy.ps1` end-to-end clean, build 5.6с, PM2 online, всі 3 URL (`/`, `/catalog`, `/admin/login`) відкриваються.
 
 **Наступне:** S34 — mobile banners + recommendations (заповнити placeholder на `HomeScreen` після S33).
+
+---
+
+## Session 34 Completion Report (2026-04-27) — Mobile Home Banners + Product Rails
+
+**Мета:** замінити placeholder "ми покажемо схожі тут" на mobile HomeScreen реальним контентом — банери з адмінки + три horizontal product rails (Топ / Акції / Новинки).
+
+**Spec:** `docs/SESSION_34_MOBILE_BANNERS_RECOMMENDATIONS.md`.
+
+**Результат:** 1 коміт (`de04d93`), 6 файлів, +702/-41 рядків. Build 7.6с, 246 unit-тестів (+3), endpoint live на `https://new.ltex.com.ua/api/mobile/home`.
+
+### Files
+
+- `apps/store/app/api/mobile/home/route.ts` (новий) — single round-trip: `Promise.all` над banner.findMany + featuredProduct.findMany + product.findMany (sale) + product.findMany (new), 12 елементів кожна колекція, ISR `revalidate = 60`. Inline `mapProduct` нормалізує `createdAt → ISO`, фільтрує prices до `wholesale + akciya`, плоский shape для mobile.
+- `apps/store/app/api/mobile/home/route.test.ts` (новий) — 3 vitest cases: shape, empty DB, product normalisation.
+- `apps/mobile-client/src/lib/api.ts` — `MobileHomeBanner`, `MobileHomeData`, `homeApi.get()` (skipAuth, public).
+- `apps/mobile-client/src/components/BannerCarousel.tsx` (новий) — pure RN: FlatList horizontal + paging + 6с auto-rotate (resets on manual swipe), dot indicators, rgba overlay (no `expo-linear-gradient` dep). Tap routes http(s) → `Linking.openURL`, `/catalog`/`/lots`/`/wishlist` → `navigation.navigate`.
+- `apps/mobile-client/src/components/HorizontalProductRail.tsx` (новий) — title + optional "Усі →" CTA + horizontal FlatList of `ProductCard` (160dp width, gap 12). Integrates `useWishlist()` so heart toggling mirrors Catalog. `extraData={items}` примушує rerender при toggle.
+- `apps/mobile-client/src/screens/home/HomeScreen.tsx` — rewrite: data fetch via `homeApi.get()`, pull-to-refresh, error message, conditional `<BannerCarousel>` / fallback brand banner, three rails (Топ / Акції / Новинки) з "Усі →" → `Catalog`. Quick actions row preserved (Каталог / Лоти / Сповіщення / Обране).
+
+### Verification
+
+- `pnpm format:check`, `pnpm -r typecheck` (6/6), `pnpm -r test` (246/246, baseline 243).
+- Server build 7.6с, PM2 online, deploy.ps1 step [4/8] passed (after one `taskkill /F /IM node.exe` reset — see S40 below).
+- Endpoint live: `Invoke-WebRequest /api/mobile/home` повернув 200 з валідним JSON. На момент verify: `banners: []` (admin ще не заллив), `featured: []` (теж pending), `onSale: 12`, `newArrivals: 12`.
+
+### Discoveries
+
+- `expo-linear-gradient` не у deps mobile-client → BannerCarousel використовує rgba overlay (`backgroundColor: 'rgba(0,0,0,0.35)'` + StyleSheet.absoluteFillObject). Якщо хочемо real gradient — окрема задача `npx expo install expo-linear-gradient`.
+- `CatalogScreen` приймає initialFilters via navigation params **не змінювався** — "Усі →" з рейок зараз йде на чистий Catalog без префільтра. Якщо потрібен префільтр (напр. "Акції" → catalog з `priceType=akciya`) — окрема міні-задача.
+- **Регресія deploy.ps1:** другий поспіль deploy завис на step [4/8] навіть з direct pnpm викликом, тому що PM2 ltex-store з попереднього deploy тримав node-процес що блокує `next build` (lock файл або port). Розв'язалось `taskkill /F /IM node.exe` (вбиває і PM2-managed node), після чого build пройшов 7.6с. Окрема spec — S40.
+
+### Commit
+
+- `de04d93 feat(mobile): home screen banners + product rails (S34)`
+
+**Branch deleted:** `claude/session-34-mobile-banners-recommendations`.
+
+**Наступне:** S35 — chat unread badge на MoreTab.
