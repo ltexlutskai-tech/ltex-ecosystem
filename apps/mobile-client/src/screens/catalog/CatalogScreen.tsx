@@ -11,6 +11,7 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { catalogApi, type WebCatalogProduct } from "@/lib/api";
+import { useWishlist } from "@/lib/wishlist";
 import { ProductCard } from "@/components/ProductCard";
 import { CatalogSkeleton } from "@/components/SkeletonLoader";
 import {
@@ -62,6 +63,11 @@ export function CatalogScreen({ navigation }: CatalogScreenProps) {
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [filterSheetOpen, setFilterSheetOpen] = useState(false);
+  const {
+    items: wishlistItems,
+    has: isWishlisted,
+    toggle: toggleWishlist,
+  } = useWishlist();
 
   const fetchProducts = useCallback(
     async (pageNum: number, isRefresh = false) => {
@@ -184,11 +190,17 @@ export function CatalogScreen({ navigation }: CatalogScreenProps) {
         <FlatList
           data={products}
           keyExtractor={(item) => item.id}
+          extraData={wishlistItems}
           numColumns={2}
           columnWrapperStyle={styles.row}
           renderItem={({ item }) => (
             <View style={styles.cardWrapper}>
-              <ProductCard product={item} onPress={handleProductPress} />
+              <ProductCard
+                product={item}
+                onPress={handleProductPress}
+                isWishlisted={isWishlisted(item.id)}
+                onWishlistToggle={toggleWishlist}
+              />
             </View>
           )}
           refreshControl={

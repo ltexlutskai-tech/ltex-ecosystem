@@ -32,6 +32,7 @@ import * as Linking from "expo-linking";
 
 import { useAuth } from "@/lib/auth";
 import { AuthProvider } from "@/lib/auth-provider";
+import { WishlistProvider } from "@/lib/wishlist-provider";
 import { OfflineBanner } from "@/components/OfflineBanner";
 import { MessengerFab } from "@/components/MessengerFab";
 import { registerPushToken } from "@/lib/notifications";
@@ -413,9 +414,11 @@ function RootNavigator() {
 export function AppNavigator() {
   return (
     <AuthProvider>
-      <NavigationContainer linking={linking} fallback={<SplashScreen />}>
-        <RootNavigator />
-      </NavigationContainer>
+      <WishlistProvider>
+        <NavigationContainer linking={linking} fallback={<SplashScreen />}>
+          <RootNavigator />
+        </NavigationContainer>
+      </WishlistProvider>
     </AuthProvider>
   );
 }
