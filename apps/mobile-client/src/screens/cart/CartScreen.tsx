@@ -38,10 +38,18 @@ interface CartScreenProps {
   navigation: {
     navigate: (screen: string, params?: Record<string, unknown>) => void;
   };
-  cart: CartContextType;
+  cart?: CartContextType;
 }
 
-export function CartScreen({ navigation, cart }: CartScreenProps) {
+const EMPTY_CART: CartContextType = {
+  items: [],
+  addItem: () => {},
+  removeItem: () => {},
+  clearCart: () => {},
+};
+
+export function CartScreen({ navigation, cart: cartProp }: CartScreenProps) {
+  const cart = cartProp ?? EMPTY_CART;
   const { customerId, customerName, phone } = useAuth();
 
   const [contactName, setContactName] = useState(customerName ?? "");
