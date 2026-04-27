@@ -10,7 +10,7 @@ Contacts: Telegram @L_TEX, +380 67 671 05 15, +380 99 358 49 92, ltex.lutsk.ai@g
 
 ## Current Status
 
-**Branch:** `main` (all work through Session 18 merged).
+**Branch:** `main` (all work through **Session 38** merged).
 
 **L-TEX website is LIVE on self-hosted Windows Server:** https://new.ltex.com.ua (Cloudflare Tunnel)
 
@@ -21,8 +21,17 @@ Contacts: Telegram @L_TEX, +380 67 671 05 15, +380 99 358 49 92, ltex.lutsk.ai@g
 - **Auto-start:** cloudflared + PostgreSQL як Windows services; PM2 через Scheduled Task "PM2 Resurrect" (60s delay).
 - **Monitoring:** UptimeRobot Free, 3 monitors (`/`, `/catalog`, `/admin/login`), 5-min interval.
 - **Backups:** Daily `pg_dump -Fc` at 03:00 → `E:\ltex-backups\` (14-day retention).
-- **CI green:** 220 unit + 36 E2E tests, TypeScript strict, 0 `any`.
+- **CI green:** 243 unit + 36 E2E tests, TypeScript strict, 0 `any`.
 - **Security:** Sessions 16-17 закрили 4 CRITICAL + 3 HIGH вразливості перед self-hosted deploy.
+- **Mobile client (Expo SDK 52):** working — Home (S33), 4-tab nav, Catalog 2-column grid + bottom-sheet filter (S38), points to `https://new.ltex.com.ua/api`. Wishlist toggle / QuickView / push notifications — pending.
+
+### Session log (recent)
+
+- **S27** deploy.ps1 hardening v1 (direct pnpm filter, .env sync, --update-env)
+- **S28-S32** web catalog UX (product card quickfixes, remove Compare, filters left sidebar + mobile bottom-sheet, grid/list toggle, wishlist always visible)
+- **S33** mobile home screen Rozetka-style + 4-tab restructure (Home / Search / Cart / More + FAB messenger)
+- **S37** deploy.ps1 hardening v2 (Tee-Object pipe + PM2 try/catch + pm2 ping). PM2 daemon resilience verified end-to-end. **Tee-Object thesis was wrong** — PowerShell still block-buffers; the real fix is `cmd /c "next build > log 2>&1"` (used during S38 recovery). Deploy step 4 still needs that rewrite — see SESSION_TASKS.md S39.
+- **S38** mobile catalog parity with web (ProductCard 4:3 + NEW/SALE + wishlist heart UI, bottom-sheet `CatalogFilterSheet` with all web filters, FlatList numColumns=2). Done by background worker subagent in ~10 min.
 
 **IMPORTANT FOR NEW SESSIONS:** Do NOT re-audit or re-merge branches. Проект повністю функціональний. Читай `docs/HISTORY.md` для деталей попередніх сесій.
 
