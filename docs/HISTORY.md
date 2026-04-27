@@ -1643,3 +1643,61 @@ Worker запущений з `docs/SESSION_19_DECOMPOSITION.md` specom. Ство
 **Branch cleanup:** `claude/session-26-newsletter-notifications` — pending видалення через GitHub UI.
 
 **Homepage refactor готовий до production deploy:** S24 (cleanup) + S25 (categories carousel) + S26 (newsletter active) — три merged сесії, один deploy на сервер.
+
+---
+
+## Session 39 Completion Report (2026-04-27) — Deploy Step 4 Fix + Wishlist Persistence
+
+**Мета:** закрити P0 deploy step 4 (build hang на PowerShell після S37 Tee-Object thesis помилки) + перший P1 mobile task (wishlist persistence — heart toggle з S38 був візуальний, не зберігався).
+
+**Результат:** 3 коміти на main (через 2 worker-merge cycles). Build тепер 5.6с end-to-end, PM2 online, mobile heart переживає reload.
+
+### Що відбулось
+
+1. **Перша спроба (commit `d6c1d2f`):** замінив S37 Tee-Object pipeline на `cmd /c "pnpm ... > build.log 2>&1"` per CLAUDE.md тезис. На сервері крок [4/8] завис так само — PowerShell тримав child stdout, навіть з cmd-редиректом всередині. Тейл `build.log` показав останній рядок `· serverActions` і нічого далі.
+2. **Diagnosis (in PS):** `taskkill /F /IM node.exe` + прямий `pnpm --filter @ltex/store run build` без редиректу → пройшов за 6.1с з реальним стрімінгом у консоль. Висновок: проблема не у буферизації Next.js, а у вкладеності `PS → cmd.exe → pnpm.cmd → cmd.exe → node` коли додається ще один редирект.
+3. **Виправлення (commit `a7ef0f6`):** revert до прямого `pnpm --filter @ltex/store run build` (як було до S37). Зберіг `$LASTEXITCODE` чек з S37. Видалив `build.log` логіку повністю.
+
+### Висновки для майбутніх сесій
+
+- **CLAUDE.md тезис "real fix is cmd /c" БУВ ХИБНИЙ.** Direct `pnpm` invocation працює як треба — нічого не блокується.
+- Tee-Object thesis з S37 теж був хибний (це вже знали).
+- **Не додавати редирект у крок [4/8]** — будь-який (Tee-Object, cmd /c, Start-Process з RedirectStandardOutput) ламає stdio chain.
+- Якщо коли-небудь build реально зависне знову — спершу `taskkill /F /IM node.exe`, далі `pnpm --filter @ltex/store run build` напряму у тому ж PS вікні.
+
+### Wishlist persistence (mobile)
+
+**Files:**
+
+- `apps/mobile-client/src/lib/wishlist.ts` (нове, 25 рядків): context type + `useWishlist()` hook
+- `apps/mobile-client/src/lib/wishlist-provider.tsx` (нове, 130 рядків): SecureStore persistence (з localStorage fallback за патерном `auth-provider.tsx`), 100-item cap, fire-and-forget mirror у `/api/mobile/favorites` коли `customerId` присутній
+- `apps/mobile-client/src/navigation/AppNavigator.tsx`: `WishlistProvider` обгортає children під `AuthProvider`
+- `apps/mobile-client/src/screens/catalog/CatalogScreen.tsx`: `useWishlist` + `extraData={items}` щоб FlatList перерендерив hearts на toggle
+- `apps/mobile-client/src/screens/wishlist/WishlistScreen.tsx`: replaces empty placeholder з 2-col grid (`ProductCard` reuse), empty state preserved
+
+**Architecture:**
+
+- Local-first: `SecureStore` source of truth для UI; навіть logged-out користувач має persistent heart.
+- Snapshot trim: зберігаємо лише поля для `ProductCard` (id/slug/name/quality/season/priceUnit/country/videoUrl/first image/wholesale+akciya prices/createdAt).
+- Server mirror: коли logged in — `favoritesApi.add/remove` fire-and-forget, без error UI. Прирівнюється до того що backend вже мав з S5.
+
+**Не зроблено навмисно (out of scope для S39):**
+
+- Pull-on-login merge сервера → локалі (server has products у іншій shape, потрібна conversion). Якщо клієнт уже мав favorites у DB — зараз не побачить їх локально.
+- QuickView modal з ProductCard довге натискання — окрема задача.
+
+### Коміти
+
+- `d6c1d2f chore(deploy): step 4 build via cmd /c redirect (S39)` — перша спроба, на сервері виявилась неробочою
+- `862126b feat(mobile): wishlist persistence + saved-products screen`
+- `a7ef0f6 fix(deploy): drop build log redirect, call pnpm directly` — фінальне виправлення deploy.ps1
+
+**Branches видалені:** `claude/review-s39-deployment-8Ll7i`, `claude/fix-s39-build-redirect`.
+
+**Verification:**
+
+- CI green на main після обох merge.
+- Local: format, typecheck (6/6 packages), test 243/243.
+- Server: `.\scripts\deploy.ps1` end-to-end clean, build 5.6с, PM2 online, всі 3 URL (`/`, `/catalog`, `/admin/login`) відкриваються.
+
+**Наступне:** S34 — mobile banners + recommendations (заповнити placeholder на `HomeScreen` після S33).

@@ -2,8 +2,8 @@
 
 Список активних задач на найближчі worker-сесії, згрупований по пріоритету.
 
-**Дата оновлення:** 2026-04-24
-**Поточний стан:** Session 18 complete — сайт LIVE, infrastructure hardened. Черга базується на `PROJECT_AUDIT_2026-04-18.md` + marketplace gap analysis.
+**Дата оновлення:** 2026-04-27
+**Поточний стан:** Session 39 complete — deploy.ps1 step 4 fixed (direct pnpm), mobile wishlist persistence + screen live. Черга базується на `PROJECT_AUDIT_2026-04-18.md` + marketplace gap analysis + mobile parity backlog.
 
 ---
 
@@ -97,6 +97,23 @@ Follow-up (user-action): заповнити real content Terms/Privacy/Returns, 
 Merged in `cf0580c`. 16 files, 859 insertions, 217 tests passing.
 **Server action required:** `pnpm --filter @ltex/db exec prisma migrate deploy` для нової NewsletterSubscriber таблиці.
 Follow-up (user-action): real Google reviews текст замість TODO, Blog/articles — окрема велика сесія.
+
+---
+
+## P1 — Mobile parity (Expo client)
+
+Базується на CLAUDE.md "Mobile client" line + `docs/SESSION_38_MOBILE_CATALOG_PARITY.md` follow-up. S38 закрив catalog grid + filter sheet + heart UI; S39 — wishlist persistence + screen.
+
+| #   | Задача                                                                                            | Тип    | Ефорт   | Статус             |
+| --- | ------------------------------------------------------------------------------------------------- | ------ | ------- | ------------------ |
+| 52  | Wishlist persistence (SecureStore + server mirror) + WishlistScreen list                          | worker | —       | ✅ DONE (S39)      |
+| 53  | **S34 banners + recommendations на mobile HomeScreen** (заповнити placeholder після S33)          | worker | 4-5 год | NEXT               |
+| 54  | **S35 chat unread badge** на MoreTab (polling `/api/mobile/chat` lastReadId або через SSE)        | worker | 2-3 год | PENDING            |
+| 55  | **S36 notifications screen** з backend list (`notificationsApi.list()` уже існує) + read state    | worker | 3-4 год | PENDING            |
+| 56  | QuickView modal (long-press на ProductCard → modal з основною інфою без переходу)                 | worker | 2-3 год | PENDING            |
+| 57  | Pull-on-login wishlist merge (server → local) + conversion з Favorite shape у `WebCatalogProduct` | worker | 1-2 год | PENDING (post-S39) |
+
+**Hard rule для mobile:** не міняти `expo`/`react-native` версій без user-а. Усі pure JS зміни проходять через `pnpm format:check` + ручний QA на Expo Go (worker не може запустити, верифікація — статичні check + spec compliance).
 
 ---
 
