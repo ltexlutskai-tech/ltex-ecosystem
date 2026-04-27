@@ -106,7 +106,7 @@ export const profileApi = {
 // Catalog (reuses existing store API)
 export const catalogApi = {
   products: (params: Record<string, string>) =>
-    api("/mobile/catalog" in {} ? "/mobile/catalog" : "/search", { params }),
+    api("/catalog", { params, skipAuth: true }),
   search: (q: string) =>
     api<{
       results: Array<{
