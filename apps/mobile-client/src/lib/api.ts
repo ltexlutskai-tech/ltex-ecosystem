@@ -226,3 +226,24 @@ export const notificationsApi = {
     }),
   list: () => api("/mobile/notifications"),
 };
+
+// Home (single round-trip for banners + featured + sale + new)
+export interface MobileHomeBanner {
+  id: string;
+  title: string;
+  subtitle: string | null;
+  imageUrl: string;
+  ctaLabel: string | null;
+  ctaHref: string | null;
+}
+
+export interface MobileHomeData {
+  banners: MobileHomeBanner[];
+  featured: WebCatalogProduct[];
+  onSale: WebCatalogProduct[];
+  newArrivals: WebCatalogProduct[];
+}
+
+export const homeApi = {
+  get: () => api<MobileHomeData>("/mobile/home", { skipAuth: true }),
+};

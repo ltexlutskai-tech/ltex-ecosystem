@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -6,10 +6,19 @@ import {
   TextInput,
   TouchableOpacity,
   StyleSheet,
+  RefreshControl,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import {
+  homeApi,
+  type MobileHomeData,
+  type WebCatalogProduct,
+} from "@/lib/api";
+import { BannerCarousel } from "@/components/BannerCarousel";
+import { HorizontalProductRail } from "@/components/HorizontalProductRail";
+import { CatalogSkeleton } from "@/components/SkeletonLoader";
 
 const BRAND_COLOR = "#16a34a";
 
@@ -52,29 +61,93 @@ const QUICK_ACTIONS: {
 
 export function HomeScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<any>>();
-  const [searchQuery, setSearchQuery] = React.useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [data, setData] = useState<MobileHomeData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const submitSearch = () => {
+  const fetchHome = useCallback(async () => {
+    try {
+      setError(null);
+      const result = await homeApi.get();
+      setData(result);
+    } catch {
+      setError("Не вдалося завантажити головну. Потягніть для оновлення.");
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchHome().finally(() => setLoading(false));
+  }, [fetchHome]);
+
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await fetchHome();
+    setRefreshing(false);
+  }, [fetchHome]);
+
+  const submitSearch = useCallback(() => {
     const q = searchQuery.trim();
     if (!q) return;
     navigation.getParent()?.navigate("SearchTab", {
       screen: "SearchMain",
       params: { q },
     });
-  };
+  }, [navigation, searchQuery]);
+
+  const handleProductPress = useCallback(
+    (product: WebCatalogProduct) => {
+      navigation.navigate("ProductDetail", {
+        productId: product.id,
+        slug: product.slug,
+        name: product.name,
+      });
+    },
+    [navigation],
+  );
+
+  const goCatalog = useCallback(() => {
+    navigation.navigate("Catalog");
+  }, [navigation]);
+
+  if (loading) {
+    return (
+      <View style={styles.container}>
+        <CatalogSkeleton />
+      </View>
+    );
+  }
+
+  const banners = data?.banners ?? [];
+  const featured = data?.featured ?? [];
+  const onSale = data?.onSale ?? [];
+  const newArrivals = data?.newArrivals ?? [];
 
   return (
     <ScrollView
       style={styles.container}
       contentContainerStyle={styles.content}
       keyboardShouldPersistTaps="handled"
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={handleRefresh}
+          tintColor={BRAND_COLOR}
+          colors={[BRAND_COLOR]}
+        />
+      }
     >
-      <View style={styles.banner}>
-        <Text style={styles.bannerTitle}>L-TEX</Text>
-        <Text style={styles.bannerSubtitle}>
-          Секонд хенд, сток, іграшки гуртом від 10 кг
-        </Text>
-      </View>
+      {banners.length > 0 ? (
+        <BannerCarousel banners={banners} />
+      ) : (
+        <View style={styles.fallbackBanner}>
+          <Text style={styles.fallbackTitle}>L-TEX</Text>
+          <Text style={styles.fallbackSubtitle}>
+            Секонд хенд, сток, іграшки гуртом від 10 кг
+          </Text>
+        </View>
+      )}
 
       <View style={styles.searchWrap}>
         <Ionicons name="search-outline" size={20} color="#9ca3af" />
@@ -112,15 +185,26 @@ export function HomeScreen() {
         ))}
       </View>
 
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Рекомендації для вас</Text>
-        <View style={styles.emptyRecsPlaceholder}>
-          <Ionicons name="sparkles-outline" size={32} color="#d1d5db" />
-          <Text style={styles.emptyRecsText}>
-            Перегляньте товари у каталозі — ми покажемо схожі тут
-          </Text>
-        </View>
-      </View>
+      {error ? <Text style={styles.errorText}>{error}</Text> : null}
+
+      <HorizontalProductRail
+        title="Топ товарів"
+        products={featured}
+        onProductPress={handleProductPress}
+        onSeeAll={goCatalog}
+      />
+      <HorizontalProductRail
+        title="Акції"
+        products={onSale}
+        onProductPress={handleProductPress}
+        onSeeAll={goCatalog}
+      />
+      <HorizontalProductRail
+        title="Новинки"
+        products={newArrivals}
+        onProductPress={handleProductPress}
+        onSeeAll={goCatalog}
+      />
     </ScrollView>
   );
 }
@@ -128,20 +212,20 @@ export function HomeScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#f9fafb" },
   content: { paddingBottom: 96 },
-  banner: {
+  fallbackBanner: {
     margin: 16,
     padding: 24,
     borderRadius: 16,
     backgroundColor: BRAND_COLOR,
     alignItems: "center",
   },
-  bannerTitle: {
+  fallbackTitle: {
     fontSize: 32,
     fontWeight: "bold",
     color: "#fff",
     letterSpacing: 2,
   },
-  bannerSubtitle: {
+  fallbackSubtitle: {
     fontSize: 14,
     color: "rgba(255,255,255,0.9)",
     marginTop: 8,
@@ -151,6 +235,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     marginHorizontal: 16,
+    marginTop: 16,
     paddingHorizontal: 12,
     paddingVertical: 10,
     backgroundColor: "#fff",
@@ -188,26 +273,11 @@ const styles = StyleSheet.create({
     color: "#374151",
     textAlign: "center",
   },
-  section: { marginTop: 24, paddingHorizontal: 16 },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: "600",
-    color: "#111827",
-    marginBottom: 12,
-  },
-  emptyRecsPlaceholder: {
-    alignItems: "center",
-    paddingVertical: 32,
-    backgroundColor: "#fff",
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: "#e5e7eb",
-    gap: 8,
-  },
-  emptyRecsText: {
+  errorText: {
+    marginTop: 16,
+    marginHorizontal: 16,
     fontSize: 13,
-    color: "#9ca3af",
+    color: "#dc2626",
     textAlign: "center",
-    paddingHorizontal: 24,
   },
 });
