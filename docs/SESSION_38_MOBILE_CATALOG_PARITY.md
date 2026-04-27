@@ -16,6 +16,7 @@
 - Фільтри: bottom-sheet (мобільний) / sidebar (desktop) з пошуком, quality select, season select, country select, sort, price range, in-stock toggle, clear all
 
 Мобілка зараз показує:
+
 - Один товар на ширину екрану (вертикальний лист)
 - Тільки quality chip filter горизонтально (при тапі надувається на пів-екрану — UX bug)
 - Власна стилістика картки що не співпадає з вебом
