@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@ltex/db";
 import { mobileFavoriteSchema } from "@/lib/validations";
 import { requireMobileSession } from "@/lib/mobile-auth";
+import {
+  mapMobileProduct,
+  mobileProductInclude,
+} from "@/lib/mobile-product-shape";
 
 /**
  * Mobile wishlist/favorites. customerId is always derived from the bearer token.
@@ -17,15 +21,7 @@ export async function GET(request: NextRequest) {
 
   const favorites = await prisma.favorite.findMany({
     where: { customerId },
-    include: {
-      product: {
-        include: {
-          images: { take: 1, orderBy: { position: "asc" } },
-          prices: { where: { priceType: "wholesale" }, take: 1 },
-          _count: { select: { lots: true } },
-        },
-      },
-    },
+    include: { product: { include: mobileProductInclude } },
     orderBy: { createdAt: "desc" },
   });
 
@@ -34,17 +30,7 @@ export async function GET(request: NextRequest) {
       id: f.id,
       productId: f.productId,
       addedAt: f.createdAt,
-      product: {
-        id: f.product.id,
-        name: f.product.name,
-        slug: f.product.slug,
-        quality: f.product.quality,
-        priceUnit: f.product.priceUnit,
-        videoUrl: f.product.videoUrl,
-        imageUrl: f.product.images[0]?.url ?? null,
-        price: f.product.prices[0]?.amount ?? null,
-        lotCount: f.product._count.lots,
-      },
+      product: mapMobileProduct(f.product),
     })),
   });
 }

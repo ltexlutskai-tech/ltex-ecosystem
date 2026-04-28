@@ -168,8 +168,19 @@ export const categoriesApi = {
 };
 
 // Favorites
+export interface ServerFavorite {
+  id: string;
+  productId: string;
+  addedAt: string;
+  product: WebCatalogProduct;
+}
+
+export interface FavoritesListResponse {
+  favorites: ServerFavorite[];
+}
+
 export const favoritesApi = {
-  list: () => api("/mobile/favorites"),
+  list: () => api<FavoritesListResponse>("/mobile/favorites"),
   add: (productId: string) =>
     api("/mobile/favorites", {
       method: "POST",

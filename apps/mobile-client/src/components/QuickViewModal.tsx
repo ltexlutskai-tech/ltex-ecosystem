@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import {
   Modal,
   View,
@@ -9,6 +9,9 @@ import {
   StyleSheet,
   Pressable,
   Dimensions,
+  FlatList,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import type { WebCatalogProduct } from "@/lib/api";
@@ -21,12 +24,17 @@ interface QuickViewModalProps {
   onViewFull: (product: WebCatalogProduct) => void;
 }
 
+const SCREEN_WIDTH = Dimensions.get("window").width;
+const SCREEN_HEIGHT = Dimensions.get("window").height;
+const IMAGE_HEIGHT = (SCREEN_WIDTH * 3) / 4;
+
 export function QuickViewModal({
   product,
   onClose,
   onViewFull,
 }: QuickViewModalProps) {
   const { has, toggle } = useWishlist();
+  const [activeIndex, setActiveIndex] = useState(0);
 
   if (!product) return null;
 
@@ -35,7 +43,12 @@ export function QuickViewModal({
     (p) => p.priceType === "wholesale",
   );
   const akciyaPrice = product.prices.find((p) => p.priceType === "akciya");
-  const firstImage = product.images[0];
+  const images = product.images;
+
+  const onMomentumScrollEnd = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const idx = Math.round(e.nativeEvent.contentOffset.x / SCREEN_WIDTH);
+    if (idx !== activeIndex) setActiveIndex(idx);
+  };
 
   const qualityLabel = QUALITY_LABELS[product.quality] ?? product.quality;
   const seasonLabel =
@@ -68,11 +81,21 @@ export function QuickViewModal({
           <View style={styles.handle} />
 
           <View style={styles.imageBox}>
-            {firstImage ? (
-              <Image
-                source={{ uri: firstImage.url }}
-                style={styles.image}
-                resizeMode="cover"
+            {images.length > 0 ? (
+              <FlatList
+                data={images}
+                horizontal
+                pagingEnabled
+                showsHorizontalScrollIndicator={false}
+                onMomentumScrollEnd={onMomentumScrollEnd}
+                keyExtractor={(item, i) => `${item.url}-${i}`}
+                renderItem={({ item }) => (
+                  <Image
+                    source={{ uri: item.url }}
+                    style={styles.image}
+                    resizeMode="cover"
+                  />
+                )}
               />
             ) : (
               <View style={styles.imagePlaceholder}>
@@ -100,6 +123,17 @@ export function QuickViewModal({
                 color={inList ? "#dc2626" : "#fff"}
               />
             </TouchableOpacity>
+
+            {images.length > 1 ? (
+              <View style={styles.dotsContainer} pointerEvents="none">
+                {images.map((_, i) => (
+                  <View
+                    key={i}
+                    style={[styles.dot, i === activeIndex && styles.dotActive]}
+                  />
+                ))}
+              </View>
+            ) : null}
           </View>
 
           <ScrollView
@@ -163,8 +197,6 @@ export function QuickViewModal({
   );
 }
 
-const SCREEN_HEIGHT = Dimensions.get("window").height;
-
 const styles = StyleSheet.create({
   root: {
     flex: 1,
@@ -193,14 +225,14 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   imageBox: {
-    width: "100%",
-    aspectRatio: 4 / 3,
+    width: SCREEN_WIDTH,
+    height: IMAGE_HEIGHT,
     backgroundColor: "#f3f4f6",
     position: "relative",
   },
   image: {
-    width: "100%",
-    height: "100%",
+    width: SCREEN_WIDTH,
+    height: IMAGE_HEIGHT,
   },
   imagePlaceholder: {
     flex: 1,
@@ -235,6 +267,24 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     justifyContent: "center",
     alignItems: "center",
+  },
+  dotsContainer: {
+    position: "absolute",
+    bottom: 8,
+    left: 0,
+    right: 0,
+    flexDirection: "row",
+    justifyContent: "center",
+    gap: 6,
+  },
+  dot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: "rgba(255,255,255,0.5)",
+  },
+  dotActive: {
+    backgroundColor: "#fff",
   },
   content: {
     paddingHorizontal: 16,

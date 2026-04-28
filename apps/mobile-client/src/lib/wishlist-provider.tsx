@@ -83,6 +83,9 @@ export function WishlistProvider({ children }: { children: React.ReactNode }) {
   // every keystroke equivalent. We still call saveToStorage on every change.
   const itemsRef = useRef(items);
   itemsRef.current = items;
+  // Remember the customerId we last pulled+merged so re-renders don't
+  // re-trigger another sync.
+  const lastSyncedCustomerIdRef = useRef<string | null>(null);
 
   // Initial load from disk.
   useEffect(() => {
@@ -97,6 +100,31 @@ export function WishlistProvider({ children }: { children: React.ReactNode }) {
     if (isLoading) return;
     saveToStorage(items);
   }, [items, isLoading]);
+
+  // On login, pull the server wishlist and merge with the local one.
+  // Server-win on conflict (productId); local-only items are preserved.
+  useEffect(() => {
+    if (isLoading) return;
+    if (!customerId) {
+      lastSyncedCustomerIdRef.current = null;
+      return;
+    }
+    if (lastSyncedCustomerIdRef.current === customerId) return;
+
+    (async () => {
+      try {
+        const { favorites } = await favoritesApi.list();
+        const serverProducts = favorites.map((f) => snapshot(f.product));
+        const serverIds = new Set(serverProducts.map((p) => p.id));
+        const localOnly = itemsRef.current.filter((i) => !serverIds.has(i.id));
+        const merged = [...serverProducts, ...localOnly].slice(0, MAX_ITEMS);
+        setItems(merged);
+        lastSyncedCustomerIdRef.current = customerId;
+      } catch {
+        // Network/parse error — silent. Local wishlist is unchanged.
+      }
+    })();
+  }, [customerId, isLoading]);
 
   const has = useCallback(
     (productId: string) => items.some((p) => p.id === productId),
