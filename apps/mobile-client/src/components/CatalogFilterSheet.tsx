@@ -1,5 +1,6 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
+  Alert,
   Modal,
   View,
   Text,
@@ -10,6 +11,7 @@ import {
   StyleSheet,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { categoriesApi, type MobileCategory } from "@/lib/api";
 import {
   QUALITY_LEVELS,
   QUALITY_LABELS,
@@ -23,6 +25,8 @@ import {
 
 export interface CatalogFilters {
   q?: string;
+  category?: string;
+  subcategory?: string;
   quality?: string;
   season?: string;
   country?: string;
@@ -48,6 +52,8 @@ const EMPTY_FILTERS: CatalogFilters = {};
 export function countActiveFilters(filters: CatalogFilters): number {
   let n = 0;
   if (filters.q && filters.q.trim()) n++;
+  if (filters.category) n++;
+  if (filters.subcategory) n++;
   if (filters.quality) n++;
   if (filters.season) n++;
   if (filters.country) n++;
@@ -81,22 +87,75 @@ export function CatalogFilterSheet({
       : "",
   );
 
+  // Categories — fetched once per sheet open. Subcategories re-fetch when the
+  // selected top-level category changes.
+  const [categories, setCategories] = useState<MobileCategory[]>([]);
+  const [subcategories, setSubcategories] = useState<MobileCategory[]>([]);
+
+  // Snapshot of the initial filters on open so we can detect "dirty" state for
+  // the discard-warning Alert.
+  const initialSnapshotRef = useRef<string>("");
+  const initialPriceMinRef = useRef<string>("");
+  const initialPriceMaxRef = useRef<string>("");
+
   // Re-sync when sheet re-opens with new external filters
   useEffect(() => {
     if (visible) {
       setDraft(initialFilters);
-      setPriceMinText(
+      const minText =
         initialFilters.priceMin !== undefined
           ? String(initialFilters.priceMin)
-          : "",
-      );
-      setPriceMaxText(
+          : "";
+      const maxText =
         initialFilters.priceMax !== undefined
           ? String(initialFilters.priceMax)
-          : "",
-      );
+          : "";
+      setPriceMinText(minText);
+      setPriceMaxText(maxText);
+
+      initialSnapshotRef.current = JSON.stringify(initialFilters);
+      initialPriceMinRef.current = minText;
+      initialPriceMaxRef.current = maxText;
     }
   }, [visible, initialFilters]);
+
+  // Load top-level categories on first open. Cached after that for the lifetime
+  // of the screen — categories rarely change.
+  useEffect(() => {
+    if (!visible || categories.length > 0) return;
+    let cancelled = false;
+    categoriesApi
+      .list()
+      .then((res) => {
+        if (!cancelled) setCategories(res.categories);
+      })
+      .catch(() => {
+        // Soft fail — sheet still works without category picker.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [visible, categories.length]);
+
+  // Load subcategories whenever the top-level category changes.
+  useEffect(() => {
+    if (!draft.category) {
+      setSubcategories([]);
+      return;
+    }
+    let cancelled = false;
+    categoriesApi
+      .subcategories(draft.category)
+      .then((res) => {
+        if (!cancelled) setSubcategories(res.categories);
+      })
+      .catch(() => {
+        if (!cancelled) setSubcategories([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [draft.category]);
 
   const update = <K extends keyof CatalogFilters>(
     key: K,
@@ -115,6 +174,17 @@ export function CatalogFilterSheet({
     }));
   };
 
+  const selectCategory = (slug: string) => {
+    setDraft((prev) => {
+      // Toggle off → clear subcategory too
+      if (prev.category === slug) {
+        return { ...prev, category: undefined, subcategory: undefined };
+      }
+      // Switch top-level → reset subcategory so we don't keep a stale slug.
+      return { ...prev, category: slug, subcategory: undefined };
+    });
+  };
+
   const handleApply = () => {
     const finalFilters: CatalogFilters = { ...draft };
     const minNum = priceMinText.trim() ? Number(priceMinText) : NaN;
@@ -131,6 +201,24 @@ export function CatalogFilterSheet({
     setPriceMaxText("");
   };
 
+  const isDirty =
+    JSON.stringify(draft) !== initialSnapshotRef.current ||
+    priceMinText !== initialPriceMinRef.current ||
+    priceMaxText !== initialPriceMaxRef.current;
+
+  // Backdrop tap / Android back button. If the user has unsaved changes, ask
+  // before discarding.
+  const handleCloseAttempt = () => {
+    if (!isDirty) {
+      onClose();
+      return;
+    }
+    Alert.alert("Скасувати фільтри?", "Ваші зміни не будуть застосовані.", [
+      { text: "Назад", style: "cancel" },
+      { text: "Так, скасувати", style: "destructive", onPress: onClose },
+    ]);
+  };
+
   const hasAnyFilter =
     countActiveFilters({
       ...draft,
@@ -143,10 +231,10 @@ export function CatalogFilterSheet({
       visible={visible}
       animationType="slide"
       transparent
-      onRequestClose={onClose}
+      onRequestClose={handleCloseAttempt}
     >
-      {/* Backdrop — taps close the sheet */}
-      <Pressable style={styles.backdrop} onPress={onClose} />
+      {/* Backdrop — taps prompt for confirmation if dirty, otherwise close. */}
+      <Pressable style={styles.backdrop} onPress={handleCloseAttempt} />
 
       <View style={styles.sheet}>
         {/* Drag handle */}
@@ -156,7 +244,7 @@ export function CatalogFilterSheet({
         <View style={styles.header}>
           <Text style={styles.headerTitle}>Фільтри</Text>
           <TouchableOpacity
-            onPress={onClose}
+            onPress={handleCloseAttempt}
             hitSlop={12}
             accessibilityLabel="Закрити"
           >
@@ -182,6 +270,44 @@ export function CatalogFilterSheet({
               clearButtonMode="while-editing"
             />
           </View>
+
+          {/* Category */}
+          {categories.length > 0 && (
+            <View style={styles.field}>
+              <Text style={styles.label}>Категорія</Text>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.chipRow}
+              >
+                {categories.map((c) => (
+                  <Chip
+                    key={c.id}
+                    label={c.name}
+                    active={draft.category === c.slug}
+                    onPress={() => selectCategory(c.slug)}
+                  />
+                ))}
+              </ScrollView>
+            </View>
+          )}
+
+          {/* Subcategory — only when a top-level is picked and it has children */}
+          {draft.category && subcategories.length > 0 && (
+            <View style={styles.field}>
+              <Text style={styles.label}>Підкатегорія</Text>
+              <View style={styles.chipRowWrap}>
+                {subcategories.map((s) => (
+                  <Chip
+                    key={s.id}
+                    label={s.name}
+                    active={draft.subcategory === s.slug}
+                    onPress={() => toggle("subcategory", s.slug)}
+                  />
+                ))}
+              </View>
+            </View>
+          )}
 
           {/* Quality */}
           <View style={styles.field}>

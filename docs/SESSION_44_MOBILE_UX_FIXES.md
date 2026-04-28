@@ -115,9 +115,13 @@ API helper:
 ```typescript
 // apps/mobile-client/src/lib/api.ts
 export const categoriesApi = {
-  async list() { return apiFetch<Category[]>("/categories"); },
+  async list() {
+    return apiFetch<Category[]>("/categories");
+  },
   async subcategories(parentSlug: string) {
-    return apiFetch<Category[]>(`/categories?parent=${encodeURIComponent(parentSlug)}`);
+    return apiFetch<Category[]>(
+      `/categories?parent=${encodeURIComponent(parentSlug)}`,
+    );
   },
 };
 ```
@@ -162,6 +166,7 @@ const toggleLayout = () => {
 ```
 
 **`ProductCard.tsx`** — додати prop `layout?: "grid" | "list"` (default `"grid"`). У `list` mode:
+
 - horizontal flex direction
 - thumbnail зліва (~120x120)
 - texts/prices справа з `flex: 1`

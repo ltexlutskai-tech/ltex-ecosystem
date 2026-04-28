@@ -20,6 +20,19 @@ import {
   type CatalogFilters,
 } from "@/components/CatalogFilterSheet";
 
+// SecureStore is loaded lazily so the screen still renders on web (where the
+// module is unavailable). Same pattern as wishlist-provider.tsx.
+let SecureStore: typeof import("expo-secure-store") | null = null;
+try {
+  SecureStore = require("expo-secure-store");
+} catch {
+  // Web fallback
+}
+
+const LAYOUT_MODE_KEY = "mobile.catalogListMode";
+
+type LayoutMode = "grid" | "list";
+
 interface CatalogScreenProps {
   navigation: {
     navigate: (screen: string, params?: Record<string, unknown>) => void;
@@ -39,6 +52,8 @@ function buildQueryParams(
     limit: "20",
   };
   if (filters.q && filters.q.trim()) params.q = filters.q.trim();
+  if (filters.category) params.categorySlug = filters.category;
+  if (filters.subcategory) params.subcategorySlug = filters.subcategory;
   if (filters.quality) params.quality = filters.quality;
   if (filters.season) params.season = filters.season;
   if (filters.country) params.country = filters.country;
@@ -63,11 +78,34 @@ export function CatalogScreen({ navigation }: CatalogScreenProps) {
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [filterSheetOpen, setFilterSheetOpen] = useState(false);
+  const [layoutMode, setLayoutMode] = useState<LayoutMode>("grid");
   const {
     items: wishlistItems,
     has: isWishlisted,
     toggle: toggleWishlist,
   } = useWishlist();
+
+  // Load persisted layout preference once on mount.
+  useEffect(() => {
+    if (!SecureStore) return;
+    SecureStore.getItemAsync(LAYOUT_MODE_KEY)
+      .then((stored) => {
+        if (stored === "list" || stored === "grid") setLayoutMode(stored);
+      })
+      .catch(() => {
+        // Best-effort; default stays "grid".
+      });
+  }, []);
+
+  const toggleLayout = useCallback(() => {
+    setLayoutMode((prev) => {
+      const next: LayoutMode = prev === "grid" ? "list" : "grid";
+      if (SecureStore) {
+        SecureStore.setItemAsync(LAYOUT_MODE_KEY, next).catch(() => {});
+      }
+      return next;
+    });
+  }, []);
 
   const fetchProducts = useCallback(
     async (pageNum: number, isRefresh = false) => {
@@ -142,10 +180,11 @@ export function CatalogScreen({ navigation }: CatalogScreenProps) {
   }, []);
 
   const activeCount = countActiveFilters(filters);
+  const isGrid = layoutMode === "grid";
 
   return (
     <View style={styles.container}>
-      {/* Header: search input + filter button */}
+      {/* Header: search input + layout toggle + filter button */}
       <View style={styles.headerRow}>
         <View style={styles.searchInputWrap}>
           <Ionicons
@@ -165,7 +204,17 @@ export function CatalogScreen({ navigation }: CatalogScreenProps) {
           />
         </View>
         <TouchableOpacity
-          style={styles.filterButton}
+          style={styles.iconButton}
+          onPress={toggleLayout}
+          accessibilityLabel={
+            isGrid ? "Переключити на список" : "Переключити на сітку"
+          }
+          activeOpacity={0.7}
+        >
+          <Ionicons name={isGrid ? "list" : "grid"} size={22} color="#1f2937" />
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.iconButton}
           onPress={() => setFilterSheetOpen(true)}
           accessibilityLabel="Відкрити фільтри"
           activeOpacity={0.7}
@@ -189,17 +238,21 @@ export function CatalogScreen({ navigation }: CatalogScreenProps) {
       ) : (
         <FlatList
           data={products}
+          // FlatList caches by numColumns — changing it requires a key change
+          // so the internal renderer is re-created from scratch.
+          key={layoutMode}
           keyExtractor={(item) => item.id}
           extraData={wishlistItems}
-          numColumns={2}
-          columnWrapperStyle={styles.row}
+          numColumns={isGrid ? 2 : 1}
+          columnWrapperStyle={isGrid ? styles.row : undefined}
           renderItem={({ item }) => (
-            <View style={styles.cardWrapper}>
+            <View style={isGrid ? styles.cardWrapper : styles.cardWrapperList}>
               <ProductCard
                 product={item}
                 onPress={handleProductPress}
                 isWishlisted={isWishlisted(item.id)}
                 onWishlistToggle={toggleWishlist}
+                layout={layoutMode}
               />
             </View>
           )}
@@ -277,7 +330,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: "#1f2937",
   },
-  filterButton: {
+  iconButton: {
     width: 42,
     height: 42,
     borderRadius: 10,
@@ -311,6 +364,10 @@ const styles = StyleSheet.create({
   },
   cardWrapper: {
     flex: 1,
+  },
+  cardWrapperList: {
+    paddingHorizontal: 12,
+    marginBottom: 8,
   },
   listContent: {
     paddingTop: 4,

@@ -116,7 +116,7 @@ Follow-up (user-action): real Google reviews текст замість TODO, Blo
 | 57  | QuickView modal (long-press на ProductCard → modal з основною інфою без переходу)                       | worker        | 2-3 год   | PENDING                                                               |
 | 58  | Pull-on-login wishlist merge (server → local) + conversion з Favorite shape у `WebCatalogProduct`       | worker        | 1-2 год   | PENDING (post-S39)                                                    |
 | 59  | EAS build + Google Play / TestFlight upload (mobile native distribution)                                | user + worker | 1-2 тижні | PENDING (P3 #50, ще не розпочато)                                     |
-| 61  | **S43 DB ViewLog + recommendations engine** + 4-й rail "Рекомендоване для вас" на mobile Home           | worker        | —         | ✅ DONE (S43, `1431790`) — ⚠️ потребує `prisma migrate deploy` на DB |
+| 61  | **S43 DB ViewLog + recommendations engine** + 4-й rail "Рекомендоване для вас" на mobile Home           | worker        | —         | ✅ DONE (S43, `1431790`) — ⚠️ потребує `prisma migrate deploy` на DB  |
 | 62  | **S44 mobile UX fixes batch** — backdrop discard warning + subcategory filter + list mode toggle        | worker        | 1-2 год   | NEXT (post-S43)                                                       |
 | 63  | **S45 QuickView modal mobile** — long-press на ProductCard → modal preview                              | worker        | 2-3 год   | PENDING (post-S44)                                                    |
 

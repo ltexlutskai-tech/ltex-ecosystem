@@ -148,6 +148,25 @@ export const catalogApi = {
     }),
 };
 
+// Categories — used by the mobile filter sheet to drive the
+// category/subcategory pickers.
+export interface MobileCategory {
+  id: string;
+  slug: string;
+  name: string;
+  parentId: string | null;
+}
+
+export const categoriesApi = {
+  list: () =>
+    api<{ categories: MobileCategory[] }>("/categories", { skipAuth: true }),
+  subcategories: (parentSlug: string) =>
+    api<{ categories: MobileCategory[] }>("/categories", {
+      params: { parent: parentSlug },
+      skipAuth: true,
+    }),
+};
+
 // Favorites
 export const favoritesApi = {
   list: () => api("/mobile/favorites"),
