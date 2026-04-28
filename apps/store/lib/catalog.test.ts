@@ -86,6 +86,64 @@ describe("getCatalogProducts", () => {
     );
   });
 
+  it("parses comma-separated quality into IN filter", async () => {
+    mockFindMany.mockResolvedValue([]);
+    mockCount.mockResolvedValue(0);
+
+    await getCatalogProducts({ quality: "extra,cream" });
+
+    expect(mockFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          quality: { in: ["extra", "cream"] },
+        }),
+      }),
+    );
+  });
+
+  it("accepts quality as array directly", async () => {
+    mockFindMany.mockResolvedValue([]);
+    mockCount.mockResolvedValue(0);
+
+    await getCatalogProducts({ quality: ["extra", "first"] });
+
+    expect(mockFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          quality: { in: ["extra", "first"] },
+        }),
+      }),
+    );
+  });
+
+  it("parses comma-separated country into IN filter", async () => {
+    mockFindMany.mockResolvedValue([]);
+    mockCount.mockResolvedValue(0);
+
+    await getCatalogProducts({ country: "england,germany" });
+
+    expect(mockFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          country: { in: ["england", "germany"] },
+        }),
+      }),
+    );
+  });
+
+  it("collapses single-element comma list back to scalar (backward compat)", async () => {
+    mockFindMany.mockResolvedValue([]);
+    mockCount.mockResolvedValue(0);
+
+    await getCatalogProducts({ quality: "extra," });
+
+    expect(mockFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ quality: "extra" }),
+      }),
+    );
+  });
+
   it("applies season filter", async () => {
     mockFindMany.mockResolvedValue([]);
     mockCount.mockResolvedValue(0);

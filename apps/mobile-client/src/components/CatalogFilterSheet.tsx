@@ -11,7 +11,7 @@ import {
   StyleSheet,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { categoriesApi, type MobileCategory } from "@/lib/api";
+import { categoriesApi, catalogApi, type MobileCategory } from "@/lib/api";
 import {
   QUALITY_LEVELS,
   QUALITY_LABELS,
@@ -22,14 +22,15 @@ import {
   COUNTRY_SHORT,
   SORT_OPTIONS,
 } from "@/lib/labels";
+import { PriceRangeSlider } from "./PriceRangeSlider";
 
 export interface CatalogFilters {
   q?: string;
   category?: string;
   subcategory?: string;
-  quality?: string;
+  qualities?: string[];
   season?: string;
-  country?: string;
+  countries?: string[];
   sort?: string;
   priceMin?: number;
   priceMax?: number;
@@ -44,6 +45,7 @@ interface CatalogFilterSheetProps {
 }
 
 const EMPTY_FILTERS: CatalogFilters = {};
+const DEFAULT_PRICE_BOUNDS: [number, number] = [0, 100];
 
 /**
  * Counts how many "active" filters there are — useful for showing a small
@@ -54,9 +56,9 @@ export function countActiveFilters(filters: CatalogFilters): number {
   if (filters.q && filters.q.trim()) n++;
   if (filters.category) n++;
   if (filters.subcategory) n++;
-  if (filters.quality) n++;
+  if (filters.qualities && filters.qualities.length > 0) n++;
   if (filters.season) n++;
-  if (filters.country) n++;
+  if (filters.countries && filters.countries.length > 0) n++;
   if (filters.sort) n++;
   if (filters.priceMin !== undefined) n++;
   if (filters.priceMax !== undefined) n++;
@@ -76,48 +78,41 @@ export function CatalogFilterSheet({
 }: CatalogFilterSheetProps) {
   // Local draft state — values are only committed on "Застосувати"
   const [draft, setDraft] = useState<CatalogFilters>(initialFilters);
-  const [priceMinText, setPriceMinText] = useState<string>(
-    initialFilters.priceMin !== undefined
-      ? String(initialFilters.priceMin)
-      : "",
-  );
-  const [priceMaxText, setPriceMaxText] = useState<string>(
-    initialFilters.priceMax !== undefined
-      ? String(initialFilters.priceMax)
-      : "",
-  );
 
   // Categories — fetched once per sheet open. Subcategories re-fetch when the
   // selected top-level category changes.
   const [categories, setCategories] = useState<MobileCategory[]>([]);
   const [subcategories, setSubcategories] = useState<MobileCategory[]>([]);
 
+  // Price slider bounds (real DB min/max). Cached per session.
+  const [priceBounds, setPriceBounds] =
+    useState<[number, number]>(DEFAULT_PRICE_BOUNDS);
+  const priceBoundsLoadedRef = useRef(false);
+
+  const [priceValues, setPriceValues] = useState<[number, number]>([
+    initialFilters.priceMin ?? DEFAULT_PRICE_BOUNDS[0],
+    initialFilters.priceMax ?? DEFAULT_PRICE_BOUNDS[1],
+  ]);
+
   // Snapshot of the initial filters on open so we can detect "dirty" state for
   // the discard-warning Alert.
   const initialSnapshotRef = useRef<string>("");
-  const initialPriceMinRef = useRef<string>("");
-  const initialPriceMaxRef = useRef<string>("");
 
   // Re-sync when sheet re-opens with new external filters
   useEffect(() => {
     if (visible) {
       setDraft(initialFilters);
-      const minText =
-        initialFilters.priceMin !== undefined
-          ? String(initialFilters.priceMin)
-          : "";
-      const maxText =
-        initialFilters.priceMax !== undefined
-          ? String(initialFilters.priceMax)
-          : "";
-      setPriceMinText(minText);
-      setPriceMaxText(maxText);
-
-      initialSnapshotRef.current = JSON.stringify(initialFilters);
-      initialPriceMinRef.current = minText;
-      initialPriceMaxRef.current = maxText;
+      setPriceValues([
+        initialFilters.priceMin ?? priceBounds[0],
+        initialFilters.priceMax ?? priceBounds[1],
+      ]);
+      initialSnapshotRef.current = JSON.stringify({
+        ...initialFilters,
+        priceMin: initialFilters.priceMin,
+        priceMax: initialFilters.priceMax,
+      });
     }
-  }, [visible, initialFilters]);
+  }, [visible, initialFilters, priceBounds]);
 
   // Load top-level categories on first open. Cached after that for the lifetime
   // of the screen — categories rarely change.
@@ -136,6 +131,32 @@ export function CatalogFilterSheet({
       cancelled = true;
     };
   }, [visible, categories.length]);
+
+  // Load price bounds once per session.
+  useEffect(() => {
+    if (!visible || priceBoundsLoadedRef.current) return;
+    priceBoundsLoadedRef.current = true;
+    let cancelled = false;
+    catalogApi
+      .priceRange()
+      .then((res) => {
+        if (cancelled) return;
+        const next: [number, number] = [res.min, res.max];
+        setPriceBounds(next);
+        setPriceValues((prev) => {
+          const lo = initialFilters.priceMin ?? next[0];
+          const hi = initialFilters.priceMax ?? next[1];
+          if (prev[0] === lo && prev[1] === hi) return prev;
+          return [lo, hi];
+        });
+      })
+      .catch(() => {
+        // Keep defaults — slider still usable with 0..100.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [visible, initialFilters.priceMin, initialFilters.priceMax]);
 
   // Load subcategories whenever the top-level category changes.
   useEffect(() => {
@@ -174,6 +195,16 @@ export function CatalogFilterSheet({
     }));
   };
 
+  const toggleListValue = (key: "qualities" | "countries", value: string) => {
+    setDraft((prev) => {
+      const current = prev[key] ?? [];
+      const next = current.includes(value)
+        ? current.filter((v) => v !== value)
+        : [...current, value];
+      return { ...prev, [key]: next.length > 0 ? next : undefined };
+    });
+  };
+
   const selectCategory = (slug: string) => {
     setDraft((prev) => {
       // Toggle off → clear subcategory too
@@ -187,24 +218,27 @@ export function CatalogFilterSheet({
 
   const handleApply = () => {
     const finalFilters: CatalogFilters = { ...draft };
-    const minNum = priceMinText.trim() ? Number(priceMinText) : NaN;
-    const maxNum = priceMaxText.trim() ? Number(priceMaxText) : NaN;
-    finalFilters.priceMin = Number.isFinite(minNum) ? minNum : undefined;
-    finalFilters.priceMax = Number.isFinite(maxNum) ? maxNum : undefined;
+    // Only persist priceMin/Max when they differ from the real DB bounds —
+    // otherwise the URL stays clean.
+    finalFilters.priceMin =
+      priceValues[0] > priceBounds[0] ? priceValues[0] : undefined;
+    finalFilters.priceMax =
+      priceValues[1] < priceBounds[1] ? priceValues[1] : undefined;
     onApply(finalFilters);
     onClose();
   };
 
   const handleResetAll = () => {
     setDraft(EMPTY_FILTERS);
-    setPriceMinText("");
-    setPriceMaxText("");
+    setPriceValues(priceBounds);
   };
 
-  const isDirty =
-    JSON.stringify(draft) !== initialSnapshotRef.current ||
-    priceMinText !== initialPriceMinRef.current ||
-    priceMaxText !== initialPriceMaxRef.current;
+  const draftSnapshot = JSON.stringify({
+    ...draft,
+    priceMin: priceValues[0] > priceBounds[0] ? priceValues[0] : undefined,
+    priceMax: priceValues[1] < priceBounds[1] ? priceValues[1] : undefined,
+  });
+  const isDirty = draftSnapshot !== initialSnapshotRef.current;
 
   // Backdrop tap / Android back button. If the user has unsaved changes, ask
   // before discarding.
@@ -222,9 +256,12 @@ export function CatalogFilterSheet({
   const hasAnyFilter =
     countActiveFilters({
       ...draft,
-      priceMin: priceMinText.trim() ? Number(priceMinText) : undefined,
-      priceMax: priceMaxText.trim() ? Number(priceMaxText) : undefined,
+      priceMin: priceValues[0] > priceBounds[0] ? priceValues[0] : undefined,
+      priceMax: priceValues[1] < priceBounds[1] ? priceValues[1] : undefined,
     }) > 0;
+
+  const selectedQualities = draft.qualities ?? [];
+  const selectedCountries = draft.countries ?? [];
 
   return (
     <Modal
@@ -309,23 +346,30 @@ export function CatalogFilterSheet({
             </View>
           )}
 
-          {/* Quality */}
+          {/* Quality — multi-select */}
           <View style={styles.field}>
             <Text style={styles.label}>Якість</Text>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.chipRow}
-            >
-              {QUALITY_LEVELS.map((q) => (
-                <Chip
+            {QUALITY_LEVELS.map((q) => {
+              const checked = selectedQualities.includes(q);
+              return (
+                <Pressable
                   key={q}
-                  label={QUALITY_LABELS[q] ?? q}
-                  active={draft.quality === q}
-                  onPress={() => toggle("quality", q)}
-                />
-              ))}
-            </ScrollView>
+                  style={styles.checkboxRow}
+                  onPress={() => toggleListValue("qualities", q)}
+                  accessibilityRole="checkbox"
+                  accessibilityState={{ checked }}
+                >
+                  <Ionicons
+                    name={checked ? "checkbox" : "square-outline"}
+                    size={22}
+                    color={checked ? "#16a34a" : "#9ca3af"}
+                  />
+                  <Text style={styles.checkboxLabel}>
+                    {QUALITY_LABELS[q] ?? q}
+                  </Text>
+                </Pressable>
+              );
+            })}
           </View>
 
           {/* Season */}
@@ -343,19 +387,31 @@ export function CatalogFilterSheet({
             </View>
           </View>
 
-          {/* Country */}
+          {/* Country — multi-select */}
           <View style={styles.field}>
             <Text style={styles.label}>Країна</Text>
-            <View style={styles.chipRowWrap}>
-              {COUNTRIES.map((c) => (
-                <Chip
+            {COUNTRIES.map((c) => {
+              const checked = selectedCountries.includes(c);
+              return (
+                <Pressable
                   key={c}
-                  label={`${COUNTRY_SHORT[c] ?? c.toUpperCase()} ${COUNTRY_LABELS[c] ?? c}`}
-                  active={draft.country === c}
-                  onPress={() => toggle("country", c)}
-                />
-              ))}
-            </View>
+                  style={styles.checkboxRow}
+                  onPress={() => toggleListValue("countries", c)}
+                  accessibilityRole="checkbox"
+                  accessibilityState={{ checked }}
+                >
+                  <Ionicons
+                    name={checked ? "checkbox" : "square-outline"}
+                    size={22}
+                    color={checked ? "#16a34a" : "#9ca3af"}
+                  />
+                  <Text style={styles.checkboxLabel}>
+                    {COUNTRY_SHORT[c] ?? c.toUpperCase()}{" "}
+                    {COUNTRY_LABELS[c] ?? c}
+                  </Text>
+                </Pressable>
+              );
+            })}
           </View>
 
           {/* Sort */}
@@ -375,35 +431,20 @@ export function CatalogFilterSheet({
             </View>
           </View>
 
-          {/* Price range */}
+          {/* Price range slider */}
           <View style={styles.field}>
             <Text style={styles.label}>Ціна (EUR)</Text>
-            <View style={styles.priceRow}>
-              <TextInput
-                style={[styles.input, styles.priceInput]}
-                value={priceMinText}
-                onChangeText={setPriceMinText}
-                placeholder="від"
-                placeholderTextColor="#9ca3af"
-                keyboardType="numeric"
-                inputMode="decimal"
-              />
-              <Text style={styles.priceDash}>—</Text>
-              <TextInput
-                style={[styles.input, styles.priceInput]}
-                value={priceMaxText}
-                onChangeText={setPriceMaxText}
-                placeholder="до"
-                placeholderTextColor="#9ca3af"
-                keyboardType="numeric"
-                inputMode="decimal"
-              />
-            </View>
+            <PriceRangeSlider
+              min={priceBounds[0]}
+              max={priceBounds[1]}
+              values={priceValues}
+              onChange={setPriceValues}
+            />
           </View>
 
           {/* In stock */}
           <TouchableOpacity
-            style={styles.checkboxRow}
+            style={styles.inStockRow}
             onPress={() => update("inStock", !draft.inStock)}
             activeOpacity={0.7}
           >
@@ -556,19 +597,13 @@ const styles = StyleSheet.create({
   chipTextActive: {
     color: "#fff",
   },
-  priceRow: {
+  checkboxRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
+    gap: 10,
+    paddingVertical: 6,
   },
-  priceInput: {
-    flex: 1,
-  },
-  priceDash: {
-    color: "#9ca3af",
-    fontSize: 16,
-  },
-  checkboxRow: {
+  inStockRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 10,

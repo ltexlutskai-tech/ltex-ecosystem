@@ -10,9 +10,9 @@ interface CatalogParams {
   categoryId?: string;
   categoryIds?: string[];
   subcategorySlug?: string;
-  quality?: string;
+  quality?: string | string[];
   season?: string;
-  country?: string;
+  country?: string | string[];
   q?: string;
   sort?: string;
   priceMin?: number;
@@ -20,6 +20,29 @@ interface CatalogParams {
   inStockOnly?: boolean;
   page?: number;
   perPage?: number;
+}
+
+// Accepts a single value, an array, or a comma-separated string. Returns
+// undefined when nothing meaningful was provided so the caller can skip the
+// filter entirely.
+function parseMultiValue(
+  raw: string | string[] | undefined,
+): string | string[] | undefined {
+  if (raw === undefined) return undefined;
+  if (Array.isArray(raw)) {
+    const cleaned = raw.map((s) => s.trim()).filter(Boolean);
+    if (cleaned.length === 0) return undefined;
+    return cleaned.length === 1 ? cleaned[0] : cleaned;
+  }
+  if (raw.includes(",")) {
+    const parts = raw
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+    if (parts.length === 0) return undefined;
+    return parts.length === 1 ? parts[0] : parts;
+  }
+  return raw.trim() ? raw : undefined;
 }
 
 type ProductWithRelations = Product & {
@@ -69,9 +92,19 @@ export async function getCatalogProducts(
   } else if (categoryId) {
     where.categoryId = categoryId;
   }
-  if (quality) where.quality = quality;
+  const qualityValue = parseMultiValue(quality);
+  if (qualityValue) {
+    where.quality = Array.isArray(qualityValue)
+      ? { in: qualityValue }
+      : qualityValue;
+  }
   if (season) where.season = season;
-  if (country) where.country = country;
+  const countryValue = parseMultiValue(country);
+  if (countryValue) {
+    where.country = Array.isArray(countryValue)
+      ? { in: countryValue }
+      : countryValue;
+  }
 
   if (inStockOnly) {
     where.lots = { some: { status: { in: ["free", "on_sale"] } } };
@@ -180,20 +213,40 @@ async function fullTextSearch(
     queryParams.push(categoryId);
     paramIdx++;
   }
-  if (quality) {
-    filterConditions.push(`p.quality = $${paramIdx}`);
-    queryParams.push(quality);
-    paramIdx++;
+  const qualityValue = parseMultiValue(quality);
+  if (qualityValue) {
+    if (Array.isArray(qualityValue)) {
+      const placeholders = qualityValue
+        .map((_, i) => `$${paramIdx + i}`)
+        .join(", ");
+      filterConditions.push(`p.quality IN (${placeholders})`);
+      queryParams.push(...qualityValue);
+      paramIdx += qualityValue.length;
+    } else {
+      filterConditions.push(`p.quality = $${paramIdx}`);
+      queryParams.push(qualityValue);
+      paramIdx++;
+    }
   }
   if (season) {
     filterConditions.push(`p.season = $${paramIdx}`);
     queryParams.push(season);
     paramIdx++;
   }
-  if (country) {
-    filterConditions.push(`p.country = $${paramIdx}`);
-    queryParams.push(country);
-    paramIdx++;
+  const countryValue = parseMultiValue(country);
+  if (countryValue) {
+    if (Array.isArray(countryValue)) {
+      const placeholders = countryValue
+        .map((_, i) => `$${paramIdx + i}`)
+        .join(", ");
+      filterConditions.push(`p.country IN (${placeholders})`);
+      queryParams.push(...countryValue);
+      paramIdx += countryValue.length;
+    } else {
+      filterConditions.push(`p.country = $${paramIdx}`);
+      queryParams.push(countryValue);
+      paramIdx++;
+    }
   }
   if (priceMin !== undefined) {
     filterConditions.push(

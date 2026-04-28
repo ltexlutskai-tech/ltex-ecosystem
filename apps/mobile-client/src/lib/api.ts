@@ -146,6 +146,10 @@ export const catalogApi = {
       params: { q },
       skipAuth: true,
     }),
+  priceRange: () =>
+    api<{ min: number; max: number }>("/catalog/price-range", {
+      skipAuth: true,
+    }),
 };
 
 // Categories — used by the mobile filter sheet to drive the

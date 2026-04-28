@@ -55,9 +55,11 @@ function buildQueryParams(
   if (filters.q && filters.q.trim()) params.q = filters.q.trim();
   if (filters.category) params.categorySlug = filters.category;
   if (filters.subcategory) params.subcategorySlug = filters.subcategory;
-  if (filters.quality) params.quality = filters.quality;
+  if (filters.qualities && filters.qualities.length > 0)
+    params.quality = filters.qualities.join(",");
   if (filters.season) params.season = filters.season;
-  if (filters.country) params.country = filters.country;
+  if (filters.countries && filters.countries.length > 0)
+    params.country = filters.countries.join(",");
   if (filters.sort) params.sort = filters.sort;
   if (filters.priceMin !== undefined)
     params.priceMin = String(filters.priceMin);

@@ -1,18 +1,29 @@
 "use client";
 
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
-import { useCallback, useState, useEffect } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { QUALITY_LEVELS, QUALITY_LABELS } from "@ltex/shared";
 import { SEASONS, SEASON_LABELS } from "@ltex/shared";
 import { COUNTRIES, COUNTRY_LABELS } from "@ltex/shared";
 import { SearchAutocomplete } from "./search-autocomplete";
+import { PriceRangeSlider } from "./price-range-slider";
 import { getDictionary } from "@/lib/i18n";
 
 const dict = getDictionary();
 
+const DEFAULT_PRICE_RANGE: [number, number] = [0, 100];
+
 export interface SubcategoryOption {
   slug: string;
   name: string;
+}
+
+function parseList(raw: string | null): string[] {
+  if (!raw) return [];
+  return raw
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
 }
 
 export function CatalogFilters({
@@ -24,18 +35,59 @@ export function CatalogFilters({
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
-  const [priceMinValue, setPriceMinValue] = useState(
-    searchParams.get("priceMin") ?? "",
+  const selectedQualities = useMemo(
+    () => parseList(searchParams.get("quality")),
+    [searchParams],
   );
-  const [priceMaxValue, setPriceMaxValue] = useState(
-    searchParams.get("priceMax") ?? "",
+  const selectedCountries = useMemo(
+    () => parseList(searchParams.get("country")),
+    [searchParams],
   );
 
-  // Sync price inputs with URL on navigation
+  const [priceBounds, setPriceBounds] =
+    useState<[number, number]>(DEFAULT_PRICE_RANGE);
+  const urlPriceMin = searchParams.get("priceMin");
+  const urlPriceMax = searchParams.get("priceMax");
+  const [priceValue, setPriceValue] = useState<[number, number]>([
+    urlPriceMin ? Number(urlPriceMin) : DEFAULT_PRICE_RANGE[0],
+    urlPriceMax ? Number(urlPriceMax) : DEFAULT_PRICE_RANGE[1],
+  ]);
+
+  // Fetch real min/max once on mount. The endpoint is cached for 5min so we
+  // don't need to re-fetch on every navigation.
   useEffect(() => {
-    setPriceMinValue(searchParams.get("priceMin") ?? "");
-    setPriceMaxValue(searchParams.get("priceMax") ?? "");
-  }, [searchParams]);
+    let cancelled = false;
+    fetch("/api/catalog/price-range")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (cancelled || !data) return;
+        const next: [number, number] = [data.min, data.max];
+        setPriceBounds(next);
+        // Initialize slider to bounds when no URL value is set.
+        setPriceValue((prev) => {
+          const lo = urlPriceMin ? Number(urlPriceMin) : data.min;
+          const hi = urlPriceMax ? Number(urlPriceMax) : data.max;
+          if (prev[0] === lo && prev[1] === hi) return prev;
+          return [lo, hi];
+        });
+      })
+      .catch(() => {
+        // Network error → keep defaults.
+      });
+    return () => {
+      cancelled = true;
+    };
+    // Intentionally excluded url deps — bounds fetched once.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Sync slider when URL changes externally (e.g. clear all).
+  useEffect(() => {
+    setPriceValue([
+      urlPriceMin ? Number(urlPriceMin) : priceBounds[0],
+      urlPriceMax ? Number(urlPriceMax) : priceBounds[1],
+    ]);
+  }, [urlPriceMin, urlPriceMax, priceBounds]);
 
   const updateFilter = useCallback(
     (key: string, value: string) => {
@@ -51,27 +103,40 @@ export function CatalogFilters({
     [router, pathname, searchParams],
   );
 
-  const updatePriceRange = useCallback(() => {
-    const params = new URLSearchParams(searchParams.toString());
-    if (priceMinValue) {
-      params.set("priceMin", priceMinValue);
-    } else {
-      params.delete("priceMin");
-    }
-    if (priceMaxValue) {
-      params.set("priceMax", priceMaxValue);
-    } else {
-      params.delete("priceMax");
-    }
-    params.delete("page");
-    router.push(`${pathname}?${params.toString()}`);
-  }, [router, pathname, searchParams, priceMinValue, priceMaxValue]);
+  const toggleListValue = useCallback(
+    (key: "quality" | "country", value: string) => {
+      const current = parseList(searchParams.get(key));
+      const next = current.includes(value)
+        ? current.filter((x) => x !== value)
+        : [...current, value];
+      updateFilter(key, next.join(","));
+    },
+    [searchParams, updateFilter],
+  );
+
+  const commitPriceRange = useCallback(
+    ([lo, hi]: [number, number]) => {
+      const params = new URLSearchParams(searchParams.toString());
+      if (lo > priceBounds[0]) {
+        params.set("priceMin", String(lo));
+      } else {
+        params.delete("priceMin");
+      }
+      if (hi < priceBounds[1]) {
+        params.set("priceMax", String(hi));
+      } else {
+        params.delete("priceMax");
+      }
+      params.delete("page");
+      router.push(`${pathname}?${params.toString()}`);
+    },
+    [router, pathname, searchParams, priceBounds],
+  );
 
   const clearAll = useCallback(() => {
-    setPriceMinValue("");
-    setPriceMaxValue("");
+    setPriceValue(priceBounds);
     router.push(pathname);
-  }, [router, pathname]);
+  }, [router, pathname, priceBounds]);
 
   const hasFilters =
     searchParams.get("q") ||
@@ -100,22 +165,26 @@ export function CatalogFilters({
       </div>
 
       <div>
-        <label htmlFor="filter-quality" className={labelClass}>
-          {dict.catalog.qualityLabel}
-        </label>
-        <select
-          id="filter-quality"
-          value={searchParams.get("quality") ?? ""}
-          onChange={(e) => updateFilter("quality", e.target.value)}
-          className={selectClass}
-        >
-          <option value="">{dict.catalog.allQualities}</option>
-          {QUALITY_LEVELS.map((q) => (
-            <option key={q} value={q}>
-              {QUALITY_LABELS[q]}
-            </option>
-          ))}
-        </select>
+        <span className={labelClass}>{dict.catalog.qualityLabel}</span>
+        <div className="space-y-1.5">
+          {QUALITY_LEVELS.map((q) => {
+            const checked = selectedQualities.includes(q);
+            return (
+              <label
+                key={q}
+                className="flex cursor-pointer items-center gap-2 text-sm text-gray-700"
+              >
+                <input
+                  type="checkbox"
+                  checked={checked}
+                  onChange={() => toggleListValue("quality", q)}
+                  className="h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-1 focus:ring-green-500"
+                />
+                <span>{QUALITY_LABELS[q]}</span>
+              </label>
+            );
+          })}
+        </div>
       </div>
 
       <div>
@@ -138,22 +207,26 @@ export function CatalogFilters({
       </div>
 
       <div>
-        <label htmlFor="filter-country" className={labelClass}>
-          {dict.catalog.countryLabel}
-        </label>
-        <select
-          id="filter-country"
-          value={searchParams.get("country") ?? ""}
-          onChange={(e) => updateFilter("country", e.target.value)}
-          className={selectClass}
-        >
-          <option value="">{dict.catalog.allCountries}</option>
-          {COUNTRIES.map((c) => (
-            <option key={c} value={c}>
-              {COUNTRY_LABELS[c]}
-            </option>
-          ))}
-        </select>
+        <span className={labelClass}>{dict.catalog.countryLabel}</span>
+        <div className="space-y-1.5">
+          {COUNTRIES.map((c) => {
+            const checked = selectedCountries.includes(c);
+            return (
+              <label
+                key={c}
+                className="flex cursor-pointer items-center gap-2 text-sm text-gray-700"
+              >
+                <input
+                  type="checkbox"
+                  checked={checked}
+                  onChange={() => toggleListValue("country", c)}
+                  className="h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-1 focus:ring-green-500"
+                />
+                <span>{COUNTRY_LABELS[c]}</span>
+              </label>
+            );
+          })}
+        </div>
       </div>
 
       <div>
@@ -197,40 +270,14 @@ export function CatalogFilters({
       )}
 
       <div>
-        <label className={labelClass}>{dict.catalog.priceRange}</label>
-        <div className="flex items-center gap-2">
-          <input
-            type="number"
-            value={priceMinValue}
-            onChange={(e) => setPriceMinValue(e.target.value)}
-            placeholder={dict.catalog.priceFrom}
-            min="0"
-            step="0.5"
-            className="w-full rounded-md border px-2 py-1.5 text-sm"
-            onKeyDown={(e) => {
-              if (e.key === "Enter") updatePriceRange();
-            }}
-          />
-          <span className="text-gray-400">—</span>
-          <input
-            type="number"
-            value={priceMaxValue}
-            onChange={(e) => setPriceMaxValue(e.target.value)}
-            placeholder={dict.catalog.priceTo}
-            min="0"
-            step="0.5"
-            className="w-full rounded-md border px-2 py-1.5 text-sm"
-            onKeyDown={(e) => {
-              if (e.key === "Enter") updatePriceRange();
-            }}
-          />
-          <button
-            onClick={updatePriceRange}
-            className="rounded-md bg-green-600 px-3 py-1.5 text-sm text-white hover:bg-green-700"
-          >
-            OK
-          </button>
-        </div>
+        <span className={labelClass}>{dict.catalog.priceRange}</span>
+        <PriceRangeSlider
+          min={priceBounds[0]}
+          max={priceBounds[1]}
+          value={priceValue}
+          onChange={setPriceValue}
+          onCommit={commitPriceRange}
+        />
       </div>
 
       <label className="flex w-full cursor-pointer items-center gap-2 rounded-md border px-3 py-2 text-sm">
