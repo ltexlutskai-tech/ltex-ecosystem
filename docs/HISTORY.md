@@ -2152,3 +2152,87 @@ Supabase migration — skip (per Session 36 decision, Supabase DB = cold backup)
 ### Branches до cleanup
 
 - `claude/session-43-viewlog-recommendations` (merged у `1431790`)
+
+---
+
+## Session 44 — Mobile UX Fixes Batch
+
+**Date:** 2026-04-28
+**Branch (worker):** `claude/session-44-mobile-ux-fixes` → merged into `main` (`f784aff`)
+**Тип:** worker → orchestrator merge
+**Spec:** `docs/SESSION_44_MOBILE_UX_FIXES.md`
+
+### Що зроблено
+
+**1. Backdrop discard warning** (`CatalogFilterSheet.tsx`)
+
+- Snapshot initial filters на open (deep copy через `JSON.parse(JSON.stringify())`).
+- `isDirty` обчислюється через JSON compare на кожну зміну.
+- Backdrop tap, X button, Android back → якщо dirty показує `Alert.alert("Скасувати фільтри?", "Ваші зміни не будуть застосовані.")` з кнопками "Назад" / "Так, скасувати".
+- Apply закриває чисто (sheet.onApply → clean close, без warning).
+
+**2. Subcategory filter** (`CatalogFilterSheet.tsx` + новий `/api/categories`)
+
+- Новий endpoint `GET /api/categories` — top-level (parentId null), `?parent=<slug>` — children. 5min ISR (`revalidate = 300`).
+- 3 vitest cases: top-level, children for valid parent, empty array for unknown parent.
+- Mobile: 2 пікери (Категорія / Підкатегорія), subcategories ре-фетчаться при зміні top-level. Reset subcategorySlug при switch top-level. Conditional render — subcategory picker hidden коли parent не вибраний або без children.
+- API plumbing у `/api/catalog/route.ts`: приймає `categorySlug` (експандується до parent + children IDs через `prisma.category.findUnique`), `subcategorySlug` (precedence над categorySlug), `inStock=true` → `inStockOnly`. `getCatalogProducts` уже підтримував ці параметри з попередніх web-сесій — лиш plumbing.
+- 4 vitest cases на `/api/catalog` route (subcategory, category expansion, inStock, base case).
+
+**3. List/Grid toggle** (`CatalogScreen.tsx` + `ProductCard.tsx`)
+
+- Header-right `Pressable` з Ionicons (`grid` / `list` залежно від поточного режиму).
+- `layoutMode` persistent у `expo-secure-store` під ключем `mobile.catalogListMode` (load on mount, save on toggle).
+- `FlatList numColumns={layoutMode === "grid" ? 2 : 1}` + `key={layoutMode}` (RN потребує key change при numColumns зміні щоб уникнути crash).
+- `ProductCard` приймає `layout?: "grid" | "list"` (default `"grid"`). У `list` mode — horizontal flex, 120×120 thumbnail зліва, тексти + ціни справа з flex:1, додано `country` line.
+
+### Verification
+
+Worker:
+
+- `pnpm format:check` ✅
+- `pnpm -r typecheck` ✅
+- `pnpm -r test` ✅ 271 (264 baseline + 7 new: 4 catalog + 3 categories)
+
+Orchestrator merge:
+
+- Fast-forward `ccedf7d..f784aff` clean ✅
+- `pnpm format:check` clean ✅
+- `pnpm -r typecheck` 6/6 ✅
+- `pnpm -r test` 271/271 ✅
+- `git push origin main` ✅
+
+### Файли
+
+- `apps/mobile-client/src/components/CatalogFilterSheet.tsx` (+148/-?)
+- `apps/mobile-client/src/components/ProductCard.tsx` (+147/-? — layout="list" branch)
+- `apps/mobile-client/src/lib/api.ts` (+19 — `categoriesApi`)
+- `apps/mobile-client/src/screens/catalog/CatalogScreen.tsx` (+69/-?)
+- `apps/store/app/api/categories/route.ts` (new, 36 рядків)
+- `apps/store/app/api/categories/route.test.ts` (new, 80 рядків, 3 cases)
+- `apps/store/app/api/catalog/route.ts` (+21 — categorySlug expansion + inStock)
+- `apps/store/app/api/catalog/route.test.ts` (new, 91 рядків, 4 cases)
+- `docs/SESSION_44_MOBILE_UX_FIXES.md` (+9 worker reformat)
+- `docs/SESSION_TASKS.md` (+2 worker status update)
+
+10 files, +601/-21.
+
+### Deploy
+
+Без DB migration. Прямий шлях:
+
+```powershell
+git pull origin main
+.\scripts\deploy.ps1
+```
+
+### Out-of-scope (per spec)
+
+- Web catalog UX fixes (S31 grid/list уже на web)
+- Filter persistence між sessions (тільки layoutMode persistent)
+- Search facets (price slider, brand filter)
+- Empty subcategory UI state
+
+### Branches до cleanup
+
+- `claude/session-44-mobile-ux-fixes` (merged у `f784aff`)
