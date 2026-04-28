@@ -104,21 +104,21 @@ Follow-up (user-action): real Google reviews текст замість TODO, Blo
 
 Базується на CLAUDE.md "Mobile client" line + `docs/SESSION_38_MOBILE_CATALOG_PARITY.md` follow-up. S38 закрив catalog grid + filter sheet + heart UI; S39 — wishlist persistence + screen.
 
-| #   | Задача                                                                                                  | Тип           | Ефорт     | Статус                                   |
-| --- | ------------------------------------------------------------------------------------------------------- | ------------- | --------- | ---------------------------------------- |
-| 52  | Wishlist persistence (SecureStore + server mirror) + WishlistScreen list                                | worker        | —         | ✅ DONE (S39)                            |
-| 53  | S34 banners + 3 product rails на mobile HomeScreen + `/api/mobile/home`                                 | worker        | —         | ✅ DONE (S34)                            |
-| 54  | **S35 chat unread badge** на MoreTab + MoreScreen (polling `/api/mobile/chat/unread`)                   | worker        | —         | ✅ DONE (S35, `efb36f0`)                 |
+| #   | Задача                                                                                                  | Тип           | Ефорт     | Статус                                                                |
+| --- | ------------------------------------------------------------------------------------------------------- | ------------- | --------- | --------------------------------------------------------------------- |
+| 52  | Wishlist persistence (SecureStore + server mirror) + WishlistScreen list                                | worker        | —         | ✅ DONE (S39)                                                         |
+| 53  | S34 banners + 3 product rails на mobile HomeScreen + `/api/mobile/home`                                 | worker        | —         | ✅ DONE (S34)                                                         |
+| 54  | **S35 chat unread badge** на MoreTab + MoreScreen (polling `/api/mobile/chat/unread`)                   | worker        | —         | ✅ DONE (S35, `efb36f0`)                                              |
 | 55  | **S36 notifications screen** з backend list + mark read + deep links                                    | worker        | —         | ✅ DONE (S36, `ceeb8b9`) — ⚠️ потребує `prisma migrate deploy` на DBs |
-| 56  | S40 deploy.ps1 `pm2 stop` prelude — partial, гіпотеза A хибна (orphan cluster workers)                  | worker        | —         | ⚠️ PARTIAL (S40, see HISTORY)            |
-| 56b | S41 fork mode + `pm2 delete` + regex orphan sweep — partial, regex не match-ив PM2 ProcessContainerFork | worker        | —         | ⚠️ PARTIAL (S41, see HISTORY)            |
-| 56c | **S42 deploy `pm2 kill` prelude** — daemon-level signal вбиває усіх дітей PM2                           | orchestrator  | —         | ✅ DONE (`b3c9bae`, verified 2x deploys) |
-| 57  | QuickView modal (long-press на ProductCard → modal з основною інфою без переходу)                       | worker        | 2-3 год   | PENDING                                  |
-| 58  | Pull-on-login wishlist merge (server → local) + conversion з Favorite shape у `WebCatalogProduct`       | worker        | 1-2 год   | PENDING (post-S39)                       |
-| 59  | EAS build + Google Play / TestFlight upload (mobile native distribution)                                | user + worker | 1-2 тижні | PENDING (P3 #50, ще не розпочато)        |
-| 61  | **S43 DB ViewLog + recommendations engine** + 4-й rail "Рекомендоване для вас" на mobile Home          | worker        | 4-6 год   | NEXT — spec `SESSION_43_*.md`            |
-| 62  | **S44 mobile UX fixes batch** — backdrop discard warning + subcategory filter + list mode toggle        | worker        | 1-2 год   | PENDING (post-S43)                       |
-| 63  | **S45 QuickView modal mobile** — long-press на ProductCard → modal preview                              | worker        | 2-3 год   | PENDING (post-S44)                       |
+| 56  | S40 deploy.ps1 `pm2 stop` prelude — partial, гіпотеза A хибна (orphan cluster workers)                  | worker        | —         | ⚠️ PARTIAL (S40, see HISTORY)                                         |
+| 56b | S41 fork mode + `pm2 delete` + regex orphan sweep — partial, regex не match-ив PM2 ProcessContainerFork | worker        | —         | ⚠️ PARTIAL (S41, see HISTORY)                                         |
+| 56c | **S42 deploy `pm2 kill` prelude** — daemon-level signal вбиває усіх дітей PM2                           | orchestrator  | —         | ✅ DONE (`b3c9bae`, verified 2x deploys)                              |
+| 57  | QuickView modal (long-press на ProductCard → modal з основною інфою без переходу)                       | worker        | 2-3 год   | PENDING                                                               |
+| 58  | Pull-on-login wishlist merge (server → local) + conversion з Favorite shape у `WebCatalogProduct`       | worker        | 1-2 год   | PENDING (post-S39)                                                    |
+| 59  | EAS build + Google Play / TestFlight upload (mobile native distribution)                                | user + worker | 1-2 тижні | PENDING (P3 #50, ще не розпочато)                                     |
+| 61  | **S43 DB ViewLog + recommendations engine** + 4-й rail "Рекомендоване для вас" на mobile Home           | worker        | 4-6 год   | NEXT — spec `SESSION_43_*.md`                                         |
+| 62  | **S44 mobile UX fixes batch** — backdrop discard warning + subcategory filter + list mode toggle        | worker        | 1-2 год   | PENDING (post-S43)                                                    |
+| 63  | **S45 QuickView modal mobile** — long-press на ProductCard → modal preview                              | worker        | 2-3 год   | PENDING (post-S44)                                                    |
 
 **Hard rule для mobile:** не міняти `expo`/`react-native` версій без user-а. Усі pure JS зміни проходять через `pnpm format:check` + ручний QA на Expo Go (worker не може запустити, верифікація — статичні check + spec compliance).
 
@@ -126,17 +126,17 @@ Follow-up (user-action): real Google reviews текст замість TODO, Blo
 
 ## P3 — Tech debt (§8.1 аудиту)
 
-| #   | Задача                                                                   | Тип                 | Ефорт |
-| --- | ------------------------------------------------------------------------ | ------------------- | ----- |
-| 37  | E2E `continue-on-error: true` → `false` (gate merge)                     | orchestrator        | 5 хв  |
-| 38  | GitHub Protected Branches на `main`                                      | user + orchestrator | 10 хв |
-| 39  | Nodemailer retry/DLQ — зараз 10с timeout і втрата email                  | worker              | 1 год |
-| 40  | `revalidatePath("/")` cleanup — знайти надмірні invalidations            | worker              | 1 год |
-| 41  | Dependabot / Renovate config                                             | worker              | 30 хв |
-| 42  | `npm audit` + license check у CI                                         | worker              | 30 хв |
-| 43  | Bundle size baseline — `ANALYZE=true pnpm build` snapshot                | worker              | 20 хв |
+| #   | Задача                                                                                                                                                                                                                                                                           | Тип                   | Ефорт |
+| --- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------- | ----- |
+| 37  | E2E `continue-on-error: true` → `false` (gate merge)                                                                                                                                                                                                                             | orchestrator          | 5 хв  |
+| 38  | GitHub Protected Branches на `main`                                                                                                                                                                                                                                              | user + orchestrator   | 10 хв |
+| 39  | Nodemailer retry/DLQ — зараз 10с timeout і втрата email                                                                                                                                                                                                                          | worker                | 1 год |
+| 40  | `revalidatePath("/")` cleanup — знайти надмірні invalidations                                                                                                                                                                                                                    | worker                | 1 год |
+| 41  | Dependabot / Renovate config                                                                                                                                                                                                                                                     | worker                | 30 хв |
+| 42  | `npm audit` + license check у CI                                                                                                                                                                                                                                                 | worker                | 30 хв |
+| 43  | Bundle size baseline — `ANALYZE=true pnpm build` snapshot                                                                                                                                                                                                                        | worker                | 20 хв |
 | 60  | **Supabase DB decoupling** — задокументувати що Supabase DB = cold backup only (не active mirror), Auth+Storage лишаються. Видалити dual-write код якщо є. Migration `20260428_notifications` НЕ застосовано на Supabase — apply, тільки якщо колись активуємо Netlify fallback. | orchestrator + worker | 1 год |
-| 44  | Видалити deprecated `netlify.toml` + `outputFileTracingIncludes` залишки | worker              | 10 хв |
+| 44  | Видалити deprecated `netlify.toml` + `outputFileTracingIncludes` залишки                                                                                                                                                                                                         | worker                | 10 хв |
 
 ---
 

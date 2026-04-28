@@ -119,7 +119,9 @@ export async function POST(
   const session = tryMobileSession(request); // null якщо немає або invalid token
   const customerId = session?.customerId ?? null;
 
-  const body = await request.json().catch(() => ({}) as Record<string, unknown>);
+  const body = await request
+    .json()
+    .catch(() => ({}) as Record<string, unknown>);
   const source =
     typeof body.source === "string" &&
     ["home", "catalog", "search", "product_detail"].includes(body.source)
@@ -127,7 +129,9 @@ export async function POST(
       : "unknown";
 
   // Перевірка існування продукту — щоб FK не падав
-  const productExists = await prisma.product.count({ where: { id: productId } });
+  const productExists = await prisma.product.count({
+    where: { id: productId },
+  });
   if (!productExists) {
     return new NextResponse(null, { status: 204 }); // не leak що продукт зник
   }
@@ -185,7 +189,9 @@ export async function GET(request: NextRequest) {
         },
         take: 12,
         orderBy: { createdAt: "desc" },
-        include: { /* same as productInclude у /api/mobile/home */ },
+        include: {
+          /* same as productInclude у /api/mobile/home */
+        },
       });
     }
   }
@@ -196,13 +202,19 @@ export async function GET(request: NextRequest) {
       where: { inStock: true },
       take: 12,
       orderBy: { createdAt: "desc" },
-      include: { /* productInclude */ },
+      include: {
+        /* productInclude */
+      },
     });
   }
 
   return NextResponse.json(
     { products: recommendations.map(mapProduct) }, // reuse mapProduct з /api/mobile/home
-    { headers: { "Cache-Control": "public, s-maxage=60, stale-while-revalidate=120" } },
+    {
+      headers: {
+        "Cache-Control": "public, s-maxage=60, stale-while-revalidate=120",
+      },
+    },
   );
 }
 ```
@@ -230,7 +242,10 @@ export const recommendationsApi = {
 };
 
 export const productsApi = {
-  async trackView(productId: string, source: "home" | "catalog" | "search" | "product_detail") {
+  async trackView(
+    productId: string,
+    source: "home" | "catalog" | "search" | "product_detail",
+  ) {
     // Fire-and-forget — не await, не throw
     apiFetch(`/products/${productId}/view`, {
       method: "POST",

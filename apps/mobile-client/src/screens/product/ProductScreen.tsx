@@ -13,7 +13,12 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "@/lib/auth";
-import { catalogApi, favoritesApi, notificationsApi } from "@/lib/api";
+import {
+  catalogApi,
+  favoritesApi,
+  notificationsApi,
+  productsApi,
+} from "@/lib/api";
 import { ProductSkeleton } from "@/components/SkeletonLoader";
 
 const QUALITY_LABELS: Record<string, string> = {
@@ -114,6 +119,10 @@ export function ProductScreen({ route, navigation }: ProductScreenProps) {
   useEffect(() => {
     loadProduct();
   }, [productId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    productsApi.trackView(productId, "product_detail");
+  }, [productId]);
 
   async function loadProduct() {
     setLoading(true);

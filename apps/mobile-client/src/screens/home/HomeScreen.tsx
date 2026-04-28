@@ -13,6 +13,7 @@ import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import {
   homeApi,
+  recommendationsApi,
   type MobileHomeData,
   type WebCatalogProduct,
 } from "@/lib/api";
@@ -63,6 +64,9 @@ export function HomeScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<any>>();
   const [searchQuery, setSearchQuery] = useState("");
   const [data, setData] = useState<MobileHomeData | null>(null);
+  const [recommendations, setRecommendations] = useState<WebCatalogProduct[]>(
+    [],
+  );
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -70,8 +74,12 @@ export function HomeScreen() {
   const fetchHome = useCallback(async () => {
     try {
       setError(null);
-      const result = await homeApi.get();
-      setData(result);
+      const [homeResult, recsResult] = await Promise.all([
+        homeApi.get(),
+        recommendationsApi.get().catch(() => ({ products: [] })),
+      ]);
+      setData(homeResult);
+      setRecommendations(recsResult.products);
     } catch {
       setError("Не вдалося завантажити головну. Потягніть для оновлення.");
     }
@@ -199,6 +207,14 @@ export function HomeScreen() {
         onProductPress={handleProductPress}
         onSeeAll={goCatalog}
       />
+      {recommendations.length > 0 && (
+        <HorizontalProductRail
+          title="Рекомендоване для вас"
+          products={recommendations}
+          onProductPress={handleProductPress}
+          onSeeAll={goCatalog}
+        />
+      )}
       <HorizontalProductRail
         title="Новинки"
         products={newArrivals}

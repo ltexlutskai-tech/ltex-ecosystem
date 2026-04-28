@@ -282,3 +282,26 @@ export interface MobileHomeData {
 export const homeApi = {
   get: () => api<MobileHomeData>("/mobile/home", { skipAuth: true }),
 };
+
+// Recommendations (personalised when logged in, newest in-stock fallback otherwise)
+export const recommendationsApi = {
+  get: () => api<{ products: WebCatalogProduct[] }>("/mobile/recommendations"),
+};
+
+// Product view tracking (fire-and-forget — never throws or awaits the caller)
+export type ProductViewSource =
+  | "home"
+  | "catalog"
+  | "search"
+  | "product_detail";
+
+export const productsApi = {
+  trackView: (productId: string, source: ProductViewSource): void => {
+    api(`/mobile/products/${productId}/view`, {
+      method: "POST",
+      body: { source },
+    }).catch(() => {
+      // Tracking is best-effort; swallow any failure.
+    });
+  },
+};

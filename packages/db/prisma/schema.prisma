@@ -58,6 +58,7 @@ model Product {
   videoSubscriptions VideoSubscription[]
   favorites          Favorite[]
   featuredEntry      FeaturedProduct?
+  viewLog            ViewLog[]
 
   @@index([categoryId])
   @@index([quality])
@@ -158,6 +159,7 @@ model Customer {
   pushTokens         PushToken[]
   favorites          Favorite[]
   notifications      Notification[]
+  viewLog            ViewLog[]
 
   @@map("customers")
 }
@@ -453,4 +455,21 @@ model PromoStripe {
   updatedAt DateTime @updatedAt
 
   @@map("promo_stripe")
+}
+
+// ─── Product View Log (recommendations + analytics) ──────────────────────────
+
+model ViewLog {
+  id         String   @id @default(cuid())
+  customerId String?  @map("customer_id")
+  productId  String   @map("product_id")
+  source     String   @default("unknown") // "home" | "catalog" | "search" | "product_detail" | "unknown"
+  viewedAt   DateTime @default(now()) @map("viewed_at")
+
+  customer Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  product  Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([customerId, viewedAt])
+  @@index([productId, viewedAt])
+  @@map("view_log")
 }

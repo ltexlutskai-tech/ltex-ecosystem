@@ -1,55 +1,15 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@ltex/db";
+import {
+  mobileProductInclude,
+  mapMobileProduct,
+  type MobileRawProduct,
+} from "@/lib/mobile-product-shape";
 
 // Force dynamic rendering: this route hits the database, so it must not
 // prerender at build time (CI does not have DATABASE_URL). The 60s edge
 // cache is delivered via the Cache-Control header instead of Next.js ISR.
 export const dynamic = "force-dynamic";
-
-const productInclude = {
-  images: { take: 1, orderBy: { position: "asc" as const } },
-  prices: {
-    where: { priceType: { in: ["wholesale", "akciya"] as string[] } },
-    take: 5,
-  },
-  _count: { select: { lots: true } },
-};
-
-interface RawProduct {
-  id: string;
-  slug: string;
-  name: string;
-  quality: string;
-  season: string | null;
-  priceUnit: string;
-  country: string | null;
-  videoUrl: string | null;
-  createdAt: Date;
-  images: { url: string; alt: string | null }[];
-  prices: { amount: number; currency: string; priceType: string }[];
-  _count: { lots: number };
-}
-
-function mapProduct(p: RawProduct) {
-  return {
-    id: p.id,
-    slug: p.slug,
-    name: p.name,
-    quality: p.quality,
-    season: p.season ?? "",
-    priceUnit: p.priceUnit,
-    country: p.country ?? "",
-    videoUrl: p.videoUrl,
-    createdAt: p.createdAt.toISOString(),
-    images: p.images.map((img) => ({ url: img.url, alt: img.alt ?? "" })),
-    prices: p.prices.map((price) => ({
-      amount: Number(price.amount),
-      currency: price.currency,
-      priceType: price.priceType,
-    })),
-    _count: { lots: p._count.lots },
-  };
-}
 
 export async function GET() {
   const [banners, featuredEntries, onSaleProducts, newProducts] =
@@ -69,7 +29,7 @@ export async function GET() {
       prisma.featuredProduct.findMany({
         orderBy: { position: "asc" },
         take: 12,
-        include: { product: { include: productInclude } },
+        include: { product: { include: mobileProductInclude } },
       }),
       prisma.product.findMany({
         where: {
@@ -78,13 +38,13 @@ export async function GET() {
         },
         take: 12,
         orderBy: { createdAt: "desc" },
-        include: productInclude,
+        include: mobileProductInclude,
       }),
       prisma.product.findMany({
         where: { inStock: true },
         take: 12,
         orderBy: { createdAt: "desc" },
-        include: productInclude,
+        include: mobileProductInclude,
       }),
     ]);
 
@@ -93,12 +53,12 @@ export async function GET() {
       banners,
       featured: featuredEntries
         .filter(
-          (entry): entry is typeof entry & { product: RawProduct } =>
+          (entry): entry is typeof entry & { product: MobileRawProduct } =>
             entry.product != null,
         )
-        .map((entry) => mapProduct(entry.product)),
-      onSale: onSaleProducts.map(mapProduct),
-      newArrivals: newProducts.map(mapProduct),
+        .map((entry) => mapMobileProduct(entry.product)),
+      onSale: onSaleProducts.map(mapMobileProduct),
+      newArrivals: newProducts.map(mapMobileProduct),
     },
     {
       headers: {

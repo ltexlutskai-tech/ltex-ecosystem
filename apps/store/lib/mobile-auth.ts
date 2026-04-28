@@ -132,3 +132,12 @@ export function requireMobileSession(
   }
   return session;
 }
+
+/**
+ * Optional-auth helper: returns the session when a valid Bearer token is
+ * present, otherwise null. Used by endpoints that personalize for logged-in
+ * users but still serve anonymous traffic (e.g. view tracking, recommendations).
+ */
+export function tryMobileSession(request: NextRequest): MobileSession | null {
+  return verifyMobileToken(request);
+}
