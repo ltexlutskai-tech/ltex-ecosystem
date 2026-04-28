@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@ltex/db";
 
-export const revalidate = 60;
+// Force dynamic rendering: this route hits the database, so it must not
+// prerender at build time (CI does not have DATABASE_URL). The 60s edge
+// cache is delivered via the Cache-Control header instead of Next.js ISR.
+export const dynamic = "force-dynamic";
 
 const productInclude = {
   images: { take: 1, orderBy: { position: "asc" as const } },
@@ -85,15 +88,22 @@ export async function GET() {
       }),
     ]);
 
-  return NextResponse.json({
-    banners,
-    featured: featuredEntries
-      .filter(
-        (entry): entry is typeof entry & { product: RawProduct } =>
-          entry.product != null,
-      )
-      .map((entry) => mapProduct(entry.product)),
-    onSale: onSaleProducts.map(mapProduct),
-    newArrivals: newProducts.map(mapProduct),
-  });
+  return NextResponse.json(
+    {
+      banners,
+      featured: featuredEntries
+        .filter(
+          (entry): entry is typeof entry & { product: RawProduct } =>
+            entry.product != null,
+        )
+        .map((entry) => mapProduct(entry.product)),
+      onSale: onSaleProducts.map(mapProduct),
+      newArrivals: newProducts.map(mapProduct),
+    },
+    {
+      headers: {
+        "Cache-Control": "public, s-maxage=60, stale-while-revalidate=120",
+      },
+    },
+  );
 }
