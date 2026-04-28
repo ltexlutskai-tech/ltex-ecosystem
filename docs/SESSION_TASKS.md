@@ -110,7 +110,8 @@ Follow-up (user-action): real Google reviews текст замість TODO, Blo
 | 53  | S34 banners + 3 product rails на mobile HomeScreen + `/api/mobile/home`                           | worker        | —         | ✅ DONE (S34)                     |
 | 54  | **S35 chat unread badge** на MoreTab + MoreScreen (polling `/api/mobile/chat/unread`)             | worker        | 2-3 год   | NEXT — spec `SESSION_35_*.md`     |
 | 55  | **S36 notifications screen** з backend list + mark read + deep links                              | worker        | 3-4 год   | PENDING — spec `SESSION_36_*.md`  |
-| 56  | **S40 deploy.ps1 fix** — `pm2 stop ltex-store` перед build (avoid `.next/cache` lock)             | worker        | 30-60хв   | PENDING — spec `SESSION_40_*.md`  |
+| 56  | S40 deploy.ps1 `pm2 stop` prelude — partial, гіпотеза A хибна (orphan cluster workers)            | worker        | —         | ⚠️ PARTIAL (S40, see HISTORY)     |
+| 56b | **S41 deploy fix v3** — fork mode + `pm2 delete` + scoped orphan sweep                            | worker        | 30-45хв   | NEXT — spec `SESSION_41_*.md`     |
 | 57  | QuickView modal (long-press на ProductCard → modal з основною інфою без переходу)                 | worker        | 2-3 год   | PENDING                           |
 | 58  | Pull-on-login wishlist merge (server → local) + conversion з Favorite shape у `WebCatalogProduct` | worker        | 1-2 год   | PENDING (post-S39)                |
 | 59  | EAS build + Google Play / TestFlight upload (mobile native distribution)                          | user + worker | 1-2 тижні | PENDING (P3 #50, ще не розпочато) |

@@ -1740,3 +1740,51 @@ Worker запущений з `docs/SESSION_19_DECOMPOSITION.md` specom. Ство
 **Branch deleted:** `claude/session-34-mobile-banners-recommendations`.
 
 **Наступне:** S35 — chat unread badge на MoreTab.
+
+---
+
+## Session 40 Partial — Deploy Hang Fix Attempt #1 (`pm2 stop` prelude)
+
+**Дата:** 2026-04-28
+**Spec:** `docs/SESSION_40_DEPLOY_PM2_NODE_LOCK.md`
+**Результат:** Не вирішив проблему. Гіпотеза A (PM2 stop звільнить `.next/cache` lock) виявилась хибною.
+
+### Що зроблено
+
+- Worker додав prelude перед step [4/8] у `scripts/deploy.ps1`: якщо `pm2 jlist` показує ltex-store running → `pm2 stop ltex-store` + 2с sleep.
+- Commit `4f0d645 fix(deploy): stop ltex-store before build to avoid .next/cache lock (S40)` зmerged у main.
+- Header script-у оновлено: `# Workflow: pull -> install -> prisma -> (stop pm2 if running) -> build -> ...`
+
+### Чому не спрацювало
+
+User зробив deploy, build знову завис на `· serverActions`. Probe (`Get-Process node | Format-Table Id, StartTime`) виявив:
+
+```
+   Id StartTime           WorkingSet
+ 6432 27.04.2026 20:55:49  145158144   <-- orphan PM2 cluster worker з вчора
+11820 28.04.2026 12:29:36   81080320   <-- свіжий
+12600 28.04.2026 12:29:36   88494080   <-- свіжий
+16780 27.04.2026 20:55:48   54853632   <-- orphan PM2 cluster worker з вчора
+```
+
+`Get-ChildItem apps\store\.next` показав свіжі writes у `apps\store\.next\standalone\apps\store\.next\cache\fetch-cache\...` — orphan-и пишуть туди в runtime, що блокує `next build`.
+
+**Корінь проблеми (відкритий S41):** PM2 cluster mode на Windows. `pm2 stop` сигналить daemon `status=stopped`, але **cluster worker-и `node.exe` лишаються живі** як orphans. PM2 daemon бачить empty list → S40 prelude skip-ає stop при наступних deploy → orphan-и живуть кілька днів і блокують write-locks.
+
+### Workaround (поки S41 не зроблений)
+
+Між deploy-ями виконати:
+
+```powershell
+taskkill /F /IM node.exe
+```
+
+Це вб'є orphan-ів і будь-який інший PM2-managed node, після чого deploy.ps1 пройде (build 6.6с). Trade-off: вбиває telegram-bot/viber-bot також, тому це **не permanent рішення**.
+
+### Наступне — S41
+
+`docs/SESSION_41_DEPLOY_FORK_MODE.md` — комбінований fix:
+
+1. `ecosystem.config.js` cluster → fork mode (single deterministic node, PM2 SIGTERM-ить чисто)
+2. `deploy.ps1` `pm2 stop` → `pm2 delete` (видаляє з registry + SIGKILL workers)
+3. Targeted orphan sweep — `Get-CimInstance Win32_Process` фільтр на CommandLine match `apps[\\/]+store[\\/]+\.next[\\/]+standalone`, щоб не вбивати telegram/viber.
