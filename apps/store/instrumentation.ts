@@ -56,6 +56,12 @@ export function register() {
     );
   }
 
+  if (!process.env.CRON_SECRET || process.env.CRON_SECRET.length < 16) {
+    console.warn(
+      "[L-TEX] CRON_SECRET missing or too short — /api/cron/* endpoints disabled (always return 401).",
+    );
+  }
+
   const missing = optional.filter(({ key }) => !process.env[key]);
   if (missing.length > 0) {
     for (const { key, feature } of missing) {
