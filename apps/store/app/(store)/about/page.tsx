@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 import {
   APP_NAME,
   CONTACTS,
@@ -68,11 +69,14 @@ const faqJsonLd = {
   ],
 };
 
-export default function AboutPage() {
+export default async function AboutPage() {
+  const nonce = (await headers()).get("x-nonce") ?? undefined;
+
   return (
     <div className="container mx-auto px-4 py-6">
       <script
         type="application/ld+json"
+        nonce={nonce}
         dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }}
       />
       <Breadcrumbs items={[{ label: dict.nav.about }]} />

@@ -1,4 +1,5 @@
 import { unstable_cache } from "next/cache";
+import { headers } from "next/headers";
 import { Button } from "@ltex/ui";
 import { APP_NAME, MIN_ORDER_KG, CONTACTS } from "@ltex/shared";
 import { prisma } from "@ltex/db";
@@ -125,10 +126,13 @@ export default async function HomePage() {
       "Гуртовий продаж секонд хенду, стоку, іграшок та Bric-a-Brac від 10 кг",
   };
 
+  const nonce = (await headers()).get("x-nonce") ?? undefined;
+
   return (
     <>
       <script
         type="application/ld+json"
+        nonce={nonce}
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
 

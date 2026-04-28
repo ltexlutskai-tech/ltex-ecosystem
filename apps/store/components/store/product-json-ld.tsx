@@ -1,3 +1,5 @@
+import { headers } from "next/headers";
+
 interface Props {
   product: {
     name: string;
@@ -9,7 +11,9 @@ interface Props {
   currency?: string;
 }
 
-export function ProductJsonLd({ product, price, currency }: Props) {
+export async function ProductJsonLd({ product, price, currency }: Props) {
+  const nonce = (await headers()).get("x-nonce") ?? undefined;
+
   const jsonLd = {
     "@context": "https://schema.org",
     "@type": "Product",
@@ -29,6 +33,7 @@ export function ProductJsonLd({ product, price, currency }: Props) {
   return (
     <script
       type="application/ld+json"
+      nonce={nonce}
       dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
     />
   );

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { headers } from "next/headers";
 import { prisma } from "@ltex/db";
 import { notFound } from "next/navigation";
 import { getCatalogProducts } from "@/lib/catalog";
@@ -124,10 +125,13 @@ export default async function CategoryPage({ params, searchParams }: Props) {
     ],
   };
 
+  const nonce = (await headers()).get("x-nonce") ?? undefined;
+
   return (
     <div className="container mx-auto px-4 py-6">
       <script
         type="application/ld+json"
+        nonce={nonce}
         dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }}
       />
       <Breadcrumbs

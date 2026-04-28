@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 import { APP_NAME, CONTACTS } from "@ltex/shared";
 import "./globals.css";
 
@@ -70,11 +71,13 @@ const organizationJsonLd = {
   sameAs: [`https://t.me/${CONTACTS.telegram.replace("@", "")}`],
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const nonce = (await headers()).get("x-nonce") ?? undefined;
+
   return (
     <html lang="uk">
       <head>
@@ -85,6 +88,7 @@ export default function RootLayout({
       <body className="font-sans">
         <script
           type="application/ld+json"
+          nonce={nonce}
           dangerouslySetInnerHTML={{
             __html: JSON.stringify(organizationJsonLd),
           }}
