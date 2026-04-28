@@ -157,6 +157,7 @@ model Customer {
   videoSubscriptions VideoSubscription[]
   pushTokens         PushToken[]
   favorites          Favorite[]
+  notifications      Notification[]
 
   @@map("customers")
 }
@@ -304,6 +305,25 @@ model VideoSubscription {
 
   @@unique([customerId, productId])
   @@map("video_subscriptions")
+}
+
+// ─── In-app notifications feed (S36) ───────────────────────────────────────
+
+model Notification {
+  id         String    @id @default(cuid())
+  customerId String    @map("customer_id")
+  type       String    // "order_status" | "new_video" | "chat_message" | "system"
+  title      String
+  body       String
+  payload    Json?
+  readAt     DateTime? @map("read_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([customerId, createdAt])
+  @@index([customerId, readAt])
+  @@map("notifications")
 }
 
 // ─── Push Notification Tokens ───────────────────────────────────────────────

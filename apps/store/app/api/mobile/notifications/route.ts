@@ -9,8 +9,9 @@ import { requireMobileSession } from "@/lib/mobile-auth";
 /**
  * Mobile notifications & video subscriptions. customerId is always derived from the bearer token.
  *
- * GET    /api/mobile/notifications — list push tokens + video subscriptions
+ * GET    /api/mobile/notifications — list push tokens + video subscriptions + in-app notification feed
  * POST   /api/mobile/notifications { action: "register_token" | "subscribe_video", ... }
+ * PUT    /api/mobile/notifications { notificationId? } — mark single (by id) or all unread as read
  * DELETE /api/mobile/notifications { action: "unregister_token" | "unsubscribe_video", ... }
  */
 
@@ -19,7 +20,7 @@ export async function GET(request: NextRequest) {
   if (session instanceof NextResponse) return session;
   const { customerId } = session;
 
-  const [pushTokens, videoSubscriptions] = await Promise.all([
+  const [pushTokens, videoSubscriptions, notifications] = await Promise.all([
     prisma.pushToken.findMany({
       where: { customerId, active: true },
       select: { id: true, platform: true, createdAt: true },
@@ -33,6 +34,20 @@ export async function GET(request: NextRequest) {
       },
       orderBy: { createdAt: "desc" },
     }),
+    prisma.notification.findMany({
+      where: { customerId },
+      orderBy: { createdAt: "desc" },
+      take: 100,
+      select: {
+        id: true,
+        type: true,
+        title: true,
+        body: true,
+        payload: true,
+        readAt: true,
+        createdAt: true,
+      },
+    }),
   ]);
 
   return NextResponse.json({
@@ -45,6 +60,7 @@ export async function GET(request: NextRequest) {
       videoUrl: s.product.videoUrl,
       subscribedAt: s.createdAt,
     })),
+    notifications,
   });
 }
 
@@ -109,6 +125,32 @@ export async function POST(request: NextRequest) {
   }
 
   return NextResponse.json({ error: "Unknown action" }, { status: 400 });
+}
+
+export async function PUT(request: NextRequest) {
+  const session = requireMobileSession(request);
+  if (session instanceof NextResponse) return session;
+  const { customerId } = session;
+
+  const body = await request
+    .json()
+    .catch(() => ({}) as Record<string, unknown>);
+  const notificationId =
+    typeof body.notificationId === "string" ? body.notificationId : undefined;
+
+  if (notificationId) {
+    await prisma.notification.updateMany({
+      where: { id: notificationId, customerId, readAt: null },
+      data: { readAt: new Date() },
+    });
+  } else {
+    await prisma.notification.updateMany({
+      where: { customerId, readAt: null },
+      data: { readAt: new Date() },
+    });
+  }
+
+  return NextResponse.json({ success: true });
 }
 
 export async function DELETE(request: NextRequest) {

@@ -209,6 +209,35 @@ export const paymentsApi = {
 };
 
 // Notifications
+export type NotificationType =
+  | "order_status"
+  | "new_video"
+  | "chat_message"
+  | "system";
+
+export interface NotificationFeedItem {
+  id: string;
+  type: NotificationType | string;
+  title: string;
+  body: string;
+  payload: Record<string, unknown> | null;
+  readAt: string | null;
+  createdAt: string;
+}
+
+export interface NotificationsListResponse {
+  pushTokens: Array<{ id: string; platform: string; createdAt: string }>;
+  videoSubscriptions: Array<{
+    id: string;
+    productId: string;
+    productName: string;
+    productSlug: string;
+    videoUrl: string | null;
+    subscribedAt: string;
+  }>;
+  notifications: NotificationFeedItem[];
+}
+
 export const notificationsApi = {
   registerToken: (token: string, platform: string) =>
     api("/mobile/notifications", {
@@ -225,7 +254,12 @@ export const notificationsApi = {
       method: "DELETE",
       body: { action: "unsubscribe_video", productId },
     }),
-  list: () => api("/mobile/notifications"),
+  list: () => api<NotificationsListResponse>("/mobile/notifications"),
+  markAsRead: (notificationId?: string) =>
+    api<{ success: true }>("/mobile/notifications", {
+      method: "PUT",
+      body: notificationId ? { notificationId } : {},
+    }),
 };
 
 // Home (single round-trip for banners + featured + sale + new)
