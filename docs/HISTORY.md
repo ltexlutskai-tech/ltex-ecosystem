@@ -2546,3 +2546,63 @@ Worker tests 274 (271 + 3). Combined post-merge: 280/280 ✅ (255 store + 25 sha
 
 - `claude/session-48-web-recommendations-9cmJg` (merged)
 - `claude/session-49-viewlog-cleanup` (merged)
+
+---
+
+## Session 50 — CSP Hardening (script-src nonce)
+
+**Date:** 2026-04-28
+**Branch:** `claude/session-50-csp-hardening` → merged at `8e3252c`
+**Spec:** `docs/SESSION_50_CSP_HARDENING.md`
+
+### Що зроблено
+
+- Перенесено CSP з `next.config.js` (static header) у `apps/store/middleware.ts` (per-request з 16-байтним nonce через `crypto.getRandomValues` + `btoa`).
+- Production CSP: `script-src 'self' 'nonce-<random>' 'strict-dynamic'` — без `unsafe-inline` і `unsafe-eval`. Dev режим лишає `unsafe-eval` (HMR).
+- `style-src 'unsafe-inline'` лишилось — Tailwind compatibility, окрема велика задача.
+- `CSP_RELAXED=true` env override — emergency fallback.
+- Supabase auth flow на `/admin/*` збережено (`updateSession(request)` викликається першим, потім додаються CSP headers).
+- Inline JSON-LD у RSC: `app/layout.tsx`, home, catalog [categorySlug] + [subcategorySlug], contacts, about, `product-json-ld.tsx` — всі читають nonce через `headers()`. ContactsPage / AboutPage / ProductJsonLd зроблені async.
+- 3 нові unit тести (`apps/store/middleware.test.ts`): nonce у prod, CSP_RELAXED override, style-src compat. Тести через `vi.stubEnv` (NODE_ENV readonly у Node 20+).
+- `docs/CSP_HARDENING.md` — runbook (rollback + permanent-fix).
+
+### Verification
+
+Worker: format ✅, typecheck ✅, tests 283/283 (258 store + 25 shared, 280 baseline + 3 нові), `pnpm build` clean. Orchestrator merge clean fast-forward, всі CI checks green.
+
+### ⚠️ Post-deploy critical step
+
+Worker не може runtime-перевірити чи сайт не зламається. Після `deploy.ps1`:
+
+1. Відкрити https://new.ltex.com.ua/ у DevTools → Console.
+2. Перевірити що немає CSP violations.
+3. Якщо `Refused to execute inline script` errors — emergency rollback:
+   ```powershell
+   Add-Content apps\store\.env "`nCSP_RELAXED=true"
+   pm2 restart ltex-store --update-env
+   ```
+4. Якщо все ОК — лишаємо як є, repository стає захищенішим від XSS.
+
+### Файли (11 changed, +179/-22)
+
+- `apps/store/middleware.ts` (+51/-? — generateNonce + buildCsp + CSP wiring)
+- `apps/store/middleware.test.ts` (new, 42)
+- `apps/store/next.config.js` (-15 — removed static CSP block)
+- `apps/store/app/layout.tsx` (+6)
+- `apps/store/app/(store)/page.tsx` (+4)
+- `apps/store/app/(store)/catalog/[categorySlug]/page.tsx` (+4)
+- `apps/store/app/(store)/catalog/[categorySlug]/[subcategorySlug]/page.tsx` (+4)
+- `apps/store/app/(store)/contacts/page.tsx` (+6/-? — async + nonce)
+- `apps/store/app/(store)/about/page.tsx` (+6/-? — async + nonce)
+- `apps/store/components/store/product-json-ld.tsx` (+7)
+- `docs/CSP_HARDENING.md` (new, 56)
+
+### Out-of-scope
+
+- Style-src `'unsafe-inline'` removal (Tailwind injecting styles — окрема велика задача)
+- Mobile API CSP (Bearer auth, не браузерні — irrelevant)
+- SRI hashes / Trusted Types / CSP report-to
+
+### Branches до cleanup
+
+- `claude/session-50-csp-hardening` (merged у `8e3252c`)
