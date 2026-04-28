@@ -17,7 +17,7 @@ Contacts: Telegram @L_TEX, +380 67 671 05 15, +380 99 358 49 92, ltex.lutsk.ai@g
 - **Live production:** `https://new.ltex.com.ua` via Cloudflare Tunnel `ltex-prod` (UUID `1b604cd0-1beb-4b0a-897f-93d67e58357f`), Windows Server 2022 (i5-9600K, 32GB, 107 Mbit symmetric)
 - **DNS:** `ltex.com.ua` на Cloudflare NS (`fiona` + `trey`). Hostiq hosting email/cPanel (non-web records як DNS-only).
 - **Netlify** `stalwart-dango-04a9b9.netlify.app` deprecated але живий (fallback).
-- **DB:** Supabase PostgreSQL (Frankfurt) AND local PostgreSQL 16 на `E:\PostgreSQL\16` — обидві синхронізовані (805 products, 725 lots, 49 categories). Next.js читає локально.
+- **DB:** local PostgreSQL 16 на `E:\PostgreSQL\16` — primary (805 products, 725 lots, 49 categories). Next.js читає звідти у runtime (`apps/store/.env` → `localhost:5432`). Supabase PostgreSQL (Frankfurt) — cold backup mirror, **не active** (оновлюється тільки при exporting changes; migration `20260428_notifications` apply-ється на ньому тільки якщо активуємо Netlify fallback). Supabase Auth (admin login) + Supabase Storage (banners, product images, відео) **лишаються активні**.
 - **Auto-start:** cloudflared + PostgreSQL як Windows services; PM2 через Scheduled Task "PM2 Resurrect" (60s delay).
 - **Monitoring:** UptimeRobot Free, 3 monitors (`/`, `/catalog`, `/admin/login`), 5-min interval.
 - **Backups:** Daily `pg_dump -Fc` at 03:00 → `E:\ltex-backups\` (14-day retention).

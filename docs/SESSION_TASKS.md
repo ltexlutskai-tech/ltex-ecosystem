@@ -132,6 +132,7 @@ Follow-up (user-action): real Google reviews текст замість TODO, Blo
 | 41  | Dependabot / Renovate config                                             | worker              | 30 хв |
 | 42  | `npm audit` + license check у CI                                         | worker              | 30 хв |
 | 43  | Bundle size baseline — `ANALYZE=true pnpm build` snapshot                | worker              | 20 хв |
+| 60  | **Supabase DB decoupling** — задокументувати що Supabase DB = cold backup only (не active mirror), Auth+Storage лишаються. Видалити dual-write код якщо є. Migration `20260428_notifications` НЕ застосовано на Supabase — apply, тільки якщо колись активуємо Netlify fallback. | orchestrator + worker | 1 год |
 | 44  | Видалити deprecated `netlify.toml` + `outputFileTracingIncludes` залишки | worker              | 10 хв |
 
 ---
