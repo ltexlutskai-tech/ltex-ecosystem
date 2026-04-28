@@ -1788,3 +1788,69 @@ taskkill /F /IM node.exe
 1. `ecosystem.config.js` cluster → fork mode (single deterministic node, PM2 SIGTERM-ить чисто)
 2. `deploy.ps1` `pm2 stop` → `pm2 delete` (видаляє з registry + SIGKILL workers)
 3. Targeted orphan sweep — `Get-CimInstance Win32_Process` фільтр на CommandLine match `apps[\\/]+store[\\/]+\.next[\\/]+standalone`, щоб не вбивати telegram/viber.
+
+---
+
+## Session 41 + 42 — Deploy Hang Fully Resolved (2026-04-28)
+
+**Spec-и:** `docs/SESSION_41_DEPLOY_FORK_MODE.md` (S41), inline orchestrator-direct fix (S42).
+
+### S41 (`fffe4c8` + follow-up `22f93ba`)
+
+Worker додав:
+
+- `ecosystem.config.js`: `exec_mode: "fork"` (з'ясувалось що оригінал не мав `exec_mode` взагалі — PM2 default з `instances:1` на Windows розгорнув cluster mode що і дало orphans).
+- `deploy.ps1` prelude: `pm2 delete ltex-store` + Targeted orphan sweep regex.
+- Orchestrator follow-up `22f93ba`: aligned `ecosystem.config.js` з server-actuals (cwd nested into `.next/standalone/apps/store`, HOSTNAME `::`, plus restart_delay/min_uptime/max_restarts). Server мав drift декілька днів і блокував `git pull origin main` під час deploy.
+
+**Результат:** PM2 mode → fork, `pm2 list` показує fork. Перший deploy пройшов 6.1с.
+
+**Але** другий поспіль deploy завис знову. Probe (`pm2 list` + `Get-CimInstance Win32_Process node.exe`) показав:
+
+- PM2 fork worker (PID 13596) живий, online, fork mode як заявлено.
+- CommandLine worker-а: `node ... pm2/lib/ProcessContainerFork.js` — без жодної згадки про apps/store/.next/standalone.
+- Тому orphan sweep regex `apps[\\/]+store[\\/]+\.next[\\/]+standalone` НЕ міг знайти worker. PM2 ховає шлях до server.js у env vars (`pm_exec_path`), не в argv.
+- Окрім того `pm2 jlist` parsing race міг повертати банер замість JSON масиву → silent skip prelude.
+
+Worker (fork mode) тримав file handle на standalone tree, новий next build блокувався на NTFS-rewrite.
+
+### S42 (`b3c9bae`) — фінальний fix
+
+Замінив весь S41 prelude block (jlist parse + pm2 delete + orphan sweep) на одну команду:
+
+```powershell
+Write-Host "  Killing PM2 daemon before build (releases ltex-store file locks)..." -ForegroundColor Yellow
+pm2 kill > $null 2>&1
+Start-Sleep -Seconds 2
+```
+
+**Чому працює:** `pm2 kill` сигналить **PM2 daemon** SIGTERM. Daemon — батько усіх PM2-managed процесів. Killing daemon → ОС автоматично signal-ить дітей (cluster workers, fork workers, ProcessContainerFork.js). Без guards, без regex magic, без race conditions.
+
+Step [8/8] потім робить `pm2 ping` — піднімає daemon заново. Plus `pm2 start ecosystem.config.js --update-env` — створює свіжий ltex-store з порожньої registry.
+
+**Cold-boot path безпечний:** `pm2 kill` коли daemon мертвий — no-op exit 0.
+
+**Verification на сервері (2026-04-28):**
+
+- Deploy 1: build 5.5с, fork mode online, prelude вивів `Killing PM2 daemon...`
+- Deploy 2 (раніше регулярно вісне): build 6.0с, той самий prelude, **без зависання**
+
+### Висновки lineage S37→S42
+
+- **S37 Tee-Object** — хибна теорія про PowerShell buffering.
+- **S39 cmd /c** — інша хибна теорія про buffering, ще й нова bug у script-у.
+- **S40 pm2 stop** — стопав daemon-statesheet, не вбивав cluster workers.
+- **S41 pm2 delete + regex sweep** — regex не міг match-ити PM2 worker CommandLine.
+- **S42 pm2 kill** — daemon-level signal, працює бо використовує ОС-рівневу parent-child relationship замість application-level enumeration.
+
+**Урок:** не enumerate-ти процеси PM2 через application API на Windows — використовувати daemon kill. PM2 на Windows у cluster mode мав bug з orphan workers роками (видно у GitHub issues), у fork mode проблем менше але file handle leak все одно є.
+
+### Branches до cleanup
+
+- `claude/session-40-deploy-pm2-lock-FQB6U` (merged у `4f0d645`)
+- `claude/fix-pm2-orphan-workers-TPD5E` (merged у `fffe4c8`)
+- Старі: `claude/session-27-deploy-hardening-QoGGQ`, `claude/session-28-product-card-quickfixes-8sWAr`, `claude/session-30-filters-left-sidebar-tvnWf`, `claude/session-31-grid-list-layout-SiZwf`, `claude/session-32-wishlist-mobile-visibility`, `claude/session-33-mobile-home-O1K7Q`, `claude/session-37-deploy-hardening-d3f2n`, `claude/session-38-mobile-catalog-parity`, `claude/setup-orchestrator-role-ORmet`, `claude/remove-compare-feature-LqTOE` — усі merged, потрібен GitHub UI delete (orchestrator не має force-delete permission).
+
+### CI red since `de04d93`
+
+Окрема проблема, не пов'язана з deploy hang (CI runs на ubuntu, deploy на Windows). Потребує окремого розбору на GitHub Actions logs — наступна orchestrator-задача.
