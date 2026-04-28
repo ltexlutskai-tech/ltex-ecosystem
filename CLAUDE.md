@@ -23,7 +23,7 @@ Contacts: Telegram @L_TEX, +380 67 671 05 15, +380 99 358 49 92, ltex.lutsk.ai@g
 - **Backups:** Daily `pg_dump -Fc` at 03:00 → `E:\ltex-backups\` (14-day retention).
 - **CI green:** 243 unit + 36 E2E tests, TypeScript strict, 0 `any`.
 - **Security:** Sessions 16-17 закрили 4 CRITICAL + 3 HIGH вразливості перед self-hosted deploy.
-- **Mobile client (Expo SDK 52):** working — Home з banners + 3 product rails (S34), 4-tab nav, Catalog 2-column grid + bottom-sheet filter (S38), wishlist persistence + saved-products screen (S39), points to `https://new.ltex.com.ua/api`. QuickView / push notifications screen / chat unread badge — pending. **Native APK не distributed** — користувачі поки скачують лише PWA з веб-сайту.
+- **Mobile client (Expo SDK 52):** working — Home з banners + 3 product rails (S34), 4-tab nav, Catalog 2-column grid + bottom-sheet filter (S38), wishlist persistence + saved-products screen (S39), chat unread badge на MoreTab + MoreScreen (S35), points to `https://new.ltex.com.ua/api`. QuickView / notifications screen — pending. **Native APK не distributed** — користувачі поки скачують лише PWA з веб-сайту.
 
 ### Session log (recent)
 
@@ -35,6 +35,7 @@ Contacts: Telegram @L_TEX, +380 67 671 05 15, +380 99 358 49 92, ltex.lutsk.ai@g
 - **S39** deploy step 4 fix + wishlist persistence. **Both prior buffering theses (S37 Tee-Object, "real fix is cmd /c") були хибними** — direct `pnpm --filter @ltex/store run build` працює як треба. Не додавати редирект у крок [4/8] жодного типу. Mobile wishlist: SecureStore-backed (100-item cap), fire-and-forget mirror у `/api/mobile/favorites` коли logged in, WishlistScreen — 2-col grid.
 - **S34** mobile home banners + 3 product rails (Топ / Акції / Новинки). Single-shot `/api/mobile/home` endpoint (60s ISR), pure-RN BannerCarousel (rgba overlay, no expo-linear-gradient dep) + HorizontalProductRail. Endpoint live, банери на сайті — pending admin upload (P0 #4).
 - **Регресія S34→S42:** другий поспіль deploy висне на [4/8] бо PM2 worker (cluster АБО fork) тримає file handle на `apps/store/.next/standalone/...`. **Закрито у S42** через `pm2 kill` prelude (daemon-level signal вбиває всіх дітей). S40/S41 спроби (`pm2 stop`, `pm2 delete`+regex) не спрацювали — application-level API на Windows нестабільне. Spec у `docs/SESSION_40_DEPLOY_PM2_NODE_LOCK.md` (S40) + `docs/SESSION_41_DEPLOY_FORK_MODE.md` (S41).
+- **S35** mobile chat unread badge — light `/api/mobile/chat/unread` endpoint (count manager+unread+customerId), `<ChatUnreadProvider>` polling 30с only when logged-in + AppState foreground refresh, `tabBarBadge` на MoreTab (#dc2626, "9+" cap) + бейдж біля "Чат з менеджером" на MoreScreen, optimistic clear у ChatScreen (initial fetch + SSE manager message). 8 files, +243/-6, tests 249/249.
 
 **IMPORTANT FOR NEW SESSIONS:** Do NOT re-audit or re-merge branches. Проект повністю функціональний. Читай `docs/HISTORY.md` для деталей попередніх сесій.
 

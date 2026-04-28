@@ -1854,3 +1854,85 @@ Step [8/8] потім робить `pm2 ping` — піднімає daemon зан
 ### CI red since `de04d93`
 
 Окрема проблема, не пов'язана з deploy hang (CI runs на ubuntu, deploy на Windows). Потребує окремого розбору на GitHub Actions logs — наступна orchestrator-задача.
+
+---
+
+## Session 35 — Mobile Chat Unread Badge
+
+**Date:** 2026-04-28
+**Branch (worker):** `claude/session-35-chat-unread-badge-rmDSc` → merged into `main` (`efb36f0`)
+**Тип:** worker → orchestrator merge
+**Spec:** `docs/SESSION_35_CHAT_UNREAD_BADGE.md`
+
+### Проблема
+
+Mobile users пропускали відповіді менеджера в Chat: жодного індикатора у 4-tab nav (Home / Search / Cart / More) і на MoreScreen ("Чат з менеджером" — без бейджа). Користувач відкривав вкладку лише за випадком, втрачаючи leads.
+
+### Що зроблено
+
+**Backend** (`apps/store/app/api/mobile/chat/unread/route.ts`)
+
+- Light GET endpoint, повертає `{ count }`. Bearer auth через `requireMobileSession`.
+- Filter: `chatMessage.count({ where: { customerId, sender: "manager", isRead: false } })`. Worker зауважив що в схемі немає `chatLastReadId` у `Customer`, тому використано тіж критерії що й існуючий `route.ts:35-37`.
+- 3 vitest cases (`route.test.ts`): `count: 0` empty, фільтр manager+isRead=false+customerId, 401 без auth.
+
+**Mobile state** (`apps/mobile-client/src/lib/chat-unread.ts` + `chat-unread-provider.tsx`)
+
+- Split context/provider за паттерном `wishlist`. Polling 30с тільки коли logged-in (`customerId` truthy).
+- `AppState "active"` listener — fresh fetch при foreground (без 30с очікування).
+- `markRead()` — instant local zero, якщо ChatScreen відкривається або SSE приносить manager message.
+- Network/auth errors silent-fall — last known count збережений.
+
+**Tab badge** (`AppNavigator.tsx:316-369`)
+
+- `tabBarBadge: moreBadge` на MoreTab, бекграунд `#dc2626`, white text, `9+` cap.
+- `<ChatUnreadProvider>` обгортає `<NavigationContainer>` під `WishlistProvider`.
+
+**MoreScreen** (`screens/more/MoreScreen.tsx`) — червоний бейдж біля рядка "Чат з менеджером" (теж `9+` cap).
+
+**ChatScreen integration** (`screens/chat/ChatScreen.tsx`)
+
+- `clearUnreadBadge()` після initial fetch (`!loadCursor`) — оптимістично гасить навіть якщо backend race-нув.
+- На кожне SSE manager message — `clearUnreadBadge()` + `chatApi.markRead(msg.id)`.
+
+### Verification
+
+Worker pre-push:
+
+- `pnpm format:check` ✅
+- `pnpm -r typecheck` 6/6 packages ✅ (mobile-client skipped як завжди)
+- `pnpm -r test` 249 passed (246 baseline + 3 new) ✅
+- `deploy.ps1 ASCII-only` ✅
+
+Orchestrator merge verification:
+
+- Fast-forward `2100c28..efb36f0` clean ✅
+- `pnpm format:check` clean ✅
+- `pnpm -r typecheck` 6/6 ✅
+- `pnpm -r test` 249/249 ✅
+- `git push origin main` ✅
+- Branch delete via API → 403 (cleanup пізніше через GitHub UI)
+
+### Файли
+
+- `apps/store/app/api/mobile/chat/unread/route.ts` (new, 22 рядки)
+- `apps/store/app/api/mobile/chat/unread/route.test.ts` (new, 67 рядків, 3 cases)
+- `apps/mobile-client/src/lib/chat-unread.ts` (new, context)
+- `apps/mobile-client/src/lib/chat-unread-provider.tsx` (new, polling + AppState)
+- `apps/mobile-client/src/lib/api.ts` (+1: `chatApi.unreadCount()`)
+- `apps/mobile-client/src/navigation/AppNavigator.tsx` (+22/-6: badge wiring)
+- `apps/mobile-client/src/screens/chat/ChatScreen.tsx` (+13/-3: clear hook)
+- `apps/mobile-client/src/screens/more/MoreScreen.tsx` (+23/-1: badge на рядку)
+
+8 files, +243/-6.
+
+### Hard rules дотримано
+
+- Не зломав ChatScreen SSE flow — лише екстракт клієнтського state у global provider.
+- Без зміни mobile chat API endpoints (`/api/mobile/chat`, `/api/mobile/chat/stream`).
+- Без нових native deps — pure RN + наявні `@react-navigation/*` + `expo-secure-store`.
+- Polling fallback (30с) існує — не покладається на SSE-only.
+
+### Branches до cleanup (нове)
+
+- `claude/session-35-chat-unread-badge-rmDSc` (merged у `efb36f0`) — додати у GitHub UI cleanup batch.
