@@ -2236,3 +2236,86 @@ git pull origin main
 ### Branches до cleanup
 
 - `claude/session-44-mobile-ux-fixes` (merged у `f784aff`)
+
+---
+
+## Session 45 — Mobile QuickView Modal
+
+**Date:** 2026-04-28
+**Branch (worker):** `claude/session-45-mobile-quickview` → merged into `main` (`b4b9c33`)
+**Тип:** worker → orchestrator merge
+**Spec:** `docs/SESSION_45_MOBILE_QUICKVIEW.md`
+
+### Що зроблено
+
+**New `QuickViewModal.tsx`** — bottom-sheet стиль з:
+
+- Hero зображення (perше з `product.images`) у `aspectRatio: 4/3` з SALE badge при наявності `akciya` price
+- Heart toggle через `useWishlist().toggle()` (S39 hook)
+- Назва (`numberOfLines={2}`)
+- Meta line (якість · сезон · країна, нон-empty filter)
+- Ціни: акційна (red `#dc2626`) + опт
+- Lots count (зелений) якщо `_count.lots > 0`
+- Actions: "Закрити" + "Дивитись повністю" (закриває modal і `navigation.navigate("Product")`)
+- Modal `presentationStyle="overFullScreen"` + `transparent` + `animationType="slide"` для bottom-sheet feel
+- Backdrop tap closes без warning
+
+**`ProductCard.tsx`** — додано опціональний `onLongPress?: (product) => void` + `delayLongPress={500}` на обох layout-ах (grid + list). API не зламано, новий prop optional.
+
+**`HorizontalProductRail.tsx`** — `onProductLongPress?` prop, прокидує далі у ProductCard.
+
+**Wired у:**
+
+- `CatalogScreen.tsx` — `quickViewProduct` state + `onLongPress` на FlatList items + `<QuickViewModal />` в кінці JSX.
+- `HomeScreen.tsx` — те саме на всі 4 rails (Топ / Акції / Рекомендоване / Новинки).
+- `WishlistScreen.tsx` — long-press на 2-col grid items.
+
+**Hard rule #4 дотримано:** `productsApi.trackView()` НЕ викликається на open QuickView. Тільки full ProductScreen mount (S43 behavior preserved).
+
+### Verification
+
+Worker:
+
+- `pnpm format:check` ✅
+- `pnpm -r typecheck` ✅
+- `pnpm -r test` ✅ 271/271 (baseline збережено, нових тестів 0 — mobile-only feature)
+
+Orchestrator merge:
+
+- Fast-forward `b475283..b4b9c33` clean ✅
+- Initial format check failed (один markdown style issue у моєму spec файлі)
+- Fix: `pnpm exec prettier --write docs/SESSION_45_MOBILE_QUICKVIEW.md` (`0cc0945`)
+- `pnpm -r typecheck` 6/6 ✅
+- `pnpm -r test` 271/271 ✅
+- `git push origin main` ✅
+
+### Файли
+
+- `apps/mobile-client/src/components/QuickViewModal.tsx` (new, 320 рядків)
+- `apps/mobile-client/src/components/ProductCard.tsx` (+6 — onLongPress prop)
+- `apps/mobile-client/src/components/HorizontalProductRail.tsx` (+5)
+- `apps/mobile-client/src/screens/catalog/CatalogScreen.tsx` (+10)
+- `apps/mobile-client/src/screens/home/HomeScreen.tsx` (+13)
+- `apps/mobile-client/src/screens/wishlist/WishlistScreen.tsx` (+12/-2)
+
+6 files, +364/-2.
+
+### Deploy
+
+Без DB migration. Прямий шлях:
+
+```powershell
+git pull origin main
+.\scripts\deploy.ps1
+```
+
+### Out-of-scope
+
+- Image carousel у QuickView (тільки перше зображення)
+- Add to cart прямо з QuickView
+- Swipe-down to dismiss gesture (backdrop tap достатньо)
+- QuickView у Search results (Search screen — placeholder)
+
+### Branches до cleanup
+
+- `claude/session-45-mobile-quickview` (merged у `b4b9c33`)

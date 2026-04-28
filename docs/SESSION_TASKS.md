@@ -118,7 +118,7 @@ Follow-up (user-action): real Google reviews текст замість TODO, Blo
 | 59  | EAS build + Google Play / TestFlight upload (mobile native distribution)                                | user + worker | 1-2 тижні | PENDING (P3 #50, ще не розпочато)                                     |
 | 61  | **S43 DB ViewLog + recommendations engine** + 4-й rail "Рекомендоване для вас" на mobile Home           | worker        | —         | ✅ DONE (S43, `1431790`) — ⚠️ потребує `prisma migrate deploy` на DB  |
 | 62  | **S44 mobile UX fixes batch** — backdrop discard warning + subcategory filter + list mode toggle        | worker        | —         | ✅ DONE (S44, `f784aff`)                                              |
-| 63  | **S45 QuickView modal mobile** — long-press на ProductCard → modal preview                              | worker        | 2-3 год   | NEXT (post-S44)                                                       |
+| 63  | **S45 QuickView modal mobile** — long-press на ProductCard → modal preview                              | worker        | —         | ✅ DONE (S45, `b4b9c33`)                                              |
 
 **Hard rule для mobile:** не міняти `expo`/`react-native` версій без user-а. Усі pure JS зміни проходять через `pnpm format:check` + ручний QA на Expo Go (worker не може запустити, верифікація — статичні check + spec compliance).
 
