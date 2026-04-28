@@ -38,49 +38,28 @@ if (-not $SkipInstall) {
 Write-Host "`n[3/$TotalSteps] Generating Prisma client..." -ForegroundColor Cyan
 pnpm --filter @ltex/db exec prisma generate
 
-# 4-prep. Stop ltex-store cluster if it's running so the cluster's
-# node.exe processes release any locks they hold on apps/store/.next/cache
-# or the SWC binary cache. Without this the second consecutive deploy
-# hangs in `next build` after printing the "serverActions" experiment line.
-# Verified twice in S39 + S34 deploys. Step [8/8] already handles the
-# "process stopped" case via fresh pm2 start ecosystem.config.js.
+# 4-prep. Kill the PM2 daemon (and therefore every child it manages --
+# the ltex-store ProcessContainerFork.js worker that holds a file handle
+# on apps/store/.next/standalone/...) before next build. Without this
+# the second consecutive deploy hangs in `next build` after the
+# "serverActions" experiment line because Windows NTFS will not let
+# next.js rewrite files that the running PM2 worker still has open.
+#
+# History of this prelude:
+# - S40 tried `pm2 stop ltex-store` -> daemon flagged stopped but cluster
+#   workers stayed alive as orphans. Build still hung.
+# - S41 tried `pm2 delete ltex-store` + a CommandLine regex sweep for
+#   "apps/store/.next/standalone" -> sweep never matched because PM2
+#   wraps workers in ProcessContainerFork.js whose CommandLine does not
+#   contain the app path; the worker path lives in env vars instead.
+# - S42 (here): just `pm2 kill`. Daemon-level signal, no guards needed,
+#   no parsing of `pm2 jlist` (which can race with daemon startup and
+#   silently fall through). Step [8/8] revives the daemon via
+#   `pm2 ping` and starts ltex-store fresh from ecosystem.config.js.
 if (-not $SkipBuild) {
-    $pm2HasLtex = $false
-    try {
-        $list = pm2 jlist 2>$null
-        if ($list -and $list -match '^\s*\[') {
-            $parsed = $list | ConvertFrom-Json -ErrorAction Stop
-            $pm2HasLtex = [bool]($parsed | Where-Object { $_.name -eq "ltex-store" })
-        }
-    } catch { $pm2HasLtex = $false }
-
-    if ($pm2HasLtex) {
-        Write-Host "  Removing ltex-store before build (releases .next locks)..." -ForegroundColor Yellow
-        # `pm2 delete` removes the process from PM2 registry AND kills its
-        # node.exe workers (in fork mode this is the single process; in
-        # cluster mode this is what `pm2 stop` should have done but doesn't
-        # reliably on Windows). Step [8/8] re-creates the process from
-        # ecosystem.config.js so the registry is clean by the end of deploy.
-        pm2 delete ltex-store > $null 2>&1
-        Start-Sleep -Seconds 2
-    }
-
-    # Sweep orphan node.exe processes that point at the L-TEX standalone tree.
-    # PM2 cluster on Windows occasionally leaves these behind after `pm2 delete`
-    # if a worker was mid-write to .next/cache. Targeted match on CommandLine
-    # so we do not touch telegram-bot / viber-bot processes that live elsewhere.
-    $orphans = Get-CimInstance Win32_Process -Filter "Name = 'node.exe'" -ErrorAction SilentlyContinue |
-        Where-Object {
-            $_.CommandLine -and
-            $_.CommandLine -match 'apps[\\/]+store[\\/]+\.next[\\/]+standalone'
-        }
-    if ($orphans) {
-        Write-Host "  Found $($orphans.Count) orphan ltex-store node process(es), terminating..." -ForegroundColor Yellow
-        foreach ($p in $orphans) {
-            Stop-Process -Id $p.ProcessId -Force -ErrorAction SilentlyContinue
-        }
-        Start-Sleep -Seconds 1
-    }
+    Write-Host "  Killing PM2 daemon before build (releases ltex-store file locks)..." -ForegroundColor Yellow
+    pm2 kill > $null 2>&1
+    Start-Sleep -Seconds 2
 }
 
 # 4. Build (direct pnpm filter bypasses turbo daemon which hangs on Windows).
