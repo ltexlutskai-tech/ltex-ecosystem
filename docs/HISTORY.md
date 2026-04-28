@@ -2390,3 +2390,84 @@ Orchestrator merge:
 ### Branches до cleanup
 
 - `claude/session-46-precommit-hook` (merged у `3166f16`)
+
+---
+
+## Session 47 — Mobile UX Completion (Wishlist Merge + QuickView Carousel)
+
+**Date:** 2026-04-28
+**Branch:** `claude/session-47-mobile-ux-completion` → merged at `0bf914f`
+**Spec:** `docs/SESSION_47_MOBILE_UX_COMPLETION.md`
+
+### Що зроблено
+
+**1. Pull-on-login wishlist merge** (`wishlist-provider.tsx`)
+
+- На `customerId` change (login event) → `favoritesApi.list()` → server items.
+- Union з local через snapshot+server-win on conflict (productId).
+- `lastSyncedCustomerIdRef` блокує re-runs у межах однієї login-сесії; reset на logout.
+- `slice(0, MAX_ITEMS=100)` cap зберігається (S39 baseline).
+- Network/parse errors silent — local wishlist лишається untouched.
+
+**2. Image carousel у QuickView** (`QuickViewModal.tsx`)
+
+- Single `<Image>` → `<FlatList horizontal pagingEnabled>` (pure RN, без deps).
+- Кожен slide = `SCREEN_WIDTH × IMAGE_HEIGHT` (`SCREEN_WIDTH * 3/4` aspect).
+- Dots indicator (8×8 з 6gap, white active / 0.5-opacity inactive) — `position:absolute bottom:8`, `pointerEvents="none"`. Тільки коли `images.length > 1`.
+- SALE badge + heart toggle лишаються поверх carousel-у.
+- Empty-images placeholder збережено.
+
+**3. Backend favorites GET shape upgrade** (`apps/store/app/api/mobile/favorites/route.ts`)
+
+- Старий thin shape (`{ imageUrl, price, lotCount, ... }`) замінено на повний `WebCatalogProduct` через спільний `mapMobileProduct(f.product) + mobileProductInclude`.
+- Тепер pull-on-login отримує canonical shape що збігається з `/home` + `/recommendations`.
+- Backward-compat verified: жоден caller у mobile-client не використовував старі поля `imageUrl/price/lotCount`.
+
+**4. API client types** (`apps/mobile-client/src/lib/api.ts`)
+
+- `favoritesApi.list()` тепер типізована: `FavoritesListResponse / ServerFavorite` interfaces.
+
+### Verification
+
+Worker:
+
+- `pnpm format:check` ✅
+- `pnpm -r typecheck` ✅
+- `pnpm -r test` ✅ 271/271 (25 shared + 246 store)
+
+Orchestrator merge:
+
+- Fast-forward `cfb71f4..0bf914f` clean ✅
+- `pnpm format:check` ✅ (hook auto-format не потрібен — worker уже format-нув)
+- `pnpm -r typecheck` 6/6 ✅
+- `pnpm -r test` 271/271 ✅
+- `git push origin main` ✅
+
+### Файли
+
+- `apps/mobile-client/src/components/QuickViewModal.tsx` (+76/-? — carousel + dots)
+- `apps/mobile-client/src/lib/api.ts` (+13/-? — types)
+- `apps/mobile-client/src/lib/wishlist-provider.tsx` (+28 — sync effect)
+- `apps/store/app/api/mobile/favorites/route.ts` (+26/-? — shape upgrade)
+
+4 files, +109/-34.
+
+### Deploy
+
+Без DB migration. Прямий шлях:
+
+```powershell
+git pull origin main
+.\scripts\deploy.ps1
+```
+
+### Out-of-scope
+
+- Add to cart з QuickView (потребує lot selection — skip)
+- Pinch-to-zoom на images
+- Pull-on-logout — clear local wishlist (guest mode дозволено)
+- Web wishlist sync (web ще без auth)
+
+### Branches до cleanup
+
+- `claude/session-47-mobile-ux-completion` (merged у `0bf914f`)
