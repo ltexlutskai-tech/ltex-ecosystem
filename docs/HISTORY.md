@@ -2319,3 +2319,74 @@ git pull origin main
 ### Branches до cleanup
 
 - `claude/session-45-mobile-quickview` (merged у `b4b9c33`)
+
+---
+
+## Session 46 — Pre-commit Format Hook
+
+**Date:** 2026-04-28
+**Branch (worker):** `claude/session-46-precommit-hook` → merged into `main` (`3166f16`)
+**Тип:** worker → orchestrator merge
+**Spec:** `docs/SESSION_46_PRECOMMIT_HOOK.md`
+
+### Проблема
+
+Orchestrator-only docs commits (S43/S44/S45 specs, fe34670, d71f4e2) падали на CI red бо `pnpm format:check` бачив stale prettier у щойно написаних .md файлах. Runtime ОК, але історія Actions виглядала погано і не дисциплінувала.
+
+### Що зроблено
+
+- `pnpm add -Dw husky@^9.1.0 lint-staged@^15.2.0` (root devDeps).
+- `package.json` (root):
+  - `"prepare": "husky"` script — тригериться при `pnpm install`, авто-init `.husky/_/`.
+  - `"lint-staged": { "*.{ts,tsx,js,jsx,json,md}": "prettier --write" }`.
+- `.husky/pre-commit` (1 рядок: `pnpm exec lint-staged`), executable mode.
+- `.husky/_/` — gitignored через auto-generated `.gitignore` (husky 9 регенерує при `pnpm install`).
+
+### Як це працює
+
+1. Будь-який commit → git викликає `.husky/pre-commit` → `lint-staged` запускає `prettier --write` тільки на staged .ts/.tsx/.js/.jsx/.json/.md.
+2. Файли auto-formatted прямо в staging area → commit йде з чистим форматом.
+3. `--no-verify` дозволяє bypass для emergency commits.
+4. CI-side `format:check` лишається safety net.
+
+### Server impact
+
+`scripts/deploy.ps1` крок [2/8] `pnpm install --frozen-lockfile` тригерить `prepare` script → husky встановиться на сервері automatically. Бо ми ніколи не commit-имо з server-а — це no-op там. 0 додаткових кроків для deploy.
+
+### Verification
+
+Worker:
+
+- Test commit з deliberately misformatted .md → hook auto-format-нув + revert тестового commit
+- `pnpm format:check` ✅
+- `pnpm -r typecheck` ✅
+- `pnpm -r test` ✅ 271/271
+
+Orchestrator merge:
+
+- Fast-forward `1612465..3166f16` clean ✅
+- `pnpm install --frozen-lockfile` auto-installed husky 9.1.7 + lint-staged 15.5.2, prepare script запустився ✅
+- `.husky/pre-commit` executable ✅
+- `.husky/_/` auto-generated ✅
+- `pnpm format:check` clean ✅
+- `pnpm -r test` 271/271 ✅
+- `git push origin main` ✅
+
+### Файли
+
+- `package.json` (+8 — devDeps + lint-staged config + prepare)
+- `pnpm-lock.yaml` (+432 — husky/lint-staged subgraph)
+- `.husky/pre-commit` (new, 1 рядок)
+
+3 files, +417/-24.
+
+### Out-of-scope
+
+- ESLint pre-commit (no eslint config у root)
+- Typecheck pre-commit (повільно)
+- Pre-push hook
+- Commit message linter
+
+### Branches до cleanup
+
+- `claude/session-46-precommit-hook` (merged у `3166f16`)
