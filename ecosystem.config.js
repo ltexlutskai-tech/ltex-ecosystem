@@ -11,6 +11,7 @@ module.exports = {
         PORT: 3000,
         HOSTNAME: "0.0.0.0",
       },
+      exec_mode: "fork",
       instances: 1,
       autorestart: true,
       max_memory_restart: "1G",

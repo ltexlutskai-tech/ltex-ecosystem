@@ -55,9 +55,31 @@ if (-not $SkipBuild) {
     } catch { $pm2HasLtex = $false }
 
     if ($pm2HasLtex) {
-        Write-Host "  Stopping ltex-store before build (avoids .next/cache lock)..." -ForegroundColor Yellow
-        pm2 stop ltex-store > $null 2>&1
+        Write-Host "  Removing ltex-store before build (releases .next locks)..." -ForegroundColor Yellow
+        # `pm2 delete` removes the process from PM2 registry AND kills its
+        # node.exe workers (in fork mode this is the single process; in
+        # cluster mode this is what `pm2 stop` should have done but doesn't
+        # reliably on Windows). Step [8/8] re-creates the process from
+        # ecosystem.config.js so the registry is clean by the end of deploy.
+        pm2 delete ltex-store > $null 2>&1
         Start-Sleep -Seconds 2
+    }
+
+    # Sweep orphan node.exe processes that point at the L-TEX standalone tree.
+    # PM2 cluster on Windows occasionally leaves these behind after `pm2 delete`
+    # if a worker was mid-write to .next/cache. Targeted match on CommandLine
+    # so we do not touch telegram-bot / viber-bot processes that live elsewhere.
+    $orphans = Get-CimInstance Win32_Process -Filter "Name = 'node.exe'" -ErrorAction SilentlyContinue |
+        Where-Object {
+            $_.CommandLine -and
+            $_.CommandLine -match 'apps[\\/]+store[\\/]+\.next[\\/]+standalone'
+        }
+    if ($orphans) {
+        Write-Host "  Found $($orphans.Count) orphan ltex-store node process(es), terminating..." -ForegroundColor Yellow
+        foreach ($p in $orphans) {
+            Stop-Process -Id $p.ProcessId -Force -ErrorAction SilentlyContinue
+        }
+        Start-Sleep -Seconds 1
     }
 }
 
