@@ -28,6 +28,7 @@ describe("useRecentlyViewed", () => {
 
     act(() =>
       result.current.addItem({
+        id: "p1",
         slug: "product-1",
         name: "Product 1",
         quality: "first",
@@ -39,6 +40,7 @@ describe("useRecentlyViewed", () => {
 
     expect(result.current.items).toHaveLength(1);
     expect(result.current.items[0]!.slug).toBe("product-1");
+    expect(result.current.items[0]!.id).toBe("p1");
     expect(result.current.items[0]!.viewedAt).toBeGreaterThan(0);
   });
 
@@ -49,6 +51,7 @@ describe("useRecentlyViewed", () => {
 
     act(() =>
       result.current.addItem({
+        id: "p1",
         slug: "product-1",
         name: "Product 1",
         quality: "first",
@@ -59,6 +62,7 @@ describe("useRecentlyViewed", () => {
     );
     act(() =>
       result.current.addItem({
+        id: "p2",
         slug: "product-2",
         name: "Product 2",
         quality: "stock",
@@ -69,6 +73,7 @@ describe("useRecentlyViewed", () => {
     );
     act(() =>
       result.current.addItem({
+        id: "p1",
         slug: "product-1",
         name: "Product 1",
         quality: "first",
@@ -91,6 +96,7 @@ describe("useRecentlyViewed", () => {
     for (let i = 0; i < 15; i++) {
       act(() =>
         result.current.addItem({
+          id: `p${i}`,
           slug: `product-${i}`,
           name: `Product ${i}`,
           quality: "first",
@@ -113,6 +119,7 @@ describe("useRecentlyViewed", () => {
 
     act(() =>
       result.current.addItem({
+        id: "p1",
         slug: "product-1",
         name: "Product 1",
         quality: "first",
@@ -127,5 +134,40 @@ describe("useRecentlyViewed", () => {
     );
     expect(stored).toHaveLength(1);
     expect(stored[0].slug).toBe("product-1");
+    expect(stored[0].id).toBe("p1");
+  });
+
+  it("drops legacy localStorage entries that are missing id", () => {
+    localStorage.setItem(
+      "ltex-recently-viewed",
+      JSON.stringify([
+        {
+          slug: "legacy-1",
+          name: "Legacy",
+          quality: "first",
+          imageUrl: null,
+          priceEur: 5,
+          priceUnit: "kg",
+          viewedAt: 1,
+        },
+        {
+          id: "p2",
+          slug: "fresh-1",
+          name: "Fresh",
+          quality: "first",
+          imageUrl: null,
+          priceEur: 6,
+          priceUnit: "kg",
+          viewedAt: 2,
+        },
+      ]),
+    );
+
+    const { result } = renderHook(() => useRecentlyViewed(), {
+      wrapper: RecentlyViewedProvider,
+    });
+
+    expect(result.current.items).toHaveLength(1);
+    expect(result.current.items[0]!.id).toBe("p2");
   });
 });

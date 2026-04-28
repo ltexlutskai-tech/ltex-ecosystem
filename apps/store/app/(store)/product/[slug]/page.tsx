@@ -128,6 +128,7 @@ export default async function ProductPage({ params }: Props) {
   return (
     <div className="container mx-auto px-4 py-6">
       <TrackProductView
+        id={product.id}
         slug={product.slug}
         name={product.name}
         quality={product.quality}

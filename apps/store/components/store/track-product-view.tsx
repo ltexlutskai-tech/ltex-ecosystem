@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { useRecentlyViewed } from "@/lib/recently-viewed";
 
 interface TrackProductViewProps {
+  id: string;
   slug: string;
   name: string;
   quality: string;

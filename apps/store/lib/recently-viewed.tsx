@@ -10,6 +10,7 @@ import {
 } from "react";
 
 export interface RecentlyViewedItem {
+  id: string;
   slug: string;
   name: string;
   quality: string;
@@ -37,7 +38,11 @@ export function RecentlyViewedProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
-      if (saved) setItems(JSON.parse(saved));
+      if (saved) {
+        const parsed = JSON.parse(saved) as RecentlyViewedItem[];
+        // Drop legacy entries without `id` — they will be re-added on next view.
+        setItems(parsed.filter((item) => typeof item.id === "string"));
+      }
     } catch {}
   }, []);
 

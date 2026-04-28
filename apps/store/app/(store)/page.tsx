@@ -4,6 +4,7 @@ import { APP_NAME, MIN_ORDER_KG, CONTACTS } from "@ltex/shared";
 import { prisma } from "@ltex/db";
 import Link from "next/link";
 import { RecentlyViewedSection } from "@/components/store/recently-viewed-section";
+import { RecommendationsSection } from "@/components/store/recommendations-section";
 import { BannerCarousel } from "@/components/store/banner-carousel";
 import { CategoriesCarousel } from "@/components/store/categories-carousel";
 import { VideoReviewsCarousel } from "@/components/store/video-reviews-carousel";
@@ -238,7 +239,10 @@ export default async function HomePage() {
         {/* 6. Video reviews carousel */}
         <VideoReviewsCarousel products={data.videoProducts} />
 
-        {/* 7. Recently viewed */}
+        {/* 7. Personalised recommendations (client-side, reads recently-viewed IDs) */}
+        <RecommendationsSection />
+
+        {/* 8. Recently viewed */}
         <RecentlyViewedSection />
       </div>
 
