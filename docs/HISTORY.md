@@ -1936,3 +1936,105 @@ Orchestrator merge verification:
 ### Branches до cleanup (нове)
 
 - `claude/session-35-chat-unread-badge-rmDSc` (merged у `efb36f0`) — додати у GitHub UI cleanup batch.
+
+---
+
+## Session 36 — Mobile Notifications Screen + Notification Model
+
+**Date:** 2026-04-28
+**Branch (worker):** `claude/session-36-notifications-screen` → merged into `main` (`ceeb8b9`)
+**Тип:** worker → orchestrator merge
+**Spec:** `docs/SESSION_36_NOTIFICATIONS_SCREEN.md`
+
+### Проблема
+
+`apps/mobile-client/src/screens/notifications/NotificationsScreen.tsx` був placeholder. Bell icon у HomeStack header (S33) вів туди але показував empty state. Додатково — spec припускав що `Notification` Prisma model вже існує, але насправді існував лише `PushToken` + `VideoSubscription` (push registration, не in-app feed).
+
+### Що зроблено
+
+**DB (нова таблиця)**
+
+- `packages/db/prisma/schema.prisma` — додано `Notification` model + `customer.notifications` relation. Поля: `id`, `customerId`, `type`, `title`, `body`, `payload?` (Json), `readAt?`, `createdAt`. Два індекси: `(customerId, createdAt)` для feed ordering і `(customerId, readAt)` для unread filter.
+- `packages/db/prisma/migrations/20260428_notifications/migration.sql` — `CREATE TABLE notifications` + 2 індекси + FK CASCADE на `customers(id)`.
+- Type union у коментарі: `"order_status" | "new_video" | "chat_message" | "system"`.
+
+**Backend** (`apps/store/app/api/mobile/notifications/route.ts`)
+
+- GET extended additively: повертає `{ pushTokens, videoSubscriptions, notifications }`. `notifications` — `take: 100` order by `createdAt desc`, scoped by token-derived `customerId`.
+- New PUT — mark single (`{ notificationId }`) АБО mark-all-unread (no body). `updateMany` з `customerId` filter забезпечує tenant isolation. Empty body fallback не падає.
+- POST/DELETE без змін (push token + video subscription actions).
+- 6 vitest cases (`route.test.ts`): GET feed shape + 401, PUT single + PUT all + PUT no-body + 401.
+
+**Mobile** (`apps/mobile-client/src/screens/notifications/NotificationsScreen.tsx`)
+
+- Full rewrite: FlatList з `keyExtractor: id`.
+- Type icons (notifications-circle / videocam / chatbox-ellipses / settings) per type.
+- Inline `formatRelative()` — "щойно" (<60с), "X хв тому" (<1год), "Сьогодні HH:mm" (today), "Вчора HH:mm" (yesterday), "12 квіт" (older).
+- Unread blue dot індикатор + bg highlight.
+- Optimistic mark-read on tap (`PUT { notificationId }` fire-and-forget, local state instant).
+- Header-right "checkmark-done" — mark-all (`PUT {}`).
+- Pull-to-refresh, empty state, loading state.
+- Deep links: `order_status` → `MoreTab/OrderDetail`, `new_video` → `ProductDetail`, `chat_message` → `MoreTab/Chat`, `system` → no-op.
+
+**API client** (`apps/mobile-client/src/lib/api.ts`)
+
+- Types: `NotificationsListResponse`, `NotificationFeedItem`, `NotificationType` union.
+- `notificationsApi.markAsRead(id?)` — z optional id для mark-single або mark-all.
+
+### Verification
+
+Worker pre-push:
+
+- `pnpm format:check` ✅
+- `pnpm -r typecheck` ✅
+- `pnpm -r test` 255/255 (+6 new) ✅
+
+Orchestrator merge verification:
+
+- Fast-forward `78a711a..ceeb8b9` clean ✅
+- `pnpm format:check` clean ✅
+- Initial typecheck FAILED (Prisma client out-of-date — `Property 'notification' does not exist on type 'PrismaClient'`)
+- Fix: `pnpm --filter @ltex/db exec prisma generate` → regenerated client
+- Re-typecheck 6/6 ✅
+- `pnpm -r test` 255/255 ✅
+- `git push origin main` ✅
+
+### Файли
+
+- `packages/db/prisma/schema.prisma` (+20)
+- `packages/db/prisma/migrations/20260428_notifications/migration.sql` (new, 24 рядки)
+- `apps/store/app/api/mobile/notifications/route.ts` (+46/-? — additive GET expansion + new PUT)
+- `apps/store/app/api/mobile/notifications/route.test.ts` (new, 166 рядків, 6 cases)
+- `apps/mobile-client/src/lib/api.ts` (+36 types + markAsRead)
+- `apps/mobile-client/src/screens/notifications/NotificationsScreen.tsx` (+295 full rewrite)
+
+6 files, +571/-16.
+
+### ⚠️ Deploy action required
+
+Перед deploy на сервер ОБОВ'ЯЗКОВО запустити migration на обох DBs:
+
+```powershell
+# Local Windows Postgres
+$env:DATABASE_URL = "postgres://...local..."; pnpm --filter @ltex/db exec prisma migrate deploy
+
+# Supabase
+$env:DATABASE_URL = "postgres://...supabase..."; pnpm --filter @ltex/db exec prisma migrate deploy
+```
+
+Без миграції GET/PUT падатимуть з `relation "notifications" does not exist`.
+
+`scripts/deploy.ps1` НЕ робить prisma migrate (тільки prisma generate). Migration deploy — manual step перед deploy.ps1, або додати окремою command-а.
+
+### Out-of-scope (per spec)
+
+- Real-time updates (WebSocket / SSE для push push з backend → screen)
+- `useUnreadNotifications` provider (як `useChatUnread`) для бейджа на bell icon
+- Notification preferences UI (mute by type)
+- Notification grouping (collapse consecutive same-type)
+
+Це окремі follow-ups — наступні worker сесії.
+
+### Branches до cleanup (нове)
+
+- `claude/session-36-notifications-screen` (merged у `ceeb8b9`)

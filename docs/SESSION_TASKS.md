@@ -109,7 +109,7 @@ Follow-up (user-action): real Google reviews текст замість TODO, Blo
 | 52  | Wishlist persistence (SecureStore + server mirror) + WishlistScreen list                                | worker        | —         | ✅ DONE (S39)                            |
 | 53  | S34 banners + 3 product rails на mobile HomeScreen + `/api/mobile/home`                                 | worker        | —         | ✅ DONE (S34)                            |
 | 54  | **S35 chat unread badge** на MoreTab + MoreScreen (polling `/api/mobile/chat/unread`)                   | worker        | —         | ✅ DONE (S35, `efb36f0`)                 |
-| 55  | **S36 notifications screen** з backend list + mark read + deep links                                    | worker        | 3-4 год   | NEXT — spec `SESSION_36_*.md`            |
+| 55  | **S36 notifications screen** з backend list + mark read + deep links                                    | worker        | —         | ✅ DONE (S36, `ceeb8b9`) — ⚠️ потребує `prisma migrate deploy` на DBs |
 | 56  | S40 deploy.ps1 `pm2 stop` prelude — partial, гіпотеза A хибна (orphan cluster workers)                  | worker        | —         | ⚠️ PARTIAL (S40, see HISTORY)            |
 | 56b | S41 fork mode + `pm2 delete` + regex orphan sweep — partial, regex не match-ив PM2 ProcessContainerFork | worker        | —         | ⚠️ PARTIAL (S41, see HISTORY)            |
 | 56c | **S42 deploy `pm2 kill` prelude** — daemon-level signal вбиває усіх дітей PM2                           | orchestrator  | —         | ✅ DONE (`b3c9bae`, verified 2x deploys) |
