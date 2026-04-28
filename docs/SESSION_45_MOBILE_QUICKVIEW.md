@@ -15,6 +15,7 @@
 Mobile зараз: tap на ProductCard → одразу `navigation.navigate("Product", { id })` → full ProductScreen. Немає швидкого preview.
 
 S45 додає **long-press на ProductCard** → bottom-sheet style modal з:
+
 - Великий thumbnail (carousel якщо кілька зображень)
 - Назва продукту
 - Якість + сезон + країна
