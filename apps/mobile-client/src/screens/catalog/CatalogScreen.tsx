@@ -19,6 +19,7 @@ import {
   countActiveFilters,
   type CatalogFilters,
 } from "@/components/CatalogFilterSheet";
+import { QuickViewModal } from "@/components/QuickViewModal";
 
 // SecureStore is loaded lazily so the screen still renders on web (where the
 // module is unavailable). Same pattern as wishlist-provider.tsx.
@@ -79,6 +80,8 @@ export function CatalogScreen({ navigation }: CatalogScreenProps) {
   const [error, setError] = useState<string | null>(null);
   const [filterSheetOpen, setFilterSheetOpen] = useState(false);
   const [layoutMode, setLayoutMode] = useState<LayoutMode>("grid");
+  const [quickViewProduct, setQuickViewProduct] =
+    useState<WebCatalogProduct | null>(null);
   const {
     items: wishlistItems,
     has: isWishlisted,
@@ -250,6 +253,7 @@ export function CatalogScreen({ navigation }: CatalogScreenProps) {
               <ProductCard
                 product={item}
                 onPress={handleProductPress}
+                onLongPress={setQuickViewProduct}
                 isWishlisted={isWishlisted(item.id)}
                 onWishlistToggle={toggleWishlist}
                 layout={layoutMode}
@@ -293,6 +297,12 @@ export function CatalogScreen({ navigation }: CatalogScreenProps) {
         onClose={() => setFilterSheetOpen(false)}
         initialFilters={filters}
         onApply={handleApplyFilters}
+      />
+
+      <QuickViewModal
+        product={quickViewProduct}
+        onClose={() => setQuickViewProduct(null)}
+        onViewFull={handleProductPress}
       />
     </View>
   );

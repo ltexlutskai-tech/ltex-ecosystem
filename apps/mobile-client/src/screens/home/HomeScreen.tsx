@@ -20,6 +20,7 @@ import {
 import { BannerCarousel } from "@/components/BannerCarousel";
 import { HorizontalProductRail } from "@/components/HorizontalProductRail";
 import { CatalogSkeleton } from "@/components/SkeletonLoader";
+import { QuickViewModal } from "@/components/QuickViewModal";
 
 const BRAND_COLOR = "#16a34a";
 
@@ -70,6 +71,8 @@ export function HomeScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [quickViewProduct, setQuickViewProduct] =
+    useState<WebCatalogProduct | null>(null);
 
   const fetchHome = useCallback(async () => {
     try {
@@ -199,12 +202,14 @@ export function HomeScreen() {
         title="Топ товарів"
         products={featured}
         onProductPress={handleProductPress}
+        onProductLongPress={setQuickViewProduct}
         onSeeAll={goCatalog}
       />
       <HorizontalProductRail
         title="Акції"
         products={onSale}
         onProductPress={handleProductPress}
+        onProductLongPress={setQuickViewProduct}
         onSeeAll={goCatalog}
       />
       {recommendations.length > 0 && (
@@ -212,6 +217,7 @@ export function HomeScreen() {
           title="Рекомендоване для вас"
           products={recommendations}
           onProductPress={handleProductPress}
+          onProductLongPress={setQuickViewProduct}
           onSeeAll={goCatalog}
         />
       )}
@@ -219,7 +225,14 @@ export function HomeScreen() {
         title="Новинки"
         products={newArrivals}
         onProductPress={handleProductPress}
+        onProductLongPress={setQuickViewProduct}
         onSeeAll={goCatalog}
+      />
+
+      <QuickViewModal
+        product={quickViewProduct}
+        onClose={() => setQuickViewProduct(null)}
+        onViewFull={handleProductPress}
       />
     </ScrollView>
   );

@@ -1,15 +1,18 @@
-import React, { useCallback } from "react";
+import React, { useCallback, useState } from "react";
 import { View, Text, FlatList, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { ProductCard } from "@/components/ProductCard";
+import { QuickViewModal } from "@/components/QuickViewModal";
 import type { WebCatalogProduct } from "@/lib/api";
 import { useWishlist } from "@/lib/wishlist";
 
 export function WishlistScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<any>>();
   const { items, toggle, isLoading } = useWishlist();
+  const [quickViewProduct, setQuickViewProduct] =
+    useState<WebCatalogProduct | null>(null);
 
   const handlePress = useCallback(
     (product: WebCatalogProduct) => {
@@ -52,12 +55,19 @@ export function WishlistScreen() {
             <ProductCard
               product={item}
               onPress={handlePress}
+              onLongPress={setQuickViewProduct}
               isWishlisted={true}
               onWishlistToggle={toggle}
             />
           </View>
         )}
         contentContainerStyle={styles.listContent}
+      />
+
+      <QuickViewModal
+        product={quickViewProduct}
+        onClose={() => setQuickViewProduct(null)}
+        onViewFull={handlePress}
       />
     </View>
   );

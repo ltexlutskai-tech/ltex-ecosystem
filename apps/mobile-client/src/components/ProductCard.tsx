@@ -12,6 +12,7 @@ const NEW_BADGE_WINDOW_MS = 14 * 24 * 60 * 60 * 1000;
 interface ProductCardProps {
   product: WebCatalogProduct;
   onPress: (product: WebCatalogProduct) => void;
+  onLongPress?: (product: WebCatalogProduct) => void;
   onWishlistToggle?: (product: WebCatalogProduct) => void;
   isWishlisted?: boolean;
   layout?: "grid" | "list";
@@ -20,6 +21,7 @@ interface ProductCardProps {
 export function ProductCard({
   product,
   onPress,
+  onLongPress,
   onWishlistToggle,
   isWishlisted = false,
   layout = "grid",
@@ -50,6 +52,8 @@ export function ProductCard({
       <TouchableOpacity
         style={styles.cardList}
         onPress={() => onPress(product)}
+        onLongPress={onLongPress ? () => onLongPress(product) : undefined}
+        delayLongPress={500}
         activeOpacity={0.85}
       >
         <View style={styles.imageContainerList}>
@@ -135,6 +139,8 @@ export function ProductCard({
     <TouchableOpacity
       style={styles.card}
       onPress={() => onPress(product)}
+      onLongPress={onLongPress ? () => onLongPress(product) : undefined}
+      delayLongPress={500}
       activeOpacity={0.85}
     >
       <View style={styles.imageContainer}>

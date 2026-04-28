@@ -18,6 +18,7 @@ interface HorizontalProductRailProps {
   title: string;
   products: WebCatalogProduct[];
   onProductPress: (product: WebCatalogProduct) => void;
+  onProductLongPress?: (product: WebCatalogProduct) => void;
   onSeeAll?: () => void;
   emptyHint?: string;
 }
@@ -26,6 +27,7 @@ export function HorizontalProductRail({
   title,
   products,
   onProductPress,
+  onProductLongPress,
   onSeeAll,
   emptyHint,
 }: HorizontalProductRailProps) {
@@ -37,12 +39,13 @@ export function HorizontalProductRail({
         <ProductCard
           product={item}
           onPress={onProductPress}
+          onLongPress={onProductLongPress}
           isWishlisted={has(item.id)}
           onWishlistToggle={toggle}
         />
       </View>
     ),
-    [onProductPress, has, toggle],
+    [onProductPress, onProductLongPress, has, toggle],
   );
 
   if (products.length === 0 && !emptyHint) return null;
