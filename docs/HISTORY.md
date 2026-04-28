@@ -2038,3 +2038,117 @@ $env:DATABASE_URL = "postgres://...supabase..."; pnpm --filter @ltex/db exec pri
 ### Branches до cleanup (нове)
 
 - `claude/session-36-notifications-screen` (merged у `ceeb8b9`)
+
+---
+
+## Session 43 — DB ViewLog + Recommendations Engine
+
+**Date:** 2026-04-28
+**Branch (worker):** `claude/session-43-viewlog-recommendations` → merged into `main` (`1431790`)
+**Тип:** worker → orchestrator merge
+**Spec:** `docs/SESSION_43_VIEWLOG_RECOMMENDATIONS.md`
+
+### Що зроблено
+
+**DB**
+
+- `packages/db/prisma/schema.prisma` — новий `ViewLog` model: `id`, `customerId?`, `productId`, `source`, `viewedAt`. Two indexes: `(customerId, viewedAt)` для recommendations query, `(productId, viewedAt)` для analytics. FK `customer` `SetNull` (історія лишається коли user видалений), `product` `Cascade`.
+- `Customer.viewLog` + `Product.viewLog` relations додано.
+- Migration `20260429_view_log/migration.sql`.
+
+**Tracking endpoint** (`apps/store/app/api/mobile/products/[id]/view/route.ts`)
+
+- POST, auth optional через новий `tryMobileSession` helper. Анонім → `customerId: null`.
+- Whitelist `source` (`home | catalog | search | product_detail`), інше → `unknown`.
+- Existence check: якщо productId не існує — silent 204 (не leak що видалено).
+- Always returns 204 No Content (~5ms) — fire-and-forget.
+- 4 vitest cases.
+
+**Recommendations endpoint** (`apps/store/app/api/mobile/recommendations/route.ts`)
+
+- GET, auth optional, `dynamic = "force-dynamic"`.
+- Algorithm:
+  1. Authed → recent views (30 days, top 20) → categories user browsed → newest in-stock products from those categories, excluding seen IDs.
+  2. Empty result OR anonymous → fallback newest in-stock (12 items).
+- 60s edge cache (`Cache-Control: public, s-maxage=60, stale-while-revalidate=120`). Cloudflare auto-skips cache when `Authorization` header present, so personalized responses don't leak between users.
+- 5 vitest cases (anonymous fallback, authed з recent views, authed без views, exclude seen, fallback empty category).
+
+**Shared shape** (`apps/store/lib/mobile-product-shape.ts`)
+
+- Витягнуто `mobileProductInclude`, `MobileRawProduct`, `mapMobileProduct` з `/api/mobile/home/route.ts` у спільний модуль. Тепер `home` і `recommendations` повертають identical product objects.
+
+**Mobile** (`apps/mobile-client/src/lib/api.ts`)
+
+- `recommendationsApi.get()` — fetch recs.
+- `productsApi.trackView(productId, source)` — fire-and-forget POST з catch suppression.
+
+**Mobile Home** (`apps/mobile-client/src/screens/home/HomeScreen.tsx`)
+
+- 4-й rail "Рекомендоване для вас" перед "Новинки".
+- Loaded паралельно з `homeApi.get()`. Hidden if `recommendations.length === 0`.
+
+**Mobile ProductScreen** (`apps/mobile-client/src/screens/product/ProductScreen.tsx`)
+
+- `useEffect` → `productsApi.trackView(productId, "product_detail")` on mount.
+
+### Verification
+
+Worker:
+
+- `pnpm format:check` ✅
+- `pnpm -r typecheck` ✅ 6/6
+- `pnpm -r test` ✅ 264 (255 baseline + 9 new)
+
+Orchestrator merge:
+
+- Fast-forward `5c53751..1431790` clean ✅
+- `pnpm --filter @ltex/db exec prisma generate` ✅ (new ViewLog model in client)
+- `pnpm format:check` ✅
+- `pnpm -r typecheck` ✅
+- `pnpm -r test` ✅ 264/264
+- `git push origin main` ✅
+- Branch delete via API → 403 (manual cleanup pending)
+
+### Файли
+
+- `packages/db/prisma/schema.prisma` (+19)
+- `packages/db/prisma/migrations/20260429_view_log/migration.sql` (new, 26 рядків)
+- `apps/store/app/api/mobile/products/[id]/view/route.ts` (new, 48)
+- `apps/store/app/api/mobile/products/[id]/view/route.test.ts` (new, 102, 4 cases)
+- `apps/store/app/api/mobile/recommendations/route.ts` (new, 86)
+- `apps/store/app/api/mobile/recommendations/route.test.ts` (new, 154, 5 cases)
+- `apps/store/lib/mobile-auth.ts` (+9 — `tryMobileSession`)
+- `apps/store/lib/mobile-product-shape.ts` (new, 52)
+- `apps/store/app/api/mobile/home/route.ts` (-64 +7 — extract shared shape)
+- `apps/mobile-client/src/lib/api.ts` (+23)
+- `apps/mobile-client/src/screens/home/HomeScreen.tsx` (+20/-?)
+- `apps/mobile-client/src/screens/product/ProductScreen.tsx` (+11/-?)
+
+14 files, +604/-85.
+
+### ⚠️ Deploy action required
+
+Перед `deploy.ps1` на сервері:
+
+```powershell
+$env:DATABASE_URL = "postgresql://ltex:tek49RcusCHUr8wV@localhost:5432/ltex_ecosystem"
+$env:DIRECT_URL = "postgresql://ltex:tek49RcusCHUr8wV@localhost:5432/ltex_ecosystem"
+pnpm --filter @ltex/db exec prisma migrate deploy
+```
+
+Очікувано: `Applying migration "20260429_view_log"`. Без цього `recommendations` і `view` endpoints падатимуть з `relation "view_log" does not exist`.
+
+Supabase migration — skip (per Session 36 decision, Supabase DB = cold backup).
+
+### Out-of-scope (per spec)
+
+- Web recommendations rail на homepage
+- Cleanup job для ViewLog (drop > 90 днів)
+- Real-time recommendations (collaborative filtering, ML)
+- Tracking з catalog grid / search results (only product_detail entry)
+- Admin dashboard "popular products"
+- Deduplication (same user-product pair multiple views still create rows)
+
+### Branches до cleanup
+
+- `claude/session-43-viewlog-recommendations` (merged у `1431790`)
