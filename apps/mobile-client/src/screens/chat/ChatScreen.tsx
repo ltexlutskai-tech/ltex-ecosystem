@@ -15,6 +15,7 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "@/lib/auth";
 import { chatApi } from "@/lib/api";
+import { useChatUnread } from "@/lib/chat-unread";
 import { ChatSkeleton } from "@/components/SkeletonLoader";
 
 interface ChatMessage {
@@ -36,6 +37,7 @@ const POLL_FALLBACK_INTERVAL = 10000;
 
 export function ChatScreen(_props: ChatScreenProps) {
   const { customerId } = useAuth();
+  const { markRead: clearUnreadBadge } = useChatUnread();
   const flatListRef = useRef<FlatList<ChatMessage>>(null);
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -82,11 +84,17 @@ export function ChatScreen(_props: ChatScreenProps) {
             chatApi.markRead(unreadManagerMsg.id).catch(() => {});
           }
         }
+        // Optimistically clear the global badge whenever the user is viewing
+        // the chat — even if the latest fetch had no new manager messages,
+        // any prior unread-count is now stale.
+        if (!loadCursor) {
+          clearUnreadBadge();
+        }
       } catch {
         // Silently handle polling errors
       }
     },
-    [customerId],
+    [customerId, clearUnreadBadge],
   );
 
   // ─── SSE connection ──────────────────────────────────────────────────────────
@@ -124,6 +132,7 @@ export function ChatScreen(_props: ChatScreenProps) {
           // Auto-mark manager messages as read while chat is open
           if (msg.sender === "manager" && !msg.isRead) {
             chatApi.markRead(msg.id).catch(() => {});
+            clearUnreadBadge();
           }
         } catch {
           // Ignore parse errors
@@ -150,7 +159,7 @@ export function ChatScreen(_props: ChatScreenProps) {
     } catch {
       setUseSSE(false);
     }
-  }, [customerId]);
+  }, [customerId, clearUnreadBadge]);
 
   const closeSSE = useCallback(() => {
     if (eventSourceRef.current) {

@@ -191,6 +191,7 @@ export const chatApi = {
     const token = currentToken ?? "";
     return `${API_URL}/mobile/chat/stream?token=${encodeURIComponent(token)}`;
   },
+  unreadCount: () => api<{ count: number }>("/mobile/chat/unread"),
 };
 
 // Shipments

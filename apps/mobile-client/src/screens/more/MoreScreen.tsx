@@ -8,6 +8,7 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
+import { useChatUnread } from "@/lib/chat-unread";
 
 interface MoreItem {
   key: string;
@@ -64,6 +65,7 @@ const ITEMS: MoreItem[] = [
 
 export function MoreScreen() {
   const navigation = useNavigation<any>();
+  const { count: chatUnread } = useChatUnread();
   return (
     <ScrollView style={styles.container}>
       {ITEMS.map((item, idx) => (
@@ -78,6 +80,13 @@ export function MoreScreen() {
             <Ionicons name={item.icon} size={22} color={item.color} />
           </View>
           <Text style={styles.label}>{item.label}</Text>
+          {item.key === "chat" && chatUnread > 0 ? (
+            <View style={styles.badge} accessibilityLabel="Нові повідомлення">
+              <Text style={styles.badgeText}>
+                {chatUnread > 9 ? "9+" : chatUnread}
+              </Text>
+            </View>
+          ) : null}
           <Ionicons name="chevron-forward" size={18} color="#9ca3af" />
         </TouchableOpacity>
       ))}
@@ -106,4 +115,18 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   label: { flex: 1, fontSize: 15, color: "#111827" },
+  badge: {
+    minWidth: 20,
+    height: 20,
+    paddingHorizontal: 6,
+    borderRadius: 10,
+    backgroundColor: "#dc2626",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  badgeText: {
+    color: "#fff",
+    fontSize: 11,
+    fontWeight: "700",
+  },
 });

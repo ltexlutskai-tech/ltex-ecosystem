@@ -33,6 +33,8 @@ import * as Linking from "expo-linking";
 import { useAuth } from "@/lib/auth";
 import { AuthProvider } from "@/lib/auth-provider";
 import { WishlistProvider } from "@/lib/wishlist-provider";
+import { ChatUnreadProvider } from "@/lib/chat-unread-provider";
+import { useChatUnread } from "@/lib/chat-unread";
 import { OfflineBanner } from "@/components/OfflineBanner";
 import { MessengerFab } from "@/components/MessengerFab";
 import { registerPushToken } from "@/lib/notifications";
@@ -316,6 +318,8 @@ const TAB_ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
 };
 
 function MainTabs() {
+  const { count } = useChatUnread();
+  const moreBadge = count > 0 ? (count > 9 ? "9+" : String(count)) : undefined;
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
@@ -356,7 +360,15 @@ function MainTabs() {
       <Tab.Screen
         name="MoreTab"
         component={MoreStackNavigator}
-        options={{ tabBarLabel: "Ще" }}
+        options={{
+          tabBarLabel: "Ще",
+          tabBarBadge: moreBadge,
+          tabBarBadgeStyle: {
+            backgroundColor: "#dc2626",
+            color: "#fff",
+            fontSize: 10,
+          },
+        }}
       />
     </Tab.Navigator>
   );
@@ -415,9 +427,11 @@ export function AppNavigator() {
   return (
     <AuthProvider>
       <WishlistProvider>
-        <NavigationContainer linking={linking} fallback={<SplashScreen />}>
-          <RootNavigator />
-        </NavigationContainer>
+        <ChatUnreadProvider>
+          <NavigationContainer linking={linking} fallback={<SplashScreen />}>
+            <RootNavigator />
+          </NavigationContainer>
+        </ChatUnreadProvider>
       </WishlistProvider>
     </AuthProvider>
   );
