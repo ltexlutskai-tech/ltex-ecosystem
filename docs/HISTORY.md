@@ -2471,3 +2471,78 @@ git pull origin main
 ### Branches до cleanup
 
 - `claude/session-47-mobile-ux-completion` (merged у `0bf914f`)
+
+---
+
+## Session 48 — Web Recommendations Rail
+
+**Date:** 2026-04-28
+**Branch:** `claude/session-48-web-recommendations-9cmJg` → merged at `0c9afc4`
+**Spec:** `docs/SESSION_48_WEB_RECOMMENDATIONS.md`
+
+### Що зроблено
+
+- New `GET /api/recommendations?seen=id1,id2,...` (parses up to 20 IDs, finds shared categories, returns 12 newest in-stock excluding seen). Fallback: newest in-stock when `seen` empty / no categories. 60s edge cache. Reuses `mobileProductInclude` + `mapMobileProduct` (no duplicate logic).
+- 5 vitest cases for endpoint (empty, with seen, ghost IDs, empty match, cache header).
+- `lib/recently-viewed.tsx` — added `id: string` field to `RecentlyViewedItem`. Hydration filter drops legacy entries без `id` (replaced after first new view).
+- Updated `recently-viewed.test.tsx` (всі тести з `id` + 1 новий "drops legacy entries").
+- `track-product-view.tsx` + `product/[slug]/page.tsx` — pass `product.id` через TrackProductView у addItem.
+- New `components/store/recommendations-section.tsx` — client component, читає `useRecentlyViewed`, fetch endpoint, grid 2/3/4/6 cols, hidden коли empty.
+- Wired у homepage `app/(store)/page.tsx` перед `<RecentlyViewedSection />`.
+
+### Verification
+
+Worker: `pnpm format:check` ✅, `pnpm -r typecheck` ✅, `pnpm -r test` ✅ (252 store + 25 shared = 277). Orchestrator merge clean ff.
+
+### Файли (8 changed, +389/-2)
+
+- `apps/store/app/(store)/page.tsx`
+- `apps/store/app/(store)/product/[slug]/page.tsx`
+- `apps/store/app/api/recommendations/route.ts` (new, 78)
+- `apps/store/app/api/recommendations/route.test.ts` (new, 147)
+- `apps/store/components/store/recommendations-section.tsx` (new, 109)
+- `apps/store/components/store/track-product-view.tsx`
+- `apps/store/lib/recently-viewed.tsx`
+- `apps/store/lib/recently-viewed.test.tsx`
+
+---
+
+## Session 49 — ViewLog Cleanup Endpoint
+
+**Date:** 2026-04-28
+**Branch:** `claude/session-49-viewlog-cleanup` → merged at `b196ed7` (no-ff merge after S48 went first)
+**Spec:** `docs/SESSION_49_VIEWLOG_CLEANUP.md`
+
+### Що зроблено
+
+- New `POST /api/cron/cleanup-viewlog` — Bearer/query auth проти `CRON_SECRET`, `prisma.viewLog.deleteMany` з cutoff 30-365 days (default 90). Response `{ deleted, cutoff, days }`.
+- 3 vitest cases (401 без secret, default 90 days, custom days param).
+- `instrumentation.ts` — startup warn якщо `CRON_SECRET` відсутній/короткий (без throw — startup must succeed).
+- `docs/CRON_SETUP.md` — secret generation script + Windows Scheduled Task setup instructions.
+
+### Verification
+
+Worker tests 274 (271 + 3). Combined post-merge: 280/280 ✅ (255 store + 25 shared = 271 baseline + 6 S48 + 3 S49).
+
+### ⚠️ User-side post-deploy actions
+
+1. Generate `CRON_SECRET` (мінімум 16 символів) і додати у `apps/store/.env`:
+   ```powershell
+   [System.Web.Security.Membership]::GeneratePassword(32, 5)
+   ```
+2. Restart PM2 (через звичайний deploy.ps1) щоб env-var підтягнулась.
+3. Створити Windows Scheduled Task per `docs/CRON_SETUP.md` (Daily 03:30, POST з Bearer header).
+
+Без `CRON_SECRET` endpoint завжди 401 — runtime безпечний, лиш cleanup не запускається.
+
+### Файли (4 new, +195)
+
+- `apps/store/app/api/cron/cleanup-viewlog/route.ts` (new, 59)
+- `apps/store/app/api/cron/cleanup-viewlog/route.test.ts` (new, 63)
+- `apps/store/instrumentation.ts` (+6)
+- `docs/CRON_SETUP.md` (new, 67)
+
+### Branches до cleanup
+
+- `claude/session-48-web-recommendations-9cmJg` (merged)
+- `claude/session-49-viewlog-cleanup` (merged)
