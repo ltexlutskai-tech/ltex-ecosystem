@@ -23,6 +23,7 @@ import {
 } from "react-native";
 import {
   NavigationContainer,
+  CommonActions,
   type LinkingOptions,
 } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
@@ -34,7 +35,6 @@ import { useAuth } from "@/lib/auth";
 import { AuthProvider } from "@/lib/auth-provider";
 import { WishlistProvider } from "@/lib/wishlist-provider";
 import { ChatUnreadProvider } from "@/lib/chat-unread-provider";
-import { useChatUnread } from "@/lib/chat-unread";
 import { OfflineBanner } from "@/components/OfflineBanner";
 import { MessengerFab } from "@/components/MessengerFab";
 import { registerPushToken } from "@/lib/notifications";
@@ -317,9 +317,36 @@ const TAB_ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
   MoreTab: "ellipsis-horizontal-outline",
 };
 
+/**
+ * Tab listener that pops the focused tab's stack back to its root screen
+ * when the user taps the already-active tab. Without this, tapping (e.g.)
+ * "Ще" while already on ChatScreen leaves the user stuck on ChatScreen.
+ */
+function makeTabPopToRootListener(tabName: string, rootScreenName: string) {
+  return ({ navigation }: { navigation: any }) => ({
+    tabPress: (e: { preventDefault: () => void }) => {
+      const state = navigation.getState();
+      const tabIndex = state.routes.findIndex(
+        (r: { name: string }) => r.name === tabName,
+      );
+      if (tabIndex === -1) return;
+      const tabRoute = state.routes[tabIndex];
+      const stackIndex = tabRoute?.state?.index ?? 0;
+      const isFocused = state.index === tabIndex;
+      if (isFocused && stackIndex > 0) {
+        e.preventDefault();
+        navigation.dispatch(
+          CommonActions.navigate({
+            name: tabName,
+            params: { screen: rootScreenName },
+          }),
+        );
+      }
+    },
+  });
+}
+
 function MainTabs() {
-  const { count } = useChatUnread();
-  const moreBadge = count > 0 ? (count > 9 ? "9+" : String(count)) : undefined;
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
@@ -346,29 +373,25 @@ function MainTabs() {
         name="HomeTab"
         component={HomeStackNavigator}
         options={{ tabBarLabel: "Головна" }}
+        listeners={makeTabPopToRootListener("HomeTab", "HomeMain")}
       />
       <Tab.Screen
         name="SearchTab"
         component={SearchStackNavigator}
         options={{ tabBarLabel: "Пошук" }}
+        listeners={makeTabPopToRootListener("SearchTab", "SearchMain")}
       />
       <Tab.Screen
         name="CartTab"
         component={CartStackNavigator}
         options={{ tabBarLabel: "Кошик" }}
+        listeners={makeTabPopToRootListener("CartTab", "CartMain")}
       />
       <Tab.Screen
         name="MoreTab"
         component={MoreStackNavigator}
-        options={{
-          tabBarLabel: "Ще",
-          tabBarBadge: moreBadge,
-          tabBarBadgeStyle: {
-            backgroundColor: "#dc2626",
-            color: "#fff",
-            fontSize: 10,
-          },
-        }}
+        options={{ tabBarLabel: "Ще" }}
+        listeners={makeTabPopToRootListener("MoreTab", "MoreMain")}
       />
     </Tab.Navigator>
   );
