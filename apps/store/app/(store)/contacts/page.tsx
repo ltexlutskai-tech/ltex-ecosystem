@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { headers } from "next/headers";
 import { APP_NAME, CONTACTS } from "@ltex/shared";
 import { Card, CardContent, CardHeader, CardTitle } from "@ltex/ui";
 import { Breadcrumbs } from "@/components/store/breadcrumbs";
@@ -12,7 +11,7 @@ export const metadata: Metadata = {
   description: `Контакти L-TEX: ${CONTACTS.phones.join(", ")}. Telegram ${CONTACTS.telegram}. ${CONTACTS.location}. Гуртовий продаж секонд хенду, стоку, іграшок, Bric-a-Brac від 10 кг.`,
 };
 
-export default async function ContactsPage() {
+export default function ContactsPage() {
   const jsonLd = {
     "@context": "https://schema.org",
     "@type": "LocalBusiness",
@@ -29,13 +28,10 @@ export default async function ContactsPage() {
     },
   };
 
-  const nonce = (await headers()).get("x-nonce") ?? undefined;
-
   return (
     <div className="container mx-auto px-4 py-6">
       <script
         type="application/ld+json"
-        nonce={nonce}
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
       <Breadcrumbs items={[{ label: dict.nav.contacts }]} />
