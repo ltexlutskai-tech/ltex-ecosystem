@@ -14,13 +14,17 @@ import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import {
   homeApi,
   recommendationsApi,
+  type MobileHomeCategory,
   type MobileHomeData,
   type WebCatalogProduct,
 } from "@/lib/api";
 import { BannerCarousel } from "@/components/BannerCarousel";
 import { HorizontalProductRail } from "@/components/HorizontalProductRail";
+import { CategoriesCarousel } from "@/components/CategoriesCarousel";
+import { TestimonialsCarousel } from "@/components/TestimonialsCarousel";
 import { CatalogSkeleton } from "@/components/SkeletonLoader";
 import { QuickViewModal } from "@/components/QuickViewModal";
+import { useRecentlyViewed } from "@/lib/recently-viewed";
 
 const BRAND_COLOR = "#16a34a";
 
@@ -73,6 +77,7 @@ export function HomeScreen() {
   const [error, setError] = useState<string | null>(null);
   const [quickViewProduct, setQuickViewProduct] =
     useState<WebCatalogProduct | null>(null);
+  const { products: recentlyViewed } = useRecentlyViewed();
 
   const fetchHome = useCallback(async () => {
     try {
@@ -122,6 +127,13 @@ export function HomeScreen() {
     navigation.navigate("Catalog");
   }, [navigation]);
 
+  const handleCategoryPress = useCallback(
+    (category: MobileHomeCategory) => {
+      navigation.navigate("Catalog", { categorySlug: category.slug });
+    },
+    [navigation],
+  );
+
   if (loading) {
     return (
       <View style={styles.container}>
@@ -134,6 +146,8 @@ export function HomeScreen() {
   const featured = data?.featured ?? [];
   const onSale = data?.onSale ?? [];
   const newArrivals = data?.newArrivals ?? [];
+  const videoReviews = data?.videoReviews ?? [];
+  const categories = data?.categories ?? [];
 
   return (
     <ScrollView
@@ -228,6 +242,28 @@ export function HomeScreen() {
         onProductLongPress={setQuickViewProduct}
         onSeeAll={goCatalog}
       />
+      {videoReviews.length > 0 && (
+        <HorizontalProductRail
+          title="Відеоогляди тижня"
+          products={videoReviews}
+          onProductPress={handleProductPress}
+          onProductLongPress={setQuickViewProduct}
+          onSeeAll={goCatalog}
+        />
+      )}
+      <CategoriesCarousel
+        categories={categories}
+        onPress={handleCategoryPress}
+      />
+      {recentlyViewed.length > 0 && (
+        <HorizontalProductRail
+          title="Нещодавно переглянуті"
+          products={recentlyViewed}
+          onProductPress={handleProductPress}
+          onProductLongPress={setQuickViewProduct}
+        />
+      )}
+      <TestimonialsCarousel />
 
       <QuickViewModal
         product={quickViewProduct}

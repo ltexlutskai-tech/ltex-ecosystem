@@ -18,8 +18,10 @@ import {
   favoritesApi,
   notificationsApi,
   productsApi,
+  type WebCatalogProduct,
 } from "@/lib/api";
 import { ProductSkeleton } from "@/components/SkeletonLoader";
+import { useRecentlyViewed } from "@/lib/recently-viewed";
 
 const QUALITY_LABELS: Record<string, string> = {
   extra: "Екстра",
@@ -111,6 +113,7 @@ export function ProductScreen({ route, navigation }: ProductScreenProps) {
   const [favoriteLoading, setFavoriteLoading] = useState(false);
   const [subscribeLoading, setSubscribeLoading] = useState(false);
   const [cart, setCart] = useState<Record<string, boolean>>({});
+  const { addItem: addRecentlyViewed } = useRecentlyViewed();
 
   useEffect(() => {
     navigation.setOptions({ title: route.params.name });
@@ -123,6 +126,29 @@ export function ProductScreen({ route, navigation }: ProductScreenProps) {
   useEffect(() => {
     productsApi.trackView(productId, "product_detail");
   }, [productId]);
+
+  // Push the product into the locally-persisted "recently viewed" feed once it
+  // has loaded. Snapshot just enough fields for ProductCard rendering.
+  useEffect(() => {
+    if (!product) return;
+    const snapshot: WebCatalogProduct = {
+      id: product.id,
+      slug: product.slug,
+      name: product.name,
+      quality: product.quality,
+      season: product.season,
+      priceUnit: product.priceUnit,
+      country: product.country,
+      videoUrl: product.videoUrl,
+      images: product.imageUrls
+        .slice(0, 1)
+        .map((url) => ({ url, alt: product.name })),
+      _count: { lots: product.lots?.length ?? 0 },
+      prices: product.prices ?? [],
+      createdAt: null,
+    };
+    addRecentlyViewed(snapshot);
+  }, [product, addRecentlyViewed]);
 
   async function loadProduct() {
     setLoading(true);
