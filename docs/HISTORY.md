@@ -2667,3 +2667,79 @@ Worker: format ✅, typecheck ✅, tests 294/294 (269 store + 25 shared, 283 bas
 ### Branches до cleanup
 
 - `claude/session-51-search-facets` (merged у `0baa2c1`)
+
+---
+
+## Session 52 — Mobile FAB Centered + Unread Badge + Tab Pop-to-Root Fix
+
+**Date:** 2026-04-29
+**Branch:** `claude/session-52-mobile-fab-centered-5d3hP` → merged at `31c9325`
+**Spec:** `docs/SESSION_52_MOBILE_FAB_CENTERED.md`
+
+### Що зроблено
+
+- `MessengerFab.tsx` переписано: 64×64 FAB по горизонтальному центру, `bottom: 24` для half-overlap верху tab bar, білий border-ring 3px, червоний unread-badge з `useChatUnread()` (cap "9+"), `pointerEvents="box-none"` на container щоб таби лишались клікабельні. Колір лишився `#16a34a` (BRAND).
+- `AppNavigator.tsx`: видалено дублікат `tabBarBadge` з MoreTab; додано helper `makeTabPopToRootListener(tabName, rootScreenName)` і навішано на всі 4 tab-и. **Регресія fix:** повторний tap на focused tab робить `CommonActions.navigate` до root screen цього tab — тепер "Ще" завжди повертає до MoreScreen menu, навіть якщо FAB → Chat → tap "Ще" (раніше застрягало на Chat).
+
+### Файли (2 changed, +97/-31)
+
+- `apps/mobile-client/src/components/MessengerFab.tsx`
+- `apps/mobile-client/src/navigation/AppNavigator.tsx`
+
+### Verification
+
+Worker: format ✅, typecheck 6/7 (mobile-client skipped як завжди) ✅, tests 291 (25 shared + 266 store). Orchestrator merge clean fast-forward.
+
+---
+
+## Session 53 — Mobile HomeScreen Content Expansion
+
+**Date:** 2026-04-29
+**Branch:** `claude/session-53-mobile-home-sections` → merged at `633ac33` (no-ff merge після S52)
+**Spec:** `docs/SESSION_53_MOBILE_HOME_SECTIONS.md`
+
+### Що зроблено
+
+**Backend** (`apps/store/app/api/mobile/home/route.ts`)
+
+- Додано `videoReviews` (in-stock products з `videoUrl`, take 8) і `categories` (top-level з `_count.products`) у response.
+- Tests 3 → 4 (всі pass).
+
+**Mobile** (`apps/mobile-client`)
+
+- `api.ts` — нові типи `MobileHomeCategory`, розширено `MobileHomeData`.
+- `CategoriesCarousel.tsx` (new, 105) — горизонтальний список топ-категорій, tap → Catalog з префільтром.
+- `useRecentlyViewed` (`recently-viewed.ts`, new 125) — SecureStore-backed (`mobile.recently_viewed_v1`, cap 12). Reload-on-focus + addItem читає storage напряму щоб уникнути race condition при швидкому mount.
+- `testimonials.ts` (new 60) + `TestimonialsCarousel.tsx` (new 177) — статичні 5 відгуків (mirror з web `apps/store/lib/testimonials.ts`), paginated FlatList з dots-indicator.
+- `HomeScreen.tsx` (+36) — порядок секцій: banners → actions → Топ → Акції → Рекомендоване → Новинки → Відеоогляди → Категорії → Нещодавно → Відгуки.
+- `ProductScreen.tsx` (+26) — на mount пушить thin snapshot у recently-viewed feed.
+- `CatalogScreen.tsx` (+12) + `AppNavigator.tsx` (+1) — приймають `route.params.categorySlug` для префільтра від CategoriesCarousel tap.
+
+### Файли (11 changed, +655/-40)
+
+- `apps/store/app/api/mobile/home/route.ts` (+96/-?)
+- `apps/store/app/api/mobile/home/route.test.ts` (+47)
+- `apps/mobile-client/src/lib/api.ts` (+9)
+- `apps/mobile-client/src/lib/recently-viewed.ts` (new, 125)
+- `apps/mobile-client/src/lib/testimonials.ts` (new, 60)
+- `apps/mobile-client/src/components/CategoriesCarousel.tsx` (new, 105)
+- `apps/mobile-client/src/components/TestimonialsCarousel.tsx` (new, 177)
+- `apps/mobile-client/src/screens/home/HomeScreen.tsx` (+36)
+- `apps/mobile-client/src/screens/product/ProductScreen.tsx` (+26)
+- `apps/mobile-client/src/screens/catalog/CatalogScreen.tsx` (+12)
+- `apps/mobile-client/src/navigation/AppNavigator.tsx` (+1)
+
+### Verification
+
+Combined post-merge: format ✅, typecheck 6/6 (mobile skip) ✅, tests 292/292 (267 store + 25 shared = 291 baseline + 1 new home test). Push main clean.
+
+### Deploy notes
+
+- DB не змінено
+- Backend: `/api/mobile/home` віддає 2 нові поля — потрібен `deploy.ps1` server-side
+- Mobile-only (нові компоненти + HomeScreen wiring) — Expo app reload з QR
+
+### Branches до cleanup
+
+- `claude/session-52-mobile-fab-centered-5d3hP` (merged у `31c9325`)
+- `claude/session-53-mobile-home-sections` (merged у `633ac33`)
