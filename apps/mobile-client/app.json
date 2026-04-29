@@ -6,7 +6,13 @@
     "orientation": "portrait",
     "userInterfaceStyle": "light",
     "scheme": "ltex",
+    "icon": "./assets/icon.png",
+    "runtimeVersion": { "policy": "sdkVersion" },
+    "updates": {
+      "url": "https://u.expo.dev/__SET_BY_EAS_INIT__"
+    },
     "splash": {
+      "image": "./assets/splash.png",
       "resizeMode": "contain",
       "backgroundColor": "#16a34a"
     },
@@ -24,6 +30,7 @@
     },
     "android": {
       "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#16a34a"
       },
       "package": "ua.com.ltex.client",
@@ -67,7 +74,7 @@
     "extra": {
       "apiUrl": "https://new.ltex.com.ua/api",
       "eas": {
-        "projectId": ""
+        "projectId": "__SET_BY_EAS_INIT__"
       }
     }
   }
