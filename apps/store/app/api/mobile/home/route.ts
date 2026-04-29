@@ -12,41 +12,60 @@ import {
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  const [banners, featuredEntries, onSaleProducts, newProducts] =
-    await Promise.all([
-      prisma.banner.findMany({
-        where: { isActive: true },
-        orderBy: { position: "asc" },
-        select: {
-          id: true,
-          title: true,
-          subtitle: true,
-          imageUrl: true,
-          ctaLabel: true,
-          ctaHref: true,
-        },
-      }),
-      prisma.featuredProduct.findMany({
-        orderBy: { position: "asc" },
-        take: 12,
-        include: { product: { include: mobileProductInclude } },
-      }),
-      prisma.product.findMany({
-        where: {
-          inStock: true,
-          prices: { some: { priceType: "akciya" } },
-        },
-        take: 12,
-        orderBy: { createdAt: "desc" },
-        include: mobileProductInclude,
-      }),
-      prisma.product.findMany({
-        where: { inStock: true },
-        take: 12,
-        orderBy: { createdAt: "desc" },
-        include: mobileProductInclude,
-      }),
-    ]);
+  const [
+    banners,
+    featuredEntries,
+    onSaleProducts,
+    newProducts,
+    videoProducts,
+    categories,
+  ] = await Promise.all([
+    prisma.banner.findMany({
+      where: { isActive: true },
+      orderBy: { position: "asc" },
+      select: {
+        id: true,
+        title: true,
+        subtitle: true,
+        imageUrl: true,
+        ctaLabel: true,
+        ctaHref: true,
+      },
+    }),
+    prisma.featuredProduct.findMany({
+      orderBy: { position: "asc" },
+      take: 12,
+      include: { product: { include: mobileProductInclude } },
+    }),
+    prisma.product.findMany({
+      where: {
+        inStock: true,
+        prices: { some: { priceType: "akciya" } },
+      },
+      take: 12,
+      orderBy: { createdAt: "desc" },
+      include: mobileProductInclude,
+    }),
+    prisma.product.findMany({
+      where: { inStock: true },
+      take: 12,
+      orderBy: { createdAt: "desc" },
+      include: mobileProductInclude,
+    }),
+    prisma.product.findMany({
+      where: { inStock: true, videoUrl: { not: null } },
+      take: 8,
+      orderBy: { createdAt: "desc" },
+      include: mobileProductInclude,
+    }),
+    prisma.category.findMany({
+      where: { parentId: null },
+      orderBy: { position: "asc" },
+      include: {
+        _count: { select: { products: { where: { inStock: true } } } },
+      },
+    }),
+  ]);
 
   return NextResponse.json(
     {
@@ -59,6 +78,13 @@ export async function GET() {
         .map((entry) => mapMobileProduct(entry.product)),
       onSale: onSaleProducts.map(mapMobileProduct),
       newArrivals: newProducts.map(mapMobileProduct),
+      videoReviews: videoProducts.map(mapMobileProduct),
+      categories: categories.map((c) => ({
+        id: c.id,
+        slug: c.slug,
+        name: c.name,
+        productCount: c._count.products,
+      })),
     },
     {
       headers: {

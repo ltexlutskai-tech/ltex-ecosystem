@@ -306,11 +306,20 @@ export interface MobileHomeBanner {
   ctaHref: string | null;
 }
 
+export interface MobileHomeCategory {
+  id: string;
+  slug: string;
+  name: string;
+  productCount: number;
+}
+
 export interface MobileHomeData {
   banners: MobileHomeBanner[];
   featured: WebCatalogProduct[];
   onSale: WebCatalogProduct[];
   newArrivals: WebCatalogProduct[];
+  videoReviews: WebCatalogProduct[];
+  categories: MobileHomeCategory[];
 }
 
 export const homeApi = {

@@ -70,7 +70,7 @@ const defaultScreenOptions = {
 
 type HomeStackParamList = {
   HomeMain: undefined;
-  Catalog: undefined;
+  Catalog: { categorySlug?: string } | undefined;
   ProductDetail: { productId: string; slug: string; name: string };
   Lots: undefined;
   Wishlist: undefined;

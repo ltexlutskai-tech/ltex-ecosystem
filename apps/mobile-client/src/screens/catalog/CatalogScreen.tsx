@@ -38,6 +38,11 @@ interface CatalogScreenProps {
   navigation: {
     navigate: (screen: string, params?: Record<string, unknown>) => void;
   };
+  route?: {
+    params?: {
+      categorySlug?: string;
+    };
+  };
 }
 
 /**
@@ -69,11 +74,14 @@ function buildQueryParams(
   return params;
 }
 
-export function CatalogScreen({ navigation }: CatalogScreenProps) {
+export function CatalogScreen({ navigation, route }: CatalogScreenProps) {
+  const initialCategorySlug = route?.params?.categorySlug;
   const [products, setProducts] = useState<WebCatalogProduct[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [filters, setFilters] = useState<CatalogFilters>({});
+  const [filters, setFilters] = useState<CatalogFilters>(
+    initialCategorySlug ? { category: initialCategorySlug } : {},
+  );
   // Search bar (in header) is wired straight into filters.q for instant feedback.
   const [searchInput, setSearchInput] = useState("");
   const [page, setPage] = useState(1);
