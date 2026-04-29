@@ -28,9 +28,12 @@ const nextConfig = {
   // (1920×600 JPG/PNG) can easily be 2-5 MB. Bump the limit to 10 MB so
   // uploads don't fail at the framework level with the opaque
   // "An unexpected response was received from the server" error.
+  // allowedOrigins required: Cloudflare Tunnel rewrites Host to localhost,
+  // so Next.js's default Origin === Host check fails with 403.
   experimental: {
     serverActions: {
       bodySizeLimit: "10mb",
+      allowedOrigins: ["new.ltex.com.ua", "ltex.com.ua", "localhost:3000"],
     },
   },
   transpilePackages: ["@ltex/ui", "@ltex/shared", "@ltex/db"],
