@@ -9,7 +9,7 @@
     "icon": "./assets/icon.png",
     "runtimeVersion": { "policy": "sdkVersion" },
     "updates": {
-      "url": "https://u.expo.dev/__SET_BY_EAS_INIT__"
+      "url": "https://u.expo.dev/83900d4b-6b2a-4d7c-bb63-562bb96b6948"
     },
     "splash": {
       "image": "./assets/splash.png",
@@ -74,7 +74,7 @@
     "extra": {
       "apiUrl": "https://new.ltex.com.ua/api",
       "eas": {
-        "projectId": "__SET_BY_EAS_INIT__"
+        "projectId": "83900d4b-6b2a-4d7c-bb63-562bb96b6948"
       }
     }
   }
