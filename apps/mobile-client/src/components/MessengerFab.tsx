@@ -1,15 +1,27 @@
 import React from "react";
 import { TouchableOpacity, View, Text, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation, useNavigationState } from "@react-navigation/native";
 import { useChatUnread } from "@/lib/chat-unread";
 
 const BRAND_COLOR = "#16a34a";
 const BADGE_COLOR = "#dc2626";
 
+function getActiveRouteName(state: any): string | undefined {
+  if (!state) return undefined;
+  const route = state.routes?.[state.index ?? 0];
+  if (!route) return undefined;
+  if (route.state) return getActiveRouteName(route.state);
+  return route.name;
+}
+
 export function MessengerFab() {
   const navigation = useNavigation<any>();
   const { count } = useChatUnread();
+  const activeRoute = useNavigationState((s) => getActiveRouteName(s));
+
+  if (activeRoute === "Chat") return null;
+
   const badgeText = count > 0 ? (count > 9 ? "9+" : String(count)) : null;
   const a11yLabel =
     count > 0
