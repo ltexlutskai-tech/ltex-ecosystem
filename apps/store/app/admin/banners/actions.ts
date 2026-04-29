@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { randomBytes } from "crypto";
 import { z } from "zod";
-import { createClient as createSupabaseAdmin } from "@/lib/supabase/server";
+import { createServiceRoleClient } from "@/lib/supabase/admin";
 import { requireAdmin } from "@/lib/admin-auth";
 import { validateImageFile, InvalidImageError } from "@/lib/validate-image";
 
@@ -78,7 +78,7 @@ export async function uploadBannerImage(
     throw err;
   }
 
-  const supabase = await createSupabaseAdmin();
+  const supabase = createServiceRoleClient();
 
   const id = randomBytes(12).toString("hex");
   const fileName = `banners/${id}.${validated.type}`;

@@ -3,7 +3,7 @@
 import { prisma } from "@ltex/db";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { createClient as createSupabaseAdmin } from "@/lib/supabase/server";
+import { createServiceRoleClient } from "@/lib/supabase/admin";
 import { requireAdmin } from "@/lib/admin-auth";
 import { validateImageFile, InvalidImageError } from "@/lib/validate-image";
 
@@ -80,7 +80,7 @@ export async function uploadProductImage(
     throw err;
   }
 
-  const supabase = await createSupabaseAdmin();
+  const supabase = createServiceRoleClient();
 
   const fileName = `${productId}/${Date.now()}.${validated.type}`;
 
@@ -120,7 +120,7 @@ export async function deleteProductImage(imageId: string, productId: string) {
     // Extract path from URL to delete from storage
     const urlParts = image.url.split("/product-images/");
     if (urlParts[1]) {
-      const supabase = await createSupabaseAdmin();
+      const supabase = createServiceRoleClient();
       await supabase.storage.from("product-images").remove([urlParts[1]]);
     }
 
