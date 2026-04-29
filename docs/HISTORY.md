@@ -2743,3 +2743,56 @@ Combined post-merge: format ✅, typecheck 6/6 (mobile skip) ✅, tests 292/292 
 
 - `claude/session-52-mobile-fab-centered-5d3hP` (merged у `31c9325`)
 - `claude/session-53-mobile-home-sections` (merged у `633ac33`)
+
+---
+
+## Session 54 — EAS Build Preview APK Setup
+
+**Date:** 2026-04-29
+**Branch:** `claude/session-54-eas-build-preview-ri28y` → merged at `8639666`
+**Spec:** `docs/SESSION_54_EAS_BUILD_PREVIEW.md`
+
+### Що зроблено
+
+- `apps/mobile-client/eas.json` (new) — 3 build profiles: `development` (dev client APK), `preview` (internal APK для тестерів), `production` (AAB для Play Store).
+- `apps/mobile-client/app.json` — додано `runtimeVersion: { policy: "sdkVersion" }`, `updates.url`, wired `icon`/`splash.image`/`android.adaptiveIcon.foregroundImage` paths. Placeholder `__SET_BY_EAS_INIT__` у `extra.eas.projectId` і `updates.url` (user замінить після `eas init`).
+- `apps/mobile-client/assets/` — placeholder PNG (icon 1024×1024, adaptive-icon з transparent margin, splash 1284×2778) — зелений `#16a34a` фон + білий "L-TEX". User може замінити на real design пізніше.
+- `docs/EAS_BUILD.md` (new, 112 рядків) — user guide: one-time setup (Expo account, `eas login`, `eas init`), кожен новий APK (`eas build --profile preview`), EAS Update OTA, troubleshooting, post-merge чек-ліст.
+
+### Verification
+
+Worker: format ✅, typecheck ✅ (після `pnpm install` + prisma generate), tests 292/292 ✅. Orchestrator merge clean fast-forward.
+
+### User-action required
+
+Деплой не потрібен (mobile-only config). Аby отримати справжній native APK:
+
+1. Створити Expo акаунт на https://expo.dev
+2. `npm install -g eas-cli && eas login`
+3. `cd apps/mobile-client && eas init` — заповнить `projectId` automatically
+4. Commit + push `app.json` зі справжнім UUID
+5. `eas build --platform android --profile preview` — ~10-15 хв
+6. APK URL → завантажити на телефон → встановити
+
+Деталі — `docs/EAS_BUILD.md`.
+
+### Файли (6 changed, +155/-1)
+
+- `apps/mobile-client/eas.json` (new, 35)
+- `apps/mobile-client/app.json` (+9/-1)
+- `apps/mobile-client/assets/icon.png` (new, binary)
+- `apps/mobile-client/assets/adaptive-icon.png` (new, binary)
+- `apps/mobile-client/assets/splash.png` (new, binary)
+- `docs/EAS_BUILD.md` (new, 112)
+
+### Out-of-scope
+
+- Apple App Store / iOS build (потребує Mac + $99/year)
+- Google Play Store production submission (signing keys, $25)
+- Custom dev client APK build
+- Real assets (icon/splash design) — placeholder зараз
+- `expo-updates` config wire-up (треба окремо коли user захоче OTA)
+
+### Branches до cleanup
+
+- `claude/session-54-eas-build-preview-ri28y` (merged у `8639666`)
