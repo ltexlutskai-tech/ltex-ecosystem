@@ -5,15 +5,15 @@ import { deleteBanner } from "./actions";
 
 export function DeleteBannerButton({
   bannerId,
-  bannerTitle,
+  bannerLabel,
 }: {
   bannerId: string;
-  bannerTitle: string;
+  bannerLabel: string;
 }) {
   return (
     <ConfirmDelete
       title="Видалити банер?"
-      description={`Банер "${bannerTitle}" буде видалено. Файл зображення залишиться в Storage.`}
+      description={`Банер "${bannerLabel}" буде видалено. Файл зображення залишиться в Storage.`}
       action={() => deleteBanner(bannerId)}
     />
   );

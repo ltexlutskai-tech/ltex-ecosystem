@@ -10,11 +10,8 @@ import { requireAdmin } from "@/lib/admin-auth";
 import { validateImageFile, InvalidImageError } from "@/lib/validate-image";
 
 const bannerSchema = z.object({
-  title: z.string().min(1, "Заголовок обов'язковий").max(200),
-  subtitle: z.string().max(500).optional().nullable(),
   imageUrl: z.string().min(1, "Зображення обов'язкове"),
-  ctaLabel: z.string().max(100).optional().nullable(),
-  ctaHref: z.string().max(500).optional().nullable(),
+  ctaHref: z.string().min(1, "Посилання обов'язкове").max(500),
   position: z.number().int().min(0).default(0),
   isActive: z.boolean().default(true),
 });
@@ -22,11 +19,8 @@ const bannerSchema = z.object({
 function parseBannerForm(formData: FormData) {
   const positionRaw = formData.get("position");
   return bannerSchema.parse({
-    title: formData.get("title") ?? "",
-    subtitle: (formData.get("subtitle") as string) || null,
     imageUrl: (formData.get("imageUrl") as string) ?? "",
-    ctaLabel: (formData.get("ctaLabel") as string) || null,
-    ctaHref: (formData.get("ctaHref") as string) || null,
+    ctaHref: (formData.get("ctaHref") as string) ?? "",
     position:
       typeof positionRaw === "string" && positionRaw.length > 0
         ? parseInt(positionRaw, 10)

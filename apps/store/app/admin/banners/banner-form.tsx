@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { Button, Input, Textarea, toast } from "@ltex/ui";
+import { Button, Input, toast } from "@ltex/ui";
 import { Upload } from "lucide-react";
 import { createBanner, updateBanner, uploadBannerImage } from "./actions";
 import type { Banner } from "@ltex/db";
@@ -62,41 +62,18 @@ export function BannerForm({ banner }: BannerFormProps) {
       <input type="hidden" name="imageUrl" value={imageUrl} />
 
       <div>
-        <label htmlFor="ban-title" className="mb-1 block text-sm font-medium">
-          Заголовок *
-        </label>
-        <Input
-          id="ban-title"
-          name="title"
-          defaultValue={banner?.title ?? ""}
-          required
-        />
-      </div>
-
-      <div>
-        <label
-          htmlFor="ban-subtitle"
-          className="mb-1 block text-sm font-medium"
-        >
-          Підзаголовок
-        </label>
-        <Textarea
-          id="ban-subtitle"
-          name="subtitle"
-          defaultValue={banner?.subtitle ?? ""}
-          rows={2}
-        />
-      </div>
-
-      <div>
         <label className="mb-1 block text-sm font-medium">Зображення *</label>
+        <p className="mb-2 text-xs text-gray-500">
+          Готова картинка з усім текстом / лого / закликом всередині.
+          Рекомендований розмір 1920×1080 (16:9).
+        </p>
         {imageUrl ? (
           <div className="mb-2">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={imageUrl}
               alt="Прев'ю"
-              className="h-32 w-full max-w-md rounded-md border object-cover"
+              className="aspect-[16/9] w-full max-w-md rounded-md border object-cover"
             />
           </div>
         ) : null}
@@ -122,35 +99,20 @@ export function BannerForm({ banner }: BannerFormProps) {
         </div>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div>
-          <label
-            htmlFor="ban-cta-label"
-            className="mb-1 block text-sm font-medium"
-          >
-            Текст кнопки
-          </label>
-          <Input
-            id="ban-cta-label"
-            name="ctaLabel"
-            defaultValue={banner?.ctaLabel ?? ""}
-            placeholder="Дивитись каталог"
-          />
-        </div>
-        <div>
-          <label
-            htmlFor="ban-cta-href"
-            className="mb-1 block text-sm font-medium"
-          >
-            Посилання кнопки
-          </label>
-          <Input
-            id="ban-cta-href"
-            name="ctaHref"
-            defaultValue={banner?.ctaHref ?? ""}
-            placeholder="/catalog"
-          />
-        </div>
+      <div>
+        <label
+          htmlFor="ban-cta-href"
+          className="mb-1 block text-sm font-medium"
+        >
+          Посилання *
+        </label>
+        <Input
+          id="ban-cta-href"
+          name="ctaHref"
+          defaultValue={banner?.ctaHref ?? ""}
+          placeholder="Посилання (обов'язкове) — наприклад /catalog або https://..."
+          required
+        />
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">

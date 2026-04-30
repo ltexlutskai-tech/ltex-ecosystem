@@ -299,11 +299,11 @@ export const notificationsApi = {
 // Home (single round-trip for banners + featured + sale + new)
 export interface MobileHomeBanner {
   id: string;
-  title: string;
+  title: string | null;
   subtitle: string | null;
   imageUrl: string;
   ctaLabel: string | null;
-  ctaHref: string | null;
+  ctaHref: string;
 }
 
 export interface MobileHomeCategory {
