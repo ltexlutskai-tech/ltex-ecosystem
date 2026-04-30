@@ -39,10 +39,12 @@ const getCachedHomeData = unstable_cache(
         where: { inStock: true },
         _count: { _all: true },
       }),
-      prisma.banner.findMany({
-        where: { isActive: true },
-        orderBy: { position: "asc" },
-      }),
+      prisma.banner
+        .findMany({
+          where: { isActive: true },
+          orderBy: { position: "asc" },
+        })
+        .then((rows) => rows.filter((b) => b.ctaHref)),
       getFeaturedProducts(12),
       prisma.product.findMany({
         where: { inStock: true },
