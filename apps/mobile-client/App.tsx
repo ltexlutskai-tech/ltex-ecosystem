@@ -1,32 +1,34 @@
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import * as Font from "expo-font";
-import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import { AppNavigator } from "@/navigation/AppNavigator";
 
-SplashScreen.preventAutoHideAsync().catch(() => {});
+const FONT_LOAD_TIMEOUT_MS = 3000;
 
 export default function App() {
-  const [fontsReady, setFontsReady] = useState(false);
+  const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    Font.loadAsync(Ionicons.font)
-      .catch(() => {})
-      .finally(() => setFontsReady(true));
+    let done = false;
+    const proceed = () => {
+      if (done) return;
+      done = true;
+      setReady(true);
+    };
+    Font.loadAsync(Ionicons.font).then(proceed).catch(proceed);
+    const timer = setTimeout(proceed, FONT_LOAD_TIMEOUT_MS);
+    return () => {
+      done = true;
+      clearTimeout(timer);
+    };
   }, []);
 
-  const onLayoutRootView = useCallback(async () => {
-    if (fontsReady) {
-      await SplashScreen.hideAsync().catch(() => {});
-    }
-  }, [fontsReady]);
-
-  if (!fontsReady) return null;
+  if (!ready) return null;
 
   return (
-    <View style={{ flex: 1 }} onLayout={onLayoutRootView}>
+    <View style={{ flex: 1 }}>
       <StatusBar style="dark" />
       <AppNavigator />
     </View>
