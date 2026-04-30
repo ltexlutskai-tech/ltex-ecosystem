@@ -30,9 +30,9 @@
 ## Hard rules
 
 1. НЕ дропати колонки `title`/`subtitle`/`ctaLabel` у БД — лише робимо nullable, на випадок якщо передумаємо. `ctaHref` робимо required.
-2. Aspect ratio фіксований **16:9** (`aspect-[16/9]` Tailwind / `aspectRatio: 16/9` RN). Рекомендований розмір картинки: 1920×1080.
-3. Web carousel — лишаємо swipe/auto-rotate/dots-indicator/prev-next. Прибираємо лише overlay з текстом і кнопкою. Цілий `<Image>` загорнутий у `<Link>`.
-4. Mobile carousel — те саме, цілий image у `<Pressable>` що навігує по ctaHref (internal route → `navigation.navigate`, external https → `Linking.openURL`).
+2. Aspect ratio фіксований **16:9** (`aspect-[16/9]` Tailwind / `aspectRatio: 16/9` RN). Рекомендований розмір картинки: 1920×1080. **Не використовувати fixed heights** (`h-64 md:h-80 lg:h-96`) — на desktop вони змушують `object-cover` кропити боки картинки. З `aspect-[16/9]` контейнер сам адаптує висоту під ширину.
+3. Web carousel — auto-rotate лишається (6с інтервал), але **видалити prev/next стрілки і dots indicator** — вони перекривають image (видно на актуальному production: круглі білі кнопки з chevron-ами по краях, точки знизу). User хоче чистий image без UI поверх.
+4. Mobile carousel — те саме: auto-rotate ОК, **prev/next/dots видалити**. Цілий image у `<Pressable>` що навігує по ctaHref (internal route → `navigation.navigate`, external https → `Linking.openURL`).
 5. Migration cleanup: `DELETE FROM banners` (user підтвердив що старі видалити).
 6. CI: 292 unit baseline + format + typecheck + build green. Без нових тестів (UI refactor).
 
@@ -118,7 +118,11 @@ function parseBannerForm(formData: FormData) {
 ```typescript
 return (
   <div className="relative aspect-[16/9] w-full overflow-hidden rounded-lg">
-    <Link href={current.ctaHref} className="block h-full w-full" data-analytics="banner-click">
+    <Link
+      href={current.ctaHref}
+      className="block h-full w-full"
+      data-analytics="banner-click"
+    >
       <Image
         src={current.imageUrl}
         alt=""
@@ -128,22 +132,31 @@ return (
         className="object-cover transition-opacity duration-500"
       />
     </Link>
-    {banners.length > 1 && (
-      <>
-        {/* prev/next/dots — як зараз. Не у середині Link, поверх. */}
-      </>
-    )}
   </div>
 );
 ```
 
-`alt=""` — бо image декоративний (вся інформація графічна, для accessibility — текст усередині картинки. Якщо потрібен — потім додамо `altText` поле у Banner моделі).
+Прибрано:
 
-Update `Banner` interface у файлі — `title` стає optional, `subtitle/ctaLabel` забираємо, `ctaHref` стає required.
+- Текстовий overlay (h2, p, CTA Link).
+- `<button>` prev / next з ChevronLeft / ChevronRight (вони перекривали image).
+- Dots indicator знизу (теж overlay поверх image).
+- Fixed heights `h-64 md:h-80 lg:h-96` — замінено на `aspect-[16/9]` щоб image не кропився на desktop.
+
+Залишається:
+
+- Auto-rotate `useEffect` 6с — без візуальних кнопок, але слайди змінюються.
+- Cleanup: useState+useEffect, `next`/`prev` callbacks тримаємо у файлі (auto-rotate їх юзає), просто не рендеримо UI controls.
+
+Імпорти `ChevronLeft, ChevronRight` з `lucide-react` — видалити (більше не потрібні).
+
+`alt=""` — бо image декоративний (вся інформація графічна, текст всередині самої картинки). Якщо потім потрібен — додамо `altText` поле у Banner моделі.
+
+Update `Banner` interface у файлі — прибрати `title/subtitle/ctaLabel` (або зробити optional), `ctaHref` стає required (`string`, не `string | null`).
 
 ### 6. Mobile carousel: `apps/mobile-client/src/components/BannerCarousel.tsx`
 
-Замінити рендер каждого банера. Загорнути `<Image>` у `<Pressable onPress={() => handlePress(banner.ctaHref)}>`. Прибрати overlay text/CTA. Aspect ratio 16:9.
+Замінити рендер каждого банера. Загорнути `<Image>` у `<Pressable onPress={() => handlePress(banner.ctaHref)}>`. Прибрати overlay text/CTA + **prev/next/dots indicator** (якщо є — на mobile зараз скоріш за все swipe-only, але якщо рендеряться dots/arrows — видалити). Aspect ratio 16:9 через `style={{ aspectRatio: 16 / 9 }}` на контейнері.
 
 ```typescript
 function handlePress(href: string) {
@@ -176,7 +189,12 @@ Worker подивиться як інші компоненти (`HorizontalProdu
 2. `pnpm -r typecheck` ✅
 3. `pnpm -r test` 292/292 ✅
 4. ASCII-only `deploy.ps1` ✅ (не зачіпається)
-5. Manual: `pnpm --filter @ltex/store dev` → `/admin/banners/new` показує лише image+ctaHref+position+isActive. Після створення — на homepage цілий банер клікається.
+5. Manual web: `pnpm --filter @ltex/store dev` → `/admin/banners/new` показує лише image+ctaHref+position+isActive. Створити banner → на homepage:
+   - Картинка займає повну ширину контейнера, **жодних кропів** — на desktop full HD (1920×1080) image fits з aspect 16:9 без обрізки боків
+   - **Жодних** chevron-кнопок зліва/справа і dots внизу
+   - Клік будь-де по image → перехід на ctaHref
+   - При >1 банері — auto-slide через 6с (без візуальних controls)
+6. Manual mobile (responsive): на 375×667 viewport image теж fits aspect 16:9, без overlay UI.
 
 ---
 
