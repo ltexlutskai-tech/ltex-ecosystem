@@ -33,7 +33,7 @@ export default async function BannersPage() {
           <thead>
             <tr className="border-b bg-gray-50 text-left text-gray-500">
               <th className="px-4 py-3 font-medium">Прев'ю</th>
-              <th className="px-4 py-3 font-medium">Заголовок</th>
+              <th className="px-4 py-3 font-medium">Посилання</th>
               <th className="px-4 py-3 font-medium">Позиція</th>
               <th className="px-4 py-3 font-medium">Статус</th>
               <th className="px-4 py-3 font-medium">Дії</th>
@@ -53,17 +53,14 @@ export default async function BannersPage() {
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={banner.imageUrl}
-                      alt={banner.title}
+                      alt={banner.title ?? ""}
                       className="h-[45px] w-20 rounded object-cover"
                     />
                   </td>
                   <td className="px-4 py-3">
-                    <div className="font-medium">{banner.title}</div>
-                    {banner.subtitle && (
-                      <div className="max-w-md truncate text-xs text-gray-500">
-                        {banner.subtitle}
-                      </div>
-                    )}
+                    <div className="max-w-md truncate font-mono text-xs text-gray-700">
+                      {banner.ctaHref}
+                    </div>
                   </td>
                   <td className="px-4 py-3">{banner.position}</td>
                   <td className="px-4 py-3">
@@ -83,7 +80,7 @@ export default async function BannersPage() {
                       </Link>
                       <DeleteBannerButton
                         bannerId={banner.id}
-                        bannerTitle={banner.title}
+                        bannerLabel={banner.ctaHref}
                       />
                     </div>
                   </td>
