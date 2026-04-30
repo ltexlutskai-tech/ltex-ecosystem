@@ -58,7 +58,7 @@ pnpm --filter @ltex/db exec prisma generate
 #   `pm2 ping` and starts ltex-store fresh from ecosystem.config.js.
 if (-not $SkipBuild) {
     Write-Host "  Killing PM2 daemon before build (releases ltex-store file locks)..." -ForegroundColor Yellow
-    pm2 kill > $null 2>&1
+    try { pm2 kill 2>&1 | Out-Null } catch { }
     Start-Sleep -Seconds 2
 }
 
