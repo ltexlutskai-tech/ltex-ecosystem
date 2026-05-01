@@ -616,7 +616,10 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "flex-end",
     paddingHorizontal: 12,
-    paddingVertical: 8,
+    paddingTop: 8,
+    // Extra bottom padding so MessengerFab (centered, 64px circle, bottom: 24)
+    // does not overlap the text input on this screen.
+    paddingBottom: 96,
     backgroundColor: "#fff",
     borderTopWidth: 1,
     borderTopColor: "#e5e7eb",
