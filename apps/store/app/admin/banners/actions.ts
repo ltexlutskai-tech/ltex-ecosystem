@@ -4,6 +4,7 @@ import { prisma } from "@ltex/db";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { randomBytes } from "crypto";
+import sharp from "sharp";
 import { z } from "zod";
 import { createServiceRoleClient } from "@/lib/supabase/admin";
 import { requireAdmin } from "@/lib/admin-auth";
@@ -64,22 +65,36 @@ export async function uploadBannerImage(
   }
 
   // Sniff actual bytes — file.name extension and file.type are attacker-controlled.
-  let validated;
   try {
-    validated = await validateImageFile(file, { maxBytes: 10 * 1024 * 1024 });
+    await validateImageFile(file, { maxBytes: 10 * 1024 * 1024 });
   } catch (err) {
     if (err instanceof InvalidImageError) throw new Error(err.message);
     throw err;
   }
 
+  // Resize + convert to WEBP. Banners are 16:9 hero images, so we allow a
+  // larger long side (2400px) to keep them sharp on desktop retina without
+  // shipping the original 5-10 MB upload.
+  const buf = Buffer.from(await file.arrayBuffer());
+  const optimized = await sharp(buf)
+    .rotate()
+    .resize({
+      width: 2400,
+      height: 1350,
+      fit: "inside",
+      withoutEnlargement: true,
+    })
+    .webp({ quality: 85 })
+    .toBuffer();
+
   const supabase = createServiceRoleClient();
 
   const id = randomBytes(12).toString("hex");
-  const fileName = `banners/${id}.${validated.type}`;
+  const fileName = `banners/${id}.webp`;
 
   const { error } = await supabase.storage
     .from("product-images")
-    .upload(fileName, file, { contentType: validated.mime });
+    .upload(fileName, optimized, { contentType: "image/webp" });
 
   if (error) {
     throw new Error(`Upload failed: ${error.message}`);
