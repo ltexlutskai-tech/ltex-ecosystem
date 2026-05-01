@@ -3,6 +3,7 @@
 import { prisma } from "@ltex/db";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import sharp from "sharp";
 import { createServiceRoleClient } from "@/lib/supabase/admin";
 import { requireAdmin } from "@/lib/admin-auth";
 import { validateImageFile, InvalidImageError } from "@/lib/validate-image";
@@ -72,21 +73,36 @@ export async function uploadProductImage(
   if (!file) return;
 
   // Sniff actual bytes — file.name extension and file.type are attacker-controlled.
-  let validated;
   try {
-    validated = await validateImageFile(file, { maxBytes: 5 * 1024 * 1024 });
+    await validateImageFile(file, { maxBytes: 5 * 1024 * 1024 });
   } catch (err) {
     if (err instanceof InvalidImageError) throw new Error(err.message);
     throw err;
   }
 
+  // Resize + convert to WEBP server-side. Originals can be 5 MB JPEGs from
+  // phones; product gallery loads them as-is, killing mobile bandwidth.
+  // 1920px on the long side is plenty for next/image's 2x retina scaling on
+  // any reasonable viewport. EXIF orientation is honored via .rotate().
+  const buf = Buffer.from(await file.arrayBuffer());
+  const optimized = await sharp(buf)
+    .rotate()
+    .resize({
+      width: 1920,
+      height: 1920,
+      fit: "inside",
+      withoutEnlargement: true,
+    })
+    .webp({ quality: 82 })
+    .toBuffer();
+
   const supabase = createServiceRoleClient();
 
-  const fileName = `${productId}/${Date.now()}.${validated.type}`;
+  const fileName = `${productId}/${Date.now()}.webp`;
 
   const { error } = await supabase.storage
     .from("product-images")
-    .upload(fileName, file, { contentType: validated.mime });
+    .upload(fileName, optimized, { contentType: "image/webp" });
 
   if (error) throw new Error(`Upload failed: ${error.message}`);
 
