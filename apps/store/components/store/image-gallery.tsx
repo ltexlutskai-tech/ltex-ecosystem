@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback } from "react";
+import Image from "next/image";
 import { Dialog, DialogContent } from "@ltex/ui";
 import { ChevronLeft, ChevronRight, X, ZoomIn } from "lucide-react";
 
@@ -41,15 +42,18 @@ export function ImageGallery({ images, productName }: ImageGalleryProps) {
     <div className="space-y-3">
       {/* Main image */}
       <div
-        className="group relative cursor-pointer overflow-hidden rounded-lg border"
+        className="group relative aspect-[4/3] w-full cursor-pointer overflow-hidden rounded-lg border bg-gray-100"
         onClick={() => setLightboxOpen(true)}
       >
-        <img
+        <Image
           src={currentImage.url}
           alt={currentImage.alt || productName}
-          className="w-full object-cover transition-transform group-hover:scale-[1.02]"
+          fill
+          sizes="(max-width: 1024px) 100vw, 50vw"
+          priority={selectedIndex === 0}
+          className="object-cover transition-transform group-hover:scale-[1.02]"
         />
-        <div className="absolute inset-0 flex items-center justify-center bg-black/0 transition-colors group-hover:bg-black/10">
+        <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center bg-black/0 transition-colors group-hover:bg-black/10">
           <ZoomIn className="h-8 w-8 text-white opacity-0 transition-opacity group-hover:opacity-80" />
         </div>
         {images.length > 1 && (
@@ -59,7 +63,7 @@ export function ImageGallery({ images, productName }: ImageGalleryProps) {
                 e.stopPropagation();
                 goTo(selectedIndex - 1);
               }}
-              className="absolute left-2 top-1/2 -translate-y-1/2 rounded-full bg-white/80 p-1.5 shadow-md hover:bg-white"
+              className="absolute left-2 top-1/2 z-20 -translate-y-1/2 rounded-full bg-white/80 p-1.5 shadow-md hover:bg-white"
               aria-label="Попереднє фото"
             >
               <ChevronLeft className="h-5 w-5" />
@@ -69,7 +73,7 @@ export function ImageGallery({ images, productName }: ImageGalleryProps) {
                 e.stopPropagation();
                 goTo(selectedIndex + 1);
               }}
-              className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-white/80 p-1.5 shadow-md hover:bg-white"
+              className="absolute right-2 top-1/2 z-20 -translate-y-1/2 rounded-full bg-white/80 p-1.5 shadow-md hover:bg-white"
               aria-label="Наступне фото"
             >
               <ChevronRight className="h-5 w-5" />
@@ -85,16 +89,19 @@ export function ImageGallery({ images, productName }: ImageGalleryProps) {
             <button
               key={i}
               onClick={() => setSelectedIndex(i)}
-              className={`h-16 w-16 shrink-0 overflow-hidden rounded-md border-2 transition-colors ${
+              className={`relative h-16 w-16 shrink-0 overflow-hidden rounded-md border-2 transition-colors ${
                 i === selectedIndex
                   ? "border-green-500"
                   : "border-transparent hover:border-gray-300"
               }`}
             >
-              <img
+              <Image
                 src={img.url}
                 alt={img.alt || `${productName} ${i + 1}`}
-                className="h-full w-full object-cover"
+                fill
+                sizes="64px"
+                loading="lazy"
+                className="object-cover"
               />
             </button>
           ))}
@@ -104,15 +111,18 @@ export function ImageGallery({ images, productName }: ImageGalleryProps) {
       {/* Lightbox */}
       <Dialog open={lightboxOpen} onOpenChange={setLightboxOpen}>
         <DialogContent className="max-h-[95vh] max-w-4xl border-0 bg-black/95 p-0">
-          <div className="relative flex h-[90vh] items-center justify-center">
-            <img
+          <div className="relative h-[90vh] w-full">
+            <Image
               src={currentImage.url}
               alt={currentImage.alt || productName}
-              className="max-h-full max-w-full object-contain"
+              fill
+              sizes="100vw"
+              quality={90}
+              className="object-contain"
             />
             <button
               onClick={() => setLightboxOpen(false)}
-              className="absolute right-4 top-4 rounded-full bg-white/20 p-2 text-white hover:bg-white/40"
+              className="absolute right-4 top-4 z-20 rounded-full bg-white/20 p-2 text-white hover:bg-white/40"
             >
               <X className="h-5 w-5" />
             </button>
@@ -120,19 +130,19 @@ export function ImageGallery({ images, productName }: ImageGalleryProps) {
               <>
                 <button
                   onClick={() => goTo(selectedIndex - 1)}
-                  className="absolute left-4 top-1/2 -translate-y-1/2 rounded-full bg-white/20 p-2 text-white hover:bg-white/40"
+                  className="absolute left-4 top-1/2 z-20 -translate-y-1/2 rounded-full bg-white/20 p-2 text-white hover:bg-white/40"
                 >
                   <ChevronLeft className="h-6 w-6" />
                 </button>
                 <button
                   onClick={() => goTo(selectedIndex + 1)}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 rounded-full bg-white/20 p-2 text-white hover:bg-white/40"
+                  className="absolute right-4 top-1/2 z-20 -translate-y-1/2 rounded-full bg-white/20 p-2 text-white hover:bg-white/40"
                 >
                   <ChevronRight className="h-6 w-6" />
                 </button>
               </>
             )}
-            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 rounded-full bg-black/50 px-3 py-1 text-sm text-white">
+            <div className="absolute bottom-4 left-1/2 z-20 -translate-x-1/2 rounded-full bg-black/50 px-3 py-1 text-sm text-white">
               {selectedIndex + 1} / {images.length}
             </div>
           </div>
