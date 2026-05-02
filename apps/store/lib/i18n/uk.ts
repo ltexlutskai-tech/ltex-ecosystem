@@ -132,6 +132,8 @@ export const uk = {
     barcode: "Штрихкод",
     weight: "Вага",
     priceEur: "Ціна EUR",
+    priceTotal: "Ціна",
+    approxPriceTooltip: "Розраховано на середню вагу — менеджер уточнить",
     clearCart: "Очистити кошик",
     summary: "Підсумок",
     lotsCount: "Лотів",
