@@ -90,19 +90,29 @@ export function LotsFiltersForm({ categories, onApply }: LotsFiltersFormProps) {
     [searchParams, updateParam],
   );
 
-  const commitRange = useCallback(
-    (minKey: string, maxKey: string, minVal: string, maxVal: string) => {
-      const params = new URLSearchParams(searchParams.toString());
-      if (minVal) params.set(minKey, minVal);
-      else params.delete(minKey);
-      if (maxVal) params.set(maxKey, maxVal);
-      else params.delete(maxKey);
-      params.delete("page");
-      router.push(`${pathname}?${params.toString()}`);
-      onApply?.();
-    },
-    [router, pathname, searchParams, onApply],
-  );
+  const commitRanges = useCallback(() => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (weightMin) params.set("weightMin", weightMin);
+    else params.delete("weightMin");
+    if (weightMax) params.set("weightMax", weightMax);
+    else params.delete("weightMax");
+    if (priceMin) params.set("priceMin", priceMin);
+    else params.delete("priceMin");
+    if (priceMax) params.set("priceMax", priceMax);
+    else params.delete("priceMax");
+    params.delete("page");
+    router.push(`${pathname}?${params.toString()}`);
+    onApply?.();
+  }, [
+    router,
+    pathname,
+    searchParams,
+    onApply,
+    weightMin,
+    weightMax,
+    priceMin,
+    priceMax,
+  ]);
 
   const clearAll = useCallback(() => {
     setWeightMin("");
@@ -283,9 +293,6 @@ export function LotsFiltersForm({ categories, onApply }: LotsFiltersFormProps) {
             placeholder="від"
             value={weightMin}
             onChange={(e) => setWeightMin(e.target.value)}
-            onBlur={() =>
-              commitRange("weightMin", "weightMax", weightMin, weightMax)
-            }
             className="w-full rounded border px-2 py-1.5"
             aria-label="Вага лота від"
           />
@@ -296,9 +303,6 @@ export function LotsFiltersForm({ categories, onApply }: LotsFiltersFormProps) {
             placeholder="до"
             value={weightMax}
             onChange={(e) => setWeightMax(e.target.value)}
-            onBlur={() =>
-              commitRange("weightMin", "weightMax", weightMin, weightMax)
-            }
             className="w-full rounded border px-2 py-1.5"
             aria-label="Вага лота до"
           />
@@ -315,9 +319,6 @@ export function LotsFiltersForm({ categories, onApply }: LotsFiltersFormProps) {
             placeholder="від"
             value={priceMin}
             onChange={(e) => setPriceMin(e.target.value)}
-            onBlur={() =>
-              commitRange("priceMin", "priceMax", priceMin, priceMax)
-            }
             className="w-full rounded border px-2 py-1.5"
             aria-label="Ціна від"
           />
@@ -328,13 +329,17 @@ export function LotsFiltersForm({ categories, onApply }: LotsFiltersFormProps) {
             placeholder="до"
             value={priceMax}
             onChange={(e) => setPriceMax(e.target.value)}
-            onBlur={() =>
-              commitRange("priceMin", "priceMax", priceMin, priceMax)
-            }
             className="w-full rounded border px-2 py-1.5"
             aria-label="Ціна до"
           />
         </div>
+        <button
+          type="button"
+          onClick={commitRanges}
+          className="mt-3 w-full rounded-md bg-green-600 px-3 py-2 text-sm font-medium text-white hover:bg-green-700"
+        >
+          Застосувати ціну та вагу
+        </button>
       </div>
     </div>
   );

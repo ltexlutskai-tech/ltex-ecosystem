@@ -17,7 +17,7 @@ interface LotsFiltersProps {
 
 export function LotsFilters({ categories }: LotsFiltersProps) {
   return (
-    <aside className="hidden h-fit rounded-lg border bg-white p-5 lg:sticky lg:top-20 lg:block">
+    <aside className="hidden h-fit max-h-[calc(100vh-6rem)] overflow-y-auto rounded-lg border bg-white p-5 lg:sticky lg:top-20 lg:block">
       <LotsFiltersForm categories={categories} />
     </aside>
   );
