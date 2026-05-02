@@ -33,10 +33,7 @@ function parseList(raw: string | null): string[] {
 
 const labelClass = "mb-2 block text-sm font-medium text-gray-700";
 
-export function LotsFiltersForm({
-  categories,
-  onApply,
-}: LotsFiltersFormProps) {
+export function LotsFiltersForm({ categories, onApply }: LotsFiltersFormProps) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
