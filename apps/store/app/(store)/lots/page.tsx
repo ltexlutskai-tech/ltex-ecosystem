@@ -15,6 +15,7 @@ import { LotCard } from "@/components/store/lot-card";
 import { LotsFilters, LotsFilterSheet } from "@/components/store/lots-filters";
 import type { LotCategoryOption } from "@/components/store/lots-filters-form";
 import { LotsSortSelect } from "@/components/store/lots-sort-select";
+import { CatalogLayoutToggle } from "@/components/store/catalog-layout-toggle";
 import { getCurrentRate } from "@/lib/exchange-rate";
 
 export const revalidate = 60;
@@ -211,6 +212,8 @@ export default async function LotsPage({
   const priceMax = parsePositiveFloat(getStr(params, "priceMax"));
   const query = (getStr(params, "q") ?? "").trim();
   const sort = getStr(params, "sort") ?? "newest";
+  const layout: "grid" | "list" =
+    getStr(params, "layout") === "list" ? "list" : "grid";
   const pageRaw = parseInt(getStr(params, "page") ?? "1", 10);
   const page = Number.isFinite(pageRaw) && pageRaw > 0 ? pageRaw : 1;
 
@@ -377,6 +380,7 @@ export default async function LotsPage({
               />
             </div>
             <LotsSortSelect />
+            <CatalogLayoutToggle currentLayout={layout} />
             <button
               type="submit"
               className="rounded-md bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 md:hidden"
@@ -417,10 +421,17 @@ export default async function LotsPage({
               .
             </div>
           ) : (
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            <div
+              className={
+                layout === "list"
+                  ? "space-y-3"
+                  : "grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3"
+              }
+            >
               {lots.map((lot) => (
                 <LotCard
                   key={lot.id}
+                  layout={layout}
                   lot={{
                     id: lot.id,
                     barcode: lot.barcode,
