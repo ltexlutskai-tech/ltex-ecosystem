@@ -17,14 +17,9 @@ afterEach(() => {
   cleanup();
 });
 
-const CATEGORIES = [
-  { id: "cat-odyag", name: "Одяг", count: 412 },
-  { id: "cat-vzuttia", name: "Взуття", count: 89 },
-];
-
 describe("LotsFiltersForm", () => {
   it("appends status=free when 'Вільні' checkbox toggled on", () => {
-    render(<LotsFiltersForm categories={CATEGORIES} />);
+    render(<LotsFiltersForm />);
     const cb = screen.getByLabelText("Вільні");
     fireEvent.click(cb);
     expect(pushMock).toHaveBeenCalledTimes(1);
@@ -33,7 +28,7 @@ describe("LotsFiltersForm", () => {
 
   it("supports multi-status (free + on_sale + reserved)", () => {
     currentSearchParams = new URLSearchParams("status=free");
-    render(<LotsFiltersForm categories={CATEGORIES} />);
+    render(<LotsFiltersForm />);
     const cb = screen.getByLabelText("Акції");
     fireEvent.click(cb);
     const url = pushMock.mock.calls[0]?.[0] as string;
@@ -42,7 +37,7 @@ describe("LotsFiltersForm", () => {
 
   it("removes single status from comma list when toggled off", () => {
     currentSearchParams = new URLSearchParams("status=free,on_sale");
-    render(<LotsFiltersForm categories={CATEGORIES} />);
+    render(<LotsFiltersForm />);
     const cb = screen.getByLabelText("Вільні");
     fireEvent.click(cb);
     const url = pushMock.mock.calls[0]?.[0] as string;
@@ -51,25 +46,27 @@ describe("LotsFiltersForm", () => {
   });
 
   it("encodes isNew=true when 'Новинки' checkbox toggled on", () => {
-    render(<LotsFiltersForm categories={CATEGORIES} />);
+    render(<LotsFiltersForm />);
     const cb = screen.getByLabelText(/Новинки/);
     fireEvent.click(cb);
     expect(pushMock).toHaveBeenCalledTimes(1);
     expect(pushMock.mock.calls[0]?.[0]).toContain("isNew=true");
   });
 
-  it("appends categoryId on toggle (multi-select via comma list)", () => {
-    render(<LotsFiltersForm categories={CATEGORIES} />);
+  // Categories moved out of the sidebar form into the top pills bar
+  // (LotsCategoryPills) — see lots-category-pills.test.tsx.
+  it.skip("appends categoryId on toggle (multi-select via comma list)", () => {
+    render(<LotsFiltersForm />);
     const cb = screen.getByLabelText(/Одяг/);
     fireEvent.click(cb);
     expect(pushMock.mock.calls[0]?.[0]).toContain("categoryId=cat-odyag");
   });
 
-  it("removes single value from comma-separated list when toggled off", () => {
+  it.skip("removes single value from comma-separated list when toggled off", () => {
     currentSearchParams = new URLSearchParams(
       "categoryId=cat-odyag,cat-vzuttia",
     );
-    render(<LotsFiltersForm categories={CATEGORIES} />);
+    render(<LotsFiltersForm />);
     const cb = screen.getByLabelText(/Одяг/);
     fireEvent.click(cb);
     const url = pushMock.mock.calls[0]?.[0] as string;
@@ -78,7 +75,7 @@ describe("LotsFiltersForm", () => {
   });
 
   it("commits weight + price ranges via 'Застосувати' button", () => {
-    render(<LotsFiltersForm categories={CATEGORIES} />);
+    render(<LotsFiltersForm />);
     const wMin = screen.getByLabelText("Вага лота від") as HTMLInputElement;
     const pMax = screen.getByLabelText("Ціна до") as HTMLInputElement;
     fireEvent.change(wMin, { target: { value: "10" } });
@@ -93,21 +90,18 @@ describe("LotsFiltersForm", () => {
 
   it("clears all filters via 'Скинути'", () => {
     currentSearchParams = new URLSearchParams("status=free&isNew=true");
-    render(<LotsFiltersForm categories={CATEGORIES} />);
+    render(<LotsFiltersForm />);
     const reset = screen.getByText("Скинути");
     fireEvent.click(reset);
     expect(pushMock).toHaveBeenCalledTimes(1);
     expect(pushMock.mock.calls[0]?.[0]).toBe("/lots");
   });
 
-  it("renders category counts next to names", () => {
-    render(<LotsFiltersForm categories={CATEGORIES} />);
-    expect(screen.getByText("(412)")).toBeDefined();
-    expect(screen.getByText("(89)")).toBeDefined();
-  });
+  // Categories moved out of the sidebar form into the top pills bar
+  // (LotsCategoryPills) — see lots-category-pills.tsx.
 
   it("does not render the removed 'Тільки з відеооглядом' filter", () => {
-    render(<LotsFiltersForm categories={CATEGORIES} />);
+    render(<LotsFiltersForm />);
     expect(screen.queryByLabelText(/Тільки з відеооглядом/)).toBeNull();
   });
 });

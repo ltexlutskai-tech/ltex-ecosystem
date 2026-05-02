@@ -14,6 +14,7 @@ import { Pagination } from "@/components/store/pagination";
 import { LotCard } from "@/components/store/lot-card";
 import { LotsFilters, LotsFilterSheet } from "@/components/store/lots-filters";
 import type { LotCategoryOption } from "@/components/store/lots-filters-form";
+import { LotsCategoryPills } from "@/components/store/lots-category-pills";
 import { LotsSortSelect } from "@/components/store/lots-sort-select";
 import { CatalogLayoutToggle } from "@/components/store/catalog-layout-toggle";
 import { getCurrentRate } from "@/lib/exchange-rate";
@@ -353,8 +354,10 @@ export default async function LotsPage({
         додай у замовлення.
       </p>
 
+      <LotsCategoryPills categories={categoryOptions} />
+
       <div className="mt-6 grid gap-6 lg:grid-cols-[280px_1fr]">
-        <LotsFilters categories={categoryOptions} />
+        <LotsFilters />
 
         <div className="min-w-0">
           <form
@@ -391,7 +394,7 @@ export default async function LotsPage({
             >
               Шукати
             </button>
-            <LotsFilterSheet categories={categoryOptions} />
+            <LotsFilterSheet />
           </form>
 
           {chips.length > 0 && (

@@ -18,7 +18,6 @@ export interface LotCategoryOption {
 }
 
 interface LotsFiltersFormProps {
-  categories: LotCategoryOption[];
   /** Optional callback fired after filter change — used by mobile sheet to close. */
   onApply?: () => void;
 }
@@ -33,7 +32,7 @@ function parseList(raw: string | null): string[] {
 
 const labelClass = "mb-2 block text-sm font-medium text-gray-700";
 
-export function LotsFiltersForm({ categories, onApply }: LotsFiltersFormProps) {
+export function LotsFiltersForm({ onApply }: LotsFiltersFormProps) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -197,28 +196,7 @@ export function LotsFiltersForm({ categories, onApply }: LotsFiltersFormProps) {
         </div>
       </div>
 
-      {categories.length > 0 && (
-        <div>
-          <span className={labelClass}>Категорія</span>
-          <div className="max-h-48 space-y-1.5 overflow-y-auto pr-1 text-sm">
-            {categories.map((c) => (
-              <label
-                key={c.id}
-                className="flex cursor-pointer items-center gap-2 text-gray-700"
-              >
-                <input
-                  type="checkbox"
-                  checked={selectedCategories.includes(c.id)}
-                  onChange={() => toggleListValue("categoryId", c.id)}
-                  className="h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-1 focus:ring-green-500"
-                />
-                <span className="flex-1">{c.name}</span>
-                <span className="text-xs text-gray-400">({c.count})</span>
-              </label>
-            ))}
-          </div>
-        </div>
-      )}
+      {/* Categories rendered as horizontal pills above the page (lots-category-pills.tsx) */}
 
       <div>
         <span className={labelClass}>Сорт</span>

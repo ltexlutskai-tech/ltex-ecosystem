@@ -10,21 +10,17 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@ltex/ui";
-import { LotsFiltersForm, type LotCategoryOption } from "./lots-filters-form";
+import { LotsFiltersForm } from "./lots-filters-form";
 
-interface LotsFiltersProps {
-  categories: LotCategoryOption[];
-}
-
-export function LotsFilters({ categories }: LotsFiltersProps) {
+export function LotsFilters() {
   return (
     <aside className="hidden h-fit max-h-[calc(100vh-6rem)] overflow-y-auto rounded-lg border bg-white p-5 lg:sticky lg:top-20 lg:block">
-      <LotsFiltersForm categories={categories} />
+      <LotsFiltersForm />
     </aside>
   );
 }
 
-export function LotsFilterSheet({ categories }: LotsFiltersProps) {
+export function LotsFilterSheet() {
   const [open, setOpen] = useState(false);
   return (
     <Sheet open={open} onOpenChange={setOpen}>
@@ -52,7 +48,7 @@ export function LotsFilterSheet({ categories }: LotsFiltersProps) {
           </SheetClose>
         </SheetHeader>
         <div className="mt-4">
-          <LotsFiltersForm categories={categories} />
+          <LotsFiltersForm />
         </div>
       </SheetContent>
     </Sheet>
