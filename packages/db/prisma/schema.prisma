@@ -32,24 +32,28 @@ model Category {
 // ─── Products (← 1С Номенклатура) ───────────────────────────────────────────
 
 model Product {
-  id              String   @id @default(cuid())
-  code1C          String?  @unique @map("code_1c")
-  articleCode     String?  @map("article_code")
-  name            String
-  slug            String   @unique
-  categoryId      String   @map("category_id")
-  description     String   @default("")
-  quality         String
-  season          String   @default("")
-  country         String
-  priceUnit       String   @default("kg") @map("price_unit")
-  averageWeight   Float?   @map("average_weight")
-  videoUrl        String?  @map("video_url")
-  inStock         Boolean  @default(true) @map("in_stock")
-  createdAt       DateTime @default(now()) @map("created_at")
-  updatedAt       DateTime @updatedAt @map("updated_at")
+  id            String   @id @default(cuid())
+  code1C        String?  @unique @map("code_1c")
+  articleCode   String?  @map("article_code")
+  name          String
+  slug          String   @unique
+  categoryId    String   @map("category_id")
+  description   String   @default("")
+  quality       String
+  season        String   @default("")
+  country       String
+  priceUnit     String   @default("kg") @map("price_unit")
+  averageWeight Float?   @map("average_weight")
+  videoUrl      String?  @map("video_url")
+  inStock       Boolean  @default(true) @map("in_stock")
+  gender        String?
+  sizes         String?
+  unitsPerKg    String?  @map("units_per_kg")
+  unitWeight    String?  @map("unit_weight")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
 
-  category           Category           @relation(fields: [categoryId], references: [id])
+  category           Category            @relation(fields: [categoryId], references: [id])
   images             ProductImage[]
   lots               Lot[]
   prices             Price[]
@@ -191,16 +195,16 @@ model Order {
 // ─── Order Items (← табличні секції документів) ─────────────────────────────
 
 model OrderItem {
-  id        String @id @default(cuid())
-  orderId   String @map("order_id")
-  lotId     String @map("lot_id")
-  productId String @map("product_id")
-  priceEur  Float  @map("price_eur")
+  id        String  @id @default(cuid())
+  orderId   String  @map("order_id")
+  lotId     String? @map("lot_id")
+  productId String  @map("product_id")
+  priceEur  Float   @map("price_eur")
   weight    Float
-  quantity  Int    @default(1)
+  quantity  Int     @default(1)
 
   order   Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  lot     Lot     @relation(fields: [lotId], references: [id])
+  lot     Lot?    @relation(fields: [lotId], references: [id])
   product Product @relation(fields: [productId], references: [id])
 
   @@index([orderId])
@@ -230,26 +234,25 @@ model Cart {
   createdAt  DateTime @default(now()) @map("created_at")
   updatedAt  DateTime @updatedAt @map("updated_at")
 
-  customer Customer? @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  customer Customer?  @relation(fields: [customerId], references: [id], onDelete: Cascade)
   items    CartItem[]
 
   @@map("carts")
 }
 
 model CartItem {
-  id        String @id @default(cuid())
-  cartId    String @map("cart_id")
-  lotId     String @map("lot_id")
-  productId String @map("product_id")
-  priceEur  Float  @map("price_eur")
+  id        String  @id @default(cuid())
+  cartId    String  @map("cart_id")
+  lotId     String? @map("lot_id")
+  productId String  @map("product_id")
+  priceEur  Float   @map("price_eur")
   weight    Float
-  quantity  Int    @default(1)
+  quantity  Int     @default(1)
 
   cart    Cart    @relation(fields: [cartId], references: [id], onDelete: Cascade)
-  lot     Lot     @relation(fields: [lotId], references: [id])
+  lot     Lot?    @relation(fields: [lotId], references: [id])
   product Product @relation(fields: [productId], references: [id])
 
-  @@unique([cartId, lotId])
   @@index([cartId])
   @@map("cart_items")
 }
@@ -259,7 +262,7 @@ model CartItem {
 model ChatMessage {
   id         String   @id @default(cuid())
   customerId String   @map("customer_id")
-  sender     String   // "customer" | "manager"
+  sender     String // "customer" | "manager"
   text       String
   imageUrl   String?  @map("image_url")
   isRead     Boolean  @default(false) @map("is_read")
@@ -274,18 +277,18 @@ model ChatMessage {
 // ─── Shipment Tracking (Nova Poshta) ────────────────────────────────────────
 
 model Shipment {
-  id              String   @id @default(cuid())
-  orderId         String   @map("order_id")
-  trackingNumber  String   @map("tracking_number")
-  carrier         String   @default("nova_poshta")
-  status          String   @default("created")
-  statusText      String?  @map("status_text")
+  id              String    @id @default(cuid())
+  orderId         String    @map("order_id")
+  trackingNumber  String    @map("tracking_number")
+  carrier         String    @default("nova_poshta")
+  status          String    @default("created")
+  statusText      String?   @map("status_text")
   estimatedDate   DateTime? @map("estimated_date")
-  recipientCity   String?  @map("recipient_city")
-  recipientBranch String?  @map("recipient_branch")
+  recipientCity   String?   @map("recipient_city")
+  recipientBranch String?   @map("recipient_branch")
   lastCheckedAt   DateTime? @map("last_checked_at")
-  createdAt       DateTime @default(now()) @map("created_at")
-  updatedAt       DateTime @updatedAt @map("updated_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
 
   order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
@@ -314,7 +317,7 @@ model VideoSubscription {
 model Notification {
   id         String    @id @default(cuid())
   customerId String    @map("customer_id")
-  type       String    // "order_status" | "new_video" | "chat_message" | "system"
+  type       String // "order_status" | "new_video" | "chat_message" | "system"
   title      String
   body       String
   payload    Json?
@@ -334,7 +337,7 @@ model PushToken {
   id         String   @id @default(cuid())
   customerId String   @map("customer_id")
   token      String   @unique
-  platform   String   // "ios" | "android" | "web"
+  platform   String // "ios" | "android" | "web"
   active     Boolean  @default(true)
   createdAt  DateTime @default(now()) @map("created_at")
 
@@ -347,16 +350,16 @@ model PushToken {
 // ─── Payments ───────────────────────────────────────────────────────────────
 
 model Payment {
-  id            String   @id @default(cuid())
-  orderId       String   @map("order_id")
-  method        String   // "cash" | "card" | "bank_transfer" | "online"
-  amount        Float
-  currency      String   @default("UAH")
-  status        String   @default("pending") // pending | completed | failed | refunded
-  externalId    String?  @map("external_id")  // payment gateway ID
-  paidAt        DateTime? @map("paid_at")
-  createdAt     DateTime @default(now()) @map("created_at")
-  updatedAt     DateTime @updatedAt @map("updated_at")
+  id         String    @id @default(cuid())
+  orderId    String    @map("order_id")
+  method     String // "cash" | "card" | "bank_transfer" | "online"
+  amount     Float
+  currency   String    @default("UAH")
+  status     String    @default("pending") // pending | completed | failed | refunded
+  externalId String?   @map("external_id") // payment gateway ID
+  paidAt     DateTime? @map("paid_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime  @updatedAt @map("updated_at")
 
   order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
@@ -383,12 +386,12 @@ model Favorite {
 // ─── Sync Log (tracking 1C sync operations) ────────────────────────────────
 
 model SyncLog {
-  id        String   @id @default(cuid())
-  entity    String
-  entityId  String?  @map("entity_id")
-  action    String
-  payload   Json?
-  syncedAt  DateTime @default(now()) @map("synced_at")
+  id       String   @id @default(cuid())
+  entity   String
+  entityId String?  @map("entity_id")
+  action   String
+  payload  Json?
+  syncedAt DateTime @default(now()) @map("synced_at")
 
   @@index([entity, entityId])
   @@index([syncedAt])
@@ -412,16 +415,16 @@ model FeaturedProduct {
 // ─── Banners (homepage carousel, admin-managed) ─────────────────────────────
 
 model Banner {
-  id         String   @id @default(cuid())
-  title      String?
-  subtitle   String?
-  imageUrl   String
-  ctaLabel   String?
-  ctaHref    String
-  position   Int      @default(0)
-  isActive   Boolean  @default(true)
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  id        String   @id @default(cuid())
+  title     String?
+  subtitle  String?
+  imageUrl  String
+  ctaLabel  String?
+  ctaHref   String
+  position  Int      @default(0)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([isActive, position])
   @@map("banners")

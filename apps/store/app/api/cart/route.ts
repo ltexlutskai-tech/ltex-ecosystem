@@ -1,5 +1,29 @@
 import { prisma } from "@ltex/db";
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
+
+const cartItemSchema = z.object({
+  lotId: z.string().min(1).optional(),
+  productId: z.string().min(1),
+  productName: z.string().optional(),
+  barcode: z.string().optional(),
+  priceEur: z.number().nonnegative(),
+  weight: z.number().nonnegative(),
+  quantity: z.number().int().positive(),
+});
+
+const cartPostSchema = z.object({
+  sessionId: z.string().min(1),
+  items: z.array(cartItemSchema),
+});
+
+const cartDeleteSchema = z.object({
+  sessionId: z.string().min(1),
+  // Either a lotId (concrete lot) or a productId-prefixed key for general items.
+  key: z.string().min(1).optional(),
+  // Backward-compat with old clients that send lotId directly.
+  lotId: z.string().min(1).optional(),
+});
 
 export async function GET(request: NextRequest) {
   const sessionId = request.nextUrl.searchParams.get("sessionId");
@@ -26,9 +50,10 @@ export async function GET(request: NextRequest) {
 
     const items = cart.items.map((item) => ({
       id: item.id,
-      lotId: item.lotId,
+      lotId: item.lotId ?? undefined,
       productId: item.productId,
       productName: item.product.name,
+      barcode: item.lot?.barcode,
       priceEur: item.priceEur,
       weight: item.weight,
       quantity: item.quantity,
@@ -48,48 +73,30 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  const { sessionId, items } = body as {
-    sessionId: string;
-    items: Array<{
-      lotId: string;
-      productId: string;
-      productName?: string;
-      priceEur: number;
-      weight: number;
-      quantity: number;
-    }>;
-  };
-
-  if (!sessionId) {
+  const parsed = cartPostSchema.safeParse(body);
+  if (!parsed.success) {
     return NextResponse.json(
-      { error: "sessionId is required" },
+      { error: parsed.error.issues[0]?.message ?? "Invalid request" },
       { status: 400 },
     );
   }
 
-  if (!Array.isArray(items)) {
-    return NextResponse.json(
-      { error: "items must be an array" },
-      { status: 400 },
-    );
-  }
+  const { sessionId, items } = parsed.data;
 
   try {
-    // Upsert cart
     const cart = await prisma.cart.upsert({
       where: { sessionId },
       create: { sessionId },
       update: { updatedAt: new Date() },
     });
 
-    // Delete existing items and recreate
     await prisma.cartItem.deleteMany({ where: { cartId: cart.id } });
 
     if (items.length > 0) {
       await prisma.cartItem.createMany({
         data: items.map((item) => ({
           cartId: cart.id,
-          lotId: item.lotId,
+          lotId: item.lotId ?? null,
           productId: item.productId,
           priceEur: item.priceEur,
           weight: item.weight,
@@ -115,11 +122,19 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  const { sessionId, lotId } = body as { sessionId: string; lotId: string };
-
-  if (!sessionId || !lotId) {
+  const parsed = cartDeleteSchema.safeParse(body);
+  if (!parsed.success) {
     return NextResponse.json(
-      { error: "sessionId and lotId are required" },
+      { error: "sessionId is required" },
+      { status: 400 },
+    );
+  }
+
+  const { sessionId, key, lotId } = parsed.data;
+  const target = key ?? lotId;
+  if (!target) {
+    return NextResponse.json(
+      { error: "key or lotId is required" },
       { status: 400 },
     );
   }
@@ -130,9 +145,17 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ success: true });
     }
 
-    await prisma.cartItem.deleteMany({
-      where: { cartId: cart.id, lotId },
-    });
+    if (target.startsWith("product-")) {
+      // General item: dedupe by productId, no lot.
+      const productId = target.slice("product-".length);
+      await prisma.cartItem.deleteMany({
+        where: { cartId: cart.id, productId, lotId: null },
+      });
+    } else {
+      await prisma.cartItem.deleteMany({
+        where: { cartId: cart.id, lotId: target },
+      });
+    }
 
     return NextResponse.json({ success: true });
   } catch {

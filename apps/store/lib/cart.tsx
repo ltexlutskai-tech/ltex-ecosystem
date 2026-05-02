@@ -11,10 +11,12 @@ import {
 } from "react";
 
 export interface CartItem {
-  lotId: string;
+  // Optional: undefined for "general" items (no specific lot — manager picks one)
+  lotId?: string;
   productId: string;
   productName: string;
-  barcode: string;
+  // Optional: only set when lotId is present
+  barcode?: string;
   weight: number;
   priceEur: number;
   quantity: number;
@@ -26,19 +28,30 @@ interface CartState {
 
 type CartAction =
   | { type: "ADD"; item: CartItem }
-  | { type: "REMOVE"; lotId: string }
+  | { type: "REMOVE"; key: string }
   | { type: "CLEAR" }
   | { type: "LOAD"; items: CartItem[] };
+
+// Stable identity for any cart item — uses lotId when present, else falls back
+// to a productId-prefixed key so general items dedupe per product.
+export function cartItemKey(
+  item: Pick<CartItem, "lotId" | "productId">,
+): string {
+  return item.lotId ?? `product-${item.productId}`;
+}
 
 function cartReducer(state: CartState, action: CartAction): CartState {
   switch (action.type) {
     case "ADD": {
-      const exists = state.items.find((i) => i.lotId === action.item.lotId);
+      const newKey = cartItemKey(action.item);
+      const exists = state.items.find((i) => cartItemKey(i) === newKey);
       if (exists) return state;
       return { items: [...state.items, action.item] };
     }
     case "REMOVE":
-      return { items: state.items.filter((i) => i.lotId !== action.lotId) };
+      return {
+        items: state.items.filter((i) => cartItemKey(i) !== action.key),
+      };
     case "CLEAR":
       return { items: [] };
     case "LOAD":
@@ -49,7 +62,7 @@ function cartReducer(state: CartState, action: CartAction): CartState {
 interface CartContextType {
   items: CartItem[];
   addItem: (item: CartItem) => void;
-  removeItem: (lotId: string) => void;
+  removeItem: (key: string) => void;
   clearCart: () => void;
   totalWeight: number;
   totalEur: number;
@@ -100,11 +113,12 @@ async function syncCartToServer(sessionId: string, items: CartItem[]) {
 function mergeItems(local: CartItem[], server: CartItem[]): CartItem[] {
   const merged = new Map<string, CartItem>();
   for (const item of server) {
-    merged.set(item.lotId, item);
+    merged.set(cartItemKey(item), item);
   }
   for (const item of local) {
-    if (!merged.has(item.lotId)) {
-      merged.set(item.lotId, item);
+    const key = cartItemKey(item);
+    if (!merged.has(key)) {
+      merged.set(key, item);
     }
   }
   return Array.from(merged.values());
@@ -151,7 +165,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
     [],
   );
   const removeItem = useCallback(
-    (lotId: string) => dispatch({ type: "REMOVE", lotId }),
+    (key: string) => dispatch({ type: "REMOVE", key }),
     [],
   );
   const clearCart = useCallback(() => dispatch({ type: "CLEAR" }), []);

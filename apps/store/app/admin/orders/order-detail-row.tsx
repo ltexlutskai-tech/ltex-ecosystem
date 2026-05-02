@@ -11,7 +11,7 @@ import { toast } from "@ltex/ui";
 interface OrderItem {
   id: string;
   productName: string;
-  barcode: string;
+  barcode: string | null;
   weight: number;
   priceEur: number;
   quantity: number;
@@ -130,7 +130,13 @@ export function OrderDetailRow({ order, statusColor }: OrderRowProps) {
                     {order.items.map((item) => (
                       <tr key={item.id} className="border-b">
                         <td className="py-1">{item.productName}</td>
-                        <td className="py-1 font-mono">{item.barcode}</td>
+                        <td className="py-1 font-mono">
+                          {item.barcode ?? (
+                            <span className="italic text-gray-400">
+                              без лоту
+                            </span>
+                          )}
+                        </td>
                         <td className="py-1 text-right">{item.weight} кг</td>
                         <td className="py-1 text-right">
                           €{item.priceEur.toFixed(2)}

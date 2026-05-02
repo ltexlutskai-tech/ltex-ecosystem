@@ -47,7 +47,7 @@ export async function GET(request: NextRequest) {
     exchangeRate: order.exchangeRate,
     notes: order.notes,
     items: order.items.map((item) => ({
-      barcode: item.lot.barcode,
+      barcode: item.lot?.barcode ?? null,
       productId: item.productId,
       priceEur: item.priceEur,
       weight: item.weight,

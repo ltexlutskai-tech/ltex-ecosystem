@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@ltex/ui";
 import { MIN_ORDER_KG, CONTACTS } from "@ltex/shared";
-import { useCart } from "@/lib/cart";
+import { useCart, cartItemKey } from "@/lib/cart";
 import { Trash2, ShoppingCart } from "lucide-react";
 import Link from "next/link";
 import { getDictionary } from "@/lib/i18n";
@@ -44,7 +44,7 @@ export default function CartPage() {
             telegram: customerTelegram || undefined,
           },
           items: items.map((i) => ({
-            lotId: i.lotId,
+            ...(i.lotId ? { lotId: i.lotId } : {}),
             productId: i.productId,
             priceEur: i.priceEur,
             weight: i.weight,
@@ -133,28 +133,33 @@ export default function CartPage() {
                 </tr>
               </thead>
               <tbody>
-                {items.map((item) => (
-                  <tr key={item.lotId} className="border-b">
-                    <td className="px-4 py-3 font-medium">
-                      {item.productName}
-                    </td>
-                    <td className="px-4 py-3 font-mono text-xs">
-                      {item.barcode}
-                    </td>
-                    <td className="px-4 py-3">
-                      {item.weight} {dict.catalog.perKg}
-                    </td>
-                    <td className="px-4 py-3">€{item.priceEur.toFixed(2)}</td>
-                    <td className="px-4 py-3">
-                      <button
-                        onClick={() => removeItem(item.lotId)}
-                        className="text-red-500 hover:text-red-700"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    </td>
-                  </tr>
-                ))}
+                {items.map((item) => {
+                  const key = cartItemKey(item);
+                  return (
+                    <tr key={key} className="border-b">
+                      <td className="px-4 py-3 font-medium">
+                        {item.productName}
+                      </td>
+                      <td className="px-4 py-3 font-mono text-xs">
+                        {item.barcode ?? (
+                          <span className="italic text-gray-400">без лоту</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3">
+                        {item.weight} {dict.catalog.perKg}
+                      </td>
+                      <td className="px-4 py-3">€{item.priceEur.toFixed(2)}</td>
+                      <td className="px-4 py-3">
+                        <button
+                          onClick={() => removeItem(key)}
+                          className="text-red-500 hover:text-red-700"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

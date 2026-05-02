@@ -190,7 +190,7 @@ export default async function OrdersPage({
                     items: order.items.map((item) => ({
                       id: item.id,
                       productName: item.product.name,
-                      barcode: item.lot.barcode,
+                      barcode: item.lot?.barcode ?? null,
                       weight: item.weight,
                       priceEur: item.priceEur,
                       quantity: item.quantity,
