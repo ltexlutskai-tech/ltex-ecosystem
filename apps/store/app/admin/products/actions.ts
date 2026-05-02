@@ -25,6 +25,10 @@ export async function createProduct(formData: FormData) {
     videoUrl: (formData.get("videoUrl") as string) || null,
     articleCode: (formData.get("articleCode") as string) || null,
     code1C: (formData.get("code1C") as string) || null,
+    gender: (formData.get("gender") as string) || null,
+    sizes: (formData.get("sizes") as string) || null,
+    unitsPerKg: (formData.get("unitsPerKg") as string) || null,
+    unitWeight: (formData.get("unitWeight") as string) || null,
     inStock: formData.get("inStock") === "on",
   };
 
@@ -50,6 +54,10 @@ export async function updateProduct(id: string, formData: FormData) {
     videoUrl: (formData.get("videoUrl") as string) || null,
     articleCode: (formData.get("articleCode") as string) || null,
     code1C: (formData.get("code1C") as string) || null,
+    gender: (formData.get("gender") as string) || null,
+    sizes: (formData.get("sizes") as string) || null,
+    unitsPerKg: (formData.get("unitsPerKg") as string) || null,
+    unitWeight: (formData.get("unitWeight") as string) || null,
     inStock: formData.get("inStock") === "on",
   };
 

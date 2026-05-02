@@ -232,6 +232,68 @@ export function ProductForm({ product, categories }: ProductFormProps) {
         </div>
       </div>
 
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div>
+          <label
+            htmlFor="prod-gender"
+            className="mb-1 block text-sm font-medium"
+          >
+            Стать
+          </label>
+          <Input
+            id="prod-gender"
+            name="gender"
+            defaultValue={product?.gender ?? ""}
+            placeholder="Жіноча, чоловіча"
+          />
+        </div>
+        <div>
+          <label
+            htmlFor="prod-sizes"
+            className="mb-1 block text-sm font-medium"
+          >
+            Розміри
+          </label>
+          <Input
+            id="prod-sizes"
+            name="sizes"
+            defaultValue={product?.sizes ?? ""}
+            placeholder="XS – 2XL"
+          />
+        </div>
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div>
+          <label
+            htmlFor="prod-units-per-kg"
+            className="mb-1 block text-sm font-medium"
+          >
+            К-сть одиниць
+          </label>
+          <Input
+            id="prod-units-per-kg"
+            name="unitsPerKg"
+            defaultValue={product?.unitsPerKg ?? ""}
+            placeholder="3–4 шт/кг"
+          />
+        </div>
+        <div>
+          <label
+            htmlFor="prod-unit-weight"
+            className="mb-1 block text-sm font-medium"
+          >
+            Вага одиниці
+          </label>
+          <Input
+            id="prod-unit-weight"
+            name="unitWeight"
+            defaultValue={product?.unitWeight ?? ""}
+            placeholder="0,25–0,35 кг"
+          />
+        </div>
+      </div>
+
       <div className="flex items-center gap-2">
         <input
           type="checkbox"
