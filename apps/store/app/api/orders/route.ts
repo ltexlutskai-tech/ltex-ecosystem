@@ -3,7 +3,10 @@ import { prisma } from "@ltex/db";
 import { MIN_ORDER_KG } from "@ltex/shared";
 import { orderSchema } from "@/lib/validations";
 import { notifyNewOrder } from "@/lib/notifications";
-import { sendOrderConfirmationEmail } from "@/lib/email";
+import {
+  sendOrderConfirmationEmail,
+  type OrderEmailLineItem,
+} from "@/lib/email";
 import { rateLimit, getClientIp } from "@/lib/rate-limit";
 
 export async function POST(request: NextRequest) {
@@ -40,16 +43,21 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // Verify all lots are still free
-  const lotIds = items.map((i) => i.lotId);
-  const lots = await prisma.lot.findMany({
-    where: { id: { in: lotIds }, status: "free" },
-  });
-  if (lots.length !== lotIds.length) {
-    return NextResponse.json(
-      { error: "Деякі лоти вже зарезервовані" },
-      { status: 409 },
-    );
+  // Verify all concrete lots are still free (general items skip this check —
+  // manager picks an available lot when confirming the order).
+  const lotIds = items
+    .map((i) => i.lotId)
+    .filter((id): id is string => Boolean(id));
+  if (lotIds.length > 0) {
+    const lots = await prisma.lot.findMany({
+      where: { id: { in: lotIds }, status: "free" },
+    });
+    if (lots.length !== lotIds.length) {
+      return NextResponse.json(
+        { error: "Деякі лоти вже зарезервовані" },
+        { status: 409 },
+      );
+    }
   }
 
   // Find or create customer
@@ -88,7 +96,7 @@ export async function POST(request: NextRequest) {
           notes: notes ?? null,
           items: {
             create: items.map((i) => ({
-              lotId: i.lotId,
+              lotId: i.lotId ?? null,
               productId: i.productId,
               priceEur: i.priceEur,
               weight: i.weight,
@@ -98,10 +106,12 @@ export async function POST(request: NextRequest) {
         },
       });
 
-      await tx.lot.updateMany({
-        where: { id: { in: lotIds } },
-        data: { status: "reserved" },
-      });
+      if (lotIds.length > 0) {
+        await tx.lot.updateMany({
+          where: { id: { in: lotIds } },
+          data: { status: "reserved" },
+        });
+      }
 
       return ord;
     });
@@ -119,6 +129,31 @@ export async function POST(request: NextRequest) {
 
     // Send confirmation email to customer (if email provided)
     if (dbCustomer.email) {
+      // Hydrate email line-items with product names + barcodes for the
+      // two-section template ("Конкретні лоти" + "Загальні позиції").
+      const productIds = Array.from(new Set(items.map((i) => i.productId)));
+      const products = await prisma.product.findMany({
+        where: { id: { in: productIds } },
+        select: { id: true, name: true },
+      });
+      const lotMap = new Map<string, string>();
+      if (lotIds.length > 0) {
+        const lotsForEmail = await prisma.lot.findMany({
+          where: { id: { in: lotIds } },
+          select: { id: true, barcode: true },
+        });
+        for (const lot of lotsForEmail) lotMap.set(lot.id, lot.barcode);
+      }
+      const productNameMap = new Map(products.map((p) => [p.id, p.name]));
+
+      const emailItems: OrderEmailLineItem[] = items.map((i) => ({
+        productName: productNameMap.get(i.productId) ?? "Товар",
+        barcode: i.lotId ? (lotMap.get(i.lotId) ?? null) : null,
+        weight: i.weight,
+        quantity: i.quantity,
+        priceEur: i.priceEur,
+      }));
+
       sendOrderConfirmationEmail({
         orderId: order.id,
         customerName: customer.name,
@@ -127,6 +162,7 @@ export async function POST(request: NextRequest) {
         totalUah,
         itemCount: items.length,
         totalWeight,
+        items: emailItems,
       }).catch(() => {});
     }
 

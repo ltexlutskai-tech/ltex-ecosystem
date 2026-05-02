@@ -7,7 +7,7 @@ export const orderCustomerSchema = z.object({
 });
 
 export const orderItemSchema = z.object({
-  lotId: z.string().min(1),
+  lotId: z.string().min(1).optional(),
   productId: z.string().min(1),
   priceEur: z.number().positive(),
   weight: z.number().positive(),
@@ -16,7 +16,7 @@ export const orderItemSchema = z.object({
 
 export const orderSchema = z.object({
   customer: orderCustomerSchema,
-  items: z.array(orderItemSchema).min(1, "Додайте хоча б один лот"),
+  items: z.array(orderItemSchema).min(1, "Додайте хоча б одну позицію"),
   notes: z.string().max(1000).optional(),
 });
 

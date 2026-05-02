@@ -13,6 +13,14 @@ import { getDictionary } from "@/lib/i18n";
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://ltex.com.ua";
 
+export interface OrderEmailLineItem {
+  productName: string;
+  barcode: string | null;
+  weight: number;
+  quantity: number;
+  priceEur: number;
+}
+
 interface OrderEmailData {
   orderId: string;
   customerName: string;
@@ -21,6 +29,7 @@ interface OrderEmailData {
   totalUah: number;
   itemCount: number;
   totalWeight: number;
+  items?: OrderEmailLineItem[];
 }
 
 interface StatusEmailData {
@@ -140,15 +149,72 @@ function baseLayout(content: string): string {
 </html>`;
 }
 
+function escapeHtml(input: string): string {
+  return input
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function renderItemsSection(
+  heading: string,
+  hint: string,
+  items: OrderEmailLineItem[],
+): string {
+  if (items.length === 0) return "";
+  const rows = items
+    .map((i) => {
+      const barcodeCell = i.barcode
+        ? `<span style="font-family:monospace;color:#374151">${escapeHtml(i.barcode)}</span>`
+        : `<span style="color:#9ca3af;font-style:italic">—</span>`;
+      return `<tr>
+        <td style="padding:8px;border-bottom:1px solid #f3f4f6">${escapeHtml(i.productName)}</td>
+        <td style="padding:8px;border-bottom:1px solid #f3f4f6">${barcodeCell}</td>
+        <td style="padding:8px;text-align:right;border-bottom:1px solid #f3f4f6">${i.weight.toFixed(1)} кг</td>
+        <td style="padding:8px;text-align:right;border-bottom:1px solid #f3f4f6;font-weight:600">€${i.priceEur.toFixed(2)}</td>
+      </tr>`;
+    })
+    .join("");
+  return `
+    <h3 style="margin:24px 0 6px;color:#374151;font-size:15px">${escapeHtml(heading)}</h3>
+    <p style="margin:0 0 8px;color:#9ca3af;font-size:12px">${escapeHtml(hint)}</p>
+    <table style="width:100%;border-collapse:collapse;font-size:13px">
+      <thead>
+        <tr style="background:#f9fafb;color:#6b7280">
+          <th style="padding:8px;text-align:left;font-weight:500">Товар</th>
+          <th style="padding:8px;text-align:left;font-weight:500">Штрихкод</th>
+          <th style="padding:8px;text-align:right;font-weight:500">Вага</th>
+          <th style="padding:8px;text-align:right;font-weight:500">Сума</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+}
+
 export async function sendOrderConfirmationEmail(
   data: OrderEmailData,
 ): Promise<void> {
   const subject = `${APP_NAME} — Замовлення #${data.orderId.slice(0, 8)} оформлено`;
 
+  const concreteLots = (data.items ?? []).filter((i) => i.barcode);
+  const generalItems = (data.items ?? []).filter((i) => !i.barcode);
+
+  const lotsSection = renderItemsSection(
+    "Конкретні лоти",
+    "Ці лоти зарезервовані за вашим замовленням.",
+    concreteLots,
+  );
+  const generalSection = renderItemsSection(
+    "Загальні позиції (потрібно підібрати лот)",
+    "Менеджер підбере доступний лот за вашим запитом і підтвердить деталі.",
+    generalItems,
+  );
+
   const content = `
     <h2 style="margin:0 0 16px;color:#16a34a;font-size:18px">Замовлення оформлено!</h2>
     <p style="color:#374151;line-height:1.6">
-      Шановний(а) ${data.customerName},<br>
+      Шановний(а) ${escapeHtml(data.customerName)},<br>
       Дякуємо за замовлення! Ми зв'яжемося з вами найближчим часом для підтвердження.
     </p>
     <table style="width:100%;border-collapse:collapse;margin:16px 0">
@@ -170,6 +236,8 @@ export async function sendOrderConfirmationEmail(
       </tr>
       ${data.totalUah > 0 ? `<tr><td></td><td style="padding:0 0 8px;text-align:right;color:#9ca3af;font-size:13px">≈ ₴${data.totalUah.toFixed(2)}</td></tr>` : ""}
     </table>
+    ${lotsSection}
+    ${generalSection}
     <div style="text-align:center;margin:24px 0">
       <a href="${SITE_URL}/order/${data.orderId}/status" style="display:inline-block;background:#16a34a;color:#fff;text-decoration:none;padding:12px 24px;border-radius:6px;font-weight:600">
         Відстежити замовлення
