@@ -141,7 +141,7 @@ function buildChips(params: SearchParams): ChipDescriptor[] {
   if (pMin || pMax) {
     chips.push({
       key: "price",
-      label: `Ціна: €${pMin || "0"}–${pMax || "∞"}`,
+      label: `Ціна: ${pMin || "0"}–${pMax || "∞"} ₴`,
       removeParams: [{ key: "priceMin" }, { key: "priceMax" }],
     });
   }
@@ -237,9 +237,13 @@ export default async function LotsPage({
     };
   }
   if (typeof priceMin === "number" || typeof priceMax === "number") {
+    // Filter inputs are UAH (matches what user sees on the card). Convert
+    // to EUR before querying because lot.priceEur is stored in EUR.
+    const rateForFilter = await getCurrentRate();
+    const r = rateForFilter > 0 ? rateForFilter : 43;
     where.priceEur = {
-      ...(typeof priceMin === "number" ? { gte: priceMin } : {}),
-      ...(typeof priceMax === "number" ? { lte: priceMax } : {}),
+      ...(typeof priceMin === "number" ? { gte: priceMin / r } : {}),
+      ...(typeof priceMax === "number" ? { lte: priceMax / r } : {}),
     };
   }
   const productWhere: Prisma.ProductWhereInput = {};

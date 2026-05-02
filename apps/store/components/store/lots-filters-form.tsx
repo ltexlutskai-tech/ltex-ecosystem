@@ -307,7 +307,7 @@ export function LotsFiltersForm({ categories, onApply }: LotsFiltersFormProps) {
       </div>
 
       <div>
-        <span className={labelClass}>Ціна, €</span>
+        <span className={labelClass}>Ціна лота, ₴</span>
         <div className="flex gap-2 text-sm">
           <input
             type="number"
