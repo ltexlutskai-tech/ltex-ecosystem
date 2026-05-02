@@ -23,32 +23,39 @@ const CATEGORIES = [
 ];
 
 describe("LotsFiltersForm", () => {
-  it("encodes hasVideo=true into URL when checkbox toggled on", () => {
+  it("appends status=free when 'Вільні' checkbox toggled on", () => {
     render(<LotsFiltersForm categories={CATEGORIES} />);
-    const cb = screen.getByLabelText(/Тільки з відеооглядом/);
+    const cb = screen.getByLabelText("Вільні");
     fireEvent.click(cb);
-    expect(pushMock).toHaveBeenCalledTimes(1);
-    const url = pushMock.mock.calls[0]?.[0] as string;
-    expect(url).toContain("hasVideo=true");
-    expect(url).not.toContain("page=");
-  });
-
-  it("encodes status=free when 'Вільні' radio selected", () => {
-    render(<LotsFiltersForm categories={CATEGORIES} />);
-    const radio = screen.getByLabelText("Вільні");
-    fireEvent.click(radio);
     expect(pushMock).toHaveBeenCalledTimes(1);
     expect(pushMock.mock.calls[0]?.[0]).toContain("status=free");
   });
 
-  it("removes status param when 'Доступні' radio selected", () => {
+  it("supports multi-status (free + on_sale + reserved)", () => {
     currentSearchParams = new URLSearchParams("status=free");
     render(<LotsFiltersForm categories={CATEGORIES} />);
-    const radio = screen.getByLabelText("Доступні");
-    fireEvent.click(radio);
-    expect(pushMock).toHaveBeenCalledTimes(1);
+    const cb = screen.getByLabelText("Акції");
+    fireEvent.click(cb);
     const url = pushMock.mock.calls[0]?.[0] as string;
-    expect(url).not.toContain("status=");
+    expect(url).toContain("status=free%2Con_sale");
+  });
+
+  it("removes single status from comma list when toggled off", () => {
+    currentSearchParams = new URLSearchParams("status=free,on_sale");
+    render(<LotsFiltersForm categories={CATEGORIES} />);
+    const cb = screen.getByLabelText("Вільні");
+    fireEvent.click(cb);
+    const url = pushMock.mock.calls[0]?.[0] as string;
+    expect(url).toContain("status=on_sale");
+    expect(url).not.toContain("status=free");
+  });
+
+  it("encodes isNew=true when 'Новинки' checkbox toggled on", () => {
+    render(<LotsFiltersForm categories={CATEGORIES} />);
+    const cb = screen.getByLabelText(/Новинки/);
+    fireEvent.click(cb);
+    expect(pushMock).toHaveBeenCalledTimes(1);
+    expect(pushMock.mock.calls[0]?.[0]).toContain("isNew=true");
   });
 
   it("appends categoryId on toggle (multi-select via comma list)", () => {
@@ -70,17 +77,22 @@ describe("LotsFiltersForm", () => {
     expect(url).not.toContain("cat-odyag");
   });
 
-  it("commits weight range on blur", () => {
+  it("commits weight + price ranges via 'Застосувати' button", () => {
     render(<LotsFiltersForm categories={CATEGORIES} />);
-    const input = screen.getByLabelText("Вага лота від") as HTMLInputElement;
-    fireEvent.change(input, { target: { value: "10" } });
-    fireEvent.blur(input);
+    const wMin = screen.getByLabelText("Вага лота від") as HTMLInputElement;
+    const pMax = screen.getByLabelText("Ціна до") as HTMLInputElement;
+    fireEvent.change(wMin, { target: { value: "10" } });
+    fireEvent.change(pMax, { target: { value: "200" } });
+    expect(pushMock).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByText("Застосувати ціну та вагу"));
     expect(pushMock).toHaveBeenCalledTimes(1);
-    expect(pushMock.mock.calls[0]?.[0]).toContain("weightMin=10");
+    const url = pushMock.mock.calls[0]?.[0] as string;
+    expect(url).toContain("weightMin=10");
+    expect(url).toContain("priceMax=200");
   });
 
   it("clears all filters via 'Скинути'", () => {
-    currentSearchParams = new URLSearchParams("status=free&hasVideo=true");
+    currentSearchParams = new URLSearchParams("status=free&isNew=true");
     render(<LotsFiltersForm categories={CATEGORIES} />);
     const reset = screen.getByText("Скинути");
     fireEvent.click(reset);
@@ -92,5 +104,10 @@ describe("LotsFiltersForm", () => {
     render(<LotsFiltersForm categories={CATEGORIES} />);
     expect(screen.getByText("(412)")).toBeDefined();
     expect(screen.getByText("(89)")).toBeDefined();
+  });
+
+  it("does not render the removed 'Тільки з відеооглядом' filter", () => {
+    render(<LotsFiltersForm categories={CATEGORIES} />);
+    expect(screen.queryByLabelText(/Тільки з відеооглядом/)).toBeNull();
   });
 });

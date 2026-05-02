@@ -15,6 +15,7 @@ import { LotCard } from "@/components/store/lot-card";
 import { LotsFilters, LotsFilterSheet } from "@/components/store/lots-filters";
 import type { LotCategoryOption } from "@/components/store/lots-filters-form";
 import { LotsSortSelect } from "@/components/store/lots-sort-select";
+import { CatalogLayoutToggle } from "@/components/store/catalog-layout-toggle";
 import { getCurrentRate } from "@/lib/exchange-rate";
 
 export const revalidate = 60;
@@ -55,27 +56,33 @@ interface ChipDescriptor {
   removeParams: { key: string; nextValue?: string }[];
 }
 
+const STATUS_LABELS: Record<string, string> = {
+  free: "Вільні",
+  on_sale: "Акції",
+  reserved: "Заброньовані",
+};
+
 function buildChips(params: SearchParams): ChipDescriptor[] {
   const chips: ChipDescriptor[] = [];
-  const status = getStr(params, "status");
-  if (status === "free") {
+  for (const s of parseList(getStr(params, "status"))) {
     chips.push({
-      key: "status",
-      label: "Тільки вільні",
-      removeParams: [{ key: "status" }],
-    });
-  } else if (status === "on_sale") {
-    chips.push({
-      key: "status",
-      label: "На акції",
-      removeParams: [{ key: "status" }],
+      key: `status:${s}`,
+      label: STATUS_LABELS[s] ?? s,
+      removeParams: [
+        {
+          key: "status",
+          nextValue: parseList(getStr(params, "status"))
+            .filter((x) => x !== s)
+            .join(","),
+        },
+      ],
     });
   }
-  if (getStr(params, "hasVideo") === "true") {
+  if (getStr(params, "isNew") === "true") {
     chips.push({
-      key: "hasVideo",
-      label: "З відеооглядом",
-      removeParams: [{ key: "hasVideo" }],
+      key: "isNew",
+      label: "Новинки (14 днів)",
+      removeParams: [{ key: "isNew" }],
     });
   }
   for (const q of parseList(getStr(params, "quality"))) {
@@ -193,8 +200,8 @@ export default async function LotsPage({
 }) {
   const params = await searchParams;
 
-  const status = getStr(params, "status");
-  const hasVideo = getStr(params, "hasVideo") === "true";
+  const statuses = parseList(getStr(params, "status"));
+  const isNewOnly = getStr(params, "isNew") === "true";
   const categoryIds = parseList(getStr(params, "categoryId"));
   const qualities = parseList(getStr(params, "quality"));
   const seasons = parseList(getStr(params, "season"));
@@ -205,17 +212,23 @@ export default async function LotsPage({
   const priceMax = parsePositiveFloat(getStr(params, "priceMax"));
   const query = (getStr(params, "q") ?? "").trim();
   const sort = getStr(params, "sort") ?? "newest";
+  const layout: "grid" | "list" =
+    getStr(params, "layout") === "list" ? "list" : "grid";
   const pageRaw = parseInt(getStr(params, "page") ?? "1", 10);
   const page = Number.isFinite(pageRaw) && pageRaw > 0 ? pageRaw : 1;
 
   const where: Prisma.LotWhereInput = {};
-  if (status === "free" || status === "on_sale") {
-    where.status = status;
+  const validStatuses = statuses.filter((s) =>
+    ["free", "on_sale", "reserved"].includes(s),
+  );
+  if (validStatuses.length > 0) {
+    where.status = { in: validStatuses };
   } else {
     where.status = { in: ["free", "on_sale"] };
   }
-  if (hasVideo) {
-    where.videoUrl = { not: null };
+  if (isNewOnly) {
+    const cutoff = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000);
+    where.createdAt = { gte: cutoff };
   }
   if (typeof weightMin === "number" || typeof weightMax === "number") {
     where.weight = {
@@ -367,6 +380,7 @@ export default async function LotsPage({
               />
             </div>
             <LotsSortSelect />
+            <CatalogLayoutToggle currentLayout={layout} />
             <button
               type="submit"
               className="rounded-md bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 md:hidden"
@@ -407,10 +421,17 @@ export default async function LotsPage({
               .
             </div>
           ) : (
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            <div
+              className={
+                layout === "list"
+                  ? "space-y-3"
+                  : "grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3"
+              }
+            >
               {lots.map((lot) => (
                 <LotCard
                   key={lot.id}
+                  layout={layout}
                   lot={{
                     id: lot.id,
                     barcode: lot.barcode,
@@ -419,6 +440,7 @@ export default async function LotsPage({
                     priceEur: lot.priceEur,
                     videoUrl: lot.videoUrl,
                     status: lot.status,
+                    createdAt: lot.createdAt.toISOString(),
                     product: {
                       id: lot.product.id,
                       slug: lot.product.slug,

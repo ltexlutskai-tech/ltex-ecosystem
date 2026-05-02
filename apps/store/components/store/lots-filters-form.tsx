@@ -38,8 +38,11 @@ export function LotsFiltersForm({ categories, onApply }: LotsFiltersFormProps) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
-  const status = searchParams.get("status") ?? "";
-  const hasVideo = searchParams.get("hasVideo") === "true";
+  const selectedStatuses = useMemo(
+    () => parseList(searchParams.get("status")),
+    [searchParams],
+  );
+  const isNewOnly = searchParams.get("isNew") === "true";
   const selectedCategories = useMemo(
     () => parseList(searchParams.get("categoryId")),
     [searchParams],
@@ -90,19 +93,29 @@ export function LotsFiltersForm({ categories, onApply }: LotsFiltersFormProps) {
     [searchParams, updateParam],
   );
 
-  const commitRange = useCallback(
-    (minKey: string, maxKey: string, minVal: string, maxVal: string) => {
-      const params = new URLSearchParams(searchParams.toString());
-      if (minVal) params.set(minKey, minVal);
-      else params.delete(minKey);
-      if (maxVal) params.set(maxKey, maxVal);
-      else params.delete(maxKey);
-      params.delete("page");
-      router.push(`${pathname}?${params.toString()}`);
-      onApply?.();
-    },
-    [router, pathname, searchParams, onApply],
-  );
+  const commitRanges = useCallback(() => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (weightMin) params.set("weightMin", weightMin);
+    else params.delete("weightMin");
+    if (weightMax) params.set("weightMax", weightMax);
+    else params.delete("weightMax");
+    if (priceMin) params.set("priceMin", priceMin);
+    else params.delete("priceMin");
+    if (priceMax) params.set("priceMax", priceMax);
+    else params.delete("priceMax");
+    params.delete("page");
+    router.push(`${pathname}?${params.toString()}`);
+    onApply?.();
+  }, [
+    router,
+    pathname,
+    searchParams,
+    onApply,
+    weightMin,
+    weightMax,
+    priceMin,
+    priceMax,
+  ]);
 
   const clearAll = useCallback(() => {
     setWeightMin("");
@@ -114,8 +127,8 @@ export function LotsFiltersForm({ categories, onApply }: LotsFiltersFormProps) {
   }, [router, pathname, onApply]);
 
   const hasActiveFilters =
-    status ||
-    hasVideo ||
+    selectedStatuses.length > 0 ||
+    isNewOnly ||
     selectedCategories.length > 0 ||
     selectedQualities.length > 0 ||
     selectedSeasons.length > 0 ||
@@ -143,51 +156,45 @@ export function LotsFiltersForm({ categories, onApply }: LotsFiltersFormProps) {
       <div>
         <span className={labelClass}>Статус</span>
         <div className="space-y-1.5 text-sm">
-          <label className="flex cursor-pointer items-center gap-2">
+          <label className="flex cursor-pointer items-center gap-2 text-gray-700">
             <input
-              type="radio"
-              name="lots-status"
-              checked={status === ""}
-              onChange={() => updateParam("status", "")}
-              className="h-4 w-4 border-gray-300 text-green-600 focus:ring-1 focus:ring-green-500"
+              type="checkbox"
+              checked={selectedStatuses.includes("reserved")}
+              onChange={() => toggleListValue("status", "reserved")}
+              className="h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-1 focus:ring-green-500"
             />
-            Доступні
+            Заброньовані
           </label>
-          <label className="flex cursor-pointer items-center gap-2">
+          <label className="flex cursor-pointer items-center gap-2 text-gray-700">
             <input
-              type="radio"
-              name="lots-status"
-              checked={status === "free"}
-              onChange={() => updateParam("status", "free")}
-              className="h-4 w-4 border-gray-300 text-green-600 focus:ring-1 focus:ring-green-500"
+              type="checkbox"
+              checked={selectedStatuses.includes("free")}
+              onChange={() => toggleListValue("status", "free")}
+              className="h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-1 focus:ring-green-500"
             />
             Вільні
           </label>
-          <label className="flex cursor-pointer items-center gap-2">
+          <label className="flex cursor-pointer items-center gap-2 text-gray-700">
             <input
-              type="radio"
-              name="lots-status"
-              checked={status === "on_sale"}
-              onChange={() => updateParam("status", "on_sale")}
-              className="h-4 w-4 border-gray-300 text-green-600 focus:ring-1 focus:ring-green-500"
+              type="checkbox"
+              checked={selectedStatuses.includes("on_sale")}
+              onChange={() => toggleListValue("status", "on_sale")}
+              className="h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-1 focus:ring-green-500"
             />
-            На акції
+            Акції
+          </label>
+          <label className="flex cursor-pointer items-center gap-2 text-gray-700">
+            <input
+              type="checkbox"
+              checked={isNewOnly}
+              onChange={(e) =>
+                updateParam("isNew", e.target.checked ? "true" : "")
+              }
+              className="h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-1 focus:ring-green-500"
+            />
+            Новинки <span className="text-xs text-gray-400">(14 днів)</span>
           </label>
         </div>
-      </div>
-
-      <div>
-        <label className="flex cursor-pointer items-center gap-2 text-sm font-medium">
-          <input
-            type="checkbox"
-            checked={hasVideo}
-            onChange={(e) =>
-              updateParam("hasVideo", e.target.checked ? "true" : "")
-            }
-            className="h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-1 focus:ring-green-500"
-          />
-          Тільки з відеооглядом
-        </label>
       </div>
 
       {categories.length > 0 && (
@@ -283,9 +290,6 @@ export function LotsFiltersForm({ categories, onApply }: LotsFiltersFormProps) {
             placeholder="від"
             value={weightMin}
             onChange={(e) => setWeightMin(e.target.value)}
-            onBlur={() =>
-              commitRange("weightMin", "weightMax", weightMin, weightMax)
-            }
             className="w-full rounded border px-2 py-1.5"
             aria-label="Вага лота від"
           />
@@ -296,9 +300,6 @@ export function LotsFiltersForm({ categories, onApply }: LotsFiltersFormProps) {
             placeholder="до"
             value={weightMax}
             onChange={(e) => setWeightMax(e.target.value)}
-            onBlur={() =>
-              commitRange("weightMin", "weightMax", weightMin, weightMax)
-            }
             className="w-full rounded border px-2 py-1.5"
             aria-label="Вага лота до"
           />
@@ -315,9 +316,6 @@ export function LotsFiltersForm({ categories, onApply }: LotsFiltersFormProps) {
             placeholder="від"
             value={priceMin}
             onChange={(e) => setPriceMin(e.target.value)}
-            onBlur={() =>
-              commitRange("priceMin", "priceMax", priceMin, priceMax)
-            }
             className="w-full rounded border px-2 py-1.5"
             aria-label="Ціна від"
           />
@@ -328,13 +326,17 @@ export function LotsFiltersForm({ categories, onApply }: LotsFiltersFormProps) {
             placeholder="до"
             value={priceMax}
             onChange={(e) => setPriceMax(e.target.value)}
-            onBlur={() =>
-              commitRange("priceMin", "priceMax", priceMin, priceMax)
-            }
             className="w-full rounded border px-2 py-1.5"
             aria-label="Ціна до"
           />
         </div>
+        <button
+          type="button"
+          onClick={commitRanges}
+          className="mt-3 w-full rounded-md bg-green-600 px-3 py-2 text-sm font-medium text-white hover:bg-green-700"
+        >
+          Застосувати ціну та вагу
+        </button>
       </div>
     </div>
   );

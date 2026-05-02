@@ -1,9 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { Filter } from "lucide-react";
+import { Filter, X } from "lucide-react";
 import {
   Sheet,
+  SheetClose,
   SheetContent,
   SheetHeader,
   SheetTitle,
@@ -17,7 +18,7 @@ interface LotsFiltersProps {
 
 export function LotsFilters({ categories }: LotsFiltersProps) {
   return (
-    <aside className="hidden h-fit rounded-lg border bg-white p-5 lg:sticky lg:top-20 lg:block">
+    <aside className="hidden h-fit max-h-[calc(100vh-6rem)] overflow-y-auto rounded-lg border bg-white p-5 lg:sticky lg:top-20 lg:block">
       <LotsFiltersForm categories={categories} />
     </aside>
   );
@@ -41,19 +42,18 @@ export function LotsFilterSheet({ categories }: LotsFiltersProps) {
         side="bottom"
         className="max-h-[85vh] overflow-y-auto rounded-t-2xl"
       >
-        <SheetHeader>
+        <SheetHeader className="flex-row items-center justify-between">
           <SheetTitle>Фільтри</SheetTitle>
+          <SheetClose
+            className="rounded-md p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+            aria-label="Закрити"
+          >
+            <X className="h-5 w-5" aria-hidden />
+          </SheetClose>
         </SheetHeader>
         <div className="mt-4">
           <LotsFiltersForm categories={categories} />
         </div>
-        <button
-          type="button"
-          onClick={() => setOpen(false)}
-          className="mt-4 w-full rounded-md bg-green-600 px-4 py-2 font-medium text-white hover:bg-green-700"
-        >
-          Застосувати
-        </button>
       </SheetContent>
     </Sheet>
   );

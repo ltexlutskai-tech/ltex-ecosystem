@@ -387,6 +387,7 @@ export default async function LotDetailPage({ params }: Props) {
                   priceEur: other.priceEur,
                   videoUrl: other.videoUrl,
                   status: other.status,
+                  createdAt: other.createdAt.toISOString(),
                   product: {
                     id: other.product.id,
                     slug: other.product.slug,
