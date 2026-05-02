@@ -17,12 +17,23 @@ export interface LotCardLot {
   priceEur: number;
   videoUrl: string | null;
   status: string;
+  /** ISO date — used to show "NEW" badge for lots younger than 14 days. */
+  createdAt?: string;
   product: {
     id: string;
     slug: string;
     name: string;
     priceUnit: string;
   };
+}
+
+const NEW_BADGE_WINDOW_MS = 14 * 24 * 60 * 60 * 1000;
+
+function isLotNew(createdAt?: string): boolean {
+  if (!createdAt) return false;
+  const ts = Date.parse(createdAt);
+  if (!Number.isFinite(ts)) return false;
+  return Date.now() - ts <= NEW_BADGE_WINDOW_MS;
 }
 
 interface LotCardProps {
@@ -73,6 +84,7 @@ export function LotCard({ lot, rate, salePercent }: LotCardProps) {
   const priceUah = formatUah(eurToUah(lot.priceEur, rate));
   const unitLabel = lot.product.priceUnit === "pair" ? "пар" : "шт";
   const badge = statusBadge(lot.status, salePercent);
+  const showNewBadge = isLotNew(lot.createdAt);
 
   const cardBorder = inCart
     ? "border-2 border-green-500 bg-green-50"
@@ -120,6 +132,11 @@ export function LotCard({ lot, rate, salePercent }: LotCardProps) {
             >
               {badge.label}
             </span>
+            {showNewBadge && (
+              <span className="absolute right-2 top-2 rounded bg-blue-600 px-1.5 py-0.5 text-[10px] font-bold uppercase text-white">
+                NEW
+              </span>
+            )}
           </button>
         ) : (
           <div className="relative flex aspect-video w-full items-center justify-center border-b-2 border-dashed border-gray-200 bg-gray-100 text-xs text-gray-400">
@@ -135,6 +152,11 @@ export function LotCard({ lot, rate, salePercent }: LotCardProps) {
             >
               {badge.label}
             </span>
+            {showNewBadge && (
+              <span className="absolute right-2 top-2 rounded bg-blue-600 px-1.5 py-0.5 text-[10px] font-bold uppercase text-white">
+                NEW
+              </span>
+            )}
           </div>
         )}
 
