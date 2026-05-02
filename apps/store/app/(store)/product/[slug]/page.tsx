@@ -197,7 +197,7 @@ export default async function ProductPage({ params }: Props) {
 
       <div className="mt-6 grid gap-8 lg:grid-cols-2">
         {/* LEFT: Gallery + Trust badge (sticky on lg) */}
-        <div className="space-y-3 lg:sticky lg:top-20 lg:self-start">
+        <div className="min-w-0 space-y-3 lg:sticky lg:top-20 lg:self-start">
           {product.images.length > 0 ? (
             <ImageGallery
               images={product.images.map((img) => ({
@@ -215,34 +215,18 @@ export default async function ProductPage({ params }: Props) {
         </div>
 
         {/* RIGHT: Details */}
-        <div className="space-y-5">
+        <div className="min-w-0 space-y-5">
           {/* Title row */}
-          <div className="flex items-start justify-between gap-4">
-            <div className="flex-1">
-              <h1 className="text-2xl font-bold leading-tight lg:text-3xl">
-                {product.name}
-              </h1>
-              {product.articleCode && (
-                <p className="mt-1 text-sm text-gray-500">
-                  {dict.product.article}:{" "}
-                  <span className="font-mono">{product.articleCode}</span>
-                </p>
-              )}
-            </div>
-            <div className="shrink-0">
-              <WishlistButton
-                product={{
-                  productId: product.id,
-                  slug: product.slug,
-                  name: product.name,
-                  quality: product.quality,
-                  imageUrl: heroImage,
-                  priceEur: displayPrice,
-                  priceUnit: product.priceUnit,
-                }}
-                size="md"
-              />
-            </div>
+          <div>
+            <h1 className="text-2xl font-bold leading-tight lg:text-3xl">
+              {product.name}
+            </h1>
+            {product.articleCode && (
+              <p className="mt-1 text-sm text-gray-500">
+                {dict.product.article}:{" "}
+                <span className="font-mono">{product.articleCode}</span>
+              </p>
+            )}
           </div>
 
           {/* Price */}

@@ -53,7 +53,11 @@ export function AddProductToCartButton({
           productId,
           productName,
           weight,
-          priceEur,
+          // Store the line total (per-kg price × average lot weight) so cart
+          // semantics match per-lot items, where priceEur is also the total
+          // for the whole lot. Manager will adjust if the actual lot weight
+          // differs.
+          priceEur: priceEur * weight,
           quantity: 1,
         })
       }
