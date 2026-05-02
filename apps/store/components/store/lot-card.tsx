@@ -8,6 +8,7 @@ import { useCart, cartItemKey } from "@/lib/cart";
 import { extractYouTubeId, getYouTubeThumbnail } from "@/lib/youtube";
 import { eurToUah, formatUah } from "@/lib/exchange-rate";
 import { VideoModal } from "./video-modal";
+import { QuickOrderModal } from "./quick-order-modal";
 
 export interface LotCardLot {
   id: string;
@@ -73,6 +74,7 @@ export function LotCard({
   layout = "grid",
 }: LotCardProps) {
   const [videoOpen, setVideoOpen] = useState(false);
+  const [quickOrderOpen, setQuickOrderOpen] = useState(false);
   const { items, addItem, removeItem } = useCart();
 
   const cartItem = {
@@ -201,6 +203,36 @@ export function LotCard({
     </button>
   );
 
+  const canQuickOrder = lot.status === "free" || lot.status === "on_sale";
+
+  const quickOrderButton = canQuickOrder ? (
+    <button
+      type="button"
+      onClick={() => setQuickOrderOpen(true)}
+      data-analytics="quick-order"
+      className="mt-2 w-full rounded-lg border-2 border-amber-500 bg-amber-50 py-2 text-xs font-medium text-amber-800 transition hover:bg-amber-100"
+      aria-label={`Купити лот ${lot.barcode} в один клік`}
+    >
+      ⚡ Купити в один клік
+    </button>
+  ) : null;
+
+  const quickOrderModal = canQuickOrder ? (
+    <QuickOrderModal
+      open={quickOrderOpen}
+      onOpenChange={setQuickOrderOpen}
+      lot={{
+        id: lot.id,
+        barcode: lot.barcode,
+        productId: lot.product.id,
+        productName: lot.product.name,
+        weight: lot.weight,
+        priceEur: lot.priceEur,
+        quantity: lot.quantity,
+      }}
+    />
+  ) : null;
+
   if (layout === "list") {
     return (
       <>
@@ -242,6 +274,7 @@ export function LotCard({
               </div>
               {cartButton}
             </div>
+            {quickOrderButton}
           </div>
         </div>
 
@@ -251,6 +284,7 @@ export function LotCard({
           onOpenChange={setVideoOpen}
           title={`Огляд лоту ${lot.barcode}`}
         />
+        {quickOrderModal}
       </>
     );
   }
@@ -296,6 +330,7 @@ export function LotCard({
             </div>
             {cartButton}
           </div>
+          {quickOrderButton}
         </div>
       </div>
 
@@ -305,6 +340,7 @@ export function LotCard({
         onOpenChange={setVideoOpen}
         title={`Огляд лоту ${lot.barcode}`}
       />
+      {quickOrderModal}
     </>
   );
 }
