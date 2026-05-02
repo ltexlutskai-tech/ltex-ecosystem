@@ -1,7 +1,7 @@
 "use client";
 
 import { Button } from "@ltex/ui";
-import { useCart, type CartItem } from "@/lib/cart";
+import { useCart, cartItemKey, type CartItem } from "@/lib/cart";
 import { ShoppingCart, Check } from "lucide-react";
 import { getDictionary } from "@/lib/i18n";
 
@@ -9,14 +9,15 @@ const dict = getDictionary();
 
 export function AddToCartButton({ lot }: { lot: CartItem }) {
   const { items, addItem, removeItem } = useCart();
-  const inCart = items.some((i) => i.lotId === lot.lotId);
+  const key = cartItemKey(lot);
+  const inCart = items.some((i) => cartItemKey(i) === key);
 
   if (inCart) {
     return (
       <Button
         size="sm"
         variant="outline"
-        onClick={() => removeItem(lot.lotId)}
+        onClick={() => removeItem(key)}
         className="text-green-700"
         aria-label={`${dict.cart.removeFromCart.replace("{name}", lot.productName)}`}
       >
