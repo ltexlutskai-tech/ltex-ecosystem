@@ -85,7 +85,11 @@ export default async function OrderConfirmationPage({ params }: Props) {
               {order.items.map((item) => (
                 <tr key={item.id} className="border-b">
                   <td className="py-2">{item.product.name}</td>
-                  <td className="py-2 font-mono text-xs">{item.lot.barcode}</td>
+                  <td className="py-2 font-mono text-xs">
+                    {item.lot?.barcode ?? (
+                      <span className="italic text-gray-400">без лоту</span>
+                    )}
+                  </td>
                   <td className="py-2">{item.weight} кг</td>
                   <td className="py-2 text-right">
                     €{item.priceEur.toFixed(2)}
