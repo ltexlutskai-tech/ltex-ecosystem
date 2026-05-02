@@ -40,7 +40,7 @@ export async function RecentReviewsCarousel({
   if (cards.length === 0) return null;
 
   return (
-    <section className="mt-10">
+    <section className="mt-10 overflow-hidden">
       <div className="mb-4 flex items-baseline justify-between">
         <h2 className="text-xl font-bold">Останні відеоогляди</h2>
         <a
@@ -54,7 +54,7 @@ export async function RecentReviewsCarousel({
         </a>
       </div>
 
-      <div className="-mx-4 flex gap-4 overflow-x-auto px-4 pb-2 scrollbar-hide">
+      <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-hide">
         {cards.map((p) => (
           <Link
             key={p.id}

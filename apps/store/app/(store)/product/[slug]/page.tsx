@@ -197,7 +197,7 @@ export default async function ProductPage({ params }: Props) {
 
       <div className="mt-6 grid gap-8 lg:grid-cols-2">
         {/* LEFT: Gallery + Trust badge (sticky on lg) */}
-        <div className="space-y-3 lg:sticky lg:top-20 lg:self-start">
+        <div className="min-w-0 space-y-3 lg:sticky lg:top-20 lg:self-start">
           {product.images.length > 0 ? (
             <ImageGallery
               images={product.images.map((img) => ({
@@ -215,7 +215,7 @@ export default async function ProductPage({ params }: Props) {
         </div>
 
         {/* RIGHT: Details */}
-        <div className="space-y-5">
+        <div className="min-w-0 space-y-5">
           {/* Title row */}
           <div>
             <h1 className="text-2xl font-bold leading-tight lg:text-3xl">

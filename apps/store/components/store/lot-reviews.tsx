@@ -116,8 +116,8 @@ function LotReviewCard({
         </div>
       )}
 
-      <div className="flex flex-1 flex-col gap-3 lg:flex-row lg:items-center lg:gap-6">
-        <div className="flex-1">
+      <div className="flex min-w-0 flex-1 flex-col gap-3 lg:flex-row lg:items-center lg:gap-6">
+        <div className="min-w-0 flex-1">
           <p className="font-mono text-xs text-gray-500">
             Штрихкод: {lot.barcode}
           </p>
