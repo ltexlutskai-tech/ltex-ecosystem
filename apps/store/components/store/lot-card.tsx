@@ -9,6 +9,7 @@ import { extractYouTubeId, getYouTubeThumbnail } from "@/lib/youtube";
 import { eurToUah, formatUah } from "@/lib/exchange-rate";
 import { VideoModal } from "./video-modal";
 import { QuickOrderModal } from "./quick-order-modal";
+import { WishlistButton } from "./wishlist-button";
 
 export interface LotCardLot {
   id: string;
@@ -25,6 +26,10 @@ export interface LotCardLot {
     slug: string;
     name: string;
     priceUnit: string;
+    /** Optional — used as fallback metadata in wishlist. */
+    quality?: string;
+    /** Optional — passed into the wishlist entry so the lot card can be re-rendered later. */
+    imageUrl?: string | null;
   };
 }
 
@@ -111,26 +116,42 @@ export function LotCard({
     else addItem(cartItem);
   }
 
+  const wishlistInput = {
+    kind: "lot" as const,
+    productId: lot.product.id,
+    slug: lot.product.slug,
+    name: lot.product.name,
+    quality: lot.product.quality ?? "",
+    imageUrl: lot.product.imageUrl ?? null,
+    priceEur: lot.priceEur,
+    priceUnit: lot.product.priceUnit,
+    lotId: lot.id,
+    barcode: lot.barcode,
+    weight: lot.weight,
+    quantity: lot.quantity,
+    videoUrl: lot.videoUrl,
+  };
+
   const badgesOverlay = (
     <>
       <span
-        className={`absolute left-2 top-2 rounded px-1.5 py-0.5 text-[10px] font-bold uppercase ${badge.className}`}
+        className={`absolute left-2 top-2 z-10 rounded px-1.5 py-0.5 text-[10px] font-bold uppercase ${badge.className}`}
       >
         {badge.label}
       </span>
       {showNewBadge && (
-        <span className="absolute right-2 top-2 rounded bg-blue-600 px-1.5 py-0.5 text-[10px] font-bold uppercase text-white">
+        <span className="absolute left-2 top-9 z-10 rounded bg-blue-600 px-1.5 py-0.5 text-[10px] font-bold uppercase text-white">
           NEW
         </span>
       )}
     </>
   );
 
-  const videoBlock = videoId ? (
+  const videoCore = videoId ? (
     <button
       type="button"
       onClick={() => setVideoOpen(true)}
-      className={`relative aspect-video overflow-hidden bg-gray-900 ${layout === "list" ? "h-28 w-48 shrink-0 rounded-md" : "w-full"}`}
+      className="absolute inset-0 h-full w-full overflow-hidden bg-gray-900"
       aria-label={`Дивитись відеоогляд лоту ${lot.barcode}`}
     >
       <Image
@@ -153,16 +174,9 @@ export function LotCard({
           />
         </div>
       </div>
-      {badgesOverlay}
     </button>
   ) : (
-    <div
-      className={`relative flex aspect-video items-center justify-center bg-gray-100 text-xs text-gray-400 ${
-        layout === "list"
-          ? "h-28 w-48 shrink-0 rounded-md border-2 border-dashed border-gray-200"
-          : "w-full border-b-2 border-dashed border-gray-200"
-      }`}
-    >
+    <div className="absolute inset-0 flex items-center justify-center bg-gray-100 text-xs text-gray-400">
       <div className="text-center">
         <VideoIcon
           className={`mx-auto mb-1 text-gray-300 ${layout === "list" ? "h-7 w-7" : "h-10 w-10"}`}
@@ -170,7 +184,26 @@ export function LotCard({
         />
         Огляд скоро
       </div>
+    </div>
+  );
+
+  const placeholderBorder = !videoId
+    ? layout === "list"
+      ? "border-2 border-dashed border-gray-200"
+      : "border-b-2 border-dashed border-gray-200"
+    : "";
+
+  const videoBlock = (
+    <div
+      className={`relative aspect-video overflow-hidden ${
+        layout === "list" ? "h-28 w-48 shrink-0 rounded-md" : "w-full"
+      } ${placeholderBorder}`}
+    >
+      {videoCore}
       {badgesOverlay}
+      <div className="absolute right-2 top-2 z-20">
+        <WishlistButton product={wishlistInput} />
+      </div>
     </div>
   );
 
