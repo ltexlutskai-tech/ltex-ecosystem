@@ -102,26 +102,37 @@ describe("rateLimit", () => {
 });
 
 describe("getClientIp", () => {
-  it("extracts IP from x-forwarded-for header", () => {
+  it("returns cf-connecting-ip when present (Cloudflare trusted)", () => {
     const req = new Request("https://example.com", {
-      headers: { "x-forwarded-for": "1.2.3.4, 5.6.7.8" },
+      headers: { "cf-connecting-ip": "203.0.113.7" },
     });
-    expect(getClientIp(req)).toBe("1.2.3.4");
+    expect(getClientIp(req)).toBe("203.0.113.7");
   });
 
-  it("extracts IP from x-real-ip header", () => {
+  it("prefers cf-connecting-ip over x-forwarded-for and x-real-ip", () => {
     const req = new Request("https://example.com", {
-      headers: { "x-real-ip": "10.0.0.1" },
+      headers: {
+        "cf-connecting-ip": "203.0.113.7",
+        "x-forwarded-for": "1.2.3.4, 5.6.7.8",
+        "x-real-ip": "10.0.0.1",
+      },
     });
-    expect(getClientIp(req)).toBe("10.0.0.1");
+    expect(getClientIp(req)).toBe("203.0.113.7");
   });
 
-  it("prefers x-forwarded-for over x-real-ip", () => {
+  it("falls back to x-real-ip when cf-connecting-ip absent", () => {
     const req = new Request("https://example.com", {
       headers: {
         "x-forwarded-for": "1.2.3.4",
         "x-real-ip": "10.0.0.1",
       },
+    });
+    expect(getClientIp(req)).toBe("10.0.0.1");
+  });
+
+  it("falls back to x-forwarded-for first IP when CF/x-real-ip absent", () => {
+    const req = new Request("https://example.com", {
+      headers: { "x-forwarded-for": "1.2.3.4, 5.6.7.8" },
     });
     expect(getClientIp(req)).toBe("1.2.3.4");
   });
@@ -131,7 +142,7 @@ describe("getClientIp", () => {
     expect(getClientIp(req)).toBe("unknown");
   });
 
-  it("trims whitespace from forwarded IP", () => {
+  it("trims whitespace from forwarded IP fallback", () => {
     const req = new Request("https://example.com", {
       headers: { "x-forwarded-for": "  1.2.3.4  , 5.6.7.8" },
     });

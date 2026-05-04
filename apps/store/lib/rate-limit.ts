@@ -75,12 +75,18 @@ export function rateLimit(
 
 /**
  * Extract client IP from request headers.
- * Works with Vercel, Cloudflare, and standard proxies.
+ *
+ * Order matters — `cf-connecting-ip` is set by Cloudflare and cannot be
+ * spoofed by the client (Cloudflare overwrites whatever the client sends).
+ * `x-forwarded-for` is forwarded as-is by Cloudflare Tunnel, so an attacker
+ * can supply an arbitrary value and bypass per-IP rate limits if we trust
+ * it first. Use it only as a last-resort fallback for non-CF environments.
  */
 export function getClientIp(request: Request): string {
   return (
-    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
+    request.headers.get("cf-connecting-ip") ??
     request.headers.get("x-real-ip") ??
+    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
     "unknown"
   );
 }
