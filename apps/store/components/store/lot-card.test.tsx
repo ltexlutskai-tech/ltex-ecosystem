@@ -1,6 +1,7 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
 import { render, screen, fireEvent, cleanup } from "@testing-library/react";
 import { CartProvider } from "@/lib/cart";
+import { WishlistProvider } from "@/lib/wishlist";
 import { LotCard, type LotCardLot } from "./lot-card";
 
 vi.mock("next/navigation", () => ({
@@ -25,10 +26,17 @@ const baseLot: LotCardLot = {
   },
 };
 
-afterEach(() => cleanup());
+afterEach(() => {
+  cleanup();
+  localStorage.clear();
+});
 
 function renderWithCart(ui: React.ReactElement) {
-  return render(<CartProvider>{ui}</CartProvider>);
+  return render(
+    <WishlistProvider>
+      <CartProvider>{ui}</CartProvider>
+    </WishlistProvider>,
+  );
 }
 
 describe("LotCard", () => {
@@ -126,8 +134,6 @@ describe("LotCard", () => {
     expect(
       screen.getByRole("link", { name: /Деталі лоту 2000153074116/ }),
     ).toBeDefined();
-    expect(
-      screen.queryByRole("button", { name: /Додати лот/ }),
-    ).toBeNull();
+    expect(screen.queryByRole("button", { name: /Додати лот/ })).toBeNull();
   });
 });

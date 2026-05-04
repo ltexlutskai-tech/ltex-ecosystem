@@ -131,8 +131,7 @@ export function WishlistProvider({ children }: { children: ReactNode }) {
   );
 
   const hasLot = useCallback(
-    (lotId: string) =>
-      items.some((i) => i.kind === "lot" && i.lotId === lotId),
+    (lotId: string) => items.some((i) => i.kind === "lot" && i.lotId === lotId),
     [items],
   );
 

@@ -155,7 +155,10 @@ function LotWishlistCard({
                 />
                 <div className="absolute inset-0 flex items-center justify-center">
                   <div className="rounded-full bg-red-600/90 p-2 shadow-lg">
-                    <Play className="h-5 w-5 fill-white text-white" aria-hidden />
+                    <Play
+                      className="h-5 w-5 fill-white text-white"
+                      aria-hidden
+                    />
                   </div>
                 </div>
               </>
