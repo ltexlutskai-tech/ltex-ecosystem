@@ -211,9 +211,9 @@ export function LotCard({
       onClick={() => setQuickOrderOpen(true)}
       data-analytics="quick-order"
       className="mt-2 w-full rounded-lg border-2 border-amber-500 bg-amber-50 py-2 text-xs font-medium text-amber-800 transition hover:bg-amber-100"
-      aria-label={`Купити лот ${lot.barcode} в один клік`}
+      aria-label={`Замовити лот ${lot.barcode} в один клік`}
     >
-      ⚡ Купити в один клік
+      ⚡ Замовити в один клік
     </button>
   ) : null;
 

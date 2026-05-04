@@ -106,7 +106,7 @@ export function QuickOrderModal({
   return (
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="max-w-md">
-        <DialogTitle>Купити в один клік</DialogTitle>
+        <DialogTitle>Замовити в один клік</DialogTitle>
         <DialogDescription>
           Лот {lot.barcode} — {lot.productName}, {lot.weight} кг
         </DialogDescription>
