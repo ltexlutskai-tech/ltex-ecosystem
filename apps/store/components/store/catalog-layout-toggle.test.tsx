@@ -39,4 +39,11 @@ describe("CatalogLayoutToggle", () => {
     expect(url).toContain("quality=ekstra");
     expect(url).not.toContain("page=");
   });
+
+  it("renders both buttons with type=button to prevent form submission", () => {
+    render(<CatalogLayoutToggle currentLayout="grid" />);
+
+    expect(screen.getByLabelText("Сітка").getAttribute("type")).toBe("button");
+    expect(screen.getByLabelText("Список").getAttribute("type")).toBe("button");
+  });
 });

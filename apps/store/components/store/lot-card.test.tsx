@@ -1,6 +1,7 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
 import { render, screen, fireEvent, cleanup } from "@testing-library/react";
 import { CartProvider } from "@/lib/cart";
+import { WishlistProvider } from "@/lib/wishlist";
 import { LotCard, type LotCardLot } from "./lot-card";
 
 vi.mock("next/navigation", () => ({
@@ -25,10 +26,17 @@ const baseLot: LotCardLot = {
   },
 };
 
-afterEach(() => cleanup());
+afterEach(() => {
+  cleanup();
+  localStorage.clear();
+});
 
 function renderWithCart(ui: React.ReactElement) {
-  return render(<CartProvider>{ui}</CartProvider>);
+  return render(
+    <WishlistProvider>
+      <CartProvider>{ui}</CartProvider>
+    </WishlistProvider>,
+  );
 }
 
 describe("LotCard", () => {
@@ -111,5 +119,21 @@ describe("LotCard", () => {
     );
     // 90 / (1 - 0.10) = 100
     expect(screen.getByText(/€100\.00/)).toBeDefined();
+  });
+
+  it("renders 'Детальніше' link to /lot/{barcode} on free lots", () => {
+    renderWithCart(<LotCard lot={baseLot} rate={43} />);
+    const link = screen.getByRole("link", {
+      name: /Деталі лоту 2000153074116/,
+    });
+    expect(link.getAttribute("href")).toBe("/lot/2000153074116");
+  });
+
+  it("renders 'Детальніше' link even for sold lots, but hides 'Додати'", () => {
+    renderWithCart(<LotCard lot={{ ...baseLot, status: "sold" }} rate={43} />);
+    expect(
+      screen.getByRole("link", { name: /Деталі лоту 2000153074116/ }),
+    ).toBeDefined();
+    expect(screen.queryByRole("button", { name: /Додати лот/ })).toBeNull();
   });
 });

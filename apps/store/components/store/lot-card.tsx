@@ -9,6 +9,7 @@ import { extractYouTubeId, getYouTubeThumbnail } from "@/lib/youtube";
 import { eurToUah, formatUah } from "@/lib/exchange-rate";
 import { VideoModal } from "./video-modal";
 import { QuickOrderModal } from "./quick-order-modal";
+import { WishlistButton } from "./wishlist-button";
 
 export interface LotCardLot {
   id: string;
@@ -25,6 +26,10 @@ export interface LotCardLot {
     slug: string;
     name: string;
     priceUnit: string;
+    /** Optional — used as fallback metadata in wishlist. */
+    quality?: string;
+    /** Optional — passed into the wishlist entry so the lot card can be re-rendered later. */
+    imageUrl?: string | null;
   };
 }
 
@@ -111,26 +116,42 @@ export function LotCard({
     else addItem(cartItem);
   }
 
+  const wishlistInput = {
+    kind: "lot" as const,
+    productId: lot.product.id,
+    slug: lot.product.slug,
+    name: lot.product.name,
+    quality: lot.product.quality ?? "",
+    imageUrl: lot.product.imageUrl ?? null,
+    priceEur: lot.priceEur,
+    priceUnit: lot.product.priceUnit,
+    lotId: lot.id,
+    barcode: lot.barcode,
+    weight: lot.weight,
+    quantity: lot.quantity,
+    videoUrl: lot.videoUrl,
+  };
+
   const badgesOverlay = (
     <>
       <span
-        className={`absolute left-2 top-2 rounded px-1.5 py-0.5 text-[10px] font-bold uppercase ${badge.className}`}
+        className={`absolute left-2 top-2 z-10 rounded px-1.5 py-0.5 text-[10px] font-bold uppercase ${badge.className}`}
       >
         {badge.label}
       </span>
       {showNewBadge && (
-        <span className="absolute right-2 top-2 rounded bg-blue-600 px-1.5 py-0.5 text-[10px] font-bold uppercase text-white">
+        <span className="absolute left-2 top-9 z-10 rounded bg-blue-600 px-1.5 py-0.5 text-[10px] font-bold uppercase text-white">
           NEW
         </span>
       )}
     </>
   );
 
-  const videoBlock = videoId ? (
+  const videoCore = videoId ? (
     <button
       type="button"
       onClick={() => setVideoOpen(true)}
-      className={`relative aspect-video overflow-hidden bg-gray-900 ${layout === "list" ? "h-28 w-48 shrink-0 rounded-md" : "w-full"}`}
+      className="absolute inset-0 h-full w-full overflow-hidden bg-gray-900"
       aria-label={`Дивитись відеоогляд лоту ${lot.barcode}`}
     >
       <Image
@@ -153,16 +174,9 @@ export function LotCard({
           />
         </div>
       </div>
-      {badgesOverlay}
     </button>
   ) : (
-    <div
-      className={`relative flex aspect-video items-center justify-center bg-gray-100 text-xs text-gray-400 ${
-        layout === "list"
-          ? "h-28 w-48 shrink-0 rounded-md border-2 border-dashed border-gray-200"
-          : "w-full border-b-2 border-dashed border-gray-200"
-      }`}
-    >
+    <div className="absolute inset-0 flex items-center justify-center bg-gray-100 text-xs text-gray-400">
       <div className="text-center">
         <VideoIcon
           className={`mx-auto mb-1 text-gray-300 ${layout === "list" ? "h-7 w-7" : "h-10 w-10"}`}
@@ -170,16 +184,47 @@ export function LotCard({
         />
         Огляд скоро
       </div>
-      {badgesOverlay}
     </div>
   );
 
-  const cartButton = (
+  const placeholderBorder = !videoId
+    ? layout === "list"
+      ? "border-2 border-dashed border-gray-200"
+      : "border-b-2 border-dashed border-gray-200"
+    : "";
+
+  const videoBlock = (
+    <div
+      className={`relative aspect-video overflow-hidden ${
+        layout === "list" ? "h-28 w-48 shrink-0 rounded-md" : "w-full"
+      } ${placeholderBorder}`}
+    >
+      {videoCore}
+      {badgesOverlay}
+      <div className="absolute right-2 top-2 z-20">
+        <WishlistButton product={wishlistInput} />
+      </div>
+    </div>
+  );
+
+  const canAddToCart = lot.status === "free" || lot.status === "on_sale";
+
+  const detailsLink = (
+    <Link
+      href={`/lot/${encodeURIComponent(lot.barcode)}`}
+      className="inline-flex flex-1 items-center justify-center rounded-lg border-2 border-green-600 bg-white px-3 py-2 text-xs font-medium text-green-700 transition hover:bg-green-50"
+      aria-label={`Деталі лоту ${lot.barcode}`}
+    >
+      Детальніше
+    </Link>
+  );
+
+  const cartButton = canAddToCart ? (
     <button
       type="button"
       onClick={handleToggleCart}
       data-analytics={inCart ? "remove-from-cart" : "add-to-cart"}
-      className={`inline-flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium transition ${
+      className={`inline-flex shrink-0 items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium transition ${
         inCart
           ? "border-2 border-green-600 bg-white text-green-700"
           : "bg-green-600 text-white hover:bg-green-700"
@@ -201,6 +246,13 @@ export function LotCard({
         </>
       )}
     </button>
+  ) : null;
+
+  const actionsRow = (
+    <div className="mt-2 flex gap-2">
+      {detailsLink}
+      {cartButton}
+    </div>
   );
 
   const canQuickOrder = lot.status === "free" || lot.status === "on_sale";
@@ -211,9 +263,9 @@ export function LotCard({
       onClick={() => setQuickOrderOpen(true)}
       data-analytics="quick-order"
       className="mt-2 w-full rounded-lg border-2 border-amber-500 bg-amber-50 py-2 text-xs font-medium text-amber-800 transition hover:bg-amber-100"
-      aria-label={`Купити лот ${lot.barcode} в один клік`}
+      aria-label={`Замовити лот ${lot.barcode} в один клік`}
     >
-      ⚡ Купити в один клік
+      ⚡ Замовити в один клік
     </button>
   ) : null;
 
@@ -257,7 +309,7 @@ export function LotCard({
                 {unitLabel}
               </span>
             </div>
-            <div className="mt-auto flex items-end justify-between gap-2 pt-1">
+            <div className="mt-auto pt-1">
               <div className="min-w-0">
                 <p className="text-base font-bold text-red-600">{priceUah}</p>
                 <p className="text-[11px] text-gray-400">
@@ -272,7 +324,7 @@ export function LotCard({
                   )}
                 </p>
               </div>
-              {cartButton}
+              {actionsRow}
             </div>
             {quickOrderButton}
           </div>
@@ -313,23 +365,21 @@ export function LotCard({
               {unitLabel}
             </span>
           </div>
-          <div className="mt-2 flex items-baseline justify-between gap-2">
-            <div className="min-w-0">
-              <p className="text-base font-bold text-red-600">{priceUah}</p>
-              <p className="text-[11px] text-gray-400">
-                €{lot.priceEur.toFixed(2)}
-                {regularPriceEur !== null && (
-                  <>
-                    {" "}
-                    <span className="line-through">
-                      €{regularPriceEur.toFixed(2)}
-                    </span>
-                  </>
-                )}
-              </p>
-            </div>
-            {cartButton}
+          <div className="mt-2 min-w-0">
+            <p className="text-base font-bold text-red-600">{priceUah}</p>
+            <p className="text-[11px] text-gray-400">
+              €{lot.priceEur.toFixed(2)}
+              {regularPriceEur !== null && (
+                <>
+                  {" "}
+                  <span className="line-through">
+                    €{regularPriceEur.toFixed(2)}
+                  </span>
+                </>
+              )}
+            </p>
           </div>
+          {actionsRow}
           {quickOrderButton}
         </div>
       </div>

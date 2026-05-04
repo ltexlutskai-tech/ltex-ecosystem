@@ -29,6 +29,7 @@ export function CatalogLayoutToggle({
   return (
     <div className="flex items-center gap-1 rounded-lg border p-1">
       <button
+        type="button"
         onClick={() => setLayout("grid")}
         className={`rounded-md p-1.5 transition-colors ${
           currentLayout === "grid"
@@ -41,6 +42,7 @@ export function CatalogLayoutToggle({
         <LayoutGrid className="h-4 w-4" />
       </button>
       <button
+        type="button"
         onClick={() => setLayout("list")}
         className={`rounded-md p-1.5 transition-colors ${
           currentLayout === "list"
