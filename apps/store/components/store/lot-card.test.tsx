@@ -112,4 +112,22 @@ describe("LotCard", () => {
     // 90 / (1 - 0.10) = 100
     expect(screen.getByText(/€100\.00/)).toBeDefined();
   });
+
+  it("renders 'Детальніше' link to /lot/{barcode} on free lots", () => {
+    renderWithCart(<LotCard lot={baseLot} rate={43} />);
+    const link = screen.getByRole("link", {
+      name: /Деталі лоту 2000153074116/,
+    });
+    expect(link.getAttribute("href")).toBe("/lot/2000153074116");
+  });
+
+  it("renders 'Детальніше' link even for sold lots, but hides 'Додати'", () => {
+    renderWithCart(<LotCard lot={{ ...baseLot, status: "sold" }} rate={43} />);
+    expect(
+      screen.getByRole("link", { name: /Деталі лоту 2000153074116/ }),
+    ).toBeDefined();
+    expect(
+      screen.queryByRole("button", { name: /Додати лот/ }),
+    ).toBeNull();
+  });
 });

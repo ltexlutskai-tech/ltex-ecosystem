@@ -174,12 +174,24 @@ export function LotCard({
     </div>
   );
 
-  const cartButton = (
+  const canAddToCart = lot.status === "free" || lot.status === "on_sale";
+
+  const detailsLink = (
+    <Link
+      href={`/lot/${encodeURIComponent(lot.barcode)}`}
+      className="inline-flex flex-1 items-center justify-center rounded-lg border-2 border-green-600 bg-white px-3 py-2 text-xs font-medium text-green-700 transition hover:bg-green-50"
+      aria-label={`Деталі лоту ${lot.barcode}`}
+    >
+      Детальніше
+    </Link>
+  );
+
+  const cartButton = canAddToCart ? (
     <button
       type="button"
       onClick={handleToggleCart}
       data-analytics={inCart ? "remove-from-cart" : "add-to-cart"}
-      className={`inline-flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium transition ${
+      className={`inline-flex shrink-0 items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium transition ${
         inCart
           ? "border-2 border-green-600 bg-white text-green-700"
           : "bg-green-600 text-white hover:bg-green-700"
@@ -201,6 +213,13 @@ export function LotCard({
         </>
       )}
     </button>
+  ) : null;
+
+  const actionsRow = (
+    <div className="mt-2 flex gap-2">
+      {detailsLink}
+      {cartButton}
+    </div>
   );
 
   const canQuickOrder = lot.status === "free" || lot.status === "on_sale";
@@ -257,7 +276,7 @@ export function LotCard({
                 {unitLabel}
               </span>
             </div>
-            <div className="mt-auto flex items-end justify-between gap-2 pt-1">
+            <div className="mt-auto pt-1">
               <div className="min-w-0">
                 <p className="text-base font-bold text-red-600">{priceUah}</p>
                 <p className="text-[11px] text-gray-400">
@@ -272,7 +291,7 @@ export function LotCard({
                   )}
                 </p>
               </div>
-              {cartButton}
+              {actionsRow}
             </div>
             {quickOrderButton}
           </div>
@@ -313,23 +332,21 @@ export function LotCard({
               {unitLabel}
             </span>
           </div>
-          <div className="mt-2 flex items-baseline justify-between gap-2">
-            <div className="min-w-0">
-              <p className="text-base font-bold text-red-600">{priceUah}</p>
-              <p className="text-[11px] text-gray-400">
-                €{lot.priceEur.toFixed(2)}
-                {regularPriceEur !== null && (
-                  <>
-                    {" "}
-                    <span className="line-through">
-                      €{regularPriceEur.toFixed(2)}
-                    </span>
-                  </>
-                )}
-              </p>
-            </div>
-            {cartButton}
+          <div className="mt-2 min-w-0">
+            <p className="text-base font-bold text-red-600">{priceUah}</p>
+            <p className="text-[11px] text-gray-400">
+              €{lot.priceEur.toFixed(2)}
+              {regularPriceEur !== null && (
+                <>
+                  {" "}
+                  <span className="line-through">
+                    €{regularPriceEur.toFixed(2)}
+                  </span>
+                </>
+              )}
+            </p>
           </div>
+          {actionsRow}
           {quickOrderButton}
         </div>
       </div>
