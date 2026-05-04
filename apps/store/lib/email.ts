@@ -60,11 +60,95 @@ function isEmailConfigured(): "smtp" | "resend" | false {
   return false;
 }
 
-async function sendViaSMTP(
-  to: string,
-  subject: string,
-  html: string,
+interface SendPayload {
+  to: string;
+  subject: string;
+  html: string;
+}
+
+/**
+ * Mask an email address for logging — preserves enough info to debug
+ * (domain, first two chars of local part) without leaking the full PII.
+ * Exported for testability.
+ */
+export function maskEmail(email: string | undefined): string {
+  if (!email) return "(unknown)";
+  const at = email.indexOf("@");
+  if (at < 1) return "(invalid)";
+  const local = email.slice(0, at);
+  const domain = email.slice(at + 1);
+  return `${local.slice(0, 2)}***@${domain}`;
+}
+
+/**
+ * Return true when an error looks like a transient transport failure
+ * (network blip, timeout, 5xx upstream) that is worth retrying.
+ * 4xx responses, validation errors, and bad credentials are NOT transient.
+ * Exported for testability.
+ */
+export function isTransientError(err: unknown): boolean {
+  if (!(err instanceof Error)) return false;
+  if (err.name === "AbortError") return true;
+  const code = (err as NodeJS.ErrnoException).code;
+  if (
+    code === "ETIMEDOUT" ||
+    code === "ECONNRESET" ||
+    code === "ECONNREFUSED" ||
+    code === "EAI_AGAIN" ||
+    code === "ENOTFOUND" ||
+    code === "ESOCKET"
+  ) {
+    return true;
+  }
+  const msg = err.message.toLowerCase();
+  if (
+    msg.includes("timeout") ||
+    msg.includes("etimedout") ||
+    msg.includes("econnreset") ||
+    msg.includes("econnrefused") ||
+    msg.includes("network")
+  ) {
+    return true;
+  }
+  // 5xx anywhere in the message (e.g. "Resend 503: Service Unavailable")
+  return /\b5\d\d\b/.test(msg);
+}
+
+/**
+ * Run `send(payload)` with up to `attempts` retries on transient errors.
+ * Backoff: 0s, 2s, 6s. Non-transient errors throw immediately (no retry).
+ * On exhaustion logs structured PII-masked record and re-throws.
+ * Exported for testability.
+ */
+export async function sendWithRetry(
+  send: (p: SendPayload) => Promise<void>,
+  payload: SendPayload,
+  attempts = 3,
 ): Promise<void> {
+  let lastErr: unknown;
+  for (let i = 0; i < attempts; i++) {
+    try {
+      await send(payload);
+      return;
+    } catch (err) {
+      lastErr = err;
+      if (!isTransientError(err)) throw err;
+      if (i < attempts - 1) {
+        const delay = i === 0 ? 2000 : 6000;
+        await new Promise((r) => setTimeout(r, delay));
+      }
+    }
+  }
+  console.error("[L-TEX] Email send failed after retries", {
+    to: maskEmail(payload.to),
+    subject: payload.subject,
+    attempts,
+    error: lastErr instanceof Error ? lastErr.message : String(lastErr),
+  });
+  throw lastErr;
+}
+
+async function sendViaSMTP(payload: SendPayload): Promise<void> {
   // Dynamic import to avoid bundling nodemailer when not needed
   const nodemailer = await import("nodemailer");
   const transporter = nodemailer.createTransport({
@@ -79,21 +163,17 @@ async function sendViaSMTP(
 
   await transporter.sendMail({
     from: `${APP_NAME} <${getFromAddress()}>`,
-    to,
-    subject,
-    html,
+    to: payload.to,
+    subject: payload.subject,
+    html: payload.html,
   });
 }
 
-async function sendViaResend(
-  to: string,
-  subject: string,
-  html: string,
-): Promise<void> {
+async function sendViaResend(payload: SendPayload): Promise<void> {
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) return;
 
-  await fetch("https://api.resend.com/emails", {
+  const res = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: {
       Authorization: `Bearer ${apiKey}`,
@@ -101,12 +181,17 @@ async function sendViaResend(
     },
     body: JSON.stringify({
       from: `${APP_NAME} <${getFromAddress()}>`,
-      to: [to],
-      subject,
-      html,
+      to: [payload.to],
+      subject: payload.subject,
+      html: payload.html,
     }),
     signal: AbortSignal.timeout(10_000),
   });
+
+  if (!res.ok) {
+    // Surface status code so isTransientError can decide whether to retry.
+    throw new Error(`Resend ${res.status}: ${res.statusText}`);
+  }
 }
 
 async function sendEmail(
@@ -117,14 +202,21 @@ async function sendEmail(
   const transport = isEmailConfigured();
   if (!transport) return;
 
+  const payload: SendPayload = { to, subject, html };
+  const send = transport === "smtp" ? sendViaSMTP : sendViaResend;
   try {
-    if (transport === "smtp") {
-      await sendViaSMTP(to, subject, html);
-    } else {
-      await sendViaResend(to, subject, html);
-    }
+    await sendWithRetry(send, payload);
   } catch (err) {
-    console.error("Failed to send email:", err);
+    // Transient failures that exhausted retries are already logged inside
+    // sendWithRetry. Non-transient errors (4xx, validation) skip retry —
+    // log them here so they don't fall through silently.
+    if (!isTransientError(err)) {
+      console.error("[L-TEX] Email send failed (non-retriable)", {
+        to: maskEmail(to),
+        subject,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
   }
 }
 
@@ -256,7 +348,7 @@ export async function sendWelcomeNewsletterEmail(email: string): Promise<void> {
 
   if (!isEmailConfigured()) {
     console.info(
-      `[L-TEX] Email provider not configured — welcome newsletter email skipped for ${email} (subject: "${subject}").`,
+      "[L-TEX] Email provider not configured — welcome newsletter email skipped.",
     );
     return;
   }

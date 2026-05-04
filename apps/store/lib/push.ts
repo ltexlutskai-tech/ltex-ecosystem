@@ -79,9 +79,10 @@ export async function sendPushNotification(
     });
 
     if (!response.ok) {
-      console.error(
-        `Expo Push API error: ${response.status} ${response.statusText}`,
-      );
+      console.error("[L-TEX] Expo Push API error", {
+        status: response.status,
+        statusText: response.statusText,
+      });
       return { sent: 0, failed: tokens.length, tickets: [] };
     }
 
@@ -115,13 +116,19 @@ export async function sendPushNotification(
           data: { active: false },
         })
         .catch((err: unknown) => {
-          console.error("Failed to deactivate invalid push tokens:", err);
+          console.error("[L-TEX] Failed to deactivate invalid push tokens", {
+            count: tokensToDeactivate.length,
+            error: err instanceof Error ? err.message : String(err),
+          });
         });
     }
 
     return { sent, failed, tickets };
   } catch (err) {
-    console.error("Failed to send push notifications:", err);
+    console.error("[L-TEX] Failed to send push notifications", {
+      tokenCount: tokens.length,
+      error: err instanceof Error ? err.message : String(err),
+    });
     return { sent: 0, failed: tokens.length, tickets: [] };
   }
 }

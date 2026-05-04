@@ -125,7 +125,12 @@ export async function POST(request: NextRequest) {
     totalUah,
     itemCount: 1,
     totalWeight: weight,
-  }).catch((e) => console.error("[L-TEX] notifyNewOrder failed:", e));
+  }).catch((e) =>
+    console.error("[L-TEX] notifyNewOrder failed", {
+      orderId: order.id,
+      error: e instanceof Error ? e.message : String(e),
+    }),
+  );
 
   if (dbCustomer.email) {
     const product = await prisma.product.findUnique({
@@ -151,7 +156,10 @@ export async function POST(request: NextRequest) {
       totalWeight: weight,
       items,
     }).catch((e) =>
-      console.error("[L-TEX] sendOrderConfirmationEmail failed:", e),
+      console.error("[L-TEX] sendOrderConfirmationEmail failed", {
+        orderId: order.id,
+        error: e instanceof Error ? e.message : String(e),
+      }),
     );
   }
 

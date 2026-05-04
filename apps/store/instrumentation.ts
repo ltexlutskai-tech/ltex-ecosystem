@@ -29,6 +29,16 @@ export function validateProductionSecrets(
         "Generate with: openssl rand -hex 32",
     );
   }
+
+  if (env.TELEGRAM_BOT_TOKEN) {
+    const tgSecret = env.TELEGRAM_WEBHOOK_SECRET;
+    if (!tgSecret || tgSecret.length < 16) {
+      throw new Error(
+        "TELEGRAM_WEBHOOK_SECRET must be at least 16 characters when TELEGRAM_BOT_TOKEN is set. " +
+          "Generate with: openssl rand -hex 24",
+      );
+    }
+  }
 }
 
 export function register() {

@@ -82,4 +82,52 @@ describe("validateProductionSecrets", () => {
       } as NodeJS.ProcessEnv),
     ).toThrow(/openssl rand -hex 32/);
   });
+
+  it("does not require TELEGRAM_WEBHOOK_SECRET when bot token is absent", () => {
+    expect(() =>
+      validateProductionSecrets({
+        NODE_ENV: "production",
+        MOBILE_JWT_SECRET: VALID_SECRET,
+        SYNC_API_KEY: VALID_SECRET,
+        TELEGRAM_BOT_TOKEN: undefined,
+        TELEGRAM_WEBHOOK_SECRET: undefined,
+      } as NodeJS.ProcessEnv),
+    ).not.toThrow();
+  });
+
+  it("passes when bot token + webhook secret are both present and long enough", () => {
+    expect(() =>
+      validateProductionSecrets({
+        NODE_ENV: "production",
+        MOBILE_JWT_SECRET: VALID_SECRET,
+        SYNC_API_KEY: VALID_SECRET,
+        TELEGRAM_BOT_TOKEN: "12345:abcdef",
+        TELEGRAM_WEBHOOK_SECRET: "x".repeat(16),
+      } as NodeJS.ProcessEnv),
+    ).not.toThrow();
+  });
+
+  it("throws when TELEGRAM_BOT_TOKEN is set but TELEGRAM_WEBHOOK_SECRET is missing", () => {
+    expect(() =>
+      validateProductionSecrets({
+        NODE_ENV: "production",
+        MOBILE_JWT_SECRET: VALID_SECRET,
+        SYNC_API_KEY: VALID_SECRET,
+        TELEGRAM_BOT_TOKEN: "12345:abcdef",
+        TELEGRAM_WEBHOOK_SECRET: undefined,
+      } as NodeJS.ProcessEnv),
+    ).toThrow(/TELEGRAM_WEBHOOK_SECRET/);
+  });
+
+  it("throws when TELEGRAM_WEBHOOK_SECRET is too short", () => {
+    expect(() =>
+      validateProductionSecrets({
+        NODE_ENV: "production",
+        MOBILE_JWT_SECRET: VALID_SECRET,
+        SYNC_API_KEY: VALID_SECRET,
+        TELEGRAM_BOT_TOKEN: "12345:abcdef",
+        TELEGRAM_WEBHOOK_SECRET: "short",
+      } as NodeJS.ProcessEnv),
+    ).toThrow(/TELEGRAM_WEBHOOK_SECRET/);
+  });
 });

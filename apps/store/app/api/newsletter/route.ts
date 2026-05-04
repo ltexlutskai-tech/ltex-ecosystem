@@ -11,10 +11,16 @@ function fireNewsletterNotifications(payload: {
   subscribedAt: Date;
 }): void {
   void notifyNewsletterSubscribe(payload).catch((e) =>
-    console.error("[L-TEX] notifyNewsletterSubscribe failed:", e),
+    console.error("[L-TEX] notifyNewsletterSubscribe failed", {
+      source: payload.source,
+      error: e instanceof Error ? e.message : String(e),
+    }),
   );
   void sendWelcomeNewsletterEmail(payload.email).catch((e) =>
-    console.error("[L-TEX] sendWelcomeNewsletterEmail failed:", e),
+    console.error("[L-TEX] sendWelcomeNewsletterEmail failed", {
+      source: payload.source,
+      error: e instanceof Error ? e.message : String(e),
+    }),
   );
 }
 
