@@ -1,24 +1,37 @@
 "use client";
 
 import { Heart } from "lucide-react";
-import { useWishlist, type WishlistItem } from "@/lib/wishlist";
+import {
+  useWishlist,
+  wishlistItemKey,
+  type WishlistItem,
+} from "@/lib/wishlist";
+
+type WishlistButtonProductInput = Omit<WishlistItem, "kind"> &
+  Partial<Pick<WishlistItem, "kind">>;
 
 interface WishlistButtonProps {
-  product: WishlistItem;
+  product: WishlistButtonProductInput;
   size?: "sm" | "md";
 }
 
 export function WishlistButton({ product, size = "sm" }: WishlistButtonProps) {
   const { addItem, removeItem, isInWishlist } = useWishlist();
-  const inWishlist = isInWishlist(product.productId);
+
+  const item: WishlistItem = {
+    ...product,
+    kind: product.kind ?? "product",
+  };
+  const key = wishlistItemKey(item);
+  const inWishlist = isInWishlist(key);
 
   function toggle(e: React.MouseEvent) {
     e.preventDefault();
     e.stopPropagation();
     if (inWishlist) {
-      removeItem(product.productId);
+      removeItem(key);
     } else {
-      addItem(product);
+      addItem(item);
     }
   }
 
@@ -26,6 +39,7 @@ export function WishlistButton({ product, size = "sm" }: WishlistButtonProps) {
 
   return (
     <button
+      type="button"
       onClick={toggle}
       data-analytics="wishlist-toggle"
       className={`rounded-full bg-white/90 p-2 shadow-md transition-colors hover:bg-white ${
