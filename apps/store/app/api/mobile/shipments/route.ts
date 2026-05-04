@@ -45,8 +45,11 @@ async function trackNovaPoshta(
     if (data.success && data.data?.[0]) {
       return data.data[0] as NovaPoshtaStatus;
     }
-  } catch {
-    console.error(`Nova Poshta tracking error for ${trackingNumber}`);
+  } catch (err) {
+    console.error("[L-TEX] Nova Poshta tracking error", {
+      trackingNumber,
+      error: err instanceof Error ? err.message : String(err),
+    });
   }
   return null;
 }

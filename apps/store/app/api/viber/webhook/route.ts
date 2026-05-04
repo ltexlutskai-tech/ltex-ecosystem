@@ -508,7 +508,9 @@ export async function POST(request: NextRequest) {
         break;
     }
   } catch (error) {
-    console.error("Viber webhook error:", error);
+    console.error("[L-TEX] Viber webhook error", {
+      error: error instanceof Error ? error.message : String(error),
+    });
   }
 
   return NextResponse.json({ status: 0 });

@@ -124,7 +124,10 @@ async function sendEmail(
       await sendViaResend(to, subject, html);
     }
   } catch (err) {
-    console.error("Failed to send email:", err);
+    console.error("[L-TEX] Failed to send email", {
+      subject,
+      error: err instanceof Error ? err.message : String(err),
+    });
   }
 }
 
@@ -256,7 +259,7 @@ export async function sendWelcomeNewsletterEmail(email: string): Promise<void> {
 
   if (!isEmailConfigured()) {
     console.info(
-      `[L-TEX] Email provider not configured — welcome newsletter email skipped for ${email} (subject: "${subject}").`,
+      "[L-TEX] Email provider not configured — welcome newsletter email skipped.",
     );
     return;
   }

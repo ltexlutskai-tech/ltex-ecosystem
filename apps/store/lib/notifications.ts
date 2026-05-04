@@ -66,9 +66,12 @@ async function sendTelegramNotification(
       }),
       signal: AbortSignal.timeout(10_000),
     });
-  } catch {
+  } catch (err) {
     // Silently fail — don't break order flow for notification issues
-    console.error("Failed to send Telegram notification");
+    console.error("[L-TEX] Failed to send Telegram notification", {
+      orderId: order.orderId,
+      error: err instanceof Error ? err.message : String(err),
+    });
   }
 }
 
@@ -106,9 +109,12 @@ async function sendViberNotification(order: OrderNotification): Promise<void> {
       }),
       signal: AbortSignal.timeout(10_000),
     });
-  } catch {
+  } catch (err) {
     // Silently fail — don't break order flow for notification issues
-    console.error("Failed to send Viber notification");
+    console.error("[L-TEX] Failed to send Viber notification", {
+      orderId: order.orderId,
+      error: err instanceof Error ? err.message : String(err),
+    });
   }
 }
 
@@ -148,11 +154,15 @@ export async function notifyNewsletterSubscribe(
       },
     );
     if (!res.ok) {
-      console.warn(
-        `[L-TEX] Telegram newsletter notification failed: ${res.status}`,
-      );
+      console.warn("[L-TEX] Telegram newsletter notification failed", {
+        status: res.status,
+        source: payload.source ?? "unknown",
+      });
     }
   } catch (err) {
-    console.warn("[L-TEX] Telegram newsletter notification error:", err);
+    console.warn("[L-TEX] Telegram newsletter notification error", {
+      source: payload.source ?? "unknown",
+      error: err instanceof Error ? err.message : String(err),
+    });
   }
 }

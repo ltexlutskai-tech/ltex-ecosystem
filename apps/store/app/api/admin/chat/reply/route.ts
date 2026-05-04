@@ -63,7 +63,11 @@ export async function POST(request: NextRequest) {
     text.length > 100 ? `${text.slice(0, 97)}...` : text,
     { type: "chat", messageId: message.id },
   ).catch((err) => {
-    console.error("chat reply push failed:", err);
+    console.error("[L-TEX] chat reply push failed", {
+      customerId,
+      messageId: message.id,
+      error: err instanceof Error ? err.message : String(err),
+    });
   });
 
   return NextResponse.json(

@@ -421,7 +421,9 @@ export async function POST(request: NextRequest) {
       await handleInlineQuery(iq);
     }
   } catch (error) {
-    console.error("Telegram webhook error:", error);
+    console.error("[L-TEX] Telegram webhook error", {
+      error: error instanceof Error ? error.message : String(error),
+    });
   }
 
   // Always return 200 to Telegram
