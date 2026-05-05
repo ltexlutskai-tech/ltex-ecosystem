@@ -71,16 +71,17 @@ Contacts: Telegram @L_TEX, +380 67 671 05 15, +380 99 358 49 92, ltex.lutsk.ai@g
 
 ## Quick Navigation
 
-| Документ                                                         | Коли читати                                              |
-| ---------------------------------------------------------------- | -------------------------------------------------------- |
-| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)                     | Tech stack, file tree, DB schema, env vars, URLs, tests  |
-| [docs/HISTORY.md](docs/HISTORY.md)                               | Що робилось у Sessions 4-18 (completion reports)         |
-| [docs/CONVENTIONS.md](docs/CONVENTIONS.md)                       | Do-not-touch list, existing systems, technical decisions |
-| [docs/SESSION_TASKS.md](docs/SESSION_TASKS.md)                   | Що треба зробити далі (priority queue P0-P3)             |
-| [DEPLOYMENT.md](DEPLOYMENT.md)                                   | Як деплоїти на Windows Server                            |
-| [docs/SUPABASE_DB_DECOUPLING.md](docs/SUPABASE_DB_DECOUPLING.md) | Стан Supabase DB як cold backup (Auth+Storage active)    |
-| [docs/BUNDLE_BASELINE.md](docs/BUNDLE_BASELINE.md)               | Bundle size snapshot для PR-порівнянь                    |
-| [PROJECT_AUDIT_2026-04-18.md](PROJECT_AUDIT_2026-04-18.md)       | Повний audit snapshot (695 рядків, 12 секцій)            |
+| Документ                                                         | Коли читати                                                    |
+| ---------------------------------------------------------------- | -------------------------------------------------------------- |
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)                     | Tech stack, file tree, DB schema, env vars, URLs, tests        |
+| [docs/HISTORY.md](docs/HISTORY.md)                               | Що робилось у Sessions 4-18 (completion reports)               |
+| [docs/CONVENTIONS.md](docs/CONVENTIONS.md)                       | Do-not-touch list, existing systems, technical decisions       |
+| [docs/SESSION_TASKS.md](docs/SESSION_TASKS.md)                   | Що треба зробити далі (priority queue P0-P3)                   |
+| [DEPLOYMENT.md](DEPLOYMENT.md)                                   | Як деплоїти на Windows Server                                  |
+| [docs/SUPABASE_DB_DECOUPLING.md](docs/SUPABASE_DB_DECOUPLING.md) | Стан Supabase DB як cold backup (Auth+Storage active)          |
+| [docs/1c-export/README.md](docs/1c-export/README.md)             | 1С metadata reference (CommonModules + ExchangePlans для sync) |
+| [docs/BUNDLE_BASELINE.md](docs/BUNDLE_BASELINE.md)               | Bundle size snapshot для PR-порівнянь                          |
+| [PROJECT_AUDIT_2026-04-18.md](PROJECT_AUDIT_2026-04-18.md)       | Повний audit snapshot (695 рядків, 12 секцій)                  |
 
 ## Critical Rules for All Sessions
 
