@@ -8,6 +8,7 @@ import {
   syncPricesSchema,
   syncLotsSchema,
   syncRatesSchema,
+  syncOrdersImportSchema,
 } from "./validations";
 
 const validCustomer = {
@@ -434,5 +435,195 @@ describe("syncRatesSchema", () => {
       { ...validRate, date: "not-a-date" },
     ]);
     expect(result.success).toBe(false);
+  });
+});
+
+describe("syncOrdersImportSchema", () => {
+  const validImportOrder = {
+    code1C: "ORD-1С-001",
+    customer: {
+      name: "Іван Петров",
+      phone: "+380676710515",
+    },
+    items: [
+      {
+        productCode1C: "PROD-0260",
+        priceEur: 161.95,
+        weight: 20.5,
+        quantity: 1,
+      },
+    ],
+  };
+
+  it("accepts minimal valid order", () => {
+    expect(syncOrdersImportSchema.safeParse([validImportOrder]).success).toBe(
+      true,
+    );
+  });
+
+  it("accepts full order with all optional fields", () => {
+    const result = syncOrdersImportSchema.safeParse([
+      {
+        ...validImportOrder,
+        customer: {
+          code1C: "CUST-001",
+          name: "Іван Петров",
+          phone: "+380676710515",
+          email: "ivan@example.com",
+          telegram: "@ivan",
+          city: "Луцьк",
+        },
+        status: "confirmed",
+        totalEur: 161.95,
+        totalUah: 7080.92,
+        exchangeRate: 43.72,
+        notes: "Доставка Новою Поштою, відділення 5",
+        createdAt: "2026-05-01T12:00:00Z",
+        items: [
+          {
+            barcode: "2580101020506101332006008T",
+            productCode1C: "PROD-0260",
+            priceEur: 161.95,
+            weight: 20.5,
+            quantity: 1,
+          },
+        ],
+      },
+    ]);
+    expect(result.success).toBe(true);
+  });
+
+  it("accepts null/optional customer fields", () => {
+    const result = syncOrdersImportSchema.safeParse([
+      {
+        ...validImportOrder,
+        customer: {
+          code1C: null,
+          name: "Анонім",
+          phone: null,
+          email: null,
+          telegram: null,
+          city: null,
+        },
+      },
+    ]);
+    expect(result.success).toBe(true);
+  });
+
+  it("accepts items without barcode (general product, manager picks lot)", () => {
+    const result = syncOrdersImportSchema.safeParse([
+      {
+        ...validImportOrder,
+        items: [
+          {
+            productCode1C: "PROD-0260",
+            priceEur: 50,
+            weight: 10,
+            quantity: 1,
+          },
+        ],
+      },
+    ]);
+    expect(result.success).toBe(true);
+  });
+
+  it("accepts empty items array (order placeholder)", () => {
+    const result = syncOrdersImportSchema.safeParse([
+      { ...validImportOrder, items: [] },
+    ]);
+    expect(result.success).toBe(true);
+  });
+
+  it("requires code1C", () => {
+    const { code1C: _code, ...without } = validImportOrder;
+    expect(syncOrdersImportSchema.safeParse([without]).success).toBe(false);
+  });
+
+  it("requires customer name", () => {
+    const result = syncOrdersImportSchema.safeParse([
+      { ...validImportOrder, customer: { name: "" } },
+    ]);
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects unsupported status", () => {
+    const result = syncOrdersImportSchema.safeParse([
+      { ...validImportOrder, status: "delivered" },
+    ]);
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects negative totals", () => {
+    expect(
+      syncOrdersImportSchema.safeParse([{ ...validImportOrder, totalEur: -1 }])
+        .success,
+    ).toBe(false);
+    expect(
+      syncOrdersImportSchema.safeParse([{ ...validImportOrder, totalUah: -1 }])
+        .success,
+    ).toBe(false);
+  });
+
+  it("rejects non-positive exchange rate", () => {
+    expect(
+      syncOrdersImportSchema.safeParse([
+        { ...validImportOrder, exchangeRate: 0 },
+      ]).success,
+    ).toBe(false);
+  });
+
+  it("accepts zero priceEur/weight (free/sample lots)", () => {
+    const result = syncOrdersImportSchema.safeParse([
+      {
+        ...validImportOrder,
+        items: [
+          {
+            productCode1C: "PROD-0260",
+            priceEur: 0,
+            weight: 0,
+            quantity: 1,
+          },
+        ],
+      },
+    ]);
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects non-integer item quantity", () => {
+    const result = syncOrdersImportSchema.safeParse([
+      {
+        ...validImportOrder,
+        items: [
+          {
+            productCode1C: "PROD-0260",
+            priceEur: 10,
+            weight: 5,
+            quantity: 1.5,
+          },
+        ],
+      },
+    ]);
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects invalid customer email", () => {
+    const result = syncOrdersImportSchema.safeParse([
+      {
+        ...validImportOrder,
+        customer: { name: "Іван", email: "not-an-email" },
+      },
+    ]);
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects invalid createdAt format", () => {
+    const result = syncOrdersImportSchema.safeParse([
+      { ...validImportOrder, createdAt: "2026-05-01" },
+    ]);
+    expect(result.success).toBe(false);
+  });
+
+  it("accepts empty array", () => {
+    expect(syncOrdersImportSchema.safeParse([]).success).toBe(true);
   });
 });

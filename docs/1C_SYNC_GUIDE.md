@@ -29,6 +29,7 @@ L-TEX у `apps/store/.env`.
    `articleCode`)
 5. **POST /rates** — окремо, у будь-який час
 6. **GET /orders/export?since=<ISO>** — забір нових замовлень для обробки в 1С
+7. **POST /orders/import** — push замовлень, створених у 1С (телефонні заявки), назад у сайт
 
 ---
 
@@ -312,6 +313,124 @@ Authorization: Bearer <SYNC_API_KEY>
 
 ---
 
+## POST `/api/sync/orders/import`
+
+Push замовлень з 1С на сайт. Використовується коли менеджер створив замовлення
+у 1С (наприклад з телефонної заявки) і його треба показати у `/admin/orders`,
+а також коли 1С оновлює status уже синхронізованого замовлення.
+
+Ідентифікатор — `code1C` (Order.code1C @unique). Upsert: якщо замовлення з цим
+`code1C` уже існує, його дані оновлюються і items замінюються повністю
+(старі OrderItem видаляються, нові створюються заново).
+
+### Request
+
+```
+POST /api/sync/orders/import
+Authorization: Bearer <SYNC_API_KEY>
+Content-Type: application/json
+
+[
+  {
+    "code1C": "ORD-1С-00042",
+    "customer": {
+      "code1C": "CUST-001",
+      "name": "Іван Петров",
+      "phone": "+380676710515",
+      "email": "ivan@example.com",
+      "telegram": "@ivan",
+      "city": "Луцьк"
+    },
+    "status": "confirmed",
+    "totalEur": 161.95,
+    "totalUah": 7080.92,
+    "exchangeRate": 43.72,
+    "notes": "Доставка Новою Поштою, відділення 5",
+    "createdAt": "2026-05-01T12:00:00Z",
+    "items": [
+      {
+        "barcode": "2580101020506101332006008T",
+        "productCode1C": "PROD-0260",
+        "priceEur": 161.95,
+        "weight": 20.5,
+        "quantity": 1
+      }
+    ]
+  }
+]
+```
+
+### Response
+
+```json
+{
+  "created": 1,
+  "updated": 0,
+  "errors": 0,
+  "errorDetails": [],
+  "total": 1
+}
+```
+
+### Required fields
+
+- `code1C` — унікальний ID замовлення у 1С
+- `customer.name` — обов'язкове, max 200 символів
+- `items[].productCode1C` — товар має існувати на сайті (синхронізовано раніше)
+- `items[].priceEur` / `weight` / `quantity` — числові значення
+
+### Optional fields
+
+- `customer.code1C` — якщо переданий, шукаємо клієнта по цьому коду; якщо не
+  знайдено — fallback на phone; якщо не знайдено по phone — створюємо нового.
+  При знайденні існуючого — його дані оновлюються (включно з `code1C` якщо був
+  пустим).
+- `customer.phone` / `email` / `telegram` / `city` — заповнюються/оновлюються
+  на клієнті
+- `status` — один з `new` / `confirmed` / `processing` / `shipped` /
+  `completed` / `cancelled` (default `new`)
+- `totalEur` / `totalUah` / `exchangeRate` — числові, нульові за замовчуванням
+- `notes` — довільний коментар менеджера
+- `createdAt` — ISO 8601 (`2026-05-01T12:00:00Z`); якщо не передано —
+  використовується час обробки запиту (тільки при create, на update — не
+  чіпається)
+- `items[].barcode` — якщо переданий, лот має існувати і належати тому самому
+  товару (`productCode1C`). Якщо не переданий — позиція без конкретного лота
+  (загальна позиція; менеджер обере вільний лот пізніше).
+
+### Customer matching
+
+1. Якщо `customer.code1C` переданий → шукаємо клієнта по `code1C` (унікальне)
+2. Інакше якщо `customer.phone` переданий → шукаємо першого клієнта з таким
+   phone
+3. Якщо нічого не знайдено → створюємо нового клієнта з усіма переданими
+   полями
+4. Якщо знайдено існуючого → оновлюємо name/phone/email/telegram/city (плюс
+   code1C якщо переданий) — null-значення в payload **зануляють** поля
+   клієнта.
+
+### Errors
+
+- "Product not found: ..." — продукт з `productCode1C` не знайдено на сайті.
+  **Дія:** синхронізуй products перед orders.
+- "Lot not found: ..." — переданий barcode, але лот відсутній. **Дія:**
+  синхронізуй lots, або прибери barcode (тоді буде загальна позиція).
+- "Lot ... does not belong to product ..." — barcode існує, але прив'язаний до
+  іншого товару. **Дія:** перевір mapping articleCode у 1С.
+
+Помилки повертаються у `200 OK` з масивом `errorDetails` (max 10) — інші
+order-и з батчу обробляються окремо.
+
+### Workflow
+
+1. Менеджер створює "Замовлення Покупця" у 1С з телефону.
+2. 1С робить POST `/api/sync/orders/import` з `code1C`, customer, items.
+3. На сайті у `/admin/orders` з'являється новий запис.
+4. Якщо у 1С міняється статус → 1С пере-надсилає те саме замовлення з оновленим
+   `status` (upsert замінить items + status + totals).
+
+---
+
 ## Test commands (PowerShell)
 
 ```powershell
@@ -345,6 +464,10 @@ Invoke-RestMethod -Uri "$URL/rates" -Method Post -Headers $h -Body $body
 
 # Test orders export
 Invoke-RestMethod -Uri "$URL/orders/export?status=new" -Method Get -Headers $h
+
+# Test orders import (push 1С-created order to site)
+$body = '[{"code1C":"ORD-1С-TEST","customer":{"name":"Тест","phone":"+380000000000"},"status":"new","items":[{"productCode1C":"TEST-1","priceEur":10,"weight":5,"quantity":1}]}]'
+Invoke-RestMethod -Uri "$URL/orders/import" -Method Post -Headers $h -Body $body
 ```
 
 ## Errors
@@ -367,10 +490,12 @@ Invoke-RestMethod -Uri "$URL/orders/export?status=new" -Method Get -Headers $h
 `action`, `payload`, `syncedAt`). Адмін бачить це у `/admin/sync-log`.
 Корисно для debug-у "куди дівся товар".
 
-| entity     | entityId                          | example                      |
-| ---------- | --------------------------------- | ---------------------------- |
-| `category` | `slug`                            | `shtany`                     |
-| `product`  | `code1C`                          | `PROD-0260`                  |
-| `price`    | `productCode1C:priceType`         | `PROD-0260:wholesale`        |
-| `lot`      | `barcode`                         | `2580101020506101332006008T` |
-| `rate`     | (немає логування — тільки upsert) | —                            |
+| entity         | entityId                          | example                      |
+| -------------- | --------------------------------- | ---------------------------- |
+| `category`     | `slug`                            | `shtany`                     |
+| `product`      | `code1C`                          | `PROD-0260`                  |
+| `price`        | `productCode1C:priceType`         | `PROD-0260:wholesale`        |
+| `lot`          | `barcode`                         | `2580101020506101332006008T` |
+| `rate`         | (немає логування — тільки upsert) | —                            |
+| `order_export` | (немає id — лише count у payload) | —                            |
+| `order`        | `code1C` (для import)             | `ORD-1С-00042`               |
