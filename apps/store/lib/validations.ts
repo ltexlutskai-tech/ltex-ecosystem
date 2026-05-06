@@ -34,6 +34,10 @@ export const syncProductSchema = z.object({
   averageWeight: z.number().positive().optional(),
   videoUrl: z.string().url().optional().or(z.literal("")),
   inStock: z.boolean().optional(),
+  gender: z.string().max(50).optional().nullable(),
+  sizes: z.string().max(100).optional().nullable(),
+  unitsPerKg: z.string().max(50).optional().nullable(),
+  unitWeight: z.string().max(50).optional().nullable(),
 });
 
 export const syncLotsSchema = z.array(
