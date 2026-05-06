@@ -498,4 +498,4 @@ Invoke-RestMethod -Uri "$URL/orders/import" -Method Post -Headers $h -Body $body
 | `lot`          | `barcode`                         | `2580101020506101332006008T` |
 | `rate`         | (немає логування — тільки upsert) | —                            |
 | `order_export` | (немає id — лише count у payload) | —                            |
-| `order_import` | `code1C`                          | `ORD-1С-00042`               |
+| `order`        | `code1C` (для import)             | `ORD-1С-00042`               |

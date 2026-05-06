@@ -170,7 +170,7 @@ export async function POST(request: NextRequest) {
 
       await prisma.syncLog.create({
         data: {
-          entity: "order_import",
+          entity: "order",
           entityId: o.code1C,
           action: existing ? "update" : "create",
           payload: JSON.parse(JSON.stringify(o)),
@@ -187,6 +187,7 @@ export async function POST(request: NextRequest) {
 
   if (created > 0 || updated > 0) {
     revalidatePath("/admin/orders");
+    revalidatePath("/admin");
   }
 
   return NextResponse.json({
