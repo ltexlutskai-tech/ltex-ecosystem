@@ -61,6 +61,17 @@ export const syncLotsSchema = z.array(
   }),
 );
 
+export const syncPricesSchema = z.array(
+  z.object({
+    productCode1C: z.string().min(1),
+    priceType: z.string().min(1).max(50),
+    amount: z.number().positive(),
+    currency: z.enum(["EUR", "UAH", "USD"]).optional(),
+    validFrom: z.string().datetime().optional(),
+    validTo: z.string().datetime().optional().nullable(),
+  }),
+);
+
 export const syncRatesSchema = z.array(
   z.object({
     currencyFrom: z.enum(["EUR", "UAH", "USD"]),
