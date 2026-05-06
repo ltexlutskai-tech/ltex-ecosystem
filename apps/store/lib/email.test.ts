@@ -253,6 +253,7 @@ describe("nextAttemptDelayMs", () => {
 describe("enqueueEmail", () => {
   const ORIGINAL_RESEND = process.env.RESEND_API_KEY;
   const ORIGINAL_NODE_ENV = process.env.NODE_ENV;
+  const env = process.env as Record<string, string | undefined>;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -261,8 +262,8 @@ describe("enqueueEmail", () => {
 
   afterEach(() => {
     process.env.RESEND_API_KEY = ORIGINAL_RESEND;
-    if (ORIGINAL_NODE_ENV === undefined) delete process.env.NODE_ENV;
-    else process.env.NODE_ENV = ORIGINAL_NODE_ENV;
+    if (ORIGINAL_NODE_ENV === undefined) delete env.NODE_ENV;
+    else env.NODE_ENV = ORIGINAL_NODE_ENV;
   });
 
   it("creates an EmailJob row with pending defaults", async () => {
@@ -327,7 +328,7 @@ describe("enqueueEmail", () => {
   it("skips persistence when no transport is configured outside production", async () => {
     delete process.env.RESEND_API_KEY;
     delete process.env.SMTP_HOST;
-    process.env.NODE_ENV = "development";
+    env.NODE_ENV = "development";
     vi.spyOn(console, "info").mockImplementation(() => {});
 
     await enqueueEmail({
