@@ -40,6 +40,15 @@ export const syncProductSchema = z.object({
   unitWeight: z.string().max(50).optional().nullable(),
 });
 
+export const syncCategoriesSchema = z.array(
+  z.object({
+    slug: z.string().min(1).max(100),
+    name: z.string().min(1).max(200),
+    parentSlug: z.string().max(100).optional().nullable(),
+    position: z.number().int().min(0).optional(),
+  }),
+);
+
 export const syncLotsSchema = z.array(
   z.object({
     barcode: z.string().min(1),
