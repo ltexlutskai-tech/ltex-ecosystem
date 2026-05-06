@@ -4,6 +4,8 @@ import {
   orderCustomerSchema,
   orderItemSchema,
   syncProductSchema,
+  syncCategoriesSchema,
+  syncPricesSchema,
   syncLotsSchema,
   syncRatesSchema,
 } from "./validations";
@@ -173,6 +175,184 @@ describe("syncProductSchema", () => {
   it("requires code1C", () => {
     const { code1C: _, ...without } = validProduct;
     expect(syncProductSchema.safeParse(without).success).toBe(false);
+  });
+
+  it("accepts S59 fields (gender/sizes/unitsPerKg/unitWeight)", () => {
+    const result = syncProductSchema.safeParse({
+      ...validProduct,
+      gender: "Чоловіча",
+      sizes: "M-XXL",
+      unitsPerKg: "3-4 шт/кг",
+      unitWeight: "0.25-0.35 кг",
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("accepts null S59 fields", () => {
+    const result = syncProductSchema.safeParse({
+      ...validProduct,
+      gender: null,
+      sizes: null,
+      unitsPerKg: null,
+      unitWeight: null,
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("accepts product without any S59 fields", () => {
+    expect(syncProductSchema.safeParse(validProduct).success).toBe(true);
+  });
+
+  it("rejects gender over 50 chars", () => {
+    const result = syncProductSchema.safeParse({
+      ...validProduct,
+      gender: "a".repeat(51),
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects sizes over 100 chars", () => {
+    const result = syncProductSchema.safeParse({
+      ...validProduct,
+      sizes: "a".repeat(101),
+    });
+    expect(result.success).toBe(false);
+  });
+});
+
+describe("syncCategoriesSchema", () => {
+  it("accepts top-level category", () => {
+    const result = syncCategoriesSchema.safeParse([
+      { slug: "odyag", name: "Одяг", position: 1 },
+    ]);
+    expect(result.success).toBe(true);
+  });
+
+  it("accepts category with parent", () => {
+    const result = syncCategoriesSchema.safeParse([
+      { slug: "odyag", name: "Одяг" },
+      { slug: "shtany", name: "Штани", parentSlug: "odyag", position: 1 },
+    ]);
+    expect(result.success).toBe(true);
+  });
+
+  it("accepts null parentSlug", () => {
+    const result = syncCategoriesSchema.safeParse([
+      { slug: "odyag", name: "Одяг", parentSlug: null },
+    ]);
+    expect(result.success).toBe(true);
+  });
+
+  it("requires slug", () => {
+    const result = syncCategoriesSchema.safeParse([{ name: "Одяг" }]);
+    expect(result.success).toBe(false);
+  });
+
+  it("requires name", () => {
+    const result = syncCategoriesSchema.safeParse([{ slug: "odyag" }]);
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects empty slug", () => {
+    const result = syncCategoriesSchema.safeParse([{ slug: "", name: "Одяг" }]);
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects negative position", () => {
+    const result = syncCategoriesSchema.safeParse([
+      { slug: "odyag", name: "Одяг", position: -1 },
+    ]);
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects non-integer position", () => {
+    const result = syncCategoriesSchema.safeParse([
+      { slug: "odyag", name: "Одяг", position: 1.5 },
+    ]);
+    expect(result.success).toBe(false);
+  });
+
+  it("accepts empty array", () => {
+    expect(syncCategoriesSchema.safeParse([]).success).toBe(true);
+  });
+});
+
+describe("syncPricesSchema", () => {
+  const validPrice = {
+    productCode1C: "PROD-0260",
+    priceType: "wholesale",
+    amount: 7.9,
+  };
+
+  it("accepts wholesale price", () => {
+    expect(syncPricesSchema.safeParse([validPrice]).success).toBe(true);
+  });
+
+  it("accepts akciya price with validFrom + validTo", () => {
+    const result = syncPricesSchema.safeParse([
+      {
+        ...validPrice,
+        priceType: "akciya",
+        amount: 6.5,
+        currency: "EUR",
+        validFrom: "2026-05-01T00:00:00Z",
+        validTo: "2026-05-31T23:59:59Z",
+      },
+    ]);
+    expect(result.success).toBe(true);
+  });
+
+  it("accepts custom priceType (e.g. retail)", () => {
+    const result = syncPricesSchema.safeParse([
+      { ...validPrice, priceType: "retail" },
+    ]);
+    expect(result.success).toBe(true);
+  });
+
+  it("accepts null validTo", () => {
+    const result = syncPricesSchema.safeParse([
+      { ...validPrice, validTo: null },
+    ]);
+    expect(result.success).toBe(true);
+  });
+
+  it("requires productCode1C", () => {
+    const { productCode1C: _, ...without } = validPrice;
+    expect(syncPricesSchema.safeParse([without]).success).toBe(false);
+  });
+
+  it("rejects non-positive amount", () => {
+    expect(
+      syncPricesSchema.safeParse([{ ...validPrice, amount: 0 }]).success,
+    ).toBe(false);
+    expect(
+      syncPricesSchema.safeParse([{ ...validPrice, amount: -1 }]).success,
+    ).toBe(false);
+  });
+
+  it("rejects unsupported currency", () => {
+    const result = syncPricesSchema.safeParse([
+      { ...validPrice, currency: "GBP" },
+    ]);
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects invalid validFrom format", () => {
+    const result = syncPricesSchema.safeParse([
+      { ...validPrice, validFrom: "2026-05-01" },
+    ]);
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects priceType over 50 chars", () => {
+    const result = syncPricesSchema.safeParse([
+      { ...validPrice, priceType: "a".repeat(51) },
+    ]);
+    expect(result.success).toBe(false);
+  });
+
+  it("accepts empty array", () => {
+    expect(syncPricesSchema.safeParse([]).success).toBe(true);
   });
 });
 
