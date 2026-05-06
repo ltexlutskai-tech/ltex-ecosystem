@@ -69,6 +69,10 @@ export async function POST(request: NextRequest) {
         videoUrl: p.videoUrl || null,
         articleCode: p.articleCode ?? null,
         inStock: p.inStock ?? true,
+        gender: p.gender ?? null,
+        sizes: p.sizes ?? null,
+        unitsPerKg: p.unitsPerKg ?? null,
+        unitWeight: p.unitWeight ?? null,
       };
 
       if (existing) {

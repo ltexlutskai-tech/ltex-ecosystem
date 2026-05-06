@@ -34,7 +34,20 @@ export const syncProductSchema = z.object({
   averageWeight: z.number().positive().optional(),
   videoUrl: z.string().url().optional().or(z.literal("")),
   inStock: z.boolean().optional(),
+  gender: z.string().max(50).optional().nullable(),
+  sizes: z.string().max(100).optional().nullable(),
+  unitsPerKg: z.string().max(50).optional().nullable(),
+  unitWeight: z.string().max(50).optional().nullable(),
 });
+
+export const syncCategoriesSchema = z.array(
+  z.object({
+    slug: z.string().min(1).max(100),
+    name: z.string().min(1).max(200),
+    parentSlug: z.string().max(100).optional().nullable(),
+    position: z.number().int().min(0).optional(),
+  }),
+);
 
 export const syncLotsSchema = z.array(
   z.object({
@@ -45,6 +58,17 @@ export const syncLotsSchema = z.array(
     status: z.enum(["free", "reserved", "on_sale"]).optional(),
     priceEur: z.number().positive(),
     videoUrl: z.string().url().optional().or(z.literal("")),
+  }),
+);
+
+export const syncPricesSchema = z.array(
+  z.object({
+    productCode1C: z.string().min(1),
+    priceType: z.string().min(1).max(50),
+    amount: z.number().positive(),
+    currency: z.enum(["EUR", "UAH", "USD"]).optional(),
+    validFrom: z.string().datetime().optional(),
+    validTo: z.string().datetime().optional().nullable(),
   }),
 );
 
