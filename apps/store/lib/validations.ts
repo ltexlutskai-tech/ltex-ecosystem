@@ -72,6 +72,44 @@ export const syncPricesSchema = z.array(
   }),
 );
 
+export const syncOrdersImportSchema = z.array(
+  z.object({
+    code1C: z.string().min(1),
+    customer: z.object({
+      code1C: z.string().optional().nullable(),
+      name: z.string().min(1).max(200),
+      phone: z.string().max(30).optional().nullable(),
+      email: z.string().email().max(200).optional().nullable(),
+      telegram: z.string().max(100).optional().nullable(),
+      city: z.string().max(200).optional().nullable(),
+    }),
+    status: z
+      .enum([
+        "new",
+        "confirmed",
+        "processing",
+        "shipped",
+        "completed",
+        "cancelled",
+      ])
+      .optional(),
+    totalEur: z.number().nonnegative().optional(),
+    totalUah: z.number().nonnegative().optional(),
+    exchangeRate: z.number().positive().optional(),
+    notes: z.string().optional().nullable(),
+    createdAt: z.string().datetime().optional(),
+    items: z.array(
+      z.object({
+        barcode: z.string().optional().nullable(),
+        productCode1C: z.string().min(1),
+        priceEur: z.number().nonnegative(),
+        weight: z.number().nonnegative(),
+        quantity: z.number().int().positive(),
+      }),
+    ),
+  }),
+);
+
 export const syncRatesSchema = z.array(
   z.object({
     currencyFrom: z.enum(["EUR", "UAH", "USD"]),
