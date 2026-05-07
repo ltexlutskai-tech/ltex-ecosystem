@@ -5,6 +5,23 @@ import {
   type ProductImage,
   type Price,
 } from "@ltex/db";
+import { getCurrentCustomer } from "./customer-auth";
+
+/**
+ * Strip wholesale prices for unauthenticated visitors. Server-side
+ * scrubbing makes the price gate (S73) effective even when an attacker
+ * targets the API directly — the rendered guest tree never holds a price.
+ *
+ * Returns a fresh array with cloned items so the result is never aliased
+ * with cached state held elsewhere.
+ */
+async function maybeStripPrices(
+  products: ProductWithRelations[],
+): Promise<ProductWithRelations[]> {
+  const customer = await getCurrentCustomer();
+  if (customer) return products;
+  return products.map((p) => ({ ...p, prices: [] }));
+}
 
 interface CatalogParams {
   categoryId?: string;
@@ -90,7 +107,16 @@ export async function getCatalogProducts(
 
   // If search query is provided, use full-text search for ranking
   if (q && q.trim().length >= 2) {
-    return fullTextSearch({ ...params, q: q.trim(), page, perPage });
+    const result = await fullTextSearch({
+      ...params,
+      q: q.trim(),
+      page,
+      perPage,
+    });
+    return {
+      ...result,
+      products: await maybeStripPrices(result.products),
+    };
   }
 
   const where: Prisma.ProductWhereInput = { inStock: true };
@@ -190,7 +216,8 @@ export async function getCatalogProducts(
     });
   }
 
-  return { products, total, totalPages: Math.ceil(total / perPage) };
+  const sanitized = await maybeStripPrices(products);
+  return { products: sanitized, total, totalPages: Math.ceil(total / perPage) };
 }
 
 /**

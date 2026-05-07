@@ -1,0 +1,142 @@
+"use client";
+
+import { useFormState, useFormStatus } from "react-dom";
+import { Button, Input, Textarea } from "@ltex/ui";
+import { updateProfileAction, type UpdateProfileResult } from "./actions";
+import { getDictionary } from "@/lib/i18n";
+
+const dict = getDictionary();
+
+interface CustomerProfile {
+  id: string;
+  name: string;
+  phone: string;
+  email: string | null;
+  telegram: string | null;
+  city: string | null;
+  notes: string | null;
+}
+
+function SubmitButton() {
+  const { pending } = useFormStatus();
+  return (
+    <Button type="submit" disabled={pending}>
+      {pending ? dict.auth.profileSaving : dict.auth.profileSave}
+    </Button>
+  );
+}
+
+export function ProfileForm({ customer }: { customer: CustomerProfile }) {
+  const [state, formAction] = useFormState<
+    UpdateProfileResult | undefined,
+    FormData
+  >(updateProfileAction, undefined);
+
+  return (
+    <form action={formAction} className="space-y-4">
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div className="space-y-1.5">
+          <label
+            htmlFor="profile-name"
+            className="text-sm font-medium leading-none"
+          >
+            {dict.auth.fields.name}
+          </label>
+          <Input
+            id="profile-name"
+            name="name"
+            defaultValue={customer.name}
+            required
+            maxLength={100}
+            autoComplete="name"
+          />
+        </div>
+        <div className="space-y-1.5">
+          <label
+            htmlFor="profile-phone"
+            className="text-sm font-medium leading-none"
+          >
+            {dict.auth.fields.phone}
+          </label>
+          <Input
+            id="profile-phone"
+            name="phone"
+            defaultValue={customer.phone}
+            disabled
+            readOnly
+          />
+        </div>
+        <div className="space-y-1.5">
+          <label
+            htmlFor="profile-email"
+            className="text-sm font-medium leading-none"
+          >
+            {dict.auth.fields.email}
+          </label>
+          <Input
+            id="profile-email"
+            name="email"
+            type="email"
+            defaultValue={customer.email ?? ""}
+            maxLength={120}
+            autoComplete="email"
+          />
+        </div>
+        <div className="space-y-1.5">
+          <label
+            htmlFor="profile-telegram"
+            className="text-sm font-medium leading-none"
+          >
+            {dict.auth.fields.telegram}
+          </label>
+          <Input
+            id="profile-telegram"
+            name="telegram"
+            defaultValue={customer.telegram ?? ""}
+            maxLength={50}
+            placeholder="@nickname"
+          />
+        </div>
+        <div className="space-y-1.5 sm:col-span-2">
+          <label
+            htmlFor="profile-city"
+            className="text-sm font-medium leading-none"
+          >
+            {dict.auth.fields.city}
+          </label>
+          <Input
+            id="profile-city"
+            name="city"
+            defaultValue={customer.city ?? ""}
+            maxLength={100}
+            autoComplete="address-level2"
+          />
+        </div>
+        <div className="space-y-1.5 sm:col-span-2">
+          <label
+            htmlFor="profile-notes"
+            className="text-sm font-medium leading-none"
+          >
+            {dict.auth.fields.notes}
+          </label>
+          <Textarea
+            id="profile-notes"
+            name="notes"
+            defaultValue={customer.notes ?? ""}
+            maxLength={500}
+            rows={3}
+          />
+        </div>
+      </div>
+      <div className="flex items-center gap-3">
+        <SubmitButton />
+        {state?.ok && (
+          <p className="text-sm text-green-700">{dict.auth.profileSaved}</p>
+        )}
+        {state && state.ok === false && state.error && (
+          <p className="text-sm text-red-600">{state.error}</p>
+        )}
+      </div>
+    </form>
+  );
+}

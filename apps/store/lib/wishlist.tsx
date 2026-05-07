@@ -5,9 +5,11 @@ import {
   useContext,
   useCallback,
   useEffect,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
+import { useCustomer } from "@/lib/customer-context";
 
 export type WishlistKind = "product" | "lot";
 
@@ -83,6 +85,8 @@ function normalizeItem(raw: unknown): WishlistItem | null {
 export function WishlistProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<WishlistItem[]>([]);
   const [loaded, setLoaded] = useState(false);
+  const customer = useCustomer();
+  const lastSyncedCustomerIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     try {
@@ -106,6 +110,73 @@ export function WishlistProvider({ children }: { children: ReactNode }) {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
     } catch {}
   }, [items, loaded]);
+
+  // Sync local product favorites with the authenticated customer once per
+  // session per customerId. Lot favorites stay local-only — there is no
+  // server-side schema for them yet (S73 keeps the lot wishlist client-only).
+  useEffect(() => {
+    if (!loaded) return;
+    if (!customer) {
+      lastSyncedCustomerIdRef.current = null;
+      return;
+    }
+    if (lastSyncedCustomerIdRef.current === customer.id) return;
+    lastSyncedCustomerIdRef.current = customer.id;
+
+    let cancelled = false;
+    (async () => {
+      const productItems = items.filter((i) => i.kind === "product");
+      try {
+        const res = await fetch("/api/customer/favorites/sync", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            items: productItems.map((i) => ({ productId: i.productId })),
+          }),
+        });
+        if (!res.ok) return;
+        const data = (await res.json()) as {
+          items?: { productId: string }[];
+        };
+        if (cancelled || !Array.isArray(data.items)) return;
+
+        const serverIds = new Set(data.items.map((i) => i.productId));
+        const localById = new Map(
+          items
+            .filter((i) => i.kind === "product")
+            .map((i) => [i.productId, i] as const),
+        );
+        const lotItems = items.filter((i) => i.kind === "lot");
+        const mergedProducts: WishlistItem[] = Array.from(serverIds).map(
+          (id) =>
+            localById.get(id) ?? {
+              kind: "product",
+              productId: id,
+              slug: "",
+              name: "",
+              quality: "",
+              imageUrl: null,
+              priceEur: null,
+              priceUnit: "kg",
+            },
+        );
+        // Drop placeholders (slug === "") — those are server entries we have
+        // no metadata for; rendering them would 404. They'll re-populate the
+        // next time the customer hovers over the product.
+        const nextItems = [
+          ...mergedProducts.filter((i) => i.slug !== ""),
+          ...lotItems,
+        ];
+        setItems(nextItems);
+      } catch {
+        // Network failure: keep local state, retry on next mount.
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [customer, loaded, items]);
 
   const addItem = useCallback((item: WishlistItem) => {
     setItems((prev) => {

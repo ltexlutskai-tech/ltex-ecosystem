@@ -2,6 +2,7 @@ import { describe, it, expect, afterEach, vi } from "vitest";
 import { render, screen, fireEvent, cleanup } from "@testing-library/react";
 import { CartProvider } from "@/lib/cart";
 import { WishlistProvider } from "@/lib/wishlist";
+import { CustomerProvider } from "@/lib/customer-context";
 import { LotCard, type LotCardLot } from "./lot-card";
 
 vi.mock("next/navigation", () => ({
@@ -33,9 +34,11 @@ afterEach(() => {
 
 function renderWithCart(ui: React.ReactElement) {
   return render(
-    <WishlistProvider>
-      <CartProvider>{ui}</CartProvider>
-    </WishlistProvider>,
+    <CustomerProvider customer={{ id: "test-customer", name: "Test" }}>
+      <WishlistProvider>
+        <CartProvider>{ui}</CartProvider>
+      </WishlistProvider>
+    </CustomerProvider>,
   );
 }
 

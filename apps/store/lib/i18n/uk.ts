@@ -472,6 +472,49 @@ export const uk = {
     youtube: "YouTube",
   },
 
+  // Customer auth (S73)
+  auth: {
+    login: "Увійти",
+    logout: "Вийти",
+    account: "Особистий кабінет",
+    phoneLabel: "Номер телефону",
+    phonePlaceholder: "+380 XX XXX XX XX",
+    nameLabel: "Імʼя",
+    namePlaceholder: "Як до вас звертатися",
+    submit: "Увійти",
+    submitting: "Входимо...",
+    priceLoginPrompt: "Увійдіть щоб побачити ціну",
+    welcomeBack: "Вітаємо знову",
+    loginTitle: "Увійти до особистого кабінету",
+    loginIntro:
+      "Залиште імʼя і телефон — ми запамʼятаємо вас, покажемо актуальні ціни та збережемо обране.",
+    backToHome: "Перейти на головну",
+    invalidPhone: "Невірний формат номера телефону",
+    rateLimited: "Забагато спроб. Зачекайте хвилину.",
+    networkError: "Не вдалося увійти. Спробуйте ще раз.",
+    profileTitle: "Профіль",
+    ordersTitle: "Мої замовлення",
+    ordersEmpty: "Замовлень ще немає.",
+    orderSeeDetails: "Деталі",
+    wishlistTitle: "Обране",
+    wishlistGoTo: "Переглянути всі",
+    cartTitle: "Кошик",
+    cartGoTo: "Переглянути кошик",
+    fields: {
+      name: "Імʼя",
+      phone: "Телефон",
+      email: "Email",
+      telegram: "Telegram",
+      city: "Місто",
+      notes: "Коментар для менеджера",
+    },
+    profileSave: "Зберегти",
+    profileSaving: "Збереження...",
+    profileSaved: "Збережено",
+    addToCartLoginRequired:
+      "Увійдіть щоб додати товар у кошик і побачити ціни.",
+  },
+
   // Common
   common: {
     loading: "Завантаження...",
