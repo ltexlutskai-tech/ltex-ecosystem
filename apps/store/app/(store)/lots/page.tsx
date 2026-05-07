@@ -128,6 +128,46 @@ function buildChips(params: SearchParams): ChipDescriptor[] {
       ],
     });
   }
+  for (const g of parseList(getStr(params, "gender"))) {
+    chips.push({
+      key: `gender:${g}`,
+      label: g,
+      removeParams: [
+        {
+          key: "gender",
+          nextValue: parseList(getStr(params, "gender"))
+            .filter((x) => x !== g)
+            .join(","),
+        },
+      ],
+    });
+  }
+  const sizesValue = getStr(params, "sizes");
+  if (sizesValue) {
+    chips.push({
+      key: "sizes",
+      label: `Розмір: ${sizesValue}`,
+      removeParams: [{ key: "sizes" }],
+    });
+  }
+  const upkMin = getStr(params, "unitsPerKgMin");
+  const upkMax = getStr(params, "unitsPerKgMax");
+  if (upkMin || upkMax) {
+    chips.push({
+      key: "unitsPerKg",
+      label: `Шт/кг: ${upkMin || "0"}–${upkMax || "∞"}`,
+      removeParams: [{ key: "unitsPerKgMin" }, { key: "unitsPerKgMax" }],
+    });
+  }
+  const uwMin = getStr(params, "unitWeightMin");
+  const uwMax = getStr(params, "unitWeightMax");
+  if (uwMin || uwMax) {
+    chips.push({
+      key: "unitWeight",
+      label: `Вага одиниці: ${uwMin || "0"}–${uwMax || "∞"} кг`,
+      removeParams: [{ key: "unitWeightMin" }, { key: "unitWeightMax" }],
+    });
+  }
   const wMin = getStr(params, "weightMin");
   const wMax = getStr(params, "weightMax");
   if (wMin || wMax) {
@@ -207,10 +247,16 @@ export default async function LotsPage({
   const qualities = parseList(getStr(params, "quality"));
   const seasons = parseList(getStr(params, "season"));
   const countries = parseList(getStr(params, "country"));
+  const genders = parseList(getStr(params, "gender"));
+  const sizesQuery = (getStr(params, "sizes") ?? "").trim();
   const weightMin = parsePositiveFloat(getStr(params, "weightMin"));
   const weightMax = parsePositiveFloat(getStr(params, "weightMax"));
   const priceMin = parsePositiveFloat(getStr(params, "priceMin"));
   const priceMax = parsePositiveFloat(getStr(params, "priceMax"));
+  const unitsPerKgMin = parsePositiveFloat(getStr(params, "unitsPerKgMin"));
+  const unitsPerKgMax = parsePositiveFloat(getStr(params, "unitsPerKgMax"));
+  const unitWeightMin = parsePositiveFloat(getStr(params, "unitWeightMin"));
+  const unitWeightMax = parsePositiveFloat(getStr(params, "unitWeightMax"));
   const query = (getStr(params, "q") ?? "").trim();
   const sort = getStr(params, "sort") ?? "newest";
   const layout: "grid" | "list" =
@@ -252,6 +298,22 @@ export default async function LotsPage({
   if (qualities.length > 0) productWhere.quality = { in: qualities };
   if (seasons.length > 0) productWhere.season = { in: seasons };
   if (countries.length > 0) productWhere.country = { in: countries };
+  if (genders.length > 0) productWhere.gender = { in: genders };
+  if (sizesQuery) {
+    productWhere.sizes = { contains: sizesQuery, mode: "insensitive" };
+  }
+  if (typeof unitsPerKgMin === "number") {
+    productWhere.unitsPerKgMax = { gte: unitsPerKgMin };
+  }
+  if (typeof unitsPerKgMax === "number") {
+    productWhere.unitsPerKgMin = { lte: unitsPerKgMax };
+  }
+  if (typeof unitWeightMin === "number") {
+    productWhere.unitWeightMax = { gte: unitWeightMin };
+  }
+  if (typeof unitWeightMax === "number") {
+    productWhere.unitWeightMin = { lte: unitWeightMax };
+  }
   if (Object.keys(productWhere).length > 0) {
     where.product = productWhere;
   }

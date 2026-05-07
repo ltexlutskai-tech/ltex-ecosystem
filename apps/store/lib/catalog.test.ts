@@ -157,6 +157,92 @@ describe("getCatalogProducts", () => {
     );
   });
 
+  it("applies single gender filter", async () => {
+    mockFindMany.mockResolvedValue([]);
+    mockCount.mockResolvedValue(0);
+
+    await getCatalogProducts({ gender: "Жіноча" });
+
+    expect(mockFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ gender: "Жіноча" }),
+      }),
+    );
+  });
+
+  it("parses comma-separated gender into IN filter", async () => {
+    mockFindMany.mockResolvedValue([]);
+    mockCount.mockResolvedValue(0);
+
+    await getCatalogProducts({ gender: "Жіноча,Чоловіча" });
+
+    expect(mockFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          gender: { in: ["Жіноча", "Чоловіча"] },
+        }),
+      }),
+    );
+  });
+
+  it("applies sizes filter as case-insensitive substring", async () => {
+    mockFindMany.mockResolvedValue([]);
+    mockCount.mockResolvedValue(0);
+
+    await getCatalogProducts({ sizes: "XXL" });
+
+    expect(mockFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          sizes: { contains: "XXL", mode: "insensitive" },
+        }),
+      }),
+    );
+  });
+
+  it("ignores empty sizes filter", async () => {
+    mockFindMany.mockResolvedValue([]);
+    mockCount.mockResolvedValue(0);
+
+    await getCatalogProducts({ sizes: "   " });
+
+    const calledWhere = mockFindMany.mock.calls[0]![0]!.where;
+    expect(calledWhere.sizes).toBeUndefined();
+  });
+
+  it("applies unitsPerKg range as overlap (Max>=min, Min<=max)", async () => {
+    mockFindMany.mockResolvedValue([]);
+    mockCount.mockResolvedValue(0);
+
+    await getCatalogProducts({ unitsPerKgMin: 2, unitsPerKgMax: 5 });
+
+    const calledWhere = mockFindMany.mock.calls[0]![0]!.where;
+    expect(calledWhere.unitsPerKgMax).toEqual({ gte: 2 });
+    expect(calledWhere.unitsPerKgMin).toEqual({ lte: 5 });
+  });
+
+  it("applies only unitsPerKgMin when unitsPerKgMax omitted", async () => {
+    mockFindMany.mockResolvedValue([]);
+    mockCount.mockResolvedValue(0);
+
+    await getCatalogProducts({ unitsPerKgMin: 3 });
+
+    const calledWhere = mockFindMany.mock.calls[0]![0]!.where;
+    expect(calledWhere.unitsPerKgMax).toEqual({ gte: 3 });
+    expect(calledWhere.unitsPerKgMin).toBeUndefined();
+  });
+
+  it("applies unitWeight range as overlap on min/max columns", async () => {
+    mockFindMany.mockResolvedValue([]);
+    mockCount.mockResolvedValue(0);
+
+    await getCatalogProducts({ unitWeightMin: 0.3, unitWeightMax: 0.6 });
+
+    const calledWhere = mockFindMany.mock.calls[0]![0]!.where;
+    expect(calledWhere.unitWeightMax).toEqual({ gte: 0.3 });
+    expect(calledWhere.unitWeightMin).toEqual({ lte: 0.6 });
+  });
+
   it("applies priceMin filter", async () => {
     mockFindMany.mockResolvedValue([]);
     mockCount.mockResolvedValue(0);

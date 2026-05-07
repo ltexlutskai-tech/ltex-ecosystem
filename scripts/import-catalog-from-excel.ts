@@ -28,6 +28,7 @@ import {
   parseCategoryCell,
   parseDescription,
   parseNomenklatura,
+  parseRangeString,
   SKU_CATEGORY_OVERRIDE,
   slugify,
   type ClassifiedToken,
@@ -435,6 +436,8 @@ async function upsertProductRow(
   existing: { id: string; slug: string } | null,
 ): Promise<void> {
   const overrideGender = SKU_CATEGORY_OVERRIDE[row.articleCode]?.gender ?? null;
+  const unitsRange = parseRangeString(row.parsed.unitsPerKg);
+  const weightRange = parseRangeString(row.parsed.unitWeight);
   const data = {
     articleCode: row.articleCode,
     name: row.name || row.articleCode,
@@ -447,7 +450,11 @@ async function upsertProductRow(
     gender: overrideGender ?? row.parsed.gender ?? row.catGender ?? null,
     sizes: row.parsed.sizes,
     unitsPerKg: row.parsed.unitsPerKg,
+    unitsPerKgMin: unitsRange?.min ?? null,
+    unitsPerKgMax: unitsRange?.max ?? null,
     unitWeight: row.parsed.unitWeight,
+    unitWeightMin: weightRange?.min ?? null,
+    unitWeightMax: weightRange?.max ?? null,
     videoUrl: row.videoUrl,
     priceUnit: isFootwear(
       Object.entries(CATEGORY_SLUG_MAP).find(

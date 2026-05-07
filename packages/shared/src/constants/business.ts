@@ -20,6 +20,18 @@ export const COUNTRY_LABELS: Record<Country, string> = {
   usa: "США",
 };
 
+// Gender labels are stored on Product as raw Ukrainian strings (see
+// `parseDescription` in utils/import-catalog.ts). Keep the union mirroring
+// the values produced there so the catalog/lots filter UI can iterate.
+export const GENDER_OPTIONS = [
+  "Жіноча",
+  "Чоловіча",
+  "Дитяча",
+  "Унісекс",
+  "Дорослий",
+] as const;
+export type Gender = (typeof GENDER_OPTIONS)[number];
+
 export const CONTACTS = {
   telegram: "@L_TEX",
   telegramGroup: "https://t.me/LTEX_Second",

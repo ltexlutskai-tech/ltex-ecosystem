@@ -3,9 +3,10 @@ export {
   MIN_ORDER_KG,
   COUNTRIES,
   COUNTRY_LABELS,
+  GENDER_OPTIONS,
   CONTACTS,
 } from "./business";
-export type { Country } from "./business";
+export type { Country, Gender } from "./business";
 
 export { CURRENCIES, DEFAULT_CURRENCY, DISPLAY_CURRENCY } from "./currency";
 export type { Currency } from "./currency";

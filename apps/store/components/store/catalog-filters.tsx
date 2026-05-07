@@ -1,10 +1,11 @@
 "use client";
 
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { QUALITY_LEVELS, QUALITY_LABELS } from "@ltex/shared";
 import { SEASONS, SEASON_LABELS } from "@ltex/shared";
 import { COUNTRIES, COUNTRY_LABELS } from "@ltex/shared";
+import { GENDER_OPTIONS } from "@ltex/shared";
 import { SearchAutocomplete } from "./search-autocomplete";
 import { PriceRangeSlider } from "./price-range-slider";
 import { getDictionary } from "@/lib/i18n";
@@ -43,6 +44,31 @@ export function CatalogFilters({
     () => parseList(searchParams.get("country")),
     [searchParams],
   );
+  const selectedGenders = useMemo(
+    () => parseList(searchParams.get("gender")),
+    [searchParams],
+  );
+
+  const urlSizes = searchParams.get("sizes") ?? "";
+  const [sizesDraft, setSizesDraft] = useState(urlSizes);
+  // Keep input in sync when URL changes externally (clear-all, browser nav).
+  useEffect(() => {
+    setSizesDraft(urlSizes);
+  }, [urlSizes]);
+  const sizesDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const urlUnitsMin = searchParams.get("unitsPerKgMin") ?? "";
+  const urlUnitsMax = searchParams.get("unitsPerKgMax") ?? "";
+  const urlWeightMin = searchParams.get("unitWeightMin") ?? "";
+  const urlWeightMax = searchParams.get("unitWeightMax") ?? "";
+  const [unitsMinDraft, setUnitsMinDraft] = useState(urlUnitsMin);
+  const [unitsMaxDraft, setUnitsMaxDraft] = useState(urlUnitsMax);
+  const [weightMinDraft, setWeightMinDraft] = useState(urlWeightMin);
+  const [weightMaxDraft, setWeightMaxDraft] = useState(urlWeightMax);
+  useEffect(() => setUnitsMinDraft(urlUnitsMin), [urlUnitsMin]);
+  useEffect(() => setUnitsMaxDraft(urlUnitsMax), [urlUnitsMax]);
+  useEffect(() => setWeightMinDraft(urlWeightMin), [urlWeightMin]);
+  useEffect(() => setWeightMaxDraft(urlWeightMax), [urlWeightMax]);
 
   const [priceBounds, setPriceBounds] =
     useState<[number, number]>(DEFAULT_PRICE_RANGE);
@@ -104,7 +130,7 @@ export function CatalogFilters({
   );
 
   const toggleListValue = useCallback(
-    (key: "quality" | "country", value: string) => {
+    (key: "quality" | "country" | "gender", value: string) => {
       const current = parseList(searchParams.get(key));
       const next = current.includes(value)
         ? current.filter((x) => x !== value)
@@ -113,6 +139,42 @@ export function CatalogFilters({
     },
     [searchParams, updateFilter],
   );
+
+  const debouncedUpdateSizes = useCallback(
+    (value: string) => {
+      setSizesDraft(value);
+      if (sizesDebounceRef.current) clearTimeout(sizesDebounceRef.current);
+      sizesDebounceRef.current = setTimeout(() => {
+        updateFilter("sizes", value.trim());
+      }, 350);
+    },
+    [updateFilter],
+  );
+
+  // Apply both range inputs (units/kg, weight/unit) at once. Pattern matches
+  // the lots-filters-form Apply button — better UX than commit-on-blur.
+  const applyNumericRanges = useCallback(() => {
+    const params = new URLSearchParams(searchParams.toString());
+    const setOrDelete = (key: string, value: string) => {
+      const trimmed = value.trim();
+      if (trimmed) params.set(key, trimmed);
+      else params.delete(key);
+    };
+    setOrDelete("unitsPerKgMin", unitsMinDraft);
+    setOrDelete("unitsPerKgMax", unitsMaxDraft);
+    setOrDelete("unitWeightMin", weightMinDraft);
+    setOrDelete("unitWeightMax", weightMaxDraft);
+    params.delete("page");
+    router.push(`${pathname}?${params.toString()}`);
+  }, [
+    router,
+    pathname,
+    searchParams,
+    unitsMinDraft,
+    unitsMaxDraft,
+    weightMinDraft,
+    weightMaxDraft,
+  ]);
 
   const commitPriceRange = useCallback(
     ([lo, hi]: [number, number]) => {
@@ -143,6 +205,12 @@ export function CatalogFilters({
     searchParams.get("quality") ||
     searchParams.get("season") ||
     searchParams.get("country") ||
+    searchParams.get("gender") ||
+    searchParams.get("sizes") ||
+    searchParams.get("unitsPerKgMin") ||
+    searchParams.get("unitsPerKgMax") ||
+    searchParams.get("unitWeightMin") ||
+    searchParams.get("unitWeightMax") ||
     searchParams.get("sort") ||
     searchParams.get("priceMin") ||
     searchParams.get("priceMax") ||
@@ -227,6 +295,107 @@ export function CatalogFilters({
             );
           })}
         </div>
+      </div>
+
+      <div>
+        <span className={labelClass}>{dict.catalog.genderLabel}</span>
+        <div className="space-y-1.5">
+          {GENDER_OPTIONS.map((g) => {
+            const checked = selectedGenders.includes(g);
+            return (
+              <label
+                key={g}
+                className="flex cursor-pointer items-center gap-2 text-sm text-gray-700"
+              >
+                <input
+                  type="checkbox"
+                  checked={checked}
+                  onChange={() => toggleListValue("gender", g)}
+                  className="h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-1 focus:ring-green-500"
+                />
+                <span>{g}</span>
+              </label>
+            );
+          })}
+        </div>
+      </div>
+
+      <div>
+        <label htmlFor="filter-sizes" className={labelClass}>
+          {dict.catalog.sizesLabel}
+        </label>
+        <input
+          id="filter-sizes"
+          type="text"
+          inputMode="text"
+          placeholder={dict.catalog.sizesPlaceholder}
+          value={sizesDraft}
+          onChange={(e) => debouncedUpdateSizes(e.target.value)}
+          className={selectClass}
+        />
+      </div>
+
+      <div>
+        <span className={labelClass}>{dict.catalog.unitsPerKgLabel}</span>
+        <div className="grid grid-cols-2 gap-2 text-sm">
+          <input
+            type="number"
+            inputMode="decimal"
+            min={0}
+            step={0.1}
+            placeholder={dict.catalog.rangeFrom}
+            value={unitsMinDraft}
+            onChange={(e) => setUnitsMinDraft(e.target.value)}
+            className="w-full rounded border px-2 py-1.5"
+            aria-label={`${dict.catalog.unitsPerKgLabel} ${dict.catalog.rangeFrom}`}
+          />
+          <input
+            type="number"
+            inputMode="decimal"
+            min={0}
+            step={0.1}
+            placeholder={dict.catalog.rangeTo}
+            value={unitsMaxDraft}
+            onChange={(e) => setUnitsMaxDraft(e.target.value)}
+            className="w-full rounded border px-2 py-1.5"
+            aria-label={`${dict.catalog.unitsPerKgLabel} ${dict.catalog.rangeTo}`}
+          />
+        </div>
+      </div>
+
+      <div>
+        <span className={labelClass}>{dict.catalog.unitWeightLabel}</span>
+        <div className="grid grid-cols-2 gap-2 text-sm">
+          <input
+            type="number"
+            inputMode="decimal"
+            min={0}
+            step={0.05}
+            placeholder={dict.catalog.rangeFrom}
+            value={weightMinDraft}
+            onChange={(e) => setWeightMinDraft(e.target.value)}
+            className="w-full rounded border px-2 py-1.5"
+            aria-label={`${dict.catalog.unitWeightLabel} ${dict.catalog.rangeFrom}`}
+          />
+          <input
+            type="number"
+            inputMode="decimal"
+            min={0}
+            step={0.05}
+            placeholder={dict.catalog.rangeTo}
+            value={weightMaxDraft}
+            onChange={(e) => setWeightMaxDraft(e.target.value)}
+            className="w-full rounded border px-2 py-1.5"
+            aria-label={`${dict.catalog.unitWeightLabel} ${dict.catalog.rangeTo}`}
+          />
+        </div>
+        <button
+          type="button"
+          onClick={applyNumericRanges}
+          className="mt-3 w-full rounded-md bg-green-600 px-3 py-2 text-sm font-medium text-white hover:bg-green-700"
+        >
+          {dict.catalog.rangeApply}
+        </button>
       </div>
 
       <div>

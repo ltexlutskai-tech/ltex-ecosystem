@@ -88,4 +88,31 @@ describe("GET /api/catalog", () => {
       expect.objectContaining({ inStockOnly: true }),
     );
   });
+
+  it("forwards gender and sizes query params", async () => {
+    await GET(
+      buildRequest("?gender=%D0%96%D1%96%D0%BD%D0%BE%D1%87%D0%B0&sizes=XXL"),
+    );
+
+    expect(mockGetCatalogProducts).toHaveBeenCalledWith(
+      expect.objectContaining({ gender: "Жіноча", sizes: "XXL" }),
+    );
+  });
+
+  it("forwards numeric range params as parsed floats", async () => {
+    await GET(
+      buildRequest(
+        "?unitsPerKgMin=2&unitsPerKgMax=5&unitWeightMin=0.3&unitWeightMax=0.6",
+      ),
+    );
+
+    expect(mockGetCatalogProducts).toHaveBeenCalledWith(
+      expect.objectContaining({
+        unitsPerKgMin: 2,
+        unitsPerKgMax: 5,
+        unitWeightMin: 0.3,
+        unitWeightMax: 0.6,
+      }),
+    );
+  });
 });
