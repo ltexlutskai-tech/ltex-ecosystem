@@ -18,8 +18,10 @@ import { LotsCategoryPills } from "@/components/store/lots-category-pills";
 import { LotsSortSelect } from "@/components/store/lots-sort-select";
 import { CatalogLayoutToggle } from "@/components/store/catalog-layout-toggle";
 import { getCurrentRate } from "@/lib/exchange-rate";
+import { getCurrentCustomer } from "@/lib/customer-auth";
 
-export const revalidate = 60;
+// Cookie-aware (price gate depends on the ltex_customer cookie); skip ISR.
+export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "Лоти (мішки) — секонд хенд, сток, іграшки гуртом",
@@ -401,6 +403,11 @@ export default async function LotsPage({
   const baseHref = buildBaseHref(params);
   const chips = buildChips(params);
 
+  // Hide prices from unauthenticated visitors (price gate, S73). Server-side
+  // strip → guests never see EUR/UAH numbers even if they bypass the client.
+  const customer = await getCurrentCustomer();
+  const isAuthed = customer !== null;
+
   return (
     <div className="container mx-auto px-4 py-6">
       <Breadcrumbs items={[{ label: "Лоти" }]} />
@@ -506,7 +513,7 @@ export default async function LotsPage({
                     barcode: lot.barcode,
                     weight: lot.weight,
                     quantity: lot.quantity,
-                    priceEur: lot.priceEur,
+                    priceEur: isAuthed ? lot.priceEur : null,
                     videoUrl: lot.videoUrl,
                     status: lot.status,
                     createdAt: lot.createdAt.toISOString(),
@@ -519,7 +526,7 @@ export default async function LotsPage({
                   }}
                   rate={rate}
                   salePercent={
-                    lot.status === "on_sale"
+                    isAuthed && lot.status === "on_sale"
                       ? computeSalePercent(lot.product.prices)
                       : undefined
                   }

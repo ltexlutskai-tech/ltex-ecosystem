@@ -1,6 +1,7 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { render, screen, cleanup } from "@testing-library/react";
 import { CartProvider } from "@/lib/cart";
+import { CustomerProvider } from "@/lib/customer-context";
 import { LotReviews } from "./lot-reviews";
 
 const baseLot = {
@@ -14,7 +15,11 @@ const baseLot = {
 afterEach(() => cleanup());
 
 function renderWithCart(ui: React.ReactElement) {
-  return render(<CartProvider>{ui}</CartProvider>);
+  return render(
+    <CustomerProvider customer={{ id: "test-customer", name: "Test" }}>
+      <CartProvider>{ui}</CartProvider>
+    </CustomerProvider>,
+  );
 }
 
 describe("LotReviews", () => {

@@ -10,6 +10,11 @@ vi.mock("@ltex/db", () => ({
   },
 }));
 
+const mockGetCurrentCustomer = vi.fn();
+vi.mock("./customer-auth", () => ({
+  getCurrentCustomer: () => mockGetCurrentCustomer(),
+}));
+
 import { getCatalogProducts, autocompleteSearch } from "./catalog";
 import { prisma } from "@ltex/db";
 
@@ -29,6 +34,39 @@ const makeProduct = (id: string, price = 10) => ({
 describe("getCatalogProducts", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Default: simulate an authenticated visitor so prices come through.
+    mockGetCurrentCustomer.mockResolvedValue({
+      id: "customer-1",
+      phone: "+380",
+      name: "Test",
+    });
+  });
+
+  it("strips wholesale prices for unauthenticated visitors (price gate, S73)", async () => {
+    mockGetCurrentCustomer.mockResolvedValueOnce(null);
+    const products = [makeProduct("1", 25), makeProduct("2", 30)];
+    mockFindMany.mockResolvedValue(products);
+    mockCount.mockResolvedValue(2);
+
+    const result = await getCatalogProducts({});
+    expect(result.products).toHaveLength(2);
+    for (const p of result.products) {
+      expect(p.prices).toEqual([]);
+    }
+    // Original input must not be mutated — guards against unstable_cache leaks.
+    const firstOriginal = products[0]!;
+    expect(firstOriginal.prices).toHaveLength(1);
+  });
+
+  it("preserves prices for authenticated visitors", async () => {
+    const products = [makeProduct("1", 25)];
+    mockFindMany.mockResolvedValue(products);
+    mockCount.mockResolvedValue(1);
+
+    const result = await getCatalogProducts({});
+    const first = result.products[0]!;
+    expect(first.prices).toHaveLength(1);
+    expect(first.prices[0]!.amount).toBe(25);
   });
 
   it("returns paginated products with default settings", async () => {

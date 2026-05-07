@@ -14,6 +14,7 @@ import { APP_NAME, CONTACTS } from "@ltex/shared";
 import { CartBadge } from "@/components/store/cart-badge";
 import { WishlistBadge } from "@/components/store/wishlist-badge";
 import { SearchAutocomplete } from "@/components/store/search-autocomplete";
+import { UserMenu } from "@/components/store/user-menu";
 import { Menu, MessageCircle, Send } from "lucide-react";
 import { getDictionary } from "@/lib/i18n";
 
@@ -28,7 +29,11 @@ const NAV_LINKS = [
   { href: "/contacts", label: dict.nav.contacts, analytics: undefined },
 ] as const;
 
-export function Header() {
+export interface HeaderProps {
+  customer: { id: string; name: string } | null;
+}
+
+export function Header({ customer }: HeaderProps) {
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container mx-auto flex h-16 items-center gap-4 px-4">
@@ -62,6 +67,7 @@ export function Header() {
         <div className="ml-auto flex flex-shrink-0 items-center gap-2 md:ml-0 md:gap-3">
           <WishlistBadge />
           <CartBadge />
+          <UserMenu customer={customer} />
           <a
             href={`tel:${CONTACTS.phones[0]?.replace(/\s/g, "")}`}
             className="hidden text-sm font-medium xl:block"
