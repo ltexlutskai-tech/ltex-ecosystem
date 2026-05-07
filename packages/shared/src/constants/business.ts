@@ -1,7 +1,14 @@
 export const APP_NAME = "L-TEX" as const;
 export const MIN_ORDER_KG = 10 as const;
 
-export const COUNTRIES = ["england", "germany", "canada", "poland"] as const;
+export const COUNTRIES = [
+  "england",
+  "germany",
+  "canada",
+  "poland",
+  "scotland",
+  "usa",
+] as const;
 export type Country = (typeof COUNTRIES)[number];
 
 export const COUNTRY_LABELS: Record<Country, string> = {
@@ -9,6 +16,8 @@ export const COUNTRY_LABELS: Record<Country, string> = {
   germany: "Німеччина",
   canada: "Канада",
   poland: "Польща",
+  scotland: "Шотландія",
+  usa: "США",
 };
 
 export const CONTACTS = {
