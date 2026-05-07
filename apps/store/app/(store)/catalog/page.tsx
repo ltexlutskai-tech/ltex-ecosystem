@@ -27,39 +27,63 @@ export const metadata: Metadata = {
 export default async function CatalogPage({
   searchParams,
 }: {
-  searchParams: Promise<Record<string, string | undefined>>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const params = await searchParams;
-  const page = parseInt(params.page ?? "1", 10);
-  const view = params.view ?? "pagination";
-  const layout: "grid" | "list" = params.layout === "list" ? "list" : "grid";
+  const getStr = (v: string | string[] | undefined): string | undefined =>
+    Array.isArray(v) ? v[0] : v;
+  const getList = (v: string | string[] | undefined): string[] => {
+    if (v == null) return [];
+    if (Array.isArray(v)) return v.filter(Boolean);
+    return v.includes(",")
+      ? v
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean)
+      : v
+        ? [v]
+        : [];
+  };
+
+  const page = parseInt(getStr(params.page) ?? "1", 10);
+  const view = getStr(params.view) ?? "pagination";
+  const layout: "grid" | "list" =
+    getStr(params.layout) === "list" ? "list" : "grid";
 
   const parseFloatParam = (raw: string | undefined): number | undefined => {
     if (!raw) return undefined;
     const n = parseFloat(raw);
     return Number.isFinite(n) ? n : undefined;
   };
-  const priceMin = parseFloatParam(params.priceMin);
-  const priceMax = parseFloatParam(params.priceMax);
-  const unitsPerKgMin = parseFloatParam(params.unitsPerKgMin);
-  const unitsPerKgMax = parseFloatParam(params.unitsPerKgMax);
-  const unitWeightMin = parseFloatParam(params.unitWeightMin);
-  const unitWeightMax = parseFloatParam(params.unitWeightMax);
+  const priceMinStr = getStr(params.priceMin);
+  const priceMaxStr = getStr(params.priceMax);
+  const unitsMinStr = getStr(params.unitsPerKgMin);
+  const unitsMaxStr = getStr(params.unitsPerKgMax);
+  const weightMinStr = getStr(params.unitWeightMin);
+  const weightMaxStr = getStr(params.unitWeightMax);
 
-  const inStockOnly = params.inStock === "true";
+  const priceMin = parseFloatParam(priceMinStr);
+  const priceMax = parseFloatParam(priceMaxStr);
+  const unitsPerKgMin = parseFloatParam(unitsMinStr);
+  const unitsPerKgMax = parseFloatParam(unitsMaxStr);
+  const unitWeightMin = parseFloatParam(weightMinStr);
+  const unitWeightMax = parseFloatParam(weightMaxStr);
+
+  const inStockOnly = getStr(params.inStock) === "true";
+  const sizesArr = getList(params.sizes);
 
   const { products, total, totalPages } = await getCatalogProducts({
-    quality: params.quality,
-    season: params.season,
-    country: params.country,
-    gender: params.gender,
-    sizes: params.sizes,
+    quality: getStr(params.quality),
+    season: getStr(params.season),
+    country: getStr(params.country),
+    gender: getStr(params.gender),
+    sizes: sizesArr.length > 0 ? sizesArr : undefined,
     unitsPerKgMin,
     unitsPerKgMax,
     unitWeightMin,
     unitWeightMax,
-    q: params.q,
-    sort: params.sort,
+    q: getStr(params.q),
+    sort: getStr(params.sort),
     priceMin,
     priceMax,
     inStockOnly,
@@ -67,23 +91,25 @@ export default async function CatalogPage({
   });
 
   const filterParams = new URLSearchParams();
-  if (params.quality) filterParams.set("quality", params.quality);
-  if (params.season) filterParams.set("season", params.season);
-  if (params.country) filterParams.set("country", params.country);
-  if (params.gender) filterParams.set("gender", params.gender);
-  if (params.sizes) filterParams.set("sizes", params.sizes);
-  if (params.unitsPerKgMin)
-    filterParams.set("unitsPerKgMin", params.unitsPerKgMin);
-  if (params.unitsPerKgMax)
-    filterParams.set("unitsPerKgMax", params.unitsPerKgMax);
-  if (params.unitWeightMin)
-    filterParams.set("unitWeightMin", params.unitWeightMin);
-  if (params.unitWeightMax)
-    filterParams.set("unitWeightMax", params.unitWeightMax);
-  if (params.q) filterParams.set("q", params.q);
-  if (params.sort) filterParams.set("sort", params.sort);
-  if (params.priceMin) filterParams.set("priceMin", params.priceMin);
-  if (params.priceMax) filterParams.set("priceMax", params.priceMax);
+  const qParam = getStr(params.quality);
+  if (qParam) filterParams.set("quality", qParam);
+  const seasonParam = getStr(params.season);
+  if (seasonParam) filterParams.set("season", seasonParam);
+  const countryParam = getStr(params.country);
+  if (countryParam) filterParams.set("country", countryParam);
+  const genderParam = getStr(params.gender);
+  if (genderParam) filterParams.set("gender", genderParam);
+  for (const s of sizesArr) filterParams.append("sizes", s);
+  if (unitsMinStr) filterParams.set("unitsPerKgMin", unitsMinStr);
+  if (unitsMaxStr) filterParams.set("unitsPerKgMax", unitsMaxStr);
+  if (weightMinStr) filterParams.set("unitWeightMin", weightMinStr);
+  if (weightMaxStr) filterParams.set("unitWeightMax", weightMaxStr);
+  const qSearch = getStr(params.q);
+  if (qSearch) filterParams.set("q", qSearch);
+  const sortParam = getStr(params.sort);
+  if (sortParam) filterParams.set("sort", sortParam);
+  if (priceMinStr) filterParams.set("priceMin", priceMinStr);
+  if (priceMaxStr) filterParams.set("priceMax", priceMaxStr);
   if (inStockOnly) filterParams.set("inStock", "true");
   const baseHref = filterParams.toString()
     ? `/catalog?${filterParams.toString()}`

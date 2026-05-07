@@ -31,7 +31,7 @@ interface CatalogParams {
   season?: string;
   country?: string | string[];
   gender?: string | string[];
-  sizes?: string;
+  sizes?: string | string[];
   unitsPerKgMin?: number;
   unitsPerKgMax?: number;
   unitWeightMin?: number;
@@ -151,8 +151,19 @@ export async function getCatalogProducts(
       : genderValue;
   }
 
-  if (sizes && sizes.trim()) {
-    where.sizes = { contains: sizes.trim(), mode: "insensitive" };
+  const sizesValue = parseMultiValue(sizes);
+  if (sizesValue) {
+    const sizeArr = Array.isArray(sizesValue) ? sizesValue : [sizesValue];
+    if (sizeArr.length === 1) {
+      where.sizes = { contains: sizeArr[0], mode: "insensitive" };
+    } else if (sizeArr.length > 1) {
+      where.OR = [
+        ...(where.OR ?? []),
+        ...sizeArr.map((s) => ({
+          sizes: { contains: s, mode: "insensitive" as const },
+        })),
+      ];
+    }
   }
 
   // Range overlap filters: product is included when its [Min, Max] interval
@@ -349,10 +360,21 @@ async function fullTextSearch(
       paramIdx++;
     }
   }
-  if (sizes && sizes.trim()) {
-    filterConditions.push(`p.sizes ILIKE $${paramIdx}`);
-    queryParams.push(`%${sizes.trim()}%`);
-    paramIdx++;
+  const sizesValueFts = parseMultiValue(sizes);
+  if (sizesValueFts) {
+    const sizeArr = Array.isArray(sizesValueFts)
+      ? sizesValueFts
+      : [sizesValueFts];
+    if (sizeArr.length === 1) {
+      filterConditions.push(`p.sizes ILIKE $${paramIdx}`);
+      queryParams.push(`%${sizeArr[0]}%`);
+      paramIdx++;
+    } else if (sizeArr.length > 1) {
+      const orParts = sizeArr.map((_, i) => `p.sizes ILIKE $${paramIdx + i}`);
+      filterConditions.push(`(${orParts.join(" OR ")})`);
+      for (const s of sizeArr) queryParams.push(`%${s}%`);
+      paramIdx += sizeArr.length;
+    }
   }
   if (unitsPerKgMin != null) {
     filterConditions.push(`p.units_per_kg_max >= $${paramIdx}`);

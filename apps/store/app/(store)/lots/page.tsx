@@ -144,12 +144,18 @@ function buildChips(params: SearchParams): ChipDescriptor[] {
       ],
     });
   }
-  const sizesValue = getStr(params, "sizes");
-  if (sizesValue) {
+  for (const sz of parseList(getStr(params, "sizes"))) {
     chips.push({
-      key: "sizes",
-      label: `Розмір: ${sizesValue}`,
-      removeParams: [{ key: "sizes" }],
+      key: `sizes:${sz}`,
+      label: `Розмір ${sz}`,
+      removeParams: [
+        {
+          key: "sizes",
+          nextValue: parseList(getStr(params, "sizes"))
+            .filter((x) => x !== sz)
+            .join(","),
+        },
+      ],
     });
   }
   const upkMin = getStr(params, "unitsPerKgMin");
@@ -157,7 +163,7 @@ function buildChips(params: SearchParams): ChipDescriptor[] {
   if (upkMin || upkMax) {
     chips.push({
       key: "unitsPerKg",
-      label: `Шт/кг: ${upkMin || "0"}–${upkMax || "∞"}`,
+      label: `${upkMin || "0"}–${upkMax || "∞"} шт/кг`,
       removeParams: [{ key: "unitsPerKgMin" }, { key: "unitsPerKgMax" }],
     });
   }
@@ -166,7 +172,7 @@ function buildChips(params: SearchParams): ChipDescriptor[] {
   if (uwMin || uwMax) {
     chips.push({
       key: "unitWeight",
-      label: `Вага одиниці: ${uwMin || "0"}–${uwMax || "∞"} кг`,
+      label: `${uwMin || "0"}–${uwMax || "∞"} кг`,
       removeParams: [{ key: "unitWeightMin" }, { key: "unitWeightMax" }],
     });
   }
@@ -250,7 +256,7 @@ export default async function LotsPage({
   const seasons = parseList(getStr(params, "season"));
   const countries = parseList(getStr(params, "country"));
   const genders = parseList(getStr(params, "gender"));
-  const sizesQuery = (getStr(params, "sizes") ?? "").trim();
+  const sizesList = parseList(getStr(params, "sizes"));
   const weightMin = parsePositiveFloat(getStr(params, "weightMin"));
   const weightMax = parsePositiveFloat(getStr(params, "weightMax"));
   const priceMin = parsePositiveFloat(getStr(params, "priceMin"));
@@ -301,8 +307,12 @@ export default async function LotsPage({
   if (seasons.length > 0) productWhere.season = { in: seasons };
   if (countries.length > 0) productWhere.country = { in: countries };
   if (genders.length > 0) productWhere.gender = { in: genders };
-  if (sizesQuery) {
-    productWhere.sizes = { contains: sizesQuery, mode: "insensitive" };
+  if (sizesList.length === 1) {
+    productWhere.sizes = { contains: sizesList[0], mode: "insensitive" };
+  } else if (sizesList.length > 1) {
+    productWhere.OR = sizesList.map((s) => ({
+      sizes: { contains: s, mode: "insensitive" as const },
+    }));
   }
   if (typeof unitsPerKgMin === "number") {
     productWhere.unitsPerKgMax = { gte: unitsPerKgMin };
