@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   QUALITY_LEVELS,
   QUALITY_LABELS,
@@ -9,6 +9,7 @@ import {
   COUNTRY_LABELS,
   SEASONS,
   SEASON_LABELS,
+  GENDER_OPTIONS,
 } from "@ltex/shared";
 
 export interface LotCategoryOption {
@@ -58,16 +59,35 @@ export function LotsFiltersForm({ onApply }: LotsFiltersFormProps) {
     () => parseList(searchParams.get("country")),
     [searchParams],
   );
+  const selectedGenders = useMemo(
+    () => parseList(searchParams.get("gender")),
+    [searchParams],
+  );
 
+  const urlSizes = searchParams.get("sizes") ?? "";
   const urlWeightMin = searchParams.get("weightMin") ?? "";
   const urlWeightMax = searchParams.get("weightMax") ?? "";
   const urlPriceMin = searchParams.get("priceMin") ?? "";
   const urlPriceMax = searchParams.get("priceMax") ?? "";
+  const urlUnitsMin = searchParams.get("unitsPerKgMin") ?? "";
+  const urlUnitsMax = searchParams.get("unitsPerKgMax") ?? "";
+  const urlUnitWeightMin = searchParams.get("unitWeightMin") ?? "";
+  const urlUnitWeightMax = searchParams.get("unitWeightMax") ?? "";
 
   const [weightMin, setWeightMin] = useState(urlWeightMin);
   const [weightMax, setWeightMax] = useState(urlWeightMax);
   const [priceMin, setPriceMin] = useState(urlPriceMin);
   const [priceMax, setPriceMax] = useState(urlPriceMax);
+  const [unitsMin, setUnitsMin] = useState(urlUnitsMin);
+  const [unitsMax, setUnitsMax] = useState(urlUnitsMax);
+  const [unitWeightMin, setUnitWeightMin] = useState(urlUnitWeightMin);
+  const [unitWeightMax, setUnitWeightMax] = useState(urlUnitWeightMax);
+
+  const [sizesDraft, setSizesDraft] = useState(urlSizes);
+  useEffect(() => {
+    setSizesDraft(urlSizes);
+  }, [urlSizes]);
+  const sizesDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const updateParam = useCallback(
     (key: string, value: string) => {
@@ -94,14 +114,18 @@ export function LotsFiltersForm({ onApply }: LotsFiltersFormProps) {
 
   const commitRanges = useCallback(() => {
     const params = new URLSearchParams(searchParams.toString());
-    if (weightMin) params.set("weightMin", weightMin);
-    else params.delete("weightMin");
-    if (weightMax) params.set("weightMax", weightMax);
-    else params.delete("weightMax");
-    if (priceMin) params.set("priceMin", priceMin);
-    else params.delete("priceMin");
-    if (priceMax) params.set("priceMax", priceMax);
-    else params.delete("priceMax");
+    const setOrDelete = (key: string, value: string) => {
+      if (value) params.set(key, value);
+      else params.delete(key);
+    };
+    setOrDelete("weightMin", weightMin);
+    setOrDelete("weightMax", weightMax);
+    setOrDelete("priceMin", priceMin);
+    setOrDelete("priceMax", priceMax);
+    setOrDelete("unitsPerKgMin", unitsMin);
+    setOrDelete("unitsPerKgMax", unitsMax);
+    setOrDelete("unitWeightMin", unitWeightMin);
+    setOrDelete("unitWeightMax", unitWeightMax);
     params.delete("page");
     router.push(`${pathname}?${params.toString()}`);
     onApply?.();
@@ -114,13 +138,33 @@ export function LotsFiltersForm({ onApply }: LotsFiltersFormProps) {
     weightMax,
     priceMin,
     priceMax,
+    unitsMin,
+    unitsMax,
+    unitWeightMin,
+    unitWeightMax,
   ]);
+
+  const debouncedUpdateSizes = useCallback(
+    (value: string) => {
+      setSizesDraft(value);
+      if (sizesDebounceRef.current) clearTimeout(sizesDebounceRef.current);
+      sizesDebounceRef.current = setTimeout(() => {
+        updateParam("sizes", value.trim());
+      }, 350);
+    },
+    [updateParam],
+  );
 
   const clearAll = useCallback(() => {
     setWeightMin("");
     setWeightMax("");
     setPriceMin("");
     setPriceMax("");
+    setUnitsMin("");
+    setUnitsMax("");
+    setUnitWeightMin("");
+    setUnitWeightMax("");
+    setSizesDraft("");
     router.push(pathname);
     onApply?.();
   }, [router, pathname, onApply]);
@@ -132,10 +176,16 @@ export function LotsFiltersForm({ onApply }: LotsFiltersFormProps) {
     selectedQualities.length > 0 ||
     selectedSeasons.length > 0 ||
     selectedCountries.length > 0 ||
+    selectedGenders.length > 0 ||
+    urlSizes ||
     urlWeightMin ||
     urlWeightMax ||
     urlPriceMin ||
-    urlPriceMax;
+    urlPriceMax ||
+    urlUnitsMin ||
+    urlUnitsMax ||
+    urlUnitWeightMin ||
+    urlUnitWeightMax;
 
   return (
     <div className="space-y-5">
@@ -259,6 +309,97 @@ export function LotsFiltersForm({ onApply }: LotsFiltersFormProps) {
       </div>
 
       <div>
+        <span className={labelClass}>Стать</span>
+        <div className="space-y-1.5 text-sm">
+          {GENDER_OPTIONS.map((g) => (
+            <label
+              key={g}
+              className="flex cursor-pointer items-center gap-2 text-gray-700"
+            >
+              <input
+                type="checkbox"
+                checked={selectedGenders.includes(g)}
+                onChange={() => toggleListValue("gender", g)}
+                className="h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-1 focus:ring-green-500"
+              />
+              {g}
+            </label>
+          ))}
+        </div>
+      </div>
+
+      <div>
+        <label htmlFor="lots-filter-sizes" className={labelClass}>
+          Розмір
+        </label>
+        <input
+          id="lots-filter-sizes"
+          type="text"
+          inputMode="text"
+          placeholder="напр. XL, XXL, 42"
+          value={sizesDraft}
+          onChange={(e) => debouncedUpdateSizes(e.target.value)}
+          className="w-full rounded border px-3 py-2 text-sm"
+        />
+      </div>
+
+      <div>
+        <span className={labelClass}>К-сть одиниць (шт/кг)</span>
+        <div className="flex gap-2 text-sm">
+          <input
+            type="number"
+            inputMode="decimal"
+            min={0}
+            step={0.1}
+            placeholder="від"
+            value={unitsMin}
+            onChange={(e) => setUnitsMin(e.target.value)}
+            className="w-full rounded border px-2 py-1.5"
+            aria-label="Шт/кг від"
+          />
+          <input
+            type="number"
+            inputMode="decimal"
+            min={0}
+            step={0.1}
+            placeholder="до"
+            value={unitsMax}
+            onChange={(e) => setUnitsMax(e.target.value)}
+            className="w-full rounded border px-2 py-1.5"
+            aria-label="Шт/кг до"
+          />
+        </div>
+      </div>
+
+      <div>
+        <span className={labelClass}>Вага одиниці (кг)</span>
+        <div className="flex gap-2 text-sm">
+          <input
+            type="number"
+            inputMode="decimal"
+            min={0}
+            step={0.05}
+            placeholder="від"
+            value={unitWeightMin}
+            onChange={(e) => setUnitWeightMin(e.target.value)}
+            className="w-full rounded border px-2 py-1.5"
+            aria-label="Вага одиниці від"
+          />
+          <input
+            type="number"
+            inputMode="decimal"
+            min={0}
+            step={0.05}
+            placeholder="до"
+            value={unitWeightMax}
+            onChange={(e) => setUnitWeightMax(e.target.value)}
+            className="w-full rounded border px-2 py-1.5"
+            aria-label="Вага одиниці до"
+          />
+        </div>
+      </div>
+
+      <div>
         <span className={labelClass}>Вага лота, кг</span>
         <div className="flex gap-2 text-sm">
           <input
@@ -313,7 +454,7 @@ export function LotsFiltersForm({ onApply }: LotsFiltersFormProps) {
           onClick={commitRanges}
           className="mt-3 w-full rounded-md bg-green-600 px-3 py-2 text-sm font-medium text-white hover:bg-green-700"
         >
-          Застосувати ціну та вагу
+          Застосувати діапазони
         </button>
       </div>
     </div>

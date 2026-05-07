@@ -49,7 +49,11 @@ model Product {
   gender        String?
   sizes         String?
   unitsPerKg    String?  @map("units_per_kg")
+  unitsPerKgMin Float?   @map("units_per_kg_min")
+  unitsPerKgMax Float?   @map("units_per_kg_max")
   unitWeight    String?  @map("unit_weight")
+  unitWeightMin Float?   @map("unit_weight_min")
+  unitWeightMax Float?   @map("unit_weight_max")
   createdAt     DateTime @default(now()) @map("created_at")
   updatedAt     DateTime @updatedAt @map("updated_at")
 
@@ -68,6 +72,10 @@ model Product {
   @@index([quality])
   @@index([inStock])
   @@index([articleCode])
+  @@index([unitsPerKgMin])
+  @@index([unitsPerKgMax])
+  @@index([unitWeightMin])
+  @@index([unitWeightMax])
   @@map("products")
 }
 

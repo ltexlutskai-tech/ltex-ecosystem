@@ -13,6 +13,12 @@ interface CatalogParams {
   quality?: string | string[];
   season?: string;
   country?: string | string[];
+  gender?: string | string[];
+  sizes?: string;
+  unitsPerKgMin?: number;
+  unitsPerKgMax?: number;
+  unitWeightMin?: number;
+  unitWeightMax?: number;
   q?: string;
   sort?: string;
   priceMin?: number;
@@ -67,6 +73,12 @@ export async function getCatalogProducts(
     quality,
     season,
     country,
+    gender,
+    sizes,
+    unitsPerKgMin,
+    unitsPerKgMax,
+    unitWeightMin,
+    unitWeightMax,
     q,
     sort,
     priceMin,
@@ -104,6 +116,33 @@ export async function getCatalogProducts(
     where.country = Array.isArray(countryValue)
       ? { in: countryValue }
       : countryValue;
+  }
+
+  const genderValue = parseMultiValue(gender);
+  if (genderValue) {
+    where.gender = Array.isArray(genderValue)
+      ? { in: genderValue }
+      : genderValue;
+  }
+
+  if (sizes && sizes.trim()) {
+    where.sizes = { contains: sizes.trim(), mode: "insensitive" };
+  }
+
+  // Range overlap filters: product is included when its [Min, Max] interval
+  // intersects [filterMin, filterMax]. This is equivalent to:
+  //   productMax ≥ filterMin AND productMin ≤ filterMax.
+  if (unitsPerKgMin != null) {
+    where.unitsPerKgMax = { gte: unitsPerKgMin };
+  }
+  if (unitsPerKgMax != null) {
+    where.unitsPerKgMin = { lte: unitsPerKgMax };
+  }
+  if (unitWeightMin != null) {
+    where.unitWeightMax = { gte: unitWeightMin };
+  }
+  if (unitWeightMax != null) {
+    where.unitWeightMin = { lte: unitWeightMax };
   }
 
   if (inStockOnly) {
@@ -170,6 +209,12 @@ async function fullTextSearch(
     quality,
     season,
     country,
+    gender,
+    sizes,
+    unitsPerKgMin,
+    unitsPerKgMax,
+    unitWeightMin,
+    unitWeightMax,
     q,
     priceMin,
     priceMax,
@@ -260,6 +305,46 @@ async function fullTextSearch(
       `EXISTS (SELECT 1 FROM prices pr WHERE pr.product_id = p.id AND pr.price_type = 'wholesale' AND pr.amount <= $${paramIdx})`,
     );
     queryParams.push(priceMax);
+    paramIdx++;
+  }
+  const genderValue = parseMultiValue(gender);
+  if (genderValue) {
+    if (Array.isArray(genderValue)) {
+      const placeholders = genderValue
+        .map((_, i) => `$${paramIdx + i}`)
+        .join(", ");
+      filterConditions.push(`p.gender IN (${placeholders})`);
+      queryParams.push(...genderValue);
+      paramIdx += genderValue.length;
+    } else {
+      filterConditions.push(`p.gender = $${paramIdx}`);
+      queryParams.push(genderValue);
+      paramIdx++;
+    }
+  }
+  if (sizes && sizes.trim()) {
+    filterConditions.push(`p.sizes ILIKE $${paramIdx}`);
+    queryParams.push(`%${sizes.trim()}%`);
+    paramIdx++;
+  }
+  if (unitsPerKgMin != null) {
+    filterConditions.push(`p.units_per_kg_max >= $${paramIdx}`);
+    queryParams.push(unitsPerKgMin);
+    paramIdx++;
+  }
+  if (unitsPerKgMax != null) {
+    filterConditions.push(`p.units_per_kg_min <= $${paramIdx}`);
+    queryParams.push(unitsPerKgMax);
+    paramIdx++;
+  }
+  if (unitWeightMin != null) {
+    filterConditions.push(`p.unit_weight_max >= $${paramIdx}`);
+    queryParams.push(unitWeightMin);
+    paramIdx++;
+  }
+  if (unitWeightMax != null) {
+    filterConditions.push(`p.unit_weight_min <= $${paramIdx}`);
+    queryParams.push(unitWeightMax);
     paramIdx++;
   }
   if (inStockOnly) {

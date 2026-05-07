@@ -3,6 +3,7 @@ import {
   parseNomenklatura,
   parseDescription,
   parseCategoryCell,
+  parseRangeString,
   classifyToken,
   slugify,
 } from "./import-catalog";
@@ -249,5 +250,42 @@ describe("slugify", () => {
 
   it("strips punctuation", () => {
     expect(slugify("Назва, з комами!")).toBe("nazva-z-komamy");
+  });
+});
+
+describe("parseRangeString", () => {
+  it("parses range with units suffix (шт/кг)", () => {
+    expect(parseRangeString("2-4 шт/кг")).toEqual({ min: 2, max: 4 });
+  });
+
+  it("parses decimal range with dot separator", () => {
+    expect(parseRangeString("0.25-0.45 кг")).toEqual({ min: 0.25, max: 0.45 });
+  });
+
+  it("parses decimal range with comma separator", () => {
+    expect(parseRangeString("0,25-0,45 кг")).toEqual({ min: 0.25, max: 0.45 });
+  });
+
+  it("parses single integer as { min, max } equal", () => {
+    expect(parseRangeString("10")).toEqual({ min: 10, max: 10 });
+  });
+
+  it("parses single decimal as { min, max } equal", () => {
+    expect(parseRangeString("1.5")).toEqual({ min: 1.5, max: 1.5 });
+  });
+
+  it("auto-swaps reversed ranges", () => {
+    expect(parseRangeString("4-2")).toEqual({ min: 2, max: 4 });
+  });
+
+  it("returns null for null/undefined/empty", () => {
+    expect(parseRangeString(null)).toBeNull();
+    expect(parseRangeString(undefined)).toBeNull();
+    expect(parseRangeString("")).toBeNull();
+    expect(parseRangeString("   ")).toBeNull();
+  });
+
+  it("returns null when no number present", () => {
+    expect(parseRangeString("шт/кг")).toBeNull();
   });
 });

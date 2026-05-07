@@ -34,8 +34,17 @@ export default async function CatalogPage({
   const view = params.view ?? "pagination";
   const layout: "grid" | "list" = params.layout === "list" ? "list" : "grid";
 
-  const priceMin = params.priceMin ? parseFloat(params.priceMin) : undefined;
-  const priceMax = params.priceMax ? parseFloat(params.priceMax) : undefined;
+  const parseFloatParam = (raw: string | undefined): number | undefined => {
+    if (!raw) return undefined;
+    const n = parseFloat(raw);
+    return Number.isFinite(n) ? n : undefined;
+  };
+  const priceMin = parseFloatParam(params.priceMin);
+  const priceMax = parseFloatParam(params.priceMax);
+  const unitsPerKgMin = parseFloatParam(params.unitsPerKgMin);
+  const unitsPerKgMax = parseFloatParam(params.unitsPerKgMax);
+  const unitWeightMin = parseFloatParam(params.unitWeightMin);
+  const unitWeightMax = parseFloatParam(params.unitWeightMax);
 
   const inStockOnly = params.inStock === "true";
 
@@ -43,10 +52,16 @@ export default async function CatalogPage({
     quality: params.quality,
     season: params.season,
     country: params.country,
+    gender: params.gender,
+    sizes: params.sizes,
+    unitsPerKgMin,
+    unitsPerKgMax,
+    unitWeightMin,
+    unitWeightMax,
     q: params.q,
     sort: params.sort,
-    priceMin: priceMin && !isNaN(priceMin) ? priceMin : undefined,
-    priceMax: priceMax && !isNaN(priceMax) ? priceMax : undefined,
+    priceMin,
+    priceMax,
     inStockOnly,
     page,
   });
@@ -55,6 +70,16 @@ export default async function CatalogPage({
   if (params.quality) filterParams.set("quality", params.quality);
   if (params.season) filterParams.set("season", params.season);
   if (params.country) filterParams.set("country", params.country);
+  if (params.gender) filterParams.set("gender", params.gender);
+  if (params.sizes) filterParams.set("sizes", params.sizes);
+  if (params.unitsPerKgMin)
+    filterParams.set("unitsPerKgMin", params.unitsPerKgMin);
+  if (params.unitsPerKgMax)
+    filterParams.set("unitsPerKgMax", params.unitsPerKgMax);
+  if (params.unitWeightMin)
+    filterParams.set("unitWeightMin", params.unitWeightMin);
+  if (params.unitWeightMax)
+    filterParams.set("unitWeightMax", params.unitWeightMax);
   if (params.q) filterParams.set("q", params.q);
   if (params.sort) filterParams.set("sort", params.sort);
   if (params.priceMin) filterParams.set("priceMin", params.priceMin);
