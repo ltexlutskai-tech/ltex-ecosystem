@@ -4,9 +4,10 @@ export {
   COUNTRIES,
   COUNTRY_LABELS,
   GENDER_OPTIONS,
+  SIZE_OPTIONS,
   CONTACTS,
 } from "./business";
-export type { Country, Gender } from "./business";
+export type { Country, Gender, SizeOption } from "./business";
 
 export { CURRENCIES, DEFAULT_CURRENCY, DISPLAY_CURRENCY } from "./currency";
 export type { Currency } from "./currency";

@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   QUALITY_LEVELS,
   QUALITY_LABELS,
@@ -10,7 +10,12 @@ import {
   SEASONS,
   SEASON_LABELS,
   GENDER_OPTIONS,
+  SIZE_OPTIONS,
 } from "@ltex/shared";
+import { PriceRangeSlider } from "./price-range-slider";
+
+const DEFAULT_UNITS_RANGE: [number, number] = [0, 20];
+const DEFAULT_WEIGHT_RANGE: [number, number] = [0, 5];
 
 export interface LotCategoryOption {
   id: string;
@@ -63,31 +68,85 @@ export function LotsFiltersForm({ onApply }: LotsFiltersFormProps) {
     () => parseList(searchParams.get("gender")),
     [searchParams],
   );
+  const selectedSizes = useMemo(
+    () => parseList(searchParams.get("sizes")),
+    [searchParams],
+  );
 
   const urlSizes = searchParams.get("sizes") ?? "";
   const urlWeightMin = searchParams.get("weightMin") ?? "";
   const urlWeightMax = searchParams.get("weightMax") ?? "";
   const urlPriceMin = searchParams.get("priceMin") ?? "";
   const urlPriceMax = searchParams.get("priceMax") ?? "";
-  const urlUnitsMin = searchParams.get("unitsPerKgMin") ?? "";
-  const urlUnitsMax = searchParams.get("unitsPerKgMax") ?? "";
-  const urlUnitWeightMin = searchParams.get("unitWeightMin") ?? "";
-  const urlUnitWeightMax = searchParams.get("unitWeightMax") ?? "";
+  const urlUnitsMin = searchParams.get("unitsPerKgMin");
+  const urlUnitsMax = searchParams.get("unitsPerKgMax");
+  const urlUnitWeightMin = searchParams.get("unitWeightMin");
+  const urlUnitWeightMax = searchParams.get("unitWeightMax");
 
   const [weightMin, setWeightMin] = useState(urlWeightMin);
   const [weightMax, setWeightMax] = useState(urlWeightMax);
   const [priceMin, setPriceMin] = useState(urlPriceMin);
   const [priceMax, setPriceMax] = useState(urlPriceMax);
-  const [unitsMin, setUnitsMin] = useState(urlUnitsMin);
-  const [unitsMax, setUnitsMax] = useState(urlUnitsMax);
-  const [unitWeightMin, setUnitWeightMin] = useState(urlUnitWeightMin);
-  const [unitWeightMax, setUnitWeightMax] = useState(urlUnitWeightMax);
 
-  const [sizesDraft, setSizesDraft] = useState(urlSizes);
+  const [unitsBounds, setUnitsBounds] =
+    useState<[number, number]>(DEFAULT_UNITS_RANGE);
+  const [weightBounds, setWeightBounds] =
+    useState<[number, number]>(DEFAULT_WEIGHT_RANGE);
+  const [unitsValue, setUnitsValue] = useState<[number, number]>([
+    urlUnitsMin ? Number(urlUnitsMin) : DEFAULT_UNITS_RANGE[0],
+    urlUnitsMax ? Number(urlUnitsMax) : DEFAULT_UNITS_RANGE[1],
+  ]);
+  const [weightValue, setWeightValue] = useState<[number, number]>([
+    urlUnitWeightMin ? Number(urlUnitWeightMin) : DEFAULT_WEIGHT_RANGE[0],
+    urlUnitWeightMax ? Number(urlUnitWeightMax) : DEFAULT_WEIGHT_RANGE[1],
+  ]);
+  const [rangesLoaded, setRangesLoaded] = useState(false);
+
+  // Fetch numeric bounds once on mount.
   useEffect(() => {
-    setSizesDraft(urlSizes);
-  }, [urlSizes]);
-  const sizesDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    let cancelled = false;
+    fetch("/api/catalog/numeric-ranges")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (cancelled || !data) return;
+        const u: [number, number] = [data.unitsPerKg.min, data.unitsPerKg.max];
+        const w: [number, number] = [data.unitWeight.min, data.unitWeight.max];
+        setUnitsBounds(u);
+        setWeightBounds(w);
+        setRangesLoaded(true);
+        setUnitsValue((prev) => {
+          const lo = urlUnitsMin ? Number(urlUnitsMin) : u[0];
+          const hi = urlUnitsMax ? Number(urlUnitsMax) : u[1];
+          if (prev[0] === lo && prev[1] === hi) return prev;
+          return [lo, hi];
+        });
+        setWeightValue((prev) => {
+          const lo = urlUnitWeightMin ? Number(urlUnitWeightMin) : w[0];
+          const hi = urlUnitWeightMax ? Number(urlUnitWeightMax) : w[1];
+          if (prev[0] === lo && prev[1] === hi) return prev;
+          return [lo, hi];
+        });
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Sync sliders when URL changes externally.
+  useEffect(() => {
+    setUnitsValue([
+      urlUnitsMin ? Number(urlUnitsMin) : unitsBounds[0],
+      urlUnitsMax ? Number(urlUnitsMax) : unitsBounds[1],
+    ]);
+  }, [urlUnitsMin, urlUnitsMax, unitsBounds]);
+  useEffect(() => {
+    setWeightValue([
+      urlUnitWeightMin ? Number(urlUnitWeightMin) : weightBounds[0],
+      urlUnitWeightMax ? Number(urlUnitWeightMax) : weightBounds[1],
+    ]);
+  }, [urlUnitWeightMin, urlUnitWeightMax, weightBounds]);
 
   const updateParam = useCallback(
     (key: string, value: string) => {
@@ -122,10 +181,6 @@ export function LotsFiltersForm({ onApply }: LotsFiltersFormProps) {
     setOrDelete("weightMax", weightMax);
     setOrDelete("priceMin", priceMin);
     setOrDelete("priceMax", priceMax);
-    setOrDelete("unitsPerKgMin", unitsMin);
-    setOrDelete("unitsPerKgMax", unitsMax);
-    setOrDelete("unitWeightMin", unitWeightMin);
-    setOrDelete("unitWeightMax", unitWeightMax);
     params.delete("page");
     router.push(`${pathname}?${params.toString()}`);
     onApply?.();
@@ -138,21 +193,34 @@ export function LotsFiltersForm({ onApply }: LotsFiltersFormProps) {
     weightMax,
     priceMin,
     priceMax,
-    unitsMin,
-    unitsMax,
-    unitWeightMin,
-    unitWeightMax,
   ]);
 
-  const debouncedUpdateSizes = useCallback(
-    (value: string) => {
-      setSizesDraft(value);
-      if (sizesDebounceRef.current) clearTimeout(sizesDebounceRef.current);
-      sizesDebounceRef.current = setTimeout(() => {
-        updateParam("sizes", value.trim());
-      }, 350);
+  const commitUnitsRange = useCallback(
+    ([lo, hi]: [number, number]) => {
+      const params = new URLSearchParams(searchParams.toString());
+      if (lo > unitsBounds[0]) params.set("unitsPerKgMin", String(lo));
+      else params.delete("unitsPerKgMin");
+      if (hi < unitsBounds[1]) params.set("unitsPerKgMax", String(hi));
+      else params.delete("unitsPerKgMax");
+      params.delete("page");
+      router.push(`${pathname}?${params.toString()}`);
+      onApply?.();
     },
-    [updateParam],
+    [router, pathname, searchParams, unitsBounds, onApply],
+  );
+
+  const commitWeightRange = useCallback(
+    ([lo, hi]: [number, number]) => {
+      const params = new URLSearchParams(searchParams.toString());
+      if (lo > weightBounds[0]) params.set("unitWeightMin", lo.toFixed(2));
+      else params.delete("unitWeightMin");
+      if (hi < weightBounds[1]) params.set("unitWeightMax", hi.toFixed(2));
+      else params.delete("unitWeightMax");
+      params.delete("page");
+      router.push(`${pathname}?${params.toString()}`);
+      onApply?.();
+    },
+    [router, pathname, searchParams, weightBounds, onApply],
   );
 
   const clearAll = useCallback(() => {
@@ -160,14 +228,11 @@ export function LotsFiltersForm({ onApply }: LotsFiltersFormProps) {
     setWeightMax("");
     setPriceMin("");
     setPriceMax("");
-    setUnitsMin("");
-    setUnitsMax("");
-    setUnitWeightMin("");
-    setUnitWeightMax("");
-    setSizesDraft("");
+    setUnitsValue(unitsBounds);
+    setWeightValue(weightBounds);
     router.push(pathname);
     onApply?.();
-  }, [router, pathname, onApply]);
+  }, [router, pathname, onApply, unitsBounds, weightBounds]);
 
   const hasActiveFilters =
     selectedStatuses.length > 0 ||
@@ -329,75 +394,58 @@ export function LotsFiltersForm({ onApply }: LotsFiltersFormProps) {
       </div>
 
       <div>
-        <label htmlFor="lots-filter-sizes" className={labelClass}>
-          Розмір
-        </label>
-        <input
-          id="lots-filter-sizes"
-          type="text"
-          inputMode="text"
-          placeholder="напр. XL, XXL, 42"
-          value={sizesDraft}
-          onChange={(e) => debouncedUpdateSizes(e.target.value)}
-          className="w-full rounded border px-3 py-2 text-sm"
-        />
-      </div>
-
-      <div>
-        <span className={labelClass}>К-сть одиниць (шт/кг)</span>
-        <div className="flex gap-2 text-sm">
-          <input
-            type="number"
-            inputMode="decimal"
-            min={0}
-            step={0.1}
-            placeholder="від"
-            value={unitsMin}
-            onChange={(e) => setUnitsMin(e.target.value)}
-            className="w-full rounded border px-2 py-1.5"
-            aria-label="Шт/кг від"
-          />
-          <input
-            type="number"
-            inputMode="decimal"
-            min={0}
-            step={0.1}
-            placeholder="до"
-            value={unitsMax}
-            onChange={(e) => setUnitsMax(e.target.value)}
-            className="w-full rounded border px-2 py-1.5"
-            aria-label="Шт/кг до"
-          />
+        <span className={labelClass}>Розмір</span>
+        <div className="grid grid-cols-4 gap-1.5">
+          {SIZE_OPTIONS.map((s) => (
+            <label
+              key={s}
+              className="flex cursor-pointer items-center gap-1 text-sm text-gray-700"
+            >
+              <input
+                type="checkbox"
+                checked={selectedSizes.includes(s)}
+                onChange={() => toggleListValue("sizes", s)}
+                className="h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-1 focus:ring-green-500"
+              />
+              <span>{s}</span>
+            </label>
+          ))}
         </div>
       </div>
 
-      <div>
-        <span className={labelClass}>Вага одиниці (кг)</span>
-        <div className="flex gap-2 text-sm">
-          <input
-            type="number"
-            inputMode="decimal"
-            min={0}
-            step={0.05}
-            placeholder="від"
-            value={unitWeightMin}
-            onChange={(e) => setUnitWeightMin(e.target.value)}
-            className="w-full rounded border px-2 py-1.5"
-            aria-label="Вага одиниці від"
-          />
-          <input
-            type="number"
-            inputMode="decimal"
-            min={0}
-            step={0.05}
-            placeholder="до"
-            value={unitWeightMax}
-            onChange={(e) => setUnitWeightMax(e.target.value)}
-            className="w-full rounded border px-2 py-1.5"
-            aria-label="Вага одиниці до"
+      {rangesLoaded && unitsBounds[1] > unitsBounds[0] && (
+        <div>
+          <span className={labelClass}>К-сть одиниць (шт/кг)</span>
+          <PriceRangeSlider
+            min={unitsBounds[0]}
+            max={unitsBounds[1]}
+            value={unitsValue}
+            onChange={setUnitsValue}
+            onCommit={commitUnitsRange}
+            step={1}
+            ariaLabelMin="Шт/кг від"
+            ariaLabelMax="Шт/кг до"
+            formatValue={(v) => `${v} шт`}
           />
         </div>
-      </div>
+      )}
+
+      {rangesLoaded && weightBounds[1] > weightBounds[0] && (
+        <div>
+          <span className={labelClass}>Вага одиниці (кг)</span>
+          <PriceRangeSlider
+            min={weightBounds[0]}
+            max={weightBounds[1]}
+            value={weightValue}
+            onChange={setWeightValue}
+            onCommit={commitWeightRange}
+            step={0.01}
+            ariaLabelMin="Вага одиниці від"
+            ariaLabelMax="Вага одиниці до"
+            formatValue={(v) => `${v.toFixed(2)} кг`}
+          />
+        </div>
+      )}
 
       <div>
         <span className={labelClass}>Вага лота, кг</span>

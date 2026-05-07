@@ -32,6 +32,28 @@ export const GENDER_OPTIONS = [
 ] as const;
 export type Gender = (typeof GENDER_OPTIONS)[number];
 
+// Fixed list of common sizes shown as multi-checkbox in catalog/lots filters.
+// Stored on Product.sizes as a free-form string ("XL, XXL, 44") — filter does
+// case-insensitive substring match so each option here OR-matches.
+export const SIZE_OPTIONS = [
+  "XS",
+  "S",
+  "M",
+  "L",
+  "XL",
+  "XXL",
+  "XXXL",
+  "36",
+  "38",
+  "40",
+  "42",
+  "44",
+  "46",
+  "48",
+  "50",
+] as const;
+export type SizeOption = (typeof SIZE_OPTIONS)[number];
+
 export const CONTACTS = {
   telegram: "@L_TEX",
   telegramGroup: "https://t.me/LTEX_Second",

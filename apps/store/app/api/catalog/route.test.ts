@@ -99,6 +99,14 @@ describe("GET /api/catalog", () => {
     );
   });
 
+  it("collects multi-value sizes via getAll into an array", async () => {
+    await GET(buildRequest("?sizes=XL&sizes=XXL&sizes=42"));
+
+    expect(mockGetCatalogProducts).toHaveBeenCalledWith(
+      expect.objectContaining({ sizes: ["XL", "XXL", "42"] }),
+    );
+  });
+
   it("forwards numeric range params as parsed floats", async () => {
     await GET(
       buildRequest(

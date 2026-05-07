@@ -43,7 +43,12 @@ export async function GET(request: NextRequest) {
     season: searchParams.get("season") ?? undefined,
     country: searchParams.get("country") ?? undefined,
     gender: searchParams.get("gender") ?? undefined,
-    sizes: searchParams.get("sizes") ?? undefined,
+    sizes: (() => {
+      const all = searchParams.getAll("sizes").filter(Boolean);
+      if (all.length === 0) return undefined;
+      if (all.length === 1) return all[0];
+      return all;
+    })(),
     unitsPerKgMin,
     unitsPerKgMax,
     unitWeightMin,
