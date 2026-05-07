@@ -1,0 +1,8 @@
+# Auto-generated dry-run report — formatting churn shadows real diffs.
+docs/CATALOG_IMPORT_DRY_RUN_REPORT.md
+
+# Build artifacts and lockfiles
+**/.next/**
+**/dist/**
+**/node_modules/**
+pnpm-lock.yaml
