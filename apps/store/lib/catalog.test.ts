@@ -223,68 +223,16 @@ describe("getCatalogProducts", () => {
     );
   });
 
-  it("applies sizes filter as case-insensitive substring", async () => {
+  it("applies oversize subcategory as cross-cutting tag (isOversize=true, no category filter)", async () => {
     mockFindMany.mockResolvedValue([]);
     mockCount.mockResolvedValue(0);
 
-    await getCatalogProducts({ sizes: "XXL" });
-
-    expect(mockFindMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: expect.objectContaining({
-          sizes: { contains: "XXL", mode: "insensitive" },
-        }),
-      }),
-    );
-  });
-
-  it("ignores empty sizes filter", async () => {
-    mockFindMany.mockResolvedValue([]);
-    mockCount.mockResolvedValue(0);
-
-    await getCatalogProducts({ sizes: "   " });
+    await getCatalogProducts({ subcategorySlug: "xxl-veliki-rozmiry" });
 
     const calledWhere = mockFindMany.mock.calls[0]![0]!.where;
-    expect(calledWhere.sizes).toBeUndefined();
-  });
-
-  it("applies sizes filter with array (multi-select OR-match)", async () => {
-    mockFindMany.mockResolvedValue([]);
-    mockCount.mockResolvedValue(0);
-
-    await getCatalogProducts({ sizes: ["XL", "XXL"] });
-
-    const calledWhere = mockFindMany.mock.calls[0]![0]!.where;
-    expect(calledWhere.OR).toEqual([
-      { sizes: { contains: "XL", mode: "insensitive" } },
-      { sizes: { contains: "XXL", mode: "insensitive" } },
-    ]);
-    expect(calledWhere.sizes).toBeUndefined();
-  });
-
-  it("applies sizes filter with comma-separated multi-value as OR-match", async () => {
-    mockFindMany.mockResolvedValue([]);
-    mockCount.mockResolvedValue(0);
-
-    await getCatalogProducts({ sizes: "XL,XXL,42" });
-
-    const calledWhere = mockFindMany.mock.calls[0]![0]!.where;
-    expect(calledWhere.OR).toEqual([
-      { sizes: { contains: "XL", mode: "insensitive" } },
-      { sizes: { contains: "XXL", mode: "insensitive" } },
-      { sizes: { contains: "42", mode: "insensitive" } },
-    ]);
-  });
-
-  it("applies sizes filter with single-element array as scalar match", async () => {
-    mockFindMany.mockResolvedValue([]);
-    mockCount.mockResolvedValue(0);
-
-    await getCatalogProducts({ sizes: ["XL"] });
-
-    const calledWhere = mockFindMany.mock.calls[0]![0]!.where;
-    expect(calledWhere.sizes).toEqual({ contains: "XL", mode: "insensitive" });
-    expect(calledWhere.OR).toBeUndefined();
+    expect(calledWhere.isOversize).toBe(true);
+    expect(calledWhere.category).toBeUndefined();
+    expect(calledWhere.categoryId).toBeUndefined();
   });
 
   it("applies unitsPerKg range as overlap (Max>=min, Min<=max)", async () => {

@@ -89,21 +89,11 @@ describe("GET /api/catalog", () => {
     );
   });
 
-  it("forwards gender and sizes query params", async () => {
-    await GET(
-      buildRequest("?gender=%D0%96%D1%96%D0%BD%D0%BE%D1%87%D0%B0&sizes=XXL"),
-    );
+  it("forwards gender query params", async () => {
+    await GET(buildRequest("?gender=%D0%96%D1%96%D0%BD%D0%BE%D1%87%D0%B0"));
 
     expect(mockGetCatalogProducts).toHaveBeenCalledWith(
-      expect.objectContaining({ gender: "Жіноча", sizes: "XXL" }),
-    );
-  });
-
-  it("collects multi-value sizes via getAll into an array", async () => {
-    await GET(buildRequest("?sizes=XL&sizes=XXL&sizes=42"));
-
-    expect(mockGetCatalogProducts).toHaveBeenCalledWith(
-      expect.objectContaining({ sizes: ["XL", "XXL", "42"] }),
+      expect.objectContaining({ gender: "Жіноча" }),
     );
   });
 

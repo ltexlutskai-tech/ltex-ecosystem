@@ -5,6 +5,7 @@ import {
   type ProductImage,
   type Price,
 } from "@ltex/db";
+import { OVERSIZE_SLUG } from "@ltex/shared";
 import { getCurrentCustomer } from "./customer-auth";
 
 /**
@@ -31,7 +32,6 @@ interface CatalogParams {
   season?: string;
   country?: string | string[];
   gender?: string | string[];
-  sizes?: string | string[];
   unitsPerKgMin?: number;
   unitsPerKgMax?: number;
   unitWeightMin?: number;
@@ -91,7 +91,6 @@ export async function getCatalogProducts(
     season,
     country,
     gender,
-    sizes,
     unitsPerKgMin,
     unitsPerKgMax,
     unitWeightMin,
@@ -121,9 +120,13 @@ export async function getCatalogProducts(
 
   const where: Prisma.ProductWhereInput = { inStock: true };
 
-  // subcategorySlug narrows to an exact sub-category; it takes precedence
-  // over categoryIds so that "вибрана підкатегорія" wins over the parent tree.
-  if (subcategorySlug) {
+  // The OVERSIZE_SLUG is a cross-cutting tag — match all products with
+  // isOversize=true across every category, ignoring any category filter.
+  if (subcategorySlug === OVERSIZE_SLUG) {
+    where.isOversize = true;
+  } else if (subcategorySlug) {
+    // subcategorySlug narrows to an exact sub-category; it takes precedence
+    // over categoryIds so that "вибрана підкатегорія" wins over the parent tree.
     where.category = { slug: subcategorySlug };
   } else if (categoryIds && categoryIds.length > 0) {
     where.categoryId = { in: categoryIds };
@@ -149,21 +152,6 @@ export async function getCatalogProducts(
     where.gender = Array.isArray(genderValue)
       ? { in: genderValue }
       : genderValue;
-  }
-
-  const sizesValue = parseMultiValue(sizes);
-  if (sizesValue) {
-    const sizeArr = Array.isArray(sizesValue) ? sizesValue : [sizesValue];
-    if (sizeArr.length === 1) {
-      where.sizes = { contains: sizeArr[0], mode: "insensitive" };
-    } else if (sizeArr.length > 1) {
-      where.OR = [
-        ...(where.OR ?? []),
-        ...sizeArr.map((s) => ({
-          sizes: { contains: s, mode: "insensitive" as const },
-        })),
-      ];
-    }
   }
 
   // Range overlap filters: product is included when its [Min, Max] interval
@@ -248,7 +236,6 @@ async function fullTextSearch(
     season,
     country,
     gender,
-    sizes,
     unitsPerKgMin,
     unitsPerKgMax,
     unitWeightMin,
@@ -278,7 +265,9 @@ async function fullTextSearch(
   const queryParams: (string | number)[] = [words, `%${q}%`];
   let paramIdx = 3;
 
-  if (subcategorySlug) {
+  if (subcategorySlug === OVERSIZE_SLUG) {
+    filterConditions.push(`p.is_oversize = true`);
+  } else if (subcategorySlug) {
     filterConditions.push(
       `EXISTS (SELECT 1 FROM categories c WHERE c.id = p.category_id AND c.slug = $${paramIdx})`,
     );
@@ -358,22 +347,6 @@ async function fullTextSearch(
       filterConditions.push(`p.gender = $${paramIdx}`);
       queryParams.push(genderValue);
       paramIdx++;
-    }
-  }
-  const sizesValueFts = parseMultiValue(sizes);
-  if (sizesValueFts) {
-    const sizeArr = Array.isArray(sizesValueFts)
-      ? sizesValueFts
-      : [sizesValueFts];
-    if (sizeArr.length === 1) {
-      filterConditions.push(`p.sizes ILIKE $${paramIdx}`);
-      queryParams.push(`%${sizeArr[0]}%`);
-      paramIdx++;
-    } else if (sizeArr.length > 1) {
-      const orParts = sizeArr.map((_, i) => `p.sizes ILIKE $${paramIdx + i}`);
-      filterConditions.push(`(${orParts.join(" OR ")})`);
-      for (const s of sizeArr) queryParams.push(`%${s}%`);
-      paramIdx += sizeArr.length;
     }
   }
   if (unitsPerKgMin != null) {

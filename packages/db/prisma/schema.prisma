@@ -54,6 +54,7 @@ model Product {
   unitWeight    String?  @map("unit_weight")
   unitWeightMin Float?   @map("unit_weight_min")
   unitWeightMax Float?   @map("unit_weight_max")
+  isOversize    Boolean  @default(false) @map("is_oversize")
   createdAt     DateTime @default(now()) @map("created_at")
   updatedAt     DateTime @updatedAt @map("updated_at")
 
@@ -76,6 +77,7 @@ model Product {
   @@index([unitsPerKgMax])
   @@index([unitWeightMin])
   @@index([unitWeightMax])
+  @@index([isOversize])
   @@map("products")
 }
 

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { prisma } from "@ltex/db";
 import { notFound } from "next/navigation";
+import { CATEGORIES, OVERSIZE_SLUG } from "@ltex/shared";
 import { getCatalogProducts } from "@/lib/catalog";
 import { ProductCard } from "@/components/store/product-card";
 import { CatalogSidebar } from "@/components/store/catalog-sidebar";
@@ -19,12 +20,35 @@ interface Props {
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { categorySlug, subcategorySlug } = await params;
+  const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://ltex.com.ua";
+
+  if (subcategorySlug === OVERSIZE_SLUG) {
+    const parent = CATEGORIES.find((c) => c.slug === categorySlug);
+    const sub = parent?.subcategories.find((s) => s.slug === OVERSIZE_SLUG);
+    if (!parent || !sub) return {};
+    const description = `${sub.name} — товари великих розмірів з категорії ${parent.name} гуртом від 10 кг. L-TEX.`;
+    return {
+      title: `${sub.name} (${parent.name}) — секонд хенд та сток гуртом`,
+      description,
+      alternates: {
+        canonical: `${SITE_URL}/catalog/${categorySlug}/${subcategorySlug}`,
+      },
+      openGraph: {
+        title: `${sub.name} — ${parent.name} — L-TEX`,
+        description,
+        url: `${SITE_URL}/catalog/${categorySlug}/${subcategorySlug}`,
+        siteName: "L-TEX",
+        locale: "uk_UA",
+        type: "website",
+      },
+    };
+  }
+
   const [parent, sub] = await Promise.all([
     prisma.category.findUnique({ where: { slug: categorySlug } }),
     prisma.category.findUnique({ where: { slug: subcategorySlug } }),
   ]);
   if (!parent || !sub) return {};
-  const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://ltex.com.ua";
   const description = `${sub.name} з категорії ${parent.name} гуртом від 10 кг. Секонд хенд, сток з Англії, Німеччини, Канади. L-TEX.`;
   return {
     title: `${sub.name} (${parent.name}) — секонд хенд та сток гуртом`,
@@ -48,28 +72,38 @@ export default async function SubcategoryPage({ params, searchParams }: Props) {
   const sp = await searchParams;
   const getStr = (v: string | string[] | undefined): string | undefined =>
     Array.isArray(v) ? v[0] : v;
-  const getList = (v: string | string[] | undefined): string[] => {
-    if (v == null) return [];
-    if (Array.isArray(v)) return v.filter(Boolean);
-    return v.includes(",")
-      ? v
-          .split(",")
-          .map((s) => s.trim())
-          .filter(Boolean)
-      : v
-        ? [v]
-        : [];
-  };
   const page = parseInt(getStr(sp.page) ?? "1", 10);
   const layout: "grid" | "list" =
     getStr(sp.layout) === "list" ? "list" : "grid";
 
-  const [parent, subcategory] = await Promise.all([
-    prisma.category.findUnique({ where: { slug: categorySlug } }),
-    prisma.category.findUnique({ where: { slug: subcategorySlug } }),
-  ]);
+  const isOversize = subcategorySlug === OVERSIZE_SLUG;
 
-  if (!parent || !subcategory || subcategory.parentId !== parent.id) notFound();
+  // Cross-cutting pseudo-subcategory — resolved via constants, not DB,
+  // because no Category row exists for it.
+  const resolved: {
+    parent: { id?: string; slug: string; name: string };
+    subcategory: { id?: string; slug: string; name: string };
+  } = await (async () => {
+    if (isOversize) {
+      const parentDef = CATEGORIES.find((c) => c.slug === categorySlug);
+      const subDef = parentDef?.subcategories.find(
+        (s) => s.slug === OVERSIZE_SLUG,
+      );
+      if (!parentDef || !subDef) notFound();
+      return {
+        parent: { slug: parentDef.slug, name: parentDef.name },
+        subcategory: { slug: subDef.slug, name: subDef.name },
+      };
+    }
+    const [parentRow, subRow] = await Promise.all([
+      prisma.category.findUnique({ where: { slug: categorySlug } }),
+      prisma.category.findUnique({ where: { slug: subcategorySlug } }),
+    ]);
+    if (!parentRow || !subRow || subRow.parentId !== parentRow.id) notFound();
+    return { parent: parentRow, subcategory: subRow };
+  })();
+  const parent = resolved.parent;
+  const subcategory = resolved.subcategory;
 
   const parseFloatParam = (raw: string | undefined): number | undefined => {
     if (!raw) return undefined;
@@ -88,15 +122,15 @@ export default async function SubcategoryPage({ params, searchParams }: Props) {
   const unitsPerKgMax = parseFloatParam(unitsMaxStr);
   const unitWeightMin = parseFloatParam(weightMinStr);
   const unitWeightMax = parseFloatParam(weightMaxStr);
-  const sizesArr = getList(sp.sizes);
 
   const { products, total, totalPages } = await getCatalogProducts({
-    categoryId: subcategory.id,
+    ...(isOversize
+      ? { subcategorySlug: OVERSIZE_SLUG }
+      : { categoryId: subcategory.id }),
     quality: getStr(sp.quality),
     season: getStr(sp.season),
     country: getStr(sp.country),
     gender: getStr(sp.gender),
-    sizes: sizesArr.length > 0 ? sizesArr : undefined,
     unitsPerKgMin,
     unitsPerKgMax,
     unitWeightMin,
@@ -117,7 +151,6 @@ export default async function SubcategoryPage({ params, searchParams }: Props) {
   if (countryParam) filterParams.set("country", countryParam);
   const genderParam = getStr(sp.gender);
   if (genderParam) filterParams.set("gender", genderParam);
-  for (const s of sizesArr) filterParams.append("sizes", s);
   if (unitsMinStr) filterParams.set("unitsPerKgMin", unitsMinStr);
   if (unitsMaxStr) filterParams.set("unitsPerKgMax", unitsMaxStr);
   if (weightMinStr) filterParams.set("unitWeightMin", weightMinStr);

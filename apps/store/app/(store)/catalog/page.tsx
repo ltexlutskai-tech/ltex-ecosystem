@@ -32,18 +32,6 @@ export default async function CatalogPage({
   const params = await searchParams;
   const getStr = (v: string | string[] | undefined): string | undefined =>
     Array.isArray(v) ? v[0] : v;
-  const getList = (v: string | string[] | undefined): string[] => {
-    if (v == null) return [];
-    if (Array.isArray(v)) return v.filter(Boolean);
-    return v.includes(",")
-      ? v
-          .split(",")
-          .map((s) => s.trim())
-          .filter(Boolean)
-      : v
-        ? [v]
-        : [];
-  };
 
   const page = parseInt(getStr(params.page) ?? "1", 10);
   const view = getStr(params.view) ?? "pagination";
@@ -70,14 +58,12 @@ export default async function CatalogPage({
   const unitWeightMax = parseFloatParam(weightMaxStr);
 
   const inStockOnly = getStr(params.inStock) === "true";
-  const sizesArr = getList(params.sizes);
 
   const { products, total, totalPages } = await getCatalogProducts({
     quality: getStr(params.quality),
     season: getStr(params.season),
     country: getStr(params.country),
     gender: getStr(params.gender),
-    sizes: sizesArr.length > 0 ? sizesArr : undefined,
     unitsPerKgMin,
     unitsPerKgMax,
     unitWeightMin,
@@ -99,7 +85,6 @@ export default async function CatalogPage({
   if (countryParam) filterParams.set("country", countryParam);
   const genderParam = getStr(params.gender);
   if (genderParam) filterParams.set("gender", genderParam);
-  for (const s of sizesArr) filterParams.append("sizes", s);
   if (unitsMinStr) filterParams.set("unitsPerKgMin", unitsMinStr);
   if (unitsMaxStr) filterParams.set("unitsPerKgMax", unitsMaxStr);
   if (weightMinStr) filterParams.set("unitWeightMin", weightMinStr);
