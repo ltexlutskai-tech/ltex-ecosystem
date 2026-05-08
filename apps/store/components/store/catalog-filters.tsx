@@ -7,7 +7,7 @@ import { SEASONS, SEASON_LABELS } from "@ltex/shared";
 import { COUNTRIES, COUNTRY_LABELS } from "@ltex/shared";
 import { GENDER_OPTIONS } from "@ltex/shared";
 import { SearchAutocomplete } from "./search-autocomplete";
-import { PriceRangeSlider } from "./price-range-slider";
+import { RangeWithInputs } from "./range-with-inputs";
 import { getDictionary } from "@/lib/i18n";
 
 const dict = getDictionary();
@@ -360,16 +360,16 @@ export function CatalogFilters({
       {rangesLoaded && unitsBounds[1] > unitsBounds[0] && (
         <div>
           <span className={labelClass}>{dict.catalog.unitsPerKgLabel}</span>
-          <PriceRangeSlider
+          <RangeWithInputs
             min={unitsBounds[0]}
             max={unitsBounds[1]}
             value={unitsValue}
             onChange={setUnitsValue}
             onCommit={commitUnitsRange}
             step={1}
+            unit="шт"
             ariaLabelMin={`${dict.catalog.unitsPerKgLabel} ${dict.catalog.rangeFrom}`}
             ariaLabelMax={`${dict.catalog.unitsPerKgLabel} ${dict.catalog.rangeTo}`}
-            formatValue={(v) => `${v} шт`}
           />
         </div>
       )}
@@ -377,16 +377,16 @@ export function CatalogFilters({
       {rangesLoaded && weightBounds[1] > weightBounds[0] && (
         <div>
           <span className={labelClass}>{dict.catalog.unitWeightLabel}</span>
-          <PriceRangeSlider
+          <RangeWithInputs
             min={weightBounds[0]}
             max={weightBounds[1]}
             value={weightValue}
             onChange={setWeightValue}
             onCommit={commitWeightRange}
             step={1}
+            unit="кг"
             ariaLabelMin={`${dict.catalog.unitWeightLabel} ${dict.catalog.rangeFrom}`}
             ariaLabelMax={`${dict.catalog.unitWeightLabel} ${dict.catalog.rangeTo}`}
-            formatValue={(v) => `${v} кг`}
           />
         </div>
       )}
@@ -433,12 +433,16 @@ export function CatalogFilters({
 
       <div>
         <span className={labelClass}>{dict.catalog.priceRange}</span>
-        <PriceRangeSlider
+        <RangeWithInputs
           min={priceBounds[0]}
           max={priceBounds[1]}
           value={priceValue}
           onChange={setPriceValue}
           onCommit={commitPriceRange}
+          step={1}
+          unit="€"
+          ariaLabelMin="Мінімальна ціна"
+          ariaLabelMax="Максимальна ціна"
         />
       </div>
 

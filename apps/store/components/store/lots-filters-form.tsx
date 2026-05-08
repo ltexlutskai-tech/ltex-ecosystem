@@ -11,7 +11,7 @@ import {
   SEASON_LABELS,
   GENDER_OPTIONS,
 } from "@ltex/shared";
-import { PriceRangeSlider } from "./price-range-slider";
+import { RangeWithInputs } from "./range-with-inputs";
 
 const DEFAULT_UNITS_RANGE: [number, number] = [1, 1000];
 const DEFAULT_WEIGHT_RANGE: [number, number] = [1, 1000];
@@ -389,16 +389,16 @@ export function LotsFiltersForm({ onApply }: LotsFiltersFormProps) {
       {rangesLoaded && unitsBounds[1] > unitsBounds[0] && (
         <div>
           <span className={labelClass}>К-сть одиниць (шт/кг)</span>
-          <PriceRangeSlider
+          <RangeWithInputs
             min={unitsBounds[0]}
             max={unitsBounds[1]}
             value={unitsValue}
             onChange={setUnitsValue}
             onCommit={commitUnitsRange}
             step={1}
+            unit="шт"
             ariaLabelMin="Шт/кг від"
             ariaLabelMax="Шт/кг до"
-            formatValue={(v) => `${v} шт`}
           />
         </div>
       )}
@@ -406,16 +406,16 @@ export function LotsFiltersForm({ onApply }: LotsFiltersFormProps) {
       {rangesLoaded && weightBounds[1] > weightBounds[0] && (
         <div>
           <span className={labelClass}>Вага одиниці (кг)</span>
-          <PriceRangeSlider
+          <RangeWithInputs
             min={weightBounds[0]}
             max={weightBounds[1]}
             value={weightValue}
             onChange={setWeightValue}
             onCommit={commitWeightRange}
             step={1}
+            unit="кг"
             ariaLabelMin="Вага одиниці від"
             ariaLabelMax="Вага одиниці до"
-            formatValue={(v) => `${v} кг`}
           />
         </div>
       )}
