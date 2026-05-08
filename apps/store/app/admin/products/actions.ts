@@ -61,15 +61,61 @@ export async function updateProduct(id: string, formData: FormData) {
     inStock: formData.get("inStock") === "on",
   };
 
-  await prisma.product.update({ where: { id }, data });
+  const product = await prisma.product.update({
+    where: { id },
+    data,
+    select: {
+      slug: true,
+      category: {
+        select: { slug: true, parent: { select: { slug: true } } },
+      },
+    },
+  });
   revalidatePath("/admin/products");
+  revalidateProductPublicPaths(product);
   redirect("/admin/products");
 }
 
 export async function deleteProduct(id: string) {
   await requireAdmin();
+  const product = await prisma.product.findUnique({
+    where: { id },
+    select: {
+      slug: true,
+      category: {
+        select: { slug: true, parent: { select: { slug: true } } },
+      },
+    },
+  });
   await prisma.product.delete({ where: { id } });
   revalidatePath("/admin/products");
+  if (product) revalidateProductPublicPaths(product);
+}
+
+type ProductRevalidateShape = {
+  slug: string;
+  category: {
+    slug: string;
+    parent: { slug: string } | null;
+  } | null;
+};
+
+function revalidateProductPublicPaths(product: ProductRevalidateShape) {
+  revalidatePath(`/product/${product.slug}`);
+  revalidatePath("/catalog");
+  if (product.category) {
+    if (product.category.parent) {
+      revalidatePath(
+        `/catalog/${product.category.parent.slug}/${product.category.slug}`,
+      );
+      revalidatePath(`/catalog/${product.category.parent.slug}`);
+    } else {
+      revalidatePath(`/catalog/${product.category.slug}`);
+    }
+  }
+  revalidatePath("/sale");
+  revalidatePath("/new");
+  revalidatePath("/", "layout");
 }
 
 export async function uploadProductImage(
@@ -132,6 +178,7 @@ export async function uploadProductImage(
   });
 
   revalidatePath(`/admin/products/${productId}`);
+  await revalidateProductImagePublicPaths(productId);
 }
 
 export async function deleteProductImage(imageId: string, productId: string) {
@@ -152,6 +199,7 @@ export async function deleteProductImage(imageId: string, productId: string) {
   }
 
   revalidatePath(`/admin/products/${productId}`);
+  await revalidateProductImagePublicPaths(productId);
 }
 
 export async function reorderProductImages(
@@ -170,4 +218,16 @@ export async function reorderProductImages(
   );
 
   revalidatePath(`/admin/products/${productId}`);
+  await revalidateProductImagePublicPaths(productId);
+}
+
+async function revalidateProductImagePublicPaths(productId: string) {
+  const product = await prisma.product.findUnique({
+    where: { id: productId },
+    select: { slug: true },
+  });
+  if (product) {
+    revalidatePath(`/product/${product.slug}`);
+    revalidatePath("/catalog");
+  }
 }
