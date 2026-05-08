@@ -3,6 +3,7 @@ import { z } from "zod";
 import { prisma } from "@ltex/db";
 import { rateLimit, getClientIp } from "@/lib/rate-limit";
 import { setCustomerCookie } from "@/lib/customer-auth";
+import { notifyNewLead } from "@/lib/notifications";
 
 const schema = z.object({
   phone: z.string().min(8).max(32),
@@ -55,6 +56,7 @@ export async function POST(request: NextRequest) {
   const name = parsed.data.name.trim();
 
   try {
+    let wasCreated = false;
     let customer = await prisma.customer.findFirst({
       where: { phone },
       select: { id: true, name: true },
@@ -64,6 +66,7 @@ export async function POST(request: NextRequest) {
         data: { phone, name },
         select: { id: true, name: true },
       });
+      wasCreated = true;
     } else if (customer.name !== name) {
       await prisma.customer.update({
         where: { id: customer.id },
@@ -72,6 +75,15 @@ export async function POST(request: NextRequest) {
     }
 
     await setCustomerCookie(customer.id);
+
+    if (wasCreated) {
+      notifyNewLead({
+        customerId: customer.id,
+        phone,
+        name,
+        source: "web",
+      }).catch(() => {});
+    }
 
     // Cart merge: if a guest cart exists for this sessionId, attach it to the
     // customer (or fold its items into the customer's existing cart).
