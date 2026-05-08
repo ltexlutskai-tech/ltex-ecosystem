@@ -54,6 +54,40 @@ export const SIZE_OPTIONS = [
 ] as const;
 export type SizeOption = (typeof SIZE_OPTIONS)[number];
 
+// Regions of Ukraine — 24 oblasts + AR Crimea + 2 cities of special status.
+// Used for the "Область" dropdown on the customer login form. Stored on
+// `Customer.city` (free-text in DB; UI offers this fixed list).
+export const UA_REGIONS = [
+  "Вінницька",
+  "Волинська",
+  "Дніпропетровська",
+  "Донецька",
+  "Житомирська",
+  "Закарпатська",
+  "Запорізька",
+  "Івано-Франківська",
+  "Київська",
+  "Кіровоградська",
+  "Луганська",
+  "Львівська",
+  "Миколаївська",
+  "Одеська",
+  "Полтавська",
+  "Рівненська",
+  "Сумська",
+  "Тернопільська",
+  "Харківська",
+  "Херсонська",
+  "Хмельницька",
+  "Черкаська",
+  "Чернівецька",
+  "Чернігівська",
+  "АР Крим",
+  "м. Київ",
+  "м. Севастополь",
+] as const;
+export type UaRegion = (typeof UA_REGIONS)[number];
+
 export const CONTACTS = {
   telegram: "@L_TEX",
   telegramGroup: "https://t.me/LTEX_Second",

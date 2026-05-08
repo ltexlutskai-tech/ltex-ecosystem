@@ -8,6 +8,7 @@ import { notifyNewLead } from "@/lib/notifications";
 const schema = z.object({
   phone: z.string().min(8).max(32),
   name: z.string().min(1).max(100),
+  city: z.string().max(100).optional().nullable(),
   sessionId: z.string().min(1).max(100).optional(),
 });
 
@@ -54,24 +55,34 @@ export async function POST(request: NextRequest) {
 
   const phone = normalizePhone(parsed.data.phone);
   const name = parsed.data.name.trim();
+  const cityProvided = parsed.data.city !== undefined;
+  const city =
+    parsed.data.city === undefined || parsed.data.city === null
+      ? null
+      : parsed.data.city.trim() || null;
 
   try {
     let wasCreated = false;
     let customer = await prisma.customer.findFirst({
       where: { phone },
-      select: { id: true, name: true },
+      select: { id: true, name: true, city: true },
     });
     if (!customer) {
       customer = await prisma.customer.create({
-        data: { phone, name },
-        select: { id: true, name: true },
+        data: { phone, name, city },
+        select: { id: true, name: true, city: true },
       });
       wasCreated = true;
-    } else if (customer.name !== name) {
-      await prisma.customer.update({
-        where: { id: customer.id },
-        data: { name },
-      });
+    } else {
+      const updates: { name?: string; city?: string | null } = {};
+      if (customer.name !== name && name) updates.name = name;
+      if (cityProvided && customer.city !== city) updates.city = city;
+      if (Object.keys(updates).length > 0) {
+        await prisma.customer.update({
+          where: { id: customer.id },
+          data: updates,
+        });
+      }
     }
 
     await setCustomerCookie(customer.id);
@@ -81,6 +92,7 @@ export async function POST(request: NextRequest) {
         customerId: customer.id,
         phone,
         name,
+        city,
         source: "web",
       }).catch(() => {});
     }

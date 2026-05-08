@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Button, Input } from "@ltex/ui";
+import { UA_REGIONS } from "@ltex/shared";
 import { getDictionary } from "@/lib/i18n";
 import { formatPhone, isValidUaPhone } from "@/lib/phone-format";
 
@@ -16,6 +17,7 @@ export function LoginForm({ returnTo }: { returnTo: string }) {
   const router = useRouter();
   const [phone, setPhone] = useState(PHONE_INITIAL);
   const [name, setName] = useState("");
+  const [city, setCity] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const phoneRef = useRef<HTMLInputElement | null>(null);
@@ -55,6 +57,7 @@ export function LoginForm({ returnTo }: { returnTo: string }) {
         body: JSON.stringify({
           phone: phone.trim(),
           name: name.trim(),
+          city: city || null,
           ...(sessionId ? { sessionId } : {}),
         }),
       });
@@ -135,6 +138,29 @@ export function LoginForm({ returnTo }: { returnTo: string }) {
             nameShowError ? "border-red-500 focus-visible:ring-red-500" : ""
           }
         />
+      </div>
+      <div className="space-y-1.5">
+        <label
+          htmlFor="login-region"
+          className="text-sm font-medium leading-none"
+        >
+          {dict.auth.regionLabel}
+        </label>
+        <select
+          id="login-region"
+          value={city}
+          onChange={(e) => setCity(e.target.value)}
+          disabled={isSubmitting}
+          autoComplete="address-level1"
+          className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          <option value="">{dict.auth.regionPlaceholder}</option>
+          {UA_REGIONS.map((r) => (
+            <option key={r} value={r}>
+              {r}
+            </option>
+          ))}
+        </select>
       </div>
       {error && (
         <p

@@ -27,7 +27,7 @@ import { TrackProductView } from "@/components/store/track-product-view";
 import { PriceOrLogin } from "@/components/store/price-or-login";
 import { getDictionary } from "@/lib/i18n";
 import { getCurrentRate, eurToUah, formatUah } from "@/lib/exchange-rate";
-import { getCurrentCustomer } from "@/lib/customer-auth";
+import { getCurrentCustomer, stripPricesForGuests } from "@/lib/customer-auth";
 
 const ImageGallery = nextDynamic(
   () => import("@/components/store/image-gallery").then((m) => m.ImageGallery),
@@ -468,10 +468,18 @@ function RecommendationsSkeleton() {
 }
 
 async function RecommendationsSection({ productId }: { productId: string }) {
-  const [similar, boughtTogether] = await Promise.all([
+  const customer = await getCurrentCustomer();
+  let [similar, boughtTogether] = await Promise.all([
     getRecommendations(productId, 6),
     getFrequentlyBoughtTogether(productId, 4),
   ]);
+
+  if (!customer) {
+    [similar, boughtTogether] = await Promise.all([
+      stripPricesForGuests(similar, false),
+      stripPricesForGuests(boughtTogether, false),
+    ]);
+  }
 
   if (similar.length === 0 && boughtTogether.length === 0) return null;
 
