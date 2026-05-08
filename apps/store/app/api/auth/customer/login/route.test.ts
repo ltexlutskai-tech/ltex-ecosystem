@@ -1,27 +1,29 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest } from "next/server";
 
-const { mockPrisma, rateLimitMock, setCookieMock } = vi.hoisted(() => ({
-  mockPrisma: {
-    customer: {
-      findFirst: vi.fn(),
-      create: vi.fn(),
-      update: vi.fn(),
+const { mockPrisma, rateLimitMock, setCookieMock, notifyNewLeadMock } =
+  vi.hoisted(() => ({
+    mockPrisma: {
+      customer: {
+        findFirst: vi.fn(),
+        create: vi.fn(),
+        update: vi.fn(),
+      },
+      cart: {
+        findUnique: vi.fn(),
+        update: vi.fn(),
+        delete: vi.fn(),
+      },
+      cartItem: {
+        create: vi.fn(),
+      },
     },
-    cart: {
-      findUnique: vi.fn(),
-      update: vi.fn(),
-      delete: vi.fn(),
-    },
-    cartItem: {
-      create: vi.fn(),
-    },
-  },
-  rateLimitMock: vi
-    .fn()
-    .mockReturnValue({ allowed: true, remaining: 5, resetAt: Date.now() }),
-  setCookieMock: vi.fn().mockResolvedValue(undefined),
-}));
+    rateLimitMock: vi
+      .fn()
+      .mockReturnValue({ allowed: true, remaining: 5, resetAt: Date.now() }),
+    setCookieMock: vi.fn().mockResolvedValue(undefined),
+    notifyNewLeadMock: vi.fn().mockResolvedValue(undefined),
+  }));
 
 vi.mock("@ltex/db", () => ({
   prisma: mockPrisma,
@@ -34,6 +36,10 @@ vi.mock("@/lib/rate-limit", () => ({
 
 vi.mock("@/lib/customer-auth", () => ({
   setCustomerCookie: (...args: unknown[]) => setCookieMock(...args),
+}));
+
+vi.mock("@/lib/notifications", () => ({
+  notifyNewLead: (...args: unknown[]) => notifyNewLeadMock(...args),
 }));
 
 import { POST } from "./route";
@@ -129,6 +135,52 @@ describe("POST /api/auth/customer/login", () => {
       where: { phone: "+380671234567" },
       select: { id: true, name: true },
     });
+  });
+
+  it("fires notifyNewLead exactly once when a new customer is created", async () => {
+    const res = await POST(
+      makeRequest({ phone: "+380671234567", name: "Іван" }),
+    );
+    expect(res.status).toBe(200);
+    expect(notifyNewLeadMock).toHaveBeenCalledTimes(1);
+    expect(notifyNewLeadMock).toHaveBeenCalledWith({
+      customerId: "customer-1",
+      phone: "+380671234567",
+      name: "Іван",
+      source: "web",
+    });
+  });
+
+  it("does NOT fire notifyNewLead for an existing customer (login, no create)", async () => {
+    mockPrisma.customer.findFirst.mockResolvedValue({
+      id: "customer-existing",
+      name: "Олена",
+    });
+    const res = await POST(
+      makeRequest({ phone: "+380671234567", name: "Олена" }),
+    );
+    expect(res.status).toBe(200);
+    expect(notifyNewLeadMock).not.toHaveBeenCalled();
+  });
+
+  it("does NOT fire notifyNewLead when an existing customer just renames", async () => {
+    mockPrisma.customer.findFirst.mockResolvedValue({
+      id: "customer-existing",
+      name: "Стара",
+    });
+    const res = await POST(
+      makeRequest({ phone: "+380671234567", name: "Нова" }),
+    );
+    expect(res.status).toBe(200);
+    expect(notifyNewLeadMock).not.toHaveBeenCalled();
+  });
+
+  it("does not fail the response when notifyNewLead rejects", async () => {
+    notifyNewLeadMock.mockRejectedValueOnce(new Error("TG down"));
+    const res = await POST(
+      makeRequest({ phone: "+380671234567", name: "Іван" }),
+    );
+    expect(res.status).toBe(200);
   });
 
   it("merges a guest cart into a new customer cart on login", async () => {

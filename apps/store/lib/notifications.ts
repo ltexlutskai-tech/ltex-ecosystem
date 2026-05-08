@@ -122,6 +122,79 @@ function escapeMarkdown(text: string): string {
   return text.replace(/[_*[\]()~`>#+\-=|{}.!]/g, "\\$&");
 }
 
+interface NewLeadNotification {
+  customerId: string;
+  phone: string;
+  name: string;
+  source?: "web" | "mobile" | "telegram-bot" | "quick-order";
+}
+
+function maskPhone(phone: string): string {
+  return phone.replace(/(\+?\d{2,4})\d+(\d{2,4})/, "$1***$2");
+}
+
+// MarkdownV2 code spans only need ` and \ escaped inside backticks.
+function escapeMarkdownCode(text: string): string {
+  return text.replace(/[`\\]/g, "\\$&");
+}
+
+export async function notifyNewLead(
+  params: NewLeadNotification,
+): Promise<void> {
+  const botToken = process.env.TELEGRAM_BOT_TOKEN;
+  const chatId = process.env.NEWSLETTER_TELEGRAM_CHAT_ID;
+
+  if (!botToken || !chatId) {
+    console.warn(
+      "[L-TEX] notifyNewLead: TELEGRAM env missing — skipping notification",
+    );
+    return;
+  }
+
+  const text = [
+    `🆕 *Новий лід*`,
+    ``,
+    `*Імʼя:* ${escapeMarkdown(params.name)}`,
+    `*Телефон:* \`${escapeMarkdownCode(params.phone)}\``,
+    `*Джерело:* ${escapeMarkdown(params.source ?? "web")}`,
+    `*Час:* ${escapeMarkdown(
+      new Date().toLocaleString("uk-UA", { timeZone: "Europe/Kyiv" }),
+    )}`,
+    ``,
+    `Customer ID: \`${escapeMarkdownCode(params.customerId)}\``,
+  ].join("\n");
+
+  try {
+    const res = await fetch(
+      `https://api.telegram.org/bot${botToken}/sendMessage`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          chat_id: chatId,
+          text,
+          parse_mode: "MarkdownV2",
+          disable_web_page_preview: true,
+        }),
+        signal: AbortSignal.timeout(5_000),
+      },
+    );
+    if (!res.ok) {
+      const body = await res.text().catch(() => "");
+      console.warn("[L-TEX] notifyNewLead failed", {
+        status: res.status,
+        phone: maskPhone(params.phone),
+        body: body.slice(0, 200),
+      });
+    }
+  } catch (err) {
+    console.warn("[L-TEX] notifyNewLead error", {
+      phone: maskPhone(params.phone),
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
+}
+
 export async function notifyNewsletterSubscribe(
   payload: NewsletterNotification,
 ): Promise<void> {
