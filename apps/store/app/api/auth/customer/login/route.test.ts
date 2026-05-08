@@ -64,10 +64,12 @@ describe("POST /api/auth/customer/login", () => {
     mockPrisma.customer.create.mockResolvedValue({
       id: "customer-1",
       name: "Іван",
+      city: null,
     });
     mockPrisma.customer.update.mockResolvedValue({
       id: "customer-1",
       name: "Іван",
+      city: null,
     });
     mockPrisma.cart.findUnique.mockResolvedValue(null);
     mockPrisma.cart.update.mockResolvedValue(null);
@@ -84,16 +86,32 @@ describe("POST /api/auth/customer/login", () => {
     );
     expect(res.status).toBe(200);
     expect(mockPrisma.customer.create).toHaveBeenCalledWith({
-      data: { phone: "+380671234567", name: "Іван" },
-      select: { id: true, name: true },
+      data: { phone: "+380671234567", name: "Іван", city: null },
+      select: { id: true, name: true, city: true },
     });
     expect(setCookieMock).toHaveBeenCalledWith("customer-1");
+  });
+
+  it("creates a customer with city when provided", async () => {
+    const res = await POST(
+      makeRequest({
+        phone: "+380671234567",
+        name: "Іван",
+        city: "Волинська",
+      }),
+    );
+    expect(res.status).toBe(200);
+    expect(mockPrisma.customer.create).toHaveBeenCalledWith({
+      data: { phone: "+380671234567", name: "Іван", city: "Волинська" },
+      select: { id: true, name: true, city: true },
+    });
   });
 
   it("reuses an existing customer by phone (findFirst, not upsert)", async () => {
     mockPrisma.customer.findFirst.mockResolvedValue({
       id: "customer-existing",
       name: "Олена",
+      city: null,
     });
     const res = await POST(
       makeRequest({ phone: "+380671234567", name: "Олена" }),
@@ -108,6 +126,7 @@ describe("POST /api/auth/customer/login", () => {
     mockPrisma.customer.findFirst.mockResolvedValue({
       id: "customer-existing",
       name: "Стара",
+      city: null,
     });
     const res = await POST(
       makeRequest({ phone: "+380671234567", name: "Нова" }),
@@ -117,6 +136,39 @@ describe("POST /api/auth/customer/login", () => {
       where: { id: "customer-existing" },
       data: { name: "Нова" },
     });
+  });
+
+  it("updates city when an existing customer logs in with a region", async () => {
+    mockPrisma.customer.findFirst.mockResolvedValue({
+      id: "customer-existing",
+      name: "Олена",
+      city: null,
+    });
+    const res = await POST(
+      makeRequest({
+        phone: "+380671234567",
+        name: "Олена",
+        city: "Львівська",
+      }),
+    );
+    expect(res.status).toBe(200);
+    expect(mockPrisma.customer.update).toHaveBeenCalledWith({
+      where: { id: "customer-existing" },
+      data: { city: "Львівська" },
+    });
+  });
+
+  it("does not update city when not provided in payload (preserves existing)", async () => {
+    mockPrisma.customer.findFirst.mockResolvedValue({
+      id: "customer-existing",
+      name: "Олена",
+      city: "Волинська",
+    });
+    const res = await POST(
+      makeRequest({ phone: "+380671234567", name: "Олена" }),
+    );
+    expect(res.status).toBe(200);
+    expect(mockPrisma.customer.update).not.toHaveBeenCalled();
   });
 
   it("rejects when rate-limited", async () => {
@@ -133,7 +185,7 @@ describe("POST /api/auth/customer/login", () => {
     await POST(makeRequest({ phone: "0671234567", name: "Іван" }));
     expect(mockPrisma.customer.findFirst).toHaveBeenCalledWith({
       where: { phone: "+380671234567" },
-      select: { id: true, name: true },
+      select: { id: true, name: true, city: true },
     });
   });
 
@@ -147,6 +199,25 @@ describe("POST /api/auth/customer/login", () => {
       customerId: "customer-1",
       phone: "+380671234567",
       name: "Іван",
+      city: null,
+      source: "web",
+    });
+  });
+
+  it("forwards city to notifyNewLead when provided on creation", async () => {
+    const res = await POST(
+      makeRequest({
+        phone: "+380671234567",
+        name: "Іван",
+        city: "Волинська",
+      }),
+    );
+    expect(res.status).toBe(200);
+    expect(notifyNewLeadMock).toHaveBeenCalledWith({
+      customerId: "customer-1",
+      phone: "+380671234567",
+      name: "Іван",
+      city: "Волинська",
       source: "web",
     });
   });
@@ -155,6 +226,7 @@ describe("POST /api/auth/customer/login", () => {
     mockPrisma.customer.findFirst.mockResolvedValue({
       id: "customer-existing",
       name: "Олена",
+      city: null,
     });
     const res = await POST(
       makeRequest({ phone: "+380671234567", name: "Олена" }),
@@ -167,6 +239,7 @@ describe("POST /api/auth/customer/login", () => {
     mockPrisma.customer.findFirst.mockResolvedValue({
       id: "customer-existing",
       name: "Стара",
+      city: null,
     });
     const res = await POST(
       makeRequest({ phone: "+380671234567", name: "Нова" }),

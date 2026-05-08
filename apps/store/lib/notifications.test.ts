@@ -373,4 +373,27 @@ describe("notifyNewLead", () => {
     const body = JSON.parse(fetchSpy.mock.calls[0]![1]!.body as string);
     expect(body.text).toContain("web");
   });
+
+  it("includes the Область line when city is provided", async () => {
+    vi.stubEnv("TELEGRAM_BOT_TOKEN", "bot-token");
+    vi.stubEnv("NEWSLETTER_TELEGRAM_CHAT_ID", "newsletter-chat-id");
+
+    await notifyNewLead({ ...params, city: "Волинська" });
+
+    const body = JSON.parse(fetchSpy.mock.calls[0]![1]!.body as string);
+    const text = body.text as string;
+    expect(text).toContain("Область");
+    expect(text).toContain("Волинська");
+  });
+
+  it("omits the Область line when city is null or undefined", async () => {
+    vi.stubEnv("TELEGRAM_BOT_TOKEN", "bot-token");
+    vi.stubEnv("NEWSLETTER_TELEGRAM_CHAT_ID", "newsletter-chat-id");
+
+    await notifyNewLead({ ...params, city: null });
+
+    const body = JSON.parse(fetchSpy.mock.calls[0]![1]!.body as string);
+    const text = body.text as string;
+    expect(text).not.toContain("Область");
+  });
 });

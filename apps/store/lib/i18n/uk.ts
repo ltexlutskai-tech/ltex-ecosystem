@@ -481,6 +481,8 @@ export const uk = {
     phonePlaceholder: "+380 XX XXX XX XX",
     nameLabel: "Імʼя",
     namePlaceholder: "Як до вас звертатися",
+    regionLabel: "Область",
+    regionPlaceholder: "— Не обрано —",
     submit: "Увійти",
     submitting: "Входимо...",
     priceLoginPrompt: "Увійдіть щоб побачити ціну",

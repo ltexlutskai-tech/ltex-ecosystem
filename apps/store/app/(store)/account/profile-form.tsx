@@ -2,6 +2,7 @@
 
 import { useFormState, useFormStatus } from "react-dom";
 import { Button, Input, Textarea } from "@ltex/ui";
+import { UA_REGIONS } from "@ltex/shared";
 import { updateProfileAction, type UpdateProfileResult } from "./actions";
 import { getDictionary } from "@/lib/i18n";
 
@@ -102,15 +103,26 @@ export function ProfileForm({ customer }: { customer: CustomerProfile }) {
             htmlFor="profile-city"
             className="text-sm font-medium leading-none"
           >
-            {dict.auth.fields.city}
+            {dict.auth.regionLabel}
           </label>
-          <Input
+          <select
             id="profile-city"
             name="city"
             defaultValue={customer.city ?? ""}
-            maxLength={100}
-            autoComplete="address-level2"
-          />
+            autoComplete="address-level1"
+            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <option value="">{dict.auth.regionPlaceholder}</option>
+            {UA_REGIONS.map((r) => (
+              <option key={r} value={r}>
+                {r}
+              </option>
+            ))}
+            {customer.city &&
+              !(UA_REGIONS as readonly string[]).includes(customer.city) && (
+                <option value={customer.city}>{customer.city}</option>
+              )}
+          </select>
         </div>
         <div className="space-y-1.5 sm:col-span-2">
           <label

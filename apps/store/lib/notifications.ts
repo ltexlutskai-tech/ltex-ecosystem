@@ -126,6 +126,7 @@ interface NewLeadNotification {
   customerId: string;
   phone: string;
   name: string;
+  city?: string | null;
   source?: "web" | "mobile" | "telegram-bot" | "quick-order";
 }
 
@@ -156,6 +157,7 @@ export async function notifyNewLead(
     ``,
     `*Імʼя:* ${escapeMarkdown(params.name)}`,
     `*Телефон:* \`${escapeMarkdownCode(params.phone)}\``,
+    ...(params.city ? [`*Область:* ${escapeMarkdown(params.city)}`] : []),
     `*Джерело:* ${escapeMarkdown(params.source ?? "web")}`,
     `*Час:* ${escapeMarkdown(
       new Date().toLocaleString("uk-UA", { timeZone: "Europe/Kyiv" }),
