@@ -47,18 +47,6 @@ export default async function CategoryPage({ params, searchParams }: Props) {
   const sp = await searchParams;
   const getStr = (v: string | string[] | undefined): string | undefined =>
     Array.isArray(v) ? v[0] : v;
-  const getList = (v: string | string[] | undefined): string[] => {
-    if (v == null) return [];
-    if (Array.isArray(v)) return v.filter(Boolean);
-    return v.includes(",")
-      ? v
-          .split(",")
-          .map((s) => s.trim())
-          .filter(Boolean)
-      : v
-        ? [v]
-        : [];
-  };
   const page = parseInt(getStr(sp.page) ?? "1", 10);
   const layout: "grid" | "list" =
     getStr(sp.layout) === "list" ? "list" : "grid";
@@ -101,7 +89,6 @@ export default async function CategoryPage({ params, searchParams }: Props) {
       ? subParam
       : undefined;
   const inStockOnly = getStr(sp.inStock) === "true";
-  const sizesArr = getList(sp.sizes);
 
   const { products, total, totalPages } = await getCatalogProducts({
     categoryIds,
@@ -110,7 +97,6 @@ export default async function CategoryPage({ params, searchParams }: Props) {
     season: getStr(sp.season),
     country: getStr(sp.country),
     gender: getStr(sp.gender),
-    sizes: sizesArr.length > 0 ? sizesArr : undefined,
     unitsPerKgMin,
     unitsPerKgMax,
     unitWeightMin,
@@ -132,7 +118,6 @@ export default async function CategoryPage({ params, searchParams }: Props) {
   if (countryParam) filterParams.set("country", countryParam);
   const genderParam = getStr(sp.gender);
   if (genderParam) filterParams.set("gender", genderParam);
-  for (const s of sizesArr) filterParams.append("sizes", s);
   if (unitsMinStr) filterParams.set("unitsPerKgMin", unitsMinStr);
   if (unitsMaxStr) filterParams.set("unitsPerKgMax", unitsMaxStr);
   if (weightMinStr) filterParams.set("unitWeightMin", weightMinStr);

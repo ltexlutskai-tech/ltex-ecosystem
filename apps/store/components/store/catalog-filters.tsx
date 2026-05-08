@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { QUALITY_LEVELS, QUALITY_LABELS } from "@ltex/shared";
 import { SEASONS, SEASON_LABELS } from "@ltex/shared";
 import { COUNTRIES, COUNTRY_LABELS } from "@ltex/shared";
-import { GENDER_OPTIONS, SIZE_OPTIONS } from "@ltex/shared";
+import { GENDER_OPTIONS } from "@ltex/shared";
 import { SearchAutocomplete } from "./search-autocomplete";
 import { PriceRangeSlider } from "./price-range-slider";
 import { getDictionary } from "@/lib/i18n";
@@ -13,8 +13,8 @@ import { getDictionary } from "@/lib/i18n";
 const dict = getDictionary();
 
 const DEFAULT_PRICE_RANGE: [number, number] = [0, 100];
-const DEFAULT_UNITS_RANGE: [number, number] = [0, 20];
-const DEFAULT_WEIGHT_RANGE: [number, number] = [0, 5];
+const DEFAULT_UNITS_RANGE: [number, number] = [1, 1000];
+const DEFAULT_WEIGHT_RANGE: [number, number] = [1, 1000];
 
 export interface SubcategoryOption {
   slug: string;
@@ -48,10 +48,6 @@ export function CatalogFilters({
   );
   const selectedGenders = useMemo(
     () => parseList(searchParams.get("gender")),
-    [searchParams],
-  );
-  const selectedSizes = useMemo(
-    () => parseList(searchParams.get("sizes")),
     [searchParams],
   );
 
@@ -180,7 +176,7 @@ export function CatalogFilters({
   );
 
   const toggleListValue = useCallback(
-    (key: "quality" | "country" | "gender" | "sizes", value: string) => {
+    (key: "quality" | "country" | "gender", value: string) => {
       const current = parseList(searchParams.get(key));
       const next = current.includes(value)
         ? current.filter((x) => x !== value)
@@ -206,9 +202,9 @@ export function CatalogFilters({
   const commitWeightRange = useCallback(
     ([lo, hi]: [number, number]) => {
       const params = new URLSearchParams(searchParams.toString());
-      if (lo > weightBounds[0]) params.set("unitWeightMin", lo.toFixed(2));
+      if (lo > weightBounds[0]) params.set("unitWeightMin", String(lo));
       else params.delete("unitWeightMin");
-      if (hi < weightBounds[1]) params.set("unitWeightMax", hi.toFixed(2));
+      if (hi < weightBounds[1]) params.set("unitWeightMax", String(hi));
       else params.delete("unitWeightMax");
       params.delete("page");
       router.push(`${pathname}?${params.toString()}`);
@@ -248,7 +244,6 @@ export function CatalogFilters({
     searchParams.get("season") ||
     searchParams.get("country") ||
     searchParams.get("gender") ||
-    searchParams.get("sizes") ||
     searchParams.get("unitsPerKgMin") ||
     searchParams.get("unitsPerKgMax") ||
     searchParams.get("unitWeightMin") ||
@@ -362,29 +357,6 @@ export function CatalogFilters({
         </div>
       </div>
 
-      <div>
-        <span className={labelClass}>{dict.catalog.sizesLabel}</span>
-        <div className="grid grid-cols-4 gap-1.5">
-          {SIZE_OPTIONS.map((s) => {
-            const checked = selectedSizes.includes(s);
-            return (
-              <label
-                key={s}
-                className="flex cursor-pointer items-center gap-1 text-sm text-gray-700"
-              >
-                <input
-                  type="checkbox"
-                  checked={checked}
-                  onChange={() => toggleListValue("sizes", s)}
-                  className="h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-1 focus:ring-green-500"
-                />
-                <span>{s}</span>
-              </label>
-            );
-          })}
-        </div>
-      </div>
-
       {rangesLoaded && unitsBounds[1] > unitsBounds[0] && (
         <div>
           <span className={labelClass}>{dict.catalog.unitsPerKgLabel}</span>
@@ -411,10 +383,10 @@ export function CatalogFilters({
             value={weightValue}
             onChange={setWeightValue}
             onCommit={commitWeightRange}
-            step={0.01}
+            step={1}
             ariaLabelMin={`${dict.catalog.unitWeightLabel} ${dict.catalog.rangeFrom}`}
             ariaLabelMax={`${dict.catalog.unitWeightLabel} ${dict.catalog.rangeTo}`}
-            formatValue={(v) => `${v.toFixed(2)} кг`}
+            formatValue={(v) => `${v} кг`}
           />
         </div>
       )}

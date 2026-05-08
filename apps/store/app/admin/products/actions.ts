@@ -30,6 +30,7 @@ export async function createProduct(formData: FormData) {
     unitsPerKg: (formData.get("unitsPerKg") as string) || null,
     unitWeight: (formData.get("unitWeight") as string) || null,
     inStock: formData.get("inStock") === "on",
+    isOversize: formData.get("isOversize") === "on",
   };
 
   await prisma.product.create({ data });
@@ -59,6 +60,7 @@ export async function updateProduct(id: string, formData: FormData) {
     unitsPerKg: (formData.get("unitsPerKg") as string) || null,
     unitWeight: (formData.get("unitWeight") as string) || null,
     inStock: formData.get("inStock") === "on",
+    isOversize: formData.get("isOversize") === "on",
   };
 
   const product = await prisma.product.update({

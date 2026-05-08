@@ -10,12 +10,11 @@ import {
   SEASONS,
   SEASON_LABELS,
   GENDER_OPTIONS,
-  SIZE_OPTIONS,
 } from "@ltex/shared";
 import { PriceRangeSlider } from "./price-range-slider";
 
-const DEFAULT_UNITS_RANGE: [number, number] = [0, 20];
-const DEFAULT_WEIGHT_RANGE: [number, number] = [0, 5];
+const DEFAULT_UNITS_RANGE: [number, number] = [1, 1000];
+const DEFAULT_WEIGHT_RANGE: [number, number] = [1, 1000];
 
 export interface LotCategoryOption {
   id: string;
@@ -68,12 +67,7 @@ export function LotsFiltersForm({ onApply }: LotsFiltersFormProps) {
     () => parseList(searchParams.get("gender")),
     [searchParams],
   );
-  const selectedSizes = useMemo(
-    () => parseList(searchParams.get("sizes")),
-    [searchParams],
-  );
 
-  const urlSizes = searchParams.get("sizes") ?? "";
   const urlWeightMin = searchParams.get("weightMin") ?? "";
   const urlWeightMax = searchParams.get("weightMax") ?? "";
   const urlPriceMin = searchParams.get("priceMin") ?? "";
@@ -212,9 +206,9 @@ export function LotsFiltersForm({ onApply }: LotsFiltersFormProps) {
   const commitWeightRange = useCallback(
     ([lo, hi]: [number, number]) => {
       const params = new URLSearchParams(searchParams.toString());
-      if (lo > weightBounds[0]) params.set("unitWeightMin", lo.toFixed(2));
+      if (lo > weightBounds[0]) params.set("unitWeightMin", String(lo));
       else params.delete("unitWeightMin");
-      if (hi < weightBounds[1]) params.set("unitWeightMax", hi.toFixed(2));
+      if (hi < weightBounds[1]) params.set("unitWeightMax", String(hi));
       else params.delete("unitWeightMax");
       params.delete("page");
       router.push(`${pathname}?${params.toString()}`);
@@ -242,7 +236,6 @@ export function LotsFiltersForm({ onApply }: LotsFiltersFormProps) {
     selectedSeasons.length > 0 ||
     selectedCountries.length > 0 ||
     selectedGenders.length > 0 ||
-    urlSizes ||
     urlWeightMin ||
     urlWeightMax ||
     urlPriceMin ||
@@ -393,26 +386,6 @@ export function LotsFiltersForm({ onApply }: LotsFiltersFormProps) {
         </div>
       </div>
 
-      <div>
-        <span className={labelClass}>Розмір</span>
-        <div className="grid grid-cols-4 gap-1.5">
-          {SIZE_OPTIONS.map((s) => (
-            <label
-              key={s}
-              className="flex cursor-pointer items-center gap-1 text-sm text-gray-700"
-            >
-              <input
-                type="checkbox"
-                checked={selectedSizes.includes(s)}
-                onChange={() => toggleListValue("sizes", s)}
-                className="h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-1 focus:ring-green-500"
-              />
-              <span>{s}</span>
-            </label>
-          ))}
-        </div>
-      </div>
-
       {rangesLoaded && unitsBounds[1] > unitsBounds[0] && (
         <div>
           <span className={labelClass}>К-сть одиниць (шт/кг)</span>
@@ -439,10 +412,10 @@ export function LotsFiltersForm({ onApply }: LotsFiltersFormProps) {
             value={weightValue}
             onChange={setWeightValue}
             onCommit={commitWeightRange}
-            step={0.01}
+            step={1}
             ariaLabelMin="Вага одиниці від"
             ariaLabelMax="Вага одиниці до"
-            formatValue={(v) => `${v.toFixed(2)} кг`}
+            formatValue={(v) => `${v} кг`}
           />
         </div>
       )}
