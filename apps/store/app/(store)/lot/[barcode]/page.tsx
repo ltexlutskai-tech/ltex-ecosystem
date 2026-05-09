@@ -19,10 +19,13 @@ import { LotCard } from "@/components/store/lot-card";
 import { LotVideoPlayer } from "@/components/store/lot-video-player";
 import { ShareIcons } from "@/components/store/share-icons";
 import { AddToCartButton } from "@/components/store/add-to-cart-button";
+import { PriceOrLogin } from "@/components/store/price-or-login";
 import { extractYouTubeId } from "@/lib/youtube";
 import { getCurrentRate, eurToUah, formatUah } from "@/lib/exchange-rate";
+import { getCurrentCustomer } from "@/lib/customer-auth";
 
-export const revalidate = 300;
+// Cookie-aware (price gate); skip ISR.
+export const dynamic = "force-dynamic";
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://ltex.com.ua";
 
@@ -93,6 +96,8 @@ export default async function LotDetailPage({ params }: Props) {
   if (!lot) notFound();
 
   const rate = await getCurrentRate();
+  const customer = await getCurrentCustomer();
+  const isAuthed = customer !== null;
   const videoId = extractYouTubeId(lot.videoUrl);
   const heroImage = lot.product.images[0]?.url ?? null;
   const unitLabel = lot.product.priceUnit === "pair" ? "пар" : "шт";
@@ -239,27 +244,33 @@ export default async function LotDetailPage({ params }: Props) {
           </div>
 
           <div>
-            <div className="flex flex-wrap items-baseline gap-3">
-              <span className="text-4xl font-bold text-red-600">
-                {priceUah}
-              </span>
-              <span className="text-base text-gray-500">за лот</span>
-              <span className="text-sm text-gray-400">
-                (€{lot.priceEur.toFixed(2)}
-                {regularPriceEur !== null && (
-                  <>
-                    {" "}
-                    <span className="line-through">
-                      €{regularPriceEur.toFixed(2)}
-                    </span>
-                  </>
-                )}
-                )
-              </span>
-            </div>
-            <p className="mt-1 text-xs text-gray-500">
-              Розрахунок при курсі {rate.toFixed(2)} ₴/€
-            </p>
+            {isAuthed ? (
+              <>
+                <div className="flex flex-wrap items-baseline gap-3">
+                  <span className="text-4xl font-bold text-red-600">
+                    {priceUah}
+                  </span>
+                  <span className="text-base text-gray-500">за лот</span>
+                  <span className="text-sm text-gray-400">
+                    (€{lot.priceEur.toFixed(2)}
+                    {regularPriceEur !== null && (
+                      <>
+                        {" "}
+                        <span className="line-through">
+                          €{regularPriceEur.toFixed(2)}
+                        </span>
+                      </>
+                    )}
+                    )
+                  </span>
+                </div>
+                <p className="mt-1 text-xs text-gray-500">
+                  Розрахунок при курсі {rate.toFixed(2)} ₴/€
+                </p>
+              </>
+            ) : (
+              <PriceOrLogin priceEur={null} hideUnit size="lg" />
+            )}
           </div>
 
           {keyFacts.length > 0 && (
@@ -292,7 +303,14 @@ export default async function LotDetailPage({ params }: Props) {
             </div>
           )}
 
-          {lot.status === "free" || lot.status === "on_sale" ? (
+          {!isAuthed ? (
+            <Link
+              href={`/login?returnTo=${encodeURIComponent(`/lot/${barcode}`)}`}
+              className="inline-flex w-full items-center justify-center rounded-lg bg-emerald-600 px-4 py-3 text-sm font-medium text-white transition hover:bg-emerald-700"
+            >
+              Увійти, щоб замовити
+            </Link>
+          ) : lot.status === "free" || lot.status === "on_sale" ? (
             <>
               <div className="flex items-stretch gap-3">
                 <div className="flex-1">
@@ -384,7 +402,7 @@ export default async function LotDetailPage({ params }: Props) {
                   barcode: other.barcode,
                   weight: other.weight,
                   quantity: other.quantity,
-                  priceEur: other.priceEur,
+                  priceEur: isAuthed ? other.priceEur : null,
                   videoUrl: other.videoUrl,
                   status: other.status,
                   createdAt: other.createdAt.toISOString(),
@@ -397,7 +415,7 @@ export default async function LotDetailPage({ params }: Props) {
                 }}
                 rate={rate}
                 salePercent={
-                  other.status === "on_sale"
+                  isAuthed && other.status === "on_sale"
                     ? computeSalePercent(other.product.prices)
                     : undefined
                 }

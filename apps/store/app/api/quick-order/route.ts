@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@ltex/db";
 import { rateLimit, getClientIp } from "@/lib/rate-limit";
-import { notifyNewOrder } from "@/lib/notifications";
+import { notifyNewOrder, notifyNewLead } from "@/lib/notifications";
 import {
   sendOrderConfirmationEmail,
   type OrderEmailLineItem,
@@ -67,10 +67,12 @@ export async function POST(request: NextRequest) {
   let dbCustomer = await prisma.customer.findFirst({
     where: { phone: customer.phone },
   });
+  let customerWasCreated = false;
   if (!dbCustomer) {
     dbCustomer = await prisma.customer.create({
       data: { name: customer.name, phone: customer.phone },
     });
+    customerWasCreated = true;
   }
 
   const latestRate = await prisma.exchangeRate.findFirst({
@@ -115,6 +117,15 @@ export async function POST(request: NextRequest) {
       { error: "Помилка створення замовлення. Спробуйте пізніше." },
       { status: 500 },
     );
+  }
+
+  if (customerWasCreated) {
+    notifyNewLead({
+      customerId: dbCustomer.id,
+      phone: customer.phone,
+      name: customer.name,
+      source: "quick-order",
+    }).catch(() => {});
   }
 
   notifyNewOrder({

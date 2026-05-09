@@ -28,7 +28,7 @@ PROJECT_AUDIT_2026-04-18.md §8.1 #6, refactor any genuinely too-broad calls.
   (`/product/[slug]`, `/catalog`, `/lots`, `/sale`, `/new`) not invalidated when
   an admin edits a single product/lot. Out of scope for this session per the
   brief ("Тільки прибрати зайве `revalidatePath('/')`"); listed for a future
-  task.
+  task. **→ Closed in Session 78** (see §3 footnote).
 
 ## 1. All call sites
 
@@ -154,6 +154,12 @@ ISR is fragile (depends on the runtime's chained-cache behavior). Skipped to
 avoid risk; see Next.js 15 cache docs for the dependency edge cases.
 
 ## 3. MISSING gaps (flagged, not fixed)
+
+> **Status update — Session 78 (2026-05-08):** All 5 gaps below are now closed.
+> `updateProduct` / `deleteProduct` / image actions / lot status actions /
+> category create+delete now issue targeted public-path invalidations. See
+> `docs/SESSION_78_REVALIDATE_GAPS.md` and the merge commit on `main` for the
+> exact paths revalidated per action.
 
 These admin actions mutate data that **does** affect public ISR pages but
 issue no public invalidation. The `/admin/*` calls they currently make are

@@ -1,11 +1,56 @@
 export const dynamic = "force-dynamic";
 
-import { prisma } from "@ltex/db";
 import Link from "next/link";
 import { AdminBreadcrumbs } from "@/components/admin/breadcrumbs";
-import { SortHeader } from "@/components/admin/sort-header";
-import { ExportCsvButton } from "@/components/admin/export-csv";
 import { AdminPagination } from "@/components/admin/pagination";
+import {
+  listCustomers,
+  getCustomerListSummary,
+  CUSTOMER_LIST_PAGE_SIZE_DEFAULT,
+  type CustomerListSort,
+} from "@/lib/admin-customers";
+
+const SORT_OPTIONS: { value: CustomerListSort; label: string }[] = [
+  { value: "first_seen_desc", label: "Дата реєстрації (нові)" },
+  { value: "last_order_desc", label: "Останнє замовлення" },
+  { value: "orders_count_desc", label: "К-сть замовлень" },
+  { value: "name_asc", label: "Ім'я (А→Я)" },
+];
+
+const VALID_SORTS = new Set(SORT_OPTIONS.map((o) => o.value));
+
+function parseHasOrders(raw: string | undefined): boolean | undefined {
+  if (raw === "true") return true;
+  if (raw === "false") return false;
+  return undefined;
+}
+
+function formatDate(d: Date | null): string {
+  if (!d) return "—";
+  return new Date(d).toLocaleString("uk-UA", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function formatDateOnly(d: Date | null): string {
+  if (!d) return "—";
+  return new Date(d).toLocaleDateString("uk-UA", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+}
+
+function formatUah(value: number): string {
+  return new Intl.NumberFormat("uk-UA", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(Math.round(value));
+}
 
 export default async function CustomersPage({
   searchParams,
@@ -14,123 +59,145 @@ export default async function CustomersPage({
     q?: string;
     page?: string;
     sort?: string;
-    dir?: string;
+    hasOrders?: string;
   }>;
 }) {
   const params = await searchParams;
-  const query = params.q ?? "";
-  const page = parseInt(params.page ?? "1", 10);
-  const sort = params.sort ?? "updatedAt";
-  const dir = params.dir === "asc" ? "asc" : "desc";
-  const perPage = 25;
+  const query = (params.q ?? "").trim();
+  const page = Math.max(1, parseInt(params.page ?? "1", 10) || 1);
+  const sort: CustomerListSort = VALID_SORTS.has(
+    params.sort as CustomerListSort,
+  )
+    ? (params.sort as CustomerListSort)
+    : "first_seen_desc";
+  const hasOrders = parseHasOrders(params.hasOrders);
+  const pageSize = CUSTOMER_LIST_PAGE_SIZE_DEFAULT;
 
-  const where = query
-    ? {
-        OR: [
-          { name: { contains: query, mode: "insensitive" as const } },
-          { phone: { contains: query, mode: "insensitive" as const } },
-          { email: { contains: query, mode: "insensitive" as const } },
-          { telegram: { contains: query, mode: "insensitive" as const } },
-          { city: { contains: query, mode: "insensitive" as const } },
-        ],
-      }
-    : {};
-
-  const orderByMap: Record<string, Record<string, string>> = {
-    name: { name: dir },
-    updatedAt: { updatedAt: dir },
-    city: { city: dir },
-  };
-  const orderBy = orderByMap[sort] ?? { updatedAt: "desc" };
-
-  const [customers, total] = await Promise.all([
-    prisma.customer.findMany({
-      where,
-      include: {
-        _count: { select: { orders: true } },
-        orders: {
-          select: { totalEur: true },
-        },
-      },
-      orderBy,
-      skip: (page - 1) * perPage,
-      take: perPage,
+  const [{ items, total }, summary] = await Promise.all([
+    listCustomers({
+      search: query || undefined,
+      hasOrders,
+      sort,
+      page,
+      pageSize,
     }),
-    prisma.customer.count({ where }),
+    getCustomerListSummary(query || undefined),
   ]);
 
-  const totalPages = Math.ceil(total / perPage);
-  const baseParams = new URLSearchParams();
-  if (query) baseParams.set("q", query);
-  if (sort !== "updatedAt") {
-    baseParams.set("sort", sort);
-    baseParams.set("dir", dir);
-  }
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
-  function sortUrl(field: string) {
-    const sp = new URLSearchParams(baseParams);
-    sp.set("sort", field);
-    sp.set("dir", sort === field && dir === "asc" ? "desc" : "asc");
-    sp.delete("page");
-    return `/admin/customers?${sp.toString()}`;
+  function buildHref(overrides: Record<string, string | undefined>): string {
+    const sp = new URLSearchParams();
+    if (query) sp.set("q", query);
+    if (sort !== "first_seen_desc") sp.set("sort", sort);
+    if (hasOrders === true) sp.set("hasOrders", "true");
+    else if (hasOrders === false) sp.set("hasOrders", "false");
+    if (page > 1) sp.set("page", String(page));
+    for (const [key, value] of Object.entries(overrides)) {
+      if (value === undefined || value === "") sp.delete(key);
+      else sp.set(key, value);
+    }
+    const qs = sp.toString();
+    return qs ? `/admin/customers?${qs}` : "/admin/customers";
   }
 
   function pageHref(p: number) {
-    const sp = new URLSearchParams(baseParams);
-    if (p > 1) sp.set("page", String(p));
-    else sp.delete("page");
-    return `/admin/customers?${sp.toString()}`;
+    return buildHref({ page: p > 1 ? String(p) : undefined });
   }
 
-  const csvData = customers.map((c) => ({
-    name: c.name,
-    phone: c.phone ?? "",
-    email: c.email ?? "",
-    telegram: c.telegram ?? "",
-    city: c.city ?? "",
-    orders: c._count.orders,
-    totalEur: c.orders.reduce((sum, o) => sum + o.totalEur, 0).toFixed(2),
-    code1C: c.code1C ?? "",
-  }));
+  function exportHref(): string {
+    const sp = new URLSearchParams();
+    if (query) sp.set("q", query);
+    if (sort !== "first_seen_desc") sp.set("sort", sort);
+    if (hasOrders === true) sp.set("hasOrders", "true");
+    else if (hasOrders === false) sp.set("hasOrders", "false");
+    const qs = sp.toString();
+    return qs ? `/admin/customers/export?${qs}` : "/admin/customers/export";
+  }
+
+  const filterTabs: {
+    label: string;
+    value: boolean | undefined;
+    count: number;
+  }[] = [
+    { label: "Всі", value: undefined, count: summary.total },
+    {
+      label: "Покупці (з замовленнями)",
+      value: true,
+      count: summary.withOrders,
+    },
+    {
+      label: "Ліди (без замовлень)",
+      value: false,
+      count: summary.leadsOnly,
+    },
+  ];
 
   return (
     <div className="space-y-6">
       <AdminBreadcrumbs items={[{ label: "Клієнти" }]} />
 
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Клієнти ({total})</h1>
-        <ExportCsvButton
-          data={csvData}
-          filename="customers"
-          headers={[
-            "name",
-            "phone",
-            "email",
-            "telegram",
-            "city",
-            "orders",
-            "totalEur",
-            "code1C",
-          ]}
-        />
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold">Клієнти</h1>
+          <p className="mt-1 text-sm text-gray-500">
+            Усього: <strong>{summary.total}</strong> · з замовленнями:{" "}
+            <strong>{summary.withOrders}</strong> · ліди:{" "}
+            <strong>{summary.leadsOnly}</strong>
+          </p>
+        </div>
+        <div className="flex flex-col items-end gap-1">
+          <a
+            href={exportHref()}
+            className="inline-flex items-center rounded-md border bg-white px-3 py-2 text-sm font-medium hover:bg-gray-50"
+          >
+            Експорт CSV
+          </a>
+          {summary.total > 5000 && (
+            <p className="max-w-xs text-right text-xs text-amber-700">
+              Експорт обмежений 5000 рядками. Звузьте фільтри (пошук, наявність
+              замовлень, сортування), щоб отримати потрібний зріз.
+            </p>
+          )}
+        </div>
       </div>
 
-      <form className="flex gap-2">
+      <form
+        className="flex flex-wrap items-center gap-2"
+        action="/admin/customers"
+      >
         <input
           name="q"
           defaultValue={query}
-          placeholder="Пошук по імені, телефону, місту, email, Telegram..."
-          className="min-w-[200px] flex-1 rounded-md border px-3 py-2 text-sm"
+          placeholder="Пошук по телефону, імені, email..."
+          className="min-w-[220px] flex-1 rounded-md border px-3 py-2 text-sm"
         />
+        {hasOrders === true && (
+          <input type="hidden" name="hasOrders" value="true" />
+        )}
+        {hasOrders === false && (
+          <input type="hidden" name="hasOrders" value="false" />
+        )}
+        <select
+          name="sort"
+          defaultValue={sort}
+          className="rounded-md border px-3 py-2 text-sm"
+        >
+          {SORT_OPTIONS.map((opt) => (
+            <option key={opt.value} value={opt.value}>
+              {opt.label}
+            </option>
+          ))}
+        </select>
         <button
           type="submit"
           className="rounded-md border bg-gray-100 px-3 py-2 text-sm hover:bg-gray-200"
         >
           Шукати
         </button>
-        {query && (
+        {(query || sort !== "first_seen_desc") && (
           <Link
-            href="/admin/customers"
+            href={buildHref({ q: undefined, sort: undefined, page: undefined })}
             className="rounded-md border px-3 py-2 text-sm text-red-600 hover:bg-red-50"
           >
             Скинути
@@ -138,56 +205,80 @@ export default async function CustomersPage({
         )}
       </form>
 
+      <div className="flex flex-wrap gap-2">
+        {filterTabs.map((tab) => {
+          const active = hasOrders === tab.value;
+          const href = buildHref({
+            hasOrders:
+              tab.value === undefined
+                ? undefined
+                : tab.value
+                  ? "true"
+                  : "false",
+            page: undefined,
+          });
+          return (
+            <Link
+              key={tab.label}
+              href={href}
+              className={`rounded-md border px-3 py-1 text-sm ${
+                active
+                  ? "border-green-200 bg-green-50 text-green-700"
+                  : "hover:bg-gray-50"
+              }`}
+            >
+              {tab.label} ({tab.count})
+            </Link>
+          );
+        })}
+      </div>
+
       <div className="overflow-x-auto rounded-lg border bg-white">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b bg-gray-50 text-left text-gray-500">
-              <SortHeader
-                label="Ім'я"
-                field="name"
-                currentSort={sort}
-                currentDir={dir}
-                href={sortUrl("name")}
-              />
               <th className="px-4 py-3 font-medium">Телефон</th>
-              <th className="px-4 py-3 font-medium">Email</th>
-              <th className="px-4 py-3 font-medium">Telegram</th>
-              <SortHeader
-                label="Місто"
-                field="city"
-                currentSort={sort}
-                currentDir={dir}
-                href={sortUrl("city")}
-              />
-              <th className="px-4 py-3 font-medium">Замовлень</th>
-              <th className="px-4 py-3 font-medium">Сума EUR</th>
-              <th className="px-4 py-3 font-medium">Код 1С</th>
+              <th className="px-4 py-3 font-medium">Ім&apos;я</th>
+              <th className="px-4 py-3 font-medium">Email · TG · Місто</th>
+              <th className="px-4 py-3 font-medium">Перший візит</th>
+              <th className="px-4 py-3 font-medium">Останнє замовлення</th>
+              <th className="px-4 py-3 text-right font-medium">Замовлень</th>
+              <th className="px-4 py-3 text-right font-medium">Сума UAH</th>
             </tr>
           </thead>
           <tbody>
-            {customers.length === 0 ? (
+            {items.length === 0 ? (
               <tr>
-                <td colSpan={8} className="px-4 py-8 text-center text-gray-500">
+                <td
+                  colSpan={7}
+                  className="px-4 py-10 text-center text-sm text-gray-500"
+                >
                   Клієнтів не знайдено
                 </td>
               </tr>
             ) : (
-              customers.map((customer) => {
-                const totalSpent = customer.orders.reduce(
-                  (sum, o) => sum + o.totalEur,
-                  0,
+              items.map((c) => {
+                const contactBits = [c.email, c.telegram, c.city].filter(
+                  (v): v is string => Boolean(v),
                 );
                 return (
-                  <tr key={customer.id} className="border-b hover:bg-gray-50">
-                    <td className="px-4 py-3 font-medium">{customer.name}</td>
-                    <td className="px-4 py-3">{customer.phone ?? "-"}</td>
-                    <td className="px-4 py-3">{customer.email ?? "-"}</td>
-                    <td className="px-4 py-3">{customer.telegram ?? "-"}</td>
-                    <td className="px-4 py-3">{customer.city ?? "-"}</td>
-                    <td className="px-4 py-3">{customer._count.orders}</td>
-                    <td className="px-4 py-3">€{totalSpent.toFixed(2)}</td>
+                  <tr key={c.id} className="border-b hover:bg-gray-50">
                     <td className="px-4 py-3 font-mono text-xs">
-                      {customer.code1C ?? "-"}
+                      {c.phone ?? "—"}
+                    </td>
+                    <td className="px-4 py-3 font-medium">{c.name}</td>
+                    <td className="px-4 py-3 text-gray-600">
+                      {contactBits.length === 0 ? "—" : contactBits.join(" · ")}
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-3 text-gray-600">
+                      {formatDate(c.firstSeenAt)}
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-3 text-gray-600">
+                      {formatDateOnly(c.lastOrderAt)}
+                    </td>
+                    <td className="px-4 py-3 text-right">{c.ordersCount}</td>
+                    <td className="px-4 py-3 text-right font-medium">
+                      {formatUah(c.ordersTotalUah)} ₴
                     </td>
                   </tr>
                 );

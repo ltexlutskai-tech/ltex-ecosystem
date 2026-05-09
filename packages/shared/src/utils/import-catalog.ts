@@ -157,6 +157,39 @@ function parseWeight(s: string | undefined): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
+/**
+ * Parses human-readable range strings into numeric { min, max }.
+ * Accepts ranges ("2-4", "0,25-0,45 кг") or single values ("10", "1.5"),
+ * supports both `.` and `,` as decimal separators, ignores trailing units.
+ * Returns null when no number could be extracted. Auto-swaps reversed ranges.
+ */
+export function parseRangeString(
+  s: string | null | undefined,
+): { min: number; max: number } | null {
+  if (s == null) return null;
+  const text = String(s).trim();
+  if (!text) return null;
+  const normalized = text.replace(/,/g, ".");
+
+  const rangeMatch = normalized.match(
+    /(-?\d+(?:\.\d+)?)\s*-\s*(-?\d+(?:\.\d+)?)/,
+  );
+  if (rangeMatch) {
+    const a = Number(rangeMatch[1]);
+    const b = Number(rangeMatch[2]);
+    if (Number.isFinite(a) && Number.isFinite(b)) {
+      return { min: Math.min(a, b), max: Math.max(a, b) };
+    }
+  }
+
+  const singleMatch = normalized.match(/-?\d+(?:\.\d+)?/);
+  if (singleMatch) {
+    const n = Number(singleMatch[0]);
+    if (Number.isFinite(n)) return { min: n, max: n };
+  }
+  return null;
+}
+
 export interface DescriptionFields {
   quality: string | null;
   season: string | null;

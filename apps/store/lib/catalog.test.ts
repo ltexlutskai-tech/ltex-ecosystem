@@ -10,6 +10,11 @@ vi.mock("@ltex/db", () => ({
   },
 }));
 
+const mockGetCurrentCustomer = vi.fn();
+vi.mock("./customer-auth", () => ({
+  getCurrentCustomer: () => mockGetCurrentCustomer(),
+}));
+
 import { getCatalogProducts, autocompleteSearch } from "./catalog";
 import { prisma } from "@ltex/db";
 
@@ -29,6 +34,39 @@ const makeProduct = (id: string, price = 10) => ({
 describe("getCatalogProducts", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Default: simulate an authenticated visitor so prices come through.
+    mockGetCurrentCustomer.mockResolvedValue({
+      id: "customer-1",
+      phone: "+380",
+      name: "Test",
+    });
+  });
+
+  it("strips wholesale prices for unauthenticated visitors (price gate, S73)", async () => {
+    mockGetCurrentCustomer.mockResolvedValueOnce(null);
+    const products = [makeProduct("1", 25), makeProduct("2", 30)];
+    mockFindMany.mockResolvedValue(products);
+    mockCount.mockResolvedValue(2);
+
+    const result = await getCatalogProducts({});
+    expect(result.products).toHaveLength(2);
+    for (const p of result.products) {
+      expect(p.prices).toEqual([]);
+    }
+    // Original input must not be mutated — guards against unstable_cache leaks.
+    const firstOriginal = products[0]!;
+    expect(firstOriginal.prices).toHaveLength(1);
+  });
+
+  it("preserves prices for authenticated visitors", async () => {
+    const products = [makeProduct("1", 25)];
+    mockFindMany.mockResolvedValue(products);
+    mockCount.mockResolvedValue(1);
+
+    const result = await getCatalogProducts({});
+    const first = result.products[0]!;
+    expect(first.prices).toHaveLength(1);
+    expect(first.prices[0]!.amount).toBe(25);
   });
 
   it("returns paginated products with default settings", async () => {
@@ -155,6 +193,86 @@ describe("getCatalogProducts", () => {
         where: expect.objectContaining({ season: "winter" }),
       }),
     );
+  });
+
+  it("applies single gender filter", async () => {
+    mockFindMany.mockResolvedValue([]);
+    mockCount.mockResolvedValue(0);
+
+    await getCatalogProducts({ gender: "Жіноча" });
+
+    expect(mockFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ gender: "Жіноча" }),
+      }),
+    );
+  });
+
+  it("parses comma-separated gender into IN filter", async () => {
+    mockFindMany.mockResolvedValue([]);
+    mockCount.mockResolvedValue(0);
+
+    await getCatalogProducts({ gender: "Жіноча,Чоловіча" });
+
+    expect(mockFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          gender: { in: ["Жіноча", "Чоловіча"] },
+        }),
+      }),
+    );
+  });
+
+  it("applies oversize subcategory as cross-cutting tag (isOversize=true, no category filter)", async () => {
+    mockFindMany.mockResolvedValue([]);
+    mockCount.mockResolvedValue(0);
+
+    await getCatalogProducts({ subcategorySlug: "xxl-veliki-rozmiry" });
+
+    const calledWhere = mockFindMany.mock.calls[0]![0]!.where;
+    expect(calledWhere.isOversize).toBe(true);
+    expect(calledWhere.category).toBeUndefined();
+    expect(calledWhere.categoryId).toBeUndefined();
+  });
+
+  it("applies unitsPerKg range as overlap with NULL passthrough", async () => {
+    mockFindMany.mockResolvedValue([]);
+    mockCount.mockResolvedValue(0);
+
+    await getCatalogProducts({ unitsPerKgMin: 2, unitsPerKgMax: 5 });
+
+    const calledWhere = mockFindMany.mock.calls[0]![0]!.where;
+    // Each bound becomes an OR (column matches range OR column is NULL) so
+    // products with no parsed numeric range stay visible (Fix 6).
+    expect(calledWhere.AND).toEqual([
+      { OR: [{ unitsPerKgMax: { gte: 2 } }, { unitsPerKgMax: null }] },
+      { OR: [{ unitsPerKgMin: { lte: 5 } }, { unitsPerKgMin: null }] },
+    ]);
+  });
+
+  it("applies only unitsPerKgMin when unitsPerKgMax omitted", async () => {
+    mockFindMany.mockResolvedValue([]);
+    mockCount.mockResolvedValue(0);
+
+    await getCatalogProducts({ unitsPerKgMin: 3 });
+
+    const calledWhere = mockFindMany.mock.calls[0]![0]!.where;
+    expect(calledWhere.AND).toEqual([
+      { OR: [{ unitsPerKgMax: { gte: 3 } }, { unitsPerKgMax: null }] },
+    ]);
+  });
+
+  it("applies unitWeight range as overlap with NULL passthrough", async () => {
+    mockFindMany.mockResolvedValue([]);
+    mockCount.mockResolvedValue(0);
+
+    await getCatalogProducts({ unitWeightMin: 0.3, unitWeightMax: 0.6 });
+
+    const calledWhere = mockFindMany.mock.calls[0]![0]!.where;
+    expect(calledWhere.AND).toEqual([
+      { OR: [{ unitWeightMax: { gte: 0.3 } }, { unitWeightMax: null }] },
+      { OR: [{ unitWeightMin: { lte: 0.6 } }, { unitWeightMin: null }] },
+    ]);
   });
 
   it("applies priceMin filter", async () => {

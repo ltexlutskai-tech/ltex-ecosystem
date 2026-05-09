@@ -13,10 +13,12 @@ import { ProductCard } from "@/components/store/product-card";
 import { getFeaturedProducts } from "@/lib/featured";
 import { getVideoReviewProducts } from "@/lib/video-reviews";
 import { getDictionary } from "@/lib/i18n";
+import { stripPricesForGuests } from "@/lib/customer-auth";
 
 const dict = getDictionary();
 
-export const revalidate = 60;
+// Cookie-aware (price gate); skip ISR.
+export const dynamic = "force-dynamic";
 
 const getCachedHomeData = unstable_cache(
   async () => {
@@ -106,6 +108,17 @@ export default async function HomePage() {
       }) as Awaited<ReturnType<typeof getCachedHomeData>>,
   );
 
+  // Price gate: hide prices from unauthenticated visitors. Done after
+  // unstable_cache to keep one shared cache entry; cloning prevents leaks
+  // back into the cached tree.
+  const [featured, newProducts, saleProducts, videoProducts] =
+    await Promise.all([
+      stripPricesForGuests(data.featured),
+      stripPricesForGuests(data.newProducts),
+      stripPricesForGuests(data.saleProducts),
+      stripPricesForGuests(data.videoProducts),
+    ]);
+
   const countByCategoryId = new Map(
     data.counts.map((c) => [c.categoryId, c._count._all]),
   );
@@ -164,7 +177,7 @@ export default async function HomePage() {
         )}
 
         {/* 2. Featured (Топ товарів) — only if admin curated some */}
-        {data.featured.length > 0 && (
+        {featured.length > 0 && (
           <section className="mt-12">
             <div className="mb-4 flex items-center justify-between">
               <h2 className="text-2xl font-bold">{dict.home.featuredTitle}</h2>
@@ -177,7 +190,7 @@ export default async function HomePage() {
               </Link>
             </div>
             <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
-              {data.featured.slice(0, 8).map((p) => (
+              {featured.slice(0, 8).map((p) => (
                 <ProductCard key={p.id} product={p} />
               ))}
             </div>
@@ -185,7 +198,7 @@ export default async function HomePage() {
         )}
 
         {/* 3. Sale block */}
-        {data.saleProducts.length > 0 && (
+        {saleProducts.length > 0 && (
           <section className="mt-12">
             <div className="mb-4 flex items-center justify-between">
               <h2 className="text-2xl font-bold">{dict.home.saleTitle}</h2>
@@ -198,7 +211,7 @@ export default async function HomePage() {
               </Link>
             </div>
             <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
-              {data.saleProducts.map((p) => (
+              {saleProducts.map((p) => (
                 <ProductCard key={p.id} product={p} hasSale />
               ))}
             </div>
@@ -206,7 +219,7 @@ export default async function HomePage() {
         )}
 
         {/* 4. New arrivals block */}
-        {data.newProducts.length > 0 && (
+        {newProducts.length > 0 && (
           <section className="mt-12">
             <div className="mb-4 flex items-center justify-between">
               <h2 className="text-2xl font-bold">{dict.home.newTitle}</h2>
@@ -219,7 +232,7 @@ export default async function HomePage() {
               </Link>
             </div>
             <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
-              {data.newProducts.map((p) => (
+              {newProducts.map((p) => (
                 <ProductCard key={p.id} product={p} isNew />
               ))}
             </div>
@@ -239,7 +252,7 @@ export default async function HomePage() {
         )}
 
         {/* 6. Video reviews carousel */}
-        <VideoReviewsCarousel products={data.videoProducts} />
+        <VideoReviewsCarousel products={videoProducts} />
 
         {/* 7. Personalised recommendations (client-side, reads recently-viewed IDs) */}
         <RecommendationsSection />

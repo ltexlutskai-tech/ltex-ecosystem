@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   QUALITY_LEVELS,
   QUALITY_LABELS,
@@ -9,7 +9,12 @@ import {
   COUNTRY_LABELS,
   SEASONS,
   SEASON_LABELS,
+  GENDER_OPTIONS,
 } from "@ltex/shared";
+import { RangeWithInputs } from "./range-with-inputs";
+
+const DEFAULT_UNITS_RANGE: [number, number] = [1, 1000];
+const DEFAULT_WEIGHT_RANGE: [number, number] = [1, 1000];
 
 export interface LotCategoryOption {
   id: string;
@@ -58,16 +63,52 @@ export function LotsFiltersForm({ onApply }: LotsFiltersFormProps) {
     () => parseList(searchParams.get("country")),
     [searchParams],
   );
+  const selectedGenders = useMemo(
+    () => parseList(searchParams.get("gender")),
+    [searchParams],
+  );
 
   const urlWeightMin = searchParams.get("weightMin") ?? "";
   const urlWeightMax = searchParams.get("weightMax") ?? "";
   const urlPriceMin = searchParams.get("priceMin") ?? "";
   const urlPriceMax = searchParams.get("priceMax") ?? "";
+  const urlUnitsMin = searchParams.get("unitsPerKgMin");
+  const urlUnitsMax = searchParams.get("unitsPerKgMax");
+  const urlUnitWeightMin = searchParams.get("unitWeightMin");
+  const urlUnitWeightMax = searchParams.get("unitWeightMax");
 
   const [weightMin, setWeightMin] = useState(urlWeightMin);
   const [weightMax, setWeightMax] = useState(urlWeightMax);
   const [priceMin, setPriceMin] = useState(urlPriceMin);
   const [priceMax, setPriceMax] = useState(urlPriceMax);
+
+  // unitsPerKg / unitWeight bounds are static — see catalog-filters.tsx for
+  // the same constants. The previous /api/catalog/numeric-ranges endpoint
+  // returned hardcoded 1..1000 anyway, so the network round-trip was waste.
+  const unitsBounds = DEFAULT_UNITS_RANGE;
+  const weightBounds = DEFAULT_WEIGHT_RANGE;
+  const [unitsValue, setUnitsValue] = useState<[number, number]>([
+    urlUnitsMin ? Number(urlUnitsMin) : DEFAULT_UNITS_RANGE[0],
+    urlUnitsMax ? Number(urlUnitsMax) : DEFAULT_UNITS_RANGE[1],
+  ]);
+  const [weightValue, setWeightValue] = useState<[number, number]>([
+    urlUnitWeightMin ? Number(urlUnitWeightMin) : DEFAULT_WEIGHT_RANGE[0],
+    urlUnitWeightMax ? Number(urlUnitWeightMax) : DEFAULT_WEIGHT_RANGE[1],
+  ]);
+
+  // Sync sliders when URL changes externally.
+  useEffect(() => {
+    setUnitsValue([
+      urlUnitsMin ? Number(urlUnitsMin) : unitsBounds[0],
+      urlUnitsMax ? Number(urlUnitsMax) : unitsBounds[1],
+    ]);
+  }, [urlUnitsMin, urlUnitsMax, unitsBounds]);
+  useEffect(() => {
+    setWeightValue([
+      urlUnitWeightMin ? Number(urlUnitWeightMin) : weightBounds[0],
+      urlUnitWeightMax ? Number(urlUnitWeightMax) : weightBounds[1],
+    ]);
+  }, [urlUnitWeightMin, urlUnitWeightMax, weightBounds]);
 
   const updateParam = useCallback(
     (key: string, value: string) => {
@@ -94,14 +135,14 @@ export function LotsFiltersForm({ onApply }: LotsFiltersFormProps) {
 
   const commitRanges = useCallback(() => {
     const params = new URLSearchParams(searchParams.toString());
-    if (weightMin) params.set("weightMin", weightMin);
-    else params.delete("weightMin");
-    if (weightMax) params.set("weightMax", weightMax);
-    else params.delete("weightMax");
-    if (priceMin) params.set("priceMin", priceMin);
-    else params.delete("priceMin");
-    if (priceMax) params.set("priceMax", priceMax);
-    else params.delete("priceMax");
+    const setOrDelete = (key: string, value: string) => {
+      if (value) params.set(key, value);
+      else params.delete(key);
+    };
+    setOrDelete("weightMin", weightMin);
+    setOrDelete("weightMax", weightMax);
+    setOrDelete("priceMin", priceMin);
+    setOrDelete("priceMax", priceMax);
     params.delete("page");
     router.push(`${pathname}?${params.toString()}`);
     onApply?.();
@@ -116,14 +157,44 @@ export function LotsFiltersForm({ onApply }: LotsFiltersFormProps) {
     priceMax,
   ]);
 
+  const commitUnitsRange = useCallback(
+    ([lo, hi]: [number, number]) => {
+      const params = new URLSearchParams(searchParams.toString());
+      if (lo > unitsBounds[0]) params.set("unitsPerKgMin", String(lo));
+      else params.delete("unitsPerKgMin");
+      if (hi < unitsBounds[1]) params.set("unitsPerKgMax", String(hi));
+      else params.delete("unitsPerKgMax");
+      params.delete("page");
+      router.push(`${pathname}?${params.toString()}`);
+      onApply?.();
+    },
+    [router, pathname, searchParams, unitsBounds, onApply],
+  );
+
+  const commitWeightRange = useCallback(
+    ([lo, hi]: [number, number]) => {
+      const params = new URLSearchParams(searchParams.toString());
+      if (lo > weightBounds[0]) params.set("unitWeightMin", String(lo));
+      else params.delete("unitWeightMin");
+      if (hi < weightBounds[1]) params.set("unitWeightMax", String(hi));
+      else params.delete("unitWeightMax");
+      params.delete("page");
+      router.push(`${pathname}?${params.toString()}`);
+      onApply?.();
+    },
+    [router, pathname, searchParams, weightBounds, onApply],
+  );
+
   const clearAll = useCallback(() => {
     setWeightMin("");
     setWeightMax("");
     setPriceMin("");
     setPriceMax("");
+    setUnitsValue(unitsBounds);
+    setWeightValue(weightBounds);
     router.push(pathname);
     onApply?.();
-  }, [router, pathname, onApply]);
+  }, [router, pathname, onApply, unitsBounds, weightBounds]);
 
   const hasActiveFilters =
     selectedStatuses.length > 0 ||
@@ -132,10 +203,15 @@ export function LotsFiltersForm({ onApply }: LotsFiltersFormProps) {
     selectedQualities.length > 0 ||
     selectedSeasons.length > 0 ||
     selectedCountries.length > 0 ||
+    selectedGenders.length > 0 ||
     urlWeightMin ||
     urlWeightMax ||
     urlPriceMin ||
-    urlPriceMax;
+    urlPriceMax ||
+    urlUnitsMin ||
+    urlUnitsMax ||
+    urlUnitWeightMin ||
+    urlUnitWeightMax;
 
   return (
     <div className="space-y-5">
@@ -259,6 +335,56 @@ export function LotsFiltersForm({ onApply }: LotsFiltersFormProps) {
       </div>
 
       <div>
+        <span className={labelClass}>Стать</span>
+        <div className="space-y-1.5 text-sm">
+          {GENDER_OPTIONS.map((g) => (
+            <label
+              key={g}
+              className="flex cursor-pointer items-center gap-2 text-gray-700"
+            >
+              <input
+                type="checkbox"
+                checked={selectedGenders.includes(g)}
+                onChange={() => toggleListValue("gender", g)}
+                className="h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-1 focus:ring-green-500"
+              />
+              {g}
+            </label>
+          ))}
+        </div>
+      </div>
+
+      <div>
+        <span className={labelClass}>К-сть одиниць (шт/кг)</span>
+        <RangeWithInputs
+          min={unitsBounds[0]}
+          max={unitsBounds[1]}
+          value={unitsValue}
+          onChange={setUnitsValue}
+          onCommit={commitUnitsRange}
+          step={1}
+          unit="шт"
+          ariaLabelMin="Шт/кг від"
+          ariaLabelMax="Шт/кг до"
+        />
+      </div>
+
+      <div>
+        <span className={labelClass}>Вага одиниці (кг)</span>
+        <RangeWithInputs
+          min={weightBounds[0]}
+          max={weightBounds[1]}
+          value={weightValue}
+          onChange={setWeightValue}
+          onCommit={commitWeightRange}
+          step={1}
+          unit="кг"
+          ariaLabelMin="Вага одиниці від"
+          ariaLabelMax="Вага одиниці до"
+        />
+      </div>
+
+      <div>
         <span className={labelClass}>Вага лота, кг</span>
         <div className="flex gap-2 text-sm">
           <input
@@ -313,7 +439,7 @@ export function LotsFiltersForm({ onApply }: LotsFiltersFormProps) {
           onClick={commitRanges}
           className="mt-3 w-full rounded-md bg-green-600 px-3 py-2 text-sm font-medium text-white hover:bg-green-700"
         >
-          Застосувати ціну та вагу
+          Застосувати діапазони
         </button>
       </div>
     </div>

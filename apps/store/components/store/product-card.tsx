@@ -5,6 +5,7 @@ import { QUALITY_LABELS, type QualityLevel } from "@ltex/shared";
 import { SEASON_LABELS } from "@ltex/shared";
 import { WishlistButton } from "./wishlist-button";
 import { QuickViewButton } from "./quick-view";
+import { PriceOrLogin } from "./price-or-login";
 import { getDictionary } from "@/lib/i18n";
 
 const dict = getDictionary();
@@ -113,17 +114,13 @@ export function ProductCard({
                 </Badge>
               )}
             </div>
-            {wholesalePrice && (
-              <p className="mt-2 text-lg font-bold text-green-700">
-                €{wholesalePrice.amount.toFixed(2)}
-                <span className="text-xs font-normal text-gray-500">
-                  /
-                  {product.priceUnit === "kg"
-                    ? dict.catalog.perKg
-                    : dict.catalog.perPiece}
-                </span>
-              </p>
-            )}
+            <div className="mt-2">
+              <PriceOrLogin
+                priceEur={wholesalePrice?.amount ?? null}
+                priceUnit={product.priceUnit}
+                size="md"
+              />
+            </div>
           </CardContent>
         </Card>
       </Link>
@@ -224,17 +221,13 @@ function ProductCardList({
                   </p>
                 )}
               </div>
-              {wholesalePrice && (
-                <p className="mt-3 text-xl font-bold text-green-700">
-                  €{wholesalePrice.amount.toFixed(2)}
-                  <span className="text-sm font-normal text-gray-500">
-                    /
-                    {product.priceUnit === "kg"
-                      ? dict.catalog.perKg
-                      : dict.catalog.perPiece}
-                  </span>
-                </p>
-              )}
+              <div className="mt-3">
+                <PriceOrLogin
+                  priceEur={wholesalePrice?.amount ?? null}
+                  priceUnit={product.priceUnit}
+                  size="lg"
+                />
+              </div>
             </CardContent>
           </div>
         </Card>

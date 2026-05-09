@@ -5,6 +5,7 @@ export {
   parseNomenklatura,
   parseDescription,
   parseCategoryCell,
+  parseRangeString,
   CATEGORY_SLUG_MAP,
   SKU_CATEGORY_OVERRIDE,
   CATEGORY_MIGRATIONS,

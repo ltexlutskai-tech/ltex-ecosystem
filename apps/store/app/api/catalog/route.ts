@@ -6,12 +6,18 @@ export async function GET(request: NextRequest) {
   const { searchParams } = request.nextUrl;
 
   const page = parseInt(searchParams.get("page") ?? "1", 10);
-  const priceMin = searchParams.get("priceMin")
-    ? parseFloat(searchParams.get("priceMin") as string)
-    : undefined;
-  const priceMax = searchParams.get("priceMax")
-    ? parseFloat(searchParams.get("priceMax") as string)
-    : undefined;
+  const parseFloatParam = (key: string): number | undefined => {
+    const raw = searchParams.get(key);
+    if (raw == null || raw === "") return undefined;
+    const n = parseFloat(raw);
+    return Number.isFinite(n) ? n : undefined;
+  };
+  const priceMin = parseFloatParam("priceMin");
+  const priceMax = parseFloatParam("priceMax");
+  const unitsPerKgMin = parseFloatParam("unitsPerKgMin");
+  const unitsPerKgMax = parseFloatParam("unitsPerKgMax");
+  const unitWeightMin = parseFloatParam("unitWeightMin");
+  const unitWeightMax = parseFloatParam("unitWeightMax");
 
   const categorySlug = searchParams.get("categorySlug") ?? undefined;
   const subcategorySlug = searchParams.get("subcategorySlug") ?? undefined;
@@ -36,10 +42,15 @@ export async function GET(request: NextRequest) {
     quality: searchParams.get("quality") ?? undefined,
     season: searchParams.get("season") ?? undefined,
     country: searchParams.get("country") ?? undefined,
+    gender: searchParams.get("gender") ?? undefined,
+    unitsPerKgMin,
+    unitsPerKgMax,
+    unitWeightMin,
+    unitWeightMax,
     q: searchParams.get("q") ?? undefined,
     sort: searchParams.get("sort") ?? undefined,
-    priceMin: priceMin && !isNaN(priceMin) ? priceMin : undefined,
-    priceMax: priceMax && !isNaN(priceMax) ? priceMax : undefined,
+    priceMin,
+    priceMax,
     inStockOnly: searchParams.get("inStock") === "true",
     page,
   });
