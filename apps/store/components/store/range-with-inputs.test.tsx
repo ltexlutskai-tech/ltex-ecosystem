@@ -117,14 +117,15 @@ describe("RangeWithInputs", () => {
     expect(onCommit).toHaveBeenCalledWith([50, 80]);
   });
 
-  it("falls back to current value when input is non-numeric", () => {
+  it("falls back to current value when input is non-numeric (noop, no commit)", () => {
+    const onChange = vi.fn();
     const onCommit = vi.fn();
     render(
       <RangeWithInputs
         min={0}
         max={100}
         value={[10, 50]}
-        onChange={() => {}}
+        onChange={onChange}
         onCommit={onCommit}
         ariaLabelMin="min"
         ariaLabelMax="max"
@@ -140,7 +141,35 @@ describe("RangeWithInputs", () => {
     fireEvent.change(minNumberInput!, { target: { value: "" } });
     fireEvent.blur(minNumberInput!);
 
-    expect(onCommit).toHaveBeenCalledWith([10, 50]);
+    expect(onChange).not.toHaveBeenCalled();
+    expect(onCommit).not.toHaveBeenCalled();
+  });
+
+  it("skips onCommit when blur happens without an edit (noop)", () => {
+    const onChange = vi.fn();
+    const onCommit = vi.fn();
+    render(
+      <RangeWithInputs
+        min={0}
+        max={100}
+        value={[10, 50]}
+        onChange={onChange}
+        onCommit={onCommit}
+        ariaLabelMin="min"
+        ariaLabelMax="max"
+      />,
+    );
+
+    const minNumberInput = screen
+      .getAllByLabelText("min")
+      .find((el) => (el as HTMLInputElement).type === "number") as
+      | HTMLInputElement
+      | undefined;
+
+    fireEvent.blur(minNumberInput!);
+
+    expect(onChange).not.toHaveBeenCalled();
+    expect(onCommit).not.toHaveBeenCalled();
   });
 
   it("commits on Enter keypress (via blur)", () => {

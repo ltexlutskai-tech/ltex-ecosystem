@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import {
   QUALITY_LEVELS,
   QUALITY_LABELS,
@@ -12,9 +12,11 @@ import {
   GENDER_OPTIONS,
 } from "@ltex/shared";
 import { RangeWithInputs } from "./range-with-inputs";
-
-const DEFAULT_UNITS_RANGE: [number, number] = [1, 1000];
-const DEFAULT_WEIGHT_RANGE: [number, number] = [1, 1000];
+import {
+  DEFAULT_UNITS_RANGE,
+  DEFAULT_WEIGHT_RANGE,
+} from "@/lib/filter-constants";
+import { useUrlSyncedRange } from "@/lib/use-url-synced-range";
 
 export interface LotCategoryOption {
   id: string;
@@ -82,33 +84,28 @@ export function LotsFiltersForm({ onApply }: LotsFiltersFormProps) {
   const [priceMin, setPriceMin] = useState(urlPriceMin);
   const [priceMax, setPriceMax] = useState(urlPriceMax);
 
-  // unitsPerKg / unitWeight bounds are static — see catalog-filters.tsx for
-  // the same constants. The previous /api/catalog/numeric-ranges endpoint
-  // returned hardcoded 1..1000 anyway, so the network round-trip was waste.
-  const unitsBounds = DEFAULT_UNITS_RANGE;
-  const weightBounds = DEFAULT_WEIGHT_RANGE;
-  const [unitsValue, setUnitsValue] = useState<[number, number]>([
-    urlUnitsMin ? Number(urlUnitsMin) : DEFAULT_UNITS_RANGE[0],
-    urlUnitsMax ? Number(urlUnitsMax) : DEFAULT_UNITS_RANGE[1],
-  ]);
-  const [weightValue, setWeightValue] = useState<[number, number]>([
-    urlUnitWeightMin ? Number(urlUnitWeightMin) : DEFAULT_WEIGHT_RANGE[0],
-    urlUnitWeightMax ? Number(urlUnitWeightMax) : DEFAULT_WEIGHT_RANGE[1],
-  ]);
-
-  // Sync sliders when URL changes externally.
-  useEffect(() => {
-    setUnitsValue([
-      urlUnitsMin ? Number(urlUnitsMin) : unitsBounds[0],
-      urlUnitsMax ? Number(urlUnitsMax) : unitsBounds[1],
-    ]);
-  }, [urlUnitsMin, urlUnitsMax, unitsBounds]);
-  useEffect(() => {
-    setWeightValue([
-      urlUnitWeightMin ? Number(urlUnitWeightMin) : weightBounds[0],
-      urlUnitWeightMax ? Number(urlUnitWeightMax) : weightBounds[1],
-    ]);
-  }, [urlUnitWeightMin, urlUnitWeightMax, weightBounds]);
+  const {
+    value: unitsValue,
+    setValue: setUnitsValue,
+    commit: commitUnitsRange,
+  } = useUrlSyncedRange({
+    paramMin: "unitsPerKgMin",
+    paramMax: "unitsPerKgMax",
+    bounds: DEFAULT_UNITS_RANGE,
+    resetParams: ["page"],
+    onApply,
+  });
+  const {
+    value: weightValue,
+    setValue: setWeightValue,
+    commit: commitWeightRange,
+  } = useUrlSyncedRange({
+    paramMin: "unitWeightMin",
+    paramMax: "unitWeightMax",
+    bounds: DEFAULT_WEIGHT_RANGE,
+    resetParams: ["page"],
+    onApply,
+  });
 
   const updateParam = useCallback(
     (key: string, value: string) => {
@@ -157,44 +154,16 @@ export function LotsFiltersForm({ onApply }: LotsFiltersFormProps) {
     priceMax,
   ]);
 
-  const commitUnitsRange = useCallback(
-    ([lo, hi]: [number, number]) => {
-      const params = new URLSearchParams(searchParams.toString());
-      if (lo > unitsBounds[0]) params.set("unitsPerKgMin", String(lo));
-      else params.delete("unitsPerKgMin");
-      if (hi < unitsBounds[1]) params.set("unitsPerKgMax", String(hi));
-      else params.delete("unitsPerKgMax");
-      params.delete("page");
-      router.push(`${pathname}?${params.toString()}`);
-      onApply?.();
-    },
-    [router, pathname, searchParams, unitsBounds, onApply],
-  );
-
-  const commitWeightRange = useCallback(
-    ([lo, hi]: [number, number]) => {
-      const params = new URLSearchParams(searchParams.toString());
-      if (lo > weightBounds[0]) params.set("unitWeightMin", String(lo));
-      else params.delete("unitWeightMin");
-      if (hi < weightBounds[1]) params.set("unitWeightMax", String(hi));
-      else params.delete("unitWeightMax");
-      params.delete("page");
-      router.push(`${pathname}?${params.toString()}`);
-      onApply?.();
-    },
-    [router, pathname, searchParams, weightBounds, onApply],
-  );
-
   const clearAll = useCallback(() => {
     setWeightMin("");
     setWeightMax("");
     setPriceMin("");
     setPriceMax("");
-    setUnitsValue(unitsBounds);
-    setWeightValue(weightBounds);
+    setUnitsValue(DEFAULT_UNITS_RANGE);
+    setWeightValue(DEFAULT_WEIGHT_RANGE);
     router.push(pathname);
     onApply?.();
-  }, [router, pathname, onApply, unitsBounds, weightBounds]);
+  }, [router, pathname, onApply, setUnitsValue, setWeightValue]);
 
   const hasActiveFilters =
     selectedStatuses.length > 0 ||
@@ -357,8 +326,8 @@ export function LotsFiltersForm({ onApply }: LotsFiltersFormProps) {
       <div>
         <span className={labelClass}>К-сть одиниць (шт/кг)</span>
         <RangeWithInputs
-          min={unitsBounds[0]}
-          max={unitsBounds[1]}
+          min={DEFAULT_UNITS_RANGE[0]}
+          max={DEFAULT_UNITS_RANGE[1]}
           value={unitsValue}
           onChange={setUnitsValue}
           onCommit={commitUnitsRange}
@@ -372,8 +341,8 @@ export function LotsFiltersForm({ onApply }: LotsFiltersFormProps) {
       <div>
         <span className={labelClass}>Вага одиниці (кг)</span>
         <RangeWithInputs
-          min={weightBounds[0]}
-          max={weightBounds[1]}
+          min={DEFAULT_WEIGHT_RANGE[0]}
+          max={DEFAULT_WEIGHT_RANGE[1]}
           value={weightValue}
           onChange={setWeightValue}
           onCommit={commitWeightRange}

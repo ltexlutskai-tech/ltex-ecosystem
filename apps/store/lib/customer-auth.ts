@@ -151,6 +151,17 @@ export async function clearCustomerCookie(): Promise<void> {
 }
 
 /**
+ * Minimum price-like shape consumed by the price gate. Every Prisma `Price`
+ * row satisfies this, as do the thin `{ priceType, amount }`-style selects
+ * used in catalog/recommendations endpoints. The constraint replaces the
+ * looser `unknown[]` to prevent shape drift (e.g. accidentally passing a
+ * `string[]` of formatted prices).
+ */
+interface ProductWithPrices {
+  prices: { priceType: string; amount: number }[];
+}
+
+/**
  * Server-side helper for the price gate (S73). Returns a shallow-cloned
  * array with `prices` set to `[]` on each product when the visitor is
  * unauthenticated. Returns the original array unchanged for authenticated
@@ -160,7 +171,7 @@ export async function clearCustomerCookie(): Promise<void> {
  * `unstable_cache(...)`, which are shared across requests. Mutating those
  * objects would leak the guest view to subsequent authenticated readers.
  */
-export async function stripPricesForGuests<T extends { prices: unknown[] }>(
+export async function stripPricesForGuests<T extends ProductWithPrices>(
   products: T[],
   isAuthenticated?: boolean,
 ): Promise<T[]> {

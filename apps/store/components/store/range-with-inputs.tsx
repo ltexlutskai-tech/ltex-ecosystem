@@ -49,9 +49,8 @@ export function RangeWithInputs({
     const finalHi = Math.max(parsedLo, parsedHi);
     setLoDraft(String(finalLo));
     setHiDraft(String(finalHi));
-    if (finalLo !== lo || finalHi !== hi) {
-      onChange([finalLo, finalHi]);
-    }
+    if (finalLo === lo && finalHi === hi) return;
+    onChange([finalLo, finalHi]);
     onCommit([finalLo, finalHi]);
   }
 
