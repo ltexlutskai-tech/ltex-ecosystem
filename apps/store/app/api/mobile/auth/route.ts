@@ -3,6 +3,7 @@ import { prisma } from "@ltex/db";
 import { mobileAuthSchema } from "@/lib/validations";
 import { rateLimit, getClientIp } from "@/lib/rate-limit";
 import { signMobileToken, MOBILE_TOKEN_TTL_SECONDS } from "@/lib/mobile-auth";
+import { notifyNewLead } from "@/lib/notifications";
 
 /**
  * POST /api/mobile/auth — Register or login by phone.
@@ -11,6 +12,10 @@ import { signMobileToken, MOBILE_TOKEN_TTL_SECONDS } from "@/lib/mobile-auth";
  *
  * In production, this should verify via SMS OTP.
  * For now, upserts customer by phone number and issues a session token.
+ *
+ * Existing customers: only fill empty/null DB fields from the payload —
+ * never overwrite a value the user set elsewhere (web /account, profile
+ * screen). Mirrors the web S82 login pattern.
  */
 export async function POST(request: NextRequest) {
   // Rate limit: 10 auth requests per minute per IP (brute force protection)
@@ -39,30 +44,50 @@ export async function POST(request: NextRequest) {
   }
 
   const { phone, name, telegram, city } = parsed.data;
+  const trimmedName = name?.trim();
+  const trimmedTelegram = telegram?.trim();
+  const trimmedCity = city?.trim();
 
   try {
     let customer = await prisma.customer.findFirst({ where: { phone } });
-    const isNew = !customer;
+    const wasCreated = !customer;
 
     if (!customer) {
-      if (!name) {
+      if (!trimmedName) {
         return NextResponse.json(
           { error: "Ім'я обов'язкове для реєстрації" },
           { status: 400 },
         );
       }
       customer = await prisma.customer.create({
-        data: { name, phone, telegram, city },
-      });
-    } else if (name || telegram || city) {
-      customer = await prisma.customer.update({
-        where: { id: customer.id },
         data: {
-          ...(name && { name }),
-          ...(telegram && { telegram }),
-          ...(city && { city }),
+          name: trimmedName,
+          phone,
+          telegram: trimmedTelegram || null,
+          city: trimmedCity || null,
         },
       });
+    } else {
+      const updates: {
+        name?: string;
+        telegram?: string;
+        city?: string;
+      } = {};
+      if (!customer.name?.trim() && trimmedName) {
+        updates.name = trimmedName;
+      }
+      if (!customer.telegram?.trim() && trimmedTelegram) {
+        updates.telegram = trimmedTelegram;
+      }
+      if (customer.city == null && trimmedCity) {
+        updates.city = trimmedCity;
+      }
+      if (Object.keys(updates).length > 0) {
+        customer = await prisma.customer.update({
+          where: { id: customer.id },
+          data: updates,
+        });
+      }
     }
 
     const token = signMobileToken(customer.id);
@@ -73,6 +98,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    if (wasCreated) {
+      notifyNewLead({
+        customerId: customer.id,
+        phone,
+        name: trimmedName ?? "(без імені)",
+        city: trimmedCity || null,
+        source: "mobile",
+      }).catch(() => {});
+    }
+
     return NextResponse.json({
       customerId: customer.id,
       name: customer.name,
@@ -80,7 +115,7 @@ export async function POST(request: NextRequest) {
       email: customer.email,
       telegram: customer.telegram,
       city: customer.city,
-      isNew,
+      isNew: wasCreated,
       token,
       tokenExpiresIn: MOBILE_TOKEN_TTL_SECONDS,
     });

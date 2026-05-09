@@ -71,19 +71,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
-  const login = useCallback(async (phone: string, name?: string) => {
-    const result = await authApi.login(phone, name);
-    const newState: AuthState = {
-      customerId: result.customerId,
-      customerName: result.name,
-      phone: result.phone,
-      token: result.token,
-      isLoading: false,
-    };
-    setApiToken(result.token);
-    setState(newState);
-    await saveAuth(newState);
-  }, []);
+  const login = useCallback(
+    async (phone: string, name?: string, city?: string) => {
+      const result = await authApi.login(phone, name, city);
+      const newState: AuthState = {
+        customerId: result.customerId,
+        customerName: result.name,
+        phone: result.phone,
+        token: result.token,
+        isLoading: false,
+      };
+      setApiToken(result.token);
+      setState(newState);
+      await saveAuth(newState);
+    },
+    [],
+  );
 
   const logout = useCallback(async () => {
     setApiToken(null);

@@ -65,6 +65,16 @@ function buildQueryParams(
   if (filters.season) params.season = filters.season;
   if (filters.countries && filters.countries.length > 0)
     params.country = filters.countries.join(",");
+  if (filters.genders && filters.genders.length > 0)
+    params.gender = filters.genders.join(",");
+  if (filters.unitsPerKgMin !== undefined)
+    params.unitsPerKgMin = String(filters.unitsPerKgMin);
+  if (filters.unitsPerKgMax !== undefined)
+    params.unitsPerKgMax = String(filters.unitsPerKgMax);
+  if (filters.unitWeightMin !== undefined)
+    params.unitWeightMin = String(filters.unitWeightMin);
+  if (filters.unitWeightMax !== undefined)
+    params.unitWeightMax = String(filters.unitWeightMax);
   if (filters.sort) params.sort = filters.sort;
   if (filters.priceMin !== undefined)
     params.priceMin = String(filters.priceMin);
