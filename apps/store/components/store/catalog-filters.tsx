@@ -5,13 +5,16 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { QUALITY_LEVELS, QUALITY_LABELS } from "@ltex/shared";
 import { SEASONS, SEASON_LABELS } from "@ltex/shared";
 import { COUNTRIES, COUNTRY_LABELS } from "@ltex/shared";
+import { GENDER_OPTIONS } from "@ltex/shared";
 import { SearchAutocomplete } from "./search-autocomplete";
-import { PriceRangeSlider } from "./price-range-slider";
+import { RangeWithInputs } from "./range-with-inputs";
 import { getDictionary } from "@/lib/i18n";
 
 const dict = getDictionary();
 
 const DEFAULT_PRICE_RANGE: [number, number] = [0, 100];
+const DEFAULT_UNITS_RANGE: [number, number] = [1, 1000];
+const DEFAULT_WEIGHT_RANGE: [number, number] = [1, 1000];
 
 export interface SubcategoryOption {
   slug: string;
@@ -43,6 +46,30 @@ export function CatalogFilters({
     () => parseList(searchParams.get("country")),
     [searchParams],
   );
+  const selectedGenders = useMemo(
+    () => parseList(searchParams.get("gender")),
+    [searchParams],
+  );
+
+  const urlUnitsMin = searchParams.get("unitsPerKgMin");
+  const urlUnitsMax = searchParams.get("unitsPerKgMax");
+  const urlWeightMin = searchParams.get("unitWeightMin");
+  const urlWeightMax = searchParams.get("unitWeightMax");
+
+  // unitsPerKg / unitWeight bounds are static — the catalog spans the full
+  // 1..1000 range and the previous /api/catalog/numeric-ranges endpoint
+  // returned identical hardcoded constants. Inlined here to skip a useless
+  // network round-trip on every catalog visit.
+  const unitsBounds = DEFAULT_UNITS_RANGE;
+  const weightBounds = DEFAULT_WEIGHT_RANGE;
+  const [unitsValue, setUnitsValue] = useState<[number, number]>([
+    urlUnitsMin ? Number(urlUnitsMin) : DEFAULT_UNITS_RANGE[0],
+    urlUnitsMax ? Number(urlUnitsMax) : DEFAULT_UNITS_RANGE[1],
+  ]);
+  const [weightValue, setWeightValue] = useState<[number, number]>([
+    urlWeightMin ? Number(urlWeightMin) : DEFAULT_WEIGHT_RANGE[0],
+    urlWeightMax ? Number(urlWeightMax) : DEFAULT_WEIGHT_RANGE[1],
+  ]);
 
   const [priceBounds, setPriceBounds] =
     useState<[number, number]>(DEFAULT_PRICE_RANGE);
@@ -89,6 +116,20 @@ export function CatalogFilters({
     ]);
   }, [urlPriceMin, urlPriceMax, priceBounds]);
 
+  // Sync sliders when URL changes externally.
+  useEffect(() => {
+    setUnitsValue([
+      urlUnitsMin ? Number(urlUnitsMin) : unitsBounds[0],
+      urlUnitsMax ? Number(urlUnitsMax) : unitsBounds[1],
+    ]);
+  }, [urlUnitsMin, urlUnitsMax, unitsBounds]);
+  useEffect(() => {
+    setWeightValue([
+      urlWeightMin ? Number(urlWeightMin) : weightBounds[0],
+      urlWeightMax ? Number(urlWeightMax) : weightBounds[1],
+    ]);
+  }, [urlWeightMin, urlWeightMax, weightBounds]);
+
   const updateFilter = useCallback(
     (key: string, value: string) => {
       const params = new URLSearchParams(searchParams.toString());
@@ -104,7 +145,7 @@ export function CatalogFilters({
   );
 
   const toggleListValue = useCallback(
-    (key: "quality" | "country", value: string) => {
+    (key: "quality" | "country" | "gender", value: string) => {
       const current = parseList(searchParams.get(key));
       const next = current.includes(value)
         ? current.filter((x) => x !== value)
@@ -112,6 +153,32 @@ export function CatalogFilters({
       updateFilter(key, next.join(","));
     },
     [searchParams, updateFilter],
+  );
+
+  const commitUnitsRange = useCallback(
+    ([lo, hi]: [number, number]) => {
+      const params = new URLSearchParams(searchParams.toString());
+      if (lo > unitsBounds[0]) params.set("unitsPerKgMin", String(lo));
+      else params.delete("unitsPerKgMin");
+      if (hi < unitsBounds[1]) params.set("unitsPerKgMax", String(hi));
+      else params.delete("unitsPerKgMax");
+      params.delete("page");
+      router.push(`${pathname}?${params.toString()}`);
+    },
+    [router, pathname, searchParams, unitsBounds],
+  );
+
+  const commitWeightRange = useCallback(
+    ([lo, hi]: [number, number]) => {
+      const params = new URLSearchParams(searchParams.toString());
+      if (lo > weightBounds[0]) params.set("unitWeightMin", String(lo));
+      else params.delete("unitWeightMin");
+      if (hi < weightBounds[1]) params.set("unitWeightMax", String(hi));
+      else params.delete("unitWeightMax");
+      params.delete("page");
+      router.push(`${pathname}?${params.toString()}`);
+    },
+    [router, pathname, searchParams, weightBounds],
   );
 
   const commitPriceRange = useCallback(
@@ -135,14 +202,21 @@ export function CatalogFilters({
 
   const clearAll = useCallback(() => {
     setPriceValue(priceBounds);
+    setUnitsValue(unitsBounds);
+    setWeightValue(weightBounds);
     router.push(pathname);
-  }, [router, pathname, priceBounds]);
+  }, [router, pathname, priceBounds, unitsBounds, weightBounds]);
 
   const hasFilters =
     searchParams.get("q") ||
     searchParams.get("quality") ||
     searchParams.get("season") ||
     searchParams.get("country") ||
+    searchParams.get("gender") ||
+    searchParams.get("unitsPerKgMin") ||
+    searchParams.get("unitsPerKgMax") ||
+    searchParams.get("unitWeightMin") ||
+    searchParams.get("unitWeightMax") ||
     searchParams.get("sort") ||
     searchParams.get("priceMin") ||
     searchParams.get("priceMax") ||
@@ -230,6 +304,59 @@ export function CatalogFilters({
       </div>
 
       <div>
+        <span className={labelClass}>{dict.catalog.genderLabel}</span>
+        <div className="space-y-1.5">
+          {GENDER_OPTIONS.map((g) => {
+            const checked = selectedGenders.includes(g);
+            return (
+              <label
+                key={g}
+                className="flex cursor-pointer items-center gap-2 text-sm text-gray-700"
+              >
+                <input
+                  type="checkbox"
+                  checked={checked}
+                  onChange={() => toggleListValue("gender", g)}
+                  className="h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-1 focus:ring-green-500"
+                />
+                <span>{g}</span>
+              </label>
+            );
+          })}
+        </div>
+      </div>
+
+      <div>
+        <span className={labelClass}>{dict.catalog.unitsPerKgLabel}</span>
+        <RangeWithInputs
+          min={unitsBounds[0]}
+          max={unitsBounds[1]}
+          value={unitsValue}
+          onChange={setUnitsValue}
+          onCommit={commitUnitsRange}
+          step={1}
+          unit="шт"
+          ariaLabelMin={`${dict.catalog.unitsPerKgLabel} ${dict.catalog.rangeFrom}`}
+          ariaLabelMax={`${dict.catalog.unitsPerKgLabel} ${dict.catalog.rangeTo}`}
+        />
+      </div>
+
+      <div>
+        <span className={labelClass}>{dict.catalog.unitWeightLabel}</span>
+        <RangeWithInputs
+          min={weightBounds[0]}
+          max={weightBounds[1]}
+          value={weightValue}
+          onChange={setWeightValue}
+          onCommit={commitWeightRange}
+          step={1}
+          unit="кг"
+          ariaLabelMin={`${dict.catalog.unitWeightLabel} ${dict.catalog.rangeFrom}`}
+          ariaLabelMax={`${dict.catalog.unitWeightLabel} ${dict.catalog.rangeTo}`}
+        />
+      </div>
+
+      <div>
         <label htmlFor="filter-sort" className={labelClass}>
           {dict.catalog.sortLabel}
         </label>
@@ -271,12 +398,16 @@ export function CatalogFilters({
 
       <div>
         <span className={labelClass}>{dict.catalog.priceRange}</span>
-        <PriceRangeSlider
+        <RangeWithInputs
           min={priceBounds[0]}
           max={priceBounds[1]}
           value={priceValue}
           onChange={setPriceValue}
           onCommit={commitPriceRange}
+          step={1}
+          unit="€"
+          ariaLabelMin="Мінімальна ціна"
+          ariaLabelMax="Максимальна ціна"
         />
       </div>
 

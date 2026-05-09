@@ -24,24 +24,32 @@ export async function GET(request: NextRequest) {
   // Simple stats (for auto-refresh notification bell)
   if (!fullStats) {
     const dayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
-    const [pendingOrders, unreadMessages, newSubscribersToday] =
-      await Promise.all([
-        prisma.order.count({ where: { status: "pending" } }),
-        prisma.chatMessage.count({
-          where: { sender: "customer", isRead: false },
-        }),
-        prisma.newsletterSubscriber.count({
-          where: {
-            subscribedAt: { gte: dayAgo },
-            unsubscribedAt: null,
-          },
-        }),
-      ]);
+    const [
+      pendingOrders,
+      unreadMessages,
+      newSubscribersToday,
+      emailQueueCount,
+    ] = await Promise.all([
+      prisma.order.count({ where: { status: "pending" } }),
+      prisma.chatMessage.count({
+        where: { sender: "customer", isRead: false },
+      }),
+      prisma.newsletterSubscriber.count({
+        where: {
+          subscribedAt: { gte: dayAgo },
+          unsubscribedAt: null,
+        },
+      }),
+      prisma.emailJob.count({
+        where: { status: { in: ["pending", "retrying", "failed"] } },
+      }),
+    ]);
 
     return NextResponse.json({
       pendingOrders,
       unreadMessages,
       newSubscribersToday,
+      emailQueueCount,
       timestamp: Date.now(),
     });
   }

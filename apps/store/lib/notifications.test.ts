@@ -1,5 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { notifyNewOrder, notifyNewsletterSubscribe } from "./notifications";
+import {
+  notifyNewLead,
+  notifyNewOrder,
+  notifyNewsletterSubscribe,
+} from "./notifications";
 
 const mockOrder = {
   orderId: "order-123",
@@ -250,5 +254,146 @@ describe("notifyNewsletterSubscribe", () => {
 
     await notifyNewsletterSubscribe(payload);
     expect(warnSpy).toHaveBeenCalled();
+  });
+});
+
+describe("notifyNewLead", () => {
+  let fetchSpy: ReturnType<typeof vi.spyOn>;
+  let warnSpy: ReturnType<typeof vi.spyOn>;
+
+  const params = {
+    customerId: "cust-123",
+    phone: "+380671234567",
+    name: "Іван Петров",
+    source: "web" as const,
+  };
+
+  beforeEach(() => {
+    fetchSpy = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValue(
+        new Response(JSON.stringify({ ok: true }), { status: 200 }),
+      );
+    warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    fetchSpy.mockRestore();
+    warnSpy.mockRestore();
+    vi.unstubAllEnvs();
+  });
+
+  it("posts to Telegram with full phone in body when both env vars set", async () => {
+    vi.stubEnv("TELEGRAM_BOT_TOKEN", "bot-token");
+    vi.stubEnv("NEWSLETTER_TELEGRAM_CHAT_ID", "newsletter-chat-id");
+
+    await notifyNewLead(params);
+
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchSpy.mock.calls[0]!;
+    expect(url).toBe("https://api.telegram.org/botbot-token/sendMessage");
+    const body = JSON.parse((init as RequestInit).body as string);
+    expect(body.chat_id).toBe("newsletter-chat-id");
+    expect(body.parse_mode).toBe("MarkdownV2");
+    expect(body.text).toContain("Новий лід");
+    expect(body.text).toContain("Іван Петров");
+    // Manager needs full phone in the actual message
+    expect(body.text).toContain("+380671234567");
+    expect(body.text).toContain("web");
+    expect(body.text).toContain("cust-123");
+  });
+
+  it("returns silently when TELEGRAM_BOT_TOKEN missing", async () => {
+    vi.stubEnv("TELEGRAM_BOT_TOKEN", "");
+    vi.stubEnv("NEWSLETTER_TELEGRAM_CHAT_ID", "newsletter-chat-id");
+
+    await expect(notifyNewLead(params)).resolves.toBeUndefined();
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(warnSpy).toHaveBeenCalled();
+  });
+
+  it("returns silently when NEWSLETTER_TELEGRAM_CHAT_ID missing", async () => {
+    vi.stubEnv("TELEGRAM_BOT_TOKEN", "bot-token");
+    vi.stubEnv("NEWSLETTER_TELEGRAM_CHAT_ID", "");
+
+    await expect(notifyNewLead(params)).resolves.toBeUndefined();
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("does not throw on network failure and masks phone in log", async () => {
+    vi.stubEnv("TELEGRAM_BOT_TOKEN", "bot-token");
+    vi.stubEnv("NEWSLETTER_TELEGRAM_CHAT_ID", "newsletter-chat-id");
+    fetchSpy.mockRejectedValueOnce(new Error("network"));
+
+    await expect(notifyNewLead(params)).resolves.toBeUndefined();
+    expect(warnSpy).toHaveBeenCalled();
+    // The masked phone log payload must NOT contain the raw phone middle digits.
+    const allLoggedArgs = warnSpy.mock.calls.flat();
+    const serialized = JSON.stringify(allLoggedArgs);
+    expect(serialized).not.toContain("+380671234567");
+    expect(serialized).toContain("***");
+  });
+
+  it("warns on non-OK Telegram response without throwing", async () => {
+    vi.stubEnv("TELEGRAM_BOT_TOKEN", "bot-token");
+    vi.stubEnv("NEWSLETTER_TELEGRAM_CHAT_ID", "newsletter-chat-id");
+    fetchSpy.mockResolvedValueOnce(
+      new Response("Bad request", { status: 400 }),
+    );
+
+    await expect(notifyNewLead(params)).resolves.toBeUndefined();
+    expect(warnSpy).toHaveBeenCalled();
+  });
+
+  it("escapes Markdown special characters in name", async () => {
+    vi.stubEnv("TELEGRAM_BOT_TOKEN", "bot-token");
+    vi.stubEnv("NEWSLETTER_TELEGRAM_CHAT_ID", "newsletter-chat-id");
+
+    await notifyNewLead({
+      ...params,
+      name: "Test_User (special)",
+    });
+
+    const body = JSON.parse(fetchSpy.mock.calls[0]![1]!.body as string);
+    const text = body.text as string;
+    expect(text).toContain("Test\\_User");
+    expect(text).toContain("\\(special\\)");
+  });
+
+  it("defaults source to 'web' when omitted", async () => {
+    vi.stubEnv("TELEGRAM_BOT_TOKEN", "bot-token");
+    vi.stubEnv("NEWSLETTER_TELEGRAM_CHAT_ID", "newsletter-chat-id");
+
+    await notifyNewLead({
+      customerId: "c-1",
+      phone: "+380501112233",
+      name: "Іван",
+    });
+
+    const body = JSON.parse(fetchSpy.mock.calls[0]![1]!.body as string);
+    expect(body.text).toContain("web");
+  });
+
+  it("includes the Область line when city is provided", async () => {
+    vi.stubEnv("TELEGRAM_BOT_TOKEN", "bot-token");
+    vi.stubEnv("NEWSLETTER_TELEGRAM_CHAT_ID", "newsletter-chat-id");
+
+    await notifyNewLead({ ...params, city: "Волинська" });
+
+    const body = JSON.parse(fetchSpy.mock.calls[0]![1]!.body as string);
+    const text = body.text as string;
+    expect(text).toContain("Область");
+    expect(text).toContain("Волинська");
+  });
+
+  it("omits the Область line when city is null or undefined", async () => {
+    vi.stubEnv("TELEGRAM_BOT_TOKEN", "bot-token");
+    vi.stubEnv("NEWSLETTER_TELEGRAM_CHAT_ID", "newsletter-chat-id");
+
+    await notifyNewLead({ ...params, city: null });
+
+    const body = JSON.parse(fetchSpy.mock.calls[0]![1]!.body as string);
+    const text = body.text as string;
+    expect(text).not.toContain("Область");
   });
 });

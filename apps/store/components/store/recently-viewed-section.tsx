@@ -4,9 +4,11 @@ import Link from "next/link";
 import { Card, CardContent, Badge } from "@ltex/ui";
 import { QUALITY_LABELS, type QualityLevel } from "@ltex/shared";
 import { useRecentlyViewed } from "@/lib/recently-viewed";
+import { useCustomer } from "@/lib/customer-context";
 
 export function RecentlyViewedSection() {
   const { items } = useRecentlyViewed();
+  const customer = useCustomer();
 
   if (items.length === 0) return null;
 
@@ -39,7 +41,12 @@ export function RecentlyViewedSection() {
                     {QUALITY_LABELS[item.quality as QualityLevel] ??
                       item.quality}
                   </Badge>
-                  {item.priceEur !== null && (
+                  {/*
+                    Price gate: priceEur lives in localStorage and survives
+                    log-out. Guests must never see EUR prices, even if the
+                    user was authed when this row was saved.
+                  */}
+                  {customer && item.priceEur !== null && (
                     <p className="mt-1 text-sm font-bold text-green-700">
                       €{item.priceEur.toFixed(2)}
                     </p>
