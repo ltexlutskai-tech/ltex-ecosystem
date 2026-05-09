@@ -40,6 +40,7 @@ export const CATEGORIES: Category[] = [
       { slug: "vitrovky-shtormovky", name: "Вітровки та штормовки" },
       { slug: "sukni-spidnytsi", name: "Сукні та спідниці" },
       { slug: "inshe-odyag", name: "Інше" },
+      { slug: "xxl-veliki-rozmiry", name: "Великі розміри (XXL+)" },
     ],
   },
   {
@@ -101,3 +102,5 @@ export const CATEGORIES: Category[] = [
     subcategories: [{ slug: "miks-kosmetyka", name: "Мікс" }],
   },
 ];
+
+export const OVERSIZE_SLUG = "xxl-veliki-rozmiry";

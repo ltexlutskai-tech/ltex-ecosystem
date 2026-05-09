@@ -5,6 +5,7 @@ import {
   mapMobileProduct,
   type MobileRawProduct,
 } from "@/lib/mobile-product-shape";
+import { getCurrentCustomer, stripPricesForGuests } from "@/lib/customer-auth";
 
 export const dynamic = "force-dynamic";
 
@@ -67,11 +68,19 @@ export async function GET(request: NextRequest) {
     })) as unknown as MobileRawProduct[];
   }
 
+  let mapped = products.map(mapMobileProduct);
+  const customer = await getCurrentCustomer();
+  if (!customer) {
+    mapped = await stripPricesForGuests(mapped, false);
+  }
+
   return NextResponse.json(
-    { products: products.map(mapMobileProduct) },
+    { products: mapped },
     {
+      // Response varies per visitor (price gate). Avoid shared/CDN caching to
+      // prevent leaking authed prices to guests or vice-versa.
       headers: {
-        "Cache-Control": "public, s-maxage=60, stale-while-revalidate=120",
+        "Cache-Control": "private, no-store",
       },
     },
   );

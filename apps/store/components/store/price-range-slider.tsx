@@ -11,6 +11,7 @@ interface Props {
   step?: number;
   ariaLabelMin?: string;
   ariaLabelMax?: string;
+  formatValue?: (v: number) => string;
 }
 
 /**
@@ -28,6 +29,7 @@ export function PriceRangeSlider({
   step = 1,
   ariaLabelMin = "Мінімальна ціна",
   ariaLabelMax = "Максимальна ціна",
+  formatValue,
 }: Props) {
   const [lo, hi] = value;
   const safeMin = Math.max(min, Math.min(lo, hi));
@@ -59,8 +61,8 @@ export function PriceRangeSlider({
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between text-xs text-gray-600">
-        <span>{safeMin} €</span>
-        <span>{safeMax} €</span>
+        <span>{formatValue ? formatValue(safeMin) : `${safeMin} €`}</span>
+        <span>{formatValue ? formatValue(safeMax) : `${safeMax} €`}</span>
       </div>
       <div className="relative h-6">
         <div className="absolute left-0 right-0 top-1/2 h-1 -translate-y-1/2 rounded bg-gray-200" />
