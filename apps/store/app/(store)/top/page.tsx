@@ -3,11 +3,13 @@ import { Breadcrumbs } from "@/components/store/breadcrumbs";
 import { ProductCard } from "@/components/store/product-card";
 import { getFeaturedProducts } from "@/lib/featured";
 import { getDictionary } from "@/lib/i18n";
+import { stripPricesForGuests } from "@/lib/customer-auth";
 
 const dict = getDictionary();
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://ltex.com.ua";
 
-export const revalidate = 60;
+// Cookie-aware (price gate); skip ISR.
+export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "Топ товарів — L-TEX",
@@ -17,7 +19,8 @@ export const metadata: Metadata = {
 };
 
 export default async function TopProductsPage() {
-  const products = await getFeaturedProducts(24).catch(() => []);
+  const rawProducts = await getFeaturedProducts(24).catch(() => []);
+  const products = await stripPricesForGuests(rawProducts);
 
   return (
     <div className="container mx-auto px-4 py-6">
