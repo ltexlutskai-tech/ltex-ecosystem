@@ -4,12 +4,14 @@ import { Breadcrumbs } from "@/components/store/breadcrumbs";
 import { Pagination } from "@/components/store/pagination";
 import { ProductCard } from "@/components/store/product-card";
 import { getDictionary } from "@/lib/i18n";
+import { stripPricesForGuests } from "@/lib/customer-auth";
 
 const dict = getDictionary();
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://ltex.com.ua";
 const PER_PAGE = 24;
 
-export const revalidate = 60;
+// Cookie-aware (price gate); skip ISR.
+export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: `${dict.newPage.title} — L-TEX`,
@@ -52,12 +54,13 @@ export default async function NewArrivalsPage({
 
   // DB may be unreachable at build-time prerender (CI with placeholder
   // DATABASE_URL). Fall back to empty data; ISR will populate on first request.
-  const { products, total } = await loadNewProducts(page).catch(
+  const { products: rawProducts, total } = await loadNewProducts(page).catch(
     () =>
       ({ products: [], total: 0 }) as Awaited<
         ReturnType<typeof loadNewProducts>
       >,
   );
+  const products = await stripPricesForGuests(rawProducts);
 
   const totalPages = Math.ceil(total / PER_PAGE);
 

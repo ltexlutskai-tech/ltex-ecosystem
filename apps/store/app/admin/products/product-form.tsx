@@ -306,6 +306,21 @@ export function ProductForm({ product, categories }: ProductFormProps) {
         </label>
       </div>
 
+      <div className="flex items-center gap-2">
+        <input
+          type="checkbox"
+          name="isOversize"
+          id="prod-isoversize"
+          defaultChecked={product?.isOversize ?? false}
+        />
+        <label htmlFor="prod-isoversize" className="text-sm">
+          Великий розмір (XXL+)
+          <span className="ml-1 text-xs text-gray-500">
+            — товар з&apos;явиться у спеціальній підкатегорії
+          </span>
+        </label>
+      </div>
+
       <div className="flex gap-2">
         <Button type="submit">{product ? "Зберегти" : "Створити"}</Button>
         <Button type="button" variant="outline" asChild>

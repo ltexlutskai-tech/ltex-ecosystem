@@ -3,10 +3,13 @@
 import { useState } from "react";
 import Image from "next/image";
 import { Play, Video as VideoIcon } from "lucide-react";
+import Link from "next/link";
 import { AddToCartButton } from "@/components/store/add-to-cart-button";
 import { VideoModal } from "@/components/store/video-modal";
+import { PriceOrLogin } from "@/components/store/price-or-login";
 import { extractYouTubeId, getYouTubeThumbnail } from "@/lib/youtube";
 import { formatUah, eurToUah } from "@/lib/exchange-rate";
+import { useCustomer } from "@/lib/customer-context";
 
 export interface LotReviewCardData {
   id: string;
@@ -31,8 +34,9 @@ export function LotReviewCard({
   productName,
   rate,
 }: LotReviewCardProps) {
+  const customer = useCustomer();
   const videoId = extractYouTubeId(lot.videoUrl);
-  const priceUah = formatUah(eurToUah(lot.priceEur, rate));
+  const priceUah = customer ? formatUah(eurToUah(lot.priceEur, rate)) : null;
   const [videoOpen, setVideoOpen] = useState(false);
 
   return (
@@ -92,26 +96,39 @@ export function LotReviewCard({
               <span className="text-gray-500">К-сть:</span>{" "}
               <strong>{lot.quantity} шт</strong>
             </span>
-            <span>
-              <span className="text-gray-500">Ціна:</span>{" "}
-              <strong className="text-red-600">{priceUah}</strong>{" "}
-              <span className="text-xs text-gray-400">
-                (€{lot.priceEur.toFixed(2)})
+            {customer ? (
+              <span>
+                <span className="text-gray-500">Ціна:</span>{" "}
+                <strong className="text-red-600">{priceUah}</strong>{" "}
+                <span className="text-xs text-gray-400">
+                  (€{lot.priceEur.toFixed(2)})
+                </span>
               </span>
-            </span>
+            ) : (
+              <PriceOrLogin priceEur={null} hideUnit size="sm" />
+            )}
           </div>
         </div>
-        <AddToCartButton
-          lot={{
-            lotId: lot.id,
-            productId,
-            productName,
-            barcode: lot.barcode,
-            weight: lot.weight,
-            priceEur: lot.priceEur,
-            quantity: lot.quantity,
-          }}
-        />
+        {customer ? (
+          <AddToCartButton
+            lot={{
+              lotId: lot.id,
+              productId,
+              productName,
+              barcode: lot.barcode,
+              weight: lot.weight,
+              priceEur: lot.priceEur,
+              quantity: lot.quantity,
+            }}
+          />
+        ) : (
+          <Link
+            href={`/login?returnTo=${encodeURIComponent(`/lot/${lot.barcode}`)}`}
+            className="inline-flex shrink-0 items-center justify-center rounded-lg bg-emerald-600 px-3 py-2 text-sm font-medium text-white transition hover:bg-emerald-700"
+          >
+            Увійти
+          </Link>
+        )}
       </div>
     </div>
   );

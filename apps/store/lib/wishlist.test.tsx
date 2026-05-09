@@ -1,5 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { renderHook, act } from "@testing-library/react";
+import { renderHook, act, waitFor } from "@testing-library/react";
+import { type ReactNode } from "react";
+import { CustomerProvider } from "./customer-context";
 import {
   WishlistProvider,
   useWishlist,
@@ -191,5 +193,37 @@ describe("useWishlist", () => {
   it("wishlistItemKey produces lot-{id} for lots and product-{id} for products", () => {
     expect(wishlistItemKey(mockItem)).toBe("product-p1");
     expect(wishlistItemKey(mockLot)).toBe("lot-lot-1");
+  });
+
+  it("does not re-fire favorites sync when items change for the same customer", async () => {
+    // Fix 8 regression test: the merge effect previously had `items` in its
+    // deps array, so each addItem/removeItem retriggered it. With items
+    // moved into a ref, sync runs once per (customer.id, loaded).
+    const fetchSpy = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValue(
+        new Response(JSON.stringify({ items: [] }), { status: 200 }),
+      );
+
+    const wrapper = ({ children }: { children: ReactNode }) => (
+      <CustomerProvider customer={{ id: "customer-x", name: "X" }}>
+        <WishlistProvider>{children}</WishlistProvider>
+      </CustomerProvider>
+    );
+
+    const { result } = renderHook(() => useWishlist(), { wrapper });
+
+    await waitFor(() => {
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+    });
+
+    act(() => result.current.addItem(mockItem));
+    act(() => result.current.addItem(mockItem2));
+    act(() => result.current.removeItem(wishlistItemKey(mockItem)));
+
+    // Allow any pending microtasks to drain.
+    await new Promise((r) => setTimeout(r, 10));
+
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
   });
 });

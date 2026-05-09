@@ -18,8 +18,10 @@ import { LotsCategoryPills } from "@/components/store/lots-category-pills";
 import { LotsSortSelect } from "@/components/store/lots-sort-select";
 import { CatalogLayoutToggle } from "@/components/store/catalog-layout-toggle";
 import { getCurrentRate } from "@/lib/exchange-rate";
+import { getCurrentCustomer } from "@/lib/customer-auth";
 
-export const revalidate = 60;
+// Cookie-aware (price gate depends on the ltex_customer cookie); skip ISR.
+export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "Лоти (мішки) — секонд хенд, сток, іграшки гуртом",
@@ -128,6 +130,38 @@ function buildChips(params: SearchParams): ChipDescriptor[] {
       ],
     });
   }
+  for (const g of parseList(getStr(params, "gender"))) {
+    chips.push({
+      key: `gender:${g}`,
+      label: g,
+      removeParams: [
+        {
+          key: "gender",
+          nextValue: parseList(getStr(params, "gender"))
+            .filter((x) => x !== g)
+            .join(","),
+        },
+      ],
+    });
+  }
+  const upkMin = getStr(params, "unitsPerKgMin");
+  const upkMax = getStr(params, "unitsPerKgMax");
+  if (upkMin || upkMax) {
+    chips.push({
+      key: "unitsPerKg",
+      label: `${upkMin || "0"}–${upkMax || "∞"} шт/кг`,
+      removeParams: [{ key: "unitsPerKgMin" }, { key: "unitsPerKgMax" }],
+    });
+  }
+  const uwMin = getStr(params, "unitWeightMin");
+  const uwMax = getStr(params, "unitWeightMax");
+  if (uwMin || uwMax) {
+    chips.push({
+      key: "unitWeight",
+      label: `${uwMin || "0"}–${uwMax || "∞"} кг`,
+      removeParams: [{ key: "unitWeightMin" }, { key: "unitWeightMax" }],
+    });
+  }
   const wMin = getStr(params, "weightMin");
   const wMax = getStr(params, "weightMax");
   if (wMin || wMax) {
@@ -207,10 +241,15 @@ export default async function LotsPage({
   const qualities = parseList(getStr(params, "quality"));
   const seasons = parseList(getStr(params, "season"));
   const countries = parseList(getStr(params, "country"));
+  const genders = parseList(getStr(params, "gender"));
   const weightMin = parsePositiveFloat(getStr(params, "weightMin"));
   const weightMax = parsePositiveFloat(getStr(params, "weightMax"));
   const priceMin = parsePositiveFloat(getStr(params, "priceMin"));
   const priceMax = parsePositiveFloat(getStr(params, "priceMax"));
+  const unitsPerKgMin = parsePositiveFloat(getStr(params, "unitsPerKgMin"));
+  const unitsPerKgMax = parsePositiveFloat(getStr(params, "unitsPerKgMax"));
+  const unitWeightMin = parsePositiveFloat(getStr(params, "unitWeightMin"));
+  const unitWeightMax = parsePositiveFloat(getStr(params, "unitWeightMax"));
   const query = (getStr(params, "q") ?? "").trim();
   const sort = getStr(params, "sort") ?? "newest";
   const layout: "grid" | "list" =
@@ -252,6 +291,19 @@ export default async function LotsPage({
   if (qualities.length > 0) productWhere.quality = { in: qualities };
   if (seasons.length > 0) productWhere.season = { in: seasons };
   if (countries.length > 0) productWhere.country = { in: countries };
+  if (genders.length > 0) productWhere.gender = { in: genders };
+  if (typeof unitsPerKgMin === "number") {
+    productWhere.unitsPerKgMax = { gte: unitsPerKgMin };
+  }
+  if (typeof unitsPerKgMax === "number") {
+    productWhere.unitsPerKgMin = { lte: unitsPerKgMax };
+  }
+  if (typeof unitWeightMin === "number") {
+    productWhere.unitWeightMax = { gte: unitWeightMin };
+  }
+  if (typeof unitWeightMax === "number") {
+    productWhere.unitWeightMin = { lte: unitWeightMax };
+  }
   if (Object.keys(productWhere).length > 0) {
     where.product = productWhere;
   }
@@ -338,6 +390,11 @@ export default async function LotsPage({
   const totalPages = Math.max(1, Math.ceil(total / PER_PAGE));
   const baseHref = buildBaseHref(params);
   const chips = buildChips(params);
+
+  // Hide prices from unauthenticated visitors (price gate, S73). Server-side
+  // strip → guests never see EUR/UAH numbers even if they bypass the client.
+  const customer = await getCurrentCustomer();
+  const isAuthed = customer !== null;
 
   return (
     <div className="container mx-auto px-4 py-6">
@@ -444,7 +501,7 @@ export default async function LotsPage({
                     barcode: lot.barcode,
                     weight: lot.weight,
                     quantity: lot.quantity,
-                    priceEur: lot.priceEur,
+                    priceEur: isAuthed ? lot.priceEur : null,
                     videoUrl: lot.videoUrl,
                     status: lot.status,
                     createdAt: lot.createdAt.toISOString(),
@@ -457,7 +514,7 @@ export default async function LotsPage({
                   }}
                   rate={rate}
                   salePercent={
-                    lot.status === "on_sale"
+                    isAuthed && lot.status === "on_sale"
                       ? computeSalePercent(lot.product.prices)
                       : undefined
                   }

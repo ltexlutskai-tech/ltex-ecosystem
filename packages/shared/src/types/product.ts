@@ -9,14 +9,21 @@ export const PRICE_UNIT_LABELS: Record<PriceUnit, string> = {
   piece: "€/шт",
 };
 
-export const SEASONS = ["winter", "summer", "demiseason", ""] as const;
+export const SEASONS = [
+  "winter",
+  "summer",
+  "demiseason",
+  "all_season",
+  "",
+] as const;
 export type Season = (typeof SEASONS)[number];
 
 export const SEASON_LABELS: Record<string, string> = {
   winter: "Зима",
   summer: "Літо",
   demiseason: "Демісезон",
-  "": "Всесезон",
+  all_season: "Всесезонне",
+  "": "—",
 };
 
 export interface Product {
