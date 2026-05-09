@@ -400,6 +400,24 @@ async function reconcileCategories(
 
 // ─── Phase 4: product upsert ────────────────────────────────────────────────
 
+/**
+ * Run `fn` over `items` in fixed-size batches with bounded concurrency.
+ * 4 is the tested sweet spot for local Postgres (no pool tuning needed).
+ */
+async function processInBatches<T, R>(
+  items: T[],
+  batchSize: number,
+  fn: (item: T) => Promise<R>,
+): Promise<R[]> {
+  const results: R[] = [];
+  for (let i = 0; i < items.length; i += batchSize) {
+    const batch = items.slice(i, i + batchSize);
+    const batchResults = await Promise.all(batch.map(fn));
+    results.push(...batchResults);
+  }
+  return results;
+}
+
 async function buildCategoryIdMap(): Promise<Map<string, string>> {
   if (!dbAvailable) return new Map();
   const cats = await prisma.category.findMany({
@@ -794,6 +812,18 @@ async function main() {
   const toCreate: ProductReportEntry[] = [];
   const toUpdate: ProductReportEntry[] = [];
 
+  // Phase 4a (sequential): resolve category, slug-uniqueness and build report
+  // entries. Slug collision detection requires linear state (`allSlugs`) so
+  // this part stays single-threaded; the actual DB writes run concurrently
+  // below.
+  type UpsertTarget = {
+    row: ParsedRow;
+    categoryId: string;
+    slug: string;
+    existing: { id: string; slug: string } | null;
+  };
+  const upsertTargets: UpsertTarget[] = [];
+
   for (const row of rows) {
     const targetSlug = row.categorySlug ?? "inshe-odyag";
     const categoryId = categoryIdBySlug.get(targetSlug);
@@ -828,13 +858,23 @@ async function main() {
     if (action === "CREATE") toCreate.push(entry);
     else toUpdate.push(entry);
 
-    if (!DRY_RUN) {
-      // Reload product slug map so the next row can detect collisions among
-      // newly-inserted siblings (the primary `slug @unique` constraint already
-      // enforces this; this is purely for tighter reporting).
-      await upsertProductRow(row, categoryId, slug, existing);
-      allSlugs.add(slug);
-    }
+    upsertTargets.push({ row, categoryId, slug, existing });
+    // Track slug as taken for the next row's uniqueness check. The DB
+    // `slug @unique` constraint is the actual safety net.
+    allSlugs.add(slug);
+  }
+
+  // Phase 4b (concurrent): execute the DB upserts in batches of 4. The local
+  // Postgres pool stays well under saturation at this concurrency, and each
+  // upsertProductRow only touches its own product + price rows (no cross-row
+  // dependencies once slugs are resolved).
+  if (!DRY_RUN) {
+    await processInBatches(
+      upsertTargets,
+      4,
+      ({ row, categoryId, slug, existing }) =>
+        upsertProductRow(row, categoryId, slug, existing),
+    );
   }
 
   // Phase 5: deletions

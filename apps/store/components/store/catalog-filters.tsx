@@ -9,12 +9,14 @@ import { GENDER_OPTIONS } from "@ltex/shared";
 import { SearchAutocomplete } from "./search-autocomplete";
 import { RangeWithInputs } from "./range-with-inputs";
 import { getDictionary } from "@/lib/i18n";
+import {
+  DEFAULT_PRICE_RANGE,
+  DEFAULT_UNITS_RANGE,
+  DEFAULT_WEIGHT_RANGE,
+} from "@/lib/filter-constants";
+import { useUrlSyncedRange } from "@/lib/use-url-synced-range";
 
 const dict = getDictionary();
-
-const DEFAULT_PRICE_RANGE: [number, number] = [0, 100];
-const DEFAULT_UNITS_RANGE: [number, number] = [1, 1000];
-const DEFAULT_WEIGHT_RANGE: [number, number] = [1, 1000];
 
 export interface SubcategoryOption {
   slug: string;
@@ -51,52 +53,50 @@ export function CatalogFilters({
     [searchParams],
   );
 
-  const urlUnitsMin = searchParams.get("unitsPerKgMin");
-  const urlUnitsMax = searchParams.get("unitsPerKgMax");
-  const urlWeightMin = searchParams.get("unitWeightMin");
-  const urlWeightMax = searchParams.get("unitWeightMax");
-
-  // unitsPerKg / unitWeight bounds are static — the catalog spans the full
-  // 1..1000 range and the previous /api/catalog/numeric-ranges endpoint
-  // returned identical hardcoded constants. Inlined here to skip a useless
-  // network round-trip on every catalog visit.
-  const unitsBounds = DEFAULT_UNITS_RANGE;
-  const weightBounds = DEFAULT_WEIGHT_RANGE;
-  const [unitsValue, setUnitsValue] = useState<[number, number]>([
-    urlUnitsMin ? Number(urlUnitsMin) : DEFAULT_UNITS_RANGE[0],
-    urlUnitsMax ? Number(urlUnitsMax) : DEFAULT_UNITS_RANGE[1],
-  ]);
-  const [weightValue, setWeightValue] = useState<[number, number]>([
-    urlWeightMin ? Number(urlWeightMin) : DEFAULT_WEIGHT_RANGE[0],
-    urlWeightMax ? Number(urlWeightMax) : DEFAULT_WEIGHT_RANGE[1],
-  ]);
-
   const [priceBounds, setPriceBounds] =
     useState<[number, number]>(DEFAULT_PRICE_RANGE);
-  const urlPriceMin = searchParams.get("priceMin");
-  const urlPriceMax = searchParams.get("priceMax");
-  const [priceValue, setPriceValue] = useState<[number, number]>([
-    urlPriceMin ? Number(urlPriceMin) : DEFAULT_PRICE_RANGE[0],
-    urlPriceMax ? Number(urlPriceMax) : DEFAULT_PRICE_RANGE[1],
-  ]);
+
+  const {
+    value: unitsValue,
+    setValue: setUnitsValue,
+    commit: commitUnitsRange,
+  } = useUrlSyncedRange({
+    paramMin: "unitsPerKgMin",
+    paramMax: "unitsPerKgMax",
+    bounds: DEFAULT_UNITS_RANGE,
+    resetParams: ["page"],
+  });
+  const {
+    value: weightValue,
+    setValue: setWeightValue,
+    commit: commitWeightRange,
+  } = useUrlSyncedRange({
+    paramMin: "unitWeightMin",
+    paramMax: "unitWeightMax",
+    bounds: DEFAULT_WEIGHT_RANGE,
+    resetParams: ["page"],
+  });
+  const {
+    value: priceValue,
+    setValue: setPriceValue,
+    commit: commitPriceRange,
+  } = useUrlSyncedRange({
+    paramMin: "priceMin",
+    paramMax: "priceMax",
+    bounds: priceBounds,
+    resetParams: ["page"],
+  });
 
   // Fetch real min/max once on mount. The endpoint is cached for 5min so we
-  // don't need to re-fetch on every navigation.
+  // don't need to re-fetch on every navigation. The hook's URL→state sync
+  // re-initializes the slider when `priceBounds` updates.
   useEffect(() => {
     let cancelled = false;
     fetch("/api/catalog/price-range")
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
         if (cancelled || !data) return;
-        const next: [number, number] = [data.min, data.max];
-        setPriceBounds(next);
-        // Initialize slider to bounds when no URL value is set.
-        setPriceValue((prev) => {
-          const lo = urlPriceMin ? Number(urlPriceMin) : data.min;
-          const hi = urlPriceMax ? Number(urlPriceMax) : data.max;
-          if (prev[0] === lo && prev[1] === hi) return prev;
-          return [lo, hi];
-        });
+        setPriceBounds([data.min, data.max]);
       })
       .catch(() => {
         // Network error → keep defaults.
@@ -104,31 +104,7 @@ export function CatalogFilters({
     return () => {
       cancelled = true;
     };
-    // Intentionally excluded url deps — bounds fetched once.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  // Sync slider when URL changes externally (e.g. clear all).
-  useEffect(() => {
-    setPriceValue([
-      urlPriceMin ? Number(urlPriceMin) : priceBounds[0],
-      urlPriceMax ? Number(urlPriceMax) : priceBounds[1],
-    ]);
-  }, [urlPriceMin, urlPriceMax, priceBounds]);
-
-  // Sync sliders when URL changes externally.
-  useEffect(() => {
-    setUnitsValue([
-      urlUnitsMin ? Number(urlUnitsMin) : unitsBounds[0],
-      urlUnitsMax ? Number(urlUnitsMax) : unitsBounds[1],
-    ]);
-  }, [urlUnitsMin, urlUnitsMax, unitsBounds]);
-  useEffect(() => {
-    setWeightValue([
-      urlWeightMin ? Number(urlWeightMin) : weightBounds[0],
-      urlWeightMax ? Number(urlWeightMax) : weightBounds[1],
-    ]);
-  }, [urlWeightMin, urlWeightMax, weightBounds]);
 
   const updateFilter = useCallback(
     (key: string, value: string) => {
@@ -155,57 +131,19 @@ export function CatalogFilters({
     [searchParams, updateFilter],
   );
 
-  const commitUnitsRange = useCallback(
-    ([lo, hi]: [number, number]) => {
-      const params = new URLSearchParams(searchParams.toString());
-      if (lo > unitsBounds[0]) params.set("unitsPerKgMin", String(lo));
-      else params.delete("unitsPerKgMin");
-      if (hi < unitsBounds[1]) params.set("unitsPerKgMax", String(hi));
-      else params.delete("unitsPerKgMax");
-      params.delete("page");
-      router.push(`${pathname}?${params.toString()}`);
-    },
-    [router, pathname, searchParams, unitsBounds],
-  );
-
-  const commitWeightRange = useCallback(
-    ([lo, hi]: [number, number]) => {
-      const params = new URLSearchParams(searchParams.toString());
-      if (lo > weightBounds[0]) params.set("unitWeightMin", String(lo));
-      else params.delete("unitWeightMin");
-      if (hi < weightBounds[1]) params.set("unitWeightMax", String(hi));
-      else params.delete("unitWeightMax");
-      params.delete("page");
-      router.push(`${pathname}?${params.toString()}`);
-    },
-    [router, pathname, searchParams, weightBounds],
-  );
-
-  const commitPriceRange = useCallback(
-    ([lo, hi]: [number, number]) => {
-      const params = new URLSearchParams(searchParams.toString());
-      if (lo > priceBounds[0]) {
-        params.set("priceMin", String(lo));
-      } else {
-        params.delete("priceMin");
-      }
-      if (hi < priceBounds[1]) {
-        params.set("priceMax", String(hi));
-      } else {
-        params.delete("priceMax");
-      }
-      params.delete("page");
-      router.push(`${pathname}?${params.toString()}`);
-    },
-    [router, pathname, searchParams, priceBounds],
-  );
-
   const clearAll = useCallback(() => {
     setPriceValue(priceBounds);
-    setUnitsValue(unitsBounds);
-    setWeightValue(weightBounds);
+    setUnitsValue(DEFAULT_UNITS_RANGE);
+    setWeightValue(DEFAULT_WEIGHT_RANGE);
     router.push(pathname);
-  }, [router, pathname, priceBounds, unitsBounds, weightBounds]);
+  }, [
+    router,
+    pathname,
+    priceBounds,
+    setPriceValue,
+    setUnitsValue,
+    setWeightValue,
+  ]);
 
   const hasFilters =
     searchParams.get("q") ||
@@ -329,8 +267,8 @@ export function CatalogFilters({
       <div>
         <span className={labelClass}>{dict.catalog.unitsPerKgLabel}</span>
         <RangeWithInputs
-          min={unitsBounds[0]}
-          max={unitsBounds[1]}
+          min={DEFAULT_UNITS_RANGE[0]}
+          max={DEFAULT_UNITS_RANGE[1]}
           value={unitsValue}
           onChange={setUnitsValue}
           onCommit={commitUnitsRange}
@@ -344,8 +282,8 @@ export function CatalogFilters({
       <div>
         <span className={labelClass}>{dict.catalog.unitWeightLabel}</span>
         <RangeWithInputs
-          min={weightBounds[0]}
-          max={weightBounds[1]}
+          min={DEFAULT_WEIGHT_RANGE[0]}
+          max={DEFAULT_WEIGHT_RANGE[1]}
           value={weightValue}
           onChange={setWeightValue}
           onCommit={commitWeightRange}
