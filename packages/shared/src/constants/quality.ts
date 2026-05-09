@@ -5,6 +5,9 @@ export const QUALITY_LEVELS = [
   "second",
   "stock",
   "mix",
+  "extra_first",
+  "extra_cream",
+  "first_second",
 ] as const;
 
 export type QualityLevel = (typeof QUALITY_LEVELS)[number];
@@ -16,4 +19,7 @@ export const QUALITY_LABELS: Record<QualityLevel, string> = {
   second: "2й сорт",
   stock: "Сток",
   mix: "Мікс",
+  extra_first: "Екстра + 1й сорт",
+  extra_cream: "Екстра + Крем",
+  first_second: "1й + 2й сорт",
 };

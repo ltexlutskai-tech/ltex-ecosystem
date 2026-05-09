@@ -49,7 +49,12 @@ model Product {
   gender        String?
   sizes         String?
   unitsPerKg    String?  @map("units_per_kg")
+  unitsPerKgMin Float?   @map("units_per_kg_min")
+  unitsPerKgMax Float?   @map("units_per_kg_max")
   unitWeight    String?  @map("unit_weight")
+  unitWeightMin Float?   @map("unit_weight_min")
+  unitWeightMax Float?   @map("unit_weight_max")
+  isOversize    Boolean  @default(false) @map("is_oversize")
   createdAt     DateTime @default(now()) @map("created_at")
   updatedAt     DateTime @updatedAt @map("updated_at")
 
@@ -68,6 +73,11 @@ model Product {
   @@index([quality])
   @@index([inStock])
   @@index([articleCode])
+  @@index([unitsPerKgMin])
+  @@index([unitsPerKgMax])
+  @@index([unitWeightMin])
+  @@index([unitWeightMax])
+  @@index([isOversize])
   @@map("products")
 }
 
@@ -475,4 +485,28 @@ model ViewLog {
   @@index([customerId, viewedAt])
   @@index([productId, viewedAt])
   @@map("view_log")
+}
+
+// ─── Email DLQ (persistent retry queue, Session 70) ─────────────────────────
+
+model EmailJob {
+  id            String    @id @default(cuid())
+  to            String    @map("to_address")
+  subject       String
+  htmlBody      String    @map("html_body")
+  textBody      String?   @map("text_body")
+  source        String
+  referenceId   String?   @map("reference_id")
+  status        String    @default("pending")
+  attempts      Int       @default(0)
+  maxAttempts   Int       @default(5) @map("max_attempts")
+  nextAttemptAt DateTime  @default(now()) @map("next_attempt_at")
+  lastError     String?   @map("last_error")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+  sentAt        DateTime? @map("sent_at")
+
+  @@index([status, nextAttemptAt])
+  @@index([source, createdAt])
+  @@map("email_jobs")
 }

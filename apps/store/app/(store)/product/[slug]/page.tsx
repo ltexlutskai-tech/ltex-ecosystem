@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { cache, Suspense } from "react";
-import dynamic from "next/dynamic";
+import nextDynamic from "next/dynamic";
 import { prisma } from "@ltex/db";
 import { notFound } from "next/navigation";
 import {
@@ -24,10 +24,12 @@ import {
   getFrequentlyBoughtTogether,
 } from "@/lib/recommendations";
 import { TrackProductView } from "@/components/store/track-product-view";
+import { PriceOrLogin } from "@/components/store/price-or-login";
 import { getDictionary } from "@/lib/i18n";
 import { getCurrentRate, eurToUah, formatUah } from "@/lib/exchange-rate";
+import { getCurrentCustomer, stripPricesForGuests } from "@/lib/customer-auth";
 
-const ImageGallery = dynamic(
+const ImageGallery = nextDynamic(
   () => import("@/components/store/image-gallery").then((m) => m.ImageGallery),
   {
     loading: () => (
@@ -38,7 +40,8 @@ const ImageGallery = dynamic(
 
 const dict = getDictionary();
 
-export const revalidate = 300;
+// Cookie-aware (price gate); skip ISR.
+export const dynamic = "force-dynamic";
 
 const getProduct = cache(async (slug: string) => {
   return prisma.product.findUnique({
@@ -128,10 +131,16 @@ export default async function ProductPage({ params }: Props) {
   const product = await getProduct(slug);
   if (!product) notFound();
 
-  const wholesalePrice = product.prices.find(
+  const customer = await getCurrentCustomer();
+  const isAuthed = customer !== null;
+
+  const rawWholesalePrice = product.prices.find(
     (p) => p.priceType === "wholesale",
   );
-  const salePrice = product.prices.find((p) => p.priceType === "akciya");
+  const rawSalePrice = product.prices.find((p) => p.priceType === "akciya");
+  // Price gate: hide pricing data from guests entirely.
+  const wholesalePrice = isAuthed ? rawWholesalePrice : undefined;
+  const salePrice = isAuthed ? rawSalePrice : undefined;
   const displayPrice = salePrice?.amount ?? wholesalePrice?.amount ?? null;
   const regularPrice =
     salePrice && wholesalePrice ? wholesalePrice.amount : null;
@@ -230,7 +239,7 @@ export default async function ProductPage({ params }: Props) {
           </div>
 
           {/* Price */}
-          {displayPrice !== null && (
+          {displayPrice !== null ? (
             <div className="flex flex-wrap items-baseline gap-3">
               <span
                 className={`text-4xl font-bold ${hasSale ? "text-red-600" : "text-green-700"}`}
@@ -256,6 +265,8 @@ export default async function ProductPage({ params }: Props) {
                 </span>
               )}
             </div>
+          ) : (
+            <PriceOrLogin priceEur={null} hideUnit size="lg" />
           )}
 
           {/* Stock indicator */}
@@ -296,14 +307,14 @@ export default async function ProductPage({ params }: Props) {
           )}
 
           {/* CTA buttons */}
-          {displayPrice !== null && (
+          {!isAuthed ? (
             <div className="flex gap-3">
-              <AddProductToCartButton
-                productId={product.id}
-                productName={product.name}
-                priceEur={displayPrice}
-                weight={product.averageWeight ?? 25}
-              />
+              <a
+                href={`/login?returnTo=${encodeURIComponent(`/product/${product.slug}`)}`}
+                className="inline-flex flex-1 items-center justify-center rounded-lg bg-emerald-600 px-4 py-3 text-sm font-medium text-white transition hover:bg-emerald-700"
+              >
+                Увійти, щоб додати в кошик
+              </a>
               <WishlistButton
                 product={{
                   productId: product.id,
@@ -311,12 +322,35 @@ export default async function ProductPage({ params }: Props) {
                   name: product.name,
                   quality: product.quality,
                   imageUrl: heroImage,
-                  priceEur: displayPrice,
+                  priceEur: null,
                   priceUnit: product.priceUnit,
                 }}
                 size="md"
               />
             </div>
+          ) : (
+            displayPrice !== null && (
+              <div className="flex gap-3">
+                <AddProductToCartButton
+                  productId={product.id}
+                  productName={product.name}
+                  priceEur={displayPrice}
+                  weight={product.averageWeight ?? 25}
+                />
+                <WishlistButton
+                  product={{
+                    productId: product.id,
+                    slug: product.slug,
+                    name: product.name,
+                    quality: product.quality,
+                    imageUrl: heroImage,
+                    priceEur: displayPrice,
+                    priceUnit: product.priceUnit,
+                  }}
+                  size="md"
+                />
+              </div>
+            )
           )}
           <p className="-mt-2 text-xs text-gray-500">
             Замовлення обробляє менеджер. Передоплата не потрібна — ми
@@ -344,7 +378,10 @@ export default async function ProductPage({ params }: Props) {
           barcode: lot.barcode,
           weight: lot.weight,
           quantity: lot.quantity,
-          priceEur: lot.priceEur,
+          // Strip prices server-side for guests — the prop ships in the React
+          // server payload, so a client-side hide-only would still leak via
+          // View Source / DevTools.
+          priceEur: isAuthed ? lot.priceEur : 0,
           videoUrl: lot.videoUrl,
           status: lot.status,
         }))}
@@ -434,10 +471,18 @@ function RecommendationsSkeleton() {
 }
 
 async function RecommendationsSection({ productId }: { productId: string }) {
-  const [similar, boughtTogether] = await Promise.all([
+  const customer = await getCurrentCustomer();
+  let [similar, boughtTogether] = await Promise.all([
     getRecommendations(productId, 6),
     getFrequentlyBoughtTogether(productId, 4),
   ]);
+
+  if (!customer) {
+    [similar, boughtTogether] = await Promise.all([
+      stripPricesForGuests(similar, false),
+      stripPricesForGuests(boughtTogether, false),
+    ]);
+  }
 
   if (similar.length === 0 && boughtTogether.length === 0) return null;
 

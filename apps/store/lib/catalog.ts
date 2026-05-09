@@ -5,6 +5,24 @@ import {
   type ProductImage,
   type Price,
 } from "@ltex/db";
+import { OVERSIZE_SLUG } from "@ltex/shared";
+import { getCurrentCustomer } from "./customer-auth";
+
+/**
+ * Strip wholesale prices for unauthenticated visitors. Server-side
+ * scrubbing makes the price gate (S73) effective even when an attacker
+ * targets the API directly — the rendered guest tree never holds a price.
+ *
+ * Returns a fresh array with cloned items so the result is never aliased
+ * with cached state held elsewhere.
+ */
+async function maybeStripPrices(
+  products: ProductWithRelations[],
+): Promise<ProductWithRelations[]> {
+  const customer = await getCurrentCustomer();
+  if (customer) return products;
+  return products.map((p) => ({ ...p, prices: [] }));
+}
 
 interface CatalogParams {
   categoryId?: string;
@@ -13,6 +31,11 @@ interface CatalogParams {
   quality?: string | string[];
   season?: string;
   country?: string | string[];
+  gender?: string | string[];
+  unitsPerKgMin?: number;
+  unitsPerKgMax?: number;
+  unitWeightMin?: number;
+  unitWeightMax?: number;
   q?: string;
   sort?: string;
   priceMin?: number;
@@ -67,6 +90,11 @@ export async function getCatalogProducts(
     quality,
     season,
     country,
+    gender,
+    unitsPerKgMin,
+    unitsPerKgMax,
+    unitWeightMin,
+    unitWeightMax,
     q,
     sort,
     priceMin,
@@ -78,14 +106,27 @@ export async function getCatalogProducts(
 
   // If search query is provided, use full-text search for ranking
   if (q && q.trim().length >= 2) {
-    return fullTextSearch({ ...params, q: q.trim(), page, perPage });
+    const result = await fullTextSearch({
+      ...params,
+      q: q.trim(),
+      page,
+      perPage,
+    });
+    return {
+      ...result,
+      products: await maybeStripPrices(result.products),
+    };
   }
 
   const where: Prisma.ProductWhereInput = { inStock: true };
 
-  // subcategorySlug narrows to an exact sub-category; it takes precedence
-  // over categoryIds so that "вибрана підкатегорія" wins over the parent tree.
-  if (subcategorySlug) {
+  // The OVERSIZE_SLUG is a cross-cutting tag — match all products with
+  // isOversize=true across every category, ignoring any category filter.
+  if (subcategorySlug === OVERSIZE_SLUG) {
+    where.isOversize = true;
+  } else if (subcategorySlug) {
+    // subcategorySlug narrows to an exact sub-category; it takes precedence
+    // over categoryIds so that "вибрана підкатегорія" wins over the parent tree.
     where.category = { slug: subcategorySlug };
   } else if (categoryIds && categoryIds.length > 0) {
     where.categoryId = { in: categoryIds };
@@ -104,6 +145,52 @@ export async function getCatalogProducts(
     where.country = Array.isArray(countryValue)
       ? { in: countryValue }
       : countryValue;
+  }
+
+  const genderValue = parseMultiValue(gender);
+  if (genderValue) {
+    where.gender = Array.isArray(genderValue)
+      ? { in: genderValue }
+      : genderValue;
+  }
+
+  // Range overlap filters: product is included when its [Min, Max] interval
+  // intersects [filterMin, filterMax]. This is equivalent to:
+  //   productMax ≥ filterMin AND productMin ≤ filterMax.
+  //
+  // NULL handling: most products were imported without a parsed numeric
+  // range, so unitsPerKgMin/Max and unitWeightMin/Max are NULL. Postgres
+  // treats `NULL gte X` as unknown → row excluded, which silently hid ~70%
+  // of products as soon as a slider moved off default. We OR-in `null`
+  // matches so products without numeric data stay visible. Trade-off: those
+  // products always show, even when the slider is narrowed — preferable to
+  // hiding the bulk of the catalog.
+  const rangeAnd: Prisma.ProductWhereInput[] = [];
+  if (unitsPerKgMin != null) {
+    rangeAnd.push({
+      OR: [{ unitsPerKgMax: { gte: unitsPerKgMin } }, { unitsPerKgMax: null }],
+    });
+  }
+  if (unitsPerKgMax != null) {
+    rangeAnd.push({
+      OR: [{ unitsPerKgMin: { lte: unitsPerKgMax } }, { unitsPerKgMin: null }],
+    });
+  }
+  if (unitWeightMin != null) {
+    rangeAnd.push({
+      OR: [{ unitWeightMax: { gte: unitWeightMin } }, { unitWeightMax: null }],
+    });
+  }
+  if (unitWeightMax != null) {
+    rangeAnd.push({
+      OR: [{ unitWeightMin: { lte: unitWeightMax } }, { unitWeightMin: null }],
+    });
+  }
+  if (rangeAnd.length > 0) {
+    where.AND = [
+      ...((where.AND as Prisma.ProductWhereInput[]) ?? []),
+      ...rangeAnd,
+    ];
   }
 
   if (inStockOnly) {
@@ -151,7 +238,8 @@ export async function getCatalogProducts(
     });
   }
 
-  return { products, total, totalPages: Math.ceil(total / perPage) };
+  const sanitized = await maybeStripPrices(products);
+  return { products: sanitized, total, totalPages: Math.ceil(total / perPage) };
 }
 
 /**
@@ -170,6 +258,11 @@ async function fullTextSearch(
     quality,
     season,
     country,
+    gender,
+    unitsPerKgMin,
+    unitsPerKgMax,
+    unitWeightMin,
+    unitWeightMax,
     q,
     priceMin,
     priceMax,
@@ -195,7 +288,9 @@ async function fullTextSearch(
   const queryParams: (string | number)[] = [words, `%${q}%`];
   let paramIdx = 3;
 
-  if (subcategorySlug) {
+  if (subcategorySlug === OVERSIZE_SLUG) {
+    filterConditions.push(`p.is_oversize = true`);
+  } else if (subcategorySlug) {
     filterConditions.push(
       `EXISTS (SELECT 1 FROM categories c WHERE c.id = p.category_id AND c.slug = $${paramIdx})`,
     );
@@ -260,6 +355,52 @@ async function fullTextSearch(
       `EXISTS (SELECT 1 FROM prices pr WHERE pr.product_id = p.id AND pr.price_type = 'wholesale' AND pr.amount <= $${paramIdx})`,
     );
     queryParams.push(priceMax);
+    paramIdx++;
+  }
+  const genderValue = parseMultiValue(gender);
+  if (genderValue) {
+    if (Array.isArray(genderValue)) {
+      const placeholders = genderValue
+        .map((_, i) => `$${paramIdx + i}`)
+        .join(", ");
+      filterConditions.push(`p.gender IN (${placeholders})`);
+      queryParams.push(...genderValue);
+      paramIdx += genderValue.length;
+    } else {
+      filterConditions.push(`p.gender = $${paramIdx}`);
+      queryParams.push(genderValue);
+      paramIdx++;
+    }
+  }
+  // Range NULL handling: include rows whose numeric column is NULL so we
+  // don't silently hide products without parsed range data. See the matching
+  // explainer above getCatalogProducts' rangeAnd block.
+  if (unitsPerKgMin != null) {
+    filterConditions.push(
+      `(p.units_per_kg_max >= $${paramIdx} OR p.units_per_kg_max IS NULL)`,
+    );
+    queryParams.push(unitsPerKgMin);
+    paramIdx++;
+  }
+  if (unitsPerKgMax != null) {
+    filterConditions.push(
+      `(p.units_per_kg_min <= $${paramIdx} OR p.units_per_kg_min IS NULL)`,
+    );
+    queryParams.push(unitsPerKgMax);
+    paramIdx++;
+  }
+  if (unitWeightMin != null) {
+    filterConditions.push(
+      `(p.unit_weight_max >= $${paramIdx} OR p.unit_weight_max IS NULL)`,
+    );
+    queryParams.push(unitWeightMin);
+    paramIdx++;
+  }
+  if (unitWeightMax != null) {
+    filterConditions.push(
+      `(p.unit_weight_min <= $${paramIdx} OR p.unit_weight_min IS NULL)`,
+    );
+    queryParams.push(unitWeightMax);
     paramIdx++;
   }
   if (inStockOnly) {

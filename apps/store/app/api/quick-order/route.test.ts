@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest } from "next/server";
 
-const { mockPrisma, rateLimitMock, notifyMock, sendEmailMock } = vi.hoisted(
-  () => ({
+const { mockPrisma, rateLimitMock, notifyMock, notifyLeadMock, sendEmailMock } =
+  vi.hoisted(() => ({
     mockPrisma: {
       lot: { findUnique: vi.fn(), update: vi.fn() },
       customer: { findFirst: vi.fn(), create: vi.fn() },
@@ -15,9 +15,9 @@ const { mockPrisma, rateLimitMock, notifyMock, sendEmailMock } = vi.hoisted(
       .fn()
       .mockReturnValue({ allowed: true, remaining: 3, resetAt: Date.now() }),
     notifyMock: vi.fn().mockResolvedValue(undefined),
+    notifyLeadMock: vi.fn().mockResolvedValue(undefined),
     sendEmailMock: vi.fn().mockResolvedValue(undefined),
-  }),
-);
+  }));
 
 vi.mock("@ltex/db", () => ({
   prisma: mockPrisma,
@@ -30,6 +30,7 @@ vi.mock("@/lib/rate-limit", () => ({
 
 vi.mock("@/lib/notifications", () => ({
   notifyNewOrder: (...args: unknown[]) => notifyMock(...args),
+  notifyNewLead: (...args: unknown[]) => notifyLeadMock(...args),
 }));
 
 vi.mock("@/lib/email", () => ({
@@ -152,5 +153,29 @@ describe("POST /api/quick-order", () => {
     const res = await POST(makeRequest(validBody));
     expect(res.status).toBe(201);
     expect(sendEmailMock).not.toHaveBeenCalled();
+  });
+
+  it("fires notifyNewLead with source 'quick-order' when a new customer is created", async () => {
+    const res = await POST(makeRequest(validBody));
+    expect(res.status).toBe(201);
+    expect(notifyLeadMock).toHaveBeenCalledTimes(1);
+    expect(notifyLeadMock).toHaveBeenCalledWith({
+      customerId: "cust-1",
+      phone: "+380676710515",
+      name: "Тест",
+      source: "quick-order",
+    });
+  });
+
+  it("does NOT fire notifyNewLead for an existing customer", async () => {
+    mockPrisma.customer.findFirst.mockResolvedValue({
+      id: "cust-existing",
+      name: "Стара",
+      phone: "+380676710515",
+      email: null,
+    });
+    const res = await POST(makeRequest(validBody));
+    expect(res.status).toBe(201);
+    expect(notifyLeadMock).not.toHaveBeenCalled();
   });
 });

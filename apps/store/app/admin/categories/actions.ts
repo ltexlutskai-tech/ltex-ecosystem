@@ -25,6 +25,8 @@ export async function createCategory(formData: FormData) {
   });
 
   revalidatePath("/admin/categories");
+  revalidatePath("/catalog", "layout");
+  revalidatePath("/", "layout");
 }
 
 export async function deleteCategory(id: string) {
@@ -42,4 +44,6 @@ export async function deleteCategory(id: string) {
 
   await prisma.category.delete({ where: { id } });
   revalidatePath("/admin/categories");
+  revalidatePath("/catalog", "layout");
+  revalidatePath("/", "layout");
 }
