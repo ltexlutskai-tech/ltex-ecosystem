@@ -207,8 +207,18 @@ export default async function ProductsPage({
               products.map((product) => (
                 <tr key={product.id} className="border-b hover:bg-gray-50">
                   <td className="px-4 py-3">
-                    <div className="max-w-xs truncate font-medium">
-                      {product.name}
+                    <div className="flex max-w-xs items-center gap-2">
+                      <span className="truncate font-medium">
+                        {product.name}
+                      </span>
+                      {product.isOversize && (
+                        <Badge
+                          variant="outline"
+                          className="shrink-0 border-purple-200 bg-purple-50 text-purple-700"
+                        >
+                          XXL+
+                        </Badge>
+                      )}
                     </div>
                     <div className="text-xs text-gray-400">{product.slug}</div>
                   </td>

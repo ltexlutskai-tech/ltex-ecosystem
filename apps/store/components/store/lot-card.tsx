@@ -10,13 +10,16 @@ import { eurToUah, formatUah } from "@/lib/exchange-rate";
 import { VideoModal } from "./video-modal";
 import { QuickOrderModal } from "./quick-order-modal";
 import { WishlistButton } from "./wishlist-button";
+import { PriceOrLogin } from "./price-or-login";
+import { useCustomer } from "@/lib/customer-context";
 
 export interface LotCardLot {
   id: string;
   barcode: string;
   weight: number;
   quantity: number;
-  priceEur: number;
+  /** `null` when the visitor is unauthenticated (price gate, S73). */
+  priceEur: number | null;
   videoUrl: string | null;
   status: string;
   /** ISO date — used to show "NEW" badge for lots younger than 14 days. */
@@ -81,6 +84,8 @@ export function LotCard({
   const [videoOpen, setVideoOpen] = useState(false);
   const [quickOrderOpen, setQuickOrderOpen] = useState(false);
   const { items, addItem, removeItem } = useCart();
+  const customer = useCustomer();
+  const hasPrice = lot.priceEur != null && lot.priceEur > 0;
 
   const cartItem = {
     lotId: lot.id,
@@ -88,14 +93,16 @@ export function LotCard({
     productName: lot.product.name,
     barcode: lot.barcode,
     weight: lot.weight,
-    priceEur: lot.priceEur,
+    priceEur: lot.priceEur ?? 0,
     quantity: lot.quantity,
   };
   const key = cartItemKey(cartItem);
   const inCart = items.some((i) => cartItemKey(i) === key);
 
   const videoId = extractYouTubeId(lot.videoUrl);
-  const priceUah = formatUah(eurToUah(lot.priceEur, rate));
+  const priceUah = hasPrice
+    ? formatUah(eurToUah(lot.priceEur as number, rate))
+    : null;
   const unitLabel = lot.product.priceUnit === "pair" ? "пар" : "шт";
   const badge = statusBadge(lot.status, salePercent);
   const showNewBadge = isLotNew(lot.createdAt);
@@ -107,11 +114,17 @@ export function LotCard({
       : "border bg-white";
 
   const regularPriceEur =
-    typeof salePercent === "number" && salePercent > 0
-      ? lot.priceEur / (1 - salePercent / 100)
+    hasPrice && typeof salePercent === "number" && salePercent > 0
+      ? (lot.priceEur as number) / (1 - salePercent / 100)
       : null;
 
   function handleToggleCart() {
+    if (!customer) {
+      const target = encodeURIComponent("/lots");
+      window.location.assign(`/login?returnTo=${target}`);
+      return;
+    }
+    if (!hasPrice) return;
     if (inCart) removeItem(key);
     else addItem(cartItem);
   }
@@ -123,7 +136,7 @@ export function LotCard({
     name: lot.product.name,
     quality: lot.product.quality ?? "",
     imageUrl: lot.product.imageUrl ?? null,
-    priceEur: lot.priceEur,
+    priceEur: lot.priceEur ?? null,
     priceUnit: lot.product.priceUnit,
     lotId: lot.id,
     barcode: lot.barcode,
@@ -207,7 +220,8 @@ export function LotCard({
     </div>
   );
 
-  const canAddToCart = lot.status === "free" || lot.status === "on_sale";
+  const canAddToCart =
+    hasPrice && (lot.status === "free" || lot.status === "on_sale");
 
   const detailsLink = (
     <Link
@@ -219,7 +233,14 @@ export function LotCard({
     </Link>
   );
 
-  const cartButton = canAddToCart ? (
+  const cartButton = !customer ? (
+    <Link
+      href={`/login?returnTo=${encodeURIComponent("/lots")}`}
+      className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-medium text-white transition hover:bg-emerald-700"
+    >
+      Увійти
+    </Link>
+  ) : canAddToCart ? (
     <button
       type="button"
       onClick={handleToggleCart}
@@ -255,7 +276,8 @@ export function LotCard({
     </div>
   );
 
-  const canQuickOrder = lot.status === "free" || lot.status === "on_sale";
+  const canQuickOrder =
+    hasPrice && (lot.status === "free" || lot.status === "on_sale");
 
   const quickOrderButton = canQuickOrder ? (
     <button
@@ -279,7 +301,7 @@ export function LotCard({
         productId: lot.product.id,
         productName: lot.product.name,
         weight: lot.weight,
-        priceEur: lot.priceEur,
+        priceEur: lot.priceEur as number,
         quantity: lot.quantity,
       }}
     />
@@ -311,18 +333,26 @@ export function LotCard({
             </div>
             <div className="mt-auto pt-1">
               <div className="min-w-0">
-                <p className="text-base font-bold text-red-600">{priceUah}</p>
-                <p className="text-[11px] text-gray-400">
-                  €{lot.priceEur.toFixed(2)}
-                  {regularPriceEur !== null && (
-                    <>
-                      {" "}
-                      <span className="line-through">
-                        €{regularPriceEur.toFixed(2)}
-                      </span>
-                    </>
-                  )}
-                </p>
+                {hasPrice ? (
+                  <>
+                    <p className="text-base font-bold text-red-600">
+                      {priceUah}
+                    </p>
+                    <p className="text-[11px] text-gray-400">
+                      €{(lot.priceEur as number).toFixed(2)}
+                      {regularPriceEur !== null && (
+                        <>
+                          {" "}
+                          <span className="line-through">
+                            €{regularPriceEur.toFixed(2)}
+                          </span>
+                        </>
+                      )}
+                    </p>
+                  </>
+                ) : (
+                  <PriceOrLogin priceEur={null} hideUnit size="sm" />
+                )}
               </div>
               {actionsRow}
             </div>
@@ -366,18 +396,24 @@ export function LotCard({
             </span>
           </div>
           <div className="mt-2 min-w-0">
-            <p className="text-base font-bold text-red-600">{priceUah}</p>
-            <p className="text-[11px] text-gray-400">
-              €{lot.priceEur.toFixed(2)}
-              {regularPriceEur !== null && (
-                <>
-                  {" "}
-                  <span className="line-through">
-                    €{regularPriceEur.toFixed(2)}
-                  </span>
-                </>
-              )}
-            </p>
+            {hasPrice ? (
+              <>
+                <p className="text-base font-bold text-red-600">{priceUah}</p>
+                <p className="text-[11px] text-gray-400">
+                  €{(lot.priceEur as number).toFixed(2)}
+                  {regularPriceEur !== null && (
+                    <>
+                      {" "}
+                      <span className="line-through">
+                        €{regularPriceEur.toFixed(2)}
+                      </span>
+                    </>
+                  )}
+                </p>
+              </>
+            ) : (
+              <PriceOrLogin priceEur={null} hideUnit size="sm" />
+            )}
           </div>
           {actionsRow}
           {quickOrderButton}

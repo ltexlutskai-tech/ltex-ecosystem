@@ -1,11 +1,25 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest } from "next/server";
 
+const { getCurrentCustomerMock } = vi.hoisted(() => ({
+  getCurrentCustomerMock: vi.fn(),
+}));
+
 vi.mock("@ltex/db", () => ({
   prisma: {
     product: { findMany: vi.fn() },
   },
 }));
+
+vi.mock("@/lib/customer-auth", async () => {
+  const actual = await vi.importActual<typeof import("@/lib/customer-auth")>(
+    "@/lib/customer-auth",
+  );
+  return {
+    ...actual,
+    getCurrentCustomer: getCurrentCustomerMock,
+  };
+});
 
 import { GET } from "./route";
 import { prisma } from "@ltex/db";
@@ -38,6 +52,8 @@ function buildRequest(query = ""): NextRequest {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  // Default to guest visitor — exercises the price-strip path on every test.
+  getCurrentCustomerMock.mockResolvedValue(null);
 });
 
 describe("GET /api/recommendations", () => {
@@ -136,12 +152,43 @@ describe("GET /api/recommendations", () => {
     expect(mockPrisma.product.findMany).toHaveBeenCalledTimes(3);
   });
 
-  it("emits a 60s edge cache header", async () => {
+  it("uses a private cache header (price gate varies per visitor)", async () => {
     mockPrisma.product.findMany.mockResolvedValue([]);
 
     const res = await GET(buildRequest());
-    expect(res.headers.get("Cache-Control")).toBe(
-      "public, s-maxage=60, stale-while-revalidate=120",
-    );
+    expect(res.headers.get("Cache-Control")).toBe("private, no-store");
+  });
+
+  it("strips prices on every product when the visitor is a guest", async () => {
+    getCurrentCustomerMock.mockResolvedValue(null);
+    mockPrisma.product.findMany.mockResolvedValue([
+      makeProduct("a"),
+      makeProduct("b"),
+    ]);
+
+    const res = await GET(buildRequest());
+    const body = (await res.json()) as {
+      products: { id: string; prices: unknown[] }[];
+    };
+    expect(body.products).toHaveLength(2);
+    for (const p of body.products) {
+      expect(p.prices).toEqual([]);
+    }
+  });
+
+  it("preserves prices when the visitor is authenticated", async () => {
+    getCurrentCustomerMock.mockResolvedValue({
+      id: "c-1",
+      phone: "+380",
+      name: "Іван",
+    });
+    mockPrisma.product.findMany.mockResolvedValue([makeProduct("a")]);
+
+    const res = await GET(buildRequest());
+    const body = (await res.json()) as {
+      products: { prices: { amount: number }[] }[];
+    };
+    expect(body.products[0]?.prices).toHaveLength(1);
+    expect(body.products[0]?.prices[0]?.amount).toBe(10);
   });
 });
