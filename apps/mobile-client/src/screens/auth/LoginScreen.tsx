@@ -10,14 +10,18 @@ import {
   ActivityIndicator,
   Alert,
 } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "@/lib/auth";
+import { RegionPicker } from "@/components/RegionPicker";
 
 export function LoginScreen() {
   const { login } = useAuth();
   const [phone, setPhone] = useState("");
   const [name, setName] = useState("");
+  const [city, setCity] = useState<string | null>(null);
   const [isNew, setIsNew] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [regionPickerOpen, setRegionPickerOpen] = useState(false);
 
   async function handleSubmit() {
     if (phone.length < 10) {
@@ -31,7 +35,7 @@ export function LoginScreen() {
 
     setLoading(true);
     try {
-      await login(phone, isNew ? name : undefined);
+      await login(phone, isNew ? name : undefined, city ?? undefined);
     } catch (error) {
       Alert.alert(
         "Помилка",
@@ -78,6 +82,25 @@ export function LoginScreen() {
           </>
         )}
 
+        <Text style={styles.label}>Область</Text>
+        <TouchableOpacity
+          style={styles.pickerButton}
+          onPress={() => setRegionPickerOpen(true)}
+          accessibilityRole="button"
+          accessibilityLabel="Обрати область"
+          activeOpacity={0.7}
+        >
+          <Text
+            style={[
+              styles.pickerButtonText,
+              !city && styles.pickerButtonPlaceholder,
+            ]}
+          >
+            {city ?? "— Не обрано —"}
+          </Text>
+          <Ionicons name="chevron-down" size={18} color="#6b7280" />
+        </TouchableOpacity>
+
         <TouchableOpacity
           style={[styles.button, loading && styles.buttonDisabled]}
           onPress={handleSubmit}
@@ -98,6 +121,13 @@ export function LoginScreen() {
           </Text>
         </TouchableOpacity>
       </View>
+
+      <RegionPicker
+        visible={regionPickerOpen}
+        selected={city}
+        onSelect={setCity}
+        onClose={() => setRegionPickerOpen(false)}
+      />
     </KeyboardAvoidingView>
   );
 }
@@ -121,6 +151,24 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     fontSize: 16,
+  },
+  pickerButton: {
+    borderWidth: 1,
+    borderColor: "#ddd",
+    borderRadius: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: "#fff",
+  },
+  pickerButtonText: {
+    fontSize: 16,
+    color: "#1f2937",
+  },
+  pickerButtonPlaceholder: {
+    color: "#9ca3af",
   },
   button: {
     backgroundColor: "#16a34a",

@@ -14,6 +14,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "@/lib/auth";
 import { profileApi, ordersApi } from "@/lib/api";
 import { ProfileSkeleton } from "@/components/SkeletonLoader";
+import { RegionPicker } from "@/components/RegionPicker";
 
 interface ProfileData {
   id: string;
@@ -46,6 +47,7 @@ export function ProfileScreen({ navigation }: ProfileScreenProps) {
   const [refreshing, setRefreshing] = useState(false);
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [regionPickerOpen, setRegionPickerOpen] = useState(false);
 
   // Editable fields
   const [editName, setEditName] = useState("");
@@ -256,13 +258,24 @@ export function ProfileScreen({ navigation }: ProfileScreenProps) {
               autoCapitalize="none"
             />
 
-            <Text style={styles.fieldLabel}>Місто</Text>
-            <TextInput
-              style={styles.input}
-              value={editCity}
-              onChangeText={setEditCity}
-              placeholder="Луцьк"
-            />
+            <Text style={styles.fieldLabel}>Область</Text>
+            <TouchableOpacity
+              style={styles.pickerButton}
+              onPress={() => setRegionPickerOpen(true)}
+              accessibilityRole="button"
+              accessibilityLabel="Обрати область"
+              activeOpacity={0.7}
+            >
+              <Text
+                style={[
+                  styles.pickerButtonText,
+                  !editCity && styles.pickerButtonPlaceholder,
+                ]}
+              >
+                {editCity || "— Не обрано —"}
+              </Text>
+              <Ionicons name="chevron-down" size={18} color="#6b7280" />
+            </TouchableOpacity>
 
             <View style={styles.formActions}>
               <TouchableOpacity
@@ -308,7 +321,7 @@ export function ProfileScreen({ navigation }: ProfileScreenProps) {
             />
             <InfoRow
               icon="location-outline"
-              label="Місто"
+              label="Область"
               value={profile.city ?? "Не вказано"}
             />
           </View>
@@ -390,6 +403,13 @@ export function ProfileScreen({ navigation }: ProfileScreenProps) {
       </TouchableOpacity>
 
       <View style={styles.bottomSpacer} />
+
+      <RegionPicker
+        visible={regionPickerOpen}
+        selected={editCity || null}
+        onSelect={(region) => setEditCity(region ?? "")}
+        onClose={() => setRegionPickerOpen(false)}
+      />
     </ScrollView>
   );
 }
@@ -612,6 +632,24 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: "#1f2937",
     backgroundColor: "#f9fafb",
+  },
+  pickerButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    borderWidth: 1,
+    borderColor: "#e5e7eb",
+    borderRadius: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+    backgroundColor: "#f9fafb",
+  },
+  pickerButtonText: {
+    fontSize: 15,
+    color: "#1f2937",
+  },
+  pickerButtonPlaceholder: {
+    color: "#9ca3af",
   },
   formActions: {
     flexDirection: "row",

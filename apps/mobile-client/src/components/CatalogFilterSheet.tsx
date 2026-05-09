@@ -21,8 +21,15 @@ import {
   COUNTRY_LABELS,
   COUNTRY_SHORT,
   SORT_OPTIONS,
+  GENDER_OPTIONS,
+  OVERSIZE_SLUG,
+  OVERSIZE_LABEL,
 } from "@/lib/labels";
 import { PriceRangeSlider } from "./PriceRangeSlider";
+
+const ODYAG_SLUG = "odyag";
+const UNITS_RANGE_BOUNDS: [number, number] = [1, 1000];
+const WEIGHT_RANGE_BOUNDS: [number, number] = [1, 1000];
 
 export interface CatalogFilters {
   q?: string;
@@ -31,6 +38,11 @@ export interface CatalogFilters {
   qualities?: string[];
   season?: string;
   countries?: string[];
+  genders?: string[];
+  unitsPerKgMin?: number;
+  unitsPerKgMax?: number;
+  unitWeightMin?: number;
+  unitWeightMax?: number;
   sort?: string;
   priceMin?: number;
   priceMax?: number;
@@ -59,6 +71,11 @@ export function countActiveFilters(filters: CatalogFilters): number {
   if (filters.qualities && filters.qualities.length > 0) n++;
   if (filters.season) n++;
   if (filters.countries && filters.countries.length > 0) n++;
+  if (filters.genders && filters.genders.length > 0) n++;
+  if (filters.unitsPerKgMin !== undefined) n++;
+  if (filters.unitsPerKgMax !== undefined) n++;
+  if (filters.unitWeightMin !== undefined) n++;
+  if (filters.unitWeightMax !== undefined) n++;
   if (filters.sort) n++;
   if (filters.priceMin !== undefined) n++;
   if (filters.priceMax !== undefined) n++;
@@ -168,10 +185,39 @@ export function CatalogFilterSheet({
     categoriesApi
       .subcategories(draft.category)
       .then((res) => {
-        if (!cancelled) setSubcategories(res.categories);
+        if (cancelled) return;
+        // Append the cross-cutting "великі розміри" virtual subcategory only
+        // for the clothing category — it filters by isOversize=true across
+        // all subcategories on the server (lib/catalog.ts).
+        const list = res.categories;
+        if (
+          draft.category === ODYAG_SLUG &&
+          !list.some((c) => c.slug === OVERSIZE_SLUG)
+        ) {
+          list.push({
+            id: `virtual-${OVERSIZE_SLUG}`,
+            slug: OVERSIZE_SLUG,
+            name: OVERSIZE_LABEL,
+            parentId: null,
+          });
+        }
+        setSubcategories(list);
       })
       .catch(() => {
-        if (!cancelled) setSubcategories([]);
+        if (cancelled) return;
+        // API failure → still expose the virtual XXL+ option for clothing.
+        if (draft.category === ODYAG_SLUG) {
+          setSubcategories([
+            {
+              id: `virtual-${OVERSIZE_SLUG}`,
+              slug: OVERSIZE_SLUG,
+              name: OVERSIZE_LABEL,
+              parentId: null,
+            },
+          ]);
+        } else {
+          setSubcategories([]);
+        }
       });
     return () => {
       cancelled = true;
@@ -195,13 +241,42 @@ export function CatalogFilterSheet({
     }));
   };
 
-  const toggleListValue = (key: "qualities" | "countries", value: string) => {
+  const toggleListValue = (
+    key: "qualities" | "countries" | "genders",
+    value: string,
+  ) => {
     setDraft((prev) => {
       const current = prev[key] ?? [];
       const next = current.includes(value)
         ? current.filter((v) => v !== value)
         : [...current, value];
       return { ...prev, [key]: next.length > 0 ? next : undefined };
+    });
+  };
+
+  const updateNumericRange = (
+    key: "unitsPerKgMin" | "unitsPerKgMax" | "unitWeightMin" | "unitWeightMax",
+    raw: string,
+    bounds: [number, number],
+  ) => {
+    const trimmed = raw.trim();
+    if (!trimmed) {
+      setDraft((prev) => ({ ...prev, [key]: undefined }));
+      return;
+    }
+    const n = Number(trimmed);
+    if (!Number.isFinite(n)) return;
+    const clamped = Math.max(bounds[0], Math.min(bounds[1], n));
+    setDraft((prev) => {
+      // Drop the value when it equals the boundary so the URL stays clean.
+      const isMin = key === "unitsPerKgMin" || key === "unitWeightMin";
+      if (isMin && clamped <= bounds[0]) {
+        return { ...prev, [key]: undefined };
+      }
+      if (!isMin && clamped >= bounds[1]) {
+        return { ...prev, [key]: undefined };
+      }
+      return { ...prev, [key]: clamped };
     });
   };
 
@@ -262,6 +337,7 @@ export function CatalogFilterSheet({
 
   const selectedQualities = draft.qualities ?? [];
   const selectedCountries = draft.countries ?? [];
+  const selectedGenders = draft.genders ?? [];
 
   return (
     <Modal
@@ -412,6 +488,98 @@ export function CatalogFilterSheet({
                 </Pressable>
               );
             })}
+          </View>
+
+          {/* Gender — multi-select */}
+          <View style={styles.field}>
+            <Text style={styles.label}>Стать</Text>
+            {GENDER_OPTIONS.map((g) => {
+              const checked = selectedGenders.includes(g);
+              return (
+                <Pressable
+                  key={g}
+                  style={styles.checkboxRow}
+                  onPress={() => toggleListValue("genders", g)}
+                  accessibilityRole="checkbox"
+                  accessibilityState={{ checked }}
+                >
+                  <Ionicons
+                    name={checked ? "checkbox" : "square-outline"}
+                    size={22}
+                    color={checked ? "#16a34a" : "#9ca3af"}
+                  />
+                  <Text style={styles.checkboxLabel}>{g}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
+
+          {/* Units per kg range */}
+          <View style={styles.field}>
+            <Text style={styles.label}>К-сть одиниць (шт/кг)</Text>
+            <View style={styles.rangeRow}>
+              <TextInput
+                style={[styles.input, styles.rangeInput]}
+                value={
+                  draft.unitsPerKgMin != null ? String(draft.unitsPerKgMin) : ""
+                }
+                onChangeText={(v) =>
+                  updateNumericRange("unitsPerKgMin", v, UNITS_RANGE_BOUNDS)
+                }
+                placeholder={`Від ${UNITS_RANGE_BOUNDS[0]}`}
+                placeholderTextColor="#9ca3af"
+                keyboardType="number-pad"
+                accessibilityLabel="К-сть одиниць від"
+              />
+              <Text style={styles.rangeSep}>—</Text>
+              <TextInput
+                style={[styles.input, styles.rangeInput]}
+                value={
+                  draft.unitsPerKgMax != null ? String(draft.unitsPerKgMax) : ""
+                }
+                onChangeText={(v) =>
+                  updateNumericRange("unitsPerKgMax", v, UNITS_RANGE_BOUNDS)
+                }
+                placeholder={`До ${UNITS_RANGE_BOUNDS[1]}`}
+                placeholderTextColor="#9ca3af"
+                keyboardType="number-pad"
+                accessibilityLabel="К-сть одиниць до"
+              />
+            </View>
+          </View>
+
+          {/* Unit weight range */}
+          <View style={styles.field}>
+            <Text style={styles.label}>Вага одиниці (кг)</Text>
+            <View style={styles.rangeRow}>
+              <TextInput
+                style={[styles.input, styles.rangeInput]}
+                value={
+                  draft.unitWeightMin != null ? String(draft.unitWeightMin) : ""
+                }
+                onChangeText={(v) =>
+                  updateNumericRange("unitWeightMin", v, WEIGHT_RANGE_BOUNDS)
+                }
+                placeholder={`Від ${WEIGHT_RANGE_BOUNDS[0]}`}
+                placeholderTextColor="#9ca3af"
+                keyboardType="number-pad"
+                accessibilityLabel="Вага одиниці від"
+              />
+              <Text style={styles.rangeSep}>—</Text>
+              <TextInput
+                style={[styles.input, styles.rangeInput]}
+                value={
+                  draft.unitWeightMax != null ? String(draft.unitWeightMax) : ""
+                }
+                onChangeText={(v) =>
+                  updateNumericRange("unitWeightMax", v, WEIGHT_RANGE_BOUNDS)
+                }
+                placeholder={`До ${WEIGHT_RANGE_BOUNDS[1]}`}
+                placeholderTextColor="#9ca3af"
+                keyboardType="number-pad"
+                accessibilityLabel="Вага одиниці до"
+              />
+            </View>
           </View>
 
           {/* Sort */}
@@ -567,6 +735,19 @@ const styles = StyleSheet.create({
     paddingVertical: 9,
     fontSize: 14,
     color: "#1f2937",
+  },
+  rangeRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  rangeInput: {
+    flex: 1,
+  },
+  rangeSep: {
+    fontSize: 14,
+    color: "#9ca3af",
+    fontWeight: "500",
   },
   chipRow: {
     gap: 8,

@@ -77,17 +77,18 @@ export async function api<T = unknown>(
 
 // Auth — login returns a token that must be persisted and attached to subsequent calls.
 export const authApi = {
-  login: (phone: string, name?: string) =>
+  login: (phone: string, name?: string, city?: string) =>
     api<{
       customerId: string;
       name: string;
       phone: string;
+      city: string | null;
       isNew: boolean;
       token: string;
       tokenExpiresIn: number;
     }>("/mobile/auth", {
       method: "POST",
-      body: { phone, name },
+      body: { phone, name, city: city || null },
       skipAuth: true,
     }),
 };
