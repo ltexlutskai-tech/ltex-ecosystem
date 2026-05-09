@@ -81,7 +81,7 @@ describe("LotsFiltersForm", () => {
     fireEvent.change(wMin, { target: { value: "10" } });
     fireEvent.change(pMax, { target: { value: "200" } });
     expect(pushMock).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByText("Застосувати ціну та вагу"));
+    fireEvent.click(screen.getByText("Застосувати діапазони"));
     expect(pushMock).toHaveBeenCalledTimes(1);
     const url = pushMock.mock.calls[0]?.[0] as string;
     expect(url).toContain("weightMin=10");

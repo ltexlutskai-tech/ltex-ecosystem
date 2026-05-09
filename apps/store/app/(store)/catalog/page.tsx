@@ -27,38 +27,74 @@ export const metadata: Metadata = {
 export default async function CatalogPage({
   searchParams,
 }: {
-  searchParams: Promise<Record<string, string | undefined>>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const params = await searchParams;
-  const page = parseInt(params.page ?? "1", 10);
-  const view = params.view ?? "pagination";
-  const layout: "grid" | "list" = params.layout === "list" ? "list" : "grid";
+  const getStr = (v: string | string[] | undefined): string | undefined =>
+    Array.isArray(v) ? v[0] : v;
 
-  const priceMin = params.priceMin ? parseFloat(params.priceMin) : undefined;
-  const priceMax = params.priceMax ? parseFloat(params.priceMax) : undefined;
+  const page = parseInt(getStr(params.page) ?? "1", 10);
+  const view = getStr(params.view) ?? "pagination";
+  const layout: "grid" | "list" =
+    getStr(params.layout) === "list" ? "list" : "grid";
 
-  const inStockOnly = params.inStock === "true";
+  const parseFloatParam = (raw: string | undefined): number | undefined => {
+    if (!raw) return undefined;
+    const n = parseFloat(raw);
+    return Number.isFinite(n) ? n : undefined;
+  };
+  const priceMinStr = getStr(params.priceMin);
+  const priceMaxStr = getStr(params.priceMax);
+  const unitsMinStr = getStr(params.unitsPerKgMin);
+  const unitsMaxStr = getStr(params.unitsPerKgMax);
+  const weightMinStr = getStr(params.unitWeightMin);
+  const weightMaxStr = getStr(params.unitWeightMax);
+
+  const priceMin = parseFloatParam(priceMinStr);
+  const priceMax = parseFloatParam(priceMaxStr);
+  const unitsPerKgMin = parseFloatParam(unitsMinStr);
+  const unitsPerKgMax = parseFloatParam(unitsMaxStr);
+  const unitWeightMin = parseFloatParam(weightMinStr);
+  const unitWeightMax = parseFloatParam(weightMaxStr);
+
+  const inStockOnly = getStr(params.inStock) === "true";
 
   const { products, total, totalPages } = await getCatalogProducts({
-    quality: params.quality,
-    season: params.season,
-    country: params.country,
-    q: params.q,
-    sort: params.sort,
-    priceMin: priceMin && !isNaN(priceMin) ? priceMin : undefined,
-    priceMax: priceMax && !isNaN(priceMax) ? priceMax : undefined,
+    quality: getStr(params.quality),
+    season: getStr(params.season),
+    country: getStr(params.country),
+    gender: getStr(params.gender),
+    unitsPerKgMin,
+    unitsPerKgMax,
+    unitWeightMin,
+    unitWeightMax,
+    q: getStr(params.q),
+    sort: getStr(params.sort),
+    priceMin,
+    priceMax,
     inStockOnly,
     page,
   });
 
   const filterParams = new URLSearchParams();
-  if (params.quality) filterParams.set("quality", params.quality);
-  if (params.season) filterParams.set("season", params.season);
-  if (params.country) filterParams.set("country", params.country);
-  if (params.q) filterParams.set("q", params.q);
-  if (params.sort) filterParams.set("sort", params.sort);
-  if (params.priceMin) filterParams.set("priceMin", params.priceMin);
-  if (params.priceMax) filterParams.set("priceMax", params.priceMax);
+  const qParam = getStr(params.quality);
+  if (qParam) filterParams.set("quality", qParam);
+  const seasonParam = getStr(params.season);
+  if (seasonParam) filterParams.set("season", seasonParam);
+  const countryParam = getStr(params.country);
+  if (countryParam) filterParams.set("country", countryParam);
+  const genderParam = getStr(params.gender);
+  if (genderParam) filterParams.set("gender", genderParam);
+  if (unitsMinStr) filterParams.set("unitsPerKgMin", unitsMinStr);
+  if (unitsMaxStr) filterParams.set("unitsPerKgMax", unitsMaxStr);
+  if (weightMinStr) filterParams.set("unitWeightMin", weightMinStr);
+  if (weightMaxStr) filterParams.set("unitWeightMax", weightMaxStr);
+  const qSearch = getStr(params.q);
+  if (qSearch) filterParams.set("q", qSearch);
+  const sortParam = getStr(params.sort);
+  if (sortParam) filterParams.set("sort", sortParam);
+  if (priceMinStr) filterParams.set("priceMin", priceMinStr);
+  if (priceMaxStr) filterParams.set("priceMax", priceMaxStr);
   if (inStockOnly) filterParams.set("inStock", "true");
   const baseHref = filterParams.toString()
     ? `/catalog?${filterParams.toString()}`

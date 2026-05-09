@@ -34,7 +34,20 @@ export const syncProductSchema = z.object({
   averageWeight: z.number().positive().optional(),
   videoUrl: z.string().url().optional().or(z.literal("")),
   inStock: z.boolean().optional(),
+  gender: z.string().max(50).optional().nullable(),
+  sizes: z.string().max(100).optional().nullable(),
+  unitsPerKg: z.string().max(50).optional().nullable(),
+  unitWeight: z.string().max(50).optional().nullable(),
 });
+
+export const syncCategoriesSchema = z.array(
+  z.object({
+    slug: z.string().min(1).max(100),
+    name: z.string().min(1).max(200),
+    parentSlug: z.string().max(100).optional().nullable(),
+    position: z.number().int().min(0).optional(),
+  }),
+);
 
 export const syncLotsSchema = z.array(
   z.object({
@@ -45,6 +58,55 @@ export const syncLotsSchema = z.array(
     status: z.enum(["free", "reserved", "on_sale"]).optional(),
     priceEur: z.number().positive(),
     videoUrl: z.string().url().optional().or(z.literal("")),
+  }),
+);
+
+export const syncPricesSchema = z.array(
+  z.object({
+    productCode1C: z.string().min(1),
+    priceType: z.string().min(1).max(50),
+    amount: z.number().positive(),
+    currency: z.enum(["EUR", "UAH", "USD"]).optional(),
+    validFrom: z.string().datetime().optional(),
+    validTo: z.string().datetime().optional().nullable(),
+  }),
+);
+
+export const syncOrdersImportSchema = z.array(
+  z.object({
+    code1C: z.string().min(1),
+    customer: z.object({
+      code1C: z.string().optional().nullable(),
+      name: z.string().min(1).max(200),
+      phone: z.string().max(30).optional().nullable(),
+      email: z.string().email().max(200).optional().nullable(),
+      telegram: z.string().max(100).optional().nullable(),
+      city: z.string().max(200).optional().nullable(),
+    }),
+    status: z
+      .enum([
+        "new",
+        "confirmed",
+        "processing",
+        "shipped",
+        "completed",
+        "cancelled",
+      ])
+      .optional(),
+    totalEur: z.number().nonnegative().optional(),
+    totalUah: z.number().nonnegative().optional(),
+    exchangeRate: z.number().positive().optional(),
+    notes: z.string().optional().nullable(),
+    createdAt: z.string().datetime().optional(),
+    items: z.array(
+      z.object({
+        barcode: z.string().optional().nullable(),
+        productCode1C: z.string().min(1),
+        priceEur: z.number().nonnegative(),
+        weight: z.number().nonnegative(),
+        quantity: z.number().int().positive(),
+      }),
+    ),
   }),
 );
 

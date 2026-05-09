@@ -6,9 +6,15 @@
  * 2. Resend API (RESEND_API_KEY, SMTP_FROM as from address)
  *
  * If neither is configured, emails are silently skipped.
+ *
+ * Persistence (S70): customer-facing functions enqueue an EmailJob row in
+ * Postgres rather than sending synchronously. A separate cron job
+ * (`/api/cron/process-email-queue`) drains the queue with attempt accounting,
+ * exponential backoff, and a `failed` terminal state visible in /admin/emails.
  */
 
 import { APP_NAME, CONTACTS } from "@ltex/shared";
+import { prisma } from "@ltex/db";
 import { getDictionary } from "@/lib/i18n";
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://ltex.com.ua";
@@ -39,6 +45,17 @@ interface StatusEmailData {
   status: string;
   statusLabel: string;
   orderRef: string;
+}
+
+export type EmailSource = "order" | "order_status" | "newsletter" | "quote";
+
+export interface EnqueueEmailInput {
+  to: string;
+  subject: string;
+  html: string;
+  text?: string;
+  source: EmailSource;
+  referenceId?: string;
 }
 
 function getFromAddress(): string {
@@ -81,6 +98,33 @@ export function maskEmail(email: string | undefined): string {
 }
 
 /**
+ * Replace email + phone substrings inside an arbitrary string with masked
+ * equivalents — used before persisting `lastError` to avoid leaking PII into
+ * the DLQ table or admin UI.
+ */
+export function maskPii(input: string): string {
+  // Mask email addresses (preserve domain, first 2 chars of local part).
+  let out = input.replace(
+    /([A-Za-z0-9._%+-]+)@([A-Za-z0-9.-]+\.[A-Za-z]{2,})/g,
+    (_, local: string, domain: string) => `${local.slice(0, 2)}***@${domain}`,
+  );
+  // Mask phone numbers — sequences of 9+ digits (optionally with +/-/space).
+  out = out.replace(/\+?\d[\d\s().-]{8,}\d/g, (m) => {
+    const digits = m.replace(/\D/g, "");
+    if (digits.length < 9) return m;
+    return `${digits.slice(0, 3)}***${digits.slice(-2)}`;
+  });
+  return out;
+}
+
+const MAX_LAST_ERROR_LEN = 500;
+
+function describeError(err: unknown): string {
+  const msg = err instanceof Error ? err.message : String(err);
+  return maskPii(msg).slice(0, MAX_LAST_ERROR_LEN);
+}
+
+/**
  * Return true when an error looks like a transient transport failure
  * (network blip, timeout, 5xx upstream) that is worth retrying.
  * 4xx responses, validation errors, and bad credentials are NOT transient.
@@ -118,7 +162,9 @@ export function isTransientError(err: unknown): boolean {
  * Run `send(payload)` with up to `attempts` retries on transient errors.
  * Backoff: 0s, 2s, 6s. Non-transient errors throw immediately (no retry).
  * On exhaustion logs structured PII-masked record and re-throws.
- * Exported for testability.
+ *
+ * Kept exported for legacy use (and tests). The DLQ flow (`processEmailQueue`)
+ * does its own per-job attempt accounting via the DB and does NOT call this.
  */
 export async function sendWithRetry(
   send: (p: SendPayload) => Promise<void>,
@@ -194,30 +240,155 @@ async function sendViaResend(payload: SendPayload): Promise<void> {
   }
 }
 
-async function sendEmail(
-  to: string,
-  subject: string,
-  html: string,
-): Promise<void> {
+/**
+ * Single-attempt low-level send. Picks the configured transport.
+ * Returns silently if no transport is configured (preserves dev-mode behavior
+ * for the legacy `sendEmail` callers).
+ */
+async function attemptSend(payload: SendPayload): Promise<void> {
   const transport = isEmailConfigured();
   if (!transport) return;
-
-  const payload: SendPayload = { to, subject, html };
   const send = transport === "smtp" ? sendViaSMTP : sendViaResend;
+  await send(payload);
+}
+
+/**
+ * Persist a pending EmailJob row. Fire-and-forget from caller's POV — never
+ * throws into the request path; failures to enqueue are logged with masked PII.
+ *
+ * If no transport is configured AND we're outside production, the email is
+ * silently dropped (matches legacy dev-mode behavior). In production the row
+ * is still persisted so it can be replayed once a transport is wired up.
+ */
+export async function enqueueEmail(input: EnqueueEmailInput): Promise<void> {
+  if (!isEmailConfigured() && process.env.NODE_ENV !== "production") {
+    console.info(
+      "[L-TEX] Email provider not configured — enqueueEmail skipped",
+      { source: input.source, subject: input.subject },
+    );
+    return;
+  }
   try {
-    await sendWithRetry(send, payload);
+    await prisma.emailJob.create({
+      data: {
+        to: input.to,
+        subject: input.subject,
+        htmlBody: input.html,
+        textBody: input.text ?? null,
+        source: input.source,
+        referenceId: input.referenceId ?? null,
+      },
+    });
   } catch (err) {
-    // Transient failures that exhausted retries are already logged inside
-    // sendWithRetry. Non-transient errors (4xx, validation) skip retry —
-    // log them here so they don't fall through silently.
-    if (!isTransientError(err)) {
-      console.error("[L-TEX] Email send failed (non-retriable)", {
-        to: maskEmail(to),
-        subject,
-        error: err instanceof Error ? err.message : String(err),
+    console.error("[L-TEX] enqueueEmail failed", {
+      to: maskEmail(input.to),
+      source: input.source,
+      subject: input.subject,
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
+}
+
+// Per-attempt backoff (minutes): 1m, 5m, 30m, 2h, 6h, 12h. The Nth retry
+// (attempts incremented to N) reads index min(N-1, last).
+const BACKOFF_MINUTES: readonly number[] = [1, 5, 30, 120, 360, 720] as const;
+
+export function nextAttemptDelayMs(attempts: number): number {
+  const idx = Math.min(Math.max(attempts - 1, 0), BACKOFF_MINUTES.length - 1);
+  const minutes =
+    BACKOFF_MINUTES[idx] ?? BACKOFF_MINUTES[BACKOFF_MINUTES.length - 1] ?? 60;
+  return minutes * 60 * 1000;
+}
+
+export interface ProcessQueueResult {
+  processed: number;
+  sent: number;
+  failed: number;
+  retrying: number;
+}
+
+/**
+ * Drain pending/retrying EmailJob rows whose `nextAttemptAt <= now`.
+ * Each row is attempted once per invocation. Success → `sent`. Transient and
+ * non-transient failures both increment `attempts`; row stays `retrying` until
+ * `attempts >= maxAttempts`, at which point it's marked `failed` and an
+ * alert-level log is emitted (admin UI surfaces failed jobs with a Retry CTA).
+ */
+export async function processEmailQueue(
+  limit = 50,
+): Promise<ProcessQueueResult> {
+  const now = new Date();
+  const jobs = await prisma.emailJob.findMany({
+    where: {
+      status: { in: ["pending", "retrying"] },
+      nextAttemptAt: { lte: now },
+    },
+    orderBy: { nextAttemptAt: "asc" },
+    take: limit,
+  });
+
+  let sent = 0;
+  let failed = 0;
+  let retrying = 0;
+
+  for (const job of jobs) {
+    try {
+      await attemptSend({
+        to: job.to,
+        subject: job.subject,
+        html: job.htmlBody,
       });
+      await prisma.emailJob.update({
+        where: { id: job.id },
+        data: {
+          status: "sent",
+          attempts: job.attempts + 1,
+          sentAt: new Date(),
+          lastError: null,
+        },
+      });
+      sent++;
+    } catch (err) {
+      const nextAttempts = job.attempts + 1;
+      const exhausted = nextAttempts >= job.maxAttempts;
+      const lastError = describeError(err);
+      if (exhausted) {
+        await prisma.emailJob.update({
+          where: { id: job.id },
+          data: {
+            status: "failed",
+            attempts: nextAttempts,
+            lastError,
+          },
+        });
+        failed++;
+        console.error("[L-TEX] EmailJob exhausted retries", {
+          id: job.id,
+          source: job.source,
+          referenceId: job.referenceId,
+          to: maskEmail(job.to),
+          subject: job.subject,
+          attempts: nextAttempts,
+          maxAttempts: job.maxAttempts,
+          lastError,
+        });
+      } else {
+        const next = new Date(Date.now() + nextAttemptDelayMs(nextAttempts));
+        await prisma.emailJob.update({
+          where: { id: job.id },
+          data: {
+            status: "retrying",
+            attempts: nextAttempts,
+            nextAttemptAt: next,
+            lastError,
+          },
+        });
+        retrying++;
+      }
     }
   }
+
+  return { processed: jobs.length, sent, failed, retrying };
 }
 
 function baseLayout(content: string): string {
@@ -339,19 +510,18 @@ export async function sendOrderConfirmationEmail(
       Зв'яжіться з нами: Telegram <a href="https://t.me/${CONTACTS.telegram.replace("@", "")}" style="color:#16a34a">${CONTACTS.telegram}</a>
     </p>`;
 
-  await sendEmail(data.customerEmail, subject, baseLayout(content));
+  await enqueueEmail({
+    to: data.customerEmail,
+    subject,
+    html: baseLayout(content),
+    source: "order",
+    referenceId: data.orderId,
+  });
 }
 
 export async function sendWelcomeNewsletterEmail(email: string): Promise<void> {
   const dict = getDictionary();
   const { subject, heading, body } = dict.newsletter.welcomeEmail;
-
-  if (!isEmailConfigured()) {
-    console.info(
-      "[L-TEX] Email provider not configured — welcome newsletter email skipped.",
-    );
-    return;
-  }
 
   const paragraphs = body
     .split("\n\n")
@@ -381,7 +551,12 @@ export async function sendWelcomeNewsletterEmail(email: string): Promise<void> {
       Зв'яжіться з нами: Telegram <a href="https://t.me/${CONTACTS.telegram.replace("@", "")}" style="color:#16a34a">${CONTACTS.telegram}</a>
     </p>`;
 
-  await sendEmail(email, subject, baseLayout(content));
+  await enqueueEmail({
+    to: email,
+    subject,
+    html: baseLayout(content),
+    source: "newsletter",
+  });
 }
 
 export async function sendOrderStatusEmail(
@@ -418,5 +593,11 @@ export async function sendOrderStatusEmail(
       Зв'яжіться з нами: Telegram <a href="https://t.me/${CONTACTS.telegram.replace("@", "")}" style="color:#16a34a">${CONTACTS.telegram}</a>
     </p>`;
 
-  await sendEmail(data.customerEmail, subject, baseLayout(content));
+  await enqueueEmail({
+    to: data.customerEmail,
+    subject,
+    html: baseLayout(content),
+    source: "order_status",
+    referenceId: data.orderId,
+  });
 }

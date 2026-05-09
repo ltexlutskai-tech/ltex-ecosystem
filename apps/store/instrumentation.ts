@@ -30,6 +30,14 @@ export function validateProductionSecrets(
     );
   }
 
+  const customerAuthSecret = env.CUSTOMER_AUTH_SECRET;
+  if (!customerAuthSecret || customerAuthSecret.length < 32) {
+    throw new Error(
+      "CUSTOMER_AUTH_SECRET must be at least 32 characters. " +
+        "Generate with: openssl rand -hex 32",
+    );
+  }
+
   if (env.TELEGRAM_BOT_TOKEN) {
     const tgSecret = env.TELEGRAM_WEBHOOK_SECRET;
     if (!tgSecret || tgSecret.length < 16) {
