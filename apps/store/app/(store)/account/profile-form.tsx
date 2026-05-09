@@ -1,7 +1,7 @@
 "use client";
 
 import { useFormState, useFormStatus } from "react-dom";
-import { Button, Input, Textarea } from "@ltex/ui";
+import { Button, Input } from "@ltex/ui";
 import { UA_REGIONS } from "@ltex/shared";
 import { updateProfileAction, type UpdateProfileResult } from "./actions";
 import { getDictionary } from "@/lib/i18n";
@@ -15,7 +15,7 @@ interface CustomerProfile {
   email: string | null;
   telegram: string | null;
   city: string | null;
-  notes: string | null;
+  // `Customer.notes` is admin-only and not exposed in this form; see Fix 12.
 }
 
 function SubmitButton() {
@@ -123,21 +123,6 @@ export function ProfileForm({ customer }: { customer: CustomerProfile }) {
                 <option value={customer.city}>{customer.city}</option>
               )}
           </select>
-        </div>
-        <div className="space-y-1.5 sm:col-span-2">
-          <label
-            htmlFor="profile-notes"
-            className="text-sm font-medium leading-none"
-          >
-            {dict.auth.fields.notes}
-          </label>
-          <Textarea
-            id="profile-notes"
-            name="notes"
-            defaultValue={customer.notes ?? ""}
-            maxLength={500}
-            rows={3}
-          />
         </div>
       </div>
       <div className="flex items-center gap-3">

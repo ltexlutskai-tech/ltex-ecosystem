@@ -66,6 +66,36 @@ describe("LotReviews", () => {
     expect(screen.getByText(/Огляд скоро/i)).toBeDefined();
   });
 
+  it("does not leak prices in the DOM when there is no customer", () => {
+    // Defence-in-depth: the page-level wrapper in `product/[slug]/page.tsx`
+    // already zeroes priceEur for guests, but even if a real price slipped
+    // through, the client component must not render it. This is the visible
+    // half of the price gate. The prop ships in the React server payload
+    // either way, so server-side stripping (Fix 2) is the *primary* defence.
+    render(
+      <CustomerProvider customer={null}>
+        <CartProvider>
+          <LotReviews
+            lots={[
+              {
+                id: "lot-1",
+                ...baseLot,
+                priceEur: 200, // would-be leak
+                videoUrl: null,
+              },
+            ]}
+            productId="prod-1"
+            productName="Test product"
+            rate={50}
+          />
+        </CartProvider>
+      </CustomerProvider>,
+    );
+    const body = document.body.textContent ?? "";
+    expect(body).not.toMatch(/€\s*200/);
+    expect(body).not.toMatch(/₴/);
+  });
+
   it("formats price as UAH primary + EUR secondary", () => {
     renderWithCart(
       <LotReviews

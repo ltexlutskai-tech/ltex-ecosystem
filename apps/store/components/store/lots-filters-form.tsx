@@ -82,10 +82,11 @@ export function LotsFiltersForm({ onApply }: LotsFiltersFormProps) {
   const [priceMin, setPriceMin] = useState(urlPriceMin);
   const [priceMax, setPriceMax] = useState(urlPriceMax);
 
-  const [unitsBounds, setUnitsBounds] =
-    useState<[number, number]>(DEFAULT_UNITS_RANGE);
-  const [weightBounds, setWeightBounds] =
-    useState<[number, number]>(DEFAULT_WEIGHT_RANGE);
+  // unitsPerKg / unitWeight bounds are static — see catalog-filters.tsx for
+  // the same constants. The previous /api/catalog/numeric-ranges endpoint
+  // returned hardcoded 1..1000 anyway, so the network round-trip was waste.
+  const unitsBounds = DEFAULT_UNITS_RANGE;
+  const weightBounds = DEFAULT_WEIGHT_RANGE;
   const [unitsValue, setUnitsValue] = useState<[number, number]>([
     urlUnitsMin ? Number(urlUnitsMin) : DEFAULT_UNITS_RANGE[0],
     urlUnitsMax ? Number(urlUnitsMax) : DEFAULT_UNITS_RANGE[1],
@@ -94,39 +95,6 @@ export function LotsFiltersForm({ onApply }: LotsFiltersFormProps) {
     urlUnitWeightMin ? Number(urlUnitWeightMin) : DEFAULT_WEIGHT_RANGE[0],
     urlUnitWeightMax ? Number(urlUnitWeightMax) : DEFAULT_WEIGHT_RANGE[1],
   ]);
-  const [rangesLoaded, setRangesLoaded] = useState(false);
-
-  // Fetch numeric bounds once on mount.
-  useEffect(() => {
-    let cancelled = false;
-    fetch("/api/catalog/numeric-ranges")
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data) => {
-        if (cancelled || !data) return;
-        const u: [number, number] = [data.unitsPerKg.min, data.unitsPerKg.max];
-        const w: [number, number] = [data.unitWeight.min, data.unitWeight.max];
-        setUnitsBounds(u);
-        setWeightBounds(w);
-        setRangesLoaded(true);
-        setUnitsValue((prev) => {
-          const lo = urlUnitsMin ? Number(urlUnitsMin) : u[0];
-          const hi = urlUnitsMax ? Number(urlUnitsMax) : u[1];
-          if (prev[0] === lo && prev[1] === hi) return prev;
-          return [lo, hi];
-        });
-        setWeightValue((prev) => {
-          const lo = urlUnitWeightMin ? Number(urlUnitWeightMin) : w[0];
-          const hi = urlUnitWeightMax ? Number(urlUnitWeightMax) : w[1];
-          if (prev[0] === lo && prev[1] === hi) return prev;
-          return [lo, hi];
-        });
-      })
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   // Sync sliders when URL changes externally.
   useEffect(() => {
@@ -386,39 +354,35 @@ export function LotsFiltersForm({ onApply }: LotsFiltersFormProps) {
         </div>
       </div>
 
-      {rangesLoaded && unitsBounds[1] > unitsBounds[0] && (
-        <div>
-          <span className={labelClass}>К-сть одиниць (шт/кг)</span>
-          <RangeWithInputs
-            min={unitsBounds[0]}
-            max={unitsBounds[1]}
-            value={unitsValue}
-            onChange={setUnitsValue}
-            onCommit={commitUnitsRange}
-            step={1}
-            unit="шт"
-            ariaLabelMin="Шт/кг від"
-            ariaLabelMax="Шт/кг до"
-          />
-        </div>
-      )}
+      <div>
+        <span className={labelClass}>К-сть одиниць (шт/кг)</span>
+        <RangeWithInputs
+          min={unitsBounds[0]}
+          max={unitsBounds[1]}
+          value={unitsValue}
+          onChange={setUnitsValue}
+          onCommit={commitUnitsRange}
+          step={1}
+          unit="шт"
+          ariaLabelMin="Шт/кг від"
+          ariaLabelMax="Шт/кг до"
+        />
+      </div>
 
-      {rangesLoaded && weightBounds[1] > weightBounds[0] && (
-        <div>
-          <span className={labelClass}>Вага одиниці (кг)</span>
-          <RangeWithInputs
-            min={weightBounds[0]}
-            max={weightBounds[1]}
-            value={weightValue}
-            onChange={setWeightValue}
-            onCommit={commitWeightRange}
-            step={1}
-            unit="кг"
-            ariaLabelMin="Вага одиниці від"
-            ariaLabelMax="Вага одиниці до"
-          />
-        </div>
-      )}
+      <div>
+        <span className={labelClass}>Вага одиниці (кг)</span>
+        <RangeWithInputs
+          min={weightBounds[0]}
+          max={weightBounds[1]}
+          value={weightValue}
+          onChange={setWeightValue}
+          onCommit={commitWeightRange}
+          step={1}
+          unit="кг"
+          ariaLabelMin="Вага одиниці від"
+          ariaLabelMax="Вага одиниці до"
+        />
+      </div>
 
       <div>
         <span className={labelClass}>Вага лота, кг</span>

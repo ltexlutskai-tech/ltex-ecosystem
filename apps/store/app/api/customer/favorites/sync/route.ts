@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@ltex/db";
 import { getCurrentCustomer } from "@/lib/customer-auth";
+import { rateLimit } from "@/lib/rate-limit";
 
 /**
  * POST /api/customer/favorites/sync
@@ -27,6 +28,17 @@ export async function POST(request: NextRequest) {
   const customer = await getCurrentCustomer();
   if (!customer) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const limit = rateLimit(`favorites-sync:${customer.id}`, {
+    windowMs: 60_000,
+    max: 10,
+  });
+  if (!limit.allowed) {
+    return NextResponse.json(
+      { error: "Забагато запитів. Зачекайте хвилину." },
+      { status: 429, headers: { "Retry-After": "60" } },
+    );
   }
 
   let body: unknown;

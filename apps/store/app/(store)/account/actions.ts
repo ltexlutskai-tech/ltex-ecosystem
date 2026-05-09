@@ -5,12 +5,14 @@ import { prisma } from "@ltex/db";
 import { revalidatePath } from "next/cache";
 import { getCurrentCustomer } from "@/lib/customer-auth";
 
+// `Customer.notes` is admin-only — never accept it from the customer-edited
+// profile form (Fix 12: prior schema let a customer write into the same
+// column the admin reads as their internal notes).
 const profileSchema = z.object({
   name: z.string().trim().min(1).max(100),
   email: z.string().trim().email().or(z.literal("")).optional().nullable(),
   telegram: z.string().trim().max(50).optional().nullable(),
   city: z.string().trim().max(100).optional().nullable(),
-  notes: z.string().trim().max(500).optional().nullable(),
 });
 
 export interface UpdateProfileResult {
@@ -39,7 +41,6 @@ export async function updateProfileAction(
     email: nullable(formData.get("email")),
     telegram: nullable(formData.get("telegram")),
     city: nullable(formData.get("city")),
-    notes: nullable(formData.get("notes")),
   });
   if (!parsed.success) {
     return {
@@ -56,7 +57,6 @@ export async function updateProfileAction(
       email: data.email && data.email.length > 0 ? data.email : null,
       telegram: data.telegram ?? null,
       city: data.city ?? null,
-      notes: data.notes ?? null,
     },
   });
 

@@ -139,6 +139,15 @@ function escapeMarkdownCode(text: string): string {
   return text.replace(/[`\\]/g, "\\$&");
 }
 
+/**
+ * Sends a "new customer lead" notification to the manager Telegram group.
+ *
+ * Reuses `NEWSLETTER_TELEGRAM_CHAT_ID` — the same chat that receives
+ * newsletter signups — because both events are lead-capture for the
+ * same audience (manager triages incoming contacts in one place).
+ * For order notifications use `TELEGRAM_CHAT_ID` instead, which is
+ * a different chat owned by the operations team.
+ */
 export async function notifyNewLead(
   params: NewLeadNotification,
 ): Promise<void> {

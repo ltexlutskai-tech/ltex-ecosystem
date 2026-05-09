@@ -9,7 +9,6 @@ const schema = z.object({
   phone: z.string().min(8).max(32),
   name: z.string().min(1).max(100),
   city: z.string().max(100).optional().nullable(),
-  sessionId: z.string().min(1).max(100).optional(),
 });
 
 function normalizePhone(raw: string): string {
@@ -55,7 +54,6 @@ export async function POST(request: NextRequest) {
 
   const phone = normalizePhone(parsed.data.phone);
   const name = parsed.data.name.trim();
-  const cityProvided = parsed.data.city !== undefined;
   const city =
     parsed.data.city === undefined || parsed.data.city === null
       ? null
@@ -74,9 +72,15 @@ export async function POST(request: NextRequest) {
       });
       wasCreated = true;
     } else {
+      // For existing customers: never overwrite name/city the user set in
+      // /account. Only fill empty/null fields from the login payload.
       const updates: { name?: string; city?: string | null } = {};
-      if (customer.name !== name && name) updates.name = name;
-      if (cityProvided && customer.city !== city) updates.city = city;
+      if (!customer.name?.trim() && name) {
+        updates.name = name;
+      }
+      if (customer.city == null && city) {
+        updates.city = city;
+      }
       if (Object.keys(updates).length > 0) {
         await prisma.customer.update({
           where: { id: customer.id },
@@ -97,18 +101,13 @@ export async function POST(request: NextRequest) {
       }).catch(() => {});
     }
 
-    // Cart merge: if a guest cart exists for this sessionId, attach it to the
-    // customer (or fold its items into the customer's existing cart).
-    const sessionId = parsed.data.sessionId;
-    if (sessionId) {
-      try {
-        await mergeGuestCartIntoCustomer(sessionId, customer.id);
-      } catch (err) {
-        console.warn("[L-TEX] cart merge on login failed", {
-          error: err instanceof Error ? err.message : String(err),
-        });
-      }
-    }
+    // NOTE: Guest cart merge intentionally NOT supported here. The cart
+    // sessionId lives in localStorage (apps/store/lib/cart.tsx), so the
+    // server cannot verify that the caller actually owns it — accepting it
+    // would let an attacker absorb any victim's guest cart by submitting
+    // their sessionId during login. If we ever move the cart sessionId into
+    // a signed HTTP-only cookie, ownership becomes verifiable and merge can
+    // be reintroduced safely.
 
     return NextResponse.json({
       ok: true,
@@ -120,56 +119,4 @@ export async function POST(request: NextRequest) {
     });
     return NextResponse.json({ error: "Server error" }, { status: 500 });
   }
-}
-
-async function mergeGuestCartIntoCustomer(
-  sessionId: string,
-  customerId: string,
-): Promise<void> {
-  const guestCart = await prisma.cart.findUnique({
-    where: { sessionId },
-    include: { items: true },
-  });
-  if (!guestCart) return;
-
-  const customerCart = await prisma.cart.findUnique({
-    where: { customerId },
-    include: { items: true },
-  });
-
-  if (!customerCart) {
-    // Promote the guest cart into the customer cart.
-    await prisma.cart.update({
-      where: { id: guestCart.id },
-      data: { customerId, sessionId: null },
-    });
-    return;
-  }
-
-  // Merge: skip duplicates (same lotId or same productId for general items).
-  const existingKeys = new Set(
-    customerCart.items.map((i) =>
-      i.lotId ? `lot:${i.lotId}` : `product:${i.productId}`,
-    ),
-  );
-  for (const item of guestCart.items) {
-    const key = item.lotId ? `lot:${item.lotId}` : `product:${item.productId}`;
-    if (existingKeys.has(key)) continue;
-    await prisma.cartItem
-      .create({
-        data: {
-          cartId: customerCart.id,
-          lotId: item.lotId,
-          productId: item.productId,
-          priceEur: item.priceEur,
-          weight: item.weight,
-          quantity: item.quantity,
-        },
-      })
-      .catch(() => {
-        // Defensive: ignore any conflict (race / unique).
-      });
-    existingKeys.add(key);
-  }
-  await prisma.cart.delete({ where: { id: guestCart.id } });
 }

@@ -11,6 +11,11 @@ const VALID_SORTS = new Set<CustomerListSort>([
   "name_asc",
 ]);
 
+// Hard cap for a single CSV export. Larger result sets must be narrowed via
+// search / hasOrders / sort filters or split across multiple exports — keeps
+// memory bounded so a growing customer base can't OOM the page.
+const MAX_EXPORT = 5000;
+
 function csvField(value: unknown): string {
   if (value === null || value === undefined) return "";
   const str = String(value);
@@ -37,13 +42,14 @@ export async function GET(request: Request) {
     ? (sortRaw as CustomerListSort)
     : "first_seen_desc";
 
-  const { items } = await listCustomers({
+  const { items, total } = await listCustomers({
     hasOrders,
     search,
     sort,
     page: 1,
-    pageSize: 10000,
+    pageSize: MAX_EXPORT,
   });
+  const truncatedBy = Math.max(0, total - MAX_EXPORT);
 
   const headers = [
     "Phone",
@@ -85,6 +91,7 @@ export async function GET(request: Request) {
       "Content-Type": "text/csv; charset=utf-8",
       "Content-Disposition": `attachment; filename="${filename}"`,
       "Cache-Control": "no-store",
+      ...(truncatedBy > 0 ? { "X-Truncated": String(truncatedBy) } : {}),
     },
   });
 }

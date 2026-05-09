@@ -378,7 +378,10 @@ export default async function ProductPage({ params }: Props) {
           barcode: lot.barcode,
           weight: lot.weight,
           quantity: lot.quantity,
-          priceEur: lot.priceEur,
+          // Strip prices server-side for guests — the prop ships in the React
+          // server payload, so a client-side hide-only would still leak via
+          // View Source / DevTools.
+          priceEur: isAuthed ? lot.priceEur : 0,
           videoUrl: lot.videoUrl,
           status: lot.status,
         }))}

@@ -157,17 +157,40 @@ export async function getCatalogProducts(
   // Range overlap filters: product is included when its [Min, Max] interval
   // intersects [filterMin, filterMax]. This is equivalent to:
   //   productMax ≥ filterMin AND productMin ≤ filterMax.
+  //
+  // NULL handling: most products were imported without a parsed numeric
+  // range, so unitsPerKgMin/Max and unitWeightMin/Max are NULL. Postgres
+  // treats `NULL gte X` as unknown → row excluded, which silently hid ~70%
+  // of products as soon as a slider moved off default. We OR-in `null`
+  // matches so products without numeric data stay visible. Trade-off: those
+  // products always show, even when the slider is narrowed — preferable to
+  // hiding the bulk of the catalog.
+  const rangeAnd: Prisma.ProductWhereInput[] = [];
   if (unitsPerKgMin != null) {
-    where.unitsPerKgMax = { gte: unitsPerKgMin };
+    rangeAnd.push({
+      OR: [{ unitsPerKgMax: { gte: unitsPerKgMin } }, { unitsPerKgMax: null }],
+    });
   }
   if (unitsPerKgMax != null) {
-    where.unitsPerKgMin = { lte: unitsPerKgMax };
+    rangeAnd.push({
+      OR: [{ unitsPerKgMin: { lte: unitsPerKgMax } }, { unitsPerKgMin: null }],
+    });
   }
   if (unitWeightMin != null) {
-    where.unitWeightMax = { gte: unitWeightMin };
+    rangeAnd.push({
+      OR: [{ unitWeightMax: { gte: unitWeightMin } }, { unitWeightMax: null }],
+    });
   }
   if (unitWeightMax != null) {
-    where.unitWeightMin = { lte: unitWeightMax };
+    rangeAnd.push({
+      OR: [{ unitWeightMin: { lte: unitWeightMax } }, { unitWeightMin: null }],
+    });
+  }
+  if (rangeAnd.length > 0) {
+    where.AND = [
+      ...((where.AND as Prisma.ProductWhereInput[]) ?? []),
+      ...rangeAnd,
+    ];
   }
 
   if (inStockOnly) {
@@ -349,23 +372,34 @@ async function fullTextSearch(
       paramIdx++;
     }
   }
+  // Range NULL handling: include rows whose numeric column is NULL so we
+  // don't silently hide products without parsed range data. See the matching
+  // explainer above getCatalogProducts' rangeAnd block.
   if (unitsPerKgMin != null) {
-    filterConditions.push(`p.units_per_kg_max >= $${paramIdx}`);
+    filterConditions.push(
+      `(p.units_per_kg_max >= $${paramIdx} OR p.units_per_kg_max IS NULL)`,
+    );
     queryParams.push(unitsPerKgMin);
     paramIdx++;
   }
   if (unitsPerKgMax != null) {
-    filterConditions.push(`p.units_per_kg_min <= $${paramIdx}`);
+    filterConditions.push(
+      `(p.units_per_kg_min <= $${paramIdx} OR p.units_per_kg_min IS NULL)`,
+    );
     queryParams.push(unitsPerKgMax);
     paramIdx++;
   }
   if (unitWeightMin != null) {
-    filterConditions.push(`p.unit_weight_max >= $${paramIdx}`);
+    filterConditions.push(
+      `(p.unit_weight_max >= $${paramIdx} OR p.unit_weight_max IS NULL)`,
+    );
     queryParams.push(unitWeightMin);
     paramIdx++;
   }
   if (unitWeightMax != null) {
-    filterConditions.push(`p.unit_weight_min <= $${paramIdx}`);
+    filterConditions.push(
+      `(p.unit_weight_min <= $${paramIdx} OR p.unit_weight_min IS NULL)`,
+    );
     queryParams.push(unitWeightMax);
     paramIdx++;
   }

@@ -10,7 +10,6 @@ import { formatPhone, isValidUaPhone } from "@/lib/phone-format";
 
 const dict = getDictionary();
 const NAME_HINT_KEY = "ltex_customer_name_hint";
-const SESSION_ID_KEY = "ltex-session-id";
 const PHONE_INITIAL = "+380 ";
 
 export function LoginForm({ returnTo }: { returnTo: string }) {
@@ -46,10 +45,6 @@ export function LoginForm({ returnTo }: { returnTo: string }) {
     setError(null);
     if (!canSubmit) return;
     setIsSubmitting(true);
-    let sessionId: string | null = null;
-    try {
-      sessionId = localStorage.getItem(SESSION_ID_KEY);
-    } catch {}
     try {
       const res = await fetch("/api/auth/customer/login", {
         method: "POST",
@@ -58,7 +53,6 @@ export function LoginForm({ returnTo }: { returnTo: string }) {
           phone: phone.trim(),
           name: name.trim(),
           city: city || null,
-          ...(sessionId ? { sessionId } : {}),
         }),
       });
       if (res.status === 429) {

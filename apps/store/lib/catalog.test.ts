@@ -235,15 +235,19 @@ describe("getCatalogProducts", () => {
     expect(calledWhere.categoryId).toBeUndefined();
   });
 
-  it("applies unitsPerKg range as overlap (Max>=min, Min<=max)", async () => {
+  it("applies unitsPerKg range as overlap with NULL passthrough", async () => {
     mockFindMany.mockResolvedValue([]);
     mockCount.mockResolvedValue(0);
 
     await getCatalogProducts({ unitsPerKgMin: 2, unitsPerKgMax: 5 });
 
     const calledWhere = mockFindMany.mock.calls[0]![0]!.where;
-    expect(calledWhere.unitsPerKgMax).toEqual({ gte: 2 });
-    expect(calledWhere.unitsPerKgMin).toEqual({ lte: 5 });
+    // Each bound becomes an OR (column matches range OR column is NULL) so
+    // products with no parsed numeric range stay visible (Fix 6).
+    expect(calledWhere.AND).toEqual([
+      { OR: [{ unitsPerKgMax: { gte: 2 } }, { unitsPerKgMax: null }] },
+      { OR: [{ unitsPerKgMin: { lte: 5 } }, { unitsPerKgMin: null }] },
+    ]);
   });
 
   it("applies only unitsPerKgMin when unitsPerKgMax omitted", async () => {
@@ -253,19 +257,22 @@ describe("getCatalogProducts", () => {
     await getCatalogProducts({ unitsPerKgMin: 3 });
 
     const calledWhere = mockFindMany.mock.calls[0]![0]!.where;
-    expect(calledWhere.unitsPerKgMax).toEqual({ gte: 3 });
-    expect(calledWhere.unitsPerKgMin).toBeUndefined();
+    expect(calledWhere.AND).toEqual([
+      { OR: [{ unitsPerKgMax: { gte: 3 } }, { unitsPerKgMax: null }] },
+    ]);
   });
 
-  it("applies unitWeight range as overlap on min/max columns", async () => {
+  it("applies unitWeight range as overlap with NULL passthrough", async () => {
     mockFindMany.mockResolvedValue([]);
     mockCount.mockResolvedValue(0);
 
     await getCatalogProducts({ unitWeightMin: 0.3, unitWeightMax: 0.6 });
 
     const calledWhere = mockFindMany.mock.calls[0]![0]!.where;
-    expect(calledWhere.unitWeightMax).toEqual({ gte: 0.3 });
-    expect(calledWhere.unitWeightMin).toEqual({ lte: 0.6 });
+    expect(calledWhere.AND).toEqual([
+      { OR: [{ unitWeightMax: { gte: 0.3 } }, { unitWeightMax: null }] },
+      { OR: [{ unitWeightMin: { lte: 0.6 } }, { unitWeightMin: null }] },
+    ]);
   });
 
   it("applies priceMin filter", async () => {

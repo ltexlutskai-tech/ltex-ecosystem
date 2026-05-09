@@ -95,7 +95,6 @@ export default async function AccountPage() {
                 email: customer.email,
                 telegram: customer.telegram,
                 city: customer.city,
-                notes: customer.notes,
               }}
             />
           </CardContent>

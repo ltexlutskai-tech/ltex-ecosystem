@@ -9,14 +9,6 @@ const { mockPrisma, rateLimitMock, setCookieMock, notifyNewLeadMock } =
         create: vi.fn(),
         update: vi.fn(),
       },
-      cart: {
-        findUnique: vi.fn(),
-        update: vi.fn(),
-        delete: vi.fn(),
-      },
-      cartItem: {
-        create: vi.fn(),
-      },
     },
     rateLimitMock: vi
       .fn()
@@ -71,8 +63,6 @@ describe("POST /api/auth/customer/login", () => {
       name: "Іван",
       city: null,
     });
-    mockPrisma.cart.findUnique.mockResolvedValue(null);
-    mockPrisma.cart.update.mockResolvedValue(null);
   });
 
   it("rejects an invalid payload with 400", async () => {
@@ -122,20 +112,52 @@ describe("POST /api/auth/customer/login", () => {
     expect(setCookieMock).toHaveBeenCalledWith("customer-existing");
   });
 
-  it("updates the customer name when it changed", async () => {
+  it("backfills the customer name when it is empty", async () => {
     mockPrisma.customer.findFirst.mockResolvedValue({
       id: "customer-existing",
-      name: "Стара",
+      name: "   ",
       city: null,
     });
     const res = await POST(
-      makeRequest({ phone: "+380671234567", name: "Нова" }),
+      makeRequest({ phone: "+380671234567", name: "Іван" }),
     );
     expect(res.status).toBe(200);
     expect(mockPrisma.customer.update).toHaveBeenCalledWith({
       where: { id: "customer-existing" },
-      data: { name: "Нова" },
+      data: { name: "Іван" },
     });
+  });
+
+  it("does NOT overwrite an existing non-empty name on login", async () => {
+    // User edited their name to "Олена" via /account; on next login they still
+    // submit "Стара" from the form — the DB value must win.
+    mockPrisma.customer.findFirst.mockResolvedValue({
+      id: "customer-existing",
+      name: "Олена",
+      city: null,
+    });
+    const res = await POST(
+      makeRequest({ phone: "+380671234567", name: "Стара" }),
+    );
+    expect(res.status).toBe(200);
+    expect(mockPrisma.customer.update).not.toHaveBeenCalled();
+  });
+
+  it("does NOT overwrite an existing non-null city on login", async () => {
+    mockPrisma.customer.findFirst.mockResolvedValue({
+      id: "customer-existing",
+      name: "Олена",
+      city: "Львівська",
+    });
+    const res = await POST(
+      makeRequest({
+        phone: "+380671234567",
+        name: "Олена",
+        city: "Київська",
+      }),
+    );
+    expect(res.status).toBe(200);
+    expect(mockPrisma.customer.update).not.toHaveBeenCalled();
   });
 
   it("updates city when an existing customer logs in with a region", async () => {
@@ -256,37 +278,20 @@ describe("POST /api/auth/customer/login", () => {
     expect(res.status).toBe(200);
   });
 
-  it("merges a guest cart into a new customer cart on login", async () => {
-    mockPrisma.cart.findUnique
-      // First call: findUnique by sessionId — guest cart exists with one item
-      .mockResolvedValueOnce({
-        id: "guest-cart",
-        items: [
-          {
-            id: "ci-1",
-            cartId: "guest-cart",
-            lotId: "lot-1",
-            productId: "p-1",
-            priceEur: 50,
-            weight: 10,
-            quantity: 1,
-          },
-        ],
-      })
-      // Second call: findUnique by customerId — none yet
-      .mockResolvedValueOnce(null);
-
+  it("ignores sessionId from the request body (no cart merge)", async () => {
+    // sessionId from body is unverifiable (lives in localStorage on the
+    // client) — accepting it would let an attacker absorb a victim's guest
+    // cart by submitting their sessionId. Login must succeed but not touch
+    // any Cart row.
+    // The schema no longer accepts sessionId, so passing it via JSON is a
+    // no-op — login still succeeds and no Cart row is touched.
     const res = await POST(
       makeRequest({
         phone: "+380671234567",
         name: "Іван",
-        sessionId: "session-abc",
+        sessionId: "victim-session-id",
       }),
     );
     expect(res.status).toBe(200);
-    expect(mockPrisma.cart.update).toHaveBeenCalledWith({
-      where: { id: "guest-cart" },
-      data: { customerId: "customer-1", sessionId: null },
-    });
   });
 });

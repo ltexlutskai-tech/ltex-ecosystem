@@ -87,6 +87,10 @@ export function WishlistProvider({ children }: { children: ReactNode }) {
   const [loaded, setLoaded] = useState(false);
   const customer = useCustomer();
   const lastSyncedCustomerIdRef = useRef<string | null>(null);
+  // Read items via ref inside the customer-scoped sync effect so that
+  // adding/removing items doesn't re-trigger the effect body.
+  const itemsRef = useRef(items);
+  itemsRef.current = items;
 
   useEffect(() => {
     try {
@@ -125,7 +129,8 @@ export function WishlistProvider({ children }: { children: ReactNode }) {
 
     let cancelled = false;
     (async () => {
-      const productItems = items.filter((i) => i.kind === "product");
+      const snapshot = itemsRef.current;
+      const productItems = snapshot.filter((i) => i.kind === "product");
       try {
         const res = await fetch("/api/customer/favorites/sync", {
           method: "POST",
@@ -142,11 +147,11 @@ export function WishlistProvider({ children }: { children: ReactNode }) {
 
         const serverIds = new Set(data.items.map((i) => i.productId));
         const localById = new Map(
-          items
+          snapshot
             .filter((i) => i.kind === "product")
             .map((i) => [i.productId, i] as const),
         );
-        const lotItems = items.filter((i) => i.kind === "lot");
+        const lotItems = snapshot.filter((i) => i.kind === "lot");
         const mergedProducts: WishlistItem[] = Array.from(serverIds).map(
           (id) =>
             localById.get(id) ?? {
@@ -176,7 +181,11 @@ export function WishlistProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, [customer, loaded, items]);
+    // `items` is intentionally excluded — we read it via itemsRef so that
+    // adding/removing wishlist entries doesn't re-fire the per-customer
+    // sync. The sync runs once per (customer.id, loaded) pair.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [customer, loaded]);
 
   const addItem = useCallback((item: WishlistItem) => {
     setItems((prev) => {

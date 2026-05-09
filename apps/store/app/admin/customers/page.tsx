@@ -146,12 +146,20 @@ export default async function CustomersPage({
             <strong>{summary.leadsOnly}</strong>
           </p>
         </div>
-        <a
-          href={exportHref()}
-          className="inline-flex items-center rounded-md border bg-white px-3 py-2 text-sm font-medium hover:bg-gray-50"
-        >
-          Експорт CSV
-        </a>
+        <div className="flex flex-col items-end gap-1">
+          <a
+            href={exportHref()}
+            className="inline-flex items-center rounded-md border bg-white px-3 py-2 text-sm font-medium hover:bg-gray-50"
+          >
+            Експорт CSV
+          </a>
+          {summary.total > 5000 && (
+            <p className="max-w-xs text-right text-xs text-amber-700">
+              Експорт обмежений 5000 рядками. Звузьте фільтри (пошук, наявність
+              замовлень, сортування), щоб отримати потрібний зріз.
+            </p>
+          )}
+        </div>
       </div>
 
       <form
