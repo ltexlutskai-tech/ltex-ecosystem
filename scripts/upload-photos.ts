@@ -14,6 +14,16 @@
  *   npx tsx scripts/upload-photos.ts ./photos --dry-run
  *   npx tsx scripts/upload-photos.ts ./photos
  *   npx tsx scripts/upload-photos.ts ./photos --skip-existing --concurrency 3
+ *   npx tsx scripts/upload-photos.ts ./photos --replace --max-per-product=10
+ *
+ * Flags:
+ *   --dry-run               do not write to Storage or DB
+ *   --skip-existing         skip products that already have any ProductImage
+ *   --replace               for each touched product: delete all old Storage
+ *                           files under {productId}/ and ProductImage rows
+ *                           before uploading the new set
+ *   --max-per-product=N     cap to first N photos (sorted by position) per code
+ *   --concurrency=N         parallel product groups (default 5)
  *
  * Requires: NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, DATABASE_URL
  */
@@ -42,6 +52,7 @@ const args = process.argv.slice(2);
 const photosDir = args.find((a) => !a.startsWith("--"));
 const dryRun = args.includes("--dry-run");
 const skipExisting = args.includes("--skip-existing");
+const replaceMode = args.includes("--replace");
 const concurrencyArg = args.find((a) => a.startsWith("--concurrency"));
 const concurrency = concurrencyArg
   ? parseInt(
@@ -50,6 +61,24 @@ const concurrency = concurrencyArg
         "5",
     )
   : 5;
+const maxPerProductArg = args.find((a) => a.startsWith("--max-per-product"));
+const maxPerProduct = maxPerProductArg
+  ? parseInt(
+      maxPerProductArg.includes("=")
+        ? maxPerProductArg.split("=")[1]!
+        : (args[args.indexOf(maxPerProductArg) + 1] ?? "10"),
+      10,
+    )
+  : Number.POSITIVE_INFINITY;
+
+if (skipExisting && replaceMode) {
+  console.error("--skip-existing and --replace are mutually exclusive.");
+  process.exit(1);
+}
+if (Number.isNaN(maxPerProduct) || maxPerProduct < 1) {
+  console.error(`Invalid --max-per-product: ${maxPerProductArg}`);
+  process.exit(1);
+}
 
 if (!photosDir) {
   console.error(
@@ -133,6 +162,60 @@ async function uploadToStorage(
   return `${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${storagePath}`;
 }
 
+async function deleteFromStorage(storagePaths: string[]): Promise<void> {
+  if (storagePaths.length === 0) return;
+  const url = `${SUPABASE_URL}/storage/v1/object/${BUCKET}`;
+  const res = await fetch(url, {
+    method: "DELETE",
+    headers: {
+      Authorization: `Bearer ${SERVICE_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ prefixes: storagePaths }),
+  });
+  if (!res.ok && res.status !== 404) {
+    const err = await res.text();
+    throw new Error(`Storage delete failed: ${res.status} ${err}`);
+  }
+}
+
+async function listStoragePrefix(prefix: string): Promise<string[]> {
+  const url = `${SUPABASE_URL}/storage/v1/object/list/${BUCKET}`;
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${SERVICE_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ prefix, limit: 1000 }),
+  });
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`Storage list failed: ${res.status} ${err}`);
+  }
+  const items = (await res.json()) as Array<{ name: string }>;
+  // Recurse into sub-folders (full/, thumb/) — list returns only one level
+  const out: string[] = [];
+  for (const item of items) {
+    const full = `${prefix}${item.name}`;
+    if (!item.name.includes(".")) {
+      // looks like a sub-folder
+      const nested = await listStoragePrefix(`${full}/`);
+      out.push(...nested);
+    } else {
+      out.push(full);
+    }
+  }
+  return out;
+}
+
+async function clearProductStorage(productId: string): Promise<number> {
+  const paths = await listStoragePrefix(`${productId}/`);
+  if (paths.length === 0) return 0;
+  await deleteFromStorage(paths);
+  return paths.length;
+}
+
 // ─── Process images with sharp ──────────────────────────────────────────────
 
 async function processImage(
@@ -209,15 +292,32 @@ async function main() {
     }
   }
 
-  // 2. Group by articleCode
+  // 2. Group by articleCode + sort each group + cap to maxPerProduct
   const grouped = new Map<string, ParsedFile[]>();
   for (const file of parsed) {
     const existing = grouped.get(file.articleCode) ?? [];
     existing.push(file);
     grouped.set(file.articleCode, existing);
   }
+  let cappedCount = 0;
+  for (const [code, list] of grouped) {
+    list.sort((a, b) =>
+      a.position === b.position
+        ? a.fileName.localeCompare(b.fileName)
+        : a.position - b.position,
+    );
+    if (Number.isFinite(maxPerProduct) && list.length > maxPerProduct) {
+      cappedCount += list.length - maxPerProduct;
+      grouped.set(code, list.slice(0, maxPerProduct));
+    }
+  }
 
   console.log(`\nУнікальних артикулів: ${grouped.size}`);
+  if (Number.isFinite(maxPerProduct)) {
+    console.log(
+      `Cap per product: ${maxPerProduct} (skipped ${cappedCount} файлів)`,
+    );
+  }
 
   // 3. Find products in DB by code1C (numeric code in filenames matches code1C, not articleCode)
   const articleCodes = [...grouped.keys()];
@@ -278,6 +378,8 @@ async function main() {
     productMap.has(code),
   );
 
+  let cleared = 0;
+
   await processInBatches(entries, concurrency, async ([code, files], index) => {
     const product = productMap.get(code)!;
 
@@ -286,8 +388,24 @@ async function main() {
       return;
     }
 
-    // Sort by position
+    // Sort by position (already sorted in grouping step but be defensive)
     files.sort((a, b) => a.position - b.position);
+
+    if (replaceMode) {
+      try {
+        const removed = await clearProductStorage(product.id);
+        cleared += removed;
+        await prisma.productImage.deleteMany({
+          where: { productId: product.id },
+        });
+      } catch (err) {
+        errors++;
+        const msg = `(${code}) clear failed: ${err instanceof Error ? err.message : String(err)}`;
+        errorDetails.push(msg);
+        console.error(`  ✗ ${msg}`);
+        return; // skip uploads if clear failed — leave old set intact
+      }
+    }
 
     for (const file of files) {
       try {
@@ -299,17 +417,8 @@ async function main() {
         const fullUrl = await uploadToStorage(fullPath, full, "image/webp");
         await uploadToStorage(thumbPath, thumb, "image/webp");
 
-        // Upsert product_images record
-        const existing = await prisma.productImage.findFirst({
-          where: { productId: product.id, position: file.position },
-        });
-
-        if (existing) {
-          await prisma.productImage.update({
-            where: { id: existing.id },
-            data: { url: fullUrl, alt: product.name },
-          });
-        } else {
+        if (replaceMode) {
+          // Storage + rows already cleared above — always create fresh
           await prisma.productImage.create({
             data: {
               productId: product.id,
@@ -318,6 +427,26 @@ async function main() {
               alt: product.name,
             },
           });
+        } else {
+          // Upsert product_images record
+          const existing = await prisma.productImage.findFirst({
+            where: { productId: product.id, position: file.position },
+          });
+          if (existing) {
+            await prisma.productImage.update({
+              where: { id: existing.id },
+              data: { url: fullUrl, alt: product.name },
+            });
+          } else {
+            await prisma.productImage.create({
+              data: {
+                productId: product.id,
+                url: fullUrl,
+                position: file.position,
+                alt: product.name,
+              },
+            });
+          }
         }
 
         uploaded++;
@@ -339,6 +468,9 @@ async function main() {
   console.log("════════════════════════════════════");
   console.log(`Завантажено:    ${uploaded} фото`);
   console.log(`Пропущено:      ${skipped} фото`);
+  if (replaceMode) {
+    console.log(`Видалено старих: ${cleared} файлів зі Storage`);
+  }
   console.log(`Помилки:        ${errors}`);
   console.log(`Не розпізнано:  ${unparsed.length} файлів`);
   console.log(`Не знайдено:    ${notFound.length} артикулів`);
