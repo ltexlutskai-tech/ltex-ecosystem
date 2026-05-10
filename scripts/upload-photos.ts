@@ -33,6 +33,31 @@ import path from "path";
 import sharp from "sharp";
 import { PrismaClient } from "@prisma/client";
 
+// Load .env files if present (root then apps/store override). No dotenv dep —
+// keeps the script portable. apps/store/.env is the canonical home for
+// SUPABASE_* and DATABASE_URL on the production server.
+function loadEnvFile(envPath: string) {
+  if (!fs.existsSync(envPath)) return;
+  const content = fs.readFileSync(envPath, "utf-8");
+  for (const line of content.split(/\r?\n/)) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("#")) continue;
+    const m = trimmed.match(/^([A-Za-z_][A-Za-z0-9_]*)=(.*)$/);
+    if (!m) continue;
+    const key = m[1]!;
+    let val = m[2]!;
+    if (
+      (val.startsWith('"') && val.endsWith('"')) ||
+      (val.startsWith("'") && val.endsWith("'"))
+    ) {
+      val = val.slice(1, -1);
+    }
+    if (process.env[key] === undefined) process.env[key] = val;
+  }
+}
+loadEnvFile(path.resolve(".env"));
+loadEnvFile(path.resolve("apps/store/.env"));
+
 const prisma = new PrismaClient();
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -42,6 +67,9 @@ const BUCKET = "product-images";
 if (!SUPABASE_URL || !SERVICE_KEY) {
   console.error(
     "Error: NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY required.",
+  );
+  console.error(
+    "Looked in process.env, ./.env, and ./apps/store/.env — none had them set.",
   );
   process.exit(1);
 }

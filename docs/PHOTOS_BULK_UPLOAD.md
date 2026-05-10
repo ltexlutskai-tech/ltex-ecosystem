@@ -10,6 +10,7 @@
   - `DATABASE_URL` — local PostgreSQL
   - `NEXT_PUBLIC_SUPABASE_URL`
   - `SUPABASE_SERVICE_ROLE_KEY`
+- `upload-photos.ts` автоматично читає `./.env` і `./apps/store/.env` (process.env має пріоритет — нічого не перезаписує).
 - Запуск з кореня проекту в PowerShell.
 
 ## Phase 1 — створити папку з ≤10 фото на код
