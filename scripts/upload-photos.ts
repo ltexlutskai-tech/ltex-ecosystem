@@ -347,14 +347,50 @@ async function main() {
     );
   }
 
-  // 3. Find products in DB by code1C (numeric code in filenames matches code1C, not articleCode)
+  // 3. Find products in DB by code1C OR articleCode.
+  // The numeric code in filenames usually matches Product.code1C, but for
+  // some imports it lands in articleCode instead — query both and pick
+  // code1C-match first, falling back to articleCode-match.
   const articleCodes = [...grouped.keys()];
-  const products = await prisma.product.findMany({
-    where: { code1C: { in: articleCodes } },
-    select: { id: true, code1C: true, name: true },
+  const candidateProducts = await prisma.product.findMany({
+    where: {
+      OR: [
+        { code1C: { in: articleCodes } },
+        { articleCode: { in: articleCodes } },
+      ],
+    },
+    select: { id: true, code1C: true, articleCode: true, name: true },
   });
 
-  const productMap = new Map(products.map((p) => [p.code1C!, p]));
+  const productMap = new Map<
+    string,
+    { id: string; code1C: string | null; name: string; matchedVia: string }
+  >();
+  let viaCode1C = 0;
+  let viaArticleCode = 0;
+  for (const code of articleCodes) {
+    const byCode1C = candidateProducts.find((p) => p.code1C === code);
+    if (byCode1C) {
+      productMap.set(code, {
+        id: byCode1C.id,
+        code1C: byCode1C.code1C,
+        name: byCode1C.name,
+        matchedVia: "code1C",
+      });
+      viaCode1C++;
+      continue;
+    }
+    const byArticleCode = candidateProducts.find((p) => p.articleCode === code);
+    if (byArticleCode) {
+      productMap.set(code, {
+        id: byArticleCode.id,
+        code1C: byArticleCode.code1C,
+        name: byArticleCode.name,
+        matchedVia: "articleCode",
+      });
+      viaArticleCode++;
+    }
+  }
 
   const notFound: string[] = [];
   for (const code of articleCodes) {
@@ -363,7 +399,9 @@ async function main() {
     }
   }
 
-  console.log(`Знайдено в БД: ${products.length}`);
+  console.log(`Знайдено в БД: ${productMap.size}`);
+  console.log(`  через code1C:      ${viaCode1C}`);
+  console.log(`  через articleCode: ${viaArticleCode}`);
   if (notFound.length > 0) {
     console.log(`\nНе знайдено товар для артикулів (${notFound.length}):`);
     for (const code of notFound.slice(0, 20)) {
@@ -380,7 +418,7 @@ async function main() {
     console.log(
       `Буде завантажено: ${parsed.length - notFound.reduce((sum, code) => sum + (grouped.get(code)?.length ?? 0), 0)} фото`,
     );
-    console.log(`Для ${products.length} товарів`);
+    console.log(`Для ${productMap.size} товарів`);
     await prisma.$disconnect();
     return;
   }
@@ -478,8 +516,10 @@ async function main() {
         }
 
         uploaded++;
+        const viaTag =
+          product.matchedVia === "articleCode" ? " [via articleCode]" : "";
         console.log(
-          `[${index + 1}/${entries.length}] (${code}) ${product.name} — фото ${file.position} ✓`,
+          `[${index + 1}/${entries.length}] (${code})${viaTag} ${product.name} — фото ${file.position} ✓`,
         );
       } catch (err) {
         errors++;
