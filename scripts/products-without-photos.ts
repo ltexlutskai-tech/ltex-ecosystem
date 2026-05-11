@@ -36,6 +36,24 @@ loadEnvFile(path.resolve("apps/store/.env"));
 
 const prisma = new PrismaClient();
 
+const args = process.argv.slice(2);
+const photosDir = args.find((a) => !a.startsWith("--"));
+
+const IMAGE_EXTS = new Set([".jpg", ".jpeg", ".png", ".webp", ".bmp", ".tiff"]);
+
+function extractCode(fileName: string): string | null {
+  const start = fileName.match(/^\((\d+)\)\s+/);
+  if (start) return start[1]!;
+  const end = fileName.match(/\((\d+)\)(?:_\d+)?\.\w+$/);
+  if (end) return end[1]!;
+  return null;
+}
+
+function csvCell(s: string | null | undefined): string {
+  const v = (s ?? "").replace(/"/g, '""');
+  return /[",\n;]/.test(v) ? `"${v}"` : v;
+}
+
 async function main() {
   const products = await prisma.product.findMany({
     where: { images: { none: {} } },
@@ -100,7 +118,51 @@ async function main() {
 
   const reportPath = "docs/PRODUCTS_NO_PHOTOS.md";
   fs.writeFileSync(reportPath, out.join("\n"), "utf-8");
-  console.log(`\nЗвіт: ${reportPath}`);
+  console.log(`\nЗвіт MD: ${reportPath}`);
+
+  // CSV — flat list, easy to open in Excel
+  const csvLines: string[] = [];
+  csvLines.push("code1C;articleCode;name;category;inStock;hasPhotoInFolder");
+
+  // Cross-check with photos folder if provided
+  let folderCodes = new Set<string>();
+  if (photosDir && fs.existsSync(photosDir)) {
+    for (const f of fs.readdirSync(photosDir)) {
+      if (!IMAGE_EXTS.has(path.extname(f).toLowerCase())) continue;
+      const c = extractCode(f);
+      if (c) folderCodes.add(c);
+    }
+    console.log(`\nКодів у папці ${photosDir}: ${folderCodes.size}`);
+  }
+
+  let hasPhoto = 0;
+  for (const p of products) {
+    const inFolder =
+      (p.code1C && folderCodes.has(p.code1C)) ||
+      (p.articleCode && folderCodes.has(p.articleCode));
+    if (inFolder) hasPhoto++;
+    csvLines.push(
+      [
+        csvCell(p.code1C),
+        csvCell(p.articleCode),
+        csvCell(p.name),
+        csvCell(p.category?.name),
+        p.inStock ? "1" : "0",
+        inFolder ? "1" : "0",
+      ].join(";"),
+    );
+  }
+  const csvPath = "docs/PRODUCTS_NO_PHOTOS.csv";
+  fs.writeFileSync(csvPath, csvLines.join("\n"), "utf-8");
+  console.log(`Звіт CSV: ${csvPath}`);
+
+  if (photosDir) {
+    console.log(`\nЗ ${products.length} товарів без фото:`);
+    console.log(`  фото є у папці (code1C або articleCode): ${hasPhoto}`);
+    console.log(
+      `  фото немає у папці взагалі:              ${products.length - hasPhoto}`,
+    );
+  }
 
   await prisma.$disconnect();
 }
