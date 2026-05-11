@@ -24,6 +24,8 @@ export default async function ProductsPage({
     dir?: string;
     category?: string;
     quality?: string;
+    photos?: string;
+    lots?: string;
   }>;
 }) {
   const params = await searchParams;
@@ -33,6 +35,8 @@ export default async function ProductsPage({
   const dir = params.dir === "asc" ? "asc" : "desc";
   const categoryFilter = params.category ?? "";
   const qualityFilter = params.quality ?? "";
+  const photosFilter = params.photos ?? "";
+  const lotsFilter = params.lots ?? "";
   const perPage = 25;
 
   const where: Record<string, unknown> = {};
@@ -53,6 +57,16 @@ export default async function ProductsPage({
   }
   if (qualityFilter) {
     conditions.push({ quality: qualityFilter });
+  }
+  if (photosFilter === "none") {
+    conditions.push({ images: { none: {} } });
+  } else if (photosFilter === "some") {
+    conditions.push({ images: { some: {} } });
+  }
+  if (lotsFilter === "none") {
+    conditions.push({ lots: { none: {} } });
+  } else if (lotsFilter === "some") {
+    conditions.push({ lots: { some: {} } });
   }
   if (conditions.length > 0) {
     where.AND = conditions;
@@ -91,6 +105,8 @@ export default async function ProductsPage({
   if (query) baseParams.set("q", query);
   if (categoryFilter) baseParams.set("category", categoryFilter);
   if (qualityFilter) baseParams.set("quality", qualityFilter);
+  if (photosFilter) baseParams.set("photos", photosFilter);
+  if (lotsFilter) baseParams.set("lots", lotsFilter);
   if (sort !== "updatedAt") {
     baseParams.set("sort", sort);
     baseParams.set("dir", dir);
@@ -125,7 +141,18 @@ export default async function ProductsPage({
     label: QUALITY_LABELS[q],
   }));
 
-  const hasFilters = query || categoryFilter || qualityFilter;
+  const photosOptions = [
+    { value: "none", label: "Без фото" },
+    { value: "some", label: "З фото" },
+  ];
+
+  const lotsOptions = [
+    { value: "none", label: "Без лотів" },
+    { value: "some", label: "З лотами" },
+  ];
+
+  const hasFilters =
+    query || categoryFilter || qualityFilter || photosFilter || lotsFilter;
 
   return (
     <div className="space-y-6">
@@ -145,6 +172,16 @@ export default async function ProductsPage({
           placeholder="Пошук по назві, артикулу, коду 1С..."
           className="min-w-[200px] flex-1 rounded-md border px-3 py-2 text-sm"
         />
+        {categoryFilter && (
+          <input type="hidden" name="category" value={categoryFilter} />
+        )}
+        {qualityFilter && (
+          <input type="hidden" name="quality" value={qualityFilter} />
+        )}
+        {photosFilter && (
+          <input type="hidden" name="photos" value={photosFilter} />
+        )}
+        {lotsFilter && <input type="hidden" name="lots" value={lotsFilter} />}
         <Button type="submit" variant="secondary">
           Шукати
         </Button>
@@ -160,6 +197,16 @@ export default async function ProductsPage({
           paramName="quality"
           options={qualityOptions}
           placeholder="Всі якості"
+        />
+        <FilterSelect
+          paramName="photos"
+          options={photosOptions}
+          placeholder="Усі фото"
+        />
+        <FilterSelect
+          paramName="lots"
+          options={lotsOptions}
+          placeholder="Усі лоти"
         />
         {hasFilters && (
           <Link
