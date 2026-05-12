@@ -164,13 +164,29 @@ JWT: HS256 with `MANAGER_JWT_SECRET` (мінімум 32 байти). Verify че
 Скрипт `scripts/seed-admin-user.ts` — один раз запускається на сервері з env vars:
 
 ```bash
-SEED_ADMIN_EMAIL=admin@ltex.com.ua \
+SEED_ADMIN_EMAIL=ltex.lutsk.ai@gmail.com \
 SEED_ADMIN_PASSWORD=<тимчасовий> \
-SEED_ADMIN_NAME="Адміністратор" \
+SEED_ADMIN_NAME="Адміністратор L-TEX" \
 pnpm tsx scripts/seed-admin-user.ts
 ```
 
-Створює `User { role: admin }`. Цей admin потім через `/manager` UI запрошує менеджерів (заповнює email+name → автогенерує password + посилає email з first-login reset). Manager invitation flow — частина M1.1.
+Створює `User { role: admin, email: "ltex.lutsk.ai@gmail.com" }`. Цей admin потім через `/manager/admin/users` UI запрошує менеджерів (вписує email+ПІБ → автогенерується випадковий пароль → відсилається invite-email з посиланням "Задайте ваш пароль" → менеджер переходить → задає свій пароль → логіниться).
+
+### 4.4. Whitelist через invite
+
+**Принцип:** менеджер не може зареєструватись сам. У систему потрапляють тільки ті email-адреси, які admin особисто додав через UI. Це і є whitelist — таблиця `users` сама собою.
+
+Login flow:
+- Email є у `users` + пароль вірний + `isActive=true` → OK
+- Email є у `users` + пароль невірний → counter++, після 5 fails — lockout 15 хв
+- Email є у `users` + `isActive=false` → "обліковий запис вимкнено"
+- Email **немає** у `users` → "невірний email або пароль" (та сама відповідь що при невірному паролі — anti-enumeration, не виявляємо чи user існує)
+
+### 4.5. Локалізовані рішення (зафіксовано з user 2026-05-12)
+
+- **Очікувано 5-10 менеджерів** у v1 — admin invite-flow реалізується одразу в M1.1 (не self-service registration).
+- **Telegram сповіщення з нуля** — не існує legacy спільного каналу для менеджерів, тому новий код шле тільки в особисті DM (per-manager); якщо менеджер ще не виконав `/start_manager` — повідомлення тимчасово не доходить до Telegram (але є в-app + email digest fallback).
+- **Перший admin email:** `ltex.lutsk.ai@gmail.com`.
 
 ## 5. Data flow (read/write)
 
