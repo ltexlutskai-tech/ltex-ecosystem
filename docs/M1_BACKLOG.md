@@ -34,34 +34,66 @@ V2: M2.1 returns, M2.2 presentations+viber, M2.3 reports, M2.4 reservations
 
 ---
 
-### M1.1 — Manager DB schema + auth endpoints
-**Goal:** Створити Prisma модель `Manager` + auth API + login screen.
-**Pre-reqs:** Скрін поточного 1С `ФормаВводаПароля` (`MOBILE_APP_ANALYSIS.md §5.4.5`).
+### M1.1 — Self-hosted auth (users + bcrypt + JWT) + login + password reset + admin invite
+**Goal:** Власна auth-система **без Supabase**: таблиця `User`, bcrypt пароль, HMAC JWT, email password-reset через Resend, admin invite flow.
+**Pre-reqs:** Жодних — design зафіксований у `MANAGER_APP_STRATEGY.md §4`.
 **Acceptance:**
-- [ ] Migration `2026MMDD_manager_auth`: `Manager`, `ManagerRefreshToken`, `ClientAssignment`, enum `ManagerRole`
-- [ ] `POST /api/v1/manager/auth/login` (Zod, rate-limit 5/min/IP, Supabase Admin SDK validate, return JWT pair)
-- [ ] `POST /api/v1/manager/auth/refresh` (rotate refresh token)
-- [ ] `POST /api/v1/manager/auth/logout` (revoke refresh)
-- [ ] `GET /api/v1/manager/auth/me` (return Manager + role)
-- [ ] `lib/manager-auth.ts` middleware helper (verify Bearer JWT, attach `req.manager`)
-- [ ] Login screen `/manager/login` (mirror admin UI but на manager-namespace)
-- [ ] Middleware: `/manager/:path*` → redirect to `/manager/login` коли немає valid JWT
-- [ ] Unit tests ≥ 8 (auth happy + invalid + expired + rate-limited + manager-disabled)
-- [ ] `.env.example` доповнено: `MOBILE_EXCHANGE_SOAP_URL`, `MOBILE_EXCHANGE_SOAP_USER`, `MOBILE_EXCHANGE_SOAP_PASSWORD` (поки stub)
-**Out of scope:** UI inside `/manager/*` крім login (М1.2 робить shell).
+- [ ] Migration `2026MMDD_users_auth`: `users`, `user_refresh_tokens`, `password_reset_tokens`, `client_assignments`, enum `UserRole(manager|senior_manager|admin)`. Усі через `@@map`.
+- [ ] `bcryptjs` додано у `apps/store/package.json` (dependency)
+- [ ] `MANAGER_JWT_SECRET` додано у `.env.example` (≥32 байти, validated у `instrumentation.ts`)
+- [ ] `lib/auth/password.ts` — `hashPassword()`, `verifyPassword()`, `generateRandomPassword(length=16)`
+- [ ] `lib/auth/jwt.ts` — `signAccessToken(userId, role)`, `verifyAccessToken()`, `signRefreshToken()`, sha256 helper
+- [ ] `lib/auth/lockout.ts` — failed-login counter + 15м lockout після 5 fails
+- [ ] `POST /api/v1/manager/auth/login` (Zod, rate-limit 10/min/IP, bcrypt.compare, lockout check, return JWT pair)
+- [ ] `POST /api/v1/manager/auth/refresh` (rotate: revoke old + issue new)
+- [ ] `POST /api/v1/manager/auth/logout` (revoke single refresh; `?everywhere=true` для revoke-all)
+- [ ] `GET /api/v1/manager/auth/me` (return User shape з `telegramLinked: boolean`)
+- [ ] `POST /api/v1/manager/auth/password-reset/request` (rate-limit 3/hour/email, anti-enumeration — always 202)
+- [ ] `POST /api/v1/manager/auth/password-reset/confirm` (Zod: ≥12 chars + ≥1 digit + ≥1 letter)
+- [ ] Email template `manager-password-reset.ts` (HTML + plaintext, ukrainian) — sent via existing `lib/email.ts` queue
+- [ ] **Admin invite flow:** `POST /api/v1/manager/admin/users` (auth=admin, role=admin only) — створює User з тимчасовим bcrypt-hash, одразу відсилає reset-email щоб новий менеджер задав свій пароль
+- [ ] `GET /api/v1/manager/admin/users` (admin only — list usernів)
+- [ ] `PATCH /api/v1/manager/admin/users/{id}` (admin only — toggle isActive, change role, force password reset)
+- [ ] `lib/manager-auth.ts` middleware helper — `getCurrentUser(req)` повертає `User | null`
+- [ ] Next.js middleware: `/manager/:path*` → redirect to `/manager/login` без valid access JWT
+- [ ] Pages:
+  - `/manager/login` — email + password + "забули пароль?" link + lockout error display
+  - `/manager/forgot` — email input → success screen
+  - `/manager/reset?token=XXX` — new password + confirm + redirect to login
+  - `/manager/admin/users` — list + invite form (admin only; інші ролі hidden)
+- [ ] `scripts/seed-admin-user.ts` — створює першого admin через env vars
+- [ ] `.env.example` доповнено: `MANAGER_JWT_SECRET`, `MOBILE_EXCHANGE_SOAP_URL`, `MOBILE_EXCHANGE_SOAP_USER`, `MOBILE_EXCHANGE_SOAP_PASSWORD` (stub)
+- [ ] Unit tests ≥ 18:
+  - password hash/verify/generate (3)
+  - JWT sign/verify happy + tampered + expired (3)
+  - login route: happy + bad-password + locked + inactive + rate-limited (5)
+  - refresh: rotate + revoked + expired (3)
+  - reset: request anti-enumeration + confirm happy + expired + used twice (4)
+**Out of scope:** UI inside `/manager/*` крім auth pages (M1.2). Existing `/admin/login` (Supabase) — НЕ ламаємо. Customer auth `/api/mobile/*` — НЕ торкаємо.
+**User-action post-deploy:** запустити `pnpm tsx scripts/seed-admin-user.ts` один раз з env vars; залогінитись як admin; з UI запросити менеджерів.
 
 ---
 
-### M1.2 — Workstation shell + dashboard skeleton
-**Goal:** Layout `/manager/*` із sidebar, header (manager name + logout + connection-status), і Dashboard з 4 заглушками (Сьогодні / Замовлення / Чат / Маршрут).
-**Pre-reqs:** Скрін поточного `Catalog.РабочийСтол.ФормаСписка` (`§5.1.2` головний екран 1С). User вкаже які 4-6 плиток найважливіші.
+### M1.2 — Workstation shell + dashboard + minimal settings
+**Goal:** Layout `/manager/*` із sidebar, header (user name + logout + connection-status), Dashboard з реальними cards, і Settings page **мінімальна** (replaces 1С `ФормаВводаПароля` — усі 7 toggles викинуті, бо менеджери ними не користуються).
+**Pre-reqs:** Скрін поточного `Catalog.РабочийСтол.ФормаСписка` (`§5.1.2`) — user вкаже які 4-6 плиток найважливіші.
 **Acceptance:**
-- [ ] `apps/store/app/manager/layout.tsx` — двоколонковий desktop layout, mobile fallback Sheet
-- [ ] Sidebar nav: Dashboard, Клієнти, Товари, Замовлення, Реалізації, Каса, Маршрути, Чат, Нагадування, Налаштування
-- [ ] Header: manager fullName, connection indicator (online/syncing/offline), notification bell (count), logout
-- [ ] Dashboard `/manager` — 4 plate cards з real data (count from DB) + auto-refresh 30s
+- [ ] `apps/store/app/manager/(workstation)/layout.tsx` — двоколонковий desktop layout, mobile fallback Sheet
+- [ ] Sidebar nav: Dashboard, Клієнти, Товари, Замовлення, Реалізації, Каса, Маршрути, Чат, Нагадування, Налаштування. Items з permission gating (наприклад "Користувачі" — admin-only)
+- [ ] Header: user fullName, connection indicator (online/syncing/offline), notification bell (count), logout
+- [ ] Dashboard `/manager` — 4-6 plate cards з real data (count from DB) + auto-refresh 30s
 - [ ] Layout adapts: <1024px → sidebar в Sheet, ≥1024px → fixed
-- [ ] `lib/manager-context.tsx` — React context з current manager, connection state, notification count
+- [ ] `lib/manager-context.tsx` — React context з current user, connection state, notification count
+- [ ] **Settings `/manager/settings`** (заміна 1С `ФормаВводаПароля`) — мінімум:
+  - **Профіль:** email (read-only), fullName (editable, PATCH `/api/v1/manager/auth/me`), кнопка "Змінити пароль" (відкриває modal з current+new+confirm)
+  - **Telegram:** статус (linked/not) + кнопка "Прив'язати" (показує QR код з `tg://resolve?domain=<bot>&start=<token>` АБО plaintext token для copy) — UI заглушка тут, реальне binding у M1.10
+  - **Сповіщення:** 2 toggles — "OS push" + "Telegram DM" (стає `User.notifyChannels`)
+  - **Сесії:** список активних refresh tokens (User-Agent + IP + lastUsed) + "Logout everywhere" button
+  - **Logout** (внизу, окремо)
+  - **БЕЗ:** "Локальне з'єднання", "Курси валют авто", "Залишки при підборі", "Борги/ціни авто", "Вечірнє скидання", "Час обміну", "Кнопка Записати" (auto-save on change)
+- [ ] Save-on-blur для editable fields (профіль fullName, notifyChannels) — без global "Зберегти"
+- [ ] Toast `Збережено` при кожному успішному PATCH-у
+- [ ] `PATCH /api/v1/manager/auth/me` — Zod schema {fullName?, notifyChannels?}, auth required
 
 ---
 
@@ -245,8 +277,9 @@ V2: M2.1 returns, M2.2 presentations+viber, M2.3 reports, M2.4 reservations
 
 ## Open questions для user (зібрати перед M1.1)
 
-1. Чи всі менеджери уже мають Supabase Auth account (admin/login користувались) — чи доведеться створити нових?
-2. Звідки брати `Manager.code1C` (mapping до 1С `Catalog.ТорговыеАгенты.Код`)? Manual seed чи sync з 1С?
-3. Чи Wi-Fi у офісі і LTE на телефоні менеджера — це той самий network (тобто `192.168.0.10` LAN доступний звідки) чи завжди через VPN до `ltex1c.com.ua`?
-4. Чи зараз менеджери реально використовують Telegram-канал нотифікацій (`TELEGRAM_CHAT_ID`)? Якщо так — поточний канал ламати не можна, треба добавляти DM поверх.
-5. Чи `ПарольВхода` (поточний 1С) = email-у Supabase? Якщо так — можемо при first-login auto-mapping. Якщо ні — manual admin invite потрібен.
+1. **Скільки менеджерів стартує?** 1-3 (single admin запрошує усіх) чи 10+ (треба self-service "Запросити" UI з самого початку)?
+2. **Які email-домени менеджерів?** Це визначає чи робимо whitelist `@ltex.com.ua` only або open. Recommendation — whitelist для security.
+3. **Звідки брати `User.code1C`** (mapping до 1С `Catalog.ТорговыеАгенты.Код`)? Manual seed admin-ом у `/manager/admin/users` UI чи sync з 1С через `ВыгрузитиАгентов` SOAP? V1 → manual; sync — V2.
+4. **Чи 1С-сервер (`ltex1c.com.ua` або LAN `192.168.0.10`) доступний з нашого Windows-сервера?** Sync worker буде на той самий Windows host що Next.js (`E:\...`). Якщо так — direct SOAP. Якщо ні — треба VPN/tunnel конфіг (документую у `MANAGER_APP_DEPLOY.md`).
+5. **Чи зараз менеджери реально використовують Telegram-канал нотифікацій (`TELEGRAM_CHAT_ID` group)?** Якщо так — поточний канал ламати не можна, треба добавляти DM поверх. Якщо ні — можна одразу switch на per-user DM.
+6. **First admin user — email який?** Для `scripts/seed-admin-user.ts`. Це залишається у `apps/store/.env` як `SEED_ADMIN_EMAIL` тільки на час першого запуску.

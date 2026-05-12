@@ -1,6 +1,7 @@
 # Manager Workstation — Strategy
 
-**Status:** Draft v1 (2026-05-12). Owner: orchestrator session.
+**Status:** Draft v2 (2026-05-12). Owner: orchestrator session.
+**v2 changes:** dropped Supabase Auth for manager app (own users table + bcrypt + HMAC JWT). Existing admin/storage Supabase usage deferred to V2 phase-out roadmap. Simplified settings UI — викинуто всі 1С toggles, лишилось мінімум.
 **Replaces:** 1C `MobileAgentLTEX` v1.15.3 (Android-only, SOAP-bound).
 **Companion docs:** [`MOBILE_APP_ANALYSIS.md`](../MOBILE_APP_ANALYSIS.md) — повний аудит 1С-конфігурацій; [`M1_BACKLOG.md`](M1_BACKLOG.md) — посесійний backlog з acceptance criteria.
 
@@ -16,97 +17,160 @@
 |---|---|---|---|
 | 1 | Shell | **Web-first → Tauri wrap (M1.11)** | Зменшити initial risk; web-функціонал стабілізується, потім нативний інсталер. |
 | 2 | 1С integration | **Hybrid: read snapshot, write SOAP-proxy** | `MOBILE_APP_ANALYSIS.md §8.7`. Швидкий UI читає з локального Postgres-snapshot; write-операції одразу проксі у `MobileExchange.1cws` з idempotency-key. Background `services/manager-sync/` оновлює snapshot. |
-| 3 | Auth | **Email+password + HMAC JWT** (`/api/v1/manager/auth/*`) | Той самий pattern, що `/api/mobile/*` customer auth — `MOBILE_JWT_SECRET` уже у проді. Reset через Supabase magic-link. |
+| 3 | Auth | **Self-hosted: own `users` table + bcrypt + HMAC JWT** | Жодного Supabase для manager app. Password reset через власний email-токен (Resend SMTP уже у проді). |
 | 4 | Notifications | **Tauri native push + Telegram DM** паралельно | Workstation відкритий → OS push; закритий → Telegram DM на телефон менеджера. Telegram bot уже існує (`services/telegram-bot`). |
+| 5 | Storage | **Local volume `E:\ltex-storage\`** для нових файлів | Manager-uploads — на наш Windows server через Next.js Route Handler. Existing banners/product photos на Supabase Storage лишаються до окремої V2-міграції (див. §12). |
+| 6 | Settings UI | **Мінімум:** profile + Telegram pair + notification channels + logout | Поточний 1С `ФормаВводаПароля` має 7 toggles які менеджери не міняють — викинуто. Auto-sync курсів/борг/залишків тепер default-on без UI. |
 
 ## 3. Tech stack
 
 | Шар | Технологія | Примітка |
 |---|---|---|
 | Frontend | Next.js 15 App Router + React 19 + Tailwind + shadcn/ui | Сегмент `apps/store/app/manager/*` усередині існуючого monorepo |
-| Auth | `/api/v1/manager/auth/login` → HMAC JWT (15 хв access + 30 днів refresh) | Reuse `lib/mobile-auth.ts` pattern |
+| Auth | Власна таблиця `users` + `bcryptjs` (cost=12) + HMAC JWT через `lib/mobile-auth.ts` | Жодного Supabase Auth. Access 15хв + refresh 30д. Password reset через email-link (token у власному `password_reset_tokens`, сесія 1г) |
+| Email | **Resend** (уже у проді — `lib/email.ts`) | Used for password reset + критичних alerts |
 | State (server) | TanStack Query | Cache invalidation через SSE events |
 | Real-time | Server-Sent Events через `/api/v1/manager/stream` | Resume via `Last-Event-ID` header |
-| DB | Той самий PostgreSQL 16 (local Windows Server) + Prisma | Нові таблиці з префіксом `mgr_` |
+| DB | Той самий PostgreSQL 16 (local Windows Server, `E:\PostgreSQL\16`) + Prisma | Нові таблиці з префіксом `mgr_` |
+| File storage | Local volume `E:\ltex-storage\manager\` через `/api/v1/manager/files/*` Route Handler | Stream-served з content-type sniff, antimalware-free for trusted internal use |
 | Sync worker | Новий `services/manager-sync/` (Node, окрема PM2 instance) | Polls `MobileExchange.1cws` кожні 60c, пише дельти у `mgr_*` snapshot tables |
 | Notifications | Telegram bot DM + Tauri OS push | `services/telegram-bot` розширюється `/start_manager` + DM-send функцією |
 | Desktop wrap | Tauri 2 (M1.11) | Rust shell ~10 МБ; auto-update через GitHub Releases |
-| Build | EAS не потрібен (Tauri має власний `tauri build`); CI matrix windows-latest + macos-latest у M1.11 | macOS code-signing — окрема історія (можна self-signed DMG для internal distribution) |
+| Build | Tauri власний `tauri build`; CI matrix windows-latest + macos-latest у M1.11 | macOS code-signing — окрема історія (self-signed DMG для internal distribution) |
 
 ## 4. Identity модель
+
+**Принцип:** одна таблиця `User` для всіх internal-користувачів (manager, senior_manager, admin). У майбутньому існуючі Supabase-admin-аккаунти мігрують у цю саму таблицю (див. §12). Customers — окрема існуюча таблиця `customers`, **не торкаємо**.
 
 ### 4.1. DB additions
 
 ```prisma
-model Manager {
+model User {
   id              String   @id @default(cuid())
-  supabaseUserId  String   @unique
   email           String   @unique
+  passwordHash    String                          // bcryptjs $2b$ hash, cost=12
   fullName        String
-  role            ManagerRole @default(manager)
+  role            UserRole @default(manager)
   isActive        Boolean  @default(true)
 
-  // 1C-bridge
-  code1C          String?  @unique     // ТорговыеАгенты.Код
-  warehouseId1C   String?              // склад менеджера у ЦБ
+  // 1C-bridge (manager-specific, null для non-manager)
+  code1C          String?  @unique                 // ТорговыеАгенты.Код
+  warehouseId1C   String?                          // склад менеджера у ЦБ
 
   // Telegram bot bridge
-  telegramChatId  String?  @unique     // null until /start_manager linked
-  telegramLinkToken String? @unique    // one-time token for QR/copy-paste pairing
-  notifyChannels  String[] @default(["push","telegram"])  // ["push","telegram","none"]
+  telegramChatId    String? @unique                // null поки не виконано /start_manager
+  telegramLinkToken String? @unique                // one-time token для pairing
+  notifyChannels    String[] @default(["push","telegram"])
 
+  // Audit
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
   lastSeenAt      DateTime?
+  lastLoginIp     String?
+
+  // Lockout (захист від brute-force)
+  failedLoginCount Int      @default(0)
+  lockedUntil      DateTime?
 
   // relations
-  refreshTokens   ManagerRefreshToken[]
+  refreshTokens   UserRefreshToken[]
+  passwordResets  PasswordResetToken[]
   assignedClients ClientAssignment[]
+
+  @@map("users")
 }
 
-enum ManagerRole {
+enum UserRole {
   manager
   senior_manager
   admin
 }
 
-model ManagerRefreshToken {
+model UserRefreshToken {
   id          String   @id @default(cuid())
-  managerId   String
-  tokenHash   String   @unique
+  userId      String
+  tokenHash   String   @unique                     // sha256(token), не plaintext
   expiresAt   DateTime
   revokedAt   DateTime?
   userAgent   String?
   ipAddress   String?
   createdAt   DateTime @default(now())
-  manager     Manager  @relation(fields: [managerId], references: [id], onDelete: Cascade)
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, revokedAt])
+  @@map("user_refresh_tokens")
+}
+
+model PasswordResetToken {
+  id          String   @id @default(cuid())
+  userId      String
+  tokenHash   String   @unique                     // sha256(token)
+  expiresAt   DateTime                             // 1 година від створення
+  usedAt      DateTime?                            // null = ще не використаний
+  requestedIp String?
+  createdAt   DateTime @default(now())
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, usedAt])
+  @@map("password_reset_tokens")
 }
 
 model ClientAssignment {
   id          String   @id @default(cuid())
-  managerId   String
-  customerId  String                    // FK to existing customers table
+  userId      String                               // hto веде клієнта
+  customerId  String                               // FK на існуючу customers
   assignedAt  DateTime @default(now())
-  manager     Manager  @relation(fields: [managerId], references: [id], onDelete: Cascade)
-  @@unique([managerId, customerId])
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@unique([userId, customerId])
+  @@map("client_assignments")
 }
 ```
 
 ### 4.2. Auth flow
 
 ```
-POST /api/v1/manager/auth/login
-  Body: { email, password }
-  → Supabase Auth Admin SDK validate
-  → upsert Manager record (auto-create на перший login якщо є whitelist у env або Manager row уже існує)
-  → return { accessToken (15min HMAC JWT), refreshToken (30d), manager: { id, fullName, role, telegramLinked } }
+POST /api/v1/manager/auth/login              { email, password }
+  → if lockedUntil > now → 423 Locked
+  → bcrypt.compare(password, user.passwordHash)
+  → on fail:  failedLoginCount++; if >=5 → lockedUntil = now+15m; return 401
+  → on pass:  reset counters, set lastSeenAt + lastLoginIp
+  → generate accessToken (HMAC JWT, payload { sub: userId, role, exp: 15m })
+  → generate refreshToken (32 bytes), store sha256 in UserRefreshToken (30d)
+  → 200 { accessToken, refreshToken, user: { id, fullName, role, telegramLinked: telegramChatId !== null } }
 
-POST /api/v1/manager/auth/refresh   Body: { refreshToken }
-POST /api/v1/manager/auth/logout    Body: { refreshToken }
-GET  /api/v1/manager/auth/me        Authorization: Bearer <accessToken>
+POST /api/v1/manager/auth/refresh            { refreshToken }
+  → lookup by sha256, validate not revoked/expired
+  → rotate: revoke old + issue new refresh + new access
+POST /api/v1/manager/auth/logout             { refreshToken } → 204
+GET  /api/v1/manager/auth/me                 Bearer <access> → { user }
+
+POST /api/v1/manager/auth/password-reset/request  { email }
+  → завжди 202 (anti-enumeration — same response if user existing or not)
+  → if user found + active: generate 32-byte token, store sha256 + 1h expiry
+  → send Resend email з link https://new.ltex.com.ua/manager/reset?token=<plain>
+
+POST /api/v1/manager/auth/password-reset/confirm  { token, newPassword }
+  → lookup by sha256(token), validate not used/expired
+  → bcrypt.hash(newPassword, 12) → User.passwordHash
+  → revoke all refresh tokens of this user
+  → mark PasswordResetToken.usedAt = now
+  → 204
 ```
 
-JWT payload: `{ sub: managerId, role, exp, iat }`. Verify через існуючий `lib/mobile-auth.ts::verifyJwt()` (extended with manager-namespace claim).
+JWT: HS256 with `MANAGER_JWT_SECRET` (мінімум 32 байти). Verify через existing `lib/mobile-auth.ts::verifyJwt()` pattern (extracted to shared `lib/jwt.ts`).
+
+### 4.3. Seed першого admin
+
+Скрипт `scripts/seed-admin-user.ts` — один раз запускається на сервері з env vars:
+
+```bash
+SEED_ADMIN_EMAIL=admin@ltex.com.ua \
+SEED_ADMIN_PASSWORD=<тимчасовий> \
+SEED_ADMIN_NAME="Адміністратор" \
+pnpm tsx scripts/seed-admin-user.ts
+```
+
+Створює `User { role: admin }`. Цей admin потім через `/manager` UI запрошує менеджерів (заповнює email+name → автогенерує password + посилає email з first-login reset). Manager invitation flow — частина M1.1.
 
 ## 5. Data flow (read/write)
 
@@ -223,14 +287,15 @@ User per-channel toggle у settings (`manager.notifyChannels`). Per-event prefer
 
 ## 9. Out of scope для M1 (визначено явно)
 
-- **iOS native** — Tauri тільки для Win+macOS. Для iOS — окрема пожиланка пізніше.
-- **Друк чеків** — Bluetooth-принтери не у v1. Менеджер друкує через Web Bluetooth API стороннього додатку (V2).
-- **Bric-a-Brac live-photo** — те, що для customer mobile-client, тут не actual.
+- **iOS native** — Tauri тільки для Win+macOS. Для iOS — окрема історія пізніше.
+- **Друк чеків** — Bluetooth-принтери не у v1. V2 через Web Bluetooth API.
 - **Видавання знижок** — лишається у 1С Director-role; manager-app дисплейс % але не може override (V2).
 - **Бронювання партій** — V2 (потребує live race-detection у `mgr_lots`).
 - **Звіти у форматі 1С-СКД** — V2; в v1 simplified dashboard.
-- **Виборка з режиму "ВечірнійОбмін"** — гнучкий sync-worker robust enough.
 - **Конкуренти-ціни** (поле `ІншіПостачальники` у Заказ) — V2.
+- **Міграція existing `/admin/*` з Supabase Auth** — див. §11 V2 phase-out. Existing admin працює і не ламається.
+- **Міграція existing banners/products image-storage** — Supabase Storage лишається до §11.
+- **Налаштувальна форма як у 1С `ФормаВводаПароля`** — викинуто; auto-defaults замінюють всі 7 toggles (див. §6).
 
 ## 10. Risks + mitigations
 
@@ -241,12 +306,30 @@ User per-channel toggle у settings (`manager.notifyChannels`). Per-event prefer
 | Race: 2 менеджери намагаються забронювати той самий лот | Medium | Pessimistic lock у `mgr_lots.reservedByManagerId` + SOAP write protected by 1С transaction |
 | Tauri auto-update ламає running session | Low | `tauri-plugin-updater` показує UI prompt, never silent restart |
 | Telegram bot rate-limit (FloodWait) | Low | Existing `services/telegram-bot` уже має retry; per-manager DM ≤ 30 msgs/sec ліміт безпечно |
-| Manager забув email — не може скинути пароль | Low | Supabase magic-link → admin web UI (admin role може reset чужий password) |
+| Manager забув email — не може скинути пароль | Low | Власний reset через Resend email-link. Якщо втратив доступ до email — admin role у `/manager/users` сторінці може force-reset через копіювання тимчасового пароля (M1.1) |
+| Brute-force на login endpoint | Medium | bcrypt cost=12 (~250ms per check); `failedLoginCount` lockout після 5 спроб на 15 хвилин; rate-limit 10/min/IP на `/auth/login` |
+| Втрата `MANAGER_JWT_SECRET` (rotation) | Medium | Token-version у JWT payload; при rotate — increment `User.tokenVersion`, JWT з minor version stays valid 15хв але refresh видасть з новим. Документ — `docs/MANAGER_APP_DEPLOY.md` §rotation |
+| Resend SMTP down → password reset не доходить | Low | S70 EmailJob queue з retry уже зроблений; reset emails йдуть через ту саму чергу |
 | Sync worker memory leak за 24 год uptime | Low | PM2 `max_memory_restart: 500M` per S68 logrotate pattern |
 
-## 11. Definition of Done — v1.0
+## 11. Supabase phase-out roadmap (parallel track, V2)
 
-- [ ] Менеджер логіниться через email+password у браузері
+Manager app (M1) **не використовує Supabase** взагалі. Однак existing виробничий код тримає Supabase для двох речей, які треба замігрувати окремими сесіями (не блокують M1):
+
+| Що | Файли | Сесія | Стратегія |
+|---|---|---|---|
+| **Admin login** | `apps/store/middleware.ts`, `apps/store/lib/supabase/*.ts`, `apps/store/app/admin/login/page.tsx`, `apps/store/lib/admin-auth.ts` | S88 (after M1.1) | Переключити admin SSR-middleware з `@supabase/ssr` на наш JWT cookie. Admin users переїздять у `users` таблицю (один SQL-export з Supabase Auth → bcrypt-hash → INSERT). Logout усіх Supabase-sessions, перший login через password-reset. |
+| **Banner upload** | `apps/store/app/admin/banners/actions.ts`, `lib/supabase/admin.ts` | S89 | Storage → `E:\ltex-storage\banners\`. Existing URL-и: backfill-script скопіює усі файли з Supabase Storage у локальний volume + UPDATE `banners.imageUrl` на нові `/files/banners/...` шляхи. |
+| **Product photo upload** | `apps/store/app/admin/products/actions.ts` | S90 | Те саме що S89 для `product_images.url`. Це 805 продуктів × ~5 фото = ~4000 файлів. Migration script + rollback план. |
+| **Customer mobile (Expo) — Supabase Storage URLs** | `apps/mobile-client/src/screens/product/*` | S91 | Bumping image-URL prefix у mobile API responses — не потребує re-build app, бо URL приходить з API. |
+| **Decommission Supabase project** | — | S92 (тільки коли S88-S91 done + 30 днів stable) | Експорт даних, шилання env vars, зняття `NEXT_PUBLIC_SUPABASE_*`. |
+
+Ця секція — **roadmap**, не M1-блокер. Manager app M1.1-M1.12 шипиться раніше і паралельно.
+
+## 12. Definition of Done — v1.0
+
+- [ ] Менеджер логіниться через email+password у браузері (власна auth, без Supabase)
+- [ ] Може скинути пароль через email-link
 - [ ] Бачить dashboard з сьогоднішніми orders + борги
 - [ ] Може створити Order (повний life-cycle: pick client → pick items → submit)
 - [ ] Order синхронізується з 1С протягом 2 хв (snapshot оновлюється)
