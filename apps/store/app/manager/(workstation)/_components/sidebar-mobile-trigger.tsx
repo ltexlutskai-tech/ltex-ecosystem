@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { createElement, useState } from "react";
 import { Menu } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@ltex/ui";
 import type { ManagerRole } from "@/lib/auth/jwt";
@@ -13,6 +13,12 @@ import {
   SETTINGS_LINK,
   type SidebarLink,
 } from "./sidebar-links";
+
+// Render lucide-react icon inside the client component boundary —
+// uses createElement to avoid passing the ComponentType through RSC props.
+function iconFor(link: SidebarLink) {
+  return createElement(link.icon, { className: "h-4 w-4" });
+}
 
 export function SidebarMobileTrigger({
   role,
@@ -46,15 +52,27 @@ export function SidebarMobileTrigger({
           <Section links={SECONDARY_LINKS} onNavigate={close} />
           <Separator />
           <SidebarNavLink
-            {...CHAT_LINK}
+            href={CHAT_LINK.href}
+            label={CHAT_LINK.label}
+            icon={iconFor(CHAT_LINK)}
             badge={chatUnread}
             onNavigate={close}
           />
           <Separator />
           {role === "admin" && (
-            <SidebarNavLink {...ADMIN_USERS_LINK} onNavigate={close} />
+            <SidebarNavLink
+              href={ADMIN_USERS_LINK.href}
+              label={ADMIN_USERS_LINK.label}
+              icon={iconFor(ADMIN_USERS_LINK)}
+              onNavigate={close}
+            />
           )}
-          <SidebarNavLink {...SETTINGS_LINK} onNavigate={close} />
+          <SidebarNavLink
+            href={SETTINGS_LINK.href}
+            label={SETTINGS_LINK.label}
+            icon={iconFor(SETTINGS_LINK)}
+            onNavigate={close}
+          />
         </div>
       </SheetContent>
     </Sheet>
@@ -71,7 +89,13 @@ function Section({
   return (
     <nav className="space-y-1">
       {links.map((link) => (
-        <SidebarNavLink key={link.href} {...link} onNavigate={onNavigate} />
+        <SidebarNavLink
+          key={link.href}
+          href={link.href}
+          label={link.label}
+          icon={iconFor(link)}
+          onNavigate={onNavigate}
+        />
       ))}
     </nav>
   );

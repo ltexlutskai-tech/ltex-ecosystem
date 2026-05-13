@@ -2,13 +2,13 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import type { ComponentType } from "react";
+import type { ReactNode } from "react";
 import { cn } from "@ltex/ui";
 
 export interface SidebarNavLinkProps {
   href: string;
   label: string;
-  icon: ComponentType<{ className?: string }>;
+  icon: ReactNode;
   badge?: number;
   onNavigate?: () => void;
 }
@@ -16,7 +16,7 @@ export interface SidebarNavLinkProps {
 export function SidebarNavLink({
   href,
   label,
-  icon: Icon,
+  icon,
   badge,
   onNavigate,
 }: SidebarNavLinkProps) {
@@ -37,7 +37,7 @@ export function SidebarNavLink({
           : "text-gray-700 hover:bg-gray-100",
       )}
     >
-      <Icon className="h-4 w-4" />
+      {icon}
       <span className="flex-1">{label}</span>
       {badge !== undefined && badge > 0 && (
         <span className="rounded-full bg-red-500 px-2 py-0.5 text-xs font-medium text-white">

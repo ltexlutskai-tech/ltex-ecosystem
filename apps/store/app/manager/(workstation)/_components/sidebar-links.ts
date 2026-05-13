@@ -1,4 +1,4 @@
-import type { ComponentType } from "react";
+import { createElement, type ComponentType, type ReactElement } from "react";
 import {
   BarChart3,
   Bell,
@@ -62,3 +62,10 @@ export const SETTINGS_LINK: SidebarLink = {
   label: "Налаштування",
   icon: Settings,
 };
+
+// Pre-render link icon у server scope щоб не передавати ComponentType reference
+// через RSC boundary у SidebarNavLink (client). Передаємо готовий ReactElement
+// через `children`-style prop — серіалізується RSC normally.
+export function renderLinkIcon(link: SidebarLink): ReactElement {
+  return createElement(link.icon, { className: "h-4 w-4" });
+}

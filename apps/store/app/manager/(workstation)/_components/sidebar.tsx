@@ -6,6 +6,7 @@ import {
   PRIMARY_LINKS,
   SECONDARY_LINKS,
   SETTINGS_LINK,
+  renderLinkIcon,
   type SidebarLink,
 } from "./sidebar-links";
 
@@ -22,10 +23,25 @@ export function ManagerSidebar({
       <Separator />
       <NavSection links={SECONDARY_LINKS} />
       <Separator />
-      <SidebarNavLink {...CHAT_LINK} badge={chatUnread} />
+      <SidebarNavLink
+        href={CHAT_LINK.href}
+        label={CHAT_LINK.label}
+        icon={renderLinkIcon(CHAT_LINK)}
+        badge={chatUnread}
+      />
       <Separator />
-      {role === "admin" && <SidebarNavLink {...ADMIN_USERS_LINK} />}
-      <SidebarNavLink {...SETTINGS_LINK} />
+      {role === "admin" && (
+        <SidebarNavLink
+          href={ADMIN_USERS_LINK.href}
+          label={ADMIN_USERS_LINK.label}
+          icon={renderLinkIcon(ADMIN_USERS_LINK)}
+        />
+      )}
+      <SidebarNavLink
+        href={SETTINGS_LINK.href}
+        label={SETTINGS_LINK.label}
+        icon={renderLinkIcon(SETTINGS_LINK)}
+      />
     </aside>
   );
 }
@@ -34,7 +50,12 @@ function NavSection({ links }: { links: readonly SidebarLink[] }) {
   return (
     <nav className="space-y-1">
       {links.map((link) => (
-        <SidebarNavLink key={link.href} {...link} />
+        <SidebarNavLink
+          key={link.href}
+          href={link.href}
+          label={link.label}
+          icon={renderLinkIcon(link)}
+        />
       ))}
     </nav>
   );
