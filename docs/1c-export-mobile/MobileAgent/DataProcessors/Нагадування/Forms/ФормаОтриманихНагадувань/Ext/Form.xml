@@ -1,0 +1,502 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<Form xmlns="http://v8.1c.ru/8.3/xcf/logform" xmlns:app="http://v8.1c.ru/8.2/managed-application/core" xmlns:cfg="http://v8.1c.ru/8.1/data/enterprise/current-config" xmlns:dcscor="http://v8.1c.ru/8.1/data-composition-system/core" xmlns:dcsset="http://v8.1c.ru/8.1/data-composition-system/settings" xmlns:ent="http://v8.1c.ru/8.1/data/enterprise" xmlns:lf="http://v8.1c.ru/8.2/managed-application/logform" xmlns:style="http://v8.1c.ru/8.1/data/ui/style" xmlns:sys="http://v8.1c.ru/8.1/data/ui/fonts/system" xmlns:v8="http://v8.1c.ru/8.1/data/core" xmlns:v8ui="http://v8.1c.ru/8.1/data/ui" xmlns:web="http://v8.1c.ru/8.1/data/ui/colors/web" xmlns:win="http://v8.1c.ru/8.1/data/ui/colors/windows" xmlns:xr="http://v8.1c.ru/8.3/xcf/readable" xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" version="2.8">
+	<Title>
+		<v8:item>
+			<v8:lang>uk</v8:lang>
+			<v8:content>Активні нагадування</v8:content>
+		</v8:item>
+	</Title>
+	<AutoTitle>false</AutoTitle>
+	<CommandBarLocation>None</CommandBarLocation>
+	<AutoCommandBar name="ФормаКоманднаяПанель" id="-1"/>
+	<Events>
+		<Event name="OnOpen">ПриОткрытии</Event>
+	</Events>
+	<ChildItems>
+		<Table name="АктивніНагадування" id="1">
+			<Representation>List</Representation>
+			<ReadOnly>true</ReadOnly>
+			<AutoInsertNewRow>true</AutoInsertNewRow>
+			<EnableStartDrag>true</EnableStartDrag>
+			<EnableDrag>true</EnableDrag>
+			<DataPath>АктивніНагадування</DataPath>
+			<RowFilter xsi:nil="true"/>
+			<ContextMenu name="АктивніНагадуванняКонтекстноеМеню" id="2">
+				<Autofill>false</Autofill>
+			</ContextMenu>
+			<AutoCommandBar name="АктивніНагадуванняКоманднаяПанель" id="3">
+				<Autofill>false</Autofill>
+			</AutoCommandBar>
+			<ExtendedTooltip name="АктивніНагадуванняРасширеннаяПодсказка" id="4"/>
+			<SearchStringAddition name="АктивніНагадуванняСтрокаПоиска" id="5">
+				<AdditionSource>
+					<Item>АктивніНагадування</Item>
+					<Type>SearchStringRepresentation</Type>
+				</AdditionSource>
+				<ContextMenu name="АктивніНагадуванняСтрокаПоискаКонтекстноеМеню" id="6"/>
+				<ExtendedTooltip name="АктивніНагадуванняСтрокаПоискаРасширеннаяПодсказка" id="7"/>
+			</SearchStringAddition>
+			<ViewStatusAddition name="АктивніНагадуванняСостояниеПросмотра" id="8">
+				<AdditionSource>
+					<Item>АктивніНагадування</Item>
+					<Type>ViewStatusRepresentation</Type>
+				</AdditionSource>
+				<ContextMenu name="АктивніНагадуванняСостояниеПросмотраКонтекстноеМеню" id="9"/>
+				<ExtendedTooltip name="АктивніНагадуванняСостояниеПросмотраРасширеннаяПодсказка" id="10"/>
+			</ViewStatusAddition>
+			<SearchControlAddition name="АктивніНагадуванняУправлениеПоиском" id="11">
+				<AdditionSource>
+					<Item>АктивніНагадування</Item>
+					<Type>SearchControl</Type>
+				</AdditionSource>
+				<ContextMenu name="АктивніНагадуванняУправлениеПоискомКонтекстноеМеню" id="12"/>
+				<ExtendedTooltip name="АктивніНагадуванняУправлениеПоискомРасширеннаяПодсказка" id="13"/>
+			</SearchControlAddition>
+			<Events>
+				<Event name="Selection">АктивніНагадуванняВыбор</Event>
+			</Events>
+			<ChildItems>
+				<InputField name="АктивніНагадуванняТекст" id="40">
+					<DataPath>АктивніНагадування.Текст</DataPath>
+					<EditMode>EnterOnInput</EditMode>
+					<AutoMaxHeight>false</AutoMaxHeight>
+					<MaxHeight>10</MaxHeight>
+					<MultiLine>true</MultiLine>
+					<ContextMenu name="АктивніНагадуванняТекстКонтекстноеМеню" id="41"/>
+					<ExtendedTooltip name="АктивніНагадуванняТекстРасширеннаяПодсказка" id="42"/>
+				</InputField>
+			</ChildItems>
+		</Table>
+		<UsualGroup name="ГруппаОтображениеДанныхНапоминания" id="17">
+			<Title>
+				<v8:item>
+					<v8:lang>uk</v8:lang>
+					<v8:content>Нагадування</v8:content>
+				</v8:item>
+			</Title>
+			<ToolTip>
+				<v8:item>
+					<v8:lang>uk</v8:lang>
+					<v8:content>Группа отображение данных напоминания</v8:content>
+				</v8:item>
+			</ToolTip>
+			<Group>Vertical</Group>
+			<BackColor>style:FieldAlternativeBackColor</BackColor>
+			<ExtendedTooltip name="ГруппаОтображениеДанныхНапоминанияРасширеннаяПодсказка" id="18"/>
+			<ChildItems>
+				<LabelField name="ДатаНагадування" id="19">
+					<DataPath>ДатаНагадування</DataPath>
+					<ReadOnly>true</ReadOnly>
+					<Title>
+						<v8:item>
+							<v8:lang>uk</v8:lang>
+							<v8:content>Дата нагадування</v8:content>
+						</v8:item>
+						<v8:item>
+							<v8:lang>ru</v8:lang>
+							<v8:content>Дата нагадування</v8:content>
+						</v8:item>
+					</Title>
+					<TitleLocation>None</TitleLocation>
+					<Font height="10" kind="AutoFont"/>
+					<ContextMenu name="ДатаНагадуванняКонтекстноеМеню" id="20"/>
+					<ExtendedTooltip name="ДатаНагадуванняРасширеннаяПодсказка" id="21"/>
+				</LabelField>
+				<LabelField name="ТекстНагадування" id="22">
+					<DataPath>ТекстНагадування</DataPath>
+					<ReadOnly>true</ReadOnly>
+					<TitleLocation>None</TitleLocation>
+					<VerticalAlign>Top</VerticalAlign>
+					<GroupVerticalAlign>Top</GroupVerticalAlign>
+					<AutoMaxWidth>false</AutoMaxWidth>
+					<AutoMaxHeight>false</AutoMaxHeight>
+					<HorizontalStretch>true</HorizontalStretch>
+					<VerticalStretch>true</VerticalStretch>
+					<Font height="10" kind="AutoFont"/>
+					<ContextMenu name="ТекстНагадуванняКонтекстноеМеню" id="23"/>
+					<ExtendedTooltip name="ТекстНагадуванняРасширеннаяПодсказка" id="24"/>
+				</LabelField>
+				<Button name="ДействиеПоПредупреждению" id="25">
+					<Type>UsualButton</Type>
+					<CommandName>Form.Command.ДействиеПоПредупреждению</CommandName>
+					<TextColor>#000000</TextColor>
+					<BackColor>web:PaleGreen</BackColor>
+					<ExtendedTooltip name="ДействиеПоПредупреждениюРасширеннаяПодсказка" id="26"/>
+				</Button>
+				<Pages name="ОсновнаяПанель" id="27">
+					<Title>
+						<v8:item>
+							<v8:lang>uk</v8:lang>
+							<v8:content>Основная панель</v8:content>
+						</v8:item>
+					</Title>
+					<ToolTip>
+						<v8:item>
+							<v8:lang>uk</v8:lang>
+							<v8:content>Основная панель</v8:content>
+						</v8:item>
+					</ToolTip>
+					<PagesRepresentation>None</PagesRepresentation>
+					<ExtendedTooltip name="ОсновнаяПанельРасширеннаяПодсказка" id="28"/>
+					<ChildItems>
+						<Page name="Действия" id="29">
+							<Title>
+								<v8:item>
+									<v8:lang>uk</v8:lang>
+									<v8:content>Действия</v8:content>
+								</v8:item>
+							</Title>
+							<ToolTip>
+								<v8:item>
+									<v8:lang>uk</v8:lang>
+									<v8:content>Действия</v8:content>
+								</v8:item>
+							</ToolTip>
+							<ExtendedTooltip name="ДействияРасширеннаяПодсказка" id="30"/>
+							<ChildItems>
+								<RadioButtonField name="Действие" id="31">
+									<DataPath>Действие</DataPath>
+									<TitleLocation>None</TitleLocation>
+									<VerticalAlign>Top</VerticalAlign>
+									<RadioButtonType>RadioButtons</RadioButtonType>
+									<ColumnsCount>3</ColumnsCount>
+									<ChoiceList>
+										<xr:Item>
+											<xr:Presentation/>
+											<xr:CheckState>0</xr:CheckState>
+											<xr:Value xsi:type="FormChoiceListDesTimeValue">
+												<Presentation>
+													<v8:item>
+														<v8:lang>uk</v8:lang>
+														<v8:content>Виконано</v8:content>
+													</v8:item>
+												</Presentation>
+												<Value xsi:type="xs:decimal">0</Value>
+											</xr:Value>
+										</xr:Item>
+										<xr:Item>
+											<xr:Presentation/>
+											<xr:CheckState>0</xr:CheckState>
+											<xr:Value xsi:type="FormChoiceListDesTimeValue">
+												<Presentation>
+													<v8:item>
+														<v8:lang>uk</v8:lang>
+														<v8:content>Відкласти на 10 хв</v8:content>
+													</v8:item>
+												</Presentation>
+												<Value xsi:type="xs:decimal">10</Value>
+											</xr:Value>
+										</xr:Item>
+										<xr:Item>
+											<xr:Presentation/>
+											<xr:CheckState>0</xr:CheckState>
+											<xr:Value xsi:type="FormChoiceListDesTimeValue">
+												<Presentation>
+													<v8:item>
+														<v8:lang>uk</v8:lang>
+														<v8:content>Відкласти на 30 хв</v8:content>
+													</v8:item>
+												</Presentation>
+												<Value xsi:type="xs:decimal">30</Value>
+											</xr:Value>
+										</xr:Item>
+										<xr:Item>
+											<xr:Presentation/>
+											<xr:CheckState>0</xr:CheckState>
+											<xr:Value xsi:type="FormChoiceListDesTimeValue">
+												<Presentation>
+													<v8:item>
+														<v8:lang>uk</v8:lang>
+														<v8:content>Відкласти на годину</v8:content>
+													</v8:item>
+												</Presentation>
+												<Value xsi:type="xs:decimal">60</Value>
+											</xr:Value>
+										</xr:Item>
+										<xr:Item>
+											<xr:Presentation/>
+											<xr:CheckState>0</xr:CheckState>
+											<xr:Value xsi:type="FormChoiceListDesTimeValue">
+												<Presentation>
+													<v8:item>
+														<v8:lang>uk</v8:lang>
+														<v8:content>Відкласти на 3 години</v8:content>
+													</v8:item>
+												</Presentation>
+												<Value xsi:type="xs:decimal">180</Value>
+											</xr:Value>
+										</xr:Item>
+										<xr:Item>
+											<xr:Presentation/>
+											<xr:CheckState>0</xr:CheckState>
+											<xr:Value xsi:type="FormChoiceListDesTimeValue">
+												<Presentation>
+													<v8:item>
+														<v8:lang>uk</v8:lang>
+														<v8:content>Відкласти на 6 години</v8:content>
+													</v8:item>
+												</Presentation>
+												<Value xsi:type="xs:decimal">360</Value>
+											</xr:Value>
+										</xr:Item>
+									</ChoiceList>
+									<ContextMenu name="ДействиеКонтекстноеМеню" id="32"/>
+									<ExtendedTooltip name="ДействиеРасширеннаяПодсказка" id="33"/>
+								</RadioButtonField>
+							</ChildItems>
+						</Page>
+						<Page name="ДействияСТоваром" id="34">
+							<Title>
+								<v8:item>
+									<v8:lang>uk</v8:lang>
+									<v8:content>Действия с товаром</v8:content>
+								</v8:item>
+							</Title>
+							<ToolTip>
+								<v8:item>
+									<v8:lang>uk</v8:lang>
+									<v8:content>Действия с товаром</v8:content>
+								</v8:item>
+							</ToolTip>
+							<ExtendedTooltip name="ДействияСТоваромРасширеннаяПодсказка" id="35"/>
+						</Page>
+					</ChildItems>
+				</Pages>
+				<UsualGroup name="Группа1" id="36">
+					<HorizontalStretch>true</HorizontalStretch>
+					<GroupVerticalAlign>Center</GroupVerticalAlign>
+					<HorizontalAlign>Center</HorizontalAlign>
+					<ShowTitle>false</ShowTitle>
+					<BackColor>#F2F2F2</BackColor>
+					<ExtendedTooltip name="Группа1РасширеннаяПодсказка" id="37"/>
+					<ChildItems>
+						<Button name="ОК" id="38">
+							<Type>UsualButton</Type>
+							<Width>8</Width>
+							<GroupHorizontalAlign>Center</GroupHorizontalAlign>
+							<GroupVerticalAlign>Bottom</GroupVerticalAlign>
+							<CommandName>Form.Command.ОК</CommandName>
+							<BackColor>#FCE751</BackColor>
+							<Shape>Oval</Shape>
+							<ExtendedTooltip name="ОКРасширеннаяПодсказка" id="39"/>
+						</Button>
+					</ChildItems>
+				</UsualGroup>
+			</ChildItems>
+		</UsualGroup>
+	</ChildItems>
+	<Attributes>
+		<Attribute name="Объект" id="1">
+			<Type>
+				<v8:Type>cfg:DataProcessorObject.Нагадування</v8:Type>
+			</Type>
+			<MainAttribute>true</MainAttribute>
+		</Attribute>
+		<Attribute name="АктивніНагадування" id="2">
+			<Title>
+				<v8:item>
+					<v8:lang>uk</v8:lang>
+					<v8:content>Активні нагадування</v8:content>
+				</v8:item>
+			</Title>
+			<Type>
+				<v8:Type>v8:ValueTable</v8:Type>
+			</Type>
+			<Columns>
+				<Column name="Текст" id="1">
+					<Title>
+						<v8:item>
+							<v8:lang>uk</v8:lang>
+							<v8:content>Текст</v8:content>
+						</v8:item>
+					</Title>
+					<Type>
+						<v8:Type>xs:string</v8:Type>
+						<v8:StringQualifiers>
+							<v8:Length>0</v8:Length>
+							<v8:AllowedLength>Variable</v8:AllowedLength>
+						</v8:StringQualifiers>
+					</Type>
+				</Column>
+				<Column name="УИД_Уведомления" id="2">
+					<Title>
+						<v8:item>
+							<v8:lang>uk</v8:lang>
+							<v8:content>УИД уведомления</v8:content>
+						</v8:item>
+					</Title>
+					<Type>
+						<v8:Type>xs:string</v8:Type>
+						<v8:StringQualifiers>
+							<v8:Length>36</v8:Length>
+							<v8:AllowedLength>Variable</v8:AllowedLength>
+						</v8:StringQualifiers>
+					</Type>
+				</Column>
+				<Column name="ДанныеУведомления" id="3">
+					<Title>
+						<v8:item>
+							<v8:lang>uk</v8:lang>
+							<v8:content>Данные уведомления</v8:content>
+						</v8:item>
+					</Title>
+					<Type/>
+				</Column>
+				<Column name="ВыбранаяСтрока" id="4">
+					<Title>
+						<v8:item>
+							<v8:lang>uk</v8:lang>
+							<v8:content>Выбраная строка</v8:content>
+						</v8:item>
+					</Title>
+					<Type>
+						<v8:Type>xs:boolean</v8:Type>
+					</Type>
+				</Column>
+			</Columns>
+		</Attribute>
+		<Attribute name="ДатаНагадування" id="3">
+			<Title>
+				<v8:item>
+					<v8:lang>uk</v8:lang>
+					<v8:content>Дата нагадування</v8:content>
+				</v8:item>
+			</Title>
+			<Type>
+				<v8:Type>xs:dateTime</v8:Type>
+				<v8:DateQualifiers>
+					<v8:DateFractions>DateTime</v8:DateFractions>
+				</v8:DateQualifiers>
+			</Type>
+		</Attribute>
+		<Attribute name="ТекстНагадування" id="4">
+			<Title>
+				<v8:item>
+					<v8:lang>uk</v8:lang>
+					<v8:content>Текст нагадування</v8:content>
+				</v8:item>
+			</Title>
+			<Type>
+				<v8:Type>xs:string</v8:Type>
+				<v8:StringQualifiers>
+					<v8:Length>0</v8:Length>
+					<v8:AllowedLength>Variable</v8:AllowedLength>
+				</v8:StringQualifiers>
+			</Type>
+		</Attribute>
+		<Attribute name="Действие" id="5">
+			<Title>
+				<v8:item>
+					<v8:lang>uk</v8:lang>
+					<v8:content>Действие</v8:content>
+				</v8:item>
+			</Title>
+			<Type>
+				<v8:Type>xs:decimal</v8:Type>
+				<v8:NumberQualifiers>
+					<v8:Digits>10</v8:Digits>
+					<v8:FractionDigits>0</v8:FractionDigits>
+					<v8:AllowedSign>Any</v8:AllowedSign>
+				</v8:NumberQualifiers>
+			</Type>
+		</Attribute>
+		<Attribute name="Напоминание" id="6">
+			<Title>
+				<v8:item>
+					<v8:lang>uk</v8:lang>
+					<v8:content>Напоминание</v8:content>
+				</v8:item>
+			</Title>
+			<Type>
+				<v8:Type>cfg:CatalogRef.Нагадування</v8:Type>
+			</Type>
+		</Attribute>
+		<Attribute name="НапоминаниеОТоваре" id="7">
+			<Title>
+				<v8:item>
+					<v8:lang>uk</v8:lang>
+					<v8:content>Напоминание о товаре</v8:content>
+				</v8:item>
+			</Title>
+			<Type>
+				<v8:Type>xs:boolean</v8:Type>
+			</Type>
+		</Attribute>
+		<Attribute name="Номенклатура" id="8">
+			<Title>
+				<v8:item>
+					<v8:lang>uk</v8:lang>
+					<v8:content>Номенклатура</v8:content>
+				</v8:item>
+			</Title>
+			<Type>
+				<v8:Type>cfg:CatalogRef.Номенклатура</v8:Type>
+			</Type>
+		</Attribute>
+		<Attribute name="УИД_Уведомления" id="9">
+			<Title>
+				<v8:item>
+					<v8:lang>uk</v8:lang>
+					<v8:content>УИД уведомления</v8:content>
+				</v8:item>
+			</Title>
+			<Type>
+				<v8:Type>v8:UUID</v8:Type>
+			</Type>
+		</Attribute>
+		<ConditionalAppearance>
+			<dcsset:item>
+				<dcsset:selection>
+					<dcsset:item>
+						<dcsset:field>АктивніНагадуванняТекст</dcsset:field>
+					</dcsset:item>
+				</dcsset:selection>
+				<dcsset:filter>
+					<dcsset:item xsi:type="dcsset:FilterItemComparison">
+						<dcsset:left xsi:type="dcscor:Field">АктивніНагадування.ВыбранаяСтрока</dcsset:left>
+						<dcsset:comparisonType>Equal</dcsset:comparisonType>
+						<dcsset:right xsi:type="xs:boolean">true</dcsset:right>
+					</dcsset:item>
+				</dcsset:filter>
+				<dcsset:appearance>
+					<dcscor:item xsi:type="dcsset:SettingsParameterValue">
+						<dcscor:parameter>Шрифт</dcscor:parameter>
+						<dcscor:value xsi:type="v8ui:Font" ref="sys:DefaultGUIFont" bold="true" italic="false" underline="false" strikeout="false" kind="WindowsFont"/>
+					</dcscor:item>
+				</dcsset:appearance>
+			</dcsset:item>
+		</ConditionalAppearance>
+	</Attributes>
+	<Commands>
+		<Command name="ДействиеПоПредупреждению" id="1">
+			<Title>
+				<v8:item>
+					<v8:lang>uk</v8:lang>
+					<v8:content>Виконати дію</v8:content>
+				</v8:item>
+			</Title>
+			<ToolTip>
+				<v8:item>
+					<v8:lang>uk</v8:lang>
+					<v8:content>Действие по предупреждению</v8:content>
+				</v8:item>
+			</ToolTip>
+			<Action>ДействиеПоПредупреждению</Action>
+		</Command>
+		<Command name="ОК" id="2">
+			<Title>
+				<v8:item>
+					<v8:lang>uk</v8:lang>
+					<v8:content>ОК</v8:content>
+				</v8:item>
+			</Title>
+			<ToolTip>
+				<v8:item>
+					<v8:lang>uk</v8:lang>
+					<v8:content>ОК</v8:content>
+				</v8:item>
+			</ToolTip>
+			<Action>ОК</Action>
+		</Command>
+	</Commands>
+</Form>

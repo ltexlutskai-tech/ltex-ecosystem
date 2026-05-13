@@ -1,0 +1,563 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<Form xmlns="http://v8.1c.ru/8.3/xcf/logform" xmlns:app="http://v8.1c.ru/8.2/managed-application/core" xmlns:cfg="http://v8.1c.ru/8.1/data/enterprise/current-config" xmlns:dcscor="http://v8.1c.ru/8.1/data-composition-system/core" xmlns:dcsset="http://v8.1c.ru/8.1/data-composition-system/settings" xmlns:ent="http://v8.1c.ru/8.1/data/enterprise" xmlns:lf="http://v8.1c.ru/8.2/managed-application/logform" xmlns:style="http://v8.1c.ru/8.1/data/ui/style" xmlns:sys="http://v8.1c.ru/8.1/data/ui/fonts/system" xmlns:v8="http://v8.1c.ru/8.1/data/core" xmlns:v8ui="http://v8.1c.ru/8.1/data/ui" xmlns:web="http://v8.1c.ru/8.1/data/ui/colors/web" xmlns:win="http://v8.1c.ru/8.1/data/ui/colors/windows" xmlns:xr="http://v8.1c.ru/8.3/xcf/readable" xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" version="2.8">
+	<AutoCommandBar name="ФормаКоманднаяПанель" id="-1">
+		<ChildItems>
+			<Button name="ФормаДатьСкидкуНаОстаток" id="42">
+				<Type>CommandBarButton</Type>
+				<CommandName>Form.Command.ДатьСкидкуНаОстаток</CommandName>
+				<ExtendedTooltip name="ФормаДатьСкидкуНаОстатокРасширеннаяПодсказка" id="43"/>
+			</Button>
+		</ChildItems>
+	</AutoCommandBar>
+	<Events>
+		<Event name="OnOpen">ПриОткрытии</Event>
+		<Event name="OnCreateAtServer">ПриСозданииНаСервере</Event>
+	</Events>
+	<ChildItems>
+		<InputField name="ВидДвиженияДенежныхСредств" id="110">
+			<DataPath>Объект.ВидДвиженияДенежныхСредств</DataPath>
+			<ContextMenu name="ВидДвиженияДенежныхСредствКонтекстноеМеню" id="111"/>
+			<ExtendedTooltip name="ВидДвиженияДенежныхСредствРасширеннаяПодсказка" id="112"/>
+			<Events>
+				<Event name="OnChange">ВидДвиженияДенежныхСредствПриИзменении</Event>
+			</Events>
+		</InputField>
+		<InputField name="СтатьяДвиженияДенежныхСредств" id="113">
+			<DataPath>Объект.СтатьяДвиженияДенежныхСредств</DataPath>
+			<ContextMenu name="СтатьяДвиженияДенежныхСредствКонтекстноеМеню" id="114"/>
+			<ExtendedTooltip name="СтатьяДвиженияДенежныхСредствРасширеннаяПодсказка" id="115"/>
+		</InputField>
+		<InputField name="Контрагент" id="91">
+			<DataPath>Объект.Контрагент</DataPath>
+			<Visible>false</Visible>
+			<ChoiceHistoryOnInput>DontUse</ChoiceHistoryOnInput>
+			<ContextMenu name="КонтрагентКонтекстноеМеню" id="92"/>
+			<ExtendedTooltip name="КонтрагентРасширеннаяПодсказка" id="93"/>
+			<Events>
+				<Event name="OnChange">КонтрагентПриИзменении</Event>
+				<Event name="AutoComplete">КонтрагентАвтоПодбор</Event>
+			</Events>
+		</InputField>
+		<CheckBoxField name="ВключитиСумуБоргу" id="97">
+			<DataPath>ВключитиСумуБоргу</DataPath>
+			<Visible>false</Visible>
+			<CheckBoxType>Auto</CheckBoxType>
+			<ContextMenu name="ВключитиСумуБоргуКонтекстноеМеню" id="98"/>
+			<ExtendedTooltip name="ВключитиСумуБоргуРасширеннаяПодсказка" id="99"/>
+			<Events>
+				<Event name="OnChange">ВключитиСумуБоргуПриИзменении</Event>
+			</Events>
+		</CheckBoxField>
+		<LabelDecoration name="Борги" id="94">
+			<Visible>false</Visible>
+			<Title formatted="false">
+				<v8:item>
+					<v8:lang>uk</v8:lang>
+					<v8:content>Борги</v8:content>
+				</v8:item>
+			</Title>
+			<ContextMenu name="БоргиКонтекстноеМеню" id="95"/>
+			<ExtendedTooltip name="БоргиРасширеннаяПодсказка" id="96"/>
+		</LabelDecoration>
+		<InputField name="СуммаКОплате" id="1">
+			<DataPath>Объект.СуммаКОплате</DataPath>
+			<EditMode>EnterOnInput</EditMode>
+			<ContextMenu name="СуммаКОплатеКонтекстноеМеню" id="2"/>
+			<ExtendedTooltip name="СуммаКОплатеРасширеннаяПодсказка" id="3"/>
+			<Events>
+				<Event name="OnChange">СуммаПриИзменении</Event>
+			</Events>
+		</InputField>
+		<UsualGroup name="ГруппаКурсыВалют" id="44">
+			<Title>
+				<v8:item>
+					<v8:lang>uk</v8:lang>
+					<v8:content>Курси валют</v8:content>
+				</v8:item>
+				<v8:item>
+					<v8:lang>ru</v8:lang>
+					<v8:content>Курсы валют</v8:content>
+				</v8:item>
+			</Title>
+			<ToolTip>
+				<v8:item>
+					<v8:lang>uk</v8:lang>
+					<v8:content>Курси валют</v8:content>
+				</v8:item>
+				<v8:item>
+					<v8:lang>ru</v8:lang>
+					<v8:content>Курсы валют</v8:content>
+				</v8:item>
+			</ToolTip>
+			<Group>AlwaysHorizontal</Group>
+			<Behavior>Collapsible</Behavior>
+			<Collapsed>true</Collapsed>
+			<ExtendedTooltip name="ГруппаКурсыВалютРасширеннаяПодсказка" id="45"/>
+			<ChildItems>
+				<InputField name="КурсEUR" id="25">
+					<DataPath>Объект.КурсEUR</DataPath>
+					<EditMode>EnterOnInput</EditMode>
+					<ContextMenu name="КурсEURКонтекстноеМеню" id="26"/>
+					<ExtendedTooltip name="КурсEURРасширеннаяПодсказка" id="27"/>
+					<Events>
+						<Event name="OnChange">КурсПриИзменении</Event>
+					</Events>
+				</InputField>
+				<InputField name="КурсUSD" id="22">
+					<DataPath>Объект.КурсUSD</DataPath>
+					<EditMode>EnterOnInput</EditMode>
+					<ContextMenu name="КурсUSDКонтекстноеМеню" id="23"/>
+					<ExtendedTooltip name="КурсUSDРасширеннаяПодсказка" id="24"/>
+					<Events>
+						<Event name="OnChange">КурсПриИзменении</Event>
+					</Events>
+				</InputField>
+			</ChildItems>
+		</UsualGroup>
+		<UsualGroup name="ГруппаОплата" id="61">
+			<ToolTip>
+				<v8:item>
+					<v8:lang>uk</v8:lang>
+					<v8:content>Группа оплата</v8:content>
+				</v8:item>
+			</ToolTip>
+			<Representation>None</Representation>
+			<ExtendedTooltip name="ГруппаОплатаРасширеннаяПодсказка" id="62"/>
+			<ChildItems>
+				<UsualGroup name="ГруппаUAH" id="46">
+					<ToolTip>
+						<v8:item>
+							<v8:lang>uk</v8:lang>
+							<v8:content>UAH</v8:content>
+						</v8:item>
+					</ToolTip>
+					<Group>AlwaysHorizontal</Group>
+					<Representation>None</Representation>
+					<ShowTitle>false</ShowTitle>
+					<ExtendedTooltip name="ГруппаUAHРасширеннаяПодсказка" id="47"/>
+					<ChildItems>
+						<InputField name="ОплатаUAH" id="4">
+							<DataPath>Объект.ОплатаUAH</DataPath>
+							<EditMode>EnterOnInput</EditMode>
+							<ChoiceButton>true</ChoiceButton>
+							<EditFormat>
+								<v8:item>
+									<v8:lang>uk</v8:lang>
+									<v8:content>ЧДЦ=2</v8:content>
+								</v8:item>
+							</EditFormat>
+							<ContextMenu name="ОплатаUAHКонтекстноеМеню" id="5"/>
+							<ExtendedTooltip name="ОплатаUAHРасширеннаяПодсказка" id="6"/>
+							<Events>
+								<Event name="OnChange">СуммаПриИзменении</Event>
+							</Events>
+						</InputField>
+						<LabelField name="ОплатаUAHРек" id="48">
+							<DataPath>Объект.ОплатаUAHРек</DataPath>
+							<TitleLocation>None</TitleLocation>
+							<TextColor>style:FieldSelectionBackColor</TextColor>
+							<ContextMenu name="ОплатаUAHРекКонтекстноеМеню" id="49"/>
+							<ExtendedTooltip name="ОплатаUAHРекРасширеннаяПодсказка" id="50"/>
+						</LabelField>
+					</ChildItems>
+				</UsualGroup>
+				<UsualGroup name="ГруппаUAH_Безнал" id="83">
+					<Title>
+						<v8:item>
+							<v8:lang>uk</v8:lang>
+							<v8:content>Группа UAH безнал</v8:content>
+						</v8:item>
+					</Title>
+					<ToolTip>
+						<v8:item>
+							<v8:lang>uk</v8:lang>
+							<v8:content>UAH</v8:content>
+						</v8:item>
+					</ToolTip>
+					<Group>AlwaysHorizontal</Group>
+					<Representation>None</Representation>
+					<ShowTitle>false</ShowTitle>
+					<ExtendedTooltip name="ГруппаUAH_БезналРасширеннаяПодсказка" id="84"/>
+					<ChildItems>
+						<InputField name="ОплатаUAH1" id="85">
+							<DataPath>Объект.ОплатаUAH_Безнал</DataPath>
+							<EditMode>EnterOnInput</EditMode>
+							<ChoiceButton>true</ChoiceButton>
+							<EditFormat>
+								<v8:item>
+									<v8:lang>uk</v8:lang>
+									<v8:content>ЧДЦ=2</v8:content>
+								</v8:item>
+							</EditFormat>
+							<ContextMenu name="ОплатаUAH1КонтекстноеМеню" id="86"/>
+							<ExtendedTooltip name="ОплатаUAH1РасширеннаяПодсказка" id="87"/>
+							<Events>
+								<Event name="OnChange">ОплатаUAH1ПриИзменении</Event>
+							</Events>
+						</InputField>
+						<LabelField name="ОплатаUAHРек1" id="88">
+							<DataPath>Объект.ОплатаUAHРек</DataPath>
+							<TitleLocation>None</TitleLocation>
+							<TextColor>style:FieldSelectionBackColor</TextColor>
+							<ContextMenu name="ОплатаUAHРек1КонтекстноеМеню" id="89"/>
+							<ExtendedTooltip name="ОплатаUAHРек1РасширеннаяПодсказка" id="90"/>
+						</LabelField>
+					</ChildItems>
+				</UsualGroup>
+				<UsualGroup name="ГруппаБанковскийСчет" id="103">
+					<Title>
+						<v8:item>
+							<v8:lang>uk</v8:lang>
+							<v8:content>Группа банковский счет</v8:content>
+						</v8:item>
+					</Title>
+					<ToolTip>
+						<v8:item>
+							<v8:lang>uk</v8:lang>
+							<v8:content>Группа банковский счет</v8:content>
+						</v8:item>
+					</ToolTip>
+					<ToolTipRepresentation>None</ToolTipRepresentation>
+					<Group>AlwaysHorizontal</Group>
+					<ChildrenAlign>None</ChildrenAlign>
+					<Representation>None</Representation>
+					<ShowTitle>false</ShowTitle>
+					<ExtendedTooltip name="ГруппаБанковскийСчетРасширеннаяПодсказка" id="104"/>
+					<ChildItems>
+						<InputField name="БанковскийСчет" id="100">
+							<DataPath>Объект.БанковскийСчет</DataPath>
+							<DropListButton>true</DropListButton>
+							<ChoiceButton>true</ChoiceButton>
+							<ClearButton>false</ClearButton>
+							<SpinButton>false</SpinButton>
+							<OpenButton>false</OpenButton>
+							<CreateButton>false</CreateButton>
+							<ContextMenu name="БанковскийСчетКонтекстноеМеню" id="101"/>
+							<ExtendedTooltip name="БанковскийСчетРасширеннаяПодсказка" id="102"/>
+							<Events>
+								<Event name="OnChange">БанковскийСчетПриИзменении</Event>
+								<Event name="StartChoice">БанковскийСчетНачалоВыбора</Event>
+							</Events>
+						</InputField>
+						<CheckBoxField name="ОтображатьВсеСчета" id="105">
+							<DataPath>ОтображатьВсеСчета</DataPath>
+							<TitleLocation>Right</TitleLocation>
+							<CheckBoxType>Auto</CheckBoxType>
+							<ContextMenu name="ОтображатьВсеСчетаКонтекстноеМеню" id="106"/>
+							<ExtendedTooltip name="ОтображатьВсеСчетаРасширеннаяПодсказка" id="107"/>
+						</CheckBoxField>
+					</ChildItems>
+				</UsualGroup>
+				<UsualGroup name="ГруппаEUR" id="51">
+					<ToolTip>
+						<v8:item>
+							<v8:lang>uk</v8:lang>
+							<v8:content>Группа EUR</v8:content>
+						</v8:item>
+					</ToolTip>
+					<Group>AlwaysHorizontal</Group>
+					<Representation>None</Representation>
+					<ShowTitle>false</ShowTitle>
+					<ExtendedTooltip name="ГруппаEURРасширеннаяПодсказка" id="52"/>
+					<ChildItems>
+						<InputField name="ОплатаEUR" id="7">
+							<DataPath>Объект.ОплатаEUR</DataPath>
+							<EditMode>EnterOnInput</EditMode>
+							<ContextMenu name="ОплатаEURКонтекстноеМеню" id="8"/>
+							<ExtendedTooltip name="ОплатаEURРасширеннаяПодсказка" id="9"/>
+							<Events>
+								<Event name="OnChange">СуммаПриИзменении</Event>
+							</Events>
+						</InputField>
+						<LabelField name="ОплатаEURРек" id="53">
+							<DataPath>Объект.ОплатаEURРек</DataPath>
+							<TitleLocation>None</TitleLocation>
+							<TextColor>style:FieldSelectionBackColor</TextColor>
+							<ContextMenu name="ОплатаEURРекКонтекстноеМеню" id="54"/>
+							<ExtendedTooltip name="ОплатаEURРекРасширеннаяПодсказка" id="55"/>
+						</LabelField>
+					</ChildItems>
+				</UsualGroup>
+				<UsualGroup name="ГруппаUSD" id="56">
+					<ToolTip>
+						<v8:item>
+							<v8:lang>uk</v8:lang>
+							<v8:content>USD</v8:content>
+						</v8:item>
+						<v8:item>
+							<v8:lang>ru</v8:lang>
+							<v8:content>USD</v8:content>
+						</v8:item>
+					</ToolTip>
+					<Group>AlwaysHorizontal</Group>
+					<Representation>None</Representation>
+					<ShowTitle>false</ShowTitle>
+					<ExtendedTooltip name="ГруппаUSDРасширеннаяПодсказка" id="57"/>
+					<ChildItems>
+						<InputField name="ОплатаUSD" id="10">
+							<DataPath>Объект.ОплатаUSD</DataPath>
+							<EditMode>EnterOnInput</EditMode>
+							<ContextMenu name="ОплатаUSDКонтекстноеМеню" id="11"/>
+							<ExtendedTooltip name="ОплатаUSDРасширеннаяПодсказка" id="12"/>
+							<Events>
+								<Event name="OnChange">СуммаПриИзменении</Event>
+							</Events>
+						</InputField>
+						<LabelField name="ОплатаUSDРек" id="58">
+							<DataPath>Объект.ОплатаUSDРек</DataPath>
+							<TitleLocation>None</TitleLocation>
+							<TextColor>style:FieldSelectionBackColor</TextColor>
+							<ContextMenu name="ОплатаUSDРекКонтекстноеМеню" id="59"/>
+							<ExtendedTooltip name="ОплатаUSDРекРасширеннаяПодсказка" id="60"/>
+						</LabelField>
+					</ChildItems>
+				</UsualGroup>
+			</ChildItems>
+		</UsualGroup>
+		<UsualGroup name="ГруппаСдачаUAH" id="63">
+			<ToolTip>
+				<v8:item>
+					<v8:lang>uk</v8:lang>
+					<v8:content>Группа сдача UAH</v8:content>
+				</v8:item>
+			</ToolTip>
+			<Group>AlwaysHorizontal</Group>
+			<Representation>None</Representation>
+			<ShowTitle>false</ShowTitle>
+			<ExtendedTooltip name="ГруппаСдачаUAHРасширеннаяПодсказка" id="64"/>
+			<ChildItems>
+				<InputField name="СдачаUAH" id="13">
+					<DataPath>Объект.СдачаUAH</DataPath>
+					<EditMode>EnterOnInput</EditMode>
+					<ContextMenu name="СдачаUAHКонтекстноеМеню" id="14"/>
+					<ExtendedTooltip name="СдачаUAHРасширеннаяПодсказка" id="15"/>
+					<Events>
+						<Event name="OnChange">СуммаПриИзменении</Event>
+					</Events>
+				</InputField>
+				<LabelField name="СдачаUAHРек" id="65">
+					<DataPath>Объект.СдачаUAHРек</DataPath>
+					<TitleLocation>None</TitleLocation>
+					<TextColor>style:FieldSelectionBackColor</TextColor>
+					<ContextMenu name="СдачаUAHРекКонтекстноеМеню" id="66"/>
+					<ExtendedTooltip name="СдачаUAHРекРасширеннаяПодсказка" id="67"/>
+				</LabelField>
+			</ChildItems>
+		</UsualGroup>
+		<UsualGroup name="ГруппаСдачаEUR" id="68">
+			<Title>
+				<v8:item>
+					<v8:lang>uk</v8:lang>
+					<v8:content>Группа сдача EUR</v8:content>
+				</v8:item>
+			</Title>
+			<ToolTip>
+				<v8:item>
+					<v8:lang>uk</v8:lang>
+					<v8:content>Группа сдача EUR</v8:content>
+				</v8:item>
+			</ToolTip>
+			<Group>AlwaysHorizontal</Group>
+			<Representation>None</Representation>
+			<ShowTitle>false</ShowTitle>
+			<ExtendedTooltip name="ГруппаСдачаEURРасширеннаяПодсказка" id="69"/>
+			<ChildItems>
+				<InputField name="СдачаEUR" id="16">
+					<DataPath>Объект.СдачаEUR</DataPath>
+					<EditMode>EnterOnInput</EditMode>
+					<ContextMenu name="СдачаEURКонтекстноеМеню" id="17"/>
+					<ExtendedTooltip name="СдачаEURРасширеннаяПодсказка" id="18"/>
+					<Events>
+						<Event name="OnChange">СуммаПриИзменении</Event>
+					</Events>
+				</InputField>
+				<LabelField name="СдачаEURРек" id="70">
+					<DataPath>Объект.СдачаEURРек</DataPath>
+					<TitleLocation>None</TitleLocation>
+					<TextColor>style:FieldSelectionBackColor</TextColor>
+					<ContextMenu name="СдачаEURРекКонтекстноеМеню" id="71"/>
+					<ExtendedTooltip name="СдачаEURРекРасширеннаяПодсказка" id="72"/>
+				</LabelField>
+			</ChildItems>
+		</UsualGroup>
+		<UsualGroup name="ГруппаСдачаUSD" id="73">
+			<ToolTip>
+				<v8:item>
+					<v8:lang>uk</v8:lang>
+					<v8:content>Группа сдача USD</v8:content>
+				</v8:item>
+			</ToolTip>
+			<Group>AlwaysHorizontal</Group>
+			<Representation>None</Representation>
+			<ShowTitle>false</ShowTitle>
+			<ExtendedTooltip name="ГруппаСдачаUSDРасширеннаяПодсказка" id="74"/>
+			<ChildItems>
+				<InputField name="СдачаUSD" id="19">
+					<DataPath>Объект.СдачаUSD</DataPath>
+					<EditMode>EnterOnInput</EditMode>
+					<ContextMenu name="СдачаUSDКонтекстноеМеню" id="20"/>
+					<ExtendedTooltip name="СдачаUSDРасширеннаяПодсказка" id="21"/>
+					<Events>
+						<Event name="OnChange">СуммаПриИзменении</Event>
+					</Events>
+				</InputField>
+				<LabelField name="СдачаUSDРек" id="75">
+					<DataPath>Объект.СдачаUSDРек</DataPath>
+					<TitleLocation>None</TitleLocation>
+					<TextColor>style:FieldSelectionBackColor</TextColor>
+					<ContextMenu name="СдачаUSDРекКонтекстноеМеню" id="76"/>
+					<ExtendedTooltip name="СдачаUSDРекРасширеннаяПодсказка" id="77"/>
+				</LabelField>
+			</ChildItems>
+		</UsualGroup>
+		<Button name="ОтправитьВайбер" id="108">
+			<Type>UsualButton</Type>
+			<CommandName>Form.Command.ОтправитьВайбер</CommandName>
+			<Title>
+				<v8:item>
+					<v8:lang>uk</v8:lang>
+					<v8:content>Вайбер</v8:content>
+				</v8:item>
+			</Title>
+			<ExtendedTooltip name="ОтправитьВайберРасширеннаяПодсказка" id="109"/>
+		</Button>
+		<LabelField name="ОплатаДокумента" id="28">
+			<DataPath>Объект.ОплатаДокумента</DataPath>
+			<Title>
+				<v8:item>
+					<v8:lang>uk</v8:lang>
+					<v8:content>Сума оплати (EUR)</v8:content>
+				</v8:item>
+				<v8:item>
+					<v8:lang>ru</v8:lang>
+					<v8:content>Сумма оплаты (EUR)</v8:content>
+				</v8:item>
+			</Title>
+			<EditMode>EnterOnInput</EditMode>
+			<ContextMenu name="ОплатаДокументаКонтекстноеМеню" id="29"/>
+			<ExtendedTooltip name="ОплатаДокументаРасширеннаяПодсказка" id="30"/>
+		</LabelField>
+		<LabelField name="СдачаДокумента" id="31">
+			<DataPath>Объект.СдачаДокумента</DataPath>
+			<Title>
+				<v8:item>
+					<v8:lang>uk</v8:lang>
+					<v8:content>Сума решти (EUR)</v8:content>
+				</v8:item>
+				<v8:item>
+					<v8:lang>ru</v8:lang>
+					<v8:content>Сумма сдачи (EUR)</v8:content>
+				</v8:item>
+			</Title>
+			<EditMode>EnterOnInput</EditMode>
+			<ContextMenu name="СдачаДокументаКонтекстноеМеню" id="32"/>
+			<ExtendedTooltip name="СдачаДокументаРасширеннаяПодсказка" id="33"/>
+		</LabelField>
+		<LabelField name="ОстатокДокумента" id="34">
+			<DataPath>Объект.ОстатокДокумента</DataPath>
+			<Title>
+				<v8:item>
+					<v8:lang>uk</v8:lang>
+					<v8:content>Сума залишку (EUR)</v8:content>
+				</v8:item>
+				<v8:item>
+					<v8:lang>ru</v8:lang>
+					<v8:content>Сума остатка (EUR)</v8:content>
+				</v8:item>
+			</Title>
+			<EditMode>EnterOnInput</EditMode>
+			<ContextMenu name="ОстатокДокументаКонтекстноеМеню" id="35"/>
+			<ExtendedTooltip name="ОстатокДокументаРасширеннаяПодсказка" id="36"/>
+		</LabelField>
+		<Button name="ФормаСформировать" id="40">
+			<Type>UsualButton</Type>
+			<CommandName>Form.Command.Сформировать</CommandName>
+			<ExtendedTooltip name="ФормаСформироватьРасширеннаяПодсказка" id="41"/>
+		</Button>
+	</ChildItems>
+	<Attributes>
+		<Attribute name="Объект" id="1">
+			<Type>
+				<v8:Type>cfg:DataProcessorObject.Оплата</v8:Type>
+			</Type>
+			<MainAttribute>true</MainAttribute>
+		</Attribute>
+		<Attribute name="ВключитиСумуБоргу" id="2">
+			<Title>
+				<v8:item>
+					<v8:lang>uk</v8:lang>
+					<v8:content>Включити суму боргу</v8:content>
+				</v8:item>
+			</Title>
+			<Type>
+				<v8:Type>xs:boolean</v8:Type>
+			</Type>
+		</Attribute>
+		<Attribute name="ОтображатьВсеСчета" id="3">
+			<Title>
+				<v8:item>
+					<v8:lang>uk</v8:lang>
+					<v8:content>Показати всі</v8:content>
+				</v8:item>
+			</Title>
+			<Type>
+				<v8:Type>xs:boolean</v8:Type>
+			</Type>
+		</Attribute>
+	</Attributes>
+	<Commands>
+		<Command name="Сформировать" id="1">
+			<Title>
+				<v8:item>
+					<v8:lang>uk</v8:lang>
+					<v8:content>Сформувати</v8:content>
+				</v8:item>
+				<v8:item>
+					<v8:lang>ru</v8:lang>
+					<v8:content>Сформировать</v8:content>
+				</v8:item>
+			</Title>
+			<ToolTip>
+				<v8:item>
+					<v8:lang>uk</v8:lang>
+					<v8:content>Сформировать</v8:content>
+				</v8:item>
+			</ToolTip>
+			<Action>Сформировать</Action>
+		</Command>
+		<Command name="ДатьСкидкуНаОстаток" id="2">
+			<Title>
+				<v8:item>
+					<v8:lang>uk</v8:lang>
+					<v8:content>Дати знижку на залишок</v8:content>
+				</v8:item>
+				<v8:item>
+					<v8:lang>ru</v8:lang>
+					<v8:content>Дать скидку на остаток</v8:content>
+				</v8:item>
+			</Title>
+			<ToolTip>
+				<v8:item>
+					<v8:lang>uk</v8:lang>
+					<v8:content>Дать скидку на остаток</v8:content>
+				</v8:item>
+			</ToolTip>
+			<Action>ДатьСкидкуНаОстаток</Action>
+		</Command>
+		<Command name="ОтправитьВайбер" id="3">
+			<Title>
+				<v8:item>
+					<v8:lang>uk</v8:lang>
+					<v8:content>Отправить вайбер</v8:content>
+				</v8:item>
+			</Title>
+			<ToolTip>
+				<v8:item>
+					<v8:lang>uk</v8:lang>
+					<v8:content>Отправить вайбер</v8:content>
+				</v8:item>
+			</ToolTip>
+			<Action>ОтправитьВайбер</Action>
+		</Command>
+	</Commands>
+</Form>

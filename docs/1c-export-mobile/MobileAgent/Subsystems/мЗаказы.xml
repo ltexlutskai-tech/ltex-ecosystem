@@ -1,0 +1,109 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<MetaDataObject xmlns="http://v8.1c.ru/8.3/MDClasses" xmlns:app="http://v8.1c.ru/8.2/managed-application/core" xmlns:cfg="http://v8.1c.ru/8.1/data/enterprise/current-config" xmlns:cmi="http://v8.1c.ru/8.2/managed-application/cmi" xmlns:ent="http://v8.1c.ru/8.1/data/enterprise" xmlns:lf="http://v8.1c.ru/8.2/managed-application/logform" xmlns:style="http://v8.1c.ru/8.1/data/ui/style" xmlns:sys="http://v8.1c.ru/8.1/data/ui/fonts/system" xmlns:v8="http://v8.1c.ru/8.1/data/core" xmlns:v8ui="http://v8.1c.ru/8.1/data/ui" xmlns:web="http://v8.1c.ru/8.1/data/ui/colors/web" xmlns:win="http://v8.1c.ru/8.1/data/ui/colors/windows" xmlns:xen="http://v8.1c.ru/8.3/xcf/enums" xmlns:xpr="http://v8.1c.ru/8.3/xcf/predef" xmlns:xr="http://v8.1c.ru/8.3/xcf/readable" xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" version="2.8">
+	<Subsystem uuid="d81c641f-a03f-4f59-a881-971de98c7db5">
+		<Properties>
+			<Name>мЗаказы</Name>
+			<Synonym>
+				<v8:item>
+					<v8:lang>uk</v8:lang>
+					<v8:content>М заказы</v8:content>
+				</v8:item>
+			</Synonym>
+			<Comment/>
+			<IncludeHelpInContents>true</IncludeHelpInContents>
+			<IncludeInCommandInterface>true</IncludeInCommandInterface>
+			<Explanation/>
+			<Picture/>
+			<Content>
+				<xr:Item xsi:type="xr:MDObjectRef">AccumulationRegister.ОстаткиТоваров</xr:Item>
+				<xr:Item xsi:type="xr:MDObjectRef">AccumulationRegister.ДенежныеСредства</xr:Item>
+				<xr:Item xsi:type="xr:MDObjectRef">CommonCommand.ВыполнитьОбмен</xr:Item>
+				<xr:Item xsi:type="xr:MDObjectRef">CommonCommand.ОтчетПереченьНаличия</xr:Item>
+				<xr:Item xsi:type="xr:MDObjectRef">CommonCommand.ОтчетПродажи</xr:Item>
+				<xr:Item xsi:type="xr:MDObjectRef">CommonCommand.ПарольВходаОткрыть</xr:Item>
+				<xr:Item xsi:type="xr:MDObjectRef">CommonCommand.ВыполнитьПолныйОбмен</xr:Item>
+				<xr:Item xsi:type="xr:MDObjectRef">CommonCommand.ЗавантажитиОновлення</xr:Item>
+				<xr:Item xsi:type="xr:MDObjectRef">CommonCommand.ОновитиЗалишкиТаЦіни</xr:Item>
+				<xr:Item xsi:type="xr:MDObjectRef">CommonCommand.ВивантажитиДокументи</xr:Item>
+				<xr:Item xsi:type="xr:MDObjectRef">CommonCommand.ЗавантажитиТовари</xr:Item>
+				<xr:Item xsi:type="xr:MDObjectRef">CommonCommand.ЗавантажитиКонтрагентів</xr:Item>
+				<xr:Item xsi:type="xr:MDObjectRef">CommonCommand.ЗавантажитиДокументи</xr:Item>
+				<xr:Item xsi:type="xr:MDObjectRef">CommonCommand.ОновитиКурсиВалют</xr:Item>
+				<xr:Item xsi:type="xr:MDObjectRef">CommonCommand.ЗакрытиеЗаказов</xr:Item>
+				<xr:Item xsi:type="xr:MDObjectRef">Constant.ПарольВхода</xr:Item>
+				<xr:Item xsi:type="xr:MDObjectRef">Constant.ПроцентОбмена</xr:Item>
+				<xr:Item xsi:type="xr:MDObjectRef">Constant.ОшибкаОбмена</xr:Item>
+				<xr:Item xsi:type="xr:MDObjectRef">Constant.ДолгПартнера</xr:Item>
+				<xr:Item xsi:type="xr:MDObjectRef">Constant.ЭтоНеПервыйОбмен</xr:Item>
+				<xr:Item xsi:type="xr:MDObjectRef">Constant.СкладПартнера</xr:Item>
+				<xr:Item xsi:type="xr:MDObjectRef">Constant.Партнер</xr:Item>
+				<xr:Item xsi:type="xr:MDObjectRef">Constant.ПродавецПартнера</xr:Item>
+				<xr:Item xsi:type="xr:MDObjectRef">Constant.ОбменВыполняется</xr:Item>
+				<xr:Item xsi:type="xr:MDObjectRef">Constant.ПоследняяДатаВхода</xr:Item>
+				<xr:Item xsi:type="xr:MDObjectRef">Constant.АвтоматичнийОбмін</xr:Item>
+				<xr:Item xsi:type="xr:MDObjectRef">Constant.ОновлюватиЗалишкиПриВиборі</xr:Item>
+				<xr:Item xsi:type="xr:MDObjectRef">Constant.ДатаОстанньогоОбміну</xr:Item>
+				<xr:Item xsi:type="xr:MDObjectRef">Constant.ПідбірВПачкахШтуках</xr:Item>
+				<xr:Item xsi:type="xr:MDObjectRef">Constant.ЛокальнеЗєднання</xr:Item>
+				<xr:Item xsi:type="xr:MDObjectRef">Constant.КурсUSD</xr:Item>
+				<xr:Item xsi:type="xr:MDObjectRef">Constant.КурсEUR</xr:Item>
+				<xr:Item xsi:type="xr:MDObjectRef">Constant.ПорогЗадолженостиEUR</xr:Item>
+				<xr:Item xsi:type="xr:MDObjectRef">Constant.АвтоматичнийОбмінКурсВалют</xr:Item>
+				<xr:Item xsi:type="xr:MDObjectRef">Constant.АвтоматичнеВечірнєСкиданняДокументів</xr:Item>
+				<xr:Item xsi:type="xr:MDObjectRef">Constant.ЧасСкиданняЗамовлень</xr:Item>
+				<xr:Item xsi:type="xr:MDObjectRef">Constant.ПравоМінятиКурсиВалют</xr:Item>
+				<xr:Item xsi:type="xr:MDObjectRef">Constant.ПоказыватьЦены</xr:Item>
+				<xr:Item xsi:type="xr:MDObjectRef">Constant.ПоказыватьЦеныПоставщиков</xr:Item>
+				<xr:Item xsi:type="xr:MDObjectRef">Constant.ДатаОбновлениеСообщений</xr:Item>
+				<xr:Item xsi:type="xr:MDObjectRef">Catalog.Номенклатура</xr:Item>
+				<xr:Item xsi:type="xr:MDObjectRef">Catalog.ХарактеристикиНоменклатуры</xr:Item>
+				<xr:Item xsi:type="xr:MDObjectRef">Catalog.ХранилищеДополнительнойИнформации</xr:Item>
+				<xr:Item xsi:type="xr:MDObjectRef">Catalog.ЕдиницыИзмерения</xr:Item>
+				<xr:Item xsi:type="xr:MDObjectRef">Catalog.ТипыЦенНоменклатуры</xr:Item>
+				<xr:Item xsi:type="xr:MDObjectRef">Catalog.КлассификаторЕдиницИзмерения</xr:Item>
+				<xr:Item xsi:type="xr:MDObjectRef">Catalog.РабочийСтол</xr:Item>
+				<xr:Item xsi:type="xr:MDObjectRef">Catalog.Контрагенты</xr:Item>
+				<xr:Item xsi:type="xr:MDObjectRef">Catalog.СкладыКонтрагентов</xr:Item>
+				<xr:Item xsi:type="xr:MDObjectRef">Catalog.Области</xr:Item>
+				<xr:Item xsi:type="xr:MDObjectRef">Catalog.Города</xr:Item>
+				<xr:Item xsi:type="xr:MDObjectRef">Catalog.КатегорииОбъектов</xr:Item>
+				<xr:Item xsi:type="xr:MDObjectRef">Catalog.ГруппыЧата</xr:Item>
+				<xr:Item xsi:type="xr:MDObjectRef">Catalog.УчасникиЧата</xr:Item>
+				<xr:Item xsi:type="xr:MDObjectRef">Document.Приход</xr:Item>
+				<xr:Item xsi:type="xr:MDObjectRef">Document.Возврат</xr:Item>
+				<xr:Item xsi:type="xr:MDObjectRef">Document.ВозвратОтПокупателя</xr:Item>
+				<xr:Item xsi:type="xr:MDObjectRef">Document.КассовыйОрдер</xr:Item>
+				<xr:Item xsi:type="xr:MDObjectRef">Document.Заказ</xr:Item>
+				<xr:Item xsi:type="xr:MDObjectRef">Document.РеализацияТоваровУслуг</xr:Item>
+				<xr:Item xsi:type="xr:MDObjectRef">Document.МаршрутныйЛист</xr:Item>
+				<xr:Item xsi:type="xr:MDObjectRef">DataProcessor.ЗакрытиеСтарыхЗаказов</xr:Item>
+				<xr:Item xsi:type="xr:MDObjectRef">DataProcessor.Оплата</xr:Item>
+				<xr:Item xsi:type="xr:MDObjectRef">DataProcessor.Чат1с</xr:Item>
+				<xr:Item xsi:type="xr:MDObjectRef">InformationRegister.Штрихкоды</xr:Item>
+				<xr:Item xsi:type="xr:MDObjectRef">InformationRegister.ЦеныНоменклатуры</xr:Item>
+				<xr:Item xsi:type="xr:MDObjectRef">InformationRegister.РегистрацияОбмена</xr:Item>
+				<xr:Item xsi:type="xr:MDObjectRef">InformationRegister.НормыЗапасов</xr:Item>
+				<xr:Item xsi:type="xr:MDObjectRef">InformationRegister.ОтметкиНаличия</xr:Item>
+				<xr:Item xsi:type="xr:MDObjectRef">InformationRegister.Лог</xr:Item>
+				<xr:Item xsi:type="xr:MDObjectRef">InformationRegister.РегистрацияКоординат</xr:Item>
+				<xr:Item xsi:type="xr:MDObjectRef">InformationRegister.ОтгруженныеЗаказы</xr:Item>
+				<xr:Item xsi:type="xr:MDObjectRef">InformationRegister.Кілометраж</xr:Item>
+				<xr:Item xsi:type="xr:MDObjectRef">InformationRegister.КатегорииОбъектов</xr:Item>
+				<xr:Item xsi:type="xr:MDObjectRef">InformationRegister.ЦеныПоставщиков</xr:Item>
+				<xr:Item xsi:type="xr:MDObjectRef">InformationRegister.ВходящиеСообщения</xr:Item>
+				<xr:Item xsi:type="xr:MDObjectRef">InformationRegister.ИсходящиеСообщения</xr:Item>
+				<xr:Item xsi:type="xr:MDObjectRef">InformationRegister.НепрочитаныеСообщения</xr:Item>
+				<xr:Item xsi:type="xr:MDObjectRef">AccumulationRegister.Продажи</xr:Item>
+				<xr:Item xsi:type="xr:MDObjectRef">CommonCommand.СвоїКлієнти</xr:Item>
+				<xr:Item xsi:type="xr:MDObjectRef">InformationRegister.РаботаСКлиентом</xr:Item>
+				<xr:Item xsi:type="xr:MDObjectRef">DataProcessor.Нагадування</xr:Item>
+				<xr:Item xsi:type="xr:MDObjectRef">Catalog.Нагадування</xr:Item>
+				<xr:Item xsi:type="xr:MDObjectRef">Catalog.БанковскиеСчета</xr:Item>
+				<xr:Item xsi:type="xr:MDObjectRef">Document.Презентація</xr:Item>
+				<xr:Item xsi:type="xr:MDObjectRef">InformationRegister.Обміни</xr:Item>
+				<xr:Item xsi:type="xr:MDObjectRef">InformationRegister.НастройкиПользователя</xr:Item>
+			</Content>
+		</Properties>
+		<ChildObjects/>
+	</Subsystem>
+</MetaDataObject>

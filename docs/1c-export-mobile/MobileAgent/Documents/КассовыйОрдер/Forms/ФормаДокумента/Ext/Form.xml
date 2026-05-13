@@ -1,0 +1,482 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<Form xmlns="http://v8.1c.ru/8.3/xcf/logform" xmlns:app="http://v8.1c.ru/8.2/managed-application/core" xmlns:cfg="http://v8.1c.ru/8.1/data/enterprise/current-config" xmlns:dcscor="http://v8.1c.ru/8.1/data-composition-system/core" xmlns:dcsset="http://v8.1c.ru/8.1/data-composition-system/settings" xmlns:ent="http://v8.1c.ru/8.1/data/enterprise" xmlns:lf="http://v8.1c.ru/8.2/managed-application/logform" xmlns:style="http://v8.1c.ru/8.1/data/ui/style" xmlns:sys="http://v8.1c.ru/8.1/data/ui/fonts/system" xmlns:v8="http://v8.1c.ru/8.1/data/core" xmlns:v8ui="http://v8.1c.ru/8.1/data/ui" xmlns:web="http://v8.1c.ru/8.1/data/ui/colors/web" xmlns:win="http://v8.1c.ru/8.1/data/ui/colors/windows" xmlns:xr="http://v8.1c.ru/8.3/xcf/readable" xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" version="2.8">
+	<AutoTime>CurrentOrLast</AutoTime>
+	<UsePostingMode>Auto</UsePostingMode>
+	<RepostOnWrite>true</RepostOnWrite>
+	<AutoCommandBar name="ФормаКоманднаяПанель" id="-1"/>
+	<Events>
+		<Event name="AfterWrite">ПослеЗаписи</Event>
+		<Event name="OnOpen">ПриОткрытии</Event>
+		<Event name="OnCreateAtServer">ПриСозданииНаСервере</Event>
+	</Events>
+	<ChildItems>
+		<InputField name="Номер" id="1">
+			<DataPath>Объект.Number</DataPath>
+			<EditMode>EnterOnInput</EditMode>
+			<ContextMenu name="НомерКонтекстноеМеню" id="2"/>
+			<ExtendedTooltip name="НомерРасширеннаяПодсказка" id="3"/>
+		</InputField>
+		<InputField name="Дата" id="4">
+			<DataPath>Объект.Date</DataPath>
+			<EditMode>EnterOnInput</EditMode>
+			<ContextMenu name="ДатаКонтекстноеМеню" id="5"/>
+			<ExtendedTooltip name="ДатаРасширеннаяПодсказка" id="6"/>
+		</InputField>
+		<InputField name="ВидДвиженияДенежныхСредств" id="74">
+			<DataPath>Объект.ВидДвиженияДенежныхСредств</DataPath>
+			<ReadOnly>true</ReadOnly>
+			<ContextMenu name="ВидДвиженияДенежныхСредствКонтекстноеМеню" id="75"/>
+			<ExtendedTooltip name="ВидДвиженияДенежныхСредствРасширеннаяПодсказка" id="76"/>
+		</InputField>
+		<InputField name="СтатьяДвиженияДенежныхСредств" id="77">
+			<DataPath>Объект.СтатьяДвиженияДенежныхСредств</DataPath>
+			<ContextMenu name="СтатьяДвиженияДенежныхСредствКонтекстноеМеню" id="78"/>
+			<ExtendedTooltip name="СтатьяДвиженияДенежныхСредствРасширеннаяПодсказка" id="79"/>
+		</InputField>
+		<InputField name="Контрагент" id="21">
+			<DataPath>Объект.Контрагент</DataPath>
+			<ContextMenu name="КонтрагентКонтекстноеМеню" id="22"/>
+			<ExtendedTooltip name="КонтрагентРасширеннаяПодсказка" id="23"/>
+			<Events>
+				<Event name="OnChange">КонтрагентПриИзменении</Event>
+				<Event name="AutoComplete">КонтрагентАвтоПодбор</Event>
+			</Events>
+		</InputField>
+		<LabelDecoration name="Борги" id="69">
+			<ContextMenu name="БоргиКонтекстноеМеню" id="70"/>
+			<ExtendedTooltip name="БоргиРасширеннаяПодсказка" id="71"/>
+		</LabelDecoration>
+		<UsualGroup name="Группа13" id="52">
+			<ShowTitle>false</ShowTitle>
+			<ExtendedTooltip name="Группа13РасширеннаяПодсказка" id="53"/>
+			<ChildItems>
+				<UsualGroup name="ГруппаВайбер" id="63">
+					<Title>
+						<v8:item>
+							<v8:lang>uk</v8:lang>
+							<v8:content>Відправити у Viber</v8:content>
+						</v8:item>
+					</Title>
+					<ToolTip>
+						<v8:item>
+							<v8:lang>uk</v8:lang>
+							<v8:content>Группа вайбер</v8:content>
+						</v8:item>
+					</ToolTip>
+					<Height>4</Height>
+					<Group>AlwaysHorizontal</Group>
+					<Behavior>Collapsible</Behavior>
+					<Collapsed>true</Collapsed>
+					<Representation>NormalSeparation</Representation>
+					<ExtendedTooltip name="ГруппаВайберРасширеннаяПодсказка" id="64"/>
+					<ChildItems>
+						<Button name="ВідправитиКонтрагенту" id="65">
+							<Type>UsualButton</Type>
+							<CommandName>Form.Command.ВідправитиКонтрагенту</CommandName>
+							<Title>
+								<v8:item>
+									<v8:lang>uk</v8:lang>
+									<v8:content>Контрагенту</v8:content>
+								</v8:item>
+								<v8:item>
+									<v8:lang>ru</v8:lang>
+									<v8:content>Контрагенту</v8:content>
+								</v8:item>
+							</Title>
+							<ExtendedTooltip name="ВідправитиКонтрагентуРасширеннаяПодсказка" id="66"/>
+						</Button>
+						<Button name="ВідправитиВГрупу" id="67">
+							<Type>UsualButton</Type>
+							<CommandName>Form.Command.ВідправитиВГрупу</CommandName>
+							<Title>
+								<v8:item>
+									<v8:lang>uk</v8:lang>
+									<v8:content>В групу</v8:content>
+								</v8:item>
+								<v8:item>
+									<v8:lang>ru</v8:lang>
+									<v8:content>В групу</v8:content>
+								</v8:item>
+							</Title>
+							<ExtendedTooltip name="ВідправитиВГрупуРасширеннаяПодсказка" id="68"/>
+						</Button>
+						<Button name="ОтправитьУЧат" id="72">
+							<Type>UsualButton</Type>
+							<CommandName>Form.Command.ОтправитьУЧат</CommandName>
+							<ExtendedTooltip name="ОтправитьУЧатРасширеннаяПодсказка" id="73"/>
+						</Button>
+					</ChildItems>
+				</UsualGroup>
+			</ChildItems>
+		</UsualGroup>
+		<UsualGroup name="КурсиВалют" id="24">
+			<Title>
+				<v8:item>
+					<v8:lang>uk</v8:lang>
+					<v8:content>Курси валют</v8:content>
+				</v8:item>
+			</Title>
+			<ToolTip>
+				<v8:item>
+					<v8:lang>uk</v8:lang>
+					<v8:content>Курси валют</v8:content>
+				</v8:item>
+			</ToolTip>
+			<Group>AlwaysHorizontal</Group>
+			<Behavior>Collapsible</Behavior>
+			<Collapsed>true</Collapsed>
+			<ExtendedTooltip name="КурсиВалютРасширеннаяПодсказка" id="25"/>
+			<ChildItems>
+				<InputField name="КурсUSD" id="26">
+					<DataPath>Объект.КурсUSD</DataPath>
+					<Title>
+						<v8:item>
+							<v8:lang>uk</v8:lang>
+							<v8:content>USD</v8:content>
+						</v8:item>
+					</Title>
+					<HorizontalAlign>Left</HorizontalAlign>
+					<GroupHorizontalAlign>Left</GroupHorizontalAlign>
+					<ContextMenu name="КурсUSDКонтекстноеМеню" id="27"/>
+					<ExtendedTooltip name="КурсUSDРасширеннаяПодсказка" id="28"/>
+					<Events>
+						<Event name="OnChange">СумаПриИзменении</Event>
+					</Events>
+				</InputField>
+				<InputField name="КурсEUR" id="29">
+					<DataPath>Объект.КурсEUR</DataPath>
+					<Title>
+						<v8:item>
+							<v8:lang>uk</v8:lang>
+							<v8:content>EUR</v8:content>
+						</v8:item>
+					</Title>
+					<HorizontalAlign>Left</HorizontalAlign>
+					<GroupHorizontalAlign>Left</GroupHorizontalAlign>
+					<ContextMenu name="КурсEURКонтекстноеМеню" id="30"/>
+					<ExtendedTooltip name="КурсEURРасширеннаяПодсказка" id="31"/>
+					<Events>
+						<Event name="OnChange">СумаПриИзменении</Event>
+					</Events>
+				</InputField>
+			</ChildItems>
+		</UsualGroup>
+		<UsualGroup name="ГруппаОплати" id="7">
+			<UserVisible>
+				<xr:Common>true</xr:Common>
+				<xr:Value name="Role.Пользователь">true</xr:Value>
+			</UserVisible>
+			<Title>
+				<v8:item>
+					<v8:lang>uk</v8:lang>
+					<v8:content>Оплата</v8:content>
+				</v8:item>
+			</Title>
+			<ToolTip>
+				<v8:item>
+					<v8:lang>uk</v8:lang>
+					<v8:content>Группа оплати</v8:content>
+				</v8:item>
+			</ToolTip>
+			<Group>Vertical</Group>
+			<ExtendedTooltip name="ГруппаОплатиРасширеннаяПодсказка" id="8"/>
+			<ChildItems>
+				<UsualGroup name="ГруппаUAH" id="32">
+					<Title>
+						<v8:item>
+							<v8:lang>uk</v8:lang>
+							<v8:content>Группа UAH</v8:content>
+						</v8:item>
+					</Title>
+					<ToolTip>
+						<v8:item>
+							<v8:lang>uk</v8:lang>
+							<v8:content>Группа UAH</v8:content>
+						</v8:item>
+					</ToolTip>
+					<Group>AlwaysHorizontal</Group>
+					<ShowTitle>false</ShowTitle>
+					<ExtendedTooltip name="ГруппаUAHРасширеннаяПодсказка" id="33"/>
+					<ChildItems>
+						<InputField name="СумаUAH" id="9">
+							<DataPath>Объект.СумаUAH</DataPath>
+							<Title>
+								<v8:item>
+									<v8:lang>uk</v8:lang>
+									<v8:content>UAH</v8:content>
+								</v8:item>
+							</Title>
+							<ContextMenu name="СумаUAHКонтекстноеМеню" id="10"/>
+							<ExtendedTooltip name="СумаUAHРасширеннаяПодсказка" id="11"/>
+							<Events>
+								<Event name="OnChange">СумаПриИзменении</Event>
+							</Events>
+						</InputField>
+						<LabelField name="РекомендованоДоСплатиUAH" id="34">
+							<DataPath>РекомендованоДоСплатиUAH</DataPath>
+							<TitleLocation>None</TitleLocation>
+							<HorizontalAlign>Left</HorizontalAlign>
+							<ContextMenu name="РекомендованоДоСплатиUAHКонтекстноеМеню" id="35"/>
+							<ExtendedTooltip name="РекомендованоДоСплатиUAHРасширеннаяПодсказка" id="36"/>
+						</LabelField>
+					</ChildItems>
+				</UsualGroup>
+				<UsualGroup name="ГруппаUAH_Безнал" id="47">
+					<Title>
+						<v8:item>
+							<v8:lang>uk</v8:lang>
+							<v8:content>Группа UAH</v8:content>
+						</v8:item>
+					</Title>
+					<ToolTip>
+						<v8:item>
+							<v8:lang>uk</v8:lang>
+							<v8:content>Группа UAH</v8:content>
+						</v8:item>
+					</ToolTip>
+					<Group>AlwaysHorizontal</Group>
+					<ShowTitle>false</ShowTitle>
+					<ExtendedTooltip name="ГруппаUAH_БезналРасширеннаяПодсказка" id="48"/>
+					<ChildItems>
+						<InputField name="СумаUAH_Безнал" id="49">
+							<DataPath>Объект.СумаUAH_Безнал</DataPath>
+							<Title>
+								<v8:item>
+									<v8:lang>uk</v8:lang>
+									<v8:content>UAH (безгот)</v8:content>
+								</v8:item>
+							</Title>
+							<TitleLocation>Left</TitleLocation>
+							<AutoMaxWidth>false</AutoMaxWidth>
+							<MaxWidth>8</MaxWidth>
+							<ContextMenu name="СумаUAH_БезналКонтекстноеМеню" id="50"/>
+							<ExtendedTooltip name="СумаUAH_БезналРасширеннаяПодсказка" id="51"/>
+						</InputField>
+					</ChildItems>
+				</UsualGroup>
+				<UsualGroup name="ГруппаEUR" id="37">
+					<Title>
+						<v8:item>
+							<v8:lang>uk</v8:lang>
+							<v8:content>Группа EUR</v8:content>
+						</v8:item>
+					</Title>
+					<ToolTip>
+						<v8:item>
+							<v8:lang>uk</v8:lang>
+							<v8:content>Группа EUR</v8:content>
+						</v8:item>
+					</ToolTip>
+					<Group>AlwaysHorizontal</Group>
+					<ShowTitle>false</ShowTitle>
+					<ExtendedTooltip name="ГруппаEURРасширеннаяПодсказка" id="38"/>
+					<ChildItems>
+						<InputField name="СумаEUR" id="12">
+							<DataPath>Объект.СумаEUR</DataPath>
+							<Title>
+								<v8:item>
+									<v8:lang>uk</v8:lang>
+									<v8:content>EUR</v8:content>
+								</v8:item>
+							</Title>
+							<ContextMenu name="СумаEURКонтекстноеМеню" id="13"/>
+							<ExtendedTooltip name="СумаEURРасширеннаяПодсказка" id="14"/>
+							<Events>
+								<Event name="OnChange">СумаПриИзменении</Event>
+							</Events>
+						</InputField>
+						<LabelField name="РекомендованоДоСплатиEUR" id="41">
+							<DataPath>РекомендованоДоСплатиEUR</DataPath>
+							<TitleLocation>None</TitleLocation>
+							<HorizontalAlign>Left</HorizontalAlign>
+							<ContextMenu name="РекомендованоДоСплатиEURКонтекстноеМеню" id="42"/>
+							<ExtendedTooltip name="РекомендованоДоСплатиEURРасширеннаяПодсказка" id="43"/>
+						</LabelField>
+					</ChildItems>
+				</UsualGroup>
+				<UsualGroup name="ГруппаUSD" id="39">
+					<Title>
+						<v8:item>
+							<v8:lang>uk</v8:lang>
+							<v8:content>Группа USD</v8:content>
+						</v8:item>
+					</Title>
+					<ToolTip>
+						<v8:item>
+							<v8:lang>uk</v8:lang>
+							<v8:content>Группа USD</v8:content>
+						</v8:item>
+					</ToolTip>
+					<Group>AlwaysHorizontal</Group>
+					<ShowTitle>false</ShowTitle>
+					<ExtendedTooltip name="ГруппаUSDРасширеннаяПодсказка" id="40"/>
+					<ChildItems>
+						<InputField name="СумаUSD" id="15">
+							<DataPath>Объект.СумаUSD</DataPath>
+							<Title>
+								<v8:item>
+									<v8:lang>uk</v8:lang>
+									<v8:content>USD</v8:content>
+								</v8:item>
+							</Title>
+							<ContextMenu name="СумаUSDКонтекстноеМеню" id="16"/>
+							<ExtendedTooltip name="СумаUSDРасширеннаяПодсказка" id="17"/>
+							<Events>
+								<Event name="OnChange">СумаПриИзменении</Event>
+							</Events>
+						</InputField>
+						<LabelField name="РекомендованоДоСплатиUSD" id="44">
+							<DataPath>РекомендованоДоСплатиUSD</DataPath>
+							<TitleLocation>None</TitleLocation>
+							<HorizontalAlign>Left</HorizontalAlign>
+							<ContextMenu name="РекомендованоДоСплатиUSDКонтекстноеМеню" id="45"/>
+							<ExtendedTooltip name="РекомендованоДоСплатиUSDРасширеннаяПодсказка" id="46"/>
+						</LabelField>
+					</ChildItems>
+				</UsualGroup>
+			</ChildItems>
+		</UsualGroup>
+		<LabelField name="СуммаДокумента" id="18">
+			<DataPath>Объект.СуммаДокумента</DataPath>
+			<Title>
+				<v8:item>
+					<v8:lang>uk</v8:lang>
+					<v8:content>Сума документа (EUR)</v8:content>
+				</v8:item>
+			</Title>
+			<ContextMenu name="СуммаДокументаКонтекстноеМеню" id="19"/>
+			<ExtendedTooltip name="СуммаДокументаРасширеннаяПодсказка" id="20"/>
+		</LabelField>
+	</ChildItems>
+	<Attributes>
+		<Attribute name="Объект" id="1">
+			<Type>
+				<v8:Type>cfg:DocumentObject.КассовыйОрдер</v8:Type>
+			</Type>
+			<View>
+				<xr:Common>true</xr:Common>
+				<xr:Value name="Role.Пользователь">true</xr:Value>
+			</View>
+			<Edit>
+				<xr:Common>true</xr:Common>
+				<xr:Value name="Role.Пользователь">true</xr:Value>
+			</Edit>
+			<MainAttribute>true</MainAttribute>
+			<SavedData>true</SavedData>
+			<UseAlways>
+				<Field>Объект.RegisterRecords</Field>
+			</UseAlways>
+		</Attribute>
+		<Attribute name="РекомендованоДоСплатиUAH" id="2">
+			<Title>
+				<v8:item>
+					<v8:lang>uk</v8:lang>
+					<v8:content>Рекомендовано до сплати UAH</v8:content>
+				</v8:item>
+			</Title>
+			<Type>
+				<v8:Type>xs:decimal</v8:Type>
+				<v8:NumberQualifiers>
+					<v8:Digits>10</v8:Digits>
+					<v8:FractionDigits>2</v8:FractionDigits>
+					<v8:AllowedSign>Nonnegative</v8:AllowedSign>
+				</v8:NumberQualifiers>
+			</Type>
+		</Attribute>
+		<Attribute name="РекомендованоДоСплатиUSD" id="3">
+			<Title>
+				<v8:item>
+					<v8:lang>uk</v8:lang>
+					<v8:content>Рекомендовано до сплати USD</v8:content>
+				</v8:item>
+			</Title>
+			<Type>
+				<v8:Type>xs:decimal</v8:Type>
+				<v8:NumberQualifiers>
+					<v8:Digits>10</v8:Digits>
+					<v8:FractionDigits>2</v8:FractionDigits>
+					<v8:AllowedSign>Nonnegative</v8:AllowedSign>
+				</v8:NumberQualifiers>
+			</Type>
+		</Attribute>
+		<Attribute name="РекомендованоДоСплатиEUR" id="4">
+			<Title>
+				<v8:item>
+					<v8:lang>uk</v8:lang>
+					<v8:content>Рекомендовано до сплати EUR</v8:content>
+				</v8:item>
+			</Title>
+			<Type>
+				<v8:Type>xs:decimal</v8:Type>
+				<v8:NumberQualifiers>
+					<v8:Digits>10</v8:Digits>
+					<v8:FractionDigits>2</v8:FractionDigits>
+					<v8:AllowedSign>Nonnegative</v8:AllowedSign>
+				</v8:NumberQualifiers>
+			</Type>
+		</Attribute>
+		<Attribute name="ОплаченаСума" id="5">
+			<Title>
+				<v8:item>
+					<v8:lang>uk</v8:lang>
+					<v8:content>Оплачена сума</v8:content>
+				</v8:item>
+			</Title>
+			<Type>
+				<v8:Type>xs:decimal</v8:Type>
+				<v8:NumberQualifiers>
+					<v8:Digits>10</v8:Digits>
+					<v8:FractionDigits>2</v8:FractionDigits>
+					<v8:AllowedSign>Any</v8:AllowedSign>
+				</v8:NumberQualifiers>
+			</Type>
+		</Attribute>
+	</Attributes>
+	<Commands>
+		<Command name="ВідправитиВГрупу" id="1">
+			<Title>
+				<v8:item>
+					<v8:lang>uk</v8:lang>
+					<v8:content>Відправити в групу</v8:content>
+				</v8:item>
+			</Title>
+			<ToolTip>
+				<v8:item>
+					<v8:lang>uk</v8:lang>
+					<v8:content>Відправити в групу</v8:content>
+				</v8:item>
+			</ToolTip>
+			<Action>ВідправитиВГрупу</Action>
+		</Command>
+		<Command name="ВідправитиКонтрагенту" id="2">
+			<Title>
+				<v8:item>
+					<v8:lang>uk</v8:lang>
+					<v8:content>Відправити контрагенту</v8:content>
+				</v8:item>
+			</Title>
+			<ToolTip>
+				<v8:item>
+					<v8:lang>uk</v8:lang>
+					<v8:content>Відправити контрагенту</v8:content>
+				</v8:item>
+			</ToolTip>
+			<Action>ВідправитиКонтрагенту</Action>
+		</Command>
+		<Command name="ОтправитьУЧат" id="3">
+			<Title>
+				<v8:item>
+					<v8:lang>uk</v8:lang>
+					<v8:content>У чат</v8:content>
+				</v8:item>
+			</Title>
+			<ToolTip>
+				<v8:item>
+					<v8:lang>uk</v8:lang>
+					<v8:content>Отправить у чат</v8:content>
+				</v8:item>
+			</ToolTip>
+			<Action>ОтправитьУЧат</Action>
+		</Command>
+	</Commands>
+</Form>

@@ -1,0 +1,27 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<PredefinedData xmlns="http://v8.1c.ru/8.3/xcf/predef" xmlns:v8="http://v8.1c.ru/8.1/data/core" xmlns:xr="http://v8.1c.ru/8.3/xcf/readable" xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="CatalogPredefinedItems" version="2.7">
+	<Item id="187ca9da-a4dc-418b-972f-99239b3a41f2">
+		<Name>ВиїзднаТоргівля</Name>
+		<Code>000000003</Code>
+		<Description>Виїздна торгівля</Description>
+		<IsFolder>false</IsFolder>
+	</Item>
+	<Item id="2128206c-15c9-41cc-b59c-e2c4b7342919">
+		<Name>Інтернет</Name>
+		<Code>000000004</Code>
+		<Description>Інтернет</Description>
+		<IsFolder>false</IsFolder>
+	</Item>
+	<Item id="0d9499f1-6904-45fe-8500-686fa3d4f743">
+		<Name>Магазин</Name>
+		<Code>000000001</Code>
+		<Description>Магазин</Description>
+		<IsFolder>false</IsFolder>
+	</Item>
+	<Item id="37434aab-138f-4c1d-8978-7402efa56c9a">
+		<Name>Ринок</Name>
+		<Code>000000002</Code>
+		<Description>Ринок</Description>
+		<IsFolder>false</IsFolder>
+	</Item>
+</PredefinedData>

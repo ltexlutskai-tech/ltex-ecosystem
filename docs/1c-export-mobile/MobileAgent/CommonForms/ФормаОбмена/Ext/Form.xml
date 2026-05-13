@@ -1,0 +1,163 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<Form xmlns="http://v8.1c.ru/8.3/xcf/logform" xmlns:app="http://v8.1c.ru/8.2/managed-application/core" xmlns:cfg="http://v8.1c.ru/8.1/data/enterprise/current-config" xmlns:dcscor="http://v8.1c.ru/8.1/data-composition-system/core" xmlns:dcsset="http://v8.1c.ru/8.1/data-composition-system/settings" xmlns:ent="http://v8.1c.ru/8.1/data/enterprise" xmlns:lf="http://v8.1c.ru/8.2/managed-application/logform" xmlns:style="http://v8.1c.ru/8.1/data/ui/style" xmlns:sys="http://v8.1c.ru/8.1/data/ui/fonts/system" xmlns:v8="http://v8.1c.ru/8.1/data/core" xmlns:v8ui="http://v8.1c.ru/8.1/data/ui" xmlns:web="http://v8.1c.ru/8.1/data/ui/colors/web" xmlns:win="http://v8.1c.ru/8.1/data/ui/colors/windows" xmlns:xr="http://v8.1c.ru/8.3/xcf/readable" xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" version="2.8">
+	<Title>
+		<v8:item>
+			<v8:lang>ru</v8:lang>
+			<v8:content>Обмін з сервером</v8:content>
+		</v8:item>
+	</Title>
+	<WindowOpeningMode>LockWholeInterface</WindowOpeningMode>
+	<AutoTitle>false</AutoTitle>
+	<CommandBarLocation>None</CommandBarLocation>
+	<AutoCommandBar name="ФормаКоманднаяПанель" id="-1"/>
+	<Events>
+		<Event name="OnOpen">ПриОткрытии</Event>
+		<Event name="BeforeClose">ПередЗакрытием</Event>
+		<Event name="OnCreateAtServer">ПриСозданииНаСервере</Event>
+	</Events>
+	<ChildItems>
+		<LabelDecoration name="ДекорацияОбмен" id="10">
+			<HorizontalStretch>true</HorizontalStretch>
+			<Font ref="style:NormalTextFont" height="12" kind="StyleItem"/>
+			<Title formatted="false">
+				<v8:item>
+					<v8:lang>ru</v8:lang>
+					<v8:content>Виконання обміну...</v8:content>
+				</v8:item>
+			</Title>
+			<HorizontalAlign>Center</HorizontalAlign>
+			<ContextMenu name="ДекорацияОбменКонтекстноеМеню" id="11"/>
+			<ExtendedTooltip name="ДекорацияОбменРасширеннаяПодсказка" id="12"/>
+		</LabelDecoration>
+		<PictureDecoration name="Декорация2" id="18">
+			<Width>9</Width>
+			<Height>4</Height>
+			<HorizontalStretch>true</HorizontalStretch>
+			<VerticalStretch>false</VerticalStretch>
+			<GroupHorizontalAlign>Center</GroupHorizontalAlign>
+			<GroupVerticalAlign>Center</GroupVerticalAlign>
+			<PictureSize>Proportionally</PictureSize>
+			<Picture>
+				<xr:Ref>CommonPicture.ДлительнаяОперация</xr:Ref>
+				<xr:LoadTransparent>true</xr:LoadTransparent>
+			</Picture>
+			<FileDragMode>AsFile</FileDragMode>
+			<ContextMenu name="Декорация2КонтекстноеМеню" id="19"/>
+			<ExtendedTooltip name="Декорация2РасширеннаяПодсказка" id="20"/>
+		</PictureDecoration>
+		<UsualGroup name="Группа1" id="16">
+			<Visible>false</Visible>
+			<Group>Horizontal</Group>
+			<Representation>StrongSeparation</Representation>
+			<ShowTitle>false</ShowTitle>
+			<ExtendedTooltip name="Группа1РасширеннаяПодсказка" id="17"/>
+			<ChildItems>
+				<LabelField name="Прогрес1" id="13">
+					<DataPath>Прогрес</DataPath>
+					<Title>
+						<v8:item>
+							<v8:lang>ru</v8:lang>
+							<v8:content>%</v8:content>
+						</v8:item>
+					</Title>
+					<TitleLocation>Right</TitleLocation>
+					<GroupVerticalAlign>Center</GroupVerticalAlign>
+					<Width>4</Width>
+					<Height>1</Height>
+					<HorizontalStretch>false</HorizontalStretch>
+					<Format>
+						<v8:item>
+							<v8:lang>ru</v8:lang>
+							<v8:content>ЧН=0</v8:content>
+						</v8:item>
+					</Format>
+					<ContextMenu name="Прогрес1КонтекстноеМеню" id="14"/>
+					<ExtendedTooltip name="Прогрес1РасширеннаяПодсказка" id="15"/>
+				</LabelField>
+				<ProgressBarField name="Прогрес" id="7">
+					<DataPath>Прогрес</DataPath>
+					<Title>
+						<v8:item>
+							<v8:lang>ru</v8:lang>
+							<v8:content>Обмен</v8:content>
+						</v8:item>
+					</Title>
+					<TitleTextColor>#000000</TitleTextColor>
+					<TitleLocation>None</TitleLocation>
+					<Representation>Broken</Representation>
+					<BorderColor>#999999</BorderColor>
+					<ContextMenu name="ПрогресКонтекстноеМеню" id="8"/>
+					<ExtendedTooltip name="ПрогресРасширеннаяПодсказка" id="9"/>
+				</ProgressBarField>
+			</ChildItems>
+		</UsualGroup>
+	</ChildItems>
+	<Attributes>
+		<Attribute name="Прогрес" id="3">
+			<Title>
+				<v8:item>
+					<v8:lang>ru</v8:lang>
+					<v8:content>Прогрес</v8:content>
+				</v8:item>
+			</Title>
+			<Type>
+				<v8:Type>xs:decimal</v8:Type>
+				<v8:NumberQualifiers>
+					<v8:Digits>10</v8:Digits>
+					<v8:FractionDigits>0</v8:FractionDigits>
+					<v8:AllowedSign>Any</v8:AllowedSign>
+				</v8:NumberQualifiers>
+			</Type>
+		</Attribute>
+		<Attribute name="ФЗУИД" id="1">
+			<Title>
+				<v8:item>
+					<v8:lang>ru</v8:lang>
+					<v8:content>ФЗУИД</v8:content>
+				</v8:item>
+			</Title>
+			<Type>
+				<v8:Type>v8:UUID</v8:Type>
+			</Type>
+		</Attribute>
+		<Attribute name="УспешноеНачалоОбмена" id="4">
+			<Title>
+				<v8:item>
+					<v8:lang>ru</v8:lang>
+					<v8:content>Успешное начало обмена</v8:content>
+				</v8:item>
+			</Title>
+			<Type>
+				<v8:Type>xs:boolean</v8:Type>
+			</Type>
+		</Attribute>
+		<Attribute name="РежимВыполненияОбмена" id="5">
+			<Title>
+				<v8:item>
+					<v8:lang>uk</v8:lang>
+					<v8:content>Режим выполнения обмена</v8:content>
+				</v8:item>
+			</Title>
+			<Type>
+				<v8:Type>xs:decimal</v8:Type>
+				<v8:NumberQualifiers>
+					<v8:Digits>10</v8:Digits>
+					<v8:FractionDigits>0</v8:FractionDigits>
+					<v8:AllowedSign>Any</v8:AllowedSign>
+				</v8:NumberQualifiers>
+			</Type>
+		</Attribute>
+	</Attributes>
+	<Parameters>
+		<Parameter name="РежимВыполненияОбмена">
+			<Type>
+				<v8:Type>xs:decimal</v8:Type>
+				<v8:NumberQualifiers>
+					<v8:Digits>10</v8:Digits>
+					<v8:FractionDigits>0</v8:FractionDigits>
+					<v8:AllowedSign>Any</v8:AllowedSign>
+				</v8:NumberQualifiers>
+			</Type>
+		</Parameter>
+	</Parameters>
+</Form>

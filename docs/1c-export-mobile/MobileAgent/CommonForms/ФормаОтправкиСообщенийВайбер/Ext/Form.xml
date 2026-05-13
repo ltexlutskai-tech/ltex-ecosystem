@@ -1,0 +1,149 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<Form xmlns="http://v8.1c.ru/8.3/xcf/logform" xmlns:app="http://v8.1c.ru/8.2/managed-application/core" xmlns:cfg="http://v8.1c.ru/8.1/data/enterprise/current-config" xmlns:dcscor="http://v8.1c.ru/8.1/data-composition-system/core" xmlns:dcsset="http://v8.1c.ru/8.1/data-composition-system/settings" xmlns:ent="http://v8.1c.ru/8.1/data/enterprise" xmlns:lf="http://v8.1c.ru/8.2/managed-application/logform" xmlns:style="http://v8.1c.ru/8.1/data/ui/style" xmlns:sys="http://v8.1c.ru/8.1/data/ui/fonts/system" xmlns:v8="http://v8.1c.ru/8.1/data/core" xmlns:v8ui="http://v8.1c.ru/8.1/data/ui" xmlns:web="http://v8.1c.ru/8.1/data/ui/colors/web" xmlns:win="http://v8.1c.ru/8.1/data/ui/colors/windows" xmlns:xr="http://v8.1c.ru/8.3/xcf/readable" xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" version="2.8">
+	<AutoCommandBar name="ФормаКоманднаяПанель" id="-1"/>
+	<Events>
+		<Event name="OnCreateAtServer">ПриСозданииНаСервере</Event>
+	</Events>
+	<ChildItems>
+		<InputField name="НовоеСообщение" id="1">
+			<DataPath>НовоеСообщение</DataPath>
+			<TitleLocation>None</TitleLocation>
+			<MultiLine>true</MultiLine>
+			<ChoiceButton>true</ChoiceButton>
+			<InputHint>
+				<v8:item>
+					<v8:lang>uk</v8:lang>
+					<v8:content>Нове повідомлення</v8:content>
+				</v8:item>
+				<v8:item>
+					<v8:lang>ru</v8:lang>
+					<v8:content>Новое сообщение</v8:content>
+				</v8:item>
+			</InputHint>
+			<ContextMenu name="НовоеСообщениеКонтекстноеМеню" id="2"/>
+			<ExtendedTooltip name="НовоеСообщениеРасширеннаяПодсказка" id="3"/>
+			<Events>
+				<Event name="OnChange">НовоеСообщениеПриИзменении</Event>
+				<Event name="StartChoice">НовоеСообщениеНачалоВыбора</Event>
+				<Event name="TextEditEnd">НовоеСообщениеОкончаниеВводаТекста</Event>
+			</Events>
+		</InputField>
+		<InputField name="ВыбратьФайл" id="6">
+			<DataPath>ВыбратьФайл</DataPath>
+			<ChoiceButton>true</ChoiceButton>
+			<ContextMenu name="ВыбратьФайлКонтекстноеМеню" id="7"/>
+			<ExtendedTooltip name="ВыбратьФайлРасширеннаяПодсказка" id="8"/>
+			<Events>
+				<Event name="StartChoice">ВыбратьФайлНачалоВыбора</Event>
+				<Event name="TextEditEnd">ВыбратьФайлОкончаниеВводаТекста</Event>
+			</Events>
+		</InputField>
+		<Button name="ОтправитьВайбер" id="4">
+			<Type>UsualButton</Type>
+			<Height>3</Height>
+			<HorizontalStretch>true</HorizontalStretch>
+			<GroupHorizontalAlign>Center</GroupHorizontalAlign>
+			<CommandName>Form.Command.ОтправитьВайбер</CommandName>
+			<ExtendedTooltip name="ОтправитьВайберРасширеннаяПодсказка" id="5"/>
+		</Button>
+	</ChildItems>
+	<Attributes>
+		<Attribute name="НовоеСообщение" id="1">
+			<Title>
+				<v8:item>
+					<v8:lang>uk</v8:lang>
+					<v8:content>Новое сообщение</v8:content>
+				</v8:item>
+			</Title>
+			<Type>
+				<v8:Type>xs:string</v8:Type>
+				<v8:StringQualifiers>
+					<v8:Length>0</v8:Length>
+					<v8:AllowedLength>Variable</v8:AllowedLength>
+				</v8:StringQualifiers>
+			</Type>
+		</Attribute>
+		<Attribute name="СписокКонтрагентов" id="2">
+			<Title>
+				<v8:item>
+					<v8:lang>uk</v8:lang>
+					<v8:content>Список контрагентов</v8:content>
+				</v8:item>
+			</Title>
+			<Type>
+				<v8:Type>v8:ValueTable</v8:Type>
+			</Type>
+			<Columns>
+				<Column name="Контрагент" id="1">
+					<Title>
+						<v8:item>
+							<v8:lang>uk</v8:lang>
+							<v8:content>Контрагент</v8:content>
+						</v8:item>
+					</Title>
+					<Type>
+						<v8:Type>cfg:CatalogRef.Контрагенты</v8:Type>
+					</Type>
+				</Column>
+			</Columns>
+		</Attribute>
+		<Attribute name="ВыбратьФайл" id="3">
+			<Title>
+				<v8:item>
+					<v8:lang>uk</v8:lang>
+					<v8:content>Обрати файл</v8:content>
+				</v8:item>
+				<v8:item>
+					<v8:lang>ru</v8:lang>
+					<v8:content>Выбрать файл</v8:content>
+				</v8:item>
+			</Title>
+			<Type>
+				<v8:Type>xs:string</v8:Type>
+				<v8:StringQualifiers>
+					<v8:Length>0</v8:Length>
+					<v8:AllowedLength>Variable</v8:AllowedLength>
+				</v8:StringQualifiers>
+			</Type>
+		</Attribute>
+	</Attributes>
+	<Commands>
+		<Command name="ОтправитьВайбер" id="1">
+			<Title>
+				<v8:item>
+					<v8:lang>uk</v8:lang>
+					<v8:content>Віправити VIBER</v8:content>
+				</v8:item>
+				<v8:item>
+					<v8:lang>ru</v8:lang>
+					<v8:content>Отправить VIBER</v8:content>
+				</v8:item>
+			</Title>
+			<ToolTip>
+				<v8:item>
+					<v8:lang>uk</v8:lang>
+					<v8:content>Отправить вайбер</v8:content>
+				</v8:item>
+			</ToolTip>
+			<Action>ОтправитьВайбер</Action>
+		</Command>
+		<Command name="ДобавитьФайл" id="2">
+			<Title>
+				<v8:item>
+					<v8:lang>uk</v8:lang>
+					<v8:content>Добавить файл</v8:content>
+				</v8:item>
+				<v8:item>
+					<v8:lang>ru</v8:lang>
+					<v8:content>Додати файл</v8:content>
+				</v8:item>
+			</Title>
+			<ToolTip>
+				<v8:item>
+					<v8:lang>uk</v8:lang>
+					<v8:content>Добавить файл</v8:content>
+				</v8:item>
+			</ToolTip>
+		</Command>
+	</Commands>
+</Form>

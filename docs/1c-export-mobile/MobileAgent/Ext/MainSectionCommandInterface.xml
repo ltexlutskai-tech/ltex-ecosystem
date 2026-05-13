@@ -1,0 +1,222 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<CommandInterface xmlns="http://v8.1c.ru/8.3/xcf/extrnprops" xmlns:xr="http://v8.1c.ru/8.3/xcf/readable" xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" version="2.8">
+	<CommandsVisibility>
+		<Command name="Document.Заказ.StandardCommand.OpenList">
+			<Visibility>
+				<xr:Common>true</xr:Common>
+			</Visibility>
+		</Command>
+		<Command name="CommonCommand.ЗакрытиеЗаказов">
+			<Visibility>
+				<xr:Common>true</xr:Common>
+			</Visibility>
+		</Command>
+		<Command name="Document.КассовыйОрдер.StandardCommand.OpenList">
+			<Visibility>
+				<xr:Common>true</xr:Common>
+			</Visibility>
+		</Command>
+		<Command name="Document.РеализацияТоваровУслуг.StandardCommand.OpenList">
+			<Visibility>
+				<xr:Common>true</xr:Common>
+			</Visibility>
+		</Command>
+		<Command name="Document.Презентація.StandardCommand.OpenList">
+			<Visibility>
+				<xr:Common>true</xr:Common>
+			</Visibility>
+		</Command>
+		<Command name="Catalog.Контрагенты.StandardCommand.OpenList">
+			<Visibility>
+				<xr:Common>true</xr:Common>
+				<xr:Value name="Role.Пользователь">false</xr:Value>
+				<xr:Value name="Role.ВидимістьВсіхКлієнтів">true</xr:Value>
+			</Visibility>
+		</Command>
+		<Command name="CommonCommand.СвоїКлієнти">
+			<Visibility>
+				<xr:Common>true</xr:Common>
+			</Visibility>
+		</Command>
+		<Command name="Catalog.Номенклатура.StandardCommand.OpenList">
+			<Visibility>
+				<xr:Common>false</xr:Common>
+				<xr:Value name="Role.Пользователь">false</xr:Value>
+				<xr:Value name="Role.ВидимістьВсіхКлієнтів">false</xr:Value>
+			</Visibility>
+		</Command>
+		<Command name="CommonCommand.ОткрытьПрайс">
+			<Visibility>
+				<xr:Common>true</xr:Common>
+			</Visibility>
+		</Command>
+		<Command name="Catalog.Нагадування.StandardCommand.OpenList">
+			<Visibility>
+				<xr:Common>true</xr:Common>
+			</Visibility>
+		</Command>
+		<Command name="DataProcessor.Чат1с.StandardCommand.Open">
+			<Visibility>
+				<xr:Common>true</xr:Common>
+			</Visibility>
+		</Command>
+		<Command name="CommonCommand.ВыполнитьПолныйОбмен">
+			<Visibility>
+				<xr:Common>true</xr:Common>
+			</Visibility>
+		</Command>
+		<Command name="CommonCommand.ВыполнитьОбмен">
+			<Visibility>
+				<xr:Common>false</xr:Common>
+			</Visibility>
+		</Command>
+		<Command name="CommonCommand.ЗавантажитиКонтрагентів">
+			<Visibility>
+				<xr:Common>true</xr:Common>
+			</Visibility>
+		</Command>
+		<Command name="CommonCommand.ЗавантажитиТовари">
+			<Visibility>
+				<xr:Common>true</xr:Common>
+			</Visibility>
+		</Command>
+		<Command name="CommonCommand.ПарольВходаОткрыть">
+			<Visibility>
+				<xr:Common>true</xr:Common>
+			</Visibility>
+		</Command>
+		<Command name="CommonCommand.ОновитиИсториюКлиента">
+			<Visibility>
+				<xr:Common>true</xr:Common>
+			</Visibility>
+		</Command>
+		<Command name="DataProcessor.Нагадування.StandardCommand.Open">
+			<Visibility>
+				<xr:Common>false</xr:Common>
+			</Visibility>
+		</Command>
+	</CommandsVisibility>
+	<CommandsPlacement>
+		<Command name="Document.Заказ.StandardCommand.OpenList">
+			<CommandGroup>NavigationPanelImportant</CommandGroup>
+			<Placement>Manual</Placement>
+		</Command>
+		<Command name="CommonCommand.ЗакрытиеЗаказов">
+			<CommandGroup>NavigationPanelImportant</CommandGroup>
+			<Placement>Manual</Placement>
+		</Command>
+		<Command name="Document.КассовыйОрдер.StandardCommand.OpenList">
+			<CommandGroup>NavigationPanelImportant</CommandGroup>
+			<Placement>Manual</Placement>
+		</Command>
+		<Command name="Document.РеализацияТоваровУслуг.StandardCommand.OpenList">
+			<CommandGroup>NavigationPanelImportant</CommandGroup>
+			<Placement>Manual</Placement>
+		</Command>
+		<Command name="Document.Презентація.StandardCommand.OpenList">
+			<CommandGroup>NavigationPanelImportant</CommandGroup>
+			<Placement>Manual</Placement>
+		</Command>
+		<Command name="Catalog.Контрагенты.StandardCommand.OpenList">
+			<CommandGroup>NavigationPanelOrdinary</CommandGroup>
+			<Placement>Manual</Placement>
+		</Command>
+		<Command name="CommonCommand.СвоїКлієнти">
+			<CommandGroup>NavigationPanelOrdinary</CommandGroup>
+			<Placement>Manual</Placement>
+		</Command>
+		<Command name="Catalog.Номенклатура.StandardCommand.OpenList">
+			<CommandGroup>NavigationPanelOrdinary</CommandGroup>
+			<Placement>Manual</Placement>
+		</Command>
+		<Command name="CommonCommand.ОткрытьПрайс">
+			<CommandGroup>NavigationPanelOrdinary</CommandGroup>
+			<Placement>Manual</Placement>
+		</Command>
+		<Command name="Catalog.Нагадування.StandardCommand.OpenList">
+			<CommandGroup>NavigationPanelSeeAlso</CommandGroup>
+			<Placement>Manual</Placement>
+		</Command>
+		<Command name="DataProcessor.Чат1с.StandardCommand.Open">
+			<CommandGroup>ActionsPanelTools</CommandGroup>
+			<Placement>Manual</Placement>
+		</Command>
+		<Command name="CommonCommand.ВыполнитьПолныйОбмен">
+			<CommandGroup>ActionsPanelTools</CommandGroup>
+			<Placement>Manual</Placement>
+		</Command>
+		<Command name="CommonCommand.ВыполнитьОбмен">
+			<CommandGroup>ActionsPanelTools</CommandGroup>
+			<Placement>Manual</Placement>
+		</Command>
+		<Command name="CommonCommand.ЗавантажитиКонтрагентів">
+			<CommandGroup>ActionsPanelTools</CommandGroup>
+			<Placement>Manual</Placement>
+		</Command>
+		<Command name="CommonCommand.ЗавантажитиТовари">
+			<CommandGroup>ActionsPanelTools</CommandGroup>
+			<Placement>Manual</Placement>
+		</Command>
+		<Command name="CommonCommand.ПарольВходаОткрыть">
+			<CommandGroup>ActionsPanelTools</CommandGroup>
+			<Placement>Manual</Placement>
+		</Command>
+		<Command name="CommonCommand.ОновитиИсториюКлиента">
+			<CommandGroup>ActionsPanelTools</CommandGroup>
+			<Placement>Manual</Placement>
+		</Command>
+		<Command name="DataProcessor.Нагадування.StandardCommand.Open">
+			<CommandGroup>ActionsPanelTools</CommandGroup>
+			<Placement>Manual</Placement>
+		</Command>
+	</CommandsPlacement>
+	<CommandsOrder>
+		<Command name="Document.Заказ.StandardCommand.OpenList">
+			<CommandGroup>NavigationPanelImportant</CommandGroup>
+		</Command>
+		<Command name="CommonCommand.ЗакрытиеЗаказов">
+			<CommandGroup>NavigationPanelImportant</CommandGroup>
+		</Command>
+		<Command name="Document.КассовыйОрдер.StandardCommand.OpenList">
+			<CommandGroup>NavigationPanelImportant</CommandGroup>
+		</Command>
+		<Command name="Document.РеализацияТоваровУслуг.StandardCommand.OpenList">
+			<CommandGroup>NavigationPanelImportant</CommandGroup>
+		</Command>
+		<Command name="Document.Презентація.StandardCommand.OpenList">
+			<CommandGroup>NavigationPanelImportant</CommandGroup>
+		</Command>
+		<Command name="Catalog.Нагадування.StandardCommand.OpenList">
+			<CommandGroup>NavigationPanelSeeAlso</CommandGroup>
+		</Command>
+		<Command name="DataProcessor.Чат1с.StandardCommand.Open">
+			<CommandGroup>ActionsPanelTools</CommandGroup>
+		</Command>
+		<Command name="CommonCommand.ВыполнитьПолныйОбмен">
+			<CommandGroup>ActionsPanelTools</CommandGroup>
+		</Command>
+		<Command name="CommonCommand.ВыполнитьОбмен">
+			<CommandGroup>ActionsPanelTools</CommandGroup>
+		</Command>
+		<Command name="CommonCommand.ЗавантажитиКонтрагентів">
+			<CommandGroup>ActionsPanelTools</CommandGroup>
+		</Command>
+		<Command name="CommonCommand.ЗавантажитиТовари">
+			<CommandGroup>ActionsPanelTools</CommandGroup>
+		</Command>
+		<Command name="CommonCommand.ПарольВходаОткрыть">
+			<CommandGroup>ActionsPanelTools</CommandGroup>
+		</Command>
+		<Command name="CommonCommand.ОновитиИсториюКлиента">
+			<CommandGroup>ActionsPanelTools</CommandGroup>
+		</Command>
+		<Command name="DataProcessor.Нагадування.StandardCommand.Open">
+			<CommandGroup>ActionsPanelTools</CommandGroup>
+		</Command>
+	</CommandsOrder>
+	<GroupsOrder>
+		<Group>NavigationPanelImportant</Group>
+		<Group>NavigationPanelSeeAlso</Group>
+		<Group>ActionsPanelTools</Group>
+	</GroupsOrder>
+</CommandInterface>

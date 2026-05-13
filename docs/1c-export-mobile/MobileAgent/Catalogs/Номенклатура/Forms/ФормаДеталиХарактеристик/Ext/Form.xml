@@ -1,0 +1,544 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<Form xmlns="http://v8.1c.ru/8.3/xcf/logform" xmlns:app="http://v8.1c.ru/8.2/managed-application/core" xmlns:cfg="http://v8.1c.ru/8.1/data/enterprise/current-config" xmlns:dcscor="http://v8.1c.ru/8.1/data-composition-system/core" xmlns:dcsset="http://v8.1c.ru/8.1/data-composition-system/settings" xmlns:ent="http://v8.1c.ru/8.1/data/enterprise" xmlns:lf="http://v8.1c.ru/8.2/managed-application/logform" xmlns:style="http://v8.1c.ru/8.1/data/ui/style" xmlns:sys="http://v8.1c.ru/8.1/data/ui/fonts/system" xmlns:v8="http://v8.1c.ru/8.1/data/core" xmlns:v8ui="http://v8.1c.ru/8.1/data/ui" xmlns:web="http://v8.1c.ru/8.1/data/ui/colors/web" xmlns:win="http://v8.1c.ru/8.1/data/ui/colors/windows" xmlns:xr="http://v8.1c.ru/8.3/xcf/readable" xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" version="2.8">
+	<AutoCommandBar name="ФормаКоманднаяПанель" id="-1"/>
+	<Events>
+		<Event name="OnOpen">ПриОткрытии</Event>
+	</Events>
+	<ChildItems>
+		<UsualGroup name="Отборы" id="20">
+			<Title>
+				<v8:item>
+					<v8:lang>uk</v8:lang>
+					<v8:content>Отборы</v8:content>
+				</v8:item>
+			</Title>
+			<ToolTip>
+				<v8:item>
+					<v8:lang>uk</v8:lang>
+					<v8:content>Отборы</v8:content>
+				</v8:item>
+			</ToolTip>
+			<Group>Vertical</Group>
+			<ShowTitle>false</ShowTitle>
+			<ExtendedTooltip name="ОтборыРасширеннаяПодсказка" id="21"/>
+			<ChildItems>
+				<UsualGroup name="ГруппаОтбор" id="39">
+					<Title>
+						<v8:item>
+							<v8:lang>uk</v8:lang>
+							<v8:content>Группа отбор</v8:content>
+						</v8:item>
+					</Title>
+					<ToolTip>
+						<v8:item>
+							<v8:lang>uk</v8:lang>
+							<v8:content>Группа отбор</v8:content>
+						</v8:item>
+					</ToolTip>
+					<Width>17</Width>
+					<HorizontalStretch>true</HorizontalStretch>
+					<GroupHorizontalAlign>Center</GroupHorizontalAlign>
+					<Group>AlwaysHorizontal</Group>
+					<HorizontalSpacing>Single</HorizontalSpacing>
+					<HorizontalAlign>Left</HorizontalAlign>
+					<ShowTitle>false</ShowTitle>
+					<ExtendedTooltip name="ГруппаОтборРасширеннаяПодсказка" id="40"/>
+					<ChildItems>
+						<CheckBoxField name="отборЦелевый" id="34">
+							<DataPath>отборЦелевый</DataPath>
+							<Title>
+								<v8:item>
+									<v8:lang>uk</v8:lang>
+									<v8:content>Цільові</v8:content>
+								</v8:item>
+							</Title>
+							<VerticalAlign>Top</VerticalAlign>
+							<GroupHorizontalAlign>Center</GroupHorizontalAlign>
+							<GroupVerticalAlign>Top</GroupVerticalAlign>
+							<CheckBoxType>Auto</CheckBoxType>
+							<ContextMenu name="отборЦелевыйКонтекстноеМеню" id="35"/>
+							<ExtendedTooltip name="отборЦелевыйРасширеннаяПодсказка" id="36"/>
+							<Events>
+								<Event name="OnChange">отборЦелевыйПриИзменении</Event>
+							</Events>
+						</CheckBoxField>
+						<CheckBoxField name="отборВидео" id="25">
+							<DataPath>отборВидео</DataPath>
+							<VerticalAlign>Top</VerticalAlign>
+							<GroupHorizontalAlign>Center</GroupHorizontalAlign>
+							<GroupVerticalAlign>Top</GroupVerticalAlign>
+							<CheckBoxType>Auto</CheckBoxType>
+							<ContextMenu name="отборВидеоКонтекстноеМеню" id="26"/>
+							<ExtendedTooltip name="отборВидеоРасширеннаяПодсказка" id="27"/>
+							<Events>
+								<Event name="OnChange">отборВидеоПриИзменении</Event>
+							</Events>
+						</CheckBoxField>
+						<CheckBoxField name="отборНаявні" id="59">
+							<DataPath>отборНаявні</DataPath>
+							<Visible>false</Visible>
+							<Title>
+								<v8:item>
+									<v8:lang>uk</v8:lang>
+									<v8:content>На складі</v8:content>
+								</v8:item>
+							</Title>
+							<CheckBoxType>Auto</CheckBoxType>
+							<ContextMenu name="отборНаявніКонтекстноеМеню" id="60"/>
+							<ExtendedTooltip name="отборНаявніРасширеннаяПодсказка" id="61"/>
+							<Events>
+								<Event name="OnChange">отборНаявніПриИзменении</Event>
+							</Events>
+						</CheckBoxField>
+						<CheckBoxField name="отборБронь" id="44">
+							<DataPath>отборБронь</DataPath>
+							<Title>
+								<v8:item>
+									<v8:lang>uk</v8:lang>
+									<v8:content>Бронь</v8:content>
+								</v8:item>
+							</Title>
+							<VerticalAlign>Top</VerticalAlign>
+							<GroupHorizontalAlign>Center</GroupHorizontalAlign>
+							<GroupVerticalAlign>Top</GroupVerticalAlign>
+							<CheckBoxType>Auto</CheckBoxType>
+							<ContextMenu name="отборБроньКонтекстноеМеню" id="45"/>
+							<ExtendedTooltip name="отборБроньРасширеннаяПодсказка" id="46"/>
+							<Events>
+								<Event name="OnChange">отборБроньПриИзменении</Event>
+							</Events>
+						</CheckBoxField>
+					</ChildItems>
+				</UsualGroup>
+				<UsualGroup name="ГруппаБронь" id="37">
+					<Title>
+						<v8:item>
+							<v8:lang>uk</v8:lang>
+							<v8:content>Бронь</v8:content>
+						</v8:item>
+					</Title>
+					<ToolTip>
+						<v8:item>
+							<v8:lang>uk</v8:lang>
+							<v8:content>Группа бронь</v8:content>
+						</v8:item>
+					</ToolTip>
+					<ShowTitle>false</ShowTitle>
+					<ExtendedTooltip name="ГруппаБроньРасширеннаяПодсказка" id="38"/>
+					<ChildItems>
+						<RadioButtonField name="Бронь" id="41">
+							<DataPath>Бронь</DataPath>
+							<TitleLocation>None</TitleLocation>
+							<VerticalAlign>Center</VerticalAlign>
+							<GroupHorizontalAlign>Center</GroupHorizontalAlign>
+							<GroupVerticalAlign>Center</GroupVerticalAlign>
+							<RadioButtonType>RadioButtons</RadioButtonType>
+							<ColumnsCount>3</ColumnsCount>
+							<ChoiceList>
+								<xr:Item>
+									<xr:Presentation/>
+									<xr:CheckState>0</xr:CheckState>
+									<xr:Value xsi:type="FormChoiceListDesTimeValue">
+										<Presentation>
+											<v8:item>
+												<v8:lang>uk</v8:lang>
+												<v8:content>Моя бронь</v8:content>
+											</v8:item>
+										</Presentation>
+										<Value xsi:type="xs:decimal">1</Value>
+									</xr:Value>
+								</xr:Item>
+								<xr:Item>
+									<xr:Presentation/>
+									<xr:CheckState>0</xr:CheckState>
+									<xr:Value xsi:type="FormChoiceListDesTimeValue">
+										<Presentation>
+											<v8:item>
+												<v8:lang>uk</v8:lang>
+												<v8:content>Всі броні </v8:content>
+											</v8:item>
+										</Presentation>
+										<Value xsi:type="xs:decimal">2</Value>
+									</xr:Value>
+								</xr:Item>
+								<xr:Item>
+									<xr:Presentation/>
+									<xr:CheckState>0</xr:CheckState>
+									<xr:Value xsi:type="FormChoiceListDesTimeValue">
+										<Presentation>
+											<v8:item>
+												<v8:lang>uk</v8:lang>
+												<v8:content>Протермінована</v8:content>
+											</v8:item>
+										</Presentation>
+										<Value xsi:type="xs:decimal">3</Value>
+									</xr:Value>
+								</xr:Item>
+							</ChoiceList>
+							<ContextMenu name="БроньКонтекстноеМеню" id="42"/>
+							<ExtendedTooltip name="БроньРасширеннаяПодсказка" id="43"/>
+							<Events>
+								<Event name="OnChange">БроньПриИзменении</Event>
+							</Events>
+						</RadioButtonField>
+					</ChildItems>
+				</UsualGroup>
+				<UsualGroup name="Группа1" id="83">
+					<ExtendedTooltip name="Группа1РасширеннаяПодсказка" id="84"/>
+				</UsualGroup>
+			</ChildItems>
+		</UsualGroup>
+		<Table name="Список" id="1">
+			<UseAlternationRowColor>true</UseAlternationRowColor>
+			<EnableStartDrag>true</EnableStartDrag>
+			<DataPath>Список</DataPath>
+			<RowPictureDataPath>Список.DefaultPicture</RowPictureDataPath>
+			<AutoRefresh>false</AutoRefresh>
+			<AutoRefreshPeriod>60</AutoRefreshPeriod>
+			<Period>
+				<v8:variant xsi:type="v8:StandardPeriodVariant">Custom</v8:variant>
+				<v8:startDate>0001-01-01T00:00:00</v8:startDate>
+				<v8:endDate>0001-01-01T00:00:00</v8:endDate>
+			</Period>
+			<ChoiceFoldersAndItems>Items</ChoiceFoldersAndItems>
+			<RestoreCurrentRow>false</RestoreCurrentRow>
+			<TopLevelParent xsi:nil="true"/>
+			<ShowRoot>true</ShowRoot>
+			<AllowRootChoice>false</AllowRootChoice>
+			<UpdateOnDataChange>Auto</UpdateOnDataChange>
+			<UserSettingsGroup>Группа1</UserSettingsGroup>
+			<ContextMenu name="СписокКонтекстноеМеню" id="2"/>
+			<AutoCommandBar name="СписокКоманднаяПанель" id="3"/>
+			<ExtendedTooltip name="СписокРасширеннаяПодсказка" id="4"/>
+			<SearchStringAddition name="СписокСтрокаПоиска" id="5">
+				<AdditionSource>
+					<Item>Список</Item>
+					<Type>SearchStringRepresentation</Type>
+				</AdditionSource>
+				<ContextMenu name="СписокСтрокаПоискаКонтекстноеМеню" id="6"/>
+				<ExtendedTooltip name="СписокСтрокаПоискаРасширеннаяПодсказка" id="7"/>
+			</SearchStringAddition>
+			<ViewStatusAddition name="СписокСостояниеПросмотра" id="8">
+				<AdditionSource>
+					<Item>Список</Item>
+					<Type>ViewStatusRepresentation</Type>
+				</AdditionSource>
+				<ContextMenu name="СписокСостояниеПросмотраКонтекстноеМеню" id="9"/>
+				<ExtendedTooltip name="СписокСостояниеПросмотраРасширеннаяПодсказка" id="10"/>
+			</ViewStatusAddition>
+			<SearchControlAddition name="СписокУправлениеПоиском" id="11">
+				<AdditionSource>
+					<Item>Список</Item>
+					<Type>SearchControl</Type>
+				</AdditionSource>
+				<ContextMenu name="СписокУправлениеПоискомКонтекстноеМеню" id="12"/>
+				<ExtendedTooltip name="СписокУправлениеПоискомРасширеннаяПодсказка" id="13"/>
+			</SearchControlAddition>
+			<Events>
+				<Event name="Selection">СписокВыбор</Event>
+			</Events>
+			<ChildItems>
+				<CheckBoxField name="СписокЦелевой" id="47">
+					<DataPath>Список.Целевой</DataPath>
+					<Visible>false</Visible>
+					<Title>
+						<v8:item>
+							<v8:lang>uk</v8:lang>
+							<v8:content>Цільовий</v8:content>
+						</v8:item>
+					</Title>
+					<CheckBoxType>Auto</CheckBoxType>
+					<ContextMenu name="СписокЦелевойКонтекстноеМеню" id="48"/>
+					<ExtendedTooltip name="СписокЦелевойРасширеннаяПодсказка" id="49"/>
+				</CheckBoxField>
+				<ColumnGroup name="СписокГруппа1" id="62">
+					<ExtendedTooltip name="СписокГруппа1РасширеннаяПодсказка" id="63"/>
+					<ChildItems>
+						<LabelField name="СписокНоменклатураАртикул" id="66">
+							<DataPath>Список.Номенклатура.Артикул</DataPath>
+							<Visible>false</Visible>
+							<ContextMenu name="СписокНоменклатураАртикулКонтекстноеМеню" id="67"/>
+							<ExtendedTooltip name="СписокНоменклатураАртикулРасширеннаяПодсказка" id="68"/>
+						</LabelField>
+						<LabelField name="СписокНоменклатура" id="69">
+							<DataPath>Список.Номенклатура</DataPath>
+							<ContextMenu name="СписокНоменклатураКонтекстноеМеню" id="70"/>
+							<ExtendedTooltip name="СписокНоменклатураРасширеннаяПодсказка" id="71"/>
+						</LabelField>
+						<ColumnGroup name="СписокГруппа2" id="64">
+							<Group>Horizontal</Group>
+							<ExtendedTooltip name="СписокГруппа2РасширеннаяПодсказка" id="65"/>
+							<ChildItems>
+								<LabelField name="СписокШтрихкод" id="75">
+									<DataPath>Список.Штрихкод</DataPath>
+									<ContextMenu name="СписокШтрихкодКонтекстноеМеню" id="76"/>
+									<ExtendedTooltip name="СписокШтрихкодРасширеннаяПодсказка" id="77"/>
+								</LabelField>
+								<LabelField name="СписокДатаВідео" id="78">
+									<DataPath>Список.ДатаВідео</DataPath>
+									<ContextMenu name="СписокДатаВідеоКонтекстноеМеню" id="79"/>
+									<ExtendedTooltip name="СписокДатаВідеоРасширеннаяПодсказка" id="80"/>
+								</LabelField>
+								<LabelField name="СписокХарактеристика" id="17">
+									<DataPath>Список.Характеристика</DataPath>
+									<Title>
+										<v8:item>
+											<v8:lang>uk</v8:lang>
+											<v8:content>Мішок</v8:content>
+										</v8:item>
+									</Title>
+									<Width>4</Width>
+									<ContextMenu name="СписокХарактеристикаКонтекстноеМеню" id="18"/>
+									<ExtendedTooltip name="СписокХарактеристикаРасширеннаяПодсказка" id="19"/>
+								</LabelField>
+								<LabelField name="СписокБронь" id="56">
+									<DataPath>Список.Бронь</DataPath>
+									<Title>
+										<v8:item>
+											<v8:lang>uk</v8:lang>
+											<v8:content>Торговий</v8:content>
+										</v8:item>
+									</Title>
+									<Width>18</Width>
+									<ContextMenu name="СписокБроньКонтекстноеМеню" id="57"/>
+									<ExtendedTooltip name="СписокБроньРасширеннаяПодсказка" id="58"/>
+								</LabelField>
+								<LabelField name="СписокПериодБрони" id="53">
+									<DataPath>Список.ПериодБрони</DataPath>
+									<Title>
+										<v8:item>
+											<v8:lang>uk</v8:lang>
+											<v8:content>Дата броні</v8:content>
+										</v8:item>
+									</Title>
+									<ContextMenu name="СписокПериодБрониКонтекстноеМеню" id="54"/>
+									<ExtendedTooltip name="СписокПериодБрониРасширеннаяПодсказка" id="55"/>
+								</LabelField>
+								<LabelField name="СписокКонтрагент" id="72">
+									<DataPath>Список.Контрагент</DataPath>
+									<ContextMenu name="СписокКонтрагентКонтекстноеМеню" id="73"/>
+									<ExtendedTooltip name="СписокКонтрагентРасширеннаяПодсказка" id="74"/>
+								</LabelField>
+							</ChildItems>
+						</ColumnGroup>
+					</ChildItems>
+				</ColumnGroup>
+			</ChildItems>
+		</Table>
+	</ChildItems>
+	<Attributes>
+		<Attribute name="Список" id="1">
+			<Title>
+				<v8:item>
+					<v8:lang>uk</v8:lang>
+					<v8:content>Список</v8:content>
+				</v8:item>
+			</Title>
+			<Type>
+				<v8:Type>cfg:DynamicList</v8:Type>
+			</Type>
+			<Settings xsi:type="DynamicList">
+				<ManualQuery>true</ManualQuery>
+				<DynamicDataRead>false</DynamicDataRead>
+				<QueryText>ВЫБРАТЬ
+	ХарактеристикиНоменклатуры.Ссылка КАК Характеристика,
+	ХарактеристикиНоменклатуры.Владелец.Артикул КАК Артикул,
+	ХарактеристикиНоменклатуры.СсылкаНаYouTube КАК СсылкаНаYouTube,
+	ХарактеристикиНоменклатуры.Целевой КАК Целевой,
+	ХарактеристикиНоменклатуры.ПериодБрони КАК ПериодБрони,
+	ХарактеристикиНоменклатуры.МояБронь КАК МояБронь,
+	ХарактеристикиНоменклатуры.Бронь КАК Бронь,
+	ХарактеристикиНоменклатуры.Владелец КАК Номенклатура,
+	ХарактеристикиНоменклатуры.Залишок КАК Залишок,
+	ВЫБОР
+		КОГДА ХарактеристикиНоменклатуры.Владелец.Родитель.ВерсияДанных ЕСТЬ NULL
+			ТОГДА "Товари"
+		ИНАЧЕ ХарактеристикиНоменклатуры.Владелец.Родитель
+	КОНЕЦ КАК Группа2,
+	ВЫБОР
+		КОГДА ХарактеристикиНоменклатуры.Владелец.Родитель.Родитель.ВерсияДанных ЕСТЬ NULL
+			ТОГДА "Товари"
+		ИНАЧЕ ХарактеристикиНоменклатуры.Владелец.Родитель.Родитель
+	КОНЕЦ КАК Группа1,
+	ВЫБОР
+		КОГДА ХарактеристикиНоменклатуры.Владелец.Родитель.Родитель.Родитель.ВерсияДанных ЕСТЬ NULL
+			ТОГДА "Товари"
+		ИНАЧЕ ХарактеристикиНоменклатуры.Владелец.Родитель.Родитель.Родитель
+	КОНЕЦ КАК Группа0,
+	ХарактеристикиНоменклатуры.Контрагент КАК Контрагент,
+	Штрихкоды.Штрихкод КАК Штрихкод,
+	ХарактеристикиНоменклатуры.ДатаВідео КАК ДатаВідео
+ИЗ
+	Справочник.ХарактеристикиНоменклатуры КАК ХарактеристикиНоменклатуры
+		ЛЕВОЕ СОЕДИНЕНИЕ РегистрСведений.Штрихкоды КАК Штрихкоды
+		ПО (Штрихкоды.ХарактеристикаНоменклатуры = ХарактеристикиНоменклатуры.Ссылка)</QueryText>
+				<KeyField>Характеристика</KeyField>
+				<ListSettings>
+					<dcsset:filter>
+						<dcsset:item xsi:type="dcsset:FilterItemComparison">
+							<dcsset:use>false</dcsset:use>
+							<dcsset:left xsi:type="dcscor:Field">СсылкаНаYouTube</dcsset:left>
+							<dcsset:comparisonType>Filled</dcsset:comparisonType>
+						</dcsset:item>
+						<dcsset:item xsi:type="dcsset:FilterItemComparison">
+							<dcsset:use>false</dcsset:use>
+							<dcsset:left xsi:type="dcscor:Field">Целевой</dcsset:left>
+							<dcsset:comparisonType>Equal</dcsset:comparisonType>
+							<dcsset:right xsi:type="xs:boolean">true</dcsset:right>
+						</dcsset:item>
+						<dcsset:item xsi:type="dcsset:FilterItemComparison">
+							<dcsset:use>false</dcsset:use>
+							<dcsset:left xsi:type="dcscor:Field">ПериодБрони</dcsset:left>
+							<dcsset:comparisonType>Greater</dcsset:comparisonType>
+							<dcsset:right xsi:type="v8:StandardBeginningDate">
+								<v8:variant xsi:type="v8:StandardBeginningDateVariant">BeginningOfThisDay</v8:variant>
+							</dcsset:right>
+						</dcsset:item>
+						<dcsset:item xsi:type="dcsset:FilterItemComparison">
+							<dcsset:use>false</dcsset:use>
+							<dcsset:left xsi:type="dcscor:Field">МояБронь</dcsset:left>
+							<dcsset:comparisonType>Equal</dcsset:comparisonType>
+							<dcsset:right xsi:type="xs:boolean">true</dcsset:right>
+						</dcsset:item>
+						<dcsset:item xsi:type="dcsset:FilterItemComparison">
+							<dcsset:left xsi:type="dcscor:Field">Залишок</dcsset:left>
+							<dcsset:comparisonType>Greater</dcsset:comparisonType>
+							<dcsset:right xsi:type="xs:decimal">0</dcsset:right>
+						</dcsset:item>
+						<dcsset:viewMode>Normal</dcsset:viewMode>
+					</dcsset:filter>
+					<dcsset:order>
+						<dcsset:viewMode>Normal</dcsset:viewMode>
+						<dcsset:userSettingID>88619765-ccb3-46c6-ac52-38e9c992ebd4</dcsset:userSettingID>
+					</dcsset:order>
+					<dcsset:conditionalAppearance>
+						<dcsset:viewMode>Normal</dcsset:viewMode>
+						<dcsset:userSettingID>b75fecce-942b-4aed-abc9-e6a02e460fb3</dcsset:userSettingID>
+					</dcsset:conditionalAppearance>
+					<dcsset:item xsi:type="dcsset:StructureItemGroup">
+						<dcsset:groupItems>
+							<dcsset:item xsi:type="dcsset:GroupItemField">
+								<dcsset:use>false</dcsset:use>
+								<dcsset:field>Артикул</dcsset:field>
+								<dcsset:groupType>Items</dcsset:groupType>
+								<dcsset:periodAdditionType>None</dcsset:periodAdditionType>
+								<dcsset:periodAdditionBegin xsi:type="xs:dateTime">0001-01-01T00:00:00</dcsset:periodAdditionBegin>
+								<dcsset:periodAdditionEnd xsi:type="xs:dateTime">0001-01-01T00:00:00</dcsset:periodAdditionEnd>
+							</dcsset:item>
+						</dcsset:groupItems>
+					</dcsset:item>
+					<dcsset:itemsUserSettingID>4e83bfb2-dcdf-43a8-bca2-6603217fe30e</dcsset:itemsUserSettingID>
+					<dcsset:itemsUserSettingPresentation xsi:type="v8:LocalStringType">
+						<v8:item>
+							<v8:lang>uk</v8:lang>
+							<v8:content>Групування</v8:content>
+						</v8:item>
+					</dcsset:itemsUserSettingPresentation>
+				</ListSettings>
+			</Settings>
+		</Attribute>
+		<Attribute name="отборВидео" id="2">
+			<Title>
+				<v8:item>
+					<v8:lang>uk</v8:lang>
+					<v8:content>Відео</v8:content>
+				</v8:item>
+			</Title>
+			<Type>
+				<v8:Type>xs:boolean</v8:Type>
+			</Type>
+		</Attribute>
+		<Attribute name="отборЦелевый" id="3">
+			<Title>
+				<v8:item>
+					<v8:lang>uk</v8:lang>
+					<v8:content>Отбор целевый</v8:content>
+				</v8:item>
+			</Title>
+			<Type>
+				<v8:Type>xs:boolean</v8:Type>
+			</Type>
+		</Attribute>
+		<Attribute name="отборНаявні" id="4">
+			<Title>
+				<v8:item>
+					<v8:lang>uk</v8:lang>
+					<v8:content>Отбор наявні</v8:content>
+				</v8:item>
+			</Title>
+			<Type>
+				<v8:Type>xs:boolean</v8:Type>
+			</Type>
+		</Attribute>
+		<Attribute name="отборБронь" id="5">
+			<Title>
+				<v8:item>
+					<v8:lang>uk</v8:lang>
+					<v8:content>Заброньовані</v8:content>
+				</v8:item>
+			</Title>
+			<Type>
+				<v8:Type>xs:boolean</v8:Type>
+			</Type>
+		</Attribute>
+		<Attribute name="отборПрострочкаБрони" id="6">
+			<Title>
+				<v8:item>
+					<v8:lang>uk</v8:lang>
+					<v8:content>Отбор прострочка брони</v8:content>
+				</v8:item>
+			</Title>
+			<Type>
+				<v8:Type>xs:boolean</v8:Type>
+			</Type>
+		</Attribute>
+		<Attribute name="Бронь" id="7">
+			<Title>
+				<v8:item>
+					<v8:lang>uk</v8:lang>
+					<v8:content>Бронь</v8:content>
+				</v8:item>
+			</Title>
+			<Type>
+				<v8:Type>xs:decimal</v8:Type>
+				<v8:NumberQualifiers>
+					<v8:Digits>1</v8:Digits>
+					<v8:FractionDigits>0</v8:FractionDigits>
+					<v8:AllowedSign>Any</v8:AllowedSign>
+				</v8:NumberQualifiers>
+			</Type>
+		</Attribute>
+		<Attribute name="Реквизит1" id="8">
+			<Title>
+				<v8:item>
+					<v8:lang>uk</v8:lang>
+					<v8:content>Інформація по мішках</v8:content>
+				</v8:item>
+			</Title>
+			<Type>
+				<v8:Type>xs:string</v8:Type>
+				<v8:StringQualifiers>
+					<v8:Length>0</v8:Length>
+					<v8:AllowedLength>Variable</v8:AllowedLength>
+				</v8:StringQualifiers>
+			</Type>
+		</Attribute>
+	</Attributes>
+	<Commands>
+		<Command name="Групування" id="1">
+			<Title>
+				<v8:item>
+					<v8:lang>uk</v8:lang>
+					<v8:content>Групування</v8:content>
+				</v8:item>
+			</Title>
+			<ToolTip>
+				<v8:item>
+					<v8:lang>uk</v8:lang>
+					<v8:content>Групування</v8:content>
+				</v8:item>
+			</ToolTip>
+			<Action>Групування</Action>
+		</Command>
+	</Commands>
+</Form>

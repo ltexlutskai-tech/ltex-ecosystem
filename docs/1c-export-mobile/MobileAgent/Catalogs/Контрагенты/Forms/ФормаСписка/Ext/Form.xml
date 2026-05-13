@@ -1,0 +1,1827 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<Form xmlns="http://v8.1c.ru/8.3/xcf/logform" xmlns:app="http://v8.1c.ru/8.2/managed-application/core" xmlns:cfg="http://v8.1c.ru/8.1/data/enterprise/current-config" xmlns:dcscor="http://v8.1c.ru/8.1/data-composition-system/core" xmlns:dcsset="http://v8.1c.ru/8.1/data-composition-system/settings" xmlns:ent="http://v8.1c.ru/8.1/data/enterprise" xmlns:lf="http://v8.1c.ru/8.2/managed-application/logform" xmlns:style="http://v8.1c.ru/8.1/data/ui/style" xmlns:sys="http://v8.1c.ru/8.1/data/ui/fonts/system" xmlns:v8="http://v8.1c.ru/8.1/data/core" xmlns:v8ui="http://v8.1c.ru/8.1/data/ui" xmlns:web="http://v8.1c.ru/8.1/data/ui/colors/web" xmlns:win="http://v8.1c.ru/8.1/data/ui/colors/windows" xmlns:xr="http://v8.1c.ru/8.3/xcf/readable" xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" version="2.8">
+	<AutoCommandBar name="ФормаКоманднаяПанель" id="-1">
+		<ChildItems>
+			<Button name="ФормаОбновитьViber" id="136">
+				<Type>CommandBarButton</Type>
+				<CommandName>Form.Command.ОбновитьViber</CommandName>
+				<ExtendedTooltip name="ФормаОбновитьViberРасширеннаяПодсказка" id="137"/>
+			</Button>
+			<Button name="ФормаОтправитьВайбер" id="138">
+				<Type>CommandBarButton</Type>
+				<CommandName>Form.Command.ОтправитьВайбер</CommandName>
+				<ExtendedTooltip name="ФормаОтправитьВайберРасширеннаяПодсказка" id="139"/>
+			</Button>
+			<Button name="ФормаНовыеКомнды" id="143">
+				<Type>CommandBarButton</Type>
+				<CommandName>Form.Command.НовыеКонтакты</CommandName>
+				<TextColor>#000000</TextColor>
+				<ToolTipRepresentation>ShowTop</ToolTipRepresentation>
+				<ExtendedTooltip name="ФормаНовыеКомндыРасширеннаяПодсказка" id="144"/>
+			</Button>
+			<Button name="ФормаПошукПоТелефону" id="239">
+				<Type>CommandBarButton</Type>
+				<CommandName>Form.Command.ПошукПоТелефону</CommandName>
+				<ExtendedTooltip name="ФормаПошукПоТелефонуРасширеннаяПодсказка" id="240"/>
+			</Button>
+			<Button name="СброситьНастройкиКолонок" id="237">
+				<Type>CommandBarButton</Type>
+				<OnlyInAllActions>false</OnlyInAllActions>
+				<CommandName>0</CommandName>
+				<ExtendedTooltip name="СброситьНастройкиКолонокРасширеннаяПодсказка" id="238"/>
+			</Button>
+		</ChildItems>
+	</AutoCommandBar>
+	<Events>
+		<Event name="OnOpen">ПриОткрытии</Event>
+		<Event name="BeforeClose">ПередЗакрытием</Event>
+		<Event name="OnReopen">ПриПовторномОткрытии</Event>
+		<Event name="OnCreateAtServer">ПриСозданииНаСервере</Event>
+	</Events>
+	<ChildItems>
+		<UsualGroup name="СписокКомпоновщикНастроекПользовательскиеНастройки" id="1">
+			<Title>
+				<v8:item>
+					<v8:lang>uk</v8:lang>
+					<v8:content>Група користувацьких настройок</v8:content>
+				</v8:item>
+			</Title>
+			<VerticalStretch>false</VerticalStretch>
+			<Group>Vertical</Group>
+			<ShowTitle>false</ShowTitle>
+			<ExtendedTooltip name="СписокКомпоновщикНастроекПользовательскиеНастройкиРасширеннаяПодсказка" id="2"/>
+		</UsualGroup>
+		<UsualGroup name="ГруппаФільт" id="61">
+			<Title>
+				<v8:item>
+					<v8:lang>uk</v8:lang>
+					<v8:content>Группа фільт</v8:content>
+				</v8:item>
+			</Title>
+			<ToolTip>
+				<v8:item>
+					<v8:lang>uk</v8:lang>
+					<v8:content>Группа фільт</v8:content>
+				</v8:item>
+			</ToolTip>
+			<Group>AlwaysHorizontal</Group>
+			<ShowTitle>false</ShowTitle>
+			<ExtendedTooltip name="ГруппаФільтРасширеннаяПодсказка" id="62"/>
+			<ChildItems>
+				<RadioButtonField name="ФільтрПоБоргах" id="36">
+					<DataPath>ФільтрПоБоргах</DataPath>
+					<TitleLocation>None</TitleLocation>
+					<GroupHorizontalAlign>Center</GroupHorizontalAlign>
+					<RadioButtonType>Tumbler</RadioButtonType>
+					<ChoiceList>
+						<xr:Item>
+							<xr:Presentation/>
+							<xr:CheckState>0</xr:CheckState>
+							<xr:Value xsi:type="FormChoiceListDesTimeValue">
+								<Presentation>
+									<v8:item>
+										<v8:lang>uk</v8:lang>
+										<v8:content>Усі</v8:content>
+									</v8:item>
+								</Presentation>
+								<Value xsi:type="xs:decimal">0</Value>
+							</xr:Value>
+						</xr:Item>
+						<xr:Item>
+							<xr:Presentation/>
+							<xr:CheckState>0</xr:CheckState>
+							<xr:Value xsi:type="FormChoiceListDesTimeValue">
+								<Presentation>
+									<v8:item>
+										<v8:lang>uk</v8:lang>
+										<v8:content>Переплата</v8:content>
+									</v8:item>
+								</Presentation>
+								<Value xsi:type="xs:decimal">1</Value>
+							</xr:Value>
+						</xr:Item>
+						<xr:Item>
+							<xr:Presentation/>
+							<xr:CheckState>0</xr:CheckState>
+							<xr:Value xsi:type="FormChoiceListDesTimeValue">
+								<Presentation>
+									<v8:item>
+										<v8:lang>uk</v8:lang>
+										<v8:content>Борг</v8:content>
+									</v8:item>
+								</Presentation>
+								<Value xsi:type="xs:decimal">2</Value>
+							</xr:Value>
+						</xr:Item>
+					</ChoiceList>
+					<ContextMenu name="ФільтрПоБоргахКонтекстноеМеню" id="37"/>
+					<ExtendedTooltip name="ФільтрПоБоргахРасширеннаяПодсказка" id="38"/>
+					<Events>
+						<Event name="OnChange">ФільтрПоБоргахПриИзменении</Event>
+					</Events>
+				</RadioButtonField>
+				<InputField name="ФільтрСтатус" id="58">
+					<DataPath>ФільтрСтатус</DataPath>
+					<TitleLocation>None</TitleLocation>
+					<DropListButton>true</DropListButton>
+					<ClearButton>true</ClearButton>
+					<ChoiceList>
+						<xr:Item>
+							<xr:Presentation/>
+							<xr:CheckState>0</xr:CheckState>
+							<xr:Value xsi:type="FormChoiceListDesTimeValue">
+								<Presentation>
+									<v8:item>
+										<v8:lang>uk</v8:lang>
+										<v8:content>Білий (робота протягом 7ми днів)</v8:content>
+									</v8:item>
+								</Presentation>
+								<Value xsi:type="xs:string">Білий</Value>
+							</xr:Value>
+						</xr:Item>
+						<xr:Item>
+							<xr:Presentation/>
+							<xr:CheckState>0</xr:CheckState>
+							<xr:Value xsi:type="FormChoiceListDesTimeValue">
+								<Presentation>
+									<v8:item>
+										<v8:lang>uk</v8:lang>
+										<v8:content>Рожевий (не зафіксовано роботи протягом 7ми днів)</v8:content>
+									</v8:item>
+								</Presentation>
+								<Value xsi:type="xs:string">Рожевий</Value>
+							</xr:Value>
+						</xr:Item>
+						<xr:Item>
+							<xr:Presentation/>
+							<xr:CheckState>0</xr:CheckState>
+							<xr:Value xsi:type="FormChoiceListDesTimeValue">
+								<Presentation>
+									<v8:item>
+										<v8:lang>uk</v8:lang>
+										<v8:content>Жовтий (робота протягом доби)</v8:content>
+									</v8:item>
+								</Presentation>
+								<Value xsi:type="xs:string">Жовтий</Value>
+							</xr:Value>
+						</xr:Item>
+						<xr:Item>
+							<xr:Presentation/>
+							<xr:CheckState>0</xr:CheckState>
+							<xr:Value xsi:type="FormChoiceListDesTimeValue">
+								<Presentation>
+									<v8:item>
+										<v8:lang>uk</v8:lang>
+										<v8:content>Зелений (є актуальне замовлення)</v8:content>
+									</v8:item>
+								</Presentation>
+								<Value xsi:type="xs:string">Зелений</Value>
+							</xr:Value>
+						</xr:Item>
+						<xr:Item>
+							<xr:Presentation/>
+							<xr:CheckState>0</xr:CheckState>
+							<xr:Value xsi:type="FormChoiceListDesTimeValue">
+								<Presentation>
+									<v8:item>
+										<v8:lang>uk</v8:lang>
+										<v8:content>Червоний  (не зафіксовано роботи протягом 14ти днів)</v8:content>
+									</v8:item>
+								</Presentation>
+								<Value xsi:type="xs:string">Червоний</Value>
+							</xr:Value>
+						</xr:Item>
+					</ChoiceList>
+					<InputHint>
+						<v8:item>
+							<v8:lang>uk</v8:lang>
+							<v8:content>Фільтр колір</v8:content>
+						</v8:item>
+					</InputHint>
+					<ContextMenu name="ФільтрСтатусКонтекстноеМеню" id="59"/>
+					<ExtendedTooltip name="ФільтрСтатусРасширеннаяПодсказка" id="60"/>
+					<Events>
+						<Event name="OnChange">ФільтрСтатусПриИзменении</Event>
+					</Events>
+				</InputField>
+				<InputField name="ФільтрМаршрут" id="63">
+					<DataPath>ФільтрМаршрут</DataPath>
+					<TitleLocation>None</TitleLocation>
+					<ClearButton>true</ClearButton>
+					<OpenButton>false</OpenButton>
+					<InputHint>
+						<v8:item>
+							<v8:lang>uk</v8:lang>
+							<v8:content>Фільтр маршрут</v8:content>
+						</v8:item>
+					</InputHint>
+					<ContextMenu name="ФільтрМаршрутКонтекстноеМеню" id="64"/>
+					<ExtendedTooltip name="ФільтрМаршрутРасширеннаяПодсказка" id="65"/>
+					<Events>
+						<Event name="OnChange">ФільтрМаршрутПриИзменении</Event>
+					</Events>
+				</InputField>
+				<CheckBoxField name="ФільтрКлючовіСловаАбо" id="166">
+					<DataPath>ФільтрКлючовіСлова100</DataPath>
+					<Title>
+						<v8:item>
+							<v8:lang>uk</v8:lang>
+							<v8:content>100%</v8:content>
+						</v8:item>
+					</Title>
+					<CheckBoxType>Auto</CheckBoxType>
+					<ContextMenu name="ФільтрКлючовіСловаАбоКонтекстноеМеню" id="167"/>
+					<ExtendedTooltip name="ФільтрКлючовіСловаАбоРасширеннаяПодсказка" id="168"/>
+					<Events>
+						<Event name="OnChange">ФільтрКлючовіСловаАбоПриИзменении</Event>
+					</Events>
+				</CheckBoxField>
+				<InputField name="ФільтрКлючовіСлова" id="83">
+					<DataPath>ФільтрКлючовіСлова</DataPath>
+					<TitleLocation>None</TitleLocation>
+					<ClearButton>true</ClearButton>
+					<InputHint>
+						<v8:item>
+							<v8:lang>uk</v8:lang>
+							<v8:content>Ключові слова</v8:content>
+						</v8:item>
+						<v8:item>
+							<v8:lang>ru</v8:lang>
+							<v8:content>Ключові слова</v8:content>
+						</v8:item>
+					</InputHint>
+					<ContextMenu name="ФільтрКлючовіСловаКонтекстноеМеню" id="84"/>
+					<ExtendedTooltip name="ФільтрКлючовіСловаРасширеннаяПодсказка" id="85"/>
+					<Events>
+						<Event name="OnChange">ФільтрКлючовіСловаПриИзменении</Event>
+					</Events>
+				</InputField>
+				<InputField name="ФільтрТорговыйАгент" id="145">
+					<DataPath>ФільтрТорговыйАгент</DataPath>
+					<TitleLocation>None</TitleLocation>
+					<ToolTipRepresentation>ShowLeft</ToolTipRepresentation>
+					<ClearButton>true</ClearButton>
+					<OpenButton>false</OpenButton>
+					<InputHint>
+						<v8:item>
+							<v8:lang>uk</v8:lang>
+							<v8:content>Фільтр торговий агент</v8:content>
+						</v8:item>
+						<v8:item>
+							<v8:lang>ru</v8:lang>
+							<v8:content>Фільтр торговий агент</v8:content>
+						</v8:item>
+					</InputHint>
+					<ContextMenu name="ФільтрТорговыйАгентКонтекстноеМеню" id="146"/>
+					<ExtendedTooltip name="ФільтрТорговыйАгентРасширеннаяПодсказка" id="147"/>
+					<Events>
+						<Event name="OnChange">ФільтрТорговыйАгентПриИзменении</Event>
+					</Events>
+				</InputField>
+				<InputField name="ФільтрИстория" id="154">
+					<DataPath>ФільтрИстория</DataPath>
+					<TitleLocation>None</TitleLocation>
+					<ClearButton>true</ClearButton>
+					<InputHint>
+						<v8:item>
+							<v8:lang>uk</v8:lang>
+							<v8:content>Фільтр історія</v8:content>
+						</v8:item>
+					</InputHint>
+					<ContextMenu name="ФільтрИсторияКонтекстноеМеню" id="155"/>
+					<ExtendedTooltip name="ФільтрИсторияРасширеннаяПодсказка" id="156"/>
+					<Events>
+						<Event name="OnChange">ФільтрИсторияПриИзменении</Event>
+					</Events>
+				</InputField>
+			</ChildItems>
+		</UsualGroup>
+		<UsualGroup name="Группа3" id="159">
+			<Representation>None</Representation>
+			<ShowTitle>false</ShowTitle>
+			<ExtendedTooltip name="Группа3РасширеннаяПодсказка" id="160"/>
+			<ChildItems>
+				<Button name="АнализКлиентскойБазы" id="120">
+					<Type>UsualButton</Type>
+					<CommandName>Form.Command.АнализКлиентскойБазы</CommandName>
+					<ExtendedTooltip name="АнализКлиентскойБазыРасширеннаяПодсказка" id="121"/>
+				</Button>
+				<Button name="НовыеУведомления" id="157">
+					<Type>UsualButton</Type>
+					<CommandName>Form.Command.НовыеУведомления</CommandName>
+					<TextColor>#000000</TextColor>
+					<ExtendedTooltip name="НовыеУведомленияРасширеннаяПодсказка" id="158"/>
+				</Button>
+			</ChildItems>
+		</UsualGroup>
+		<Table name="Список" id="3">
+			<Representation>List</Representation>
+			<CommandBarLocation>None</CommandBarLocation>
+			<DefaultItem>true</DefaultItem>
+			<UseAlternationRowColor>true</UseAlternationRowColor>
+			<InitialTreeView>ExpandTopLevel</InitialTreeView>
+			<EnableStartDrag>true</EnableStartDrag>
+			<FileDragMode>AsFile</FileDragMode>
+			<DataPath>Список</DataPath>
+			<RowPictureDataPath>Список.DefaultPicture</RowPictureDataPath>
+			<AutoRefresh>true</AutoRefresh>
+			<AutoRefreshPeriod>5</AutoRefreshPeriod>
+			<Period>
+				<v8:variant xsi:type="v8:StandardPeriodVariant">Custom</v8:variant>
+				<v8:startDate>0001-01-01T00:00:00</v8:startDate>
+				<v8:endDate>0001-01-01T00:00:00</v8:endDate>
+			</Period>
+			<ChoiceFoldersAndItems>Items</ChoiceFoldersAndItems>
+			<RestoreCurrentRow>false</RestoreCurrentRow>
+			<TopLevelParent xsi:nil="true"/>
+			<ShowRoot>true</ShowRoot>
+			<AllowRootChoice>false</AllowRootChoice>
+			<UpdateOnDataChange>Auto</UpdateOnDataChange>
+			<UserSettingsGroup>СписокКомпоновщикНастроекПользовательскиеНастройки</UserSettingsGroup>
+			<ContextMenu name="СписокКонтекстноеМеню" id="4">
+				<ChildItems>
+					<Button name="СписокКонтекстноеМенюУдалить" id="19">
+						<Type>CommandBarButton</Type>
+						<CommandName>Form.Item.Список.StandardCommand.Delete</CommandName>
+						<ExtendedTooltip name="СписокКонтекстноеМенюУдалитьРасширеннаяПодсказка" id="20"/>
+					</Button>
+				</ChildItems>
+			</ContextMenu>
+			<AutoCommandBar name="СписокКоманднаяПанель" id="5">
+				<Autofill>false</Autofill>
+			</AutoCommandBar>
+			<ExtendedTooltip name="СписокРасширеннаяПодсказка" id="6"/>
+			<SearchStringAddition name="СписокСтрокаПоиска" id="7">
+				<AdditionSource>
+					<Item>Список</Item>
+					<Type>SearchStringRepresentation</Type>
+				</AdditionSource>
+				<ContextMenu name="СписокСтрокаПоискаКонтекстноеМеню" id="8"/>
+				<ExtendedTooltip name="СписокСтрокаПоискаРасширеннаяПодсказка" id="9"/>
+			</SearchStringAddition>
+			<ViewStatusAddition name="СписокСостояниеПросмотра" id="10">
+				<AdditionSource>
+					<Item>Список</Item>
+					<Type>ViewStatusRepresentation</Type>
+				</AdditionSource>
+				<ContextMenu name="СписокСостояниеПросмотраКонтекстноеМеню" id="11"/>
+				<ExtendedTooltip name="СписокСостояниеПросмотраРасширеннаяПодсказка" id="12"/>
+			</ViewStatusAddition>
+			<SearchControlAddition name="СписокУправлениеПоиском" id="13">
+				<AdditionSource>
+					<Item>Список</Item>
+					<Type>SearchControl</Type>
+				</AdditionSource>
+				<ContextMenu name="СписокУправлениеПоискомКонтекстноеМеню" id="14"/>
+				<ExtendedTooltip name="СписокУправлениеПоискомРасширеннаяПодсказка" id="15"/>
+			</SearchControlAddition>
+			<ChildItems>
+				<ColumnGroup name="ГрупиКолонокДесктоп" id="27">
+					<Title>
+						<v8:item>
+							<v8:lang>uk</v8:lang>
+							<v8:content>Групи колонок десктоп</v8:content>
+						</v8:item>
+					</Title>
+					<ToolTip>
+						<v8:item>
+							<v8:lang>uk</v8:lang>
+							<v8:content>Групи колонок десктоп</v8:content>
+						</v8:item>
+					</ToolTip>
+					<Group>Horizontal</Group>
+					<ExtendedTooltip name="ГрупиКолонокДесктопРасширеннаяПодсказка" id="28"/>
+					<ChildItems>
+						<ColumnGroup name="ГруппаАдрес" id="29">
+							<Title>
+								<v8:item>
+									<v8:lang>uk</v8:lang>
+									<v8:content>Дані про адресу</v8:content>
+								</v8:item>
+							</Title>
+							<ToolTip>
+								<v8:item>
+									<v8:lang>uk</v8:lang>
+									<v8:content>Группа адрес</v8:content>
+								</v8:item>
+							</ToolTip>
+							<HorizontalStretch>false</HorizontalStretch>
+							<Group>Horizontal</Group>
+							<ExtendedTooltip name="ГруппаАдресРасширеннаяПодсказка" id="30"/>
+							<ChildItems>
+								<LabelField name="Область" id="21">
+									<DataPath>Список.Область</DataPath>
+									<AutoMaxWidth>false</AutoMaxWidth>
+									<ContextMenu name="ОбластьКонтекстноеМеню" id="22"/>
+									<ExtendedTooltip name="ОбластьРасширеннаяПодсказка" id="23"/>
+								</LabelField>
+								<LabelField name="Город" id="24">
+									<DataPath>Список.Город</DataPath>
+									<AutoMaxWidth>false</AutoMaxWidth>
+									<ContextMenu name="ГородКонтекстноеМеню" id="25"/>
+									<ExtendedTooltip name="ГородРасширеннаяПодсказка" id="26"/>
+								</LabelField>
+								<LabelField name="НомерТелефона" id="69">
+									<DataPath>Список.НомерТелефона</DataPath>
+									<AutoMaxWidth>false</AutoMaxWidth>
+									<ContextMenu name="НомерТелефонаКонтекстноеМеню" id="70"/>
+									<ExtendedTooltip name="НомерТелефонаРасширеннаяПодсказка" id="71"/>
+								</LabelField>
+							</ChildItems>
+						</ColumnGroup>
+						<ColumnGroup name="ГруппаДопы" id="39">
+							<Title>
+								<v8:item>
+									<v8:lang>uk</v8:lang>
+									<v8:content>Додаткова інформація</v8:content>
+								</v8:item>
+							</Title>
+							<ToolTip>
+								<v8:item>
+									<v8:lang>uk</v8:lang>
+									<v8:content>Группа допы</v8:content>
+								</v8:item>
+							</ToolTip>
+							<HorizontalStretch>false</HorizontalStretch>
+							<Group>Horizontal</Group>
+							<ExtendedTooltip name="ГруппаДопыРасширеннаяПодсказка" id="40"/>
+							<ChildItems>
+								<LabelField name="Асортимент" id="41">
+									<DataPath>Список.Асортимент</DataPath>
+									<AutoMaxWidth>false</AutoMaxWidth>
+									<ContextMenu name="АсортиментКонтекстноеМеню" id="42"/>
+									<ExtendedTooltip name="АсортиментРасширеннаяПодсказка" id="43"/>
+								</LabelField>
+								<LabelField name="Статус" id="47">
+									<DataPath>Список.Статус</DataPath>
+									<AutoMaxWidth>false</AutoMaxWidth>
+									<ContextMenu name="СтатусКонтекстноеМеню" id="48"/>
+									<ExtendedTooltip name="СтатусРасширеннаяПодсказка" id="49"/>
+								</LabelField>
+								<LabelField name="ОПСтатус" id="66">
+									<DataPath>Список.ОПСтатус</DataPath>
+									<AutoMaxWidth>false</AutoMaxWidth>
+									<ContextMenu name="ОПСтатусКонтекстноеМеню" id="67"/>
+									<ExtendedTooltip name="ОПСтатусРасширеннаяПодсказка" id="68"/>
+								</LabelField>
+								<LabelField name="Маршрут" id="44">
+									<DataPath>Список.Маршрут</DataPath>
+									<AutoMaxWidth>false</AutoMaxWidth>
+									<ContextMenu name="МаршрутКонтекстноеМеню" id="45"/>
+									<ExtendedTooltip name="МаршрутРасширеннаяПодсказка" id="46"/>
+								</LabelField>
+							</ChildItems>
+						</ColumnGroup>
+						<ColumnGroup name="Группа1" id="131">
+							<HorizontalStretch>false</HorizontalStretch>
+							<Group>Horizontal</Group>
+							<ExtendedTooltip name="Группа1РасширеннаяПодсказка" id="132"/>
+							<ChildItems>
+								<LabelField name="КатегорияТТ" id="125">
+									<DataPath>Список.КатегорияТТ</DataPath>
+									<AutoMaxWidth>false</AutoMaxWidth>
+									<ContextMenu name="КатегорияТТКонтекстноеМеню" id="126"/>
+									<ExtendedTooltip name="КатегорияТТРасширеннаяПодсказка" id="127"/>
+								</LabelField>
+								<LabelField name="СпособДоставки" id="128">
+									<DataPath>Список.СпособДоставки</DataPath>
+									<AutoMaxWidth>false</AutoMaxWidth>
+									<ContextMenu name="СпособДоставкиКонтекстноеМеню" id="129"/>
+									<ExtendedTooltip name="СпособДоставкиРасширеннаяПодсказка" id="130"/>
+								</LabelField>
+								<LabelField name="ТорговыйАгент" id="148">
+									<DataPath>Список.ТорговыйАгент</DataPath>
+									<AutoMaxWidth>false</AutoMaxWidth>
+									<ContextMenu name="ТорговыйАгентКонтекстноеМеню" id="149"/>
+									<ExtendedTooltip name="ТорговыйАгентРасширеннаяПодсказка" id="150"/>
+								</LabelField>
+								<LabelField name="КоличествоДнейОтПоследнейПокупки" id="151">
+									<DataPath>Список.КоличествоДнейОтПоследнейПокупки</DataPath>
+									<Title>
+										<v8:item>
+											<v8:lang>uk</v8:lang>
+											<v8:content>Кількість днів від ост. покупки</v8:content>
+										</v8:item>
+									</Title>
+									<AutoMaxWidth>false</AutoMaxWidth>
+									<ContextMenu name="КоличествоДнейОтПоследнейПокупкиКонтекстноеМеню" id="152"/>
+									<ExtendedTooltip name="КоличествоДнейОтПоследнейПокупкиРасширеннаяПодсказка" id="153"/>
+								</LabelField>
+							</ChildItems>
+						</ColumnGroup>
+						<ColumnGroup name="Группа2" id="34">
+							<Title>
+								<v8:item>
+									<v8:lang>uk</v8:lang>
+									<v8:content>Основне</v8:content>
+								</v8:item>
+							</Title>
+							<HorizontalStretch>false</HorizontalStretch>
+							<Group>Horizontal</Group>
+							<ExtendedTooltip name="Группа2РасширеннаяПодсказка" id="35"/>
+							<ChildItems>
+								<LabelField name="Наименование" id="16">
+									<DataPath>Список.НаименованиеКонтрагента</DataPath>
+									<DefaultItem>true</DefaultItem>
+									<Width>23</Width>
+									<AutoMaxWidth>false</AutoMaxWidth>
+									<ContextMenu name="НаименованиеКонтекстноеМеню" id="17"/>
+									<ExtendedTooltip name="НаименованиеРасширеннаяПодсказка" id="18"/>
+								</LabelField>
+								<LabelField name="Борг" id="31">
+									<DataPath>Список.Борг</DataPath>
+									<AutoMaxWidth>false</AutoMaxWidth>
+									<ContextMenu name="БоргКонтекстноеМеню" id="32"/>
+									<ExtendedTooltip name="БоргРасширеннаяПодсказка" id="33"/>
+								</LabelField>
+							</ChildItems>
+						</ColumnGroup>
+						<ColumnGroup name="ГруппаИстория" id="50">
+							<Title>
+								<v8:item>
+									<v8:lang>uk</v8:lang>
+									<v8:content>Группа история</v8:content>
+								</v8:item>
+							</Title>
+							<ToolTip>
+								<v8:item>
+									<v8:lang>uk</v8:lang>
+									<v8:content>Группа история</v8:content>
+								</v8:item>
+							</ToolTip>
+							<HorizontalStretch>false</HorizontalStretch>
+							<Group>Horizontal</Group>
+							<ExtendedTooltip name="ГруппаИсторияРасширеннаяПодсказка" id="51"/>
+							<ChildItems>
+								<LabelField name="ДатаПоследнейЗаписи" id="52">
+									<DataPath>Список.ДатаПоследнейЗаписи</DataPath>
+									<Title>
+										<v8:item>
+											<v8:lang>uk</v8:lang>
+											<v8:content>Дата</v8:content>
+										</v8:item>
+									</Title>
+									<AutoMaxWidth>false</AutoMaxWidth>
+									<ContextMenu name="ДатаПоследнейЗаписиКонтекстноеМеню" id="53"/>
+									<ExtendedTooltip name="ДатаПоследнейЗаписиРасширеннаяПодсказка" id="54"/>
+								</LabelField>
+								<LabelField name="Запись" id="55">
+									<DataPath>Список.Запись</DataPath>
+									<AutoMaxWidth>false</AutoMaxWidth>
+									<ContextMenu name="ЗаписьКонтекстноеМеню" id="56"/>
+									<ExtendedTooltip name="ЗаписьРасширеннаяПодсказка" id="57"/>
+								</LabelField>
+								<CheckBoxField name="НовоеСообщение" id="133">
+									<DataPath>Список.НовоеСообщение</DataPath>
+									<Title>
+										<v8:item>
+											<v8:lang>uk</v8:lang>
+											<v8:content>Нове повідомлення</v8:content>
+										</v8:item>
+										<v8:item>
+											<v8:lang>ru</v8:lang>
+											<v8:content>Новое сообщение</v8:content>
+										</v8:item>
+									</Title>
+									<CheckBoxType>Auto</CheckBoxType>
+									<ContextMenu name="НовоеСообщениеКонтекстноеМеню" id="134"/>
+									<ExtendedTooltip name="НовоеСообщениеРасширеннаяПодсказка" id="135"/>
+								</CheckBoxField>
+							</ChildItems>
+						</ColumnGroup>
+						<ColumnGroup name="Группа4" id="161">
+							<HorizontalStretch>false</HorizontalStretch>
+							<Group>Horizontal</Group>
+							<ExtendedTooltip name="Группа4РасширеннаяПодсказка" id="162"/>
+							<ChildItems>
+								<LabelField name="ПодписанийВВайбере" id="140">
+									<DataPath>Список.ПодписанийВВайбере</DataPath>
+									<TitleLocation>None</TitleLocation>
+									<HeaderPicture>
+										<xr:Ref>CommonPicture.Viber16_16</xr:Ref>
+										<xr:LoadTransparent>true</xr:LoadTransparent>
+									</HeaderPicture>
+									<AutoMaxWidth>false</AutoMaxWidth>
+									<ContextMenu name="ПодписанийВВайбереКонтекстноеМеню" id="141"/>
+									<ExtendedTooltip name="ПодписанийВВайбереРасширеннаяПодсказка" id="142"/>
+								</LabelField>
+								<CheckBoxField name="СтатусДиалога" id="169">
+									<DataPath>Список.СтатусДиалога</DataPath>
+									<CheckBoxType>Auto</CheckBoxType>
+									<ContextMenu name="СтатусДиалогаКонтекстноеМеню" id="170"/>
+									<ExtendedTooltip name="СтатусДиалогаРасширеннаяПодсказка" id="171"/>
+								</CheckBoxField>
+								<LabelField name="ОстатокСесия" id="172">
+									<DataPath>Список.ОстатокСесия</DataPath>
+									<AutoMaxWidth>false</AutoMaxWidth>
+									<ContextMenu name="ОстатокСесияКонтекстноеМеню" id="173"/>
+									<ExtendedTooltip name="ОстатокСесияРасширеннаяПодсказка" id="174"/>
+								</LabelField>
+								<LabelField name="КаналПошуку" id="163">
+									<DataPath>Список.КаналПошуку</DataPath>
+									<AutoMaxWidth>false</AutoMaxWidth>
+									<ContextMenu name="КаналПошукуКонтекстноеМеню" id="164"/>
+									<ExtendedTooltip name="КаналПошукуРасширеннаяПодсказка" id="165"/>
+								</LabelField>
+								<LabelField name="Ссылка" id="122">
+									<DataPath>Список.Ссылка</DataPath>
+									<Visible>false</Visible>
+									<AutoMaxWidth>false</AutoMaxWidth>
+									<ContextMenu name="СсылкаКонтекстноеМеню" id="123"/>
+									<ExtendedTooltip name="СсылкаРасширеннаяПодсказка" id="124"/>
+								</LabelField>
+							</ChildItems>
+						</ColumnGroup>
+					</ChildItems>
+				</ColumnGroup>
+				<ColumnGroup name="ГруппаКолонокМобільний" id="175">
+					<Visible>false</Visible>
+					<Title>
+						<v8:item>
+							<v8:lang>uk</v8:lang>
+							<v8:content>Группа колонок мобільний</v8:content>
+						</v8:item>
+					</Title>
+					<ToolTip>
+						<v8:item>
+							<v8:lang>uk</v8:lang>
+							<v8:content>Группа колонок мобільний</v8:content>
+						</v8:item>
+					</ToolTip>
+					<ExtendedTooltip name="ГруппаКолонокМобільнийРасширеннаяПодсказка" id="176"/>
+					<ChildItems>
+						<ColumnGroup name="Підгрупа1" id="177">
+							<Title>
+								<v8:item>
+									<v8:lang>uk</v8:lang>
+									<v8:content>Підгрупа1</v8:content>
+								</v8:item>
+							</Title>
+							<ToolTip>
+								<v8:item>
+									<v8:lang>uk</v8:lang>
+									<v8:content>Підгрупа1</v8:content>
+								</v8:item>
+							</ToolTip>
+							<Group>Horizontal</Group>
+							<ExtendedTooltip name="Підгрупа1РасширеннаяПодсказка" id="178"/>
+							<ChildItems>
+								<LabelField name="Область1" id="183">
+									<DataPath>Список.Область</DataPath>
+									<ContextMenu name="Область1КонтекстноеМеню" id="184"/>
+									<ExtendedTooltip name="Область1РасширеннаяПодсказка" id="185"/>
+								</LabelField>
+								<LabelField name="Город1" id="198">
+									<DataPath>Список.Город</DataPath>
+									<ContextMenu name="Город1КонтекстноеМеню" id="199"/>
+									<ExtendedTooltip name="Город1РасширеннаяПодсказка" id="200"/>
+								</LabelField>
+								<LabelField name="НомерТелефона1" id="210">
+									<DataPath>Список.НомерТелефона</DataPath>
+									<ContextMenu name="НомерТелефона1КонтекстноеМеню" id="211"/>
+									<ExtendedTooltip name="НомерТелефона1РасширеннаяПодсказка" id="212"/>
+								</LabelField>
+							</ChildItems>
+						</ColumnGroup>
+						<ColumnGroup name="Підгрупа2" id="179">
+							<Title>
+								<v8:item>
+									<v8:lang>uk</v8:lang>
+									<v8:content>Підгрупа2</v8:content>
+								</v8:item>
+							</Title>
+							<ToolTip>
+								<v8:item>
+									<v8:lang>uk</v8:lang>
+									<v8:content>Підгрупа2</v8:content>
+								</v8:item>
+							</ToolTip>
+							<Group>Horizontal</Group>
+							<ExtendedTooltip name="Підгрупа2РасширеннаяПодсказка" id="180"/>
+							<ChildItems>
+								<LabelField name="Асортимент1" id="186">
+									<DataPath>Список.Асортимент</DataPath>
+									<ContextMenu name="Асортимент1КонтекстноеМеню" id="187"/>
+									<ExtendedTooltip name="Асортимент1РасширеннаяПодсказка" id="188"/>
+								</LabelField>
+								<LabelField name="Статус1" id="201">
+									<DataPath>Список.Статус</DataPath>
+									<ContextMenu name="Статус1КонтекстноеМеню" id="202"/>
+									<ExtendedTooltip name="Статус1РасширеннаяПодсказка" id="203"/>
+								</LabelField>
+								<LabelField name="ОПСтатус1" id="213">
+									<DataPath>Список.ОПСтатус</DataPath>
+									<ContextMenu name="ОПСтатус1КонтекстноеМеню" id="214"/>
+									<ExtendedTooltip name="ОПСтатус1РасширеннаяПодсказка" id="215"/>
+								</LabelField>
+								<LabelField name="Маршрут1" id="216">
+									<DataPath>Список.Маршрут</DataPath>
+									<ContextMenu name="Маршрут1КонтекстноеМеню" id="217"/>
+									<ExtendedTooltip name="Маршрут1РасширеннаяПодсказка" id="218"/>
+								</LabelField>
+							</ChildItems>
+						</ColumnGroup>
+						<ColumnGroup name="Підгрупа3" id="181">
+							<Title>
+								<v8:item>
+									<v8:lang>uk</v8:lang>
+									<v8:content>Підгрупа3</v8:content>
+								</v8:item>
+							</Title>
+							<ToolTip>
+								<v8:item>
+									<v8:lang>uk</v8:lang>
+									<v8:content>Підгрупа3</v8:content>
+								</v8:item>
+							</ToolTip>
+							<Group>Horizontal</Group>
+							<ExtendedTooltip name="Підгрупа3РасширеннаяПодсказка" id="182"/>
+							<ChildItems>
+								<LabelField name="КатегорияТТ1" id="189">
+									<DataPath>Список.КатегорияТТ</DataPath>
+									<ContextMenu name="КатегорияТТ1КонтекстноеМеню" id="190"/>
+									<ExtendedTooltip name="КатегорияТТ1РасширеннаяПодсказка" id="191"/>
+								</LabelField>
+								<LabelField name="СпособДоставки1" id="204">
+									<DataPath>Список.СпособДоставки</DataPath>
+									<ContextMenu name="СпособДоставки1КонтекстноеМеню" id="205"/>
+									<ExtendedTooltip name="СпособДоставки1РасширеннаяПодсказка" id="206"/>
+								</LabelField>
+								<LabelField name="ТорговыйАгент1" id="219">
+									<DataPath>Список.ТорговыйАгент</DataPath>
+									<ContextMenu name="ТорговыйАгент1КонтекстноеМеню" id="220"/>
+									<ExtendedTooltip name="ТорговыйАгент1РасширеннаяПодсказка" id="221"/>
+								</LabelField>
+								<LabelField name="КоличествоДнейОтПоследнейПокупки1" id="222">
+									<DataPath>Список.КоличествоДнейОтПоследнейПокупки</DataPath>
+									<ContextMenu name="КоличествоДнейОтПоследнейПокупки1КонтекстноеМеню" id="223"/>
+									<ExtendedTooltip name="КоличествоДнейОтПоследнейПокупки1РасширеннаяПодсказка" id="224"/>
+								</LabelField>
+							</ChildItems>
+						</ColumnGroup>
+						<ColumnGroup name="Підгрупа4" id="225">
+							<Title>
+								<v8:item>
+									<v8:lang>uk</v8:lang>
+									<v8:content>Підгрупа4</v8:content>
+								</v8:item>
+							</Title>
+							<ToolTip>
+								<v8:item>
+									<v8:lang>uk</v8:lang>
+									<v8:content>Підгрупа4</v8:content>
+								</v8:item>
+							</ToolTip>
+							<Group>Horizontal</Group>
+							<ExtendedTooltip name="Підгрупа4РасширеннаяПодсказка" id="226"/>
+							<ChildItems>
+								<LabelField name="НаименованиеКонтрагента" id="192">
+									<DataPath>Список.НаименованиеКонтрагента</DataPath>
+									<ContextMenu name="НаименованиеКонтрагентаКонтекстноеМеню" id="193"/>
+									<ExtendedTooltip name="НаименованиеКонтрагентаРасширеннаяПодсказка" id="194"/>
+								</LabelField>
+								<LabelField name="Борг1" id="207">
+									<DataPath>Список.Борг</DataPath>
+									<ContextMenu name="Борг1КонтекстноеМеню" id="208"/>
+									<ExtendedTooltip name="Борг1РасширеннаяПодсказка" id="209"/>
+								</LabelField>
+							</ChildItems>
+						</ColumnGroup>
+						<ColumnGroup name="Підгрупа5" id="227">
+							<Title>
+								<v8:item>
+									<v8:lang>uk</v8:lang>
+									<v8:content>Підгрупа5</v8:content>
+								</v8:item>
+							</Title>
+							<ToolTip>
+								<v8:item>
+									<v8:lang>uk</v8:lang>
+									<v8:content>Підгрупа5</v8:content>
+								</v8:item>
+							</ToolTip>
+							<Group>Horizontal</Group>
+							<ExtendedTooltip name="Підгрупа5РасширеннаяПодсказка" id="228"/>
+							<ChildItems>
+								<CheckBoxField name="НовоеСообщение1" id="195">
+									<DataPath>Список.НовоеСообщение</DataPath>
+									<CheckBoxType>Auto</CheckBoxType>
+									<ContextMenu name="НовоеСообщение1КонтекстноеМеню" id="196"/>
+									<ExtendedTooltip name="НовоеСообщение1РасширеннаяПодсказка" id="197"/>
+								</CheckBoxField>
+							</ChildItems>
+						</ColumnGroup>
+						<ColumnGroup name="Підгрупа6" id="229">
+							<Title>
+								<v8:item>
+									<v8:lang>uk</v8:lang>
+									<v8:content>Підгрупа6</v8:content>
+								</v8:item>
+							</Title>
+							<ToolTip>
+								<v8:item>
+									<v8:lang>uk</v8:lang>
+									<v8:content>Підгрупа6</v8:content>
+								</v8:item>
+							</ToolTip>
+							<Group>Horizontal</Group>
+							<ExtendedTooltip name="Підгрупа6РасширеннаяПодсказка" id="230"/>
+							<ChildItems>
+								<CheckBoxField name="ПодписанийВВайбере1" id="231">
+									<DataPath>Список.ПодписанийВВайбере</DataPath>
+									<Title>
+										<v8:item>
+											<v8:lang>uk</v8:lang>
+											<v8:content> </v8:content>
+										</v8:item>
+										<v8:item>
+											<v8:lang>ru</v8:lang>
+											<v8:content> </v8:content>
+										</v8:item>
+									</Title>
+									<HeaderPicture>
+										<xr:Ref>CommonPicture.Viber16_16</xr:Ref>
+										<xr:LoadTransparent>true</xr:LoadTransparent>
+									</HeaderPicture>
+									<CheckBoxType>Auto</CheckBoxType>
+									<ContextMenu name="ПодписанийВВайбере1КонтекстноеМеню" id="232"/>
+									<ExtendedTooltip name="ПодписанийВВайбере1РасширеннаяПодсказка" id="233"/>
+								</CheckBoxField>
+								<LabelField name="КаналПошуку1" id="234">
+									<DataPath>Список.КаналПошуку</DataPath>
+									<ContextMenu name="КаналПошуку1КонтекстноеМеню" id="235"/>
+									<ExtendedTooltip name="КаналПошуку1РасширеннаяПодсказка" id="236"/>
+								</LabelField>
+							</ChildItems>
+						</ColumnGroup>
+					</ChildItems>
+				</ColumnGroup>
+			</ChildItems>
+		</Table>
+	</ChildItems>
+	<Attributes>
+		<Attribute name="Список" id="1">
+			<Type>
+				<v8:Type>cfg:DynamicList</v8:Type>
+			</Type>
+			<MainAttribute>true</MainAttribute>
+			<Settings xsi:type="DynamicList">
+				<ManualQuery>true</ManualQuery>
+				<DynamicDataRead>false</DynamicDataRead>
+				<QueryText>ВЫБРАТЬ
+	СправочникКонтрагенты.Ссылка КАК Ссылка,
+	СправочникКонтрагенты.ПометкаУдаления КАК ПометкаУдаления,
+	СправочникКонтрагенты.Код КАК Код,
+	СправочникКонтрагенты.Наименование + " (" + СправочникКонтрагенты.НомерТелефона + ")" КАК НаименованиеКонтрагента,
+	СправочникКонтрагенты.Телефон КАК Телефон,
+	СправочникКонтрагенты.Адреса КАК Адреса,
+	СправочникКонтрагенты.ТипЦен КАК ТипЦен,
+	СправочникКонтрагенты.СтрокДіїЛіцензії КАК СтрокДіїЛіцензії,
+	СправочникКонтрагенты.Борг КАК Борг,
+	СправочникКонтрагенты.ПросроченийБорг КАК ПросроченийБорг,
+	СправочникКонтрагенты.БоргТзОВ КАК БоргТзОВ,
+	СправочникКонтрагенты.ПросроченийБоргТзОВ КАК ПросроченийБоргТзОВ,
+	СправочникКонтрагенты.НомерТелефона КАК НомерТелефона,
+	СправочникКонтрагенты.Город КАК Город,
+	СправочникКонтрагенты.Область КАК Область,
+	СправочникКонтрагенты.Предопределенный КАК Предопределенный,
+	СправочникКонтрагенты.ИмяПредопределенныхДанных КАК ИмяПредопределенныхДанных,
+	СправочникКонтрагенты.Власний КАК Власний,
+	СправочникКонтрагенты.РаботаСКлиентомПериод ЕСТЬ NULL
+		ИЛИ СправочникКонтрагенты.РаботаСКлиентомПериод &gt; &amp;мДата КАК РаботаСКлиентом,
+	СправочникКонтрагенты.СтатусКонтрагента КАК Статус,
+	СправочникКонтрагенты.ОперативныйСтатусКонтрагента КАК ОПСтатус,
+	СправочникКонтрагенты.Маршрут КАК Маршрут,
+	СправочникКонтрагенты.КодАсортимета КАК Асортимент,
+	СправочникКонтрагенты.РаботаСКлиентомПериод КАК ДатаПоследнейЗаписи,
+	СправочникКонтрагенты.РаботаСКлиентомЗапись КАК Запись,
+	ВЫБОР
+		КОГДА НЕ КонтрагентыСАктуальнымиЗаказами.Контрагент ЕСТЬ NULL
+			ТОГДА "Зелений"
+		КОГДА СправочникКонтрагенты.РаботаСКлиентомПериод &lt; ДОБАВИТЬКДАТЕ(&amp;ТекущаяДата, ДЕНЬ, -14)
+			ТОГДА "Червоний"
+		КОГДА СправочникКонтрагенты.РаботаСКлиентомПериод &lt; ДОБАВИТЬКДАТЕ(&amp;ТекущаяДата, ДЕНЬ, -7)
+			ТОГДА "Рожевий"
+		КОГДА СправочникКонтрагенты.РаботаСКлиентомПериод МЕЖДУ ДОБАВИТЬКДАТЕ(&amp;ТекущаяДата, ДЕНЬ, -7) И НАЧАЛОПЕРИОДА(&amp;ТекущаяДата, ДЕНЬ)
+			ТОГДА "Білий"
+		КОГДА СправочникКонтрагенты.РаботаСКлиентомПериод &gt; НАЧАЛОПЕРИОДА(&amp;ТекущаяДата, ДЕНЬ)
+			ТОГДА "Жовтий"
+	КОНЕЦ КАК СтатусКлиента,
+	СправочникКонтрагенты.КатегорияТТ КАК КатегорияТТ,
+	СправочникКонтрагенты.СпособДоставки КАК СпособДоставки,
+	ВложенныйЗапрос.Ссылка ЕСТЬ НЕ NULL  КАК ЗнайденоАсортимент,
+	СправочникКонтрагенты.ПодписанийВВайбере КАК ПодписанийВВайбере,
+	ВложенныйЗапрос1.Новое КАК НовоеСообщение,
+	СправочникКонтрагенты.ТорговыйАгент КАК ТорговыйАгент,
+	СправочникКонтрагенты.КоличествоДнейОтПоследнейПокупки КАК КоличествоДнейОтПоследнейПокупки,
+	СправочникКонтрагенты.КаналПошуку КАК КаналПошуку,
+	ВложенныйЗапрос.КоличествоАртикулов КАК КоличествоАртикулов,
+	СправочникКонтрагенты.ОстатокСесия КАК ОстатокСесия,
+	СправочникКонтрагенты.СтатусДиалога КАК СтатусДиалога
+ИЗ
+	Справочник.Контрагенты КАК СправочникКонтрагенты
+		ЛЕВОЕ СОЕДИНЕНИЕ (ВЫБРАТЬ
+			КонтрагентыСАктуальнымиЗаказами.Контрагент КАК Контрагент
+		ИЗ
+			РегистрСведений.КонтрагентыСАктуальнымиЗаказами КАК КонтрагентыСАктуальнымиЗаказами
+		
+		СГРУППИРОВАТЬ ПО
+			КонтрагентыСАктуальнымиЗаказами.Контрагент) КАК КонтрагентыСАктуальнымиЗаказами
+		ПО СправочникКонтрагенты.Ссылка = КонтрагентыСАктуальнымиЗаказами.Контрагент
+		ЛЕВОЕ СОЕДИНЕНИЕ (ВЫБРАТЬ
+			ВложенныйЗапрос.Ссылка КАК Ссылка,
+			ВложенныйЗапрос.КоличествоАртикулов КАК КоличествоАртикулов
+		ИЗ
+			(ВЫБРАТЬ
+				ВложенныйЗапрос.Ссылка КАК Ссылка,
+				КОЛИЧЕСТВО(РАЗЛИЧНЫЕ ВложенныйЗапрос.ПолеКлючовіСлова) КАК КоличествоАртикулов
+			ИЗ
+				(ВЫБРАТЬ
+					КонтрагентыАсортимент.Ссылка КАК Ссылка,
+					КонтрагентыАсортимент.Артикул КАК ПолеКлючовіСлова
+				ИЗ
+					Справочник.Контрагенты.Асортимент КАК КонтрагентыАсортимент
+				
+				СГРУППИРОВАТЬ ПО
+					КонтрагентыАсортимент.Ссылка,
+					КонтрагентыАсортимент.Артикул
+				
+				ОБЪЕДИНИТЬ ВСЕ
+				
+				ВЫБРАТЬ
+					КонтрагентыАсортиментПрезентацій.Ссылка,
+					КонтрагентыАсортиментПрезентацій.Артикул
+				ИЗ
+					Справочник.Контрагенты.АсортиментПрезентацій КАК КонтрагентыАсортиментПрезентацій) КАК ВложенныйЗапрос
+			{ГДЕ
+				ВложенныйЗапрос.ПолеКлючовіСлова КАК КлючовіСлова}
+			
+			СГРУППИРОВАТЬ ПО
+				ВложенныйЗапрос.Ссылка) КАК ВложенныйЗапрос
+		{ГДЕ
+			ВложенныйЗапрос.КоличествоАртикулов}
+		
+		СГРУППИРОВАТЬ ПО
+			ВложенныйЗапрос.Ссылка,
+			ВложенныйЗапрос.КоличествоАртикулов) КАК ВложенныйЗапрос
+		ПО СправочникКонтрагенты.Ссылка = ВложенныйЗапрос.Ссылка
+		ЛЕВОЕ СОЕДИНЕНИЕ (ВЫБРАТЬ
+			НовоеСообщение.Контакт КАК Контакт,
+			НовоеСообщение.Новое КАК Новое
+		ИЗ
+			РегистрСведений.НовоеСообщение КАК НовоеСообщение) КАК ВложенныйЗапрос1
+		ПО СправочникКонтрагенты.Ссылка = ВложенныйЗапрос1.Контакт</QueryText>
+				<MainTable>Catalog.Контрагенты</MainTable>
+				<ListSettings>
+					<dcsset:filter>
+						<dcsset:item xsi:type="dcsset:FilterItemComparison">
+							<dcsset:use>false</dcsset:use>
+							<dcsset:left xsi:type="dcscor:Field">Власний</dcsset:left>
+							<dcsset:comparisonType>Equal</dcsset:comparisonType>
+							<dcsset:right xsi:type="xs:boolean">true</dcsset:right>
+						</dcsset:item>
+						<dcsset:item xsi:type="dcsset:FilterItemComparison">
+							<dcsset:use>false</dcsset:use>
+							<dcsset:left xsi:type="dcscor:Field">Борг</dcsset:left>
+							<dcsset:comparisonType>Equal</dcsset:comparisonType>
+							<dcsset:right xsi:type="xs:decimal">0</dcsset:right>
+						</dcsset:item>
+						<dcsset:item xsi:type="dcsset:FilterItemComparison">
+							<dcsset:use>false</dcsset:use>
+							<dcsset:left xsi:type="dcscor:Field">СтатусКлиента</dcsset:left>
+							<dcsset:comparisonType>Contains</dcsset:comparisonType>
+							<dcsset:right xsi:type="xs:string"/>
+						</dcsset:item>
+						<dcsset:item xsi:type="dcsset:FilterItemComparison">
+							<dcsset:use>false</dcsset:use>
+							<dcsset:left xsi:type="dcscor:Field">Ссылка</dcsset:left>
+							<dcsset:comparisonType>Equal</dcsset:comparisonType>
+							<dcsset:right xsi:type="dcscor:DesignTimeValue">Справочник.Контрагенты.ПустаяСсылка</dcsset:right>
+						</dcsset:item>
+						<dcsset:item xsi:type="dcsset:FilterItemComparison">
+							<dcsset:use>false</dcsset:use>
+							<dcsset:left xsi:type="dcscor:Field">Асортимент</dcsset:left>
+							<dcsset:comparisonType>Equal</dcsset:comparisonType>
+						</dcsset:item>
+						<dcsset:item xsi:type="dcsset:FilterItemComparison">
+							<dcsset:use>false</dcsset:use>
+							<dcsset:left xsi:type="dcscor:Field">КатегорияТТ</dcsset:left>
+							<dcsset:comparisonType>Equal</dcsset:comparisonType>
+						</dcsset:item>
+						<dcsset:item xsi:type="dcsset:FilterItemComparison">
+							<dcsset:use>false</dcsset:use>
+							<dcsset:left xsi:type="dcscor:Field">СпособДоставки</dcsset:left>
+							<dcsset:comparisonType>Equal</dcsset:comparisonType>
+						</dcsset:item>
+						<dcsset:item xsi:type="dcsset:FilterItemComparison">
+							<dcsset:use>false</dcsset:use>
+							<dcsset:left xsi:type="dcscor:Field">ЗнайденоАсортимент</dcsset:left>
+							<dcsset:comparisonType>Equal</dcsset:comparisonType>
+							<dcsset:right xsi:type="xs:boolean">true</dcsset:right>
+						</dcsset:item>
+						<dcsset:item xsi:type="dcsset:FilterItemComparison">
+							<dcsset:use>false</dcsset:use>
+							<dcsset:left xsi:type="dcscor:Field">НовоеСообщение</dcsset:left>
+							<dcsset:comparisonType>Equal</dcsset:comparisonType>
+							<dcsset:right xsi:type="xs:boolean">false</dcsset:right>
+						</dcsset:item>
+						<dcsset:item xsi:type="dcsset:FilterItemGroup">
+							<dcsset:use>false</dcsset:use>
+							<dcsset:groupType>OrGroup</dcsset:groupType>
+							<dcsset:item xsi:type="dcsset:FilterItemComparison">
+								<dcsset:use>false</dcsset:use>
+								<dcsset:left xsi:type="dcscor:Field">КлючовіСлова</dcsset:left>
+								<dcsset:comparisonType>Contains</dcsset:comparisonType>
+								<dcsset:right xsi:type="xs:string">"3"</dcsset:right>
+							</dcsset:item>
+						</dcsset:item>
+						<dcsset:item xsi:type="dcsset:FilterItemComparison">
+							<dcsset:use>false</dcsset:use>
+							<dcsset:left xsi:type="dcscor:Field">КоличествоАртикулов</dcsset:left>
+							<dcsset:comparisonType>Equal</dcsset:comparisonType>
+							<dcsset:right xsi:type="xs:decimal">2</dcsset:right>
+						</dcsset:item>
+						<dcsset:viewMode>Normal</dcsset:viewMode>
+					</dcsset:filter>
+					<dcsset:order>
+						<dcsset:viewMode>Normal</dcsset:viewMode>
+						<dcsset:userSettingID>88619765-ccb3-46c6-ac52-38e9c992ebd4</dcsset:userSettingID>
+					</dcsset:order>
+					<dcsset:conditionalAppearance>
+						<dcsset:item>
+							<dcsset:selection>
+								<dcsset:item>
+									<dcsset:field>НаименованиеКонтрагента</dcsset:field>
+								</dcsset:item>
+								<dcsset:item>
+									<dcsset:field>Область</dcsset:field>
+								</dcsset:item>
+								<dcsset:item>
+									<dcsset:field>Город</dcsset:field>
+								</dcsset:item>
+								<dcsset:item>
+									<dcsset:field>Статус</dcsset:field>
+								</dcsset:item>
+								<dcsset:item>
+									<dcsset:field>Маршрут</dcsset:field>
+								</dcsset:item>
+								<dcsset:item>
+									<dcsset:field>Асортимент</dcsset:field>
+								</dcsset:item>
+								<dcsset:item>
+									<dcsset:field>Борг</dcsset:field>
+								</dcsset:item>
+								<dcsset:item>
+									<dcsset:field>НомерТелефона</dcsset:field>
+								</dcsset:item>
+								<dcsset:item>
+									<dcsset:field>ОПСтатус</dcsset:field>
+								</dcsset:item>
+								<dcsset:item>
+									<dcsset:field>Маршрут</dcsset:field>
+								</dcsset:item>
+							</dcsset:selection>
+							<dcsset:filter>
+								<dcsset:item xsi:type="dcsset:FilterItemComparison">
+									<dcsset:left xsi:type="dcscor:Field">РаботаСКлиентом</dcsset:left>
+									<dcsset:comparisonType>Equal</dcsset:comparisonType>
+									<dcsset:right xsi:type="xs:boolean">false</dcsset:right>
+								</dcsset:item>
+							</dcsset:filter>
+							<dcsset:appearance>
+								<dcscor:item xsi:type="dcsset:SettingsParameterValue">
+									<dcscor:parameter>ЦветФона</dcscor:parameter>
+									<dcscor:value xsi:type="v8ui:Color">#FF8DAD</dcscor:value>
+								</dcscor:item>
+							</dcsset:appearance>
+						</dcsset:item>
+						<dcsset:item>
+							<dcsset:selection>
+								<dcsset:item>
+									<dcsset:field>НаименованиеКонтрагента</dcsset:field>
+								</dcsset:item>
+								<dcsset:item>
+									<dcsset:field>Область</dcsset:field>
+								</dcsset:item>
+								<dcsset:item>
+									<dcsset:field>Город</dcsset:field>
+								</dcsset:item>
+								<dcsset:item>
+									<dcsset:field>Статус</dcsset:field>
+								</dcsset:item>
+								<dcsset:item>
+									<dcsset:field>Маршрут</dcsset:field>
+								</dcsset:item>
+								<dcsset:item>
+									<dcsset:field>Асортимент</dcsset:field>
+								</dcsset:item>
+								<dcsset:item>
+									<dcsset:field>Борг</dcsset:field>
+								</dcsset:item>
+								<dcsset:item>
+									<dcsset:field>НомерТелефона</dcsset:field>
+								</dcsset:item>
+								<dcsset:item>
+									<dcsset:field>ОПСтатус</dcsset:field>
+								</dcsset:item>
+								<dcsset:item>
+									<dcsset:field>Маршрут</dcsset:field>
+								</dcsset:item>
+								<dcsset:item>
+									<dcsset:field>ДатаПоследнейЗаписи</dcsset:field>
+								</dcsset:item>
+								<dcsset:item>
+									<dcsset:field>Запись</dcsset:field>
+								</dcsset:item>
+							</dcsset:selection>
+							<dcsset:filter>
+								<dcsset:item xsi:type="dcsset:FilterItemComparison">
+									<dcsset:left xsi:type="dcscor:Field">СтатусКлиента</dcsset:left>
+									<dcsset:comparisonType>Contains</dcsset:comparisonType>
+									<dcsset:right xsi:type="xs:string">Зелений</dcsset:right>
+								</dcsset:item>
+							</dcsset:filter>
+							<dcsset:appearance>
+								<dcscor:item xsi:type="dcsset:SettingsParameterValue">
+									<dcscor:parameter>ЦветФона</dcscor:parameter>
+									<dcscor:value xsi:type="v8ui:Color">web:PaleGreen</dcscor:value>
+								</dcscor:item>
+							</dcsset:appearance>
+						</dcsset:item>
+						<dcsset:item>
+							<dcsset:selection>
+								<dcsset:item>
+									<dcsset:field>НаименованиеКонтрагента</dcsset:field>
+								</dcsset:item>
+								<dcsset:item>
+									<dcsset:field>Область</dcsset:field>
+								</dcsset:item>
+								<dcsset:item>
+									<dcsset:field>Город</dcsset:field>
+								</dcsset:item>
+								<dcsset:item>
+									<dcsset:field>Статус</dcsset:field>
+								</dcsset:item>
+								<dcsset:item>
+									<dcsset:field>Маршрут</dcsset:field>
+								</dcsset:item>
+								<dcsset:item>
+									<dcsset:field>Асортимент</dcsset:field>
+								</dcsset:item>
+								<dcsset:item>
+									<dcsset:field>Борг</dcsset:field>
+								</dcsset:item>
+								<dcsset:item>
+									<dcsset:field>НомерТелефона</dcsset:field>
+								</dcsset:item>
+								<dcsset:item>
+									<dcsset:field>ОПСтатус</dcsset:field>
+								</dcsset:item>
+								<dcsset:item>
+									<dcsset:field>Маршрут</dcsset:field>
+								</dcsset:item>
+								<dcsset:item>
+									<dcsset:field>ДатаПоследнейЗаписи</dcsset:field>
+								</dcsset:item>
+								<dcsset:item>
+									<dcsset:field>Запись</dcsset:field>
+								</dcsset:item>
+							</dcsset:selection>
+							<dcsset:filter>
+								<dcsset:item xsi:type="dcsset:FilterItemComparison">
+									<dcsset:left xsi:type="dcscor:Field">СтатусКлиента</dcsset:left>
+									<dcsset:comparisonType>Contains</dcsset:comparisonType>
+									<dcsset:right xsi:type="xs:string">Рожевий</dcsset:right>
+								</dcsset:item>
+							</dcsset:filter>
+							<dcsset:appearance>
+								<dcscor:item xsi:type="dcsset:SettingsParameterValue">
+									<dcscor:parameter>ЦветФона</dcscor:parameter>
+									<dcscor:value xsi:type="v8ui:Color">web:MistyRose</dcscor:value>
+								</dcscor:item>
+							</dcsset:appearance>
+						</dcsset:item>
+						<dcsset:item>
+							<dcsset:selection>
+								<dcsset:item>
+									<dcsset:field>НаименованиеКонтрагента</dcsset:field>
+								</dcsset:item>
+								<dcsset:item>
+									<dcsset:field>Область</dcsset:field>
+								</dcsset:item>
+								<dcsset:item>
+									<dcsset:field>Город</dcsset:field>
+								</dcsset:item>
+								<dcsset:item>
+									<dcsset:field>Статус</dcsset:field>
+								</dcsset:item>
+								<dcsset:item>
+									<dcsset:field>Маршрут</dcsset:field>
+								</dcsset:item>
+								<dcsset:item>
+									<dcsset:field>Асортимент</dcsset:field>
+								</dcsset:item>
+								<dcsset:item>
+									<dcsset:field>Борг</dcsset:field>
+								</dcsset:item>
+								<dcsset:item>
+									<dcsset:field>НомерТелефона</dcsset:field>
+								</dcsset:item>
+								<dcsset:item>
+									<dcsset:field>ОПСтатус</dcsset:field>
+								</dcsset:item>
+								<dcsset:item>
+									<dcsset:field>Маршрут</dcsset:field>
+								</dcsset:item>
+								<dcsset:item>
+									<dcsset:field>ДатаПоследнейЗаписи</dcsset:field>
+								</dcsset:item>
+								<dcsset:item>
+									<dcsset:field>Запись</dcsset:field>
+								</dcsset:item>
+							</dcsset:selection>
+							<dcsset:filter>
+								<dcsset:item xsi:type="dcsset:FilterItemComparison">
+									<dcsset:left xsi:type="dcscor:Field">СтатусКлиента</dcsset:left>
+									<dcsset:comparisonType>Contains</dcsset:comparisonType>
+									<dcsset:right xsi:type="xs:string">Жовтий</dcsset:right>
+								</dcsset:item>
+							</dcsset:filter>
+							<dcsset:appearance>
+								<dcscor:item xsi:type="dcsset:SettingsParameterValue">
+									<dcscor:parameter>ЦветФона</dcscor:parameter>
+									<dcscor:value xsi:type="v8ui:Color">web:Yellow</dcscor:value>
+								</dcscor:item>
+							</dcsset:appearance>
+						</dcsset:item>
+						<dcsset:item>
+							<dcsset:selection>
+								<dcsset:item>
+									<dcsset:field>НаименованиеКонтрагента</dcsset:field>
+								</dcsset:item>
+								<dcsset:item>
+									<dcsset:field>Область</dcsset:field>
+								</dcsset:item>
+								<dcsset:item>
+									<dcsset:field>Город</dcsset:field>
+								</dcsset:item>
+								<dcsset:item>
+									<dcsset:field>Статус</dcsset:field>
+								</dcsset:item>
+								<dcsset:item>
+									<dcsset:field>Маршрут</dcsset:field>
+								</dcsset:item>
+								<dcsset:item>
+									<dcsset:field>Асортимент</dcsset:field>
+								</dcsset:item>
+								<dcsset:item>
+									<dcsset:field>Борг</dcsset:field>
+								</dcsset:item>
+								<dcsset:item>
+									<dcsset:field>НомерТелефона</dcsset:field>
+								</dcsset:item>
+								<dcsset:item>
+									<dcsset:field>ОПСтатус</dcsset:field>
+								</dcsset:item>
+								<dcsset:item>
+									<dcsset:field>Маршрут</dcsset:field>
+								</dcsset:item>
+								<dcsset:item>
+									<dcsset:field>ДатаПоследнейЗаписи</dcsset:field>
+								</dcsset:item>
+								<dcsset:item>
+									<dcsset:field>Запись</dcsset:field>
+								</dcsset:item>
+							</dcsset:selection>
+							<dcsset:filter>
+								<dcsset:item xsi:type="dcsset:FilterItemComparison">
+									<dcsset:left xsi:type="dcscor:Field">СтатусКлиента</dcsset:left>
+									<dcsset:comparisonType>Contains</dcsset:comparisonType>
+									<dcsset:right xsi:type="xs:string">Червоний</dcsset:right>
+								</dcsset:item>
+							</dcsset:filter>
+							<dcsset:appearance>
+								<dcscor:item xsi:type="dcsset:SettingsParameterValue">
+									<dcscor:parameter>ЦветФона</dcscor:parameter>
+									<dcscor:value xsi:type="v8ui:Color">web:Tomato</dcscor:value>
+								</dcscor:item>
+							</dcsset:appearance>
+						</dcsset:item>
+						<dcsset:viewMode>Normal</dcsset:viewMode>
+					</dcsset:conditionalAppearance>
+					<dcsset:itemsViewMode>Normal</dcsset:itemsViewMode>
+					<dcsset:itemsUserSettingID>911b6018-f537-43e8-a417-da56b22f9aec</dcsset:itemsUserSettingID>
+				</ListSettings>
+			</Settings>
+		</Attribute>
+		<Attribute name="СвоїКлієнти" id="2">
+			<Title>
+				<v8:item>
+					<v8:lang>uk</v8:lang>
+					<v8:content>Свої клієнти</v8:content>
+				</v8:item>
+			</Title>
+			<Type>
+				<v8:Type>xs:boolean</v8:Type>
+			</Type>
+		</Attribute>
+		<Attribute name="ФільтрПоБоргах" id="3">
+			<Title>
+				<v8:item>
+					<v8:lang>uk</v8:lang>
+					<v8:content>Фільтр по боргах</v8:content>
+				</v8:item>
+			</Title>
+			<Type>
+				<v8:Type>xs:decimal</v8:Type>
+				<v8:NumberQualifiers>
+					<v8:Digits>10</v8:Digits>
+					<v8:FractionDigits>0</v8:FractionDigits>
+					<v8:AllowedSign>Any</v8:AllowedSign>
+				</v8:NumberQualifiers>
+			</Type>
+		</Attribute>
+		<Attribute name="ФільтрСтатус" id="4">
+			<Title>
+				<v8:item>
+					<v8:lang>uk</v8:lang>
+					<v8:content>Фільтр статус</v8:content>
+				</v8:item>
+			</Title>
+			<Type>
+				<v8:Type>xs:string</v8:Type>
+				<v8:StringQualifiers>
+					<v8:Length>0</v8:Length>
+					<v8:AllowedLength>Variable</v8:AllowedLength>
+				</v8:StringQualifiers>
+			</Type>
+		</Attribute>
+		<Attribute name="ФільтрМаршрут" id="5">
+			<Title>
+				<v8:item>
+					<v8:lang>uk</v8:lang>
+					<v8:content>Фільтр маршрут</v8:content>
+				</v8:item>
+			</Title>
+			<Type>
+				<v8:Type>cfg:CatalogRef.Маршруты</v8:Type>
+			</Type>
+		</Attribute>
+		<Attribute name="ФільтрАсортимент" id="6">
+			<Title>
+				<v8:item>
+					<v8:lang>uk</v8:lang>
+					<v8:content>Фільтр асортимент</v8:content>
+				</v8:item>
+			</Title>
+			<Type>
+				<v8:Type>cfg:EnumRef.КодыАсортимета</v8:Type>
+			</Type>
+		</Attribute>
+		<Attribute name="ФільтрКатегоріяТТ" id="7">
+			<Title>
+				<v8:item>
+					<v8:lang>uk</v8:lang>
+					<v8:content>Фільтр категорія ТТ</v8:content>
+				</v8:item>
+			</Title>
+			<Type>
+				<v8:Type>cfg:CatalogRef.КатегорииТТ</v8:Type>
+			</Type>
+		</Attribute>
+		<Attribute name="ФільтрСпосібДоставки" id="8">
+			<Title>
+				<v8:item>
+					<v8:lang>uk</v8:lang>
+					<v8:content>Фільтр спосіб доставки</v8:content>
+				</v8:item>
+			</Title>
+			<Type>
+				<v8:Type>cfg:CatalogRef.СпособыДоставки</v8:Type>
+			</Type>
+		</Attribute>
+		<Attribute name="ФільтрКлючовіСлова" id="9">
+			<Title>
+				<v8:item>
+					<v8:lang>uk</v8:lang>
+					<v8:content>Фільтр ключові слова</v8:content>
+				</v8:item>
+			</Title>
+			<Type>
+				<v8:Type>v8:ValueListType</v8:Type>
+			</Type>
+			<Settings xsi:type="v8:TypeDescription">
+				<v8:Type>xs:string</v8:Type>
+				<v8:StringQualifiers>
+					<v8:Length>60</v8:Length>
+					<v8:AllowedLength>Variable</v8:AllowedLength>
+				</v8:StringQualifiers>
+			</Settings>
+		</Attribute>
+		<Attribute name="ФільтрТорговыйАгент" id="10">
+			<Title>
+				<v8:item>
+					<v8:lang>uk</v8:lang>
+					<v8:content>Фільтр торговый агент</v8:content>
+				</v8:item>
+			</Title>
+			<Type>
+				<v8:Type>cfg:CatalogRef.ТорговыеАгенты</v8:Type>
+			</Type>
+		</Attribute>
+		<Attribute name="ФільтрИстория" id="11">
+			<Title>
+				<v8:item>
+					<v8:lang>uk</v8:lang>
+					<v8:content>Фільтр історія</v8:content>
+				</v8:item>
+			</Title>
+			<Type>
+				<v8:Type>xs:string</v8:Type>
+				<v8:StringQualifiers>
+					<v8:Length>0</v8:Length>
+					<v8:AllowedLength>Variable</v8:AllowedLength>
+				</v8:StringQualifiers>
+			</Type>
+		</Attribute>
+		<Attribute name="ФильтрТолькоНовые" id="12">
+			<Title>
+				<v8:item>
+					<v8:lang>uk</v8:lang>
+					<v8:content>Фильтр только новые</v8:content>
+				</v8:item>
+			</Title>
+			<Type>
+				<v8:Type>xs:boolean</v8:Type>
+			</Type>
+		</Attribute>
+		<Attribute name="ФільтрКлючовіСлова100" id="13">
+			<Title>
+				<v8:item>
+					<v8:lang>uk</v8:lang>
+					<v8:content>або</v8:content>
+				</v8:item>
+				<v8:item>
+					<v8:lang>ru</v8:lang>
+					<v8:content>або</v8:content>
+				</v8:item>
+			</Title>
+			<Type>
+				<v8:Type>xs:boolean</v8:Type>
+			</Type>
+		</Attribute>
+		<ConditionalAppearance>
+			<dcsset:item>
+				<dcsset:use>false</dcsset:use>
+				<dcsset:selection>
+					<dcsset:item>
+						<dcsset:field>Наименование</dcsset:field>
+					</dcsset:item>
+					<dcsset:item>
+						<dcsset:field>Область</dcsset:field>
+					</dcsset:item>
+					<dcsset:item>
+						<dcsset:field>Город</dcsset:field>
+					</dcsset:item>
+					<dcsset:item>
+						<dcsset:field>Асортимент</dcsset:field>
+					</dcsset:item>
+					<dcsset:item>
+						<dcsset:field>Статус</dcsset:field>
+					</dcsset:item>
+					<dcsset:item>
+						<dcsset:field>Маршрут</dcsset:field>
+					</dcsset:item>
+					<dcsset:item>
+						<dcsset:field>Борг</dcsset:field>
+					</dcsset:item>
+					<dcsset:item>
+						<dcsset:field>ДатаПоследнейЗаписи</dcsset:field>
+					</dcsset:item>
+					<dcsset:item>
+						<dcsset:field>Запись</dcsset:field>
+					</dcsset:item>
+				</dcsset:selection>
+				<dcsset:filter>
+					<dcsset:item xsi:type="dcsset:FilterItemComparison">
+						<dcsset:left xsi:type="dcscor:Field">Список.СтатусКлиента</dcsset:left>
+						<dcsset:comparisonType>Contains</dcsset:comparisonType>
+						<dcsset:right xsi:type="xs:string">Зелений</dcsset:right>
+					</dcsset:item>
+				</dcsset:filter>
+				<dcsset:appearance>
+					<dcscor:item xsi:type="dcsset:SettingsParameterValue">
+						<dcscor:parameter>ЦветФона</dcscor:parameter>
+						<dcscor:value xsi:type="v8ui:Color">web:PaleGreen</dcscor:value>
+					</dcscor:item>
+				</dcsset:appearance>
+			</dcsset:item>
+			<dcsset:item>
+				<dcsset:use>false</dcsset:use>
+				<dcsset:selection>
+					<dcsset:item>
+						<dcsset:field>Наименование</dcsset:field>
+					</dcsset:item>
+					<dcsset:item>
+						<dcsset:field>Область</dcsset:field>
+					</dcsset:item>
+					<dcsset:item>
+						<dcsset:field>Город</dcsset:field>
+					</dcsset:item>
+					<dcsset:item>
+						<dcsset:field>Асортимент</dcsset:field>
+					</dcsset:item>
+					<dcsset:item>
+						<dcsset:field>Статус</dcsset:field>
+					</dcsset:item>
+					<dcsset:item>
+						<dcsset:field>Маршрут</dcsset:field>
+					</dcsset:item>
+					<dcsset:item>
+						<dcsset:field>Борг</dcsset:field>
+					</dcsset:item>
+					<dcsset:item>
+						<dcsset:field>ДатаПоследнейЗаписи</dcsset:field>
+					</dcsset:item>
+					<dcsset:item>
+						<dcsset:field>Запись</dcsset:field>
+					</dcsset:item>
+				</dcsset:selection>
+				<dcsset:filter>
+					<dcsset:item xsi:type="dcsset:FilterItemComparison">
+						<dcsset:left xsi:type="dcscor:Field">Список.СтатусКлиента</dcsset:left>
+						<dcsset:comparisonType>Contains</dcsset:comparisonType>
+						<dcsset:right xsi:type="xs:string">Рожевий</dcsset:right>
+					</dcsset:item>
+				</dcsset:filter>
+				<dcsset:appearance>
+					<dcscor:item xsi:type="dcsset:SettingsParameterValue">
+						<dcscor:parameter>ЦветФона</dcscor:parameter>
+						<dcscor:value xsi:type="v8ui:Color">web:MistyRose</dcscor:value>
+					</dcscor:item>
+				</dcsset:appearance>
+			</dcsset:item>
+			<dcsset:item>
+				<dcsset:use>false</dcsset:use>
+				<dcsset:selection>
+					<dcsset:item>
+						<dcsset:field>Наименование</dcsset:field>
+					</dcsset:item>
+					<dcsset:item>
+						<dcsset:field>Область</dcsset:field>
+					</dcsset:item>
+					<dcsset:item>
+						<dcsset:field>Город</dcsset:field>
+					</dcsset:item>
+					<dcsset:item>
+						<dcsset:field>Асортимент</dcsset:field>
+					</dcsset:item>
+					<dcsset:item>
+						<dcsset:field>Статус</dcsset:field>
+					</dcsset:item>
+					<dcsset:item>
+						<dcsset:field>Маршрут</dcsset:field>
+					</dcsset:item>
+					<dcsset:item>
+						<dcsset:field>Борг</dcsset:field>
+					</dcsset:item>
+					<dcsset:item>
+						<dcsset:field>ДатаПоследнейЗаписи</dcsset:field>
+					</dcsset:item>
+					<dcsset:item>
+						<dcsset:field>Запись</dcsset:field>
+					</dcsset:item>
+				</dcsset:selection>
+				<dcsset:filter>
+					<dcsset:item xsi:type="dcsset:FilterItemComparison">
+						<dcsset:left xsi:type="dcscor:Field">Список.СтатусКлиента</dcsset:left>
+						<dcsset:comparisonType>Contains</dcsset:comparisonType>
+						<dcsset:right xsi:type="xs:string">Жовтий</dcsset:right>
+					</dcsset:item>
+				</dcsset:filter>
+				<dcsset:appearance>
+					<dcscor:item xsi:type="dcsset:SettingsParameterValue">
+						<dcscor:parameter>ЦветФона</dcscor:parameter>
+						<dcscor:value xsi:type="v8ui:Color">web:Yellow</dcscor:value>
+					</dcscor:item>
+				</dcsset:appearance>
+			</dcsset:item>
+			<dcsset:item>
+				<dcsset:use>false</dcsset:use>
+				<dcsset:selection>
+					<dcsset:item>
+						<dcsset:field>Наименование</dcsset:field>
+					</dcsset:item>
+					<dcsset:item>
+						<dcsset:field>Область</dcsset:field>
+					</dcsset:item>
+					<dcsset:item>
+						<dcsset:field>Город</dcsset:field>
+					</dcsset:item>
+					<dcsset:item>
+						<dcsset:field>Асортимент</dcsset:field>
+					</dcsset:item>
+					<dcsset:item>
+						<dcsset:field>Статус</dcsset:field>
+					</dcsset:item>
+					<dcsset:item>
+						<dcsset:field>Маршрут</dcsset:field>
+					</dcsset:item>
+					<dcsset:item>
+						<dcsset:field>Борг</dcsset:field>
+					</dcsset:item>
+					<dcsset:item>
+						<dcsset:field>ДатаПоследнейЗаписи</dcsset:field>
+					</dcsset:item>
+					<dcsset:item>
+						<dcsset:field>Запись</dcsset:field>
+					</dcsset:item>
+				</dcsset:selection>
+				<dcsset:filter>
+					<dcsset:item xsi:type="dcsset:FilterItemComparison">
+						<dcsset:left xsi:type="dcscor:Field">Список.СтатусКлиента</dcsset:left>
+						<dcsset:comparisonType>Contains</dcsset:comparisonType>
+						<dcsset:right xsi:type="xs:string">Червоний</dcsset:right>
+					</dcsset:item>
+				</dcsset:filter>
+				<dcsset:appearance>
+					<dcscor:item xsi:type="dcsset:SettingsParameterValue">
+						<dcscor:parameter>ЦветФона</dcscor:parameter>
+						<dcscor:value xsi:type="v8ui:Color">web:Tomato</dcscor:value>
+					</dcscor:item>
+				</dcsset:appearance>
+			</dcsset:item>
+			<dcsset:item>
+				<dcsset:selection>
+					<dcsset:item>
+						<dcsset:field>ТаблицаСтатусовРазница</dcsset:field>
+					</dcsset:item>
+				</dcsset:selection>
+				<dcsset:filter>
+					<dcsset:item xsi:type="dcsset:FilterItemComparison">
+						<dcsset:left xsi:type="dcscor:Field">ТаблицаСтатусов.Разница</dcsset:left>
+						<dcsset:comparisonType>Greater</dcsset:comparisonType>
+						<dcsset:right xsi:type="xs:decimal">0</dcsset:right>
+					</dcsset:item>
+				</dcsset:filter>
+				<dcsset:appearance>
+					<dcscor:item xsi:type="dcsset:SettingsParameterValue">
+						<dcscor:parameter>ЦветТекста</dcscor:parameter>
+						<dcscor:value xsi:type="v8ui:Color">web:Seagreen</dcscor:value>
+					</dcscor:item>
+				</dcsset:appearance>
+			</dcsset:item>
+			<dcsset:item>
+				<dcsset:selection>
+					<dcsset:item>
+						<dcsset:field>ТаблицаСтатусовРазница</dcsset:field>
+					</dcsset:item>
+				</dcsset:selection>
+				<dcsset:filter>
+					<dcsset:item xsi:type="dcsset:FilterItemComparison">
+						<dcsset:left xsi:type="dcscor:Field">ТаблицаСтатусов.Разница</dcsset:left>
+						<dcsset:comparisonType>Less</dcsset:comparisonType>
+						<dcsset:right xsi:type="xs:decimal">0</dcsset:right>
+					</dcsset:item>
+				</dcsset:filter>
+				<dcsset:appearance>
+					<dcscor:item xsi:type="dcsset:SettingsParameterValue">
+						<dcscor:parameter>ЦветТекста</dcscor:parameter>
+						<dcscor:value xsi:type="v8ui:Color">web:Red</dcscor:value>
+					</dcscor:item>
+				</dcsset:appearance>
+			</dcsset:item>
+		</ConditionalAppearance>
+	</Attributes>
+	<Commands>
+		<Command name="АнализКлиентскойБазы" id="1">
+			<Title>
+				<v8:item>
+					<v8:lang>uk</v8:lang>
+					<v8:content>Аналіз клієнтської бази</v8:content>
+				</v8:item>
+			</Title>
+			<ToolTip>
+				<v8:item>
+					<v8:lang>uk</v8:lang>
+					<v8:content>Анализ клиентской базы</v8:content>
+				</v8:item>
+			</ToolTip>
+			<Action>АнализКлиентскойБазы</Action>
+		</Command>
+		<Command name="ОбновитьViber" id="2">
+			<Title>
+				<v8:item>
+					<v8:lang>uk</v8:lang>
+					<v8:content>Обновить viber</v8:content>
+				</v8:item>
+			</Title>
+			<ToolTip>
+				<v8:item>
+					<v8:lang>uk</v8:lang>
+					<v8:content>Обновить viber</v8:content>
+				</v8:item>
+			</ToolTip>
+			<Picture>
+				<xr:Ref>StdPicture.Refresh</xr:Ref>
+				<xr:LoadTransparent>true</xr:LoadTransparent>
+			</Picture>
+			<Action>ОбновитьViber</Action>
+		</Command>
+		<Command name="ОтправитьВайбер" id="3">
+			<Title>
+				<v8:item>
+					<v8:lang>uk</v8:lang>
+					<v8:content>Отправить Viber</v8:content>
+				</v8:item>
+				<v8:item>
+					<v8:lang>ru</v8:lang>
+					<v8:content>Відправити Viber</v8:content>
+				</v8:item>
+			</Title>
+			<ToolTip>
+				<v8:item>
+					<v8:lang>uk</v8:lang>
+					<v8:content>Отправить вайбер</v8:content>
+				</v8:item>
+			</ToolTip>
+			<Picture>
+				<xr:Ref>CommonPicture.Viber16_16</xr:Ref>
+				<xr:LoadTransparent>true</xr:LoadTransparent>
+			</Picture>
+			<Action>ОтправитьВайбер</Action>
+		</Command>
+		<Command name="НовыеКонтакты" id="4">
+			<Title>
+				<v8:item>
+					<v8:lang>uk</v8:lang>
+					<v8:content>Нові контакти</v8:content>
+				</v8:item>
+				<v8:item>
+					<v8:lang>ru</v8:lang>
+					<v8:content>Новые контакты</v8:content>
+				</v8:item>
+			</Title>
+			<ToolTip>
+				<v8:item>
+					<v8:lang>uk</v8:lang>
+					<v8:content>Новые контакты</v8:content>
+				</v8:item>
+			</ToolTip>
+			<Action>НовыеКонтакты</Action>
+		</Command>
+		<Command name="НовыеУведомления" id="5">
+			<Title>
+				<v8:item>
+					<v8:lang>uk</v8:lang>
+					<v8:content>Нові повідомлення</v8:content>
+				</v8:item>
+				<v8:item>
+					<v8:lang>ru</v8:lang>
+					<v8:content>Новые уведомления</v8:content>
+				</v8:item>
+			</Title>
+			<ToolTip>
+				<v8:item>
+					<v8:lang>uk</v8:lang>
+					<v8:content>Новые уведомления</v8:content>
+				</v8:item>
+			</ToolTip>
+			<Action>НовыеУведомления</Action>
+		</Command>
+		<Command name="СброситьНастройкиКолонок" id="6">
+			<Title>
+				<v8:item>
+					<v8:lang>uk</v8:lang>
+					<v8:content>Сбросить настройки колонок</v8:content>
+				</v8:item>
+			</Title>
+			<ToolTip>
+				<v8:item>
+					<v8:lang>uk</v8:lang>
+					<v8:content>Сбросить настройки колонок</v8:content>
+				</v8:item>
+			</ToolTip>
+			<Action>СброситьНастройкиКолонок</Action>
+		</Command>
+		<Command name="ПошукПоТелефону" id="7">
+			<Title>
+				<v8:item>
+					<v8:lang>uk</v8:lang>
+					<v8:content>Знайти за телефоном</v8:content>
+				</v8:item>
+				<v8:item>
+					<v8:lang>ru</v8:lang>
+					<v8:content>Знайти за телефоном</v8:content>
+				</v8:item>
+			</Title>
+			<ToolTip>
+				<v8:item>
+					<v8:lang>uk</v8:lang>
+					<v8:content>Пошук по телефону</v8:content>
+				</v8:item>
+			</ToolTip>
+			<Action>ПошукПоТелефону</Action>
+		</Command>
+	</Commands>
+</Form>

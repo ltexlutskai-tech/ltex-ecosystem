@@ -1,0 +1,111 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<Form xmlns="http://v8.1c.ru/8.3/xcf/logform" xmlns:app="http://v8.1c.ru/8.2/managed-application/core" xmlns:cfg="http://v8.1c.ru/8.1/data/enterprise/current-config" xmlns:dcscor="http://v8.1c.ru/8.1/data-composition-system/core" xmlns:dcsset="http://v8.1c.ru/8.1/data-composition-system/settings" xmlns:ent="http://v8.1c.ru/8.1/data/enterprise" xmlns:lf="http://v8.1c.ru/8.2/managed-application/logform" xmlns:style="http://v8.1c.ru/8.1/data/ui/style" xmlns:sys="http://v8.1c.ru/8.1/data/ui/fonts/system" xmlns:v8="http://v8.1c.ru/8.1/data/core" xmlns:v8ui="http://v8.1c.ru/8.1/data/ui" xmlns:web="http://v8.1c.ru/8.1/data/ui/colors/web" xmlns:win="http://v8.1c.ru/8.1/data/ui/colors/windows" xmlns:xr="http://v8.1c.ru/8.3/xcf/readable" xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" version="2.8">
+	<WindowOpeningMode>LockOwnerWindow</WindowOpeningMode>
+	<AutoCommandBar name="" id="-1"/>
+	<ChildItems>
+		<InputField name="Контакт" id="1">
+			<DataPath>Запись.Контакт</DataPath>
+			<ContextMenu name="КонтактКонтекстноеМеню" id="2"/>
+			<ExtendedTooltip name="КонтактРасширеннаяПодсказка" id="3"/>
+		</InputField>
+		<InputField name="Дата" id="4">
+			<DataPath>Запись.Дата</DataPath>
+			<ContextMenu name="ДатаКонтекстноеМеню" id="5"/>
+			<ExtendedTooltip name="ДатаРасширеннаяПодсказка" id="6"/>
+		</InputField>
+		<InputField name="Направление" id="7">
+			<DataPath>Запись.Направление</DataPath>
+			<ContextMenu name="НаправлениеКонтекстноеМеню" id="8"/>
+			<ExtendedTooltip name="НаправлениеРасширеннаяПодсказка" id="9"/>
+		</InputField>
+		<InputField name="ЧатID" id="10">
+			<DataPath>Запись.ЧатID</DataPath>
+			<ContextMenu name="ЧатIDКонтекстноеМеню" id="11"/>
+			<ExtendedTooltip name="ЧатIDРасширеннаяПодсказка" id="12"/>
+		</InputField>
+		<InputField name="ТокенСообщния" id="13">
+			<DataPath>Запись.ТокенСообщния</DataPath>
+			<ContextMenu name="ТокенСообщнияКонтекстноеМеню" id="14"/>
+			<ExtendedTooltip name="ТокенСообщнияРасширеннаяПодсказка" id="15"/>
+		</InputField>
+		<InputField name="ИсточникПривличения" id="16">
+			<DataPath>Запись.ИсточникПривличения</DataPath>
+			<ContextMenu name="ИсточникПривличенияКонтекстноеМеню" id="17"/>
+			<ExtendedTooltip name="ИсточникПривличенияРасширеннаяПодсказка" id="18"/>
+		</InputField>
+		<CheckBoxField name="Картинка" id="19">
+			<DataPath>Запись.Картинка</DataPath>
+			<CheckBoxType>Auto</CheckBoxType>
+			<ContextMenu name="КартинкаКонтекстноеМеню" id="20"/>
+			<ExtendedTooltip name="КартинкаРасширеннаяПодсказка" id="21"/>
+		</CheckBoxField>
+		<CheckBoxField name="Файл" id="22">
+			<DataPath>Запись.Файл</DataPath>
+			<CheckBoxType>Auto</CheckBoxType>
+			<ContextMenu name="ФайлКонтекстноеМеню" id="23"/>
+			<ExtendedTooltip name="ФайлРасширеннаяПодсказка" id="24"/>
+		</CheckBoxField>
+		<CheckBoxField name="Видео" id="25">
+			<DataPath>Запись.Видео</DataPath>
+			<CheckBoxType>Auto</CheckBoxType>
+			<ContextMenu name="ВидеоКонтекстноеМеню" id="26"/>
+			<ExtendedTooltip name="ВидеоРасширеннаяПодсказка" id="27"/>
+		</CheckBoxField>
+		<InputField name="Текст" id="28">
+			<DataPath>Запись.Текст</DataPath>
+			<ContextMenu name="ТекстКонтекстноеМеню" id="29"/>
+			<ExtendedTooltip name="ТекстРасширеннаяПодсказка" id="30"/>
+		</InputField>
+		<InputField name="ПутьКФайлу" id="31">
+			<DataPath>Запись.ПутьКФайлу</DataPath>
+			<ContextMenu name="ПутьКФайлуКонтекстноеМеню" id="32"/>
+			<ExtendedTooltip name="ПутьКФайлуРасширеннаяПодсказка" id="33"/>
+		</InputField>
+		<InputField name="Размер" id="34">
+			<DataPath>Запись.Размер</DataPath>
+			<ContextMenu name="РазмерКонтекстноеМеню" id="35"/>
+			<ExtendedTooltip name="РазмерРасширеннаяПодсказка" id="36"/>
+		</InputField>
+		<InputField name="Наименование" id="37">
+			<DataPath>Запись.Наименование</DataPath>
+			<ContextMenu name="НаименованиеКонтекстноеМеню" id="38"/>
+			<ExtendedTooltip name="НаименованиеРасширеннаяПодсказка" id="39"/>
+		</InputField>
+		<InputField name="ФайлВБазе" id="40">
+			<DataPath>Запись.ФайлВБазе</DataPath>
+			<ContextMenu name="ФайлВБазеКонтекстноеМеню" id="41"/>
+			<ExtendedTooltip name="ФайлВБазеРасширеннаяПодсказка" id="42"/>
+		</InputField>
+		<CheckBoxField name="Доставлено" id="43">
+			<DataPath>Запись.Доставлено</DataPath>
+			<CheckBoxType>Auto</CheckBoxType>
+			<ContextMenu name="ДоставленоКонтекстноеМеню" id="44"/>
+			<ExtendedTooltip name="ДоставленоРасширеннаяПодсказка" id="45"/>
+		</CheckBoxField>
+		<CheckBoxField name="Прочтено" id="46">
+			<DataPath>Запись.Прочтено</DataPath>
+			<CheckBoxType>Auto</CheckBoxType>
+			<ContextMenu name="ПрочтеноКонтекстноеМеню" id="47"/>
+			<ExtendedTooltip name="ПрочтеноРасширеннаяПодсказка" id="48"/>
+		</CheckBoxField>
+		<InputField name="Менеджер" id="49">
+			<DataPath>Запись.Менеджер</DataPath>
+			<ContextMenu name="МенеджерКонтекстноеМеню" id="50"/>
+			<ExtendedTooltip name="МенеджерРасширеннаяПодсказка" id="51"/>
+		</InputField>
+		<InputField name="Отправитель" id="52">
+			<DataPath>Запись.Отправитель</DataPath>
+			<ContextMenu name="ОтправительКонтекстноеМеню" id="53"/>
+			<ExtendedTooltip name="ОтправительРасширеннаяПодсказка" id="54"/>
+		</InputField>
+	</ChildItems>
+	<Attributes>
+		<Attribute name="Запись" id="1">
+			<Type>
+				<v8:Type>cfg:InformationRegisterRecordManager.ViberИсторииСообщений</v8:Type>
+			</Type>
+			<MainAttribute>true</MainAttribute>
+			<SavedData>true</SavedData>
+		</Attribute>
+	</Attributes>
+</Form>

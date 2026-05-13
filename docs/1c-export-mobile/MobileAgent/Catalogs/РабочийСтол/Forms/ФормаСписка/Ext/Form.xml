@@ -1,0 +1,767 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<Form xmlns="http://v8.1c.ru/8.3/xcf/logform" xmlns:app="http://v8.1c.ru/8.2/managed-application/core" xmlns:cfg="http://v8.1c.ru/8.1/data/enterprise/current-config" xmlns:dcscor="http://v8.1c.ru/8.1/data-composition-system/core" xmlns:dcsset="http://v8.1c.ru/8.1/data-composition-system/settings" xmlns:ent="http://v8.1c.ru/8.1/data/enterprise" xmlns:lf="http://v8.1c.ru/8.2/managed-application/logform" xmlns:style="http://v8.1c.ru/8.1/data/ui/style" xmlns:sys="http://v8.1c.ru/8.1/data/ui/fonts/system" xmlns:v8="http://v8.1c.ru/8.1/data/core" xmlns:v8ui="http://v8.1c.ru/8.1/data/ui" xmlns:web="http://v8.1c.ru/8.1/data/ui/colors/web" xmlns:win="http://v8.1c.ru/8.1/data/ui/colors/windows" xmlns:xr="http://v8.1c.ru/8.3/xcf/readable" xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" version="2.8">
+	<Title>
+		<v8:item>
+			<v8:lang>ru</v8:lang>
+			<v8:content>Мобільний агент</v8:content>
+		</v8:item>
+	</Title>
+	<AutoTitle>false</AutoTitle>
+	<AutoURL>false</AutoURL>
+	<Group>Horizontal</Group>
+	<ChildrenAlign>None</ChildrenAlign>
+	<HorizontalSpacing>None</HorizontalSpacing>
+	<VerticalSpacing>None</VerticalSpacing>
+	<HorizontalAlign>Center</HorizontalAlign>
+	<VerticalAlign>Center</VerticalAlign>
+	<AutoFillCheck>false</AutoFillCheck>
+	<CommandBarLocation>None</CommandBarLocation>
+	<AutoCommandBar name="ФормаКоманднаяПанель" id="-1">
+		<Autofill>false</Autofill>
+	</AutoCommandBar>
+	<Events>
+		<Event name="NotificationProcessing">ОбработкаОповещения</Event>
+		<Event name="OnOpen">ПриОткрытии</Event>
+		<Event name="BeforeClose">ПередЗакрытием</Event>
+		<Event name="ExternalEvent">ВнешнееСобытие</Event>
+		<Event name="ActivationProcessing">ОбработкаАктивизации</Event>
+	</Events>
+	<ChildItems>
+		<UsualGroup name="Группа2" id="81">
+			<HorizontalStretch>true</HorizontalStretch>
+			<VerticalStretch>true</VerticalStretch>
+			<GroupHorizontalAlign>Center</GroupHorizontalAlign>
+			<GroupVerticalAlign>Center</GroupVerticalAlign>
+			<Group>Vertical</Group>
+			<ChildrenAlign>None</ChildrenAlign>
+			<HorizontalSpacing>None</HorizontalSpacing>
+			<VerticalSpacing>None</VerticalSpacing>
+			<HorizontalAlign>Center</HorizontalAlign>
+			<VerticalAlign>Center</VerticalAlign>
+			<Representation>None</Representation>
+			<ShowTitle>false</ShowTitle>
+			<BackColor>#FCFAEB</BackColor>
+			<ThroughAlign>Use</ThroughAlign>
+			<ExtendedTooltip name="Группа2РасширеннаяПодсказка" id="82"/>
+			<ChildItems>
+				<LabelDecoration name="Непрочитанные" id="131">
+					<TextColor>style:SpecialTextColor</TextColor>
+					<Hyperlink>true</Hyperlink>
+					<ContextMenu name="НепрочитанныеКонтекстноеМеню" id="132"/>
+					<ExtendedTooltip name="НепрочитанныеРасширеннаяПодсказка" id="133"/>
+					<Events>
+						<Event name="Click">НепрочитанныеНажатие</Event>
+					</Events>
+				</LabelDecoration>
+				<PictureDecoration name="Декорация2" id="86">
+					<Visible>false</Visible>
+					<Height>1</Height>
+					<HorizontalStretch>true</HorizontalStretch>
+					<VerticalStretch>true</VerticalStretch>
+					<FileDragMode>AsFile</FileDragMode>
+					<ContextMenu name="Декорация2КонтекстноеМеню" id="87"/>
+					<ExtendedTooltip name="Декорация2РасширеннаяПодсказка" id="88"/>
+				</PictureDecoration>
+				<UsualGroup name="Группа1" id="29">
+					<TitleTextColor>#FCFAEB</TitleTextColor>
+					<Width>21</Width>
+					<HorizontalStretch>false</HorizontalStretch>
+					<VerticalStretch>true</VerticalStretch>
+					<GroupHorizontalAlign>Center</GroupHorizontalAlign>
+					<Group>Vertical</Group>
+					<ChildrenAlign>None</ChildrenAlign>
+					<HorizontalSpacing>None</HorizontalSpacing>
+					<VerticalSpacing>Half</VerticalSpacing>
+					<HorizontalAlign>Center</HorizontalAlign>
+					<Representation>None</Representation>
+					<ChildItemsWidth>Equal</ChildItemsWidth>
+					<ShowTitle>false</ShowTitle>
+					<BackColor>#FCFAEB</BackColor>
+					<ThroughAlign>Use</ThroughAlign>
+					<ExtendedTooltip name="Группа1РасширеннаяПодсказка" id="30"/>
+					<ChildItems>
+						<InputField name="Партнер" id="72">
+							<DataPath>Партнер</DataPath>
+							<ReadOnly>true</ReadOnly>
+							<TitleLocation>None</TitleLocation>
+							<WarningOnEditRepresentation>DontShow</WarningOnEditRepresentation>
+							<HorizontalAlign>Center</HorizontalAlign>
+							<GroupHorizontalAlign>Center</GroupHorizontalAlign>
+							<GroupVerticalAlign>Center</GroupVerticalAlign>
+							<Width>19</Width>
+							<Height>3</Height>
+							<HorizontalStretch>true</HorizontalStretch>
+							<VerticalStretch>false</VerticalStretch>
+							<MultiLine>true</MultiLine>
+							<DropListButton>false</DropListButton>
+							<ChoiceButton>false</ChoiceButton>
+							<ClearButton>false</ClearButton>
+							<SpinButton>false</SpinButton>
+							<OpenButton>false</OpenButton>
+							<CreateButton>false</CreateButton>
+							<AutoMarkIncomplete>false</AutoMarkIncomplete>
+							<ChooseType>false</ChooseType>
+							<TextEdit>false</TextEdit>
+							<TextColor>#000000</TextColor>
+							<BackColor>#FCFAEB</BackColor>
+							<BorderColor>#FCFAEB</BorderColor>
+							<Font ref="style:NormalTextFont" height="8" kind="StyleItem" scale="100"/>
+							<ChoiceHistoryOnInput>DontUse</ChoiceHistoryOnInput>
+							<ContextMenu name="ПартнерКонтекстноеМеню" id="73"/>
+							<ExtendedTooltip name="ПартнерРасширеннаяПодсказка" id="74"/>
+						</InputField>
+						<UsualGroup name="Группа3" id="114">
+							<HorizontalStretch>true</HorizontalStretch>
+							<Group>AlwaysHorizontal</Group>
+							<Representation>None</Representation>
+							<ShowTitle>false</ShowTitle>
+							<ExtendedTooltip name="Группа3РасширеннаяПодсказка" id="115"/>
+							<ChildItems>
+								<LabelDecoration name="ДекорацияEUR" id="119">
+									<TextColor>#57639D</TextColor>
+									<Font ref="style:NormalTextFont" height="10" bold="true" italic="false" underline="false" strikeout="false" kind="StyleItem"/>
+									<Title formatted="false">
+										<v8:item>
+											<v8:lang>uk</v8:lang>
+											<v8:content>Курс EUR</v8:content>
+										</v8:item>
+									</Title>
+									<ContextMenu name="ДекорацияEURКонтекстноеМеню" id="120"/>
+									<ExtendedTooltip name="ДекорацияEURРасширеннаяПодсказка" id="121"/>
+								</LabelDecoration>
+								<PictureDecoration name="ДекорацияРазделитель1" id="122">
+									<Width>3</Width>
+									<Height>1</Height>
+									<HorizontalStretch>false</HorizontalStretch>
+									<TextColor>#57639D</TextColor>
+									<Font ref="style:NormalTextFont" height="12" bold="true" italic="false" underline="false" strikeout="false" kind="StyleItem"/>
+									<ContextMenu name="ДекорацияРазделитель1КонтекстноеМеню" id="123"/>
+									<ExtendedTooltip name="ДекорацияРазделитель1РасширеннаяПодсказка" id="124"/>
+								</PictureDecoration>
+								<LabelDecoration name="ДекорацияUSD" id="116">
+									<TextColor>#57639D</TextColor>
+									<Font ref="style:NormalTextFont" height="10" bold="true" italic="false" underline="false" strikeout="false" kind="StyleItem"/>
+									<Title formatted="false">
+										<v8:item>
+											<v8:lang>uk</v8:lang>
+											<v8:content>Курс USD</v8:content>
+										</v8:item>
+									</Title>
+									<ContextMenu name="ДекорацияUSDКонтекстноеМеню" id="117"/>
+									<ExtendedTooltip name="ДекорацияUSDРасширеннаяПодсказка" id="118"/>
+								</LabelDecoration>
+								<Button name="ОбщаяКомандаВыполнитьОбмен5" id="125">
+									<Type>UsualButton</Type>
+									<Representation>Picture</Representation>
+									<Width>3</Width>
+									<AutoMaxWidth>false</AutoMaxWidth>
+									<MaxWidth>25</MaxWidth>
+									<Height>1</Height>
+									<GroupHorizontalAlign>Center</GroupHorizontalAlign>
+									<CommandName>CommonCommand.ОновитиКурсиВалют</CommandName>
+									<Picture>
+										<xr:Ref>CommonPicture.ОбмінЦінами</xr:Ref>
+										<xr:LoadTransparent>true</xr:LoadTransparent>
+									</Picture>
+									<Title>
+										<v8:item>
+											<v8:lang>uk</v8:lang>
+											<v8:content>Відправити документи в 1С</v8:content>
+										</v8:item>
+										<v8:item>
+											<v8:lang>ru</v8:lang>
+											<v8:content>Відправити документи в 1С</v8:content>
+										</v8:item>
+									</Title>
+									<ExtendedTooltip name="ОбщаяКомандаВыполнитьОбмен5РасширеннаяПодсказка" id="126"/>
+								</Button>
+								<Button name="ЗмінитиКурси" id="127">
+									<Type>UsualButton</Type>
+									<Representation>Picture</Representation>
+									<Height>1</Height>
+									<CommandName>Form.Command.ЗмінаКурсу</CommandName>
+									<Picture>
+										<xr:Abs>Picture.png</xr:Abs>
+										<xr:LoadTransparent>false</xr:LoadTransparent>
+									</Picture>
+									<ExtendedTooltip name="ЗмінитиКурсиРасширеннаяПодсказка" id="128"/>
+								</Button>
+							</ChildItems>
+						</UsualGroup>
+						<InputField name="Склад" id="89">
+							<DataPath>Склад</DataPath>
+							<Visible>false</Visible>
+							<ReadOnly>true</ReadOnly>
+							<TitleLocation>None</TitleLocation>
+							<WarningOnEditRepresentation>DontShow</WarningOnEditRepresentation>
+							<HorizontalAlign>Center</HorizontalAlign>
+							<GroupHorizontalAlign>Center</GroupHorizontalAlign>
+							<GroupVerticalAlign>Center</GroupVerticalAlign>
+							<Width>19</Width>
+							<Height>1</Height>
+							<HorizontalStretch>true</HorizontalStretch>
+							<VerticalStretch>false</VerticalStretch>
+							<Wrap>false</Wrap>
+							<MultiLine>false</MultiLine>
+							<DropListButton>false</DropListButton>
+							<ChoiceButton>false</ChoiceButton>
+							<ClearButton>false</ClearButton>
+							<SpinButton>false</SpinButton>
+							<OpenButton>false</OpenButton>
+							<CreateButton>false</CreateButton>
+							<AutoMarkIncomplete>false</AutoMarkIncomplete>
+							<ChooseType>false</ChooseType>
+							<TextEdit>false</TextEdit>
+							<TextColor>#000000</TextColor>
+							<BackColor>#FCFAEB</BackColor>
+							<BorderColor>#FCFAEB</BorderColor>
+							<Font ref="style:NormalTextFont" kind="StyleItem" scale="100"/>
+							<ChoiceHistoryOnInput>DontUse</ChoiceHistoryOnInput>
+							<ContextMenu name="СкладКонтекстноеМеню" id="90"/>
+							<ExtendedTooltip name="СкладРасширеннаяПодсказка" id="91"/>
+						</InputField>
+						<InputField name="Продавец" id="92">
+							<DataPath>Продавец</DataPath>
+							<Visible>false</Visible>
+							<ReadOnly>true</ReadOnly>
+							<TitleLocation>None</TitleLocation>
+							<WarningOnEditRepresentation>DontShow</WarningOnEditRepresentation>
+							<HorizontalAlign>Center</HorizontalAlign>
+							<GroupHorizontalAlign>Center</GroupHorizontalAlign>
+							<GroupVerticalAlign>Center</GroupVerticalAlign>
+							<Width>19</Width>
+							<Height>1</Height>
+							<HorizontalStretch>true</HorizontalStretch>
+							<VerticalStretch>false</VerticalStretch>
+							<Wrap>false</Wrap>
+							<MultiLine>false</MultiLine>
+							<DropListButton>false</DropListButton>
+							<ChoiceButton>false</ChoiceButton>
+							<ClearButton>false</ClearButton>
+							<SpinButton>false</SpinButton>
+							<OpenButton>false</OpenButton>
+							<CreateButton>false</CreateButton>
+							<AutoMarkIncomplete>false</AutoMarkIncomplete>
+							<ChooseType>false</ChooseType>
+							<TextEdit>false</TextEdit>
+							<TextColor>#000000</TextColor>
+							<BackColor>#FCFAEB</BackColor>
+							<BorderColor>#FCFAEB</BorderColor>
+							<Font ref="style:NormalTextFont" kind="StyleItem" scale="100"/>
+							<ChoiceHistoryOnInput>DontUse</ChoiceHistoryOnInput>
+							<ContextMenu name="ПродавецКонтекстноеМеню" id="93"/>
+							<ExtendedTooltip name="ПродавецРасширеннаяПодсказка" id="94"/>
+						</InputField>
+						<Button name="ОбщаяКомандаВыполнитьОбмен1" id="103">
+							<Type>UsualButton</Type>
+							<Representation>PictureAndText</Representation>
+							<Width>20</Width>
+							<AutoMaxWidth>false</AutoMaxWidth>
+							<MaxWidth>25</MaxWidth>
+							<Height>2</Height>
+							<GroupHorizontalAlign>Center</GroupHorizontalAlign>
+							<CommandName>CommonCommand.ВивантажитиДокументи</CommandName>
+							<Picture>
+								<xr:Ref>CommonPicture.ВивантаженняДокументів</xr:Ref>
+								<xr:LoadTransparent>true</xr:LoadTransparent>
+							</Picture>
+							<Title>
+								<v8:item>
+									<v8:lang>uk</v8:lang>
+									<v8:content>Відправити документи в 1С</v8:content>
+								</v8:item>
+								<v8:item>
+									<v8:lang>ru</v8:lang>
+									<v8:content>Відправити документи в 1С</v8:content>
+								</v8:item>
+							</Title>
+							<ExtendedTooltip name="ОбщаяКомандаВыполнитьОбмен1РасширеннаяПодсказка" id="104"/>
+						</Button>
+						<Button name="ОбщаяКомандаВыполнитьОбмен2" id="105">
+							<Type>UsualButton</Type>
+							<Representation>PictureAndText</Representation>
+							<Width>20</Width>
+							<AutoMaxWidth>false</AutoMaxWidth>
+							<MaxWidth>25</MaxWidth>
+							<Height>2</Height>
+							<GroupHorizontalAlign>Center</GroupHorizontalAlign>
+							<CommandName>CommonCommand.ОновитиЗалишкиТаЦіни</CommandName>
+							<Picture>
+								<xr:Ref>CommonPicture.ОбмінЦінами</xr:Ref>
+								<xr:LoadTransparent>true</xr:LoadTransparent>
+							</Picture>
+							<Title>
+								<v8:item>
+									<v8:lang>uk</v8:lang>
+									<v8:content>Оновити ціни та залишки</v8:content>
+								</v8:item>
+								<v8:item>
+									<v8:lang>ru</v8:lang>
+									<v8:content>Відправити документи в 1С</v8:content>
+								</v8:item>
+							</Title>
+							<ExtendedTooltip name="ОбщаяКомандаВыполнитьОбмен2РасширеннаяПодсказка" id="106"/>
+						</Button>
+						<Button name="ОбщаяКомандаВыполнитьОбмен" id="17">
+							<Type>UsualButton</Type>
+							<Representation>PictureAndText</Representation>
+							<Width>20</Width>
+							<AutoMaxWidth>false</AutoMaxWidth>
+							<MaxWidth>25</MaxWidth>
+							<Height>2</Height>
+							<GroupHorizontalAlign>Center</GroupHorizontalAlign>
+							<CommandName>CommonCommand.ЗавантажитиТовари</CommandName>
+							<Picture>
+								<xr:Ref>CommonPicture.Обмен</xr:Ref>
+								<xr:LoadTransparent>true</xr:LoadTransparent>
+							</Picture>
+							<Title>
+								<v8:item>
+									<v8:lang>uk</v8:lang>
+									<v8:content>Завантажити товари</v8:content>
+								</v8:item>
+								<v8:item>
+									<v8:lang>ru</v8:lang>
+									<v8:content>Відправити документи в 1С</v8:content>
+								</v8:item>
+							</Title>
+							<ExtendedTooltip name="ОбщаяКомандаВыполнитьОбменРасширеннаяПодсказка" id="18"/>
+						</Button>
+						<Button name="ОбщаяКомандаВыполнитьОбмен3" id="107">
+							<Type>UsualButton</Type>
+							<Representation>PictureAndText</Representation>
+							<Width>20</Width>
+							<AutoMaxWidth>false</AutoMaxWidth>
+							<MaxWidth>25</MaxWidth>
+							<Height>2</Height>
+							<GroupHorizontalAlign>Center</GroupHorizontalAlign>
+							<CommandName>CommonCommand.ЗавантажитиКонтрагентів</CommandName>
+							<Picture>
+								<xr:Ref>CommonPicture.ОбмінКонтрагентами</xr:Ref>
+								<xr:LoadTransparent>true</xr:LoadTransparent>
+							</Picture>
+							<Title>
+								<v8:item>
+									<v8:lang>uk</v8:lang>
+									<v8:content>Завантажити контрагентів</v8:content>
+								</v8:item>
+								<v8:item>
+									<v8:lang>ru</v8:lang>
+									<v8:content>Відправити документи в 1С</v8:content>
+								</v8:item>
+							</Title>
+							<ExtendedTooltip name="ОбщаяКомандаВыполнитьОбмен3РасширеннаяПодсказка" id="108"/>
+						</Button>
+						<Button name="ОбщаяКомандаВыполнитьОбмен4" id="109">
+							<Type>UsualButton</Type>
+							<Representation>PictureAndText</Representation>
+							<Width>20</Width>
+							<AutoMaxWidth>false</AutoMaxWidth>
+							<MaxWidth>25</MaxWidth>
+							<Height>2</Height>
+							<GroupHorizontalAlign>Center</GroupHorizontalAlign>
+							<CommandName>CommonCommand.ЗавантажитиДокументи</CommandName>
+							<Picture>
+								<xr:Ref>CommonPicture.ЗавантаженняДокументів</xr:Ref>
+								<xr:LoadTransparent>true</xr:LoadTransparent>
+							</Picture>
+							<Title>
+								<v8:item>
+									<v8:lang>uk</v8:lang>
+									<v8:content>Завантажити документи</v8:content>
+								</v8:item>
+								<v8:item>
+									<v8:lang>ru</v8:lang>
+									<v8:content>Відправити документи в 1С</v8:content>
+								</v8:item>
+							</Title>
+							<ExtendedTooltip name="ОбщаяКомандаВыполнитьОбмен4РасширеннаяПодсказка" id="110"/>
+						</Button>
+						<LabelDecoration name="Декорация3" id="111">
+							<ContextMenu name="Декорация3КонтекстноеМеню" id="112"/>
+							<ExtendedTooltip name="Декорация3РасширеннаяПодсказка" id="113"/>
+						</LabelDecoration>
+						<Button name="ОткрытьХарактеристику" id="134">
+							<Type>UsualButton</Type>
+							<Representation>PictureAndText</Representation>
+							<Height>2</Height>
+							<HorizontalStretch>true</HorizontalStretch>
+							<CommandName>Form.Command.ОткрытьХарактеристику</CommandName>
+							<Picture>
+								<xr:Abs>Picture.png</xr:Abs>
+								<xr:LoadTransparent>false</xr:LoadTransparent>
+							</Picture>
+							<Title>
+								<v8:item>
+									<v8:lang>uk</v8:lang>
+									<v8:content>Мішок</v8:content>
+								</v8:item>
+								<v8:item>
+									<v8:lang>ru</v8:lang>
+									<v8:content>Мішок</v8:content>
+								</v8:item>
+							</Title>
+							<ExtendedTooltip name="ОткрытьХарактеристикуРасширеннаяПодсказка" id="135"/>
+						</Button>
+						<Button name="ДокументЗаказ" id="15">
+							<Type>UsualButton</Type>
+							<Representation>PictureAndText</Representation>
+							<Width>20</Width>
+							<AutoMaxWidth>false</AutoMaxWidth>
+							<MaxWidth>25</MaxWidth>
+							<Height>2</Height>
+							<GroupHorizontalAlign>Center</GroupHorizontalAlign>
+							<CommandName>Document.Заказ.StandardCommand.OpenList</CommandName>
+							<Picture>
+								<xr:Ref>CommonPicture.Продажа</xr:Ref>
+								<xr:LoadTransparent>true</xr:LoadTransparent>
+							</Picture>
+							<Title>
+								<v8:item>
+									<v8:lang>uk</v8:lang>
+									<v8:content>Замовлення</v8:content>
+								</v8:item>
+								<v8:item>
+									<v8:lang>ru</v8:lang>
+									<v8:content>Заказ</v8:content>
+								</v8:item>
+							</Title>
+							<ExtendedTooltip name="ДокументЗаказРасширеннаяПодсказка" id="16"/>
+						</Button>
+						<Button name="ДокументРеализацияТоваровУслугОткрытьСписок" id="95">
+							<Type>UsualButton</Type>
+							<UserVisible>
+								<xr:Common>true</xr:Common>
+								<xr:Value name="Role.Пользователь">true</xr:Value>
+							</UserVisible>
+							<Representation>PictureAndText</Representation>
+							<Width>20</Width>
+							<AutoMaxWidth>false</AutoMaxWidth>
+							<MaxWidth>25</MaxWidth>
+							<Height>2</Height>
+							<CommandName>Document.РеализацияТоваровУслуг.StandardCommand.OpenList</CommandName>
+							<Picture>
+								<xr:Ref>CommonPicture.Поступление</xr:Ref>
+								<xr:LoadTransparent>true</xr:LoadTransparent>
+							</Picture>
+							<ExtendedTooltip name="ДокументРеализацияТоваровУслугОткрытьСписокРасширеннаяПодсказка" id="96"/>
+						</Button>
+						<Button name="ДокументМаршрутныйЛистОткрытьСписок" id="101">
+							<Type>UsualButton</Type>
+							<Representation>PictureAndText</Representation>
+							<Width>20</Width>
+							<Height>2</Height>
+							<CommandName>Document.МаршрутныйЛист.StandardCommand.OpenList</CommandName>
+							<Picture>
+								<xr:Ref>StdPicture.FixTable</xr:Ref>
+								<xr:LoadTransparent>true</xr:LoadTransparent>
+							</Picture>
+							<Title>
+								<v8:item>
+									<v8:lang>uk</v8:lang>
+									<v8:content>Маршрутний лист</v8:content>
+								</v8:item>
+								<v8:item>
+									<v8:lang>ru</v8:lang>
+									<v8:content>Маршрутний лист</v8:content>
+								</v8:item>
+							</Title>
+							<ExtendedTooltip name="ДокументМаршрутныйЛистОткрытьСписокРасширеннаяПодсказка" id="102"/>
+						</Button>
+						<Button name="ДокументПродажаОткрытьСписок" id="11">
+							<Type>UsualButton</Type>
+							<Visible>false</Visible>
+							<Representation>PictureAndText</Representation>
+							<Width>20</Width>
+							<AutoMaxWidth>false</AutoMaxWidth>
+							<MaxWidth>25</MaxWidth>
+							<Height>2</Height>
+							<GroupHorizontalAlign>Center</GroupHorizontalAlign>
+							<CommandName>0:cbd96648-8776-4f2e-ad95-f543e5013e93</CommandName>
+							<Picture>
+								<xr:Ref>CommonPicture.Поступление</xr:Ref>
+								<xr:LoadTransparent>true</xr:LoadTransparent>
+							</Picture>
+							<Title>
+								<v8:item>
+									<v8:lang>uk</v8:lang>
+									<v8:content>Реалізація</v8:content>
+								</v8:item>
+								<v8:item>
+									<v8:lang>ru</v8:lang>
+									<v8:content>Продажа</v8:content>
+								</v8:item>
+							</Title>
+							<ExtendedTooltip name="ДокументПродажаОткрытьСписокРасширеннаяПодсказка" id="12"/>
+						</Button>
+						<Button name="Оплати" id="99">
+							<Type>UsualButton</Type>
+							<Representation>PictureAndText</Representation>
+							<Width>20</Width>
+							<Height>2</Height>
+							<CommandName>Document.КассовыйОрдер.StandardCommand.OpenList</CommandName>
+							<Picture>
+								<xr:Ref>CommonPicture.Деньги</xr:Ref>
+								<xr:LoadTransparent>true</xr:LoadTransparent>
+							</Picture>
+							<Title>
+								<v8:item>
+									<v8:lang>uk</v8:lang>
+									<v8:content>Оплати</v8:content>
+								</v8:item>
+							</Title>
+							<ExtendedTooltip name="ОплатиРасширеннаяПодсказка" id="100"/>
+						</Button>
+						<Button name="ОткрытьЧат" id="129">
+							<Type>UsualButton</Type>
+							<Representation>PictureAndText</Representation>
+							<Width>20</Width>
+							<Height>2</Height>
+							<GroupHorizontalAlign>Center</GroupHorizontalAlign>
+							<CommandName>Form.Command.ОткрытьЧат</CommandName>
+							<Picture>
+								<xr:Abs>Picture.png</xr:Abs>
+								<xr:LoadTransparent>false</xr:LoadTransparent>
+							</Picture>
+							<Title>
+								<v8:item>
+									<v8:lang>uk</v8:lang>
+									<v8:content>Месенджер</v8:content>
+								</v8:item>
+							</Title>
+							<ExtendedTooltip name="ОткрытьЧатРасширеннаяПодсказка" id="130"/>
+						</Button>
+						<Button name="ТЕСТ" id="97">
+							<Type>UsualButton</Type>
+							<Visible>false</Visible>
+							<CommandName>Form.Command.ТЕСТ</CommandName>
+							<ExtendedTooltip name="ТЕСТРасширеннаяПодсказка" id="98"/>
+						</Button>
+					</ChildItems>
+				</UsualGroup>
+				<PictureDecoration name="Декорация1" id="83">
+					<HorizontalStretch>true</HorizontalStretch>
+					<VerticalStretch>true</VerticalStretch>
+					<FileDragMode>AsFile</FileDragMode>
+					<ContextMenu name="Декорация1КонтекстноеМеню" id="84"/>
+					<ExtendedTooltip name="Декорация1РасширеннаяПодсказка" id="85"/>
+				</PictureDecoration>
+			</ChildItems>
+		</UsualGroup>
+	</ChildItems>
+	<Attributes>
+		<Attribute name="Партнер" id="1">
+			<Title>
+				<v8:item>
+					<v8:lang>ru</v8:lang>
+					<v8:content>Партнер</v8:content>
+				</v8:item>
+			</Title>
+			<Type>
+				<v8:Type>xs:string</v8:Type>
+				<v8:StringQualifiers>
+					<v8:Length>0</v8:Length>
+					<v8:AllowedLength>Variable</v8:AllowedLength>
+				</v8:StringQualifiers>
+			</Type>
+		</Attribute>
+		<Attribute name="Склад" id="2">
+			<Title>
+				<v8:item>
+					<v8:lang>ru</v8:lang>
+					<v8:content>Склад</v8:content>
+				</v8:item>
+			</Title>
+			<Type>
+				<v8:Type>xs:string</v8:Type>
+				<v8:StringQualifiers>
+					<v8:Length>0</v8:Length>
+					<v8:AllowedLength>Variable</v8:AllowedLength>
+				</v8:StringQualifiers>
+			</Type>
+		</Attribute>
+		<Attribute name="Продавец" id="3">
+			<Title>
+				<v8:item>
+					<v8:lang>ru</v8:lang>
+					<v8:content>Продавец</v8:content>
+				</v8:item>
+			</Title>
+			<Type>
+				<v8:Type>xs:string</v8:Type>
+				<v8:StringQualifiers>
+					<v8:Length>0</v8:Length>
+					<v8:AllowedLength>Variable</v8:AllowedLength>
+				</v8:StringQualifiers>
+			</Type>
+		</Attribute>
+		<Attribute name="КлючФЗ" id="4">
+			<Title>
+				<v8:item>
+					<v8:lang>uk</v8:lang>
+					<v8:content>Ключ ФЗ</v8:content>
+				</v8:item>
+			</Title>
+			<Type>
+				<v8:Type>v8:UUID</v8:Type>
+			</Type>
+		</Attribute>
+		<Attribute name="КлючФЗОбновлениеБрони" id="5">
+			<Title>
+				<v8:item>
+					<v8:lang>uk</v8:lang>
+					<v8:content>Ключ ФЗОбновление брони</v8:content>
+				</v8:item>
+			</Title>
+			<Type>
+				<v8:Type>v8:UUID</v8:Type>
+			</Type>
+		</Attribute>
+		<Attribute name="КлючФЗБоргиТаЦіни" id="6">
+			<Title>
+				<v8:item>
+					<v8:lang>uk</v8:lang>
+					<v8:content>Ключ ФЗБорги та ціни</v8:content>
+				</v8:item>
+			</Title>
+			<Type>
+				<v8:Type>v8:UUID</v8:Type>
+			</Type>
+		</Attribute>
+		<Attribute name="КлючФЗОбновлениеСтатусовЗаказов" id="7">
+			<Title>
+				<v8:item>
+					<v8:lang>uk</v8:lang>
+					<v8:content>КлючФЗОбновлениеСтатусовЗаказов </v8:content>
+				</v8:item>
+			</Title>
+			<Type>
+				<v8:Type>v8:UUID</v8:Type>
+			</Type>
+		</Attribute>
+	</Attributes>
+	<Commands>
+		<Command name="ОткрытьПоследнююОшибку" id="1">
+			<Title>
+				<v8:item>
+					<v8:lang>ru</v8:lang>
+					<v8:content>Открыть последнюю ошибку</v8:content>
+				</v8:item>
+			</Title>
+			<ToolTip>
+				<v8:item>
+					<v8:lang>ru</v8:lang>
+					<v8:content>Открыть последнюю ошибку</v8:content>
+				</v8:item>
+			</ToolTip>
+			<Action>ОткрытьПоследнююОшибку</Action>
+			<CurrentRowUse>DontUse</CurrentRowUse>
+		</Command>
+		<Command name="Пустая" id="2">
+			<Title>
+				<v8:item>
+					<v8:lang>ru</v8:lang>
+					<v8:content>Пустая</v8:content>
+				</v8:item>
+			</Title>
+			<ToolTip>
+				<v8:item>
+					<v8:lang>ru</v8:lang>
+					<v8:content>Пустая</v8:content>
+				</v8:item>
+			</ToolTip>
+			<CurrentRowUse>DontUse</CurrentRowUse>
+		</Command>
+		<Command name="ФіксаціяКілометражу" id="3">
+			<Title>
+				<v8:item>
+					<v8:lang>uk</v8:lang>
+					<v8:content>Фіксація кілометражу</v8:content>
+				</v8:item>
+			</Title>
+			<ToolTip>
+				<v8:item>
+					<v8:lang>uk</v8:lang>
+					<v8:content>Фіксація кілометражу</v8:content>
+				</v8:item>
+			</ToolTip>
+			<Action>ФіксаціяКілометражу</Action>
+			<CurrentRowUse>DontUse</CurrentRowUse>
+		</Command>
+		<Command name="ТЕСТ" id="4">
+			<Title>
+				<v8:item>
+					<v8:lang>uk</v8:lang>
+					<v8:content>ТЕСТ</v8:content>
+				</v8:item>
+			</Title>
+			<ToolTip>
+				<v8:item>
+					<v8:lang>uk</v8:lang>
+					<v8:content>ТЕСТ</v8:content>
+				</v8:item>
+			</ToolTip>
+			<Action>ТЕСТ</Action>
+		</Command>
+		<Command name="Оплати" id="5">
+			<Title>
+				<v8:item>
+					<v8:lang>uk</v8:lang>
+					<v8:content>Оплати</v8:content>
+				</v8:item>
+			</Title>
+			<ToolTip>
+				<v8:item>
+					<v8:lang>uk</v8:lang>
+					<v8:content>Оплати</v8:content>
+				</v8:item>
+			</ToolTip>
+			<Action>Оплати</Action>
+		</Command>
+		<Command name="ЗмінаКурсу" id="6">
+			<Title>
+				<v8:item>
+					<v8:lang>uk</v8:lang>
+					<v8:content>Зміна курсу</v8:content>
+				</v8:item>
+			</Title>
+			<ToolTip>
+				<v8:item>
+					<v8:lang>uk</v8:lang>
+					<v8:content>Зміна курсу</v8:content>
+				</v8:item>
+			</ToolTip>
+			<Action>ЗмінаКурсу</Action>
+		</Command>
+		<Command name="ОткрытьЧат" id="7">
+			<Title>
+				<v8:item>
+					<v8:lang>uk</v8:lang>
+					<v8:content>Открыть чат</v8:content>
+				</v8:item>
+			</Title>
+			<ToolTip>
+				<v8:item>
+					<v8:lang>uk</v8:lang>
+					<v8:content>Открыть чат</v8:content>
+				</v8:item>
+			</ToolTip>
+			<Action>ОткрытьЧат</Action>
+		</Command>
+		<Command name="ОткрытьХарактеристику" id="8">
+			<Title>
+				<v8:item>
+					<v8:lang>uk</v8:lang>
+					<v8:content>Открыть характеристику</v8:content>
+				</v8:item>
+			</Title>
+			<ToolTip>
+				<v8:item>
+					<v8:lang>uk</v8:lang>
+					<v8:content>Открыть характеристику</v8:content>
+				</v8:item>
+			</ToolTip>
+			<Action>ОткрытьХарактеристику</Action>
+		</Command>
+	</Commands>
+</Form>

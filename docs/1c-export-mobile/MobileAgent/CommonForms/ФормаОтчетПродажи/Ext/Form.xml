@@ -1,0 +1,441 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<Form xmlns="http://v8.1c.ru/8.3/xcf/logform" xmlns:app="http://v8.1c.ru/8.2/managed-application/core" xmlns:cfg="http://v8.1c.ru/8.1/data/enterprise/current-config" xmlns:dcscor="http://v8.1c.ru/8.1/data-composition-system/core" xmlns:dcsset="http://v8.1c.ru/8.1/data-composition-system/settings" xmlns:ent="http://v8.1c.ru/8.1/data/enterprise" xmlns:lf="http://v8.1c.ru/8.2/managed-application/logform" xmlns:style="http://v8.1c.ru/8.1/data/ui/style" xmlns:sys="http://v8.1c.ru/8.1/data/ui/fonts/system" xmlns:v8="http://v8.1c.ru/8.1/data/core" xmlns:v8ui="http://v8.1c.ru/8.1/data/ui" xmlns:web="http://v8.1c.ru/8.1/data/ui/colors/web" xmlns:win="http://v8.1c.ru/8.1/data/ui/colors/windows" xmlns:xr="http://v8.1c.ru/8.3/xcf/readable" xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" version="2.8">
+	<Title>
+		<v8:item>
+			<v8:lang>ru</v8:lang>
+			<v8:content>Продажи</v8:content>
+		</v8:item>
+	</Title>
+	<WindowOpeningMode>LockWholeInterface</WindowOpeningMode>
+	<AutoCommandBar name="ФормаКоманднаяПанель" id="-1">
+		<Autofill>false</Autofill>
+	</AutoCommandBar>
+	<Events>
+		<Event name="OnOpen">ПриОткрытии</Event>
+		<Event name="OnCreateAtServer">ПриСозданииНаСервере</Event>
+	</Events>
+	<ChildItems>
+		<UsualGroup name="Группа4" id="52">
+			<Title>
+				<v8:item>
+					<v8:lang>ru</v8:lang>
+					<v8:content>Период</v8:content>
+				</v8:item>
+			</Title>
+			<HorizontalStretch>true</HorizontalStretch>
+			<Group>Horizontal</Group>
+			<Representation>StrongSeparation</Representation>
+			<ExtendedTooltip name="Группа4РасширеннаяПодсказка" id="53"/>
+			<ChildItems>
+				<LabelDecoration name="Декорация2" id="54">
+					<Title formatted="false">
+						<v8:item>
+							<v8:lang>ru</v8:lang>
+							<v8:content>С</v8:content>
+						</v8:item>
+					</Title>
+					<ContextMenu name="Декорация2КонтекстноеМеню" id="55"/>
+					<ExtendedTooltip name="Декорация2РасширеннаяПодсказка" id="56"/>
+				</LabelDecoration>
+				<InputField name="ДатаНачала" id="46">
+					<DataPath>ДатаНачала</DataPath>
+					<TitleLocation>None</TitleLocation>
+					<TextColor>#000000</TextColor>
+					<BackColor>#FFFFFF</BackColor>
+					<BorderColor>#999999</BorderColor>
+					<ContextMenu name="ДатаНачалаКонтекстноеМеню" id="47"/>
+					<ExtendedTooltip name="ДатаНачалаРасширеннаяПодсказка" id="48"/>
+					<Events>
+						<Event name="OnChange">ДатаНачалаПриИзменении</Event>
+						<Event name="TextEditEnd">ДатаНачалаОкончаниеВводаТекста</Event>
+						<Event name="ChoiceProcessing">ДатаНачалаОбработкаВыбора</Event>
+					</Events>
+				</InputField>
+				<LabelDecoration name="Декорация3" id="57">
+					<Title formatted="false">
+						<v8:item>
+							<v8:lang>ru</v8:lang>
+							<v8:content>по</v8:content>
+						</v8:item>
+					</Title>
+					<ContextMenu name="Декорация3КонтекстноеМеню" id="58"/>
+					<ExtendedTooltip name="Декорация3РасширеннаяПодсказка" id="59"/>
+				</LabelDecoration>
+				<InputField name="ДатаКонец" id="49">
+					<DataPath>ДатаКонец</DataPath>
+					<TitleLocation>None</TitleLocation>
+					<TextColor>#000000</TextColor>
+					<BackColor>#FFFFFF</BackColor>
+					<BorderColor>#999999</BorderColor>
+					<ContextMenu name="ДатаКонецКонтекстноеМеню" id="50"/>
+					<ExtendedTooltip name="ДатаКонецРасширеннаяПодсказка" id="51"/>
+					<Events>
+						<Event name="OnChange">ДатаКонецПриИзменении</Event>
+						<Event name="TextEditEnd">ДатаКонецОкончаниеВводаТекста</Event>
+						<Event name="ChoiceProcessing">ДатаКонецОбработкаВыбора</Event>
+					</Events>
+				</InputField>
+				<Button name="КнОчиститьПериод" id="60">
+					<Type>UsualButton</Type>
+					<CommandName>Form.Command.КнОчиститьПериод</CommandName>
+					<TextColor>#000000</TextColor>
+					<BackColor>#DDDDDD</BackColor>
+					<BorderColor>#999999</BorderColor>
+					<Title>
+						<v8:item>
+							<v8:lang>ru</v8:lang>
+							<v8:content>Очистить</v8:content>
+						</v8:item>
+					</Title>
+					<ExtendedTooltip name="КнОчиститьПериодРасширеннаяПодсказка" id="61"/>
+				</Button>
+			</ChildItems>
+		</UsualGroup>
+		<Table name="Продажи" id="4">
+			<ReadOnly>true</ReadOnly>
+			<UseAlternationRowColor>true</UseAlternationRowColor>
+			<EnableStartDrag>true</EnableStartDrag>
+			<FileDragMode>AsFile</FileDragMode>
+			<DataPath>Продажи</DataPath>
+			<RowPictureDataPath>Продажи.DefaultPicture</RowPictureDataPath>
+			<CommandSet>
+				<ExcludedCommand>CancelSearch</ExcludedCommand>
+				<ExcludedCommand>CopyToClipboard</ExcludedCommand>
+				<ExcludedCommand>DynamicListStandardSettings</ExcludedCommand>
+				<ExcludedCommand>Find</ExcludedCommand>
+				<ExcludedCommand>FindByCurrentValue</ExcludedCommand>
+				<ExcludedCommand>ListSettings</ExcludedCommand>
+				<ExcludedCommand>LoadDynamicListSettings</ExcludedCommand>
+				<ExcludedCommand>OutputList</ExcludedCommand>
+				<ExcludedCommand>Refresh</ExcludedCommand>
+				<ExcludedCommand>SaveDynamicListSettings</ExcludedCommand>
+				<ExcludedCommand>SearchHistory</ExcludedCommand>
+				<ExcludedCommand>ShowMultipleSelection</ExcludedCommand>
+			</CommandSet>
+			<AutoRefresh>false</AutoRefresh>
+			<AutoRefreshPeriod>60</AutoRefreshPeriod>
+			<Period>
+				<v8:variant xsi:type="v8:StandardPeriodVariant">Custom</v8:variant>
+				<v8:startDate>0001-01-01T00:00:00</v8:startDate>
+				<v8:endDate>0001-01-01T00:00:00</v8:endDate>
+			</Period>
+			<ChoiceFoldersAndItems>Items</ChoiceFoldersAndItems>
+			<RestoreCurrentRow>false</RestoreCurrentRow>
+			<TopLevelParent xsi:nil="true"/>
+			<ShowRoot>true</ShowRoot>
+			<AllowRootChoice>false</AllowRootChoice>
+			<UpdateOnDataChange>Auto</UpdateOnDataChange>
+			<ContextMenu name="ПродажиКонтекстноеМеню" id="5"/>
+			<AutoCommandBar name="ПродажиКоманднаяПанель" id="6">
+				<Autofill>false</Autofill>
+			</AutoCommandBar>
+			<ExtendedTooltip name="ПродажиРасширеннаяПодсказка" id="7"/>
+			<SearchStringAddition name="ПродажиСтрокаПоиска" id="8">
+				<Enabled>false</Enabled>
+				<AdditionSource>
+					<Item>Продажи</Item>
+					<Type>SearchStringRepresentation</Type>
+				</AdditionSource>
+				<ContextMenu name="ПродажиСтрокаПоискаКонтекстноеМеню" id="9"/>
+				<ExtendedTooltip name="ПродажиСтрокаПоискаРасширеннаяПодсказка" id="10"/>
+			</SearchStringAddition>
+			<ViewStatusAddition name="ПродажиСостояниеПросмотра" id="11">
+				<AdditionSource>
+					<Item>Продажи</Item>
+					<Type>ViewStatusRepresentation</Type>
+				</AdditionSource>
+				<ContextMenu name="ПродажиСостояниеПросмотраКонтекстноеМеню" id="12"/>
+				<ExtendedTooltip name="ПродажиСостояниеПросмотраРасширеннаяПодсказка" id="13"/>
+			</ViewStatusAddition>
+			<SearchControlAddition name="ПродажиУправлениеПоиском" id="14">
+				<Enabled>false</Enabled>
+				<AdditionSource>
+					<Item>Продажи</Item>
+					<Type>SearchControl</Type>
+				</AdditionSource>
+				<ContextMenu name="ПродажиУправлениеПоискомКонтекстноеМеню" id="15"/>
+				<ExtendedTooltip name="ПродажиУправлениеПоискомРасширеннаяПодсказка" id="16"/>
+			</SearchControlAddition>
+			<ChildItems>
+				<ColumnGroup name="Группа1" id="35">
+					<ExtendedTooltip name="Группа1РасширеннаяПодсказка" id="36"/>
+					<ChildItems>
+						<LabelField name="Дата" id="17">
+							<DataPath>Продажи.Дата</DataPath>
+							<ContextMenu name="ДатаКонтекстноеМеню" id="18"/>
+							<ExtendedTooltip name="ДатаРасширеннаяПодсказка" id="19"/>
+						</LabelField>
+						<LabelField name="Номер" id="20">
+							<DataPath>Продажи.Номер</DataPath>
+							<ContextMenu name="НомерКонтекстноеМеню" id="21"/>
+							<ExtendedTooltip name="НомерРасширеннаяПодсказка" id="22"/>
+						</LabelField>
+					</ChildItems>
+				</ColumnGroup>
+				<ColumnGroup name="Группа2" id="37">
+					<ExtendedTooltip name="Группа2РасширеннаяПодсказка" id="38"/>
+					<ChildItems>
+						<LabelField name="СуммаПартнера" id="26">
+							<DataPath>Продажи.СуммаПартнера</DataPath>
+							<Format>
+								<v8:item>
+									<v8:lang>ru</v8:lang>
+									<v8:content>ЧДЦ=2</v8:content>
+								</v8:item>
+							</Format>
+							<ContextMenu name="СуммаПартнераКонтекстноеМеню" id="27"/>
+							<ExtendedTooltip name="СуммаПартнераРасширеннаяПодсказка" id="28"/>
+						</LabelField>
+						<LabelField name="СуммаПродажи" id="29">
+							<DataPath>Продажи.СуммаПродажи</DataPath>
+							<Format>
+								<v8:item>
+									<v8:lang>ru</v8:lang>
+									<v8:content>ЧДЦ=2</v8:content>
+								</v8:item>
+							</Format>
+							<ContextMenu name="СуммаПродажиКонтекстноеМеню" id="30"/>
+							<ExtendedTooltip name="СуммаПродажиРасширеннаяПодсказка" id="31"/>
+						</LabelField>
+					</ChildItems>
+				</ColumnGroup>
+				<LabelField name="Прибыль" id="23">
+					<DataPath>Продажи.Прибыль</DataPath>
+					<Format>
+						<v8:item>
+							<v8:lang>ru</v8:lang>
+							<v8:content>ЧДЦ=2</v8:content>
+						</v8:item>
+					</Format>
+					<ContextMenu name="ПрибыльКонтекстноеМеню" id="24"/>
+					<ExtendedTooltip name="ПрибыльРасширеннаяПодсказка" id="25"/>
+				</LabelField>
+			</ChildItems>
+		</Table>
+		<UsualGroup name="Группа5" id="71">
+			<Group>Vertical</Group>
+			<Representation>None</Representation>
+			<ChildItemsWidth>LeftWide</ChildItemsWidth>
+			<ShowTitle>false</ShowTitle>
+			<ExtendedTooltip name="Группа5РасширеннаяПодсказка" id="72"/>
+			<ChildItems>
+				<LabelField name="ВсегоСуммаПродажи" id="65">
+					<DataPath>ВсегоСуммаПродажи</DataPath>
+					<TitleTextColor>#008000</TitleTextColor>
+					<TextColor>#008000</TextColor>
+					<ContextMenu name="ВсегоСуммаПродажиКонтекстноеМеню" id="66"/>
+					<ExtendedTooltip name="ВсегоСуммаПродажиРасширеннаяПодсказка" id="67"/>
+				</LabelField>
+				<LabelField name="ВсегоСуммаПартнера" id="62">
+					<DataPath>ВсегоСуммаПартнера</DataPath>
+					<TitleTextColor>#008000</TitleTextColor>
+					<TextColor>#008000</TextColor>
+					<ContextMenu name="ВсегоСуммаПартнераКонтекстноеМеню" id="63"/>
+					<ExtendedTooltip name="ВсегоСуммаПартнераРасширеннаяПодсказка" id="64"/>
+				</LabelField>
+				<LabelField name="ВсегоСуммаПрибыли" id="68">
+					<DataPath>ВсегоСуммаПрибыли</DataPath>
+					<TitleTextColor>#008000</TitleTextColor>
+					<TextColor>#008000</TextColor>
+					<ContextMenu name="ВсегоСуммаПрибылиКонтекстноеМеню" id="69"/>
+					<ExtendedTooltip name="ВсегоСуммаПрибылиРасширеннаяПодсказка" id="70"/>
+				</LabelField>
+			</ChildItems>
+		</UsualGroup>
+		<UsualGroup name="Группа3" id="39">
+			<HorizontalStretch>true</HorizontalStretch>
+			<VerticalStretch>false</VerticalStretch>
+			<GroupVerticalAlign>Bottom</GroupVerticalAlign>
+			<Group>Horizontal</Group>
+			<Representation>None</Representation>
+			<ShowTitle>false</ShowTitle>
+			<ThroughAlign>Use</ThroughAlign>
+			<ExtendedTooltip name="Группа3РасширеннаяПодсказка" id="40"/>
+			<ChildItems>
+				<Button name="ПровестиИЗакрыть" id="44">
+					<Type>UsualButton</Type>
+					<Representation>PictureAndText</Representation>
+					<DefaultButton>true</DefaultButton>
+					<Width>12</Width>
+					<Height>2</Height>
+					<CommandName>Form.StandardCommand.Close</CommandName>
+					<TextColor>#000000</TextColor>
+					<BackColor>#E9E6D4</BackColor>
+					<BorderColor>#999999</BorderColor>
+					<Picture>
+						<xr:Ref>StdPicture.Close</xr:Ref>
+						<xr:LoadTransparent>true</xr:LoadTransparent>
+					</Picture>
+					<Title>
+						<v8:item>
+							<v8:lang>ru</v8:lang>
+							<v8:content>Закрыть</v8:content>
+						</v8:item>
+					</Title>
+					<ExtendedTooltip name="ПровестиИЗакрытьРасширеннаяПодсказка" id="45"/>
+				</Button>
+				<LabelDecoration name="Декорация1" id="41">
+					<HorizontalStretch>true</HorizontalStretch>
+					<ContextMenu name="Декорация1КонтекстноеМеню" id="42"/>
+					<ExtendedTooltip name="Декорация1РасширеннаяПодсказка" id="43"/>
+				</LabelDecoration>
+			</ChildItems>
+		</UsualGroup>
+	</ChildItems>
+	<Attributes>
+		<Attribute name="Продажи" id="1">
+			<Title>
+				<v8:item>
+					<v8:lang>ru</v8:lang>
+					<v8:content>Продажи</v8:content>
+				</v8:item>
+			</Title>
+			<Type>
+				<v8:Type>cfg:DynamicList</v8:Type>
+			</Type>
+			<MainAttribute>true</MainAttribute>
+			<Settings xsi:type="DynamicList">
+				<ManualQuery>true</ManualQuery>
+				<DynamicDataRead>false</DynamicDataRead>
+				<QueryText>ВЫБРАТЬ
+	ПродажиОбороты.Период КАК Дата,
+	ПродажиОбороты.Регистратор.Номер КАК Номер,
+	СУММА(ПродажиОбороты.ЦенаПартнераОборот * ПродажиОбороты.КоличествоОборот) КАК СуммаПартнера,
+	СУММА(ПродажиОбороты.ЦенаОборот * ПродажиОбороты.КоличествоОборот) КАК СуммаПродажи,
+	СУММА(ПродажиОбороты.ЦенаОборот * ПродажиОбороты.КоличествоОборот - ПродажиОбороты.ЦенаПартнераОборот * ПродажиОбороты.КоличествоОборот) КАК Прибыль
+ИЗ
+	РегистрНакопления.Продажи.Обороты(, , Запись, ) КАК ПродажиОбороты
+ГДЕ
+	ПродажиОбороты.Период МЕЖДУ &amp;ДатаНачала И &amp;ДатаКонец
+
+СГРУППИРОВАТЬ ПО
+	ПродажиОбороты.Период,
+	ПродажиОбороты.Регистратор.Номер</QueryText>
+				<MainTable>AccumulationRegister.Продажи.Turnovers</MainTable>
+				<ListSettings>
+					<dcsset:filter>
+						<dcsset:viewMode>Normal</dcsset:viewMode>
+						<dcsset:userSettingID>dfcece9d-5077-440b-b6b3-45a5cb4538eb</dcsset:userSettingID>
+					</dcsset:filter>
+					<dcsset:order>
+						<dcsset:viewMode>Normal</dcsset:viewMode>
+						<dcsset:userSettingID>88619765-ccb3-46c6-ac52-38e9c992ebd4</dcsset:userSettingID>
+					</dcsset:order>
+					<dcsset:conditionalAppearance>
+						<dcsset:item>
+							<dcsset:selection/>
+							<dcsset:filter>
+								<dcsset:item xsi:type="dcsset:FilterItemComparison">
+									<dcsset:left xsi:type="dcscor:Field">СуммаПродажи</dcsset:left>
+									<dcsset:comparisonType>Less</dcsset:comparisonType>
+									<dcsset:right xsi:type="xs:decimal">0</dcsset:right>
+								</dcsset:item>
+							</dcsset:filter>
+							<dcsset:appearance>
+								<dcscor:item xsi:type="dcsset:SettingsParameterValue">
+									<dcscor:parameter>ЦветФона</dcscor:parameter>
+									<dcscor:value xsi:type="v8ui:Color">#F1F1F1</dcscor:value>
+								</dcscor:item>
+							</dcsset:appearance>
+						</dcsset:item>
+						<dcsset:viewMode>Normal</dcsset:viewMode>
+						<dcsset:userSettingID>b75fecce-942b-4aed-abc9-e6a02e460fb3</dcsset:userSettingID>
+					</dcsset:conditionalAppearance>
+					<dcsset:itemsViewMode>Normal</dcsset:itemsViewMode>
+					<dcsset:itemsUserSettingID>911b6018-f537-43e8-a417-da56b22f9aec</dcsset:itemsUserSettingID>
+				</ListSettings>
+			</Settings>
+		</Attribute>
+		<Attribute name="ДатаНачала" id="3">
+			<Title>
+				<v8:item>
+					<v8:lang>ru</v8:lang>
+					<v8:content>Дата начала</v8:content>
+				</v8:item>
+			</Title>
+			<Type>
+				<v8:Type>xs:dateTime</v8:Type>
+				<v8:DateQualifiers>
+					<v8:DateFractions>Date</v8:DateFractions>
+				</v8:DateQualifiers>
+			</Type>
+		</Attribute>
+		<Attribute name="ДатаКонец" id="4">
+			<Title>
+				<v8:item>
+					<v8:lang>ru</v8:lang>
+					<v8:content>Дата начала</v8:content>
+				</v8:item>
+			</Title>
+			<Type>
+				<v8:Type>xs:dateTime</v8:Type>
+				<v8:DateQualifiers>
+					<v8:DateFractions>Date</v8:DateFractions>
+				</v8:DateQualifiers>
+			</Type>
+		</Attribute>
+		<Attribute name="ВсегоСуммаПартнера" id="5">
+			<Title>
+				<v8:item>
+					<v8:lang>ru</v8:lang>
+					<v8:content>Всего сумма партнера</v8:content>
+				</v8:item>
+			</Title>
+			<Type>
+				<v8:Type>xs:string</v8:Type>
+				<v8:StringQualifiers>
+					<v8:Length>0</v8:Length>
+					<v8:AllowedLength>Variable</v8:AllowedLength>
+				</v8:StringQualifiers>
+			</Type>
+		</Attribute>
+		<Attribute name="ВсегоСуммаПродажи" id="6">
+			<Title>
+				<v8:item>
+					<v8:lang>ru</v8:lang>
+					<v8:content>Всего сумма продажи</v8:content>
+				</v8:item>
+			</Title>
+			<Type>
+				<v8:Type>xs:string</v8:Type>
+				<v8:StringQualifiers>
+					<v8:Length>0</v8:Length>
+					<v8:AllowedLength>Variable</v8:AllowedLength>
+				</v8:StringQualifiers>
+			</Type>
+		</Attribute>
+		<Attribute name="ВсегоСуммаПрибыли" id="7">
+			<Title>
+				<v8:item>
+					<v8:lang>ru</v8:lang>
+					<v8:content>Всего сумма прибыли</v8:content>
+				</v8:item>
+			</Title>
+			<Type>
+				<v8:Type>xs:string</v8:Type>
+				<v8:StringQualifiers>
+					<v8:Length>0</v8:Length>
+					<v8:AllowedLength>Variable</v8:AllowedLength>
+				</v8:StringQualifiers>
+			</Type>
+		</Attribute>
+	</Attributes>
+	<Commands>
+		<Command name="КнОчиститьПериод" id="1">
+			<Title>
+				<v8:item>
+					<v8:lang>ru</v8:lang>
+					<v8:content>Кн очистить период</v8:content>
+				</v8:item>
+			</Title>
+			<ToolTip>
+				<v8:item>
+					<v8:lang>ru</v8:lang>
+					<v8:content>Кн очистить период</v8:content>
+				</v8:item>
+			</ToolTip>
+			<Action>КнОчиститьПериод</Action>
+			<CurrentRowUse>DontUse</CurrentRowUse>
+		</Command>
+	</Commands>
+</Form>

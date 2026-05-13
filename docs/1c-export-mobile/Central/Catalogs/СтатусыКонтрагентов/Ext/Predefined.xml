@@ -1,0 +1,45 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<PredefinedData xmlns="http://v8.1c.ru/8.3/xcf/predef" xmlns:v8="http://v8.1c.ru/8.1/data/core" xmlns:xr="http://v8.1c.ru/8.3/xcf/readable" xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="CatalogPredefinedItems" version="2.7">
+	<Item id="dc95cef5-f264-415d-bd63-e389d20a2dab">
+		<Name>Активний</Name>
+		<Code>000000001</Code>
+		<Description>Активний</Description>
+		<IsFolder>false</IsFolder>
+	</Item>
+	<Item id="a2946a2c-d5dc-4b54-9d14-12515a12b70a">
+		<Name>Закрився</Name>
+		<Code>000000005</Code>
+		<Description>Закрився</Description>
+		<IsFolder>false</IsFolder>
+	</Item>
+	<Item id="edbb22ee-4270-4520-a988-6de084020735">
+		<Name>Малоактивний</Name>
+		<Code>000000004</Code>
+		<Description>Малоактивний</Description>
+		<IsFolder>false</IsFolder>
+	</Item>
+	<Item id="b17e6dc4-d67d-42fe-b1d4-a23dc0f80ffe">
+		<Name>Неактивний</Name>
+		<Code>000000002</Code>
+		<Description>Неактивний</Description>
+		<IsFolder>false</IsFolder>
+	</Item>
+	<Item id="91e5078e-a794-468d-9fed-bfe86b2e6a53">
+		<Name>Новий</Name>
+		<Code>000000003</Code>
+		<Description>Новий</Description>
+		<IsFolder>false</IsFolder>
+	</Item>
+	<Item id="cc6a72a9-2f28-420f-9c09-029063d6fe04">
+		<Name>Потенційний</Name>
+		<Code>000000007</Code>
+		<Description>Потенційний</Description>
+		<IsFolder>false</IsFolder>
+	</Item>
+	<Item id="10b6e9e5-134a-444f-943c-c55e1ec7e0c4">
+		<Name>ТимчасовоНеПрацює</Name>
+		<Code>000000006</Code>
+		<Description>Тимчасово не працює</Description>
+		<IsFolder>false</IsFolder>
+	</Item>
+</PredefinedData>
