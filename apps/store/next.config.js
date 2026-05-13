@@ -35,6 +35,11 @@ const nextConfig = {
       bodySizeLimit: "10mb",
       allowedOrigins: ["new.ltex.com.ua", "ltex.com.ua", "localhost:3000"],
     },
+    // Opt-in Node.js runtime для middleware. lib/auth/jwt.ts використовує
+    // Node-only `crypto` (HMAC + timingSafeEqual), якого нема в Edge Runtime.
+    // Без цього middleware тихо повертає 0-byte response на /manager/*.
+    // Stable з Next.js 16; до того потребує цей experimental flag.
+    nodeMiddleware: true,
   },
   transpilePackages: ["@ltex/ui", "@ltex/shared", "@ltex/db"],
   images: {
