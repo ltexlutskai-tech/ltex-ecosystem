@@ -9,6 +9,9 @@ const { mockPrisma, getCurrentUserMock } = vi.hoisted(() => ({
     clientAssignment: {
       count: vi.fn(),
     },
+    mgrClient: {
+      aggregate: vi.fn(),
+    },
     exchangeRate: {
       findMany: vi.fn(),
     },
@@ -49,6 +52,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   getCurrentUserMock.mockResolvedValue(MANAGER_USER);
   mockPrisma.clientAssignment.count.mockResolvedValue(47);
+  mockPrisma.mgrClient.aggregate.mockResolvedValue({ _sum: { debt: null } });
   mockPrisma.exchangeRate.findMany.mockResolvedValue([
     { currencyFrom: "EUR", currencyTo: "UAH", rate: 52, date: new Date() },
     { currencyFrom: "USD", currencyTo: "UAH", rate: 44, date: new Date() },
