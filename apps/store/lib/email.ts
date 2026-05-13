@@ -47,7 +47,12 @@ interface StatusEmailData {
   orderRef: string;
 }
 
-export type EmailSource = "order" | "order_status" | "newsletter" | "quote";
+export type EmailSource =
+  | "order"
+  | "order_status"
+  | "newsletter"
+  | "quote"
+  | "manager-auth";
 
 export interface EnqueueEmailInput {
   to: string;

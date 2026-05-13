@@ -31,6 +31,7 @@ describe("validateProductionSecrets", () => {
         MOBILE_JWT_SECRET: VALID_SECRET,
         SYNC_API_KEY: VALID_SECRET,
         CUSTOMER_AUTH_SECRET: VALID_SECRET,
+        MANAGER_JWT_SECRET: VALID_SECRET,
       } as NodeJS.ProcessEnv),
     ).not.toThrow();
   });
@@ -119,6 +120,7 @@ describe("validateProductionSecrets", () => {
         MOBILE_JWT_SECRET: VALID_SECRET,
         SYNC_API_KEY: VALID_SECRET,
         CUSTOMER_AUTH_SECRET: VALID_SECRET,
+        MANAGER_JWT_SECRET: VALID_SECRET,
         TELEGRAM_BOT_TOKEN: undefined,
         TELEGRAM_WEBHOOK_SECRET: undefined,
       } as NodeJS.ProcessEnv),
@@ -132,6 +134,7 @@ describe("validateProductionSecrets", () => {
         MOBILE_JWT_SECRET: VALID_SECRET,
         SYNC_API_KEY: VALID_SECRET,
         CUSTOMER_AUTH_SECRET: VALID_SECRET,
+        MANAGER_JWT_SECRET: VALID_SECRET,
         TELEGRAM_BOT_TOKEN: "12345:abcdef",
         TELEGRAM_WEBHOOK_SECRET: "x".repeat(16),
       } as NodeJS.ProcessEnv),
@@ -145,6 +148,7 @@ describe("validateProductionSecrets", () => {
         MOBILE_JWT_SECRET: VALID_SECRET,
         SYNC_API_KEY: VALID_SECRET,
         CUSTOMER_AUTH_SECRET: VALID_SECRET,
+        MANAGER_JWT_SECRET: VALID_SECRET,
         TELEGRAM_BOT_TOKEN: "12345:abcdef",
         TELEGRAM_WEBHOOK_SECRET: undefined,
       } as NodeJS.ProcessEnv),
@@ -158,9 +162,34 @@ describe("validateProductionSecrets", () => {
         MOBILE_JWT_SECRET: VALID_SECRET,
         SYNC_API_KEY: VALID_SECRET,
         CUSTOMER_AUTH_SECRET: VALID_SECRET,
+        MANAGER_JWT_SECRET: VALID_SECRET,
         TELEGRAM_BOT_TOKEN: "12345:abcdef",
         TELEGRAM_WEBHOOK_SECRET: "short",
       } as NodeJS.ProcessEnv),
     ).toThrow(/TELEGRAM_WEBHOOK_SECRET/);
+  });
+
+  it("throws when MANAGER_JWT_SECRET is missing in production", () => {
+    expect(() =>
+      validateProductionSecrets({
+        NODE_ENV: "production",
+        MOBILE_JWT_SECRET: VALID_SECRET,
+        SYNC_API_KEY: VALID_SECRET,
+        CUSTOMER_AUTH_SECRET: VALID_SECRET,
+        MANAGER_JWT_SECRET: undefined,
+      } as NodeJS.ProcessEnv),
+    ).toThrow(/MANAGER_JWT_SECRET/);
+  });
+
+  it("throws when MANAGER_JWT_SECRET is too short in production", () => {
+    expect(() =>
+      validateProductionSecrets({
+        NODE_ENV: "production",
+        MOBILE_JWT_SECRET: VALID_SECRET,
+        SYNC_API_KEY: VALID_SECRET,
+        CUSTOMER_AUTH_SECRET: VALID_SECRET,
+        MANAGER_JWT_SECRET: SHORT_SECRET,
+      } as NodeJS.ProcessEnv),
+    ).toThrow(/MANAGER_JWT_SECRET/);
   });
 });

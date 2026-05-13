@@ -487,6 +487,92 @@ model ViewLog {
   @@map("view_log")
 }
 
+// ─── Manager Workstation users (M1.1) ──────────────────────────────────────
+
+enum UserRole {
+  manager
+  senior_manager
+  admin
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String   @map("password_hash")
+  fullName     String   @map("full_name")
+  role         UserRole @default(manager)
+  isActive     Boolean  @default(true) @map("is_active")
+
+  // 1C bridge (manager-specific, null для non-manager-окремих accounts)
+  code1C        String? @unique @map("code_1c")
+  warehouseId1C String? @map("warehouse_id_1c")
+
+  // Telegram bot bridge
+  telegramChatId    String?  @unique @map("telegram_chat_id")
+  telegramLinkToken String?  @unique @map("telegram_link_token")
+  notifyChannels    String[] @default([]) @map("notify_channels")
+
+  // Audit
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  lastSeenAt  DateTime? @map("last_seen_at")
+  lastLoginIp String?   @map("last_login_ip")
+
+  // Lockout
+  failedLoginCount Int       @default(0) @map("failed_login_count")
+  lockedUntil      DateTime? @map("locked_until")
+
+  refreshTokens   UserRefreshToken[]
+  passwordResets  PasswordResetToken[]
+  assignedClients ClientAssignment[]
+
+  @@map("users")
+}
+
+model UserRefreshToken {
+  id        String    @id @default(cuid())
+  userId    String    @map("user_id")
+  tokenHash String    @unique @map("token_hash")
+  expiresAt DateTime  @map("expires_at")
+  revokedAt DateTime? @map("revoked_at")
+  userAgent String?   @map("user_agent")
+  ipAddress String?   @map("ip_address")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, revokedAt])
+  @@map("user_refresh_tokens")
+}
+
+model PasswordResetToken {
+  id          String    @id @default(cuid())
+  userId      String    @map("user_id")
+  tokenHash   String    @unique @map("token_hash")
+  expiresAt   DateTime  @map("expires_at")
+  usedAt      DateTime? @map("used_at")
+  isInvite    Boolean   @default(false) @map("is_invite")
+  requestedIp String?   @map("requested_ip")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, usedAt])
+  @@map("password_reset_tokens")
+}
+
+model ClientAssignment {
+  id         String   @id @default(cuid())
+  userId     String   @map("user_id")
+  customerId String   @map("customer_id")
+  assignedAt DateTime @default(now()) @map("assigned_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, customerId])
+  @@map("client_assignments")
+}
+
 // ─── Email DLQ (persistent retry queue, Session 70) ─────────────────────────
 
 model EmailJob {

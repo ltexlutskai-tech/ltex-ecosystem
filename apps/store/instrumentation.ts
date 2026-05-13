@@ -38,6 +38,14 @@ export function validateProductionSecrets(
     );
   }
 
+  const managerJwtSecret = env.MANAGER_JWT_SECRET;
+  if (!managerJwtSecret || managerJwtSecret.length < 32) {
+    throw new Error(
+      "MANAGER_JWT_SECRET must be at least 32 characters. " +
+        "Generate with: openssl rand -base64 48",
+    );
+  }
+
   if (env.TELEGRAM_BOT_TOKEN) {
     const tgSecret = env.TELEGRAM_WEBHOOK_SECRET;
     if (!tgSecret || tgSecret.length < 16) {
