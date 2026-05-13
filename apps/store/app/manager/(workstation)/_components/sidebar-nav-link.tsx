@@ -1,0 +1,49 @@
+"use client";
+
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import type { ComponentType } from "react";
+import { cn } from "@ltex/ui";
+
+export interface SidebarNavLinkProps {
+  href: string;
+  label: string;
+  icon: ComponentType<{ className?: string }>;
+  badge?: number;
+  onNavigate?: () => void;
+}
+
+export function SidebarNavLink({
+  href,
+  label,
+  icon: Icon,
+  badge,
+  onNavigate,
+}: SidebarNavLinkProps) {
+  const pathname = usePathname();
+  const active =
+    href === "/manager"
+      ? pathname === "/manager"
+      : pathname === href || pathname.startsWith(`${href}/`);
+
+  return (
+    <Link
+      href={href}
+      onClick={onNavigate}
+      className={cn(
+        "flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors",
+        active
+          ? "bg-green-50 font-medium text-green-700"
+          : "text-gray-700 hover:bg-gray-100",
+      )}
+    >
+      <Icon className="h-4 w-4" />
+      <span className="flex-1">{label}</span>
+      {badge !== undefined && badge > 0 && (
+        <span className="rounded-full bg-red-500 px-2 py-0.5 text-xs font-medium text-white">
+          {badge > 9 ? "9+" : badge}
+        </span>
+      )}
+    </Link>
+  );
+}
