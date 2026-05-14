@@ -12,6 +12,7 @@ const { mockPrisma, getCurrentUserMock } = vi.hoisted(() => ({
     mgrDeliveryMethod: { findMany: vi.fn() },
     mgrAssortmentCode: { findMany: vi.fn() },
     mgrRoute: { findMany: vi.fn() },
+    mgrPriceType: { findMany: vi.fn() },
   },
   getCurrentUserMock: vi.fn(),
 }));
@@ -65,6 +66,9 @@ beforeEach(() => {
   mockPrisma.mgrRoute.findMany.mockResolvedValue([
     { id: "r1", name: "Маршрут #1" },
   ]);
+  mockPrisma.mgrPriceType.findMany.mockResolvedValue([
+    { id: "pt1", code: "wholesale", label: "Оптові" },
+  ]);
 });
 
 describe("GET /api/v1/manager/dictionaries", () => {
@@ -74,7 +78,7 @@ describe("GET /api/v1/manager/dictionaries", () => {
     expect(res.status).toBe(401);
   });
 
-  it("returns all 6 dictionary arrays + cache header", async () => {
+  it("returns all 7 dictionary arrays + cache header", async () => {
     const res = await GET(makeReq());
     expect(res.status).toBe(200);
     expect(res.headers.get("Cache-Control")).toContain("max-age=60");
@@ -85,5 +89,6 @@ describe("GET /api/v1/manager/dictionaries", () => {
     expect(json.deliveries).toHaveLength(1);
     expect(json.assortmentCodes).toHaveLength(1);
     expect(json.routes).toHaveLength(1);
+    expect(json.priceTypes).toHaveLength(1);
   });
 });
