@@ -522,9 +522,10 @@ model User {
   failedLoginCount Int       @default(0) @map("failed_login_count")
   lockedUntil      DateTime? @map("locked_until")
 
-  refreshTokens   UserRefreshToken[]
-  passwordResets  PasswordResetToken[]
-  assignedClients ClientAssignment[]
+  refreshTokens    UserRefreshToken[]
+  passwordResets   PasswordResetToken[]
+  assignedClients  ClientAssignment[]
+  timelineComments MgrClientTimelineEntry[]
 
   @@map("users")
 }
@@ -567,10 +568,239 @@ model ClientAssignment {
   customerId String   @map("customer_id")
   assignedAt DateTime @default(now()) @map("assigned_at")
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user   User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  client MgrClient @relation(fields: [customerId], references: [id], onDelete: Cascade)
 
   @@unique([userId, customerId])
+  @@index([customerId])
   @@map("client_assignments")
+}
+
+// ─── Manager Clients (M1.3a) ───────────────────────────────────────────────
+// Snapshot з 1С `Справочник.Контрагенты` (див. docs/1c-export-mobile/Central/Catalogs/Контрагенты.xml).
+// Реальний SOAP-sync з'явиться у M1.5+; зараз — seed-скрипт з фейковими даними.
+
+model MgrClientStatus {
+  id        String @id @default(cuid())
+  code      String @unique
+  label     String
+  colorHex  String @map("color_hex")
+  sortOrder Int    @default(0) @map("sort_order")
+
+  clientsGeneral     MgrClient[] @relation("MgrClientStatusGeneral")
+  clientsOperational MgrClient[] @relation("MgrClientStatusOperational")
+
+  @@map("mgr_client_statuses")
+}
+
+model MgrSearchChannel {
+  id        String @id @default(cuid())
+  code      String @unique
+  label     String
+  sortOrder Int    @default(0) @map("sort_order")
+
+  clients MgrClient[]
+
+  @@map("mgr_search_channels")
+}
+
+model MgrCategoryTT {
+  id        String @id @default(cuid())
+  code      String @unique
+  label     String
+  sortOrder Int    @default(0) @map("sort_order")
+
+  clients MgrClient[]
+
+  @@map("mgr_categories_tt")
+}
+
+model MgrDeliveryMethod {
+  id        String @id @default(cuid())
+  code      String @unique
+  label     String
+  sortOrder Int    @default(0) @map("sort_order")
+
+  clients MgrClient[]
+
+  @@map("mgr_delivery_methods")
+}
+
+model MgrAssortmentCode {
+  id        String @id @default(cuid())
+  code      String @unique
+  label     String
+  sortOrder Int    @default(0) @map("sort_order")
+
+  clients MgrClient[]
+
+  @@map("mgr_assortment_codes")
+}
+
+model MgrRoute {
+  id        String   @id @default(cuid())
+  code1C    String?  @unique @map("code_1c")
+  name      String
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  primaryForClients MgrClient[]                @relation("MgrClientPrimaryRoute")
+  assignments       MgrClientRouteAssignment[]
+
+  @@map("mgr_routes")
+}
+
+model MgrClient {
+  id               String    @id @default(cuid())
+  code1C           String?   @unique @map("code_1c")
+  uid1C            String?   @unique @map("uid_1c")
+  name             String
+  phonePrimary     String?   @map("phone_primary")
+  city             String?
+  region           String?
+  street           String?
+  house            String?
+  novaPoshtaBranch String?   @map("nova_poshta_branch")
+  geolocation      String?
+  websiteUrl       String?   @map("website_url")
+  monthlyVolume    Decimal?  @map("monthly_volume") @db.Decimal(10, 2)
+  licenseExpiresAt DateTime? @map("license_expires_at")
+  isOwn            Boolean   @default(false) @map("is_own")
+  notDirectInput   Boolean   @default(false) @map("not_direct_input")
+
+  debt                  Decimal   @default(0) @db.Decimal(12, 2)
+  overdueDebt           Decimal   @default(0) @map("overdue_debt") @db.Decimal(12, 2)
+  daysSinceLastPurchase Int?      @map("days_since_last_purchase")
+  lastPurchaseAt        DateTime? @map("last_purchase_at")
+
+  statusGeneralId     String? @map("status_general_id")
+  statusOperationalId String? @map("status_operational_id")
+  searchChannelId     String? @map("search_channel_id")
+  categoryTTId        String? @map("category_tt_id")
+  deliveryMethodId    String? @map("delivery_method_id")
+  primaryRouteId      String? @map("primary_route_id")
+  primaryAssortmentId String? @map("primary_assortment_id")
+
+  statusGeneral     MgrClientStatus?   @relation("MgrClientStatusGeneral", fields: [statusGeneralId], references: [id])
+  statusOperational MgrClientStatus?   @relation("MgrClientStatusOperational", fields: [statusOperationalId], references: [id])
+  searchChannel     MgrSearchChannel?  @relation(fields: [searchChannelId], references: [id])
+  categoryTT        MgrCategoryTT?     @relation(fields: [categoryTTId], references: [id])
+  deliveryMethod    MgrDeliveryMethod? @relation(fields: [deliveryMethodId], references: [id])
+  primaryRoute      MgrRoute?          @relation("MgrClientPrimaryRoute", fields: [primaryRouteId], references: [id])
+  primaryAssortment MgrAssortmentCode? @relation(fields: [primaryAssortmentId], references: [id])
+
+  hasNewMessage Boolean @default(false) @map("has_new_message")
+  isViberLinked Boolean @default(false) @map("is_viber_linked")
+  dialogStatus  String? @map("dialog_status")
+
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+  lastSyncedAt DateTime? @map("last_synced_at")
+
+  phones          MgrClientPhone[]
+  warehouses      MgrClientWarehouse[]
+  routes          MgrClientRouteAssignment[]
+  messengers      MgrClientMessenger[]
+  assortmentItems MgrClientAssortmentItem[]
+  timeline        MgrClientTimelineEntry[]
+  assignments     ClientAssignment[]
+
+  @@index([statusGeneralId])
+  @@index([searchChannelId])
+  @@index([region])
+  @@index([phonePrimary])
+  @@index([name])
+  @@map("mgr_clients")
+}
+
+model MgrClientPhone {
+  id        String  @id @default(cuid())
+  clientId  String  @map("client_id")
+  phone     String
+  label     String?
+  messenger String?
+  sortOrder Int     @default(0) @map("sort_order")
+
+  client MgrClient @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@index([phone])
+  @@index([clientId])
+  @@map("mgr_client_phones")
+}
+
+model MgrClientMessenger {
+  id       String  @id @default(cuid())
+  clientId String  @map("client_id")
+  network  String
+  handle   String
+  url      String?
+  comment  String?
+
+  client MgrClient @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@index([clientId])
+  @@map("mgr_client_messengers")
+}
+
+model MgrClientWarehouse {
+  id               String    @id @default(cuid())
+  clientId         String    @map("client_id")
+  code1C           String?   @map("code_1c")
+  name             String
+  city             String?
+  region           String?
+  novaPoshtaBranch String?   @map("nova_poshta_branch")
+  licenseExpiresAt DateTime? @map("license_expires_at")
+  comment          String?
+
+  client MgrClient @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@index([clientId])
+  @@map("mgr_client_warehouses")
+}
+
+model MgrClientRouteAssignment {
+  id        String @id @default(cuid())
+  clientId  String @map("client_id")
+  routeId   String @map("route_id")
+  sortOrder Int    @default(0) @map("sort_order")
+
+  client MgrClient @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  route  MgrRoute  @relation(fields: [routeId], references: [id], onDelete: Cascade)
+
+  @@unique([clientId, routeId])
+  @@index([routeId])
+  @@map("mgr_client_route_assignments")
+}
+
+model MgrClientAssortmentItem {
+  id            String    @id @default(cuid())
+  clientId      String    @map("client_id")
+  productCode   String    @map("product_code")
+  productName   String?   @map("product_name")
+  lastOrderedAt DateTime? @map("last_ordered_at")
+
+  client MgrClient @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@index([clientId])
+  @@map("mgr_client_assortment")
+}
+
+model MgrClientTimelineEntry {
+  id           String   @id @default(cuid())
+  clientId     String   @map("client_id")
+  kind         String
+  body         String   @db.Text
+  occurredAt   DateTime @map("occurred_at")
+  authorUserId String?  @map("author_user_id")
+  metadata     Json?
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  client MgrClient @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  author User?     @relation(fields: [authorUserId], references: [id], onDelete: SetNull)
+
+  @@index([clientId, occurredAt(sort: Desc)])
+  @@map("mgr_client_timeline")
 }
 
 // ─── Email DLQ (persistent retry queue, Session 70) ─────────────────────────

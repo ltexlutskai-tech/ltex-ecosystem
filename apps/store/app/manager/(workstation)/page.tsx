@@ -9,8 +9,12 @@ import { DashboardTiles } from "./_components/dashboard-tiles";
 export const dynamic = "force-dynamic";
 
 async function getDashboardData(userId: string) {
-  const [clientCount, latestRates] = await Promise.all([
+  const [clientCount, debtAggregate, latestRates] = await Promise.all([
     prisma.clientAssignment.count({ where: { userId } }),
+    prisma.mgrClient.aggregate({
+      where: { assignments: { some: { userId } } },
+      _sum: { debt: true },
+    }),
     prisma.exchangeRate.findMany({
       where: {
         currencyTo: "UAH",
@@ -23,9 +27,12 @@ async function getDashboardData(userId: string) {
   ]);
   const eur = latestRates.find((r) => r.currencyFrom === "EUR")?.rate ?? null;
   const usd = latestRates.find((r) => r.currencyFrom === "USD")?.rate ?? null;
+  const totalDebt = debtAggregate._sum.debt
+    ? Number(debtAggregate._sum.debt)
+    : 0;
   return {
     clientCount,
-    totalDebt: 0,
+    totalDebt,
     eur,
     usd,
     tileCounts: { orders: 0, sales: 0, payments: 0, routes: 0 },
