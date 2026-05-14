@@ -2,7 +2,9 @@
 
 import { Button, useToast } from "@ltex/ui";
 
-export function ClientActionButtons() {
+export function ClientActionButtons({
+  clientId: _clientId,
+}: { clientId?: string } = {}) {
   const { toast } = useToast();
   return (
     <div className="flex flex-wrap gap-2">
@@ -22,11 +24,12 @@ export function ClientActionButtons() {
         variant="outline"
         onClick={() =>
           toast({
-            description: "Viber-повідомлення про борг буде у M1.8",
+            description:
+              "Чат-інтеграцію (Viber/Telegram повідомлення про борг) зробимо у M1.8",
           })
         }
       >
-        Повідомлення про борг
+        Повідомити про борг
       </Button>
     </div>
   );

@@ -526,6 +526,8 @@ model User {
   passwordResets   PasswordResetToken[]
   assignedClients  ClientAssignment[]
   timelineComments MgrClientTimelineEntry[]
+  agentForClients  MgrClient[]              @relation("ClientAgent")
+  reminders        MgrReminder[]            @relation("UserReminders")
 
   @@map("users")
 }
@@ -693,6 +695,18 @@ model MgrClient {
   isViberLinked Boolean @default(false) @map("is_viber_linked")
   dialogStatus  String? @map("dialog_status")
 
+  // ─── M1.3c additions (full 1С parity) ─────────────────────────────────────
+  tradePointName   String?  @map("trade_point_name")
+  tovDebt          Decimal? @map("tov_debt") @db.Decimal(12, 2)
+  tovOverdueDebt   Decimal? @map("tov_overdue_debt") @db.Decimal(12, 2)
+  agentUserId      String?  @map("agent_user_id")
+  viberContact     String?  @map("viber_contact")
+  sessionRemainder Decimal? @map("session_remainder") @db.Decimal(12, 2)
+  priceTypeId      String?  @map("price_type_id")
+
+  agent     User?         @relation("ClientAgent", fields: [agentUserId], references: [id], onDelete: SetNull)
+  priceType MgrPriceType? @relation(fields: [priceTypeId], references: [id], onDelete: SetNull)
+
   createdAt    DateTime  @default(now()) @map("created_at")
   updatedAt    DateTime  @updatedAt @map("updated_at")
   lastSyncedAt DateTime? @map("last_synced_at")
@@ -702,6 +716,9 @@ model MgrClient {
   routes          MgrClientRouteAssignment[]
   messengers      MgrClientMessenger[]
   assortmentItems MgrClientAssortmentItem[]
+  presentations   MgrClientPresentationItem[]
+  bankAccounts    MgrClientBankAccount[]
+  reminders       MgrReminder[]
   timeline        MgrClientTimelineEntry[]
   assignments     ClientAssignment[]
 
@@ -711,6 +728,18 @@ model MgrClient {
   @@index([phonePrimary])
   @@index([name])
   @@map("mgr_clients")
+}
+
+// ─── Price types dictionary (← 1С Catalog.ТипыЦенНоменклатуры) ─────────────
+model MgrPriceType {
+  id        String @id @default(cuid())
+  code      String @unique
+  label     String
+  sortOrder Int    @default(0) @map("sort_order")
+
+  clients MgrClient[]
+
+  @@map("mgr_price_types")
 }
 
 model MgrClientPhone {
@@ -729,12 +758,13 @@ model MgrClientPhone {
 }
 
 model MgrClientMessenger {
-  id       String  @id @default(cuid())
-  clientId String  @map("client_id")
-  network  String
-  handle   String
-  url      String?
-  comment  String?
+  id         String  @id @default(cuid())
+  clientId   String  @map("client_id")
+  network    String
+  handle     String
+  url        String?
+  browserUrl String? @map("browser_url")
+  comment    String?
 
   client MgrClient @relation(fields: [clientId], references: [id], onDelete: Cascade)
 
@@ -774,16 +804,68 @@ model MgrClientRouteAssignment {
 }
 
 model MgrClientAssortmentItem {
-  id            String    @id @default(cuid())
-  clientId      String    @map("client_id")
-  productCode   String    @map("product_code")
-  productName   String?   @map("product_name")
-  lastOrderedAt DateTime? @map("last_ordered_at")
+  id             String    @id @default(cuid())
+  clientId       String    @map("client_id")
+  productCode    String    @map("product_code")
+  productName    String?   @map("product_name")
+  lastOrderedAt  DateTime? @map("last_ordered_at")
+  notDirectInput Boolean   @default(false) @map("not_direct_input")
 
   client MgrClient @relation(fields: [clientId], references: [id], onDelete: Cascade)
 
   @@index([clientId])
   @@map("mgr_client_assortment")
+}
+
+// ─── Presentations (← 1С TabularSection.АсортиментПрезентацій) ─────────────
+model MgrClientPresentationItem {
+  id              String    @id @default(cuid())
+  clientId        String    @map("client_id")
+  productCode     String    @map("product_code")
+  productName     String?   @map("product_name")
+  lastPresentedAt DateTime? @map("last_presented_at")
+  notDirectInput  Boolean   @default(false) @map("not_direct_input")
+
+  client MgrClient @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@index([clientId])
+  @@map("mgr_client_presentations")
+}
+
+// ─── Bank accounts (← 1С Catalog.БанковскиеСчета, owner=Контрагент) ────────
+model MgrClientBankAccount {
+  id            String  @id @default(cuid())
+  clientId      String  @map("client_id")
+  accountNumber String  @map("account_number")
+  bankName      String? @map("bank_name")
+  mfo           String?
+  comment       String?
+  isHidden      Boolean @default(false) @map("is_hidden")
+
+  client MgrClient @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@index([clientId])
+  @@map("mgr_client_bank_accounts")
+}
+
+// ─── Reminders (← 1С Catalog.Нагадування + own private extras) ─────────────
+model MgrReminder {
+  id             String    @id @default(cuid())
+  clientId       String    @map("client_id")
+  ownerUserId    String    @map("owner_user_id")
+  body           String    @db.Text
+  remindAt       DateTime  @map("remind_at")
+  completedAt    DateTime? @map("completed_at")
+  snoozedUntilAt DateTime? @map("snoozed_until_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  client MgrClient @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  owner  User      @relation("UserReminders", fields: [ownerUserId], references: [id], onDelete: Cascade)
+
+  @@index([clientId, remindAt])
+  @@index([ownerUserId, completedAt, remindAt])
+  @@map("mgr_reminders")
 }
 
 model MgrClientTimelineEntry {

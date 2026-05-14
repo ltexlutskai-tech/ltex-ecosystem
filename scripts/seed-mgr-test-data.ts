@@ -66,10 +66,18 @@ const ROUTES = [
   { code1C: "RT003", name: "Маршрут #3 — Південь" },
 ];
 
+const PRICE_TYPES = [
+  { code: "wholesale", label: "Оптові", sortOrder: 1 },
+  { code: "small_wholesale", label: "Дрібний опт", sortOrder: 2 },
+  { code: "retail", label: "Роздрібні", sortOrder: 3 },
+];
+
 interface SeedClient {
   code1C: string;
   name: string;
+  tradePointName?: string;
   phonePrimary: string;
+  viberContact?: string;
   city: string;
   region: string;
   street?: string;
@@ -83,25 +91,57 @@ interface SeedClient {
   deliveryMethod?: string;
   primaryAssortment?: string;
   primaryRoute?: string;
+  priceType?: string;
   debt: number;
   overdueDebt?: number;
+  tovDebt?: number;
+  tovOverdueDebt?: number;
+  sessionRemainder?: number;
   daysSinceLastPurchase: number | null;
   lastPurchaseDaysAgo: number | null;
   assignToAdmin?: boolean;
+  assignAgent?: boolean;
   timeline: Array<{
     kind: "payment" | "sale" | "reminder" | "comment";
     body: string;
     daysAgo: number;
   }>;
-  assortment?: Array<{ productCode: string; productName: string }>;
-  messengers?: Array<{ network: string; handle: string }>;
+  assortment?: Array<{
+    productCode: string;
+    productName: string;
+    notDirectInput?: boolean;
+  }>;
+  presentations?: Array<{
+    productCode: string;
+    productName: string;
+    daysAgo?: number;
+    notDirectInput?: boolean;
+  }>;
+  bankAccounts?: Array<{
+    accountNumber: string;
+    bankName?: string;
+    mfo?: string;
+    comment?: string;
+  }>;
+  messengers?: Array<{
+    network: string;
+    handle: string;
+    browserUrl?: string;
+    comment?: string;
+  }>;
+  reminders?: Array<{
+    body: string;
+    daysOffset: number; // negative=past (overdue), 0=today, positive=future
+  }>;
 }
 
 const CLIENTS: SeedClient[] = [
   {
     code1C: "000001234",
     name: "Амер",
+    tradePointName: "Секонд Рівне Соборна",
     phonePrimary: "+380633669359",
+    viberContact: "+380633669359",
     city: "Рівне",
     region: "Рівненська",
     street: "Соборна",
@@ -115,11 +155,41 @@ const CLIENTS: SeedClient[] = [
     deliveryMethod: "nova_poshta",
     primaryAssortment: "second_stock",
     primaryRoute: "RT001",
+    priceType: "wholesale",
     debt: 17387.74,
     overdueDebt: 5200.0,
+    tovDebt: 5200.0,
+    tovOverdueDebt: 1200.0,
+    sessionRemainder: 0,
     daysSinceLastPurchase: 146,
     lastPurchaseDaysAgo: 146,
     assignToAdmin: true,
+    assignAgent: true,
+    bankAccounts: [
+      {
+        accountNumber: "UA213996220000026007012345678",
+        bankName: "ПриватБанк",
+        mfo: "305299",
+        comment: "Основний",
+      },
+    ],
+    presentations: [
+      {
+        productCode: "C4C TT UK ORL",
+        productName: "C4C TT UK Original",
+        daysAgo: 90,
+      },
+      {
+        productCode: "X1X NEW STK",
+        productName: "X1X NEW STOCK",
+        daysAgo: 30,
+        notDirectInput: true,
+      },
+    ],
+    reminders: [
+      { body: "Передзвонити щодо погашення боргу", daysOffset: -2 },
+      { body: "Запропонувати новий лот сток-одягу", daysOffset: 3 },
+    ],
     timeline: [
       {
         kind: "payment",
@@ -144,12 +214,20 @@ const CLIENTS: SeedClient[] = [
     messengers: [
       { network: "viber", handle: "+380633669359" },
       { network: "tiktok", handle: "@amer_rivne" },
+      {
+        network: "facebook",
+        handle: "amer.rivne",
+        browserUrl: "https://www.facebook.com/profile.php?id=100012345",
+        comment: "Зі сторінкою тільки через browser",
+      },
     ],
   },
   {
     code1C: "000001235",
     name: "Бєлоус Альона",
+    tradePointName: "@bielous_shop",
     phonePrimary: "+380505319881",
+    viberContact: "+380505319881",
     city: "Дмитрівка",
     region: "Київська",
     monthlyVolume: 60,
@@ -161,9 +239,21 @@ const CLIENTS: SeedClient[] = [
     primaryAssortment: "second",
     primaryRoute: "RT002",
     debt: -8.23,
+    tovDebt: 0,
+    sessionRemainder: 240.5,
+    priceType: "small_wholesale",
     daysSinceLastPurchase: 5,
     lastPurchaseDaysAgo: 5,
     assignToAdmin: true,
+    assignAgent: true,
+    bankAccounts: [
+      {
+        accountNumber: "UA763510050000026200876543210",
+        bankName: "Укрсиббанк",
+        mfo: "351005",
+      },
+    ],
+    reminders: [{ body: "Виставити рахунок наступного тижня", daysOffset: 5 }],
     timeline: [
       {
         kind: "payment",
@@ -172,12 +262,24 @@ const CLIENTS: SeedClient[] = [
       },
       { kind: "sale", body: "Відвантажено 22 кг сток", daysAgo: 6 },
     ],
-    messengers: [{ network: "telegram", handle: "@bielous_alona" }],
+    messengers: [
+      { network: "telegram", handle: "@bielous_alona" },
+      { network: "instagram", handle: "bielous_alona_shop" },
+    ],
   },
   {
     code1C: "000001236",
     name: "Гончарук Михайло",
+    tradePointName: "TikTok @gonchar_mh",
+    priceType: "retail",
     phonePrimary: "+380673334455",
+    viberContact: "+380673334455",
+    sessionRemainder: 580.0,
+    assignAgent: true,
+    presentations: [
+      { productCode: "TK MIX 5", productName: "TikTok Mix #5", daysAgo: 14 },
+    ],
+    reminders: [{ body: "Зробити презентацію нового міксу", daysOffset: -1 }],
     city: "Львів",
     region: "Львівська",
     status: "active",
@@ -438,6 +540,13 @@ async function seedDictionaries() {
       update: { name: r.name },
     });
   }
+  for (const p of PRICE_TYPES) {
+    await prisma.mgrPriceType.upsert({
+      where: { code: p.code },
+      create: p,
+      update: p,
+    });
+  }
   console.log("✓ Dictionaries seeded");
 }
 
@@ -448,18 +557,27 @@ interface DictMaps {
   deliveryMethod: Map<string, string>;
   assortment: Map<string, string>;
   route: Map<string, string>;
+  priceType: Map<string, string>;
 }
 
 async function loadDictMaps(): Promise<DictMaps> {
-  const [statuses, channels, categories, deliveries, assortment, routes] =
-    await Promise.all([
-      prisma.mgrClientStatus.findMany(),
-      prisma.mgrSearchChannel.findMany(),
-      prisma.mgrCategoryTT.findMany(),
-      prisma.mgrDeliveryMethod.findMany(),
-      prisma.mgrAssortmentCode.findMany(),
-      prisma.mgrRoute.findMany(),
-    ]);
+  const [
+    statuses,
+    channels,
+    categories,
+    deliveries,
+    assortment,
+    routes,
+    priceTypes,
+  ] = await Promise.all([
+    prisma.mgrClientStatus.findMany(),
+    prisma.mgrSearchChannel.findMany(),
+    prisma.mgrCategoryTT.findMany(),
+    prisma.mgrDeliveryMethod.findMany(),
+    prisma.mgrAssortmentCode.findMany(),
+    prisma.mgrRoute.findMany(),
+    prisma.mgrPriceType.findMany(),
+  ]);
   return {
     status: new Map(statuses.map((s) => [s.code, s.id])),
     channel: new Map(channels.map((c) => [c.code, c.id])),
@@ -469,6 +587,7 @@ async function loadDictMaps(): Promise<DictMaps> {
     route: new Map(
       routes.flatMap((r) => (r.code1C ? [[r.code1C, r.id] as const] : [])),
     ),
+    priceType: new Map(priceTypes.map((p) => [p.code, p.id])),
   };
 }
 
@@ -485,7 +604,9 @@ async function seedClients(maps: DictMaps) {
       data: {
         code1C: c.code1C,
         name: c.name,
+        tradePointName: c.tradePointName ?? null,
         phonePrimary: c.phonePrimary,
+        viberContact: c.viberContact ?? null,
         city: c.city,
         region: c.region,
         street: c.street ?? null,
@@ -494,6 +615,9 @@ async function seedClients(maps: DictMaps) {
         monthlyVolume: c.monthlyVolume ?? null,
         debt: c.debt,
         overdueDebt: c.overdueDebt ?? 0,
+        tovDebt: c.tovDebt ?? null,
+        tovOverdueDebt: c.tovOverdueDebt ?? null,
+        sessionRemainder: c.sessionRemainder ?? null,
         daysSinceLastPurchase: c.daysSinceLastPurchase,
         lastPurchaseAt: dayOffset(c.lastPurchaseDaysAgo),
         statusGeneralId: maps.status.get(c.status) ?? null,
@@ -513,6 +637,10 @@ async function seedClients(maps: DictMaps) {
         primaryRouteId: c.primaryRoute
           ? (maps.route.get(c.primaryRoute) ?? null)
           : null,
+        priceTypeId: c.priceType
+          ? (maps.priceType.get(c.priceType) ?? null)
+          : null,
+        agentUserId: c.assignAgent && adminUser ? adminUser.id : null,
         lastSyncedAt: new Date(),
       },
     });
@@ -535,6 +663,31 @@ async function seedClients(maps: DictMaps) {
           productCode: a.productCode,
           productName: a.productName,
           lastOrderedAt: dayOffset(c.lastPurchaseDaysAgo),
+          notDirectInput: a.notDirectInput ?? false,
+        })),
+      });
+    }
+
+    if (c.presentations && c.presentations.length > 0) {
+      await prisma.mgrClientPresentationItem.createMany({
+        data: c.presentations.map((p) => ({
+          clientId: created.id,
+          productCode: p.productCode,
+          productName: p.productName,
+          lastPresentedAt: dayOffset(p.daysAgo ?? null),
+          notDirectInput: p.notDirectInput ?? false,
+        })),
+      });
+    }
+
+    if (c.bankAccounts && c.bankAccounts.length > 0) {
+      await prisma.mgrClientBankAccount.createMany({
+        data: c.bankAccounts.map((b) => ({
+          clientId: created.id,
+          accountNumber: b.accountNumber,
+          bankName: b.bankName ?? null,
+          mfo: b.mfo ?? null,
+          comment: b.comment ?? null,
         })),
       });
     }
@@ -545,6 +698,19 @@ async function seedClients(maps: DictMaps) {
           clientId: created.id,
           network: m.network,
           handle: m.handle,
+          browserUrl: m.browserUrl ?? null,
+          comment: m.comment ?? null,
+        })),
+      });
+    }
+
+    if (c.reminders && c.reminders.length > 0 && adminUser) {
+      await prisma.mgrReminder.createMany({
+        data: c.reminders.map((r) => ({
+          clientId: created.id,
+          ownerUserId: adminUser.id,
+          body: r.body,
+          remindAt: new Date(Date.now() + r.daysOffset * 86400_000),
         })),
       });
     }
