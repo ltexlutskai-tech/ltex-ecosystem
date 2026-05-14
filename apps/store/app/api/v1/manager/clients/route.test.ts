@@ -14,7 +14,7 @@ const { mockPrisma, getCurrentUserMock } = vi.hoisted(() => ({
   getCurrentUserMock: vi.fn(),
 }));
 
-vi.mock("@ltex/db", () => ({ prisma: mockPrisma }));
+vi.mock("@ltex/db", () => ({ prisma: mockPrisma, Prisma: {} }));
 
 vi.mock("@/lib/auth/manager-auth", () => ({
   getCurrentUser: (...args: unknown[]) => getCurrentUserMock(...args),
@@ -58,8 +58,16 @@ const SAMPLE_CLIENT = {
   statusOperational: null,
   searchChannel: { code: "google", label: "Google" },
   deliveryMethod: null,
+  agent: null,
   assignments: [],
 };
+
+function findAndClause<T extends Record<string, unknown>>(
+  callArgs: { where: { AND?: T[] } } | undefined,
+  predicate: (c: T) => boolean,
+): T | undefined {
+  return (callArgs?.where.AND ?? []).find(predicate);
+}
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -68,7 +76,7 @@ beforeEach(() => {
   mockPrisma.mgrClient.findMany.mockResolvedValue([SAMPLE_CLIENT]);
 });
 
-describe("GET /api/v1/manager/clients", () => {
+describe("GET /api/v1/manager/clients — base behaviour", () => {
   it("returns 401 when not authenticated", async () => {
     getCurrentUserMock.mockResolvedValueOnce(null);
     const res = await GET(makeReq());
@@ -100,7 +108,7 @@ describe("GET /api/v1/manager/clients", () => {
     expect(nots.length).toBeGreaterThan(0);
   });
 
-  it("filters by status when query param given", async () => {
+  it("filters by legacy status code when query param given (back-compat)", async () => {
     await GET(makeReq("status=inactive"));
     const callArgs = mockPrisma.mgrClient.findMany.mock.calls[0]?.[0];
     const where = callArgs.where as {
@@ -151,5 +159,124 @@ describe("GET /api/v1/manager/clients", () => {
     const res = await GET(makeReq());
     const json = (await res.json()) as { items: Array<{ debt: string }> };
     expect(json.items[0]?.debt).toBe("1234.56");
+  });
+});
+
+describe("GET /api/v1/manager/clients — M1.3e extended filters", () => {
+  it("multi-select statusId (CSV) → statusGeneralId IN [...]", async () => {
+    await GET(makeReq("statusId=s1,s2,s3"));
+    const callArgs = mockPrisma.mgrClient.findMany.mock.calls[0]?.[0];
+    const clause = findAndClause<{ statusGeneralId?: { in: string[] } }>(
+      callArgs,
+      (c) => c.statusGeneralId !== undefined,
+    );
+    expect(clause?.statusGeneralId?.in).toEqual(["s1", "s2", "s3"]);
+  });
+
+  it("multi-select categoryTTId works", async () => {
+    await GET(makeReq("categoryTTId=cat1,cat2"));
+    const callArgs = mockPrisma.mgrClient.findMany.mock.calls[0]?.[0];
+    const clause = findAndClause<{ categoryTTId?: { in: string[] } }>(
+      callArgs,
+      (c) => c.categoryTTId !== undefined,
+    );
+    expect(clause?.categoryTTId?.in).toEqual(["cat1", "cat2"]);
+  });
+
+  it("debtMin + debtMax range → debt gte/lte", async () => {
+    await GET(makeReq("debtMin=100&debtMax=5000"));
+    const callArgs = mockPrisma.mgrClient.findMany.mock.calls[0]?.[0];
+    const clause = findAndClause<{
+      debt?: { gte?: number; lte?: number; gt?: number; lt?: number };
+    }>(callArgs, (c) => c.debt !== undefined);
+    expect(clause?.debt?.gte).toBe(100);
+    expect(clause?.debt?.lte).toBe(5000);
+    expect(clause?.debt?.gt).toBeUndefined();
+  });
+
+  it("debtMin overrides hasDebt boolean", async () => {
+    await GET(makeReq("debtMin=100&hasDebt=true"));
+    const callArgs = mockPrisma.mgrClient.findMany.mock.calls[0]?.[0];
+    const where = callArgs.where as {
+      AND?: Array<{ debt?: { gte?: number; gt?: number } }>;
+    };
+    const debtClauses = (where.AND ?? []).filter((c) => c.debt !== undefined);
+    expect(debtClauses).toHaveLength(1);
+    expect(debtClauses[0]?.debt?.gte).toBe(100);
+    expect(debtClauses[0]?.debt?.gt).toBeUndefined();
+  });
+
+  it("region LIKE %query% case-insensitive", async () => {
+    await GET(makeReq("region=Київська"));
+    const callArgs = mockPrisma.mgrClient.findMany.mock.calls[0]?.[0];
+    const clause = findAndClause<{
+      region?: { contains: string; mode: string };
+    }>(callArgs, (c) => c.region !== undefined);
+    expect(clause?.region?.contains).toBe("Київська");
+    expect(clause?.region?.mode).toBe("insensitive");
+  });
+
+  it("hasNewMessage boolean → exact match", async () => {
+    await GET(makeReq("hasNewMessage=true"));
+    const callArgs = mockPrisma.mgrClient.findMany.mock.calls[0]?.[0];
+    const clause = findAndClause<{ hasNewMessage?: boolean }>(
+      callArgs,
+      (c) => c.hasNewMessage !== undefined,
+    );
+    expect(clause?.hasNewMessage).toBe(true);
+  });
+
+  it("createdFrom + createdTo date range → createdAt gte/lte", async () => {
+    await GET(makeReq("createdFrom=2026-01-01&createdTo=2026-12-31"));
+    const callArgs = mockPrisma.mgrClient.findMany.mock.calls[0]?.[0];
+    const clause = findAndClause<{
+      createdAt?: { gte?: Date; lte?: Date };
+    }>(callArgs, (c) => c.createdAt !== undefined);
+    expect(clause?.createdAt?.gte).toBeInstanceOf(Date);
+    expect(clause?.createdAt?.lte).toBeInstanceOf(Date);
+  });
+
+  it("agentUserId multi-select → agentUserId IN [...]", async () => {
+    await GET(makeReq("agentUserId=u1,u2"));
+    const callArgs = mockPrisma.mgrClient.findMany.mock.calls[0]?.[0];
+    const clause = findAndClause<{ agentUserId?: { in: string[] } }>(
+      callArgs,
+      (c) => c.agentUserId !== undefined,
+    );
+    expect(clause?.agentUserId?.in).toEqual(["u1", "u2"]);
+  });
+
+  it("overdueDebtMin range → overdueDebt gte", async () => {
+    await GET(makeReq("overdueDebtMin=50"));
+    const callArgs = mockPrisma.mgrClient.findMany.mock.calls[0]?.[0];
+    const clause = findAndClause<{ overdueDebt?: { gte?: number } }>(
+      callArgs,
+      (c) => c.overdueDebt !== undefined,
+    );
+    expect(clause?.overdueDebt?.gte).toBe(50);
+  });
+
+  it("combined filters: status multi + debt range + region", async () => {
+    await GET(makeReq("statusId=s1,s2&debtMin=100&debtMax=1000&region=Львів"));
+    const callArgs = mockPrisma.mgrClient.findMany.mock.calls[0]?.[0];
+    const where = callArgs.where as {
+      AND?: Array<Record<string, unknown>>;
+    };
+    const ands = where.AND ?? [];
+    expect(ands.find((c) => "statusGeneralId" in c)).toBeDefined();
+    expect(ands.find((c) => "debt" in c)).toBeDefined();
+    expect(ands.find((c) => "region" in c)).toBeDefined();
+  });
+
+  it("empty CSV string skipped (statusId=) — без фільтра", async () => {
+    await GET(makeReq("statusId="));
+    const callArgs = mockPrisma.mgrClient.findMany.mock.calls[0]?.[0];
+    const where = callArgs.where as {
+      AND?: Array<{ statusGeneralId?: { in: string[] } }>;
+    };
+    const statusClause = (where.AND ?? []).find(
+      (c) => c.statusGeneralId !== undefined,
+    );
+    expect(statusClause).toBeUndefined();
   });
 });
