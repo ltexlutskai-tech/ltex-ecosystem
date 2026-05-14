@@ -75,11 +75,37 @@ const fakeClient = {
   deliveryMethod: null,
   primaryRoute: null,
   primaryAssortment: null,
+  tradePointName: "Магазин Київ #1",
+  viberContact: "+380501112233",
+  tovDebt: { toString: () => "200.00" },
+  tovOverdueDebt: null,
+  sessionRemainder: { toString: () => "0.00" },
+  priceType: { code: "wholesale", label: "Оптові" },
+  agent: { id: "u1", fullName: "Alice" },
   phones: [{ id: "p1", phone: "+380501112233", label: null, messenger: null }],
   messengers: [],
   warehouses: [],
   routes: [],
   assortmentItems: [],
+  presentations: [
+    {
+      id: "pr1",
+      productCode: "X1",
+      productName: "X1",
+      lastPresentedAt: new Date("2026-05-01"),
+      notDirectInput: false,
+    },
+  ],
+  bankAccounts: [
+    {
+      id: "b1",
+      accountNumber: "UA213996220000026007012345678",
+      bankName: "ПриватБанк",
+      mfo: "305299",
+      comment: null,
+      isHidden: false,
+    },
+  ],
   timeline: [
     {
       id: "t1",
@@ -137,5 +163,35 @@ describe("GET /api/v1/manager/clients/[id]", () => {
     expect(json.client.phones).toHaveLength(1);
     expect(json.client.timeline).toHaveLength(1);
     expect(json.client.assignedManager?.fullName).toBe("Alice");
+  });
+
+  it("returns new M1.3c fields (tradePointName, priceType, agent, presentations, bankAccounts)", async () => {
+    mockPrisma.mgrClient.findUnique.mockResolvedValueOnce(fakeClient);
+    const res = await GET(makeReq("c1"), {
+      params: Promise.resolve({ id: "c1" }),
+    });
+    expect(res.status).toBe(200);
+    const json = (await res.json()) as {
+      client: {
+        tradePointName: string | null;
+        priceType: { code: string; label: string } | null;
+        agent: { id: string; fullName: string } | null;
+        tovDebt: string | null;
+        sessionRemainder: string | null;
+        viberContact: string | null;
+        presentations: unknown[];
+        bankAccounts: { accountNumber: string }[];
+      };
+    };
+    expect(json.client.tradePointName).toBe("Магазин Київ #1");
+    expect(json.client.priceType?.code).toBe("wholesale");
+    expect(json.client.agent?.fullName).toBe("Alice");
+    expect(json.client.tovDebt).toBe("200.00");
+    expect(json.client.sessionRemainder).toBe("0.00");
+    expect(json.client.viberContact).toBe("+380501112233");
+    expect(json.client.presentations).toHaveLength(1);
+    expect(json.client.bankAccounts[0]?.accountNumber).toBe(
+      "UA213996220000026007012345678",
+    );
   });
 });

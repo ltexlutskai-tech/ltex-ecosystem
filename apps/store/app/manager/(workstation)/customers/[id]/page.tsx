@@ -4,11 +4,18 @@ import { ArrowLeft } from "lucide-react";
 import { getCurrentUser } from "@/lib/auth/manager-auth";
 import { UnderConstruction } from "../../_components/under-construction";
 import { ClientAssortmentTab } from "./_components/client-assortment-tab";
+import { ClientBankAccountsTab } from "./_components/client-bank-accounts-tab";
 import { ClientHeader } from "./_components/client-header";
 import { ClientHistoryTab } from "./_components/client-history-tab";
+import { ClientPresentationHistoryTab } from "./_components/client-presentation-history-tab";
+import { ClientPresentationsTab } from "./_components/client-presentations-tab";
+import { ClientRemindersTab } from "./_components/client-reminders-tab";
 import { ClientRequisitesTab } from "./_components/client-requisites-tab";
-import { ClientRoutesTab } from "./_components/client-routes-tab";
+import { ClientSalesHistoryTab } from "./_components/client-sales-history-tab";
+import { ClientSocialTab } from "./_components/client-social-tab";
 import { ClientTabs } from "./_components/client-tabs";
+import { ClientViberTab } from "./_components/client-viber-tab";
+import { countOverdue } from "./_components/client-reminders-grouping";
 import { loadClientDetail } from "./_lib/load-client";
 
 export const dynamic = "force-dynamic";
@@ -38,6 +45,7 @@ export default async function ClientDetailPage({
   if (!client) notFound();
 
   const canAssign = user.role === "admin";
+  const overdueCount = countOverdue(client.reminders);
 
   return (
     <div className="mx-auto max-w-5xl space-y-4">
@@ -52,23 +60,32 @@ export default async function ClientDetailPage({
       <ClientHeader client={client} canAssign={canAssign} />
 
       <ClientTabs
+        overdueRemindersCount={overdueCount}
         requisites={<ClientRequisitesTab client={client} />}
+        assortment={<ClientAssortmentTab items={client.assortmentItems} />}
+        presentations={<ClientPresentationsTab items={client.presentations} />}
         history={
           <ClientHistoryTab clientId={client.id} timeline={client.timeline} />
         }
-        routes={
-          <ClientRoutesTab
-            routes={client.routes}
-            primaryRouteId={client.primaryRoute?.id ?? null}
-          />
-        }
-        assortment={<ClientAssortmentTab items={client.assortmentItems} />}
+        salesHistory={<ClientSalesHistoryTab />}
         orders={
           <UnderConstruction
             session="M1.5"
             description="Замовлення клієнта з'являться у наступних сесіях."
           />
         }
+        reminders={
+          <ClientRemindersTab
+            clientId={client.id}
+            reminders={client.reminders}
+            currentUserId={user.id}
+            currentUserRole={user.role}
+          />
+        }
+        viber={<ClientViberTab client={client} />}
+        banks={<ClientBankAccountsTab accounts={client.bankAccounts} />}
+        presentationHistory={<ClientPresentationHistoryTab />}
+        social={<ClientSocialTab client={client} />}
       />
     </div>
   );

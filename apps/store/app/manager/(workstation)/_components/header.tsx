@@ -11,13 +11,11 @@ export function ManagerHeader({
   fullName,
   role,
   chatUnread = 0,
-  notificationsUnread = 0,
   lastSyncAt,
 }: {
   fullName: string;
   role: ManagerRole;
   chatUnread?: number;
-  notificationsUnread?: number;
   lastSyncAt: string | null;
 }) {
   return (
@@ -34,7 +32,7 @@ export function ManagerHeader({
         <HeaderBarcode />
       </div>
       <HeaderSyncIndicator initialLastSyncAt={lastSyncAt} />
-      <HeaderNotificationsBell unreadCount={notificationsUnread} />
+      <HeaderNotificationsBell />
       <HeaderProfileMenu fullName={fullName} role={role} />
     </header>
   );

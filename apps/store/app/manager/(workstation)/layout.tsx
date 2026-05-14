@@ -18,7 +18,6 @@ export default async function WorkstationLayout({
 
   const lastSyncAt = new Date().toISOString();
   const chatUnread = 0;
-  const notificationsUnread = 0;
 
   return (
     <div className="flex h-screen flex-col bg-gray-50">
@@ -26,7 +25,6 @@ export default async function WorkstationLayout({
         fullName={user.fullName}
         role={user.role}
         chatUnread={chatUnread}
-        notificationsUnread={notificationsUnread}
         lastSyncAt={lastSyncAt}
       />
       <div className="flex flex-1 overflow-hidden">

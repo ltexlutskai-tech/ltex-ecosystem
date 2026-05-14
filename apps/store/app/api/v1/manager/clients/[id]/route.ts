@@ -22,11 +22,15 @@ export async function GET(
       deliveryMethod: true,
       primaryRoute: true,
       primaryAssortment: true,
+      priceType: true,
+      agent: { select: { id: true, fullName: true } },
       phones: { orderBy: { sortOrder: "asc" } },
       messengers: true,
       warehouses: true,
       routes: { include: { route: true } },
       assortmentItems: { orderBy: { lastOrderedAt: "desc" } },
+      presentations: { orderBy: { lastPresentedAt: "desc" } },
+      bankAccounts: { orderBy: { accountNumber: "asc" } },
       timeline: {
         orderBy: { occurredAt: "desc" },
         take: 20,
@@ -64,8 +68,13 @@ export async function GET(
       licenseExpiresAt: client.licenseExpiresAt,
       isOwn: client.isOwn,
       notDirectInput: client.notDirectInput,
+      tradePointName: client.tradePointName,
+      viberContact: client.viberContact,
       debt: client.debt.toString(),
       overdueDebt: client.overdueDebt.toString(),
+      tovDebt: client.tovDebt?.toString() ?? null,
+      tovOverdueDebt: client.tovOverdueDebt?.toString() ?? null,
+      sessionRemainder: client.sessionRemainder?.toString() ?? null,
       daysSinceLastPurchase: client.daysSinceLastPurchase,
       lastPurchaseAt: client.lastPurchaseAt,
       hasNewMessage: client.hasNewMessage,
@@ -100,6 +109,12 @@ export async function GET(
             label: client.primaryAssortment.label,
           }
         : null,
+      priceType: client.priceType
+        ? { code: client.priceType.code, label: client.priceType.label }
+        : null,
+      agent: client.agent
+        ? { id: client.agent.id, fullName: client.agent.fullName }
+        : null,
       phones: client.phones.map((p) => ({
         id: p.id,
         phone: p.phone,
@@ -111,6 +126,7 @@ export async function GET(
         network: m.network,
         handle: m.handle,
         url: m.url,
+        browserUrl: m.browserUrl,
         comment: m.comment,
       })),
       warehouses: client.warehouses.map((w) => ({
@@ -133,6 +149,22 @@ export async function GET(
         productCode: a.productCode,
         productName: a.productName,
         lastOrderedAt: a.lastOrderedAt,
+        notDirectInput: a.notDirectInput,
+      })),
+      presentations: client.presentations.map((p) => ({
+        id: p.id,
+        productCode: p.productCode,
+        productName: p.productName,
+        lastPresentedAt: p.lastPresentedAt,
+        notDirectInput: p.notDirectInput,
+      })),
+      bankAccounts: client.bankAccounts.map((b) => ({
+        id: b.id,
+        accountNumber: b.accountNumber,
+        bankName: b.bankName,
+        mfo: b.mfo,
+        comment: b.comment,
+        isHidden: b.isHidden,
       })),
       timeline: client.timeline.map((t) => ({
         id: t.id,

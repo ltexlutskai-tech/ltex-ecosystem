@@ -1,14 +1,14 @@
-import type { ClientAssortmentItem } from "./types";
+import type { ClientPresentationItem } from "./types";
 
-export function ClientAssortmentTab({
+export function ClientPresentationsTab({
   items,
 }: {
-  items: ClientAssortmentItem[];
+  items: ClientPresentationItem[];
 }) {
   if (items.length === 0) {
     return (
       <div className="rounded-lg border bg-white p-5 text-sm text-gray-500 shadow-sm">
-        Для цього клієнта ще немає історії асортименту.
+        Презентацій для цього клієнта ще не було.
       </div>
     );
   }
@@ -19,7 +19,7 @@ export function ClientAssortmentTab({
           <tr>
             <th className="px-4 py-2">Артикул</th>
             <th className="px-4 py-2">Назва товару</th>
-            <th className="px-4 py-2">Останнє замовлення</th>
+            <th className="px-4 py-2">Остання презентація</th>
             <th className="px-4 py-2">Тип запису</th>
           </tr>
         </thead>
@@ -33,8 +33,8 @@ export function ClientAssortmentTab({
                 {it.productName ?? "—"}
               </td>
               <td className="px-4 py-2 text-xs text-gray-500">
-                {it.lastOrderedAt
-                  ? new Date(it.lastOrderedAt).toLocaleDateString("uk-UA")
+                {it.lastPresentedAt
+                  ? new Date(it.lastPresentedAt).toLocaleDateString("uk-UA")
                   : "—"}
               </td>
               <td className="px-4 py-2 text-xs">

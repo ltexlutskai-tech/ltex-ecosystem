@@ -14,11 +14,19 @@ export async function loadClientDetail(
       deliveryMethod: true,
       primaryRoute: true,
       primaryAssortment: true,
+      priceType: true,
+      agent: { select: { id: true, fullName: true } },
       phones: { orderBy: { sortOrder: "asc" } },
       messengers: true,
       warehouses: true,
       routes: { include: { route: true } },
       assortmentItems: { orderBy: { lastOrderedAt: "desc" } },
+      presentations: { orderBy: { lastPresentedAt: "desc" } },
+      bankAccounts: { orderBy: { accountNumber: "asc" } },
+      reminders: {
+        orderBy: { remindAt: "asc" },
+        include: { owner: { select: { id: true, fullName: true } } },
+      },
       timeline: {
         orderBy: { occurredAt: "desc" },
         take: 50,
@@ -34,12 +42,15 @@ export async function loadClientDetail(
     id: client.id,
     code1C: client.code1C,
     name: client.name,
+    tradePointName: client.tradePointName,
     phonePrimary: client.phonePrimary,
+    viberContact: client.viberContact,
     city: client.city,
     region: client.region,
     street: client.street,
     house: client.house,
     novaPoshtaBranch: client.novaPoshtaBranch,
+    geolocation: client.geolocation,
     websiteUrl: client.websiteUrl,
     monthlyVolume: client.monthlyVolume
       ? client.monthlyVolume.toString()
@@ -48,6 +59,9 @@ export async function loadClientDetail(
     isOwn: client.isOwn,
     debt: client.debt.toString(),
     overdueDebt: client.overdueDebt.toString(),
+    tovDebt: client.tovDebt?.toString() ?? null,
+    tovOverdueDebt: client.tovOverdueDebt?.toString() ?? null,
+    sessionRemainder: client.sessionRemainder?.toString() ?? null,
     daysSinceLastPurchase: client.daysSinceLastPurchase,
     lastPurchaseAt: client.lastPurchaseAt?.toISOString() ?? null,
     hasNewMessage: client.hasNewMessage,
@@ -88,8 +102,14 @@ export async function loadClientDetail(
           label: client.primaryAssortment.label,
         }
       : null,
+    priceType: client.priceType
+      ? { code: client.priceType.code, label: client.priceType.label }
+      : null,
     primaryRoute: client.primaryRoute
       ? { id: client.primaryRoute.id, name: client.primaryRoute.name }
+      : null,
+    agent: client.agent
+      ? { id: client.agent.id, fullName: client.agent.fullName }
       : null,
     phones: client.phones.map((p) => ({
       id: p.id,
@@ -102,6 +122,7 @@ export async function loadClientDetail(
       network: m.network,
       handle: m.handle,
       url: m.url,
+      browserUrl: m.browserUrl,
       comment: m.comment,
     })),
     warehouses: client.warehouses.map((w) => ({
@@ -124,6 +145,31 @@ export async function loadClientDetail(
       productCode: a.productCode,
       productName: a.productName,
       lastOrderedAt: a.lastOrderedAt?.toISOString() ?? null,
+      notDirectInput: a.notDirectInput,
+    })),
+    presentations: client.presentations.map((p) => ({
+      id: p.id,
+      productCode: p.productCode,
+      productName: p.productName,
+      lastPresentedAt: p.lastPresentedAt?.toISOString() ?? null,
+      notDirectInput: p.notDirectInput,
+    })),
+    bankAccounts: client.bankAccounts.map((b) => ({
+      id: b.id,
+      accountNumber: b.accountNumber,
+      bankName: b.bankName,
+      mfo: b.mfo,
+      comment: b.comment,
+      isHidden: b.isHidden,
+    })),
+    reminders: client.reminders.map((r) => ({
+      id: r.id,
+      body: r.body,
+      remindAt: r.remindAt.toISOString(),
+      completedAt: r.completedAt?.toISOString() ?? null,
+      snoozedUntilAt: r.snoozedUntilAt?.toISOString() ?? null,
+      createdAt: r.createdAt.toISOString(),
+      owner: r.owner ? { id: r.owner.id, fullName: r.owner.fullName } : null,
     })),
     timeline: client.timeline.map((t) => ({
       id: t.id,

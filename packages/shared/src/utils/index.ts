@@ -19,3 +19,16 @@ export type {
   NomenklaturaParts,
   DescriptionFields,
 } from "./import-catalog";
+export {
+  normalizePhone,
+  formatPhoneUkr,
+  phoneToTelUrl,
+  phoneToViberUrl,
+  phoneToWhatsAppUrl,
+} from "./phone";
+export {
+  buildSocialUrl,
+  socialNetworkIcon,
+  socialNetworkLabel,
+} from "./social-links";
+export type { SocialNetwork } from "./social-links";
