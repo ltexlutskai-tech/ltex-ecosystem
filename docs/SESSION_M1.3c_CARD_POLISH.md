@@ -1,178 +1,384 @@
-# Session M1.3c — Client card polish: quick actions, links, reminders
+# Session M1.3c — Client card FULL parity з 1С + contacts links + reminders
 
-**Type:** Worker session (~30 файлів)
-**Branch:** `claude/manager-m1-3c-card-polish-{XXXX}`
-**Goal:** Доробити картку клієнта що вже є з M1.3a. Зробити contacts dial-able (`tel:`, Viber, WhatsApp, Telegram), адресу → Google Maps deeplink, соцмережі — clickable, додати окремий **Tab Нагадування** (своя Postgres model — це private данні менеджера, не з 1С) + заповнити пустий **🔔 bell у sidebar** реальним лічильником overdue reminders.
+**Type:** Worker session (~50 файлів)
+**Branch:** `claude/manager-m1-3c-card-full-{XXXX}`
+**Goal:** Доробити картку клієнта до **повної відповідності** 1С-формі `Catalog.Контрагенты.ФормаЭлемента` (видно на user-скрінах). M1.3a пропустив 7 полів MgrClient, 5 tabs і 3 окремі таблиці — закриваємо це. Робимо clickable contacts (tel:/viber/wa/maps), додаємо новий tab "Нагадування" (наша private model), bell у sidebar з real overdue count, всі інші tabs з 1С форми — placeholders або real read-only display.
 
-**Parent spec:** [`docs/MANAGER_APP_STRATEGY.md`](MANAGER_APP_STRATEGY.md) §6. **Builds on:** M1.3a (clients schema + read-only картка).
+**User скріни (2026-05-13):**
+- Tab "Дані" має 25 полів + блок "Номери телефонів" + таблична частина "Маршрути" + кнопка "Повідомити про борг"
+- Tabs повний набір: Дані / Асортимент / **Асортимент презентацій** / Історія / **Історія продаж** / Замовлення / Нагадування / **Viber** / **Банківські рахунки** / **Історія презентацій** / **Соц мережі** (жирним — те що пропустили у M1.3a)
+- Header tabs: Головне / КатегорииОбъектов / Работа с клиентом / РегистрацияОбмена (це інший level — секції форми, не tabs)
 
-**Конфігурація 1С:** `docs/1c-export-mobile/MobileAgent/Catalogs/Нагадування.xml` + `docs/1c-export-mobile/MobileAgent/Catalogs/Контрагенты/Ext/ObjectModule.bsl` (там форма `ФормаЭлемента` має tab Нагадування з SQL запитом — використати як reference).
+**User decision (locked 2026-05-13):** "Додати всі поля з 1С + усі вкладки навіть як заглушки. У майбутньому — Viber/Telegram/Instagram чат-боти, переписку писати у timeline. Кнопки переходу у месенджери. Перечитай всю конфігурацію."
 
-**User decision (locked 2026-05-13):** "No preference" — orchestrator обирає сам. Скоп: НЕ робити inline-редагування реквізитів (без SOAP write-back ризиковано — sync скине зміни). НЕ робити Tab Замовлення (це M1.4, окрема велика робота). НЕ робити Tab Презентації (sync з 1С потрібен — M1.6+).
-
-**Out of scope:**
-- Inline-редагування реквізитів → M1.5 (одночасно з SOAP write-back)
-- Tab Замовлення → M1.4
-- Tab Презентації → M1.6+
-- "Запис дзвінка" → V2 (callback logging — окрема integration)
-- Push нотифікації reminders → M1.10 (Telegram bot)
+**Конфігурація 1С — MUST-READ перед першим commit:**
+- `docs/1c-export-mobile/MobileAgent/Catalogs/Контрагенты.xml` — повний список полів + tabular sections (40+ полів, 6 tabular: Телефоны / Маршруты / Асортимент / БанковскиеСчета / АсортиментПрезентацій / СоцМережі)
+- `docs/1c-export-mobile/MobileAgent/Catalogs/Контрагенты/Forms/ФормаЭлемента/Ext/Form.xml` — UI form з усіма tabs + control names (СторінкаІсторія, ГруппаВайбер, НагадуванняГруппа, ОтчетПоПродажамДерево, ОтчетПоПрезентациямДерево, БанковскиеСчета, СоцМережі)
+- `docs/1c-export-mobile/MobileAgent/Catalogs/Контрагенты/Forms/ФормаЭлемента/Ext/Form/Module.bsl` — server logic (SQL для timeline, для зведений Звіт по Продажах per клієнт)
+- `docs/1c-export-mobile/MobileAgent/Catalogs/БанковскиеСчета.xml` — окремий каталог банк рахунків (Опис + НеВідображатиВДодатку), посилається через FK
+- `docs/1c-export-mobile/MobileAgent/Catalogs/Нагадування.xml` — структура нагадувань (Активне / ДатаНапоминания / Нагадування body / Контрагент FK)
+- `docs/1c-export-mobile/Central/CommonModules/ОбменАРМ/Ext/Module.bsl` — точний SQL що ЦБ передає мобільному (твоя best-reference для mapping)
 
 ---
 
 ## ⚠️ HARD RULES
 
-1. **DO NOT touch** M1.3a clients API endpoints / Prisma `MgrClient*` моделі — тільки додавай `MgrReminder` як нову окрему модель.
-2. **DO NOT touch** existing `mgr_clients` schema — `MgrReminder` має свою таблицю з FK на `mgr_clients.id`.
+1. **MUST READ** 6 файлів конфіги (вказані вище) перед першим commit. Без цього ризик пропустити поля знову.
+2. **DO NOT touch** existing M1.3a `MgrClient*` fields — тільки **додавай** нові + **створюй** нові таблиці. Migration — additive only.
 3. **DO NOT touch** auth / middleware / `/admin/*` web admin.
-4. **DO NOT** додавати "Створити замовлення" як real button — лишається toast stub до M1.5.
-5. **READ** перед першим commit:
-   - `docs/1c-export-mobile/MobileAgent/Catalogs/Нагадування.xml` — реквізити моделі нагадувань (`Активне`, `ДатаНапоминания`, `Нагадування`, `Контрагент`, `КонтрагентДляДействий`, `КонтрагентВидео` — три FK на клієнтів, нас цікавить тільки головний `Контрагент`)
-   - `docs/1c-export-mobile/MobileAgent/Catalogs/Контрагенты/Forms/ФормаЭлемента/Ext/Form/Module.bsl` — SQL який 1С використовує для відображення reminders у картці (як ми будемо це робити теж — фільтр по clientId, ORDER BY date DESC)
-6. **DO NOT** імплементувати sync для reminders зараз — це чисто наш Postgres. Reminders створюються тільки у нашій UI; sync з 1С — V2.
+4. **DO NOT** робити CRUD для phones / messengers / bank accounts / assortment / presentations — вони read-only (заповнюються через 1С sync у M1.5+). **Тільки Reminders має CRUD** бо це наша private data.
+5. **DO NOT** імплементувати реальні чат-боти Viber/Telegram/Instagram — це M1.8. Tab "Viber" робимо stub з кнопкою-deeplink-ом + опис "Чат-інтеграцію зробимо у M1.8".
+6. **DO NOT** робити inline-редагування реквізитів — sync з 1С скине зміни (M1.5+ з SOAP write-back).
+7. **DO NOT** видаляти existing `client-action-buttons.tsx` — extend його з реальними actions де можна.
 
 ---
 
 ## Big picture
 
-### Реквізити tab — доробляємо contacts
+### Schema gap analysis (що пропустили у M1.3a)
 
-**Зараз (M1.3a):**
-- Phones як plain text список
-- Messengers як chip без лінку
-- Адреса — рядок
-- Відділення НП — рядок
+**MgrClient — 7 нових полів:**
+| 1С name | Postgres name | Type | Notes |
+|---|---|---|---|
+| `НаименованиеТТ` | `tradePointName` | text | "Торгова точка" — окрема назва ТТ |
+| `БоргТзОВ` | `tovDebt` | decimal(12,2) | Борг по ТОВ (юр.особа) |
+| `ПросроченийБоргТзОВ` | `tovOverdueDebt` | decimal(12,2) | Просрочений по ТОВ |
+| `ТорговыйАгент` | `agentUserId` | FK User | Окремий від ClientAssignment — це 1С-поняття "торговий агент" |
+| `КонтактВайбер` | `viberContact` | text | Окремий handle (не з phones list) |
+| `ОстатокСесия` | `sessionRemainder` | decimal(12,2) | Залишок на сесії |
+| `ТипЦен` | `priceTypeId` | FK MgrPriceType | Новий dict (Оптові / Дрібний опт / Роздрібні) |
 
-**Після M1.3c:**
-- Phones → 4 icon-buttons поряд з кожним номером: 📞 dial (tel:), 💬 Viber, ✉ Telegram, 📞 WhatsApp
-- Messengers → clickable chip → переход на handle (TikTok URL / Instagram / Facebook etc.)
-- Адреса → 📍 button → Google Maps deeplink
-- Відділення НП → 📦 button → Nova Poshta search URL
-- Геолокація (lat,lng) → 🗺 button → Google Maps з pin
-- Сайт клієнта (`websiteUrl`) → click → новий tab
+**Tables що пропустили:**
+| 1С table | Postgres model | Status |
+|---|---|---|
+| `Catalog.ТипыЦенНоменклатуры` (FK target) | `MgrPriceType` (new dict) | NEW |
+| `АсортиментПрезентацій` (tabular) | `MgrClientPresentationItem` | NEW |
+| `БанковскиеСчета` (tabular + FK на `Catalog.БанковскиеСчета`) | `MgrClientBankAccount` | NEW |
 
-### Новий Tab "Нагадування"
+**Extension to existing:**
+| Table | New field | Type | Source 1С |
+|---|---|---|---|
+| `MgrClientAssortmentItem` | `notDirectInput` | bool | `НеРучнаяЗапись` |
+| `MgrClientMessenger` | `browserUrl` | text | `ПосиланняВБраузері` |
+| `MgrClientMessenger` | `comment` (вже є?) | text | `Коментар` |
 
-```
-┌─────────────────────────────────────────────────┐
-│ [Реквізити] [Історія] [Маршрути] [Асортимент] [Нагадування ⏰3] [Замовлення] │
-└─────────────────────────────────────────────────┘
+**New private model (наша):**
+- `MgrReminder` — нагадування про клієнта (id, clientId, ownerUserId, body, remindAt, completedAt, snoozedUntilAt)
 
-⏰ Нагадування про клієнта                  + Створити
+### Tabs гap analysis
 
-▸ ⚠ ПРОСТРОЧЕНО (3 днів тому)
-  Зателефонувати щодо боргу 17 387 грн                [✓ Виконано] [⏰ Відкласти]
-  Створив: Тарас · 2026-05-10
+Tabs у 1С формі (з порядку рендеру на скріні):
+| 1С Tab | M1.3a state | M1.3c target |
+|---|---|---|
+| Дані | ✓ Реквізити (часткова) | **Доповнити** усіма пропущеними полями |
+| Асортимент | ✓ є | **Доповнити** notDirectInput chip |
+| Асортимент презентацій | ✗ нема | **NEW real** read-only list |
+| Історія | ✓ є | без змін |
+| Історія продаж | ✗ нема | **NEW stub** `<UnderConstruction session="M1.4">` (це aggregated звіт) |
+| Замовлення | ✓ stub M1.5 | без змін |
+| Нагадування | ✗ нема | **NEW REAL** MgrReminder CRUD |
+| Viber | ✗ нема | **NEW stub** з кнопкою "Перейти у Viber" + опис M1.8 |
+| Банківські рахунки | ✗ нема | **NEW real** read-only list |
+| Історія презентацій | ✗ нема | **NEW stub** `<UnderConstruction session="M1.6">` |
+| Соц мережі | ✗ є у Реквізити секції | **NEW окремий tab** з clickable links per network |
 
-▸ 🔵 Сьогодні
-  Уточнити нову адресу доставки                       [✓ Виконано] [⏰ Відкласти]
-  Створив: Тарас · 2026-05-13
+### Contact actions
 
-▸ ⚪ Заплановано (за 5 днів)
-  Передзвонити після поставки                         [✓ Виконано] [⏰ Відкласти]
-  Створив: Тарас · 2026-05-18
+**Phones** — кожен номер як `<ContactRow>` з:
+- Formatted `+380 50 123 45 67`
+- 📞 dial (tel:)
+- 💬 Viber (viber://chat?number=...)
+- ✉ WhatsApp (https://wa.me/...)
+- Telegram chip (нема phone-based deeplink — disabled з tooltip)
+- Кнопка "Додати" — поки disabled з tooltip "Додавання через 1С (sync у M1.5)"
 
-▸ ✅ Виконано
-  Узгодити новий маршрут (виконано 2026-05-08)        [↺ Відновити]
-```
+**Адреса** — clickable → Google Maps deeplink `https://www.google.com/maps/search/?api=1&query={url-encoded full address}`
 
-Create form — modal з полями:
-- Текст (textarea, required, max 500)
-- Дата нагадування (date+time picker, required, default = завтра 10:00)
+**Відділення НП** — clickable → `https://www.google.com/maps/search/?api=1&query=Нова Пошта №{N} {city}`
 
-### Bell у sidebar
+**Геолокація** — якщо `"lat,lng"` формат → Maps з pin
 
-Поточно — empty dropdown. Тепер показує count overdue reminders для current user. Click → dropdown з list (max 10 items) → click на item → перехід на `/manager/customers/{clientId}#reminders`.
+**Сайт** — `target="_blank" rel="noopener"` + icon 🔗
+
+**Контакт Viber** (новий поле) — viber:// deeplink
+
+**Соц мережі** — кожен `<MessengerLink>` per network:
+- `tiktok` → `https://tiktok.com/@{handle}`
+- `instagram` → `https://instagram.com/{handle}`
+- `facebook` → handle або URL якщо містить URL
+- `telegram` → `https://t.me/{handle}`
+- `viber` → `viber://chat?number={normalizedPhone(handle)}`
+- `youtube` → URL направо
+- Fallback: якщо є `browserUrl` (новий) — використати його напряму
+
+### Bell sidebar
+
+Поки empty. Тепер показує count overdue reminders для current user. Click → `<Popover>` (shadcn) з list (max 10). Click on item → `router.push("/manager/customers/{clientId}#reminders")` — deeplink на Tab Нагадування.
 
 ---
 
 ## Файли — повний перелік
 
-### Нові файли (~25)
+### Migration + schema (~3 файли)
 
 ```
-packages/shared/src/utils/phone.ts                                   ← formatters + deeplinks
-packages/shared/src/utils/phone.test.ts                              ← 8+ tests
+packages/db/prisma/schema.prisma                                      ← edit
+packages/db/prisma/migrations/2026MMDD_mgr_clients_full/migration.sql ← NEW
+scripts/seed-mgr-test-data.ts                                          ← edit (extend для нових полів і tables)
+```
 
-packages/db/prisma/migrations/2026MMDD_mgr_reminders/migration.sql
-packages/db/prisma/schema.prisma                                     ← edit (додати MgrReminder)
+### Shared utils (~3 файли)
 
-# API
-apps/store/app/api/v1/manager/clients/[id]/reminders/route.ts       ← GET list + POST create
-apps/store/app/api/v1/manager/clients/[id]/reminders/route.test.ts
-apps/store/app/api/v1/manager/clients/[id]/reminders/[rid]/route.ts ← PATCH complete/snooze, DELETE
-apps/store/app/api/v1/manager/clients/[id]/reminders/[rid]/route.test.ts
-apps/store/app/api/v1/manager/notifications/route.ts                 ← GET overdue list + count (for bell)
-apps/store/app/api/v1/manager/notifications/route.test.ts
+```
+packages/shared/src/utils/phone.ts                                   ← NEW: formatters + deeplinks
+packages/shared/src/utils/phone.test.ts                              ← NEW: ≥8 tests
+packages/shared/src/utils/social-links.ts                            ← NEW: messenger URL builders
+```
 
-# UI — нові компоненти
+### API (~6 файлів)
+
+```
+apps/store/app/api/v1/manager/clients/[id]/reminders/route.ts          ← NEW GET+POST
+apps/store/app/api/v1/manager/clients/[id]/reminders/route.test.ts     ← NEW ≥4 tests
+apps/store/app/api/v1/manager/clients/[id]/reminders/[rid]/route.ts    ← NEW PATCH+DELETE
+apps/store/app/api/v1/manager/clients/[id]/reminders/[rid]/route.test.ts ← NEW ≥4 tests
+apps/store/app/api/v1/manager/notifications/route.ts                    ← NEW GET (bell)
+apps/store/app/api/v1/manager/notifications/route.test.ts              ← NEW ≥2 tests
+```
+
+### UI new tabs (~10 файлів)
+
+```
 apps/store/app/manager/(workstation)/customers/[id]/_components/
-  client-reminders-tab.tsx                                          ← server, fetches reminders + groups
-  client-reminders-form.tsx                                         ← client, modal з create
-  client-reminder-item.tsx                                          ← single item з actions
-  client-reminders-grouping.ts                                      ← pure helper (overdue/today/upcoming/done)
+  client-presentations-tab.tsx                                       ← NEW real list з MgrClientPresentationItem
+  client-sales-history-tab.tsx                                       ← NEW stub UnderConstruction M1.4
+  client-reminders-tab.tsx                                           ← NEW real з grouping
+  client-reminders-form.tsx                                          ← NEW client modal create
+  client-reminder-item.tsx                                           ← NEW client wrapper з actions
+  client-reminders-grouping.ts                                       ← NEW pure helper
+  client-viber-tab.tsx                                               ← NEW stub з buttons "Перейти у Viber"
+  client-bank-accounts-tab.tsx                                       ← NEW real list з MgrClientBankAccount
+  client-presentation-history-tab.tsx                                ← NEW stub UnderConstruction M1.6
+  client-social-tab.tsx                                              ← NEW real з clickable per network
+```
 
-# UI — оновлення існуючих
+### UI updates existing (~8 файлів)
+
+```
 apps/store/app/manager/(workstation)/customers/[id]/_components/
-  client-requisites-tab.tsx                                         ← OVERWRITE з contacts links
-  client-tabs.tsx                                                   ← додати 5-й tab Нагадування (між Асортимент і Замовлення)
-  types.ts                                                          ← extend ClientDetail з reminders[]
-  client-contact-actions.tsx                                        ← NEW: shared contact action buttons (phone, viber, etc)
-  client-messenger-link.tsx                                         ← NEW: clickable messenger chip
-
-# UI — sidebar bell
-apps/store/app/manager/(workstation)/_components/
-  manager-header-bell.tsx                                           ← OVERWRITE — fetch count + dropdown з list
-  manager-header-bell-item.tsx                                      ← single bell item
+  client-requisites-tab.tsx                                          ← OVERWRITE: всі 25 полів + contact actions
+  client-contact-row.tsx                                             ← NEW: phone з 4 icon actions
+  client-messenger-link.tsx                                          ← NEW: clickable network chip
+  client-address-link.tsx                                            ← NEW: address → Maps
+  client-tabs.tsx                                                    ← OVERWRITE: 11 tabs у правильному порядку
+  client-action-buttons.tsx                                          ← extend: реальні toast-stub для "Повідомити про борг"
+  client-header.tsx                                                  ← extend: agentUserId display + priceType
+  types.ts                                                           ← extend ClientDetail з усіма новими полями + reminders[] + bankAccounts[] + presentations[]
 ```
 
-### Edit існуючих
+### UI page wiring + bell (~3 файли)
 
 ```
-apps/store/app/manager/(workstation)/customers/[id]/page.tsx        ← load reminders в parallel з client
-apps/store/app/manager/(workstation)/customers/[id]/_lib/load-client.ts  ← extend load з reminders
-packages/db/prisma/schema.prisma                                     ← MgrReminder + User.reminders[] + MgrClient.reminders[]
+apps/store/app/manager/(workstation)/customers/[id]/page.tsx          ← edit: load reminders + bank accounts + presentations parallel
+apps/store/app/manager/(workstation)/customers/[id]/_lib/load-client.ts ← edit: include нові relations
+apps/store/app/manager/(workstation)/_components/manager-header-bell.tsx ← NEW або OVERWRITE (depends якщо вже existed з M1.2)
 ```
+
+### Tests other (~3 файли)
+
+```
+packages/shared/src/utils/social-links.test.ts                       ← ≥6 tests
+apps/store/app/manager/(workstation)/customers/[id]/_components/client-reminders-grouping.test.ts ← ≥4 tests
+apps/store/app/api/v1/manager/clients/[id]/route.test.ts             ← edit (додати tests для нових полів)
+```
+
+**Total ~36 нових + ~10 edit = ~46 files.**
 
 ---
 
 ## Detailed tasks
 
-### Task 1 — Prisma schema
+### Task 1 — Prisma schema (additive only)
 
 ```prisma
+// ────── NEW dictionary ──────
+model MgrPriceType {
+  id        String @id @default(cuid())
+  code      String @unique          // "wholesale" | "small_wholesale" | "retail"
+  label     String
+  sortOrder Int    @default(0)
+  clients   MgrClient[]
+  @@map("mgr_price_types")
+}
+
+// ────── MgrClient extension ──────
+model MgrClient {
+  // ... existing fields kept ...
+
+  // NEW fields (all nullable for backward compat)
+  tradePointName    String?
+  tovDebt           Decimal? @db.Decimal(12,2)
+  tovOverdueDebt    Decimal? @db.Decimal(12,2)
+  agentUserId       String?
+  viberContact      String?
+  sessionRemainder  Decimal? @db.Decimal(12,2)
+  priceTypeId       String?
+
+  // NEW relations
+  agent             User?         @relation("ClientAgent", fields: [agentUserId], references: [id], onDelete: SetNull)
+  priceType         MgrPriceType? @relation(fields: [priceTypeId], references: [id], onDelete: SetNull)
+  presentations     MgrClientPresentationItem[]
+  bankAccounts      MgrClientBankAccount[]
+  reminders         MgrReminder[]
+
+  // existing M1.3a relations kept
+}
+
+// ────── NEW tabular: presentations ──────
+model MgrClientPresentationItem {
+  id              String   @id @default(cuid())
+  clientId        String
+  productCode     String
+  productName     String?
+  lastPresentedAt DateTime?
+  notDirectInput  Boolean  @default(false)
+  client          MgrClient @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  @@index([clientId])
+  @@map("mgr_client_presentations")
+}
+
+// ────── NEW tabular: bank accounts ──────
+model MgrClientBankAccount {
+  id            String  @id @default(cuid())
+  clientId      String
+  accountNumber String                       // IBAN UA...
+  bankName      String?
+  mfo           String?
+  comment       String?
+  isHidden      Boolean @default(false)      // НеВідображатиВДодатку у 1С
+  client        MgrClient @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  @@index([clientId])
+  @@map("mgr_client_bank_accounts")
+}
+
+// ────── existing extensions ──────
+model MgrClientAssortmentItem {
+  // existing
+  notDirectInput Boolean @default(false)
+}
+
+model MgrClientMessenger {
+  // existing
+  browserUrl String?
+  // (comment вже є — keep)
+}
+
+// ────── User edit для agent relation ──────
+model User {
+  // existing
+  agentForClients MgrClient[] @relation("ClientAgent")
+}
+
+// ────── NEW reminder ──────
 model MgrReminder {
   id              String   @id @default(cuid())
   clientId        String
-  ownerUserId     String                     // who створив (filter "мої")
+  ownerUserId     String
   body            String   @db.Text
-  remindAt        DateTime                   // коли спрацьовує
+  remindAt        DateTime
   completedAt     DateTime?
   snoozedUntilAt  DateTime?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
-
   client          MgrClient @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  owner           User      @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
-
+  owner           User      @relation("UserReminders", fields: [ownerUserId], references: [id], onDelete: Cascade)
   @@index([clientId, remindAt])
-  @@index([ownerUserId, completedAt, remindAt])    // for bell counter query
+  @@index([ownerUserId, completedAt, remindAt])
   @@map("mgr_reminders")
 }
-
-// edit
-model MgrClient {
-  // ...existing
-  reminders MgrReminder[]
-}
 model User {
-  // ...existing
-  reminders MgrReminder[]
+  reminders MgrReminder[] @relation("UserReminders")
 }
 ```
 
-### Task 2 — Migration
+### Task 2 — Migration SQL
 
 ```sql
+-- ──────── NEW dictionary mgr_price_types ────────
+CREATE TABLE IF NOT EXISTS "mgr_price_types" (
+  "id"         TEXT    NOT NULL,
+  "code"       TEXT    NOT NULL,
+  "label"      TEXT    NOT NULL,
+  "sort_order" INTEGER NOT NULL DEFAULT 0,
+  CONSTRAINT "mgr_price_types_pkey" PRIMARY KEY ("id")
+);
+CREATE UNIQUE INDEX IF NOT EXISTS "mgr_price_types_code_key" ON "mgr_price_types"("code");
+
+-- ──────── MgrClient new columns ────────
+ALTER TABLE "mgr_clients"
+  ADD COLUMN IF NOT EXISTS "trade_point_name"   TEXT,
+  ADD COLUMN IF NOT EXISTS "tov_debt"           DECIMAL(12,2),
+  ADD COLUMN IF NOT EXISTS "tov_overdue_debt"   DECIMAL(12,2),
+  ADD COLUMN IF NOT EXISTS "agent_user_id"      TEXT,
+  ADD COLUMN IF NOT EXISTS "viber_contact"      TEXT,
+  ADD COLUMN IF NOT EXISTS "session_remainder"  DECIMAL(12,2),
+  ADD COLUMN IF NOT EXISTS "price_type_id"      TEXT;
+
+DO $$ BEGIN
+  ALTER TABLE "mgr_clients"
+    ADD CONSTRAINT "mgr_clients_agent_fkey"
+    FOREIGN KEY ("agent_user_id") REFERENCES "users"("id") ON DELETE SET NULL;
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+  WHEN undefined_table THEN NULL;
+END $$;
+
+DO $$ BEGIN
+  ALTER TABLE "mgr_clients"
+    ADD CONSTRAINT "mgr_clients_price_type_fkey"
+    FOREIGN KEY ("price_type_id") REFERENCES "mgr_price_types"("id") ON DELETE SET NULL;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+-- ──────── extend MgrClientAssortmentItem ────────
+ALTER TABLE "mgr_client_assortment"
+  ADD COLUMN IF NOT EXISTS "not_direct_input" BOOLEAN NOT NULL DEFAULT false;
+
+-- ──────── extend MgrClientMessenger ────────
+ALTER TABLE "mgr_client_messengers"
+  ADD COLUMN IF NOT EXISTS "browser_url" TEXT;
+
+-- ──────── NEW presentations ────────
+CREATE TABLE IF NOT EXISTS "mgr_client_presentations" (
+  "id"                TEXT         NOT NULL,
+  "client_id"         TEXT         NOT NULL,
+  "product_code"      TEXT         NOT NULL,
+  "product_name"      TEXT,
+  "last_presented_at" TIMESTAMP(3),
+  "not_direct_input"  BOOLEAN      NOT NULL DEFAULT false,
+  CONSTRAINT "mgr_client_presentations_pkey" PRIMARY KEY ("id"),
+  CONSTRAINT "mgr_client_presentations_client_fkey"
+    FOREIGN KEY ("client_id") REFERENCES "mgr_clients"("id") ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS "mgr_client_presentations_client_idx"
+  ON "mgr_client_presentations"("client_id");
+
+-- ──────── NEW bank accounts ────────
+CREATE TABLE IF NOT EXISTS "mgr_client_bank_accounts" (
+  "id"             TEXT    NOT NULL,
+  "client_id"      TEXT    NOT NULL,
+  "account_number" TEXT    NOT NULL,
+  "bank_name"      TEXT,
+  "mfo"            TEXT,
+  "comment"        TEXT,
+  "is_hidden"      BOOLEAN NOT NULL DEFAULT false,
+  CONSTRAINT "mgr_client_bank_accounts_pkey" PRIMARY KEY ("id"),
+  CONSTRAINT "mgr_client_bank_accounts_client_fkey"
+    FOREIGN KEY ("client_id") REFERENCES "mgr_clients"("id") ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS "mgr_client_bank_accounts_client_idx"
+  ON "mgr_client_bank_accounts"("client_id");
+
+-- ──────── NEW reminders ────────
 CREATE TABLE IF NOT EXISTS "mgr_reminders" (
   "id"               TEXT         NOT NULL,
   "client_id"        TEXT         NOT NULL,
@@ -189,249 +395,285 @@ CREATE TABLE IF NOT EXISTS "mgr_reminders" (
   CONSTRAINT "mgr_reminders_owner_fkey"
     FOREIGN KEY ("owner_user_id") REFERENCES "users"("id") ON DELETE CASCADE
 );
-
 CREATE INDEX IF NOT EXISTS "mgr_reminders_client_remind_idx"
   ON "mgr_reminders"("client_id", "remind_at");
-
 CREATE INDEX IF NOT EXISTS "mgr_reminders_owner_status_idx"
   ON "mgr_reminders"("owner_user_id", "completed_at", "remind_at");
 ```
 
-### Task 3 — `packages/shared/src/utils/phone.ts`
+### Task 3 — Phone utils
 
+`packages/shared/src/utils/phone.ts` — як у попередньому spec версії:
+- `normalizePhone(raw)` — to E.164 `+380...`
+- `formatPhoneUkr(raw)` — display `+380 50 123 45 67`
+- `phoneToTelUrl(raw)`, `phoneToViberUrl(raw)`, `phoneToWhatsAppUrl(raw)`
+
+`packages/shared/src/utils/social-links.ts`:
 ```typescript
-/**
- * Phone formatters + deeplinks для українських номерів.
- *
- * Accept any raw format (0501234567 / +380501234567 / 380501234567 / 50 123 45 67)
- * Normalize to international E.164: +380501234567
- * Display format: "+380 50 123 45 67"
- */
+export type SocialNetwork = "tiktok" | "instagram" | "facebook" | "telegram" | "viber" | "youtube" | "whatsapp" | "other";
 
-const UKR_PREFIX = "+380";
-
-export function normalizePhone(raw: string | null | undefined): string | null {
-  if (!raw) return null;
-  const digits = raw.replace(/\D/g, "");
-  if (digits.length === 12 && digits.startsWith("380")) return `+${digits}`;
-  if (digits.length === 10 && digits.startsWith("0")) return UKR_PREFIX + digits.slice(1);
-  if (digits.length === 9) return UKR_PREFIX + digits;
-  return null;
-}
-
-export function formatPhoneUkr(raw: string | null | undefined): string {
-  const e164 = normalizePhone(raw);
-  if (!e164) return raw ?? "";
-  // +380 50 123 45 67
-  const d = e164.slice(4);
-  return `+380 ${d.slice(0, 2)} ${d.slice(2, 5)} ${d.slice(5, 7)} ${d.slice(7, 9)}`;
-}
-
-export function phoneToTelUrl(raw: string): string | null {
-  const e = normalizePhone(raw);
-  return e ? `tel:${e}` : null;
-}
-
-export function phoneToViberUrl(raw: string): string | null {
-  const e = normalizePhone(raw);
-  return e ? `viber://chat?number=${encodeURIComponent(e)}` : null;
-}
-
-export function phoneToWhatsAppUrl(raw: string): string | null {
-  const e = normalizePhone(raw);
-  return e ? `https://wa.me/${e.replace("+", "")}` : null;
-}
-
-export function phoneToTelegramUrl(raw: string): string | null {
-  // Telegram не підтримує phone-based deeplink. Це placeholder — клік буде disabled.
-  return null;
-}
-```
-
-### Task 4 — Tests phone
-
-`packages/shared/src/utils/phone.test.ts` — ≥ 8 тестів:
-- `normalizePhone("0501234567") === "+380501234567"`
-- `normalizePhone("+380 50 123 45 67") === "+380501234567"`
-- `normalizePhone("380501234567") === "+380501234567"`
-- `normalizePhone("501234567") === "+380501234567"`
-- `normalizePhone(null) === null`
-- `normalizePhone("invalid") === null`
-- `formatPhoneUkr("0501234567") === "+380 50 123 45 67"`
-- `phoneToViberUrl("0501234567") === "viber://chat?number=%2B380501234567"`
-
-### Task 5 — `GET+POST /api/v1/manager/clients/[id]/reminders`
-
-**GET:**
-- Auth required (`getCurrentUser`)
-- Verify client exists (404)
-- Return list ordered by `remindAt ASC`, with computed status `overdue|today|upcoming|completed`
-- Include `owner.fullName` для display
-
-**POST:**
-- Zod body: `{ body: string (1-500), remindAt: string ISO }`
-- Save with `ownerUserId = currentUser.id`
-- Return new reminder
-
-### Task 6 — `PATCH+DELETE /api/v1/manager/clients/[id]/reminders/[rid]`
-
-**PATCH:**
-- Zod body: `{ action: "complete" | "uncomplete" | "snooze", snoozedUntil?: string ISO }`
-- Permission: тільки owner OR admin може змінити
-- Update + return
-
-**DELETE:**
-- Permission: owner OR admin
-- Hard delete
-
-### Task 7 — `GET /api/v1/manager/notifications`
-
-Bell endpoint. Returns:
-```json
-{
-  "overdueCount": 3,
-  "items": [
-    {
-      "id": "...",
-      "type": "reminder_overdue",
-      "title": "Зателефонувати щодо боргу",
-      "clientId": "...",
-      "clientName": "Амер",
-      "remindAt": "2026-05-10T10:00:00Z",
-      "daysOverdue": 3
+export function buildSocialUrl(network: string, handle: string | null, browserUrl?: string | null): string | null {
+  if (browserUrl) return browserUrl;  // explicit override з 1С
+  if (!handle) return null;
+  const clean = handle.replace(/^@/, "").trim();
+  switch (network.toLowerCase()) {
+    case "tiktok": return `https://www.tiktok.com/@${clean}`;
+    case "instagram": return `https://www.instagram.com/${clean}`;
+    case "facebook":
+      if (clean.startsWith("http")) return clean;
+      return `https://www.facebook.com/${clean}`;
+    case "telegram": return `https://t.me/${clean}`;
+    case "viber": {
+      const phone = clean.replace(/[\s+()-]/g, "");
+      return `viber://chat?number=%2B${phone}`;
     }
-  ]
+    case "youtube":
+      if (clean.startsWith("http")) return clean;
+      return `https://www.youtube.com/@${clean}`;
+    case "whatsapp": {
+      const phone = clean.replace(/[\s+()-]/g, "");
+      return `https://wa.me/${phone}`;
+    }
+    default: return null;
+  }
+}
+
+export function socialNetworkIcon(network: string): string {
+  // emoji fallback — replace з proper icons коли є time
+  switch (network.toLowerCase()) {
+    case "tiktok": return "🎵";
+    case "instagram": return "📷";
+    case "facebook": return "📘";
+    case "telegram": return "✈️";
+    case "viber": return "💬";
+    case "youtube": return "🎥";
+    case "whatsapp": return "✉️";
+    default: return "🔗";
+  }
 }
 ```
 
-Query:
-```sql
-WHERE ownerUserId = currentUser.id
-  AND completedAt IS NULL
-  AND (snoozedUntilAt IS NULL OR snoozedUntilAt <= NOW())
-  AND remindAt <= NOW()
-ORDER BY remindAt ASC
-LIMIT 10
-```
+### Task 4 — UI Реквізити tab full parity
 
-Count окремою query (без LIMIT).
+Render у такому порядку (matching 1С форму з скріну):
 
-### Task 8 — UI Реквізити tab — contacts links
-
-`client-contact-actions.tsx`:
 ```tsx
-import { phoneToTelUrl, phoneToViberUrl, phoneToWhatsAppUrl, formatPhoneUkr } from "@ltex/shared/utils/phone";
-
-export function ContactActions({ phone, messenger }: { phone: string; messenger?: string | null }) {
-  const tel = phoneToTelUrl(phone);
-  const viber = phoneToViberUrl(phone);
-  const wa = phoneToWhatsAppUrl(phone);
+export function ClientRequisitesTab({ client, currentUserRole, currentUserId }: Props) {
   return (
-    <div className="flex items-center gap-2">
-      <span className="font-medium">{formatPhoneUkr(phone)}</span>
-      {tel && <a href={tel} className="rounded p-1 text-gray-500 hover:bg-blue-50 hover:text-blue-700" title="Подзвонити">📞</a>}
-      {viber && <a href={viber} className="rounded p-1 text-gray-500 hover:bg-purple-50 hover:text-purple-700" title="Viber">💬</a>}
-      {wa && <a href={wa} target="_blank" rel="noopener" className="rounded p-1 text-gray-500 hover:bg-green-50 hover:text-green-700" title="WhatsApp">✉</a>}
-      {messenger && <span className="rounded bg-gray-100 px-1.5 py-0.5 text-xs text-gray-600">{messenger}</span>}
+    <div className="space-y-6">
+      {/* Phones block (top, як у 1С) */}
+      <PhonesBlock phones={[client.phonePrimary, ...client.phones]} viberContact={client.viberContact} />
+
+      {/* Core grid 2-column (як у скріні) */}
+      <dl className="grid grid-cols-1 gap-x-8 gap-y-3 rounded-lg border bg-white p-5 shadow-sm sm:grid-cols-2">
+        <Row label="Код" value={client.code1C ?? "—"} />
+        <Row label="Створений" value={formatDate(client.createdAt)} />
+        <Row label="Найменування" value={client.name} />
+        <Row label="Торгова точка" value={client.tradePointName ?? "—"} />
+
+        <Row label="Борг" value={<DebtWithButton debt={client.debt} clientId={client.id} />} />
+        <Row label="Протерміновано" value={<DebtValue value={client.overdueDebt} muted />} />
+
+        <Row label="Борг ТОВ" value={<DebtValue value={client.tovDebt} />} />
+        <Row label="Просрочено ТОВ" value={<DebtValue value={client.tovOverdueDebt} muted />} />
+
+        <Row label="Статус" value={<StatusBadge s={client.statusGeneral} />} />
+        <Row label="Оперативний статус" value={<StatusBadge s={client.statusOperational} />} />
+
+        <Row label="Тип цін" value={client.priceType?.label ?? "—"} />
+        <Row label="Асортимент" value={client.primaryAssortment?.label ?? "—"} />
+        <Row label="Спосіб доставки" value={client.deliveryMethod?.label ?? "—"} />
+        <Row label="Категорія ТТ" value={client.categoryTT?.label ?? "—"} />
+
+        <Row label="Область" value={client.region ?? "—"} />
+        <Row label="Місто" value={client.city ?? "—"} />
+        <Row label="Вулиця" value={client.street ?? "—"} />
+        <Row label="Будинок" value={client.house ?? "—"} />
+
+        <Row label="Відділення НП" value={client.novaPoshtaBranch ?? "—"} />
+        <Row label="Сайт" value={<WebsiteLink url={client.websiteUrl} />} />
+        <Row label="Геолокація" value={<GeoLink geo={client.geolocation} />} />
+        <Row label="Обєм за місяць" value={client.monthlyVolume ? `${client.monthlyVolume} кг` : "—"} />
+
+        <Row label="Канал пошуку" value={client.searchChannel?.label ?? "—"} />
+        <Row label="Контакт Viber" value={<ViberContactLink contact={client.viberContact} />} />
+        <Row label="Торговий агент" value={client.agent?.fullName ?? "—"} />
+        <Row label="Залишок сесії" value={formatMoney(client.sessionRemainder)} />
+
+        <Row label="Дата створення" value={formatDate(client.createdAt)} />
+        <Row label="Оновлено з 1С" value={client.lastSyncedAt ? formatDateTime(client.lastSyncedAt) : "—"} />
+      </dl>
+
+      {/* Routes block (table-like, як у 1С) */}
+      <RoutesBlock routes={client.routes} />
+
+      {/* Address full на карті */}
+      <AddressBlock client={client} />
+
+      {/* Flag indicators */}
+      <FlagsBlock hasNewMessage={client.hasNewMessage} isViberLinked={client.isViberLinked} dialogStatus={client.dialogStatus} />
+
+      {/* Action buttons */}
+      <ClientActionButtons clientId={client.id} canCreate={...} />
     </div>
   );
 }
 ```
 
-`client-messenger-link.tsx`:
-- Map network → URL builder:
-  - `tiktok` → `https://tiktok.com/@{handle.replace("@","")}`
-  - `instagram` → `https://instagram.com/{handle.replace("@","")}`
-  - `facebook` → handle вже містить URL або username
-  - `telegram` → `https://t.me/{handle.replace("@","")}`
-  - `viber` → `viber://chat?number={normalizePhone(handle)}`
-- Fallback: якщо є `url` поле — використати його напряму
-- Icon + label, link target="_blank"
+`<PhonesBlock>` — render `<ContactRow>` per phone, кожен з actions.
 
-Адреса як кнопка з Maps deeplink:
+`<DebtWithButton>` — display value + кнопка "Повідомити про борг" поряд (toast stub "Чат-інтеграцію зробимо у M1.8").
+
+### Task 5 — UI Tabs повний набір
+
+`client-tabs.tsx` — переписати з 11 tabs у правильному порядку:
+
 ```tsx
-const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(fullAddress)}`;
-<a href={mapsUrl} target="_blank" rel="noopener" className="...">{fullAddress} 📍</a>
+const tabs = [
+  { value: "requisites", label: "Реквізити" },
+  { value: "assortment", label: "Асортимент" },
+  { value: "presentations", label: "Презентації" },
+  { value: "history", label: "Історія" },
+  { value: "sales-history", label: "Історія продаж" },
+  { value: "orders", label: "Замовлення" },
+  { value: "reminders", label: <>Нагадування{overdueCount > 0 && <Badge>{overdueCount}</Badge>}</> },
+  { value: "viber", label: "Viber" },
+  { value: "banks", label: "Банк. рахунки" },
+  { value: "presentation-history", label: "Іст. презентацій" },
+  { value: "social", label: "Соц мережі" },
+];
 ```
 
-Відділення НП — те саме але query = `Нова Пошта Відділення №X м. {city}`.
+Default tab = `requisites`. URL anchor `#tabname` — initial selection.
 
-Геолокація (lat,lng):
+### Task 6 — New tabs implementations
+
+**Tab Презентації** (`client-presentations-tab.tsx`) — server component:
+- Load `client.presentations` через prisma include
+- Render table: артикул / назва / остання презентація / "Не ручний запис" chip
+- Empty state: "Презентацій ще не було"
+- Read-only
+
+**Tab Історія продаж** (`client-sales-history-tab.tsx`) — stub:
 ```tsx
-const [lat, lng] = client.geolocation.split(",");
-const url = `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
+<UnderConstruction
+  session="M1.4"
+  description="Звіт по продажах за період — буде разом з підключенням Documents.Реалізація з 1С."
+/>
 ```
 
-### Task 9 — UI Tab Нагадування
+**Tab Замовлення** (`client-orders-tab.tsx`) — keep existing M1.3a stub.
 
-`client-reminders-tab.tsx` (server):
-- Fetch reminders via prisma direct (не через API — server component може використати prisma напряму, як `load-client.ts` робить)
-- Group через `client-reminders-grouping.ts`:
-  - **overdue**: `remindAt < now AND completedAt IS NULL AND (snoozedUntilAt IS NULL OR snoozedUntilAt < now)`
-  - **today**: `remindAt within today AND not completed`
-  - **upcoming**: `remindAt > today AND not completed`
-  - **completed**: `completedAt IS NOT NULL`
-- Render 4 секції (collapsible — completed default collapsed)
+**Tab Нагадування** (`client-reminders-tab.tsx`) — server, fetch + group:
+- 4 sections: Прострочено / Сьогодні / Заплановано / Виконано
+- Header: title + "+ Створити" button (відкриває modal)
 - Each item — `<ReminderItem>` з actions
 
-`client-reminders-form.tsx` (client, Dialog from `@ltex/ui`):
-- Trigger button "+ Створити" у tab header
-- Form: textarea + date+time picker (native `<input type="datetime-local">`)
-- Default remindAt = tomorrow 10:00
-- POST → `router.refresh()`
+**Tab Viber** (`client-viber-tab.tsx`) — stub з real buttons:
+```tsx
+<div className="rounded-lg border bg-white p-6">
+  <h3 className="text-lg font-semibold">Viber-чат</h3>
+  <p className="mt-2 text-sm text-gray-600">
+    Інтеграцію Viber-bot (читання + відповіді через картку) зробимо у M1.8.
+    Зараз доступні зовнішні переходи:
+  </p>
+  <div className="mt-4 flex flex-wrap gap-2">
+    {client.viberContact && (
+      <a href={phoneToViberUrl(client.viberContact)} className="...">
+        Відкрити Viber з {formatPhoneUkr(client.viberContact)}
+      </a>
+    )}
+    {client.phonePrimary && (
+      <a href={phoneToViberUrl(client.phonePrimary)} className="...">
+        Viber на основний {formatPhoneUkr(client.phonePrimary)}
+      </a>
+    )}
+  </div>
+  {!client.viberContact && !client.phonePrimary && (
+    <p className="mt-4 text-sm text-gray-500">Контактів для Viber нема.</p>
+  )}
+</div>
+```
 
-`client-reminder-item.tsx` (client wrapper з actions):
-- Body text + "Створив: X · {createdAt}"
-- Actions: [✓ Виконано] [⏰ Відкласти на 1 день] [🗑 Видалити]
-- Permission: visible тільки якщо `ownerUserId === currentUser.id` AND admin
+**Tab Банк. рахунки** (`client-bank-accounts-tab.tsx`) — server, list:
+- Render `client.bankAccounts.filter(b => !b.isHidden)` — кожен рядок: account_number monospace + bank + mfo + comment
+- Кнопка "Копіювати IBAN" на кожному рядку (client-side)
+- Empty state: "Рахунків не вказано"
 
-### Task 10 — UI sidebar bell
+**Tab Іст. презентацій** — stub UnderConstruction M1.6.
+
+**Tab Соц мережі** (`client-social-tab.tsx`) — server, grid:
+- `client.messengers.map(m => <MessengerLink ... />)`
+- `<MessengerLink>` — icon + network label + handle + opens URL з `buildSocialUrl(m.network, m.handle, m.browserUrl)`
+- Окремий блок: "Сайт клієнта" якщо `client.websiteUrl`
+- Empty state: "Соцмереж не вказано"
+
+### Task 7 — Reminders CRUD (як у попередній версії spec)
+
+GET+POST `/api/v1/manager/clients/[id]/reminders`:
+- Auth required
+- POST Zod: `{ body: 1-500, remindAt: ISO }`
+- Save with `ownerUserId = currentUser.id`
+
+PATCH+DELETE `/api/v1/manager/clients/[id]/reminders/[rid]`:
+- Permission: owner OR admin (403 otherwise)
+- PATCH actions: `complete` / `uncomplete` / `snooze` (з `snoozedUntil`)
+- DELETE: hard delete
+
+### Task 8 — Bell endpoint
+
+GET `/api/v1/manager/notifications`:
+- Returns `{ overdueCount: int, items: [...] }` для current user
+- `items`: max 10, ordered by `remindAt ASC`
+- Query: `WHERE ownerUserId = me AND completedAt IS NULL AND (snoozedUntilAt IS NULL OR snoozedUntilAt <= NOW()) AND remindAt <= NOW()`
+
+### Task 9 — Bell UI
 
 `manager-header-bell.tsx`:
-- Client component (бо потрібен interactive dropdown)
-- `useEffect` — fetch `/api/v1/manager/notifications` mount + every 60s
-- Display: bell icon + badge з `overdueCount` (cap "9+")
-- Click → dropdown (shadcn `Popover` from `@ltex/ui`)
-- Dropdown — list of items, click → `router.push("/manager/customers/{clientId}#reminders")`
-- Empty state: "Без нагадувань"
+- Client component (use shadcn `Popover`)
+- Polling: useEffect з 60s interval (clear on unmount)
+- Badge cap "9+"
+- Click → fetch list → render
+- Item click → `router.push("/manager/customers/{clientId}#reminders")`
 
-⚠️ ВАЖЛИВО — НЕ replace існуючу `<UnderConstruction>` для bell — там empty dropdown зараз. Шукай поточну реалізацію (`apps/store/app/manager/(workstation)/_components/manager-header.tsx`?) і replace empty content на реальний.
+### Task 10 — Seed update
 
-### Task 11 — Tabs intogration
+`scripts/seed-mgr-test-data.ts` — extend:
+- Додати MgrPriceType (3-4 типи: wholesale / small_wholesale / retail)
+- На 3 з 10 клієнтів — set `priceTypeId`, `tradePointName`, `tovDebt`, `agentUserId = admin`, `viberContact`, `sessionRemainder`
+- Додати на 2 клієнти приклади банк рахунків (IBAN UA + bank + comment)
+- Додати на 2 клієнти приклади презентацій
+- Додати на 1 клієнта browserUrl у messenger
+- Додати на 2 клієнтів — 1-2 reminders (one overdue, one upcoming)
+- Idempotency safeguard уже є — keep.
 
-`client-tabs.tsx` — додати 5-й tab між Асортимент і Замовлення:
-- Tab label: `Нагадування` + badge з count overdue коли > 0
-- Anchor `#reminders` для deeplink з bell
-
-### Task 12 — `load-client.ts` — додати reminders
-
-Extend `ClientDetail` type з `reminders: ReminderListItem[]`. Завантажити з prisma `include`.
-
-Або краще — окремий fetch у page для performance (Suspense boundary з skeleton).
-
-### Task 13 — Tests ≥ 12
+### Task 11 — Tests ≥ 18
 
 - `phone.test.ts` ≥ 8
-- `reminders POST+GET route.test.ts` ≥ 4 (happy GET, validation POST, 404 client, auth)
-- `reminders [rid] route.test.ts` ≥ 4 (complete, snooze, delete, non-owner 403)
-- `notifications route.test.ts` ≥ 2 (count + items)
-- `client-reminders-grouping.test.ts` ≥ 4 (overdue/today/upcoming/completed bucket)
+- `social-links.test.ts` ≥ 6
+- `client-reminders-grouping.test.ts` ≥ 4
+- `reminders route.test.ts` (GET+POST) ≥ 4
+- `reminders [rid] route.test.ts` ≥ 4
+- `notifications route.test.ts` ≥ 2
+- Extend `clients/[id]/route.test.ts` для нових полів ≥ 1 додатковий test
 
 ---
 
 ## Acceptance criteria
 
 - [ ] `pnpm format:check && pnpm -r typecheck && pnpm -r test && pnpm -r build` — green
-- [ ] Phone лінки працюють — click на 📞 відкриває tel:, на Viber-icon — viber://, etc.
-- [ ] Адреса — clickable, відкриває Google Maps у новому tab
-- [ ] Геолокація (якщо є) — pin на Maps
-- [ ] Соцмережі — clickable з правильним URL per network
-- [ ] Сайт клієнта (`websiteUrl`) — opens новий tab з `rel="noopener"`
-- [ ] Tab "Нагадування" присутній з 4 секціями (overdue / today / upcoming / completed)
-- [ ] "Створити нагадування" відкриває modal, save → router.refresh, новий item з'являється
-- [ ] Complete / Snooze / Delete працюють з permission gating
-- [ ] Bell у sidebar показує count overdue reminders (тільки `ownerUserId = currentUser.id`)
-- [ ] Click на bell item → перехід на customer card з open Tab "Нагадування"
+- [ ] Tests ≥ 18 нових passing (загалом ≥ 696 store + 57 shared)
+- [ ] Реквізити tab показує **всі** 25 полів з 1С форми
+- [ ] Phones як block з 4 icon-actions кожен
+- [ ] Адреса/Геолокація/Сайт — clickable
+- [ ] Tabs — 11 у точному порядку як 1С
+- [ ] Tab Презентації — real list (поки empty/мінімум для seed клієнтів)
+- [ ] Tab Банк. рахунки — real list + Копіювати IBAN
+- [ ] Tab Соц мережі — clickable з icon per network, opens у новому tab/Viber deeplink
+- [ ] Tab Viber — stub з real buttons на viber:// deeplinks
+- [ ] Tab Нагадування — real CRUD: створити, complete, snooze, delete
+- [ ] Sidebar bell — real count + dropdown з click → перехід
+- [ ] Кнопка "Повідомити про борг" — toast stub (M1.8)
 - [ ] **DO NOT push** на main. Тільки на feature branch.
 
 ---
@@ -445,18 +687,44 @@ git merge --ff-only origin/<worker-branch>
 git push origin main
 .\scripts\deploy.ps1
 pnpm --filter @ltex/db exec prisma migrate deploy
+# Re-seed з новими полями — safeguard у скрипті НЕ дасть пере-записати existing,
+# тож якщо хочеш повне нове seed — спершу truncate:
+# psql -d ltex_ecosystem -c "TRUNCATE mgr_clients, mgr_client_timeline, mgr_client_phones, mgr_client_messengers, mgr_client_warehouses, mgr_client_route_assignments, mgr_client_assortment, mgr_client_presentations, mgr_client_bank_accounts, mgr_reminders, client_assignments CASCADE;"
+pnpm --filter @ltex/store exec tsx ../../scripts/seed-mgr-test-data.ts
 ```
 
-Жодного seed update не потрібно — reminders створюються через UI.
+⚠️ Truncate стирає **усі** mgr_clients — використовуй тільки коли впевнений (зараз — 10 seed клієнтів, без real data). Альтернатива: окремий скрипт `seed-mgr-extras.ts` що тільки додає bank accounts / presentations / reminders до existing клієнтів.
 
 ---
 
 ## Notes for worker
 
-1. **MUST-READ перед першим commit:** `docs/1c-export-mobile/MobileAgent/Catalogs/Нагадування.xml` + `Catalogs/Контрагенты/Forms/ФормаЭлемента/Ext/Form/Module.bsl` (там SQL `НагадуванняСпр` query — паттерн для reference).
-2. **Bell endpoint** має кешуватись агресивно — 60s revalidate на client-side polling. Server response — `Cache-Control: private, max-age=0` (бо per-user).
-3. **Permission check у PATCH/DELETE:** owner OR admin. Завжди приймай payload але reject 403 якщо не дозволено.
-4. **datetime-local** input — native HTML5, повертає string `"2026-05-13T10:00"`. Конвертуй у Date через `new Date(value)` (працює бо local timezone).
-5. **Phone formatter** — є tests, не зломай їх при оптимізаціях. Особливо edge cases з international format і spaces у raw input.
-6. **НЕ додавай** "Запис дзвінка" — це окрема integration з PBX, V2.
-7. **`scripts/seed-mgr-test-data.ts`** — НЕ оновлюй. Reminders створюються через UI.
+1. **Phasing** (worker — роби у такому порядку щоб build була green на кожному кроці):
+   - Phase 1: Migration + Prisma schema → typecheck має проходити
+   - Phase 2: phone.ts + social-links.ts + tests → unit tests pass
+   - Phase 3: Реквізити tab full (+ contact components) → manual smoke
+   - Phase 4: Усі tabs з placeholders (Презентації / Sales History / Viber / Banks / Presentation History / Social) → 11 tabs у UI
+   - Phase 5: Reminders model + CRUD API + UI tab + form + actions → real tab works
+   - Phase 6: Bell endpoint + UI → bell shows real count
+   - Phase 7: Seed update → integration з UI
+   - Phase 8: Tests + build → final green
+
+2. **MUST-READ 6 файлів конфіги перед першим commit.** Якщо знайдеш ще пропущене поле — додай.
+
+3. **DO NOT touch**:
+   - `apps/store/app/api/v1/manager/clients/route.ts` (M1.3a list)
+   - `lib/auth/*` (auth не змінюємо)
+   - `next.config.js` / `middleware.ts` (config stable)
+   - existing M1.3a tabs які працюють (Історія, Маршрути, Асортимент) — тільки extend де треба, не rewrite
+
+4. **`<UnderConstruction>` компонент** уже є з M1.2 — reuse його, не створюй новий.
+
+5. **Bell у sidebar** — перевір `apps/store/app/manager/(workstation)/_components/manager-header.tsx` (або як він зветься) — там empty bell з M1.2. Replace placeholder bell-icon на новий компонент.
+
+6. **`scripts/seed-mgr-test-data.ts`** — НЕ переписуй з нуля, тільки додавай нові секції. Safeguard `if (await prisma.mgrClient.count() > 0) return;` уже є — це блокує re-run на existing data, тож worker не може test-run seed без truncate. Тестуй seed на dev DB або mock.
+
+7. **Permission check для PATCH/DELETE reminders:** `if (reminder.ownerUserId !== currentUser.id && currentUser.role !== "admin") return 403`.
+
+8. **Performance:** parallel load у `page.tsx` через `Promise.all` — client + reminders + bankAccounts + presentations. Не серіально.
+
+9. **Якщо знайдеш конфлікт між M1.3a і цим M1.3c** (наприклад типи `ClientDetail` — Tasks 5/9 у M1.3a vs Task 4 тут) — переписуй типи на новій базі, не намагайся keep backwards compat.
