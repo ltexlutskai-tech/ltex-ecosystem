@@ -77,6 +77,7 @@ export async function loadClientDetail(
           colorHex: client.statusGeneral.colorHex,
         }
       : null,
+    statusGeneralId: client.statusGeneralId,
     statusOperational: client.statusOperational
       ? {
           code: client.statusOperational.code,
@@ -84,33 +85,41 @@ export async function loadClientDetail(
           colorHex: client.statusOperational.colorHex,
         }
       : null,
+    statusOperationalId: client.statusOperationalId,
     searchChannel: client.searchChannel
       ? { code: client.searchChannel.code, label: client.searchChannel.label }
       : null,
+    searchChannelId: client.searchChannelId,
     categoryTT: client.categoryTT
       ? { code: client.categoryTT.code, label: client.categoryTT.label }
       : null,
+    categoryTTId: client.categoryTTId,
     deliveryMethod: client.deliveryMethod
       ? {
           code: client.deliveryMethod.code,
           label: client.deliveryMethod.label,
         }
       : null,
+    deliveryMethodId: client.deliveryMethodId,
     primaryAssortment: client.primaryAssortment
       ? {
           code: client.primaryAssortment.code,
           label: client.primaryAssortment.label,
         }
       : null,
+    primaryAssortmentId: client.primaryAssortmentId,
     priceType: client.priceType
       ? { code: client.priceType.code, label: client.priceType.label }
       : null,
+    priceTypeId: client.priceTypeId,
     primaryRoute: client.primaryRoute
       ? { id: client.primaryRoute.id, name: client.primaryRoute.name }
       : null,
+    primaryRouteId: client.primaryRouteId,
     agent: client.agent
       ? { id: client.agent.id, fullName: client.agent.fullName }
       : null,
+    agentUserId: client.agentUserId,
     phones: client.phones.map((p) => ({
       id: p.id,
       phone: p.phone,

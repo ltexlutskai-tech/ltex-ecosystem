@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { getCurrentUser } from "@/lib/auth/manager-auth";
+import { canEditClient } from "@/lib/permissions/mgr-client-edit";
 import { UnderConstruction } from "../../_components/under-construction";
 import { ClientAssortmentTab } from "./_components/client-assortment-tab";
 import { ClientBankAccountsTab } from "./_components/client-bank-accounts-tab";
@@ -17,6 +18,7 @@ import { ClientTabs } from "./_components/client-tabs";
 import { ClientViberTab } from "./_components/client-viber-tab";
 import { countOverdue } from "./_components/client-reminders-grouping";
 import { loadClientDetail } from "./_lib/load-client";
+import { loadEditDictionaries } from "./_lib/load-edit-dictionaries";
 
 export const dynamic = "force-dynamic";
 
@@ -41,10 +43,17 @@ export default async function ClientDetailPage({
   if (!user) redirect("/manager/login");
 
   const { id } = await params;
-  const client = await loadClientDetail(id);
+  const [client, dictionaries] = await Promise.all([
+    loadClientDetail(id),
+    loadEditDictionaries(),
+  ]);
   if (!client) notFound();
 
   const canAssign = user.role === "admin";
+  const canEdit = await canEditClient(user, client.id);
+  const editDisabledReason = canEdit
+    ? undefined
+    : "Тільки призначений менеджер або адмін може редагувати";
   const overdueCount = countOverdue(client.reminders);
 
   return (
@@ -61,7 +70,15 @@ export default async function ClientDetailPage({
 
       <ClientTabs
         overdueRemindersCount={overdueCount}
-        requisites={<ClientRequisitesTab client={client} />}
+        requisites={
+          <ClientRequisitesTab
+            client={client}
+            dictionaries={dictionaries}
+            canEdit={canEdit}
+            currentUserRole={user.role}
+            editDisabledReason={editDisabledReason}
+          />
+        }
         assortment={<ClientAssortmentTab items={client.assortmentItems} />}
         presentations={<ClientPresentationsTab items={client.presentations} />}
         history={
