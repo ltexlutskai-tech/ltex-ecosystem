@@ -1,6 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@ltex/db";
+import { Prisma, prisma } from "@ltex/db";
 import { getCurrentUser } from "@/lib/auth/manager-auth";
+import { getMyClientCodes1C } from "@/lib/manager/order-ownership";
+
+function startOfTodayUtc(): Date {
+  const now = new Date();
+  return new Date(
+    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()),
+  );
+}
 
 export async function GET(req: NextRequest) {
   const user = await getCurrentUser(req);
@@ -8,7 +16,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Не авторизовано" }, { status: 401 });
   }
 
-  const [clientCount, debtAggregate, latestRates] = await Promise.all([
+  const [clientCount, debtAggregate, latestRates, myCodes] = await Promise.all([
     prisma.clientAssignment.count({ where: { userId: user.id } }),
     prisma.mgrClient.aggregate({
       where: { assignments: { some: { userId: user.id } } },
@@ -23,6 +31,7 @@ export async function GET(req: NextRequest) {
       distinct: ["currencyFrom"],
       take: 2,
     }),
+    getMyClientCodes1C(user),
   ]);
 
   const eur = latestRates.find((r) => r.currencyFrom === "EUR")?.rate ?? null;
@@ -31,8 +40,22 @@ export async function GET(req: NextRequest) {
     ? Number(debtAggregate._sum.debt)
     : 0;
 
-  // TODO M1.4+ — реальні counts після того як з'явиться mgr_orders / mgr_sales snapshot з 1С.
-  const sessionCounts = { orders: 0, sales: 0, payments: 0, routes: 0 };
+  let ordersToday = 0;
+  if (myCodes === null || myCodes.length > 0) {
+    const ordersWhere: Prisma.OrderWhereInput = {
+      createdAt: { gte: startOfTodayUtc() },
+      ...(myCodes !== null ? { customer: { code1C: { in: myCodes } } } : {}),
+    };
+    ordersToday = await prisma.order.count({ where: ordersWhere });
+  }
+
+  // TODO M1.5+ — sales/payments/routes після SOAP snapshot
+  const sessionCounts = {
+    orders: ordersToday,
+    sales: 0,
+    payments: 0,
+    routes: 0,
+  };
   // TODO M1.5+ — `lastSyncAt` має приходити з sync-worker state, а не з now().
   const syncStatus = { lastSyncAt: new Date().toISOString() };
 

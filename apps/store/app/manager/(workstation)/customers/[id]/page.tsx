@@ -3,11 +3,11 @@ import { notFound, redirect } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { getCurrentUser } from "@/lib/auth/manager-auth";
 import { canEditClient } from "@/lib/permissions/mgr-client-edit";
-import { UnderConstruction } from "../../_components/under-construction";
 import { ClientAssortmentTab } from "./_components/client-assortment-tab";
 import { ClientBankAccountsTab } from "./_components/client-bank-accounts-tab";
 import { ClientHeader } from "./_components/client-header";
 import { ClientHistoryTab } from "./_components/client-history-tab";
+import { ClientOrdersTab } from "./_components/client-orders-tab";
 import { ClientPresentationHistoryTab } from "./_components/client-presentation-history-tab";
 import { ClientPresentationsTab } from "./_components/client-presentations-tab";
 import { ClientRemindersTab } from "./_components/client-reminders-tab";
@@ -85,12 +85,7 @@ export default async function ClientDetailPage({
           <ClientHistoryTab clientId={client.id} timeline={client.timeline} />
         }
         salesHistory={<ClientSalesHistoryTab />}
-        orders={
-          <UnderConstruction
-            session="M1.5"
-            description="Замовлення клієнта з'являться у наступних сесіях."
-          />
-        }
+        orders={<ClientOrdersTab clientId={client.id} />}
         reminders={
           <ClientRemindersTab
             clientId={client.id}
