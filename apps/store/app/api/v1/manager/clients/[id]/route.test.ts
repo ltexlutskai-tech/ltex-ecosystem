@@ -9,6 +9,7 @@ const {
   getCurrentUserMock,
   canEditClientMock,
   getViewerOwnershipMock,
+  enqueueClientUpdateMock,
 } = vi.hoisted(() => ({
   mockPrisma: {
     mgrClient: {
@@ -19,9 +20,14 @@ const {
   getCurrentUserMock: vi.fn(),
   canEditClientMock: vi.fn(),
   getViewerOwnershipMock: vi.fn(),
+  enqueueClientUpdateMock: vi.fn(),
 }));
 
 vi.mock("@ltex/db", () => ({ prisma: mockPrisma, Prisma: {} }));
+
+vi.mock("@/lib/sync/enqueue", () => ({
+  enqueueClientUpdate: (...args: unknown[]) => enqueueClientUpdateMock(...args),
+}));
 
 vi.mock("@/lib/auth/manager-auth", () => ({
   getCurrentUser: (...args: unknown[]) => getCurrentUserMock(...args),
@@ -175,6 +181,7 @@ beforeEach(() => {
   getCurrentUserMock.mockResolvedValue(MANAGER_USER);
   canEditClientMock.mockResolvedValue(true);
   getViewerOwnershipMock.mockResolvedValue("mine");
+  enqueueClientUpdateMock.mockResolvedValue({ id: "sync1" });
 });
 
 describe("GET /api/v1/manager/clients/[id]", () => {
@@ -364,6 +371,31 @@ describe("PATCH /api/v1/manager/clients/[id]", () => {
       data: Record<string, unknown>;
     };
     expect(updateCall.data.priceType).toEqual({ connect: { id: "cprice2" } });
+  });
+
+  it("M1.5: успішний PATCH enqueue-ить SyncJob для 1С write-back", async () => {
+    mockPrisma.mgrClient.update.mockResolvedValueOnce(fakeClient);
+    const res = await PATCH(makePatchReq("c1", { name: "Renamed" }), {
+      params: Promise.resolve({ id: "c1" }),
+    });
+    expect(res.status).toBe(200);
+    // Дозволяємо fire-and-forget зачекати event loop
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    expect(enqueueClientUpdateMock).toHaveBeenCalledOnce();
+    expect(enqueueClientUpdateMock).toHaveBeenCalledWith(fakeClient, "update");
+  });
+
+  it("M1.5: enqueue failure НЕ блокує сам PATCH response", async () => {
+    mockPrisma.mgrClient.update.mockResolvedValueOnce(fakeClient);
+    enqueueClientUpdateMock.mockRejectedValueOnce(new Error("DB down"));
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const res = await PATCH(makePatchReq("c1", { name: "Renamed" }), {
+      params: Promise.resolve({ id: "c1" }),
+    });
+    expect(res.status).toBe(200);
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    expect(warnSpy).toHaveBeenCalled();
+    warnSpy.mockRestore();
   });
 
   it("licenseExpiresAt ISO date converted to Date", async () => {
