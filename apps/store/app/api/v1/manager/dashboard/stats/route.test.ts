@@ -11,15 +11,19 @@ const { mockPrisma, getCurrentUserMock } = vi.hoisted(() => ({
     },
     mgrClient: {
       aggregate: vi.fn(),
+      findMany: vi.fn(),
     },
     exchangeRate: {
       findMany: vi.fn(),
+    },
+    order: {
+      count: vi.fn(),
     },
   },
   getCurrentUserMock: vi.fn(),
 }));
 
-vi.mock("@ltex/db", () => ({ prisma: mockPrisma }));
+vi.mock("@ltex/db", () => ({ prisma: mockPrisma, Prisma: {} }));
 
 vi.mock("@/lib/auth/manager-auth", () => ({
   getCurrentUser: (...args: unknown[]) => getCurrentUserMock(...args),
@@ -47,16 +51,26 @@ const MANAGER_USER = {
   notifyChannels: [],
   lastSeenAt: null,
 };
+const ADMIN_USER = {
+  ...MANAGER_USER,
+  id: "admin1",
+  role: "admin" as const,
+};
 
 beforeEach(() => {
   vi.clearAllMocks();
   getCurrentUserMock.mockResolvedValue(MANAGER_USER);
   mockPrisma.clientAssignment.count.mockResolvedValue(47);
   mockPrisma.mgrClient.aggregate.mockResolvedValue({ _sum: { debt: null } });
+  mockPrisma.mgrClient.findMany.mockResolvedValue([
+    { code1C: "000001" },
+    { code1C: "000002" },
+  ]);
   mockPrisma.exchangeRate.findMany.mockResolvedValue([
     { currencyFrom: "EUR", currencyTo: "UAH", rate: 52, date: new Date() },
     { currencyFrom: "USD", currencyTo: "UAH", rate: 44, date: new Date() },
   ]);
+  mockPrisma.order.count.mockResolvedValue(0);
 });
 
 describe("GET /api/v1/manager/dashboard/stats", () => {
@@ -94,5 +108,38 @@ describe("GET /api/v1/manager/dashboard/stats", () => {
     };
     expect(json.eur).toBeNull();
     expect(json.usd).toBeNull();
+  });
+
+  it("returns real ordersToday count scoped to manager's clients", async () => {
+    mockPrisma.order.count.mockResolvedValueOnce(7);
+    const res = await GET(makeReq());
+    const json = (await res.json()) as { sessionCounts: { orders: number } };
+    expect(json.sessionCounts.orders).toBe(7);
+
+    const args = mockPrisma.order.count.mock.calls[0]?.[0] as {
+      where: { customer?: { code1C?: { in?: string[] } } };
+    };
+    expect(args.where.customer?.code1C?.in).toEqual(["000001", "000002"]);
+  });
+
+  it("admin sees total ordersToday without scope", async () => {
+    getCurrentUserMock.mockResolvedValueOnce(ADMIN_USER);
+    mockPrisma.order.count.mockResolvedValueOnce(42);
+    const res = await GET(makeReq());
+    const json = (await res.json()) as { sessionCounts: { orders: number } };
+    expect(json.sessionCounts.orders).toBe(42);
+
+    const args = mockPrisma.order.count.mock.calls[0]?.[0] as {
+      where: { customer?: unknown };
+    };
+    expect(args.where.customer).toBeUndefined();
+  });
+
+  it("skips order count when manager has 0 assigned clients", async () => {
+    mockPrisma.mgrClient.findMany.mockResolvedValueOnce([]);
+    const res = await GET(makeReq());
+    const json = (await res.json()) as { sessionCounts: { orders: number } };
+    expect(json.sessionCounts.orders).toBe(0);
+    expect(mockPrisma.order.count).not.toHaveBeenCalled();
   });
 });
