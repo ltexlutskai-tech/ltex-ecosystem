@@ -32,12 +32,13 @@ function routeFor(job: Pick<MgrSyncJob, "entityType" | "entityId">): string {
   switch (job.entityType) {
     case "client":
       return `/sync/clients/${job.entityId}`;
-    // M1.5b додасть:
-    // case "order": return `/sync/orders/${job.entityId}`;
-    // case "payment": return `/sync/payments/${job.entityId}`;
+    case "order":
+      return `/sync/orders/${job.entityId}`;
+    case "payment":
+      return `/sync/payments/${job.entityId}`;
     default:
       throw new Error(
-        `proxy-client: unsupported entityType '${job.entityType}' (orders/payments → M1.5b)`,
+        `proxy-client: unsupported entityType '${job.entityType}'`,
       );
   }
 }

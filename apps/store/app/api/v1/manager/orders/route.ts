@@ -6,6 +6,8 @@ import {
   ORDER_STATUS_LIST,
   type OrderStatus,
 } from "@/lib/manager/order-status";
+import { createOrderSchema } from "@/lib/validations/manager-order";
+import { createOrderWithItems } from "@/lib/manager/order-create";
 
 const ORDER_STATUS_SET: Set<string> = new Set(ORDER_STATUS_LIST);
 
@@ -119,4 +121,80 @@ export async function GET(req: NextRequest) {
     page,
     pageSize,
   });
+}
+
+export async function POST(req: NextRequest) {
+  const user = await getCurrentUser(req);
+  if (!user) {
+    return NextResponse.json({ error: "Не авторизовано" }, { status: 401 });
+  }
+
+  const body = await req.json().catch(() => null);
+  const parsed = createOrderSchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: "Невірні дані", details: parsed.error.issues.slice(0, 5) },
+      { status: 400 },
+    );
+  }
+  const input = parsed.data;
+
+  const customer = await prisma.customer.findUnique({
+    where: { id: input.customerId },
+    select: { id: true, code1C: true, name: true },
+  });
+  if (!customer) {
+    return NextResponse.json({ error: "Клієнта не знайдено" }, { status: 404 });
+  }
+
+  // Ownership check: manager — only own clients; admin — будь-кого
+  const myCodes = await getMyClientCodes1C(user);
+  if (myCodes !== null) {
+    if (!customer.code1C || !myCodes.includes(customer.code1C)) {
+      return NextResponse.json({ error: "Не ваш клієнт" }, { status: 403 });
+    }
+  }
+
+  try {
+    const order = await createOrderWithItems(input, customer);
+    return NextResponse.json(
+      {
+        id: order.id,
+        code1C: order.code1C,
+        status: order.status,
+        totalEur: order.totalEur,
+        totalUah: order.totalUah,
+        exchangeRate: order.exchangeRate,
+        notes: order.notes,
+        createdAt: order.createdAt.toISOString(),
+        customer: order.customer,
+        items: order.items.map((i) => ({
+          id: i.id,
+          productId: i.productId,
+          lotId: i.lotId,
+          priceEur: i.priceEur,
+          weight: i.weight,
+          quantity: i.quantity,
+        })),
+      },
+      { status: 201 },
+    );
+  } catch (err) {
+    if (err instanceof Prisma.PrismaClientKnownRequestError) {
+      // FK violation — невалідний productId/lotId
+      if (err.code === "P2003" || err.code === "P2025") {
+        return NextResponse.json(
+          { error: "Невалідний product/lot у items" },
+          { status: 400 },
+        );
+      }
+    }
+    console.error("[L-TEX] Order create failed", {
+      error: err instanceof Error ? err.message : String(err),
+    });
+    return NextResponse.json(
+      { error: "Помилка створення замовлення" },
+      { status: 500 },
+    );
+  }
 }

@@ -90,13 +90,56 @@ describe("sendToProxy", () => {
     ).rejects.toThrow(/MANAGER_SYNC_SHARED_SECRET/);
   });
 
-  it("кидає на unsupported entityType (M1.5b orders/payments)", async () => {
+  it("POST-ить на /sync/orders/:id для entityType=order", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ ok: true, orderCode1C: "L-2026-0123" }), {
+        status: 200,
+      }),
+    );
+    const result = await sendToProxy(
+      {
+        entityType: "order",
+        entityId: "o1",
+        idempotencyKey: "key-ord",
+        payload: { customerCode1C: "000001" },
+      },
+      fetchMock as unknown as typeof fetch,
+    );
+    expect(result.ok).toBe(true);
+    const [url] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("http://proxy.test/sync/orders/o1");
+  });
+
+  it("POST-ить на /sync/payments/:id для entityType=payment", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(
+        new Response(
+          JSON.stringify({ ok: true, paymentCode1C: "P-2026-0001" }),
+          { status: 200 },
+        ),
+      );
+    const result = await sendToProxy(
+      {
+        entityType: "payment",
+        entityId: "p1",
+        idempotencyKey: "key-pay",
+        payload: { orderCode1C: "L-2026-0123" },
+      },
+      fetchMock as unknown as typeof fetch,
+    );
+    expect(result.ok).toBe(true);
+    const [url] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("http://proxy.test/sync/payments/p1");
+  });
+
+  it("кидає на unsupported entityType", async () => {
     const fetchMock = vi.fn();
     await expect(
       sendToProxy(
         {
-          entityType: "order" as unknown as "client",
-          entityId: "o1",
+          entityType: "shipment" as unknown as "client",
+          entityId: "s1",
           idempotencyKey: "k1",
           payload: {},
         },

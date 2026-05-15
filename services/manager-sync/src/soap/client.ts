@@ -4,7 +4,14 @@ import {
   buildSoapEnvelope,
   extractSoapReturn,
 } from "./envelope";
-import type { ClientUpdateRequest, ClientUpdateResult } from "./types";
+import type {
+  ClientUpdateRequest,
+  ClientUpdateResult,
+  OrderCreateRequest,
+  OrderCreateResult,
+  PaymentCreateRequest,
+  PaymentCreateResult,
+} from "./types";
 
 /**
  * Викликає 1С SOAP operation `ОбновитиКлієнта`.
@@ -89,6 +96,178 @@ function normalizeResult(parsed: unknown): ClientUpdateResult {
     return {
       ok: true,
       code1C: typeof obj.code1C === "string" ? obj.code1C : "",
+      errors: Array.isArray(obj.errors)
+        ? obj.errors.filter((e): e is string => typeof e === "string")
+        : [],
+    };
+  }
+  return {
+    ok: false,
+    errorCode: typeof obj.errorCode === "number" ? obj.errorCode : 4,
+    errorMessage:
+      typeof obj.errorMessage === "string" ? obj.errorMessage : "Unknown error",
+  };
+}
+
+// ─── M1.5b: order + payment SOAP wrappers ───────────────────────────────────
+
+/**
+ * Викликає 1С SOAP operation `СтворитиЗамовлення`.
+ * Mirror-ить `updateClientViaSoap` pattern — fetch + XML envelope + extract <return>.
+ *
+ * **NOT EXERCISED IN CI** — викликається тільки коли SYNC_MOCK_MODE=false.
+ */
+export async function createOrderViaSoap(
+  req: OrderCreateRequest,
+  config: SyncConfig,
+  fetchImpl: typeof fetch = fetch,
+): Promise<OrderCreateResult> {
+  if (!config.onecUrl || !config.onecPassword) {
+    throw new Error(
+      "createOrderViaSoap: ONEC_SOAP_URL / ONEC_SOAP_PASSWORD not configured",
+    );
+  }
+
+  const payloadJson = JSON.stringify(req.payload);
+  const envelope = buildSoapEnvelope({
+    operation: "СтворитиЗамовлення",
+    password: config.onecPassword,
+    idempotencyKey: req.idempotencyKey,
+    payloadJson,
+  });
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), config.onecTimeoutMs);
+
+  let response: Response;
+  try {
+    response = await fetchImpl(config.onecUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "text/xml; charset=utf-8",
+        SOAPAction: buildSoapAction("СтворитиЗамовлення"),
+      },
+      body: envelope,
+      signal: controller.signal,
+    });
+  } finally {
+    clearTimeout(timeout);
+  }
+
+  if (!response.ok) {
+    throw new Error(
+      `SOAP HTTP ${response.status}: ${await safeReadText(response)}`,
+    );
+  }
+
+  const bodyText = await response.text();
+  const returnText = extractSoapReturn(bodyText);
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(returnText);
+  } catch (err) {
+    throw new Error(
+      `SOAP response: invalid JSON у <return>: ${(err as Error).message}`,
+    );
+  }
+  return normalizeOrderResult(parsed);
+}
+
+function normalizeOrderResult(parsed: unknown): OrderCreateResult {
+  if (!parsed || typeof parsed !== "object") {
+    throw new Error("SOAP response: <return> JSON is not an object");
+  }
+  const obj = parsed as Record<string, unknown>;
+  if (obj.ok === true) {
+    return {
+      ok: true,
+      orderCode1C: typeof obj.orderCode1C === "string" ? obj.orderCode1C : "",
+      orderNumber:
+        typeof obj.orderNumber === "string" ? obj.orderNumber : undefined,
+      errors: Array.isArray(obj.errors)
+        ? obj.errors.filter((e): e is string => typeof e === "string")
+        : [],
+    };
+  }
+  return {
+    ok: false,
+    errorCode: typeof obj.errorCode === "number" ? obj.errorCode : 4,
+    errorMessage:
+      typeof obj.errorMessage === "string" ? obj.errorMessage : "Unknown error",
+  };
+}
+
+/**
+ * Викликає 1С SOAP operation `СтворитиОплату`.
+ */
+export async function createPaymentViaSoap(
+  req: PaymentCreateRequest,
+  config: SyncConfig,
+  fetchImpl: typeof fetch = fetch,
+): Promise<PaymentCreateResult> {
+  if (!config.onecUrl || !config.onecPassword) {
+    throw new Error(
+      "createPaymentViaSoap: ONEC_SOAP_URL / ONEC_SOAP_PASSWORD not configured",
+    );
+  }
+
+  const payloadJson = JSON.stringify(req.payload);
+  const envelope = buildSoapEnvelope({
+    operation: "СтворитиОплату",
+    password: config.onecPassword,
+    idempotencyKey: req.idempotencyKey,
+    payloadJson,
+  });
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), config.onecTimeoutMs);
+
+  let response: Response;
+  try {
+    response = await fetchImpl(config.onecUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "text/xml; charset=utf-8",
+        SOAPAction: buildSoapAction("СтворитиОплату"),
+      },
+      body: envelope,
+      signal: controller.signal,
+    });
+  } finally {
+    clearTimeout(timeout);
+  }
+
+  if (!response.ok) {
+    throw new Error(
+      `SOAP HTTP ${response.status}: ${await safeReadText(response)}`,
+    );
+  }
+
+  const bodyText = await response.text();
+  const returnText = extractSoapReturn(bodyText);
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(returnText);
+  } catch (err) {
+    throw new Error(
+      `SOAP response: invalid JSON у <return>: ${(err as Error).message}`,
+    );
+  }
+  return normalizePaymentResult(parsed);
+}
+
+function normalizePaymentResult(parsed: unknown): PaymentCreateResult {
+  if (!parsed || typeof parsed !== "object") {
+    throw new Error("SOAP response: <return> JSON is not an object");
+  }
+  const obj = parsed as Record<string, unknown>;
+  if (obj.ok === true) {
+    return {
+      ok: true,
+      paymentCode1C:
+        typeof obj.paymentCode1C === "string" ? obj.paymentCode1C : "",
       errors: Array.isArray(obj.errors)
         ? obj.errors.filter((e): e is string => typeof e === "string")
         : [],

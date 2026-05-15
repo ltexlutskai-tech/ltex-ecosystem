@@ -252,47 +252,226 @@ Update or create клієнта у 1С на основі data з нашої пр
 КонецФункции
 ```
 
-### 3.2 СтворитиЗамовлення (M1.5b, заплановано)
+### 3.2 СтворитиЗамовлення (M1.5b — implemented client-side, реальний BSL чекає 1С-розробника)
 
-**Тип:** SOAP function
+Створює документ "Замовлення Покупця" (`Document.ЗаказПокупателя`) у 1С на
+основі payload-у з нашої програми. Документ створюється у статусі "Черновик"
+(не проводиться) — менеджер у 1С підтверджує або відправляє на склад
+вручну.
+
+**Тип:** SOAP function (Output: Строка)
 
 **Параметри:**
 
-| Name             | Type      | In/Out |
-| ---------------- | --------- | ------ |
-| `ПарольВхода`    | xs:string | In     |
-| `IdempotencyKey` | xs:string | In     |
-| `ПакетДанних`    | xs:string | In     |
+| Name             | Type      | In/Out | Description            |
+| ---------------- | --------- | ------ | ---------------------- |
+| `ПарольВхода`    | xs:string | In     | Shared secret          |
+| `IdempotencyKey` | xs:string | In     | UUID для dedup         |
+| `ПакетДанних`    | xs:string | In     | JSON-payload документа |
 
-**`ПакетДанних` приклад:**
+**`ПакетДанних` JSON структура** (точно такий shape що шле наша
+`apps/store/lib/sync/enqueue.ts::buildOrderCreatePayload`):
 
 ```json
 {
-  "clientCode1C": "000005798",
-  "managerCode1C": "U0001",
-  "warehouseCode": "001",
-  "priceTypeCode": "wholesale",
-  "comment": "Терміново, погоджено по телефону",
+  "orderInternalId": "ckxyz123abc",
+  "code1C": null,
+  "status": "draft",
+  "customerCode1C": "000005798",
+  "notes": "Терміново, погоджено по телефону",
+  "totalEur": "150.50",
+  "totalUah": "6471.50",
+  "exchangeRate": "43.0000",
   "items": [
     {
-      "barcode": "1234567890123",
-      "quantity": 5,
-      "priceUah": "1500.00"
+      "productId": "ckabc1",
+      "productCode1C": "0007854",
+      "lotId": "cklot1",
+      "lotBarcode": "1234567890123",
+      "priceEur": "100.50",
+      "weight": "25.123",
+      "quantity": 1
     },
     {
-      "productCode1C": "0007854",
-      "quantity": 2,
-      "priceUah": "800.00"
+      "productId": "ckabc2",
+      "productCode1C": "0007855",
+      "lotId": null,
+      "lotBarcode": null,
+      "priceEur": "50.00",
+      "weight": "10.000",
+      "quantity": 2
     }
   ]
 }
 ```
 
-**Return:** `{ok: true, orderCode1C: "0000123", orderNumber: "L-2026-0123"}` — щоб наша сторона зберегла `code1C` у `Order` record.
+**Поля:**
 
-### 3.3 СтворитиОплату (M1.5b, заплановано)
+- `orderInternalId` — наш ID (cuid) у `Order.id`. 1С зберігає у
+  `Document.ЗаказПокупателя.ВнішнійID` (новий реквізит) щоб уникнути
+  дублів при retry-storms.
+- `code1C` — null коли наша сторона ще не знає 1С-кода (це найчастіший
+  випадок при create). 1С генерує свій номер документа і повертає у response.
+- `customerCode1C` — code1C клієнта (`Catalog.Контрагенты.Код`). 1С шукає
+  існуючого через `НайтиПоКоду`; якщо не знайдено — повертає errorCode=2.
+- `totalEur` / `totalUah` / `exchangeRate` — string з `.` decimal separator,
+  парсити через `Число()`.
+- `items[].lotBarcode` — null коли позиція "загальна" (менеджер УП обере
+  лот пізніше при відвантаженні). У такому разі 1С створює `Замовлення.Товари`
+  рядок з `Сертификат = Неопределено` і `Розкладено = Хибно`.
+- `items[].lotBarcode` not null — конкретний лот. 1С шукає `Catalog.Серії`
+  по barcode і прив'язує. Якщо лот вже у іншому замовленні → errorCode=3
+  "Lot already reserved".
+- `items[].productCode1C` — fallback коли `lotBarcode` null; шукає
+  `Catalog.Номенклатура` по коду.
 
-Аналогічна структура. Створює документ "Платіж" у 1С.
+**Return:** JSON-string
+
+```json
+{
+  "ok": true,
+  "orderCode1C": "0000123",
+  "orderNumber": "L-2026-0123",
+  "errors": []
+}
+```
+
+Або на помилку:
+
+```json
+{
+  "ok": false,
+  "errorCode": 2,
+  "errorMessage": "Клієнта 000005798 не знайдено у 1С"
+}
+```
+
+**Error codes:**
+
+- `1` — невірний пароль (як і ОбновитиКлієнта)
+- `2` — referenced entity не знайдена (customer/product/lot)
+- `3` — business rule violation (лот вже зарезервований у іншому документі,
+  заблокований склад тощо)
+- `4` — інша помилка БД у 1С
+
+**Чорновик BSL (для майбутньої реалізації):**
+
+```bsl
+Функція СтворитиЗамовлення(ПарольВхода, IdempotencyKey, ПакетДанних) Експорт
+    Якщо Не ПеревіритиПароль(ПарольВхода) Тоді
+        Возврат СтворитиВідповідьПомилки(1, "Bad password");
+    КонецЕсли;
+
+    Cached = ОтриматиСинкЛогЗапис(IdempotencyKey);
+    Якщо Cached <> Неопределено Тоді
+        Возврат Cached;
+    КонецЕсли;
+
+    Спробувати
+        Дані = ПрочитатиJSON(ПакетДанних);
+
+        // 1. Find клієнт
+        Клієнт = Catalogs.Контрагенты.НайтиПоКоду(Дані.customerCode1C);
+        Якщо Клієнт.Пустая() Тоді
+            Возврат СтворитиВідповідьПомилки(2, "Клієнта не знайдено: " + Дані.customerCode1C);
+        КонецЕсли;
+
+        // 2. Create новий документ
+        Документ = Documents.ЗаказПокупателя.СоздатьДокумент();
+        Документ.Дата = ПоточнаяДата();
+        Документ.Контрагент = Клієнт;
+        Документ.ВнішнійID = Дані.orderInternalId; // новий реквізит для dedup
+        Документ.СумаEUR = Число(Дані.totalEur);
+        Документ.СумаUAH = Число(Дані.totalUah);
+        Документ.КурсEUR = Число(Дані.exchangeRate);
+        Документ.Коментар = Дані.notes;
+
+        // 3. Items
+        Для Каждого Поз Из Дані.items Цикл
+            Рядок = Документ.Товари.Добавить();
+            // Try lot-bound first
+            Якщо Не ПустоеЗначение(Поз.lotBarcode) Тоді
+                Серія = Catalogs.Серії.НайтиПоНайменуванню(Поз.lotBarcode);
+                Якщо Серія.Пустая() Тоді
+                    Возврат СтворитиВідповідьПомилки(2, "Лот не знайдено: " + Поз.lotBarcode);
+                КонецЕсли;
+                Рядок.Серія = Серія;
+                Рядок.Номенклатура = Серія.Номенклатура;
+            Інакше
+                Номен = Catalogs.Номенклатура.НайтиПоКоду(Поз.productCode1C);
+                Якщо Номен.Пустая() Тоді
+                    Возврат СтворитиВідповідьПомилки(2, "Товар не знайдено: " + Поз.productCode1C);
+                КонецЕсли;
+                Рядок.Номенклатура = Номен;
+            КонецЕсли;
+            Рядок.Вага = Число(Поз.weight);
+            Рядок.Количество = Поз.quantity;
+            Рядок.ЦінаEUR = Число(Поз.priceEur);
+        КонецЦикла;
+
+        Документ.Записать(РежимЗаписиДокумента.Запись); // черновик, не проводимо
+
+        Результат = СтворитиВідповідьЗамовлення(Документ.Код, Документ.Номер);
+        ЗберегтиСинкЛогЗапис(IdempotencyKey, "СтворитиЗамовлення", Результат);
+        Возврат Результат;
+    Виключення
+        Возврат СтворитиВідповідьПомилки(4, "DB write: " + ОписаниеОшибки());
+    КонецСпробувати;
+КонецФункції
+
+Функція СтворитиВідповідьЗамовлення(Code, Номер)
+    Шаблон = "{""ok"":true,""orderCode1C"":""%1"",""orderNumber"":""%2"",""errors"":[]}";
+    Возврат СтрШаблон(Шаблон, Code, Номер);
+КонецФункції
+```
+
+### 3.3 СтворитиОплату (M1.5b — implemented client-side)
+
+Створює документ "Поступлення на расчетный счет" або "Поступлення готівки"
+(залежить від `method`) у 1С на основі payload-у.
+
+**Тип:** SOAP function (Output: Строка)
+
+**Параметри:** ті самі що `СтворитиЗамовлення`.
+
+**`ПакетДанних` JSON структура** (echo `buildPaymentCreatePayload`):
+
+```json
+{
+  "paymentInternalId": "ckpay1",
+  "orderInternalId": "ckxyz123abc",
+  "orderCode1C": "0000123",
+  "method": "cash",
+  "amount": "1500.00",
+  "currency": "UAH",
+  "externalId": null,
+  "paidAt": "2026-05-15T10:00:00.000Z"
+}
+```
+
+**Поля:**
+
+- `paymentInternalId` — наш ID (`Payment.id`); 1С зберігає у `ВнішнійID`.
+- `orderCode1C` — 1С код документу замовлення. Може бути null коли парент
+  Order ще sync-ається у тому ж пакеті — у такому разі 1С шукає по
+  `orderInternalId` → знаходить документ через `ВнішнійID`.
+- `method` — enum: `cash` | `card` | `bank_transfer` | `online`.
+  - `cash` → `Document.ПКО` (Прибутковий касовий ордер)
+  - `card` | `online` | `bank_transfer` → `Document.ПоступленнеНаРС`
+- `amount` — string з `.` decimal separator.
+- `paidAt` — ISO 8601 UTC; 1С парсить через `XMLЗначение(Тип("Дата"), ...)`.
+
+**Return:** JSON-string
+
+```json
+{
+  "ok": true,
+  "paymentCode1C": "0000456",
+  "errors": []
+}
+```
+
+**Error codes:** ті самі що `СтворитиЗамовлення` (1-4).
 
 ### 3.4 ОтриматиСнапшот (M1.6, заплановано — inbound)
 
@@ -385,6 +564,74 @@ Content-Type: text/xml; charset=utf-8
 **Note:** SOAP-faults НЕ використовуємо — усі помилки приходять у body
 як JSON у `ok:false` форматі. Це уніфікує клієнтський код.
 
+### Request `СтворитиЗамовлення`
+
+```xml
+POST /ltex/ws/MobileExchange.1cws HTTP/1.1
+Host: 1c-server.local
+Content-Type: text/xml; charset=utf-8
+SOAPAction: "http://arm_mobile#MobileExchange:СтворитиЗамовлення"
+
+<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+  <soap:Body>
+    <ms:СтворитиЗамовлення xmlns:ms="http://arm_mobile">
+      <ms:ПарольВхода>shared-secret-value</ms:ПарольВхода>
+      <ms:IdempotencyKey>660e8400-e29b-41d4-a716-446655440100</ms:IdempotencyKey>
+      <ms:ПакетДанних>{"orderInternalId":"ckxyz123","customerCode1C":"000005798","totalEur":"150.50","totalUah":"6471.50","exchangeRate":"43.0000","items":[{"productId":"ckabc1","productCode1C":"0007854","lotId":"cklot1","lotBarcode":"1234567890123","priceEur":"100.50","weight":"25.123","quantity":1}]}</ms:ПакетДанних>
+    </ms:СтворитиЗамовлення>
+  </soap:Body>
+</soap:Envelope>
+```
+
+### Successful Response `СтворитиЗамовлення`
+
+```xml
+HTTP/1.1 200 OK
+Content-Type: text/xml; charset=utf-8
+
+<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+  <soap:Body>
+    <ms:СтворитиЗамовленняResponse xmlns:ms="http://arm_mobile">
+      <ms:return>{"ok":true,"orderCode1C":"0000123","orderNumber":"L-2026-0123","errors":[]}</ms:return>
+    </ms:СтворитиЗамовленняResponse>
+  </soap:Body>
+</soap:Envelope>
+```
+
+### Request `СтворитиОплату`
+
+```xml
+POST /ltex/ws/MobileExchange.1cws HTTP/1.1
+Host: 1c-server.local
+Content-Type: text/xml; charset=utf-8
+SOAPAction: "http://arm_mobile#MobileExchange:СтворитиОплату"
+
+<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+  <soap:Body>
+    <ms:СтворитиОплату xmlns:ms="http://arm_mobile">
+      <ms:ПарольВхода>shared-secret-value</ms:ПарольВхода>
+      <ms:IdempotencyKey>770e8400-e29b-41d4-a716-446655440200</ms:IdempotencyKey>
+      <ms:ПакетДанних>{"paymentInternalId":"ckpay1","orderCode1C":"0000123","method":"cash","amount":"1500.00","currency":"UAH","paidAt":"2026-05-15T10:00:00.000Z"}</ms:ПакетДанних>
+    </ms:СтворитиОплату>
+  </soap:Body>
+</soap:Envelope>
+```
+
+### Successful Response `СтворитиОплату`
+
+```xml
+HTTP/1.1 200 OK
+Content-Type: text/xml; charset=utf-8
+
+<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+  <soap:Body>
+    <ms:СтворитиОплатуResponse xmlns:ms="http://arm_mobile">
+      <ms:return>{"ok":true,"paymentCode1C":"0000456","errors":[]}</ms:return>
+    </ms:СтворитиОплатуResponse>
+  </soap:Body>
+</soap:Envelope>
+```
+
 ---
 
 ## 5. Implementation у 1С — checklist
@@ -398,13 +645,22 @@ Content-Type: text/xml; charset=utf-8
 3. Створи `Constant "СинкПароль"` (Строка 64), задай random shared secret
 4. Створи `ScheduledJob "ЧисткаСинкЛогу"` — щодня видаляє `СинкЛог` записи старші 7 днів
 5. Створи `WebService "MobileExchange"` (URI Namespace: `http://arm_mobile`)
-6. Додай operations:
-   - `ОбновитиКлієнта` (Type: Function, Return: xs:string, Params: ПарольВхода, IdempotencyKey, ПакетДанних — усі xs:string In)
-   - У майбутньому: `СтворитиЗамовлення`, `СтворитиОплату`, `ОтриматиСнапшот`
-7. Each operation мapping на функцію `СинкВхідний.<operation>(…)`
-8. Публікація через web-platform на IIS / Apache (стандартний 1С workflow)
-9. URL endpoint format: `https://<1c-server>/<base>/ws/MobileExchange.1cws`
-10. Тест через SoapUI або curl + manual XML envelope (див. приклади у §4)
+6. Додай operations (усі мають однаковий signature: 3 xs:string In params, return xs:string):
+   - `ОбновитиКлієнта` — update/create клієнта
+   - `СтворитиЗамовлення` — create Document.ЗаказПокупателя (chernovik)
+   - `СтворитиОплату` — create Document.ПКО або ПоступленнеНаРС
+   - У майбутньому: `ОтриматиСнапшот` (inbound polling, M1.6)
+7. Додай реквізит `ВнішнійID` (Строка 36) до:
+   - `Catalogs.Контрагенты` (для match при ОбновитиКлієнта-create flow)
+   - `Documents.ЗаказПокупателя` (для match при retry-storm на СтворитиЗамовлення)
+   - `Documents.ПКО` + `Documents.ПоступленнеНаРС` (для СтворитиОплату)
+   - НЕ unique constraint на 1С-стороні — `СинкЛог.IdempotencyKey` робить
+     primary dedup; `ВнішнійID` корисний для manual cross-reference під час
+     debugging
+8. Each operation мapping на функцію `СинкВхідний.<operation>(…)`
+9. Публікація через web-platform на IIS / Apache (стандартний 1С workflow)
+10. URL endpoint format: `https://<1c-server>/<base>/ws/MobileExchange.1cws`
+11. Тест через SoapUI або curl + manual XML envelope (див. приклади у §4)
 
 ---
 
@@ -423,13 +679,14 @@ Content-Type: text/xml; charset=utf-8
 
 ## 7. Майбутні розширення
 
-| Operation               | Coming in  | Notes                                         |
-| ----------------------- | ---------- | --------------------------------------------- |
-| `СтворитиЗамовлення`    | M1.5b      | Order creation                                |
-| `СтворитиОплату`        | M1.5b      | Payment creation                              |
-| `СтворитиРеалізацію`    | M1.5b опц. | Facts of delivery                             |
-| `ОтриматиСнапшот`       | M1.6       | Inbound polling                               |
-| Inbound webhook from 1С | Future V2  | Push-based snapshot замість pull (1С 8.3.21+) |
+| Operation               | Status                      | Notes                                         |
+| ----------------------- | --------------------------- | --------------------------------------------- |
+| `ОбновитиКлієнта`       | client-side shipped (M1.5)  | BSL чекає 1С-розробника                       |
+| `СтворитиЗамовлення`    | client-side shipped (M1.5b) | mock-mode default; BSL чекає 1С-розробника    |
+| `СтворитиОплату`        | client-side shipped (M1.5b) | mock-mode default; BSL чекає 1С-розробника    |
+| `СтворитиРеалізацію`    | future                      | Facts of delivery (можливо M1.7)              |
+| `ОтриматиСнапшот`       | future M1.6                 | Inbound polling                               |
+| Inbound webhook from 1С | future V2                   | Push-based snapshot замість pull (1С 8.3.21+) |
 
 ---
 
