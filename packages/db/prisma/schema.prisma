@@ -926,3 +926,52 @@ model MgrUserViewPrefs {
   @@unique([userId, viewKey])
   @@map("mgr_user_view_prefs")
 }
+
+// ─── Manager sync queue (M1.5) — outbound write-back to 1С ──────────────────
+// Кожна зміна картки клієнта / замовлення / оплати на стороні менеджера
+// створює row у цій черзі. Cron `/api/cron/process-sync-queue` періодично
+// дренує її викликаючи services/manager-sync proxy.
+//
+// Lifecycle: pending → retrying ⇄ pending → sent
+//                                ↘ failed (attempts ≥ maxAttempts)
+//
+// `idempotencyKey` — UUID; передається у SOAP-call щоб 1С міг dedup
+// duplicate retries. Backoff schedule: 1m / 5m / 30m / 2h / 6h.
+
+enum SyncJobStatus {
+  pending
+  retrying
+  sent
+  failed
+
+  @@map("mgr_sync_job_status")
+}
+
+enum SyncEntityType {
+  client
+  order
+  payment
+
+  @@map("mgr_sync_entity_type")
+}
+
+model MgrSyncJob {
+  id             String         @id @default(cuid())
+  entityType     SyncEntityType @map("entity_type")
+  entityId       String         @map("entity_id")
+  action         String
+  payload        Json
+  status         SyncJobStatus  @default(pending)
+  attempts       Int            @default(0)
+  maxAttempts    Int            @default(5) @map("max_attempts")
+  nextAttemptAt  DateTime       @default(now()) @map("next_attempt_at")
+  lastError      String?        @map("last_error")
+  idempotencyKey String         @unique @map("idempotency_key")
+  sentAt         DateTime?      @map("sent_at")
+  createdAt      DateTime       @default(now()) @map("created_at")
+  updatedAt      DateTime       @updatedAt @map("updated_at")
+
+  @@index([status, nextAttemptAt])
+  @@index([entityType, entityId])
+  @@map("mgr_sync_jobs")
+}

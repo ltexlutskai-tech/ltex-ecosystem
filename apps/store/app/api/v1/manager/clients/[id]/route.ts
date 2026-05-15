@@ -6,6 +6,7 @@ import {
   maskClientForForeign,
 } from "@/lib/manager/client-visibility";
 import { canEditClient } from "@/lib/permissions/mgr-client-edit";
+import { enqueueClientUpdate } from "@/lib/sync/enqueue";
 import { mgrClientPatchSchema } from "@/lib/validations/mgr-client";
 
 const clientInclude = {
@@ -17,7 +18,7 @@ const clientInclude = {
   primaryRoute: true,
   primaryAssortment: true,
   priceType: true,
-  agent: { select: { id: true, fullName: true } },
+  agent: { select: { id: true, fullName: true, code1C: true } },
   phones: { orderBy: { sortOrder: "asc" } },
   messengers: true,
   warehouses: true,
@@ -177,6 +178,15 @@ export async function PATCH(
       data: updateData,
       include: clientInclude,
     });
+
+    // M1.5: enqueue write-back до 1С — best-effort, не блокує response.
+    enqueueClientUpdate(updated, "update").catch((e: unknown) => {
+      console.warn("[L-TEX] Failed to enqueue client sync", {
+        clientId: updated.id,
+        error: e instanceof Error ? e.message : String(e),
+      });
+    });
+
     return NextResponse.json({ client: serializeMgrClient(updated) });
   } catch (err) {
     if (err instanceof Prisma.PrismaClientKnownRequestError) {
