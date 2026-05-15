@@ -86,8 +86,25 @@ export interface ClientTimelineEntry {
   metadata: unknown;
 }
 
+/**
+ * Власник клієнта з точки зору поточного користувача:
+ * - `admin` — admin role (бачить усе)
+ * - `mine` — клієнт призначений на мене (повний доступ + редагування)
+ * - `foreign` — чужий клієнт (masked контакти, hidden tabs)
+ *
+ * Серверне поле, передається з GET `/clients/[id]` та з server-side
+ * loader-а. UI використовує для conditional rendering.
+ */
+export type ViewerOwnership = "mine" | "foreign" | "admin";
+
 export interface ClientDetail {
   id: string;
+  /**
+   * Власник клієнта з точки зору поточного користувача (server-set).
+   * Server вже застосував masking коли `foreign` — це лише hint для UI
+   * (банер, hidden tabs, disabled edit button).
+   */
+  viewerOwnership: ViewerOwnership;
   code1C: string | null;
   name: string;
   tradePointName: string | null;

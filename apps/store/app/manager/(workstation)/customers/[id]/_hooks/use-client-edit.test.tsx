@@ -6,6 +6,7 @@ import type { ClientDetail } from "../_components/types";
 function baseClient(overrides: Partial<ClientDetail> = {}): ClientDetail {
   return {
     id: "c1",
+    viewerOwnership: "mine",
     code1C: "000005798",
     name: "Test Client",
     tradePointName: "ТТ-1",

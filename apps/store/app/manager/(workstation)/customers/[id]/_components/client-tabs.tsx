@@ -1,24 +1,52 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
-const TABS = [
-  { id: "requisites", label: "Реквізити" },
-  { id: "assortment", label: "Асортимент" },
-  { id: "presentations", label: "Презентації" },
-  { id: "history", label: "Історія" },
-  { id: "sales-history", label: "Історія продаж" },
-  { id: "orders", label: "Замовлення" },
-  { id: "reminders", label: "Нагадування" },
-  { id: "viber", label: "Viber" },
-  { id: "banks", label: "Банк. рахунки" },
-  { id: "presentation-history", label: "Іст. презентацій" },
-  { id: "social", label: "Соц мережі" },
-] as const;
+interface TabDef {
+  id:
+    | "requisites"
+    | "assortment"
+    | "presentations"
+    | "history"
+    | "sales-history"
+    | "orders"
+    | "reminders"
+    | "viber"
+    | "banks"
+    | "presentation-history"
+    | "social";
+  label: string;
+  foreignVisible: boolean;
+}
 
-type TabId = (typeof TABS)[number]["id"];
+/**
+ * Усі tabs у точному 1С порядку. Поле `foreignVisible` — чи показати tab
+ * коли поточний user дивиться на чужого клієнта (M1.3f).
+ *
+ * У foreign view приховуються tabs з sensitive contact data:
+ * Презентації, Історія, Нагадування, Viber, Банк. рахунки, Іст.
+ * презентацій, Соц мережі (7 з 11). Лишається: Реквізити (з masked
+ * полями), Асортимент, Історія продаж, Замовлення.
+ */
+const TABS: TabDef[] = [
+  { id: "requisites", label: "Реквізити", foreignVisible: true },
+  { id: "assortment", label: "Асортимент", foreignVisible: true },
+  { id: "presentations", label: "Презентації", foreignVisible: false },
+  { id: "history", label: "Історія", foreignVisible: false },
+  { id: "sales-history", label: "Історія продаж", foreignVisible: true },
+  { id: "orders", label: "Замовлення", foreignVisible: true },
+  { id: "reminders", label: "Нагадування", foreignVisible: false },
+  { id: "viber", label: "Viber", foreignVisible: false },
+  { id: "banks", label: "Банк. рахунки", foreignVisible: false },
+  {
+    id: "presentation-history",
+    label: "Іст. презентацій",
+    foreignVisible: false,
+  },
+  { id: "social", label: "Соц мережі", foreignVisible: false },
+];
 
-const VALID_TAB_IDS = new Set<string>(TABS.map((t) => t.id));
+type TabId = TabDef["id"];
 
 export function ClientTabs({
   requisites,
@@ -33,6 +61,7 @@ export function ClientTabs({
   presentationHistory,
   social,
   overdueRemindersCount = 0,
+  isForeign = false,
 }: {
   requisites: React.ReactNode;
   assortment: React.ReactNode;
@@ -46,17 +75,31 @@ export function ClientTabs({
   presentationHistory: React.ReactNode;
   social: React.ReactNode;
   overdueRemindersCount?: number;
+  isForeign?: boolean;
 }) {
+  const visibleTabs = useMemo(
+    () => (isForeign ? TABS.filter((t) => t.foreignVisible) : TABS),
+    [isForeign],
+  );
+  const visibleIds = useMemo(
+    () => new Set<string>(visibleTabs.map((t) => t.id)),
+    [visibleTabs],
+  );
+
   const [tab, setTab] = useState<TabId>("requisites");
 
-  // URL anchor `#tabname` → initial selection
   useEffect(() => {
     if (typeof window === "undefined") return;
     const hash = window.location.hash.replace(/^#/, "");
-    if (hash && VALID_TAB_IDS.has(hash)) {
+    if (hash && visibleIds.has(hash)) {
       setTab(hash as TabId);
+    } else if (hash && !visibleIds.has(hash)) {
+      // Deeplink на hidden tab (наприклад #viber для foreign view) →
+      // fallback на 'requisites' + очистити anchor щоб не reset-нути назад.
+      setTab("requisites");
+      window.history.replaceState(null, "", "#requisites");
     }
-  }, []);
+  }, [visibleIds]);
 
   function selectTab(id: TabId) {
     setTab(id);
@@ -85,7 +128,7 @@ export function ClientTabs({
         role="tablist"
         className="flex flex-wrap gap-1 border-b border-gray-200"
       >
-        {TABS.map((t) => (
+        {visibleTabs.map((t) => (
           <button
             key={t.id}
             type="button"

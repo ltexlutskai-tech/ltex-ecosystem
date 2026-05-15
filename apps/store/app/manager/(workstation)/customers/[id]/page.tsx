@@ -44,16 +44,19 @@ export default async function ClientDetailPage({
 
   const { id } = await params;
   const [client, dictionaries] = await Promise.all([
-    loadClientDetail(id),
+    loadClientDetail(id, user),
     loadEditDictionaries(),
   ]);
   if (!client) notFound();
 
+  const isForeign = client.viewerOwnership === "foreign";
   const canAssign = user.role === "admin";
   const canEdit = await canEditClient(user, client.id);
   const editDisabledReason = canEdit
     ? undefined
-    : "Тільки призначений менеджер або адмін може редагувати";
+    : isForeign
+      ? "Тільки призначений менеджер"
+      : "Тільки призначений менеджер або адмін може редагувати";
   const overdueCount = countOverdue(client.reminders);
 
   return (
@@ -70,6 +73,7 @@ export default async function ClientDetailPage({
 
       <ClientTabs
         overdueRemindersCount={overdueCount}
+        isForeign={isForeign}
         requisites={
           <ClientRequisitesTab
             client={client}
@@ -77,6 +81,7 @@ export default async function ClientDetailPage({
             canEdit={canEdit}
             currentUserRole={user.role}
             editDisabledReason={editDisabledReason}
+            isForeign={isForeign}
           />
         }
         assortment={<ClientAssortmentTab items={client.assortmentItems} />}

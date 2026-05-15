@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Prisma, prisma } from "@ltex/db";
 import { getCurrentUser } from "@/lib/auth/manager-auth";
+import { ownershipWhere } from "@/lib/manager/client-visibility";
 import { listQuerySchema } from "@/lib/validations/manager-clients";
 
 // Префікси імен сміттєвих контрагентів з 1С — "1111111 ()", "777777 ()" тощо.
@@ -161,13 +162,27 @@ export async function GET(req: NextRequest) {
   }
 
   // ─── Assignment + trash ───────────────────────────────────────────────────
-  if (q.onlyMine) {
-    andClauses.push({ assignments: { some: { userId: user.id } } });
+  // `onlyMine` URL-param лише для admin-а. Менеджер завжди enforced до своїх
+  // через `ownershipWhere` нижче (URL bypass-ів немає).
+  if (user.role === "admin" && q.onlyMine) {
+    andClauses.push({
+      OR: [
+        { agentUserId: user.id },
+        { assignments: { some: { userId: user.id } } },
+      ],
+    });
   }
   if (q.hideTrash) {
     for (const prefix of TRASH_NAME_PREFIXES) {
       andClauses.push({ NOT: { name: { startsWith: prefix } } });
     }
+  }
+
+  // ─── M1.3f visibility scope (server-enforced) ────────────────────────────
+  // Manager — лише свої клієнти (agentUserId OR assignment). Admin — усі.
+  const ownership = ownershipWhere(user);
+  if (Object.keys(ownership).length > 0) {
+    andClauses.push(ownership);
   }
 
   const where: Prisma.MgrClientWhereInput =

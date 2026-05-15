@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   formatPhoneUkr,
+  maskPhone,
   normalizePhone,
   phoneToTelUrl,
   phoneToViberUrl,
@@ -71,5 +72,32 @@ describe("phone deeplinks", () => {
     expect(phoneToTelUrl(null)).toBeNull();
     expect(phoneToViberUrl("")).toBeNull();
     expect(phoneToWhatsAppUrl("xx")).toBeNull();
+  });
+});
+
+describe("maskPhone", () => {
+  it("masks valid phone exposing last 3 digits", () => {
+    expect(maskPhone("+380501234567")).toBe("*** *** *** 567");
+    expect(maskPhone("0501234567")).toBe("*** *** *** 567");
+    expect(maskPhone("+380 (50) 123-45-67")).toBe("*** *** *** 567");
+  });
+
+  it("returns null для null/undefined/empty", () => {
+    expect(maskPhone(null)).toBeNull();
+    expect(maskPhone(undefined)).toBeNull();
+    expect(maskPhone("")).toBeNull();
+  });
+
+  it("returns null для не-валідного номера", () => {
+    expect(maskPhone("not-a-phone")).toBeNull();
+    expect(maskPhone("123")).toBeNull();
+  });
+
+  it("does not leak prefix or middle digits", () => {
+    const masked = maskPhone("+380501234567");
+    expect(masked).not.toContain("380");
+    expect(masked).not.toContain("50");
+    expect(masked).not.toContain("123");
+    expect(masked).not.toContain("45");
   });
 });

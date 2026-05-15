@@ -120,16 +120,26 @@ describe("GET /api/v1/manager/clients — base behaviour", () => {
     expect(statusFilter?.statusGeneral?.code).toBe("inactive");
   });
 
-  it("filters by onlyMine using current user id", async () => {
+  it("manager — onlyMine URL param ігнорується (ownership enforced server-side)", async () => {
+    // M1.3f: для менеджера завжди застосовується ownership filter, незалежно
+    // від `onlyMine=true|false` у URL.
     await GET(makeReq("onlyMine=true"));
     const callArgs = mockPrisma.mgrClient.findMany.mock.calls[0]?.[0];
     const where = callArgs.where as {
       AND?: Array<{
-        assignments?: { some: { userId: string } };
+        OR?: Array<{
+          agentUserId?: string;
+          assignments?: { some: { userId: string } };
+        }>;
       }>;
     };
-    const mine = (where.AND ?? []).find((c) => c.assignments !== undefined);
-    expect(mine?.assignments?.some.userId).toBe("u1");
+    const ownershipClause = (where.AND ?? []).find(
+      (c) =>
+        Array.isArray(c.OR) &&
+        c.OR.some((o) => o.agentUserId !== undefined) &&
+        c.OR.some((o) => o.assignments !== undefined),
+    );
+    expect(ownershipClause).toBeDefined();
   });
 
   it("search query uses OR across name/phone/city/phones[].phone", async () => {
@@ -278,5 +288,59 @@ describe("GET /api/v1/manager/clients — M1.3e extended filters", () => {
       (c) => c.statusGeneralId !== undefined,
     );
     expect(statusClause).toBeUndefined();
+  });
+});
+
+describe("GET /api/v1/manager/clients — M1.3f visibility scope", () => {
+  const ADMIN_USER = {
+    id: "admin1",
+    email: "admin@example.com",
+    fullName: "Admin",
+    role: "admin" as const,
+    isActive: true,
+    code1C: null,
+    telegramLinked: false,
+    notifyChannels: [],
+    lastSeenAt: null,
+  };
+
+  function hasOwnershipClause(
+    callArgs: { where: { AND?: Array<{ OR?: unknown }> } } | undefined,
+  ): boolean {
+    const ands = callArgs?.where.AND ?? [];
+    return ands.some((c) => {
+      if (!Array.isArray(c.OR)) return false;
+      const types = (c.OR as Array<Record<string, unknown>>).map((o) =>
+        Object.keys(o).join(","),
+      );
+      return types.includes("agentUserId") && types.includes("assignments");
+    });
+  }
+
+  it("manager — ownership filter завжди додається у WHERE", async () => {
+    await GET(makeReq());
+    const callArgs = mockPrisma.mgrClient.findMany.mock.calls[0]?.[0];
+    expect(hasOwnershipClause(callArgs)).toBe(true);
+  });
+
+  it("manager + ?onlyMine=false → ownership filter ВСЕ ОДНО застосовано", async () => {
+    // M1.3f hard rule: менеджер не може bypass-нути ownership через URL.
+    await GET(makeReq("onlyMine=false"));
+    const callArgs = mockPrisma.mgrClient.findMany.mock.calls[0]?.[0];
+    expect(hasOwnershipClause(callArgs)).toBe(true);
+  });
+
+  it("admin — без onlyMine — ownership filter не додається", async () => {
+    getCurrentUserMock.mockResolvedValueOnce(ADMIN_USER);
+    await GET(makeReq());
+    const callArgs = mockPrisma.mgrClient.findMany.mock.calls[0]?.[0];
+    expect(hasOwnershipClause(callArgs)).toBe(false);
+  });
+
+  it("admin + ?onlyMine=true — opt-in ownership filter", async () => {
+    getCurrentUserMock.mockResolvedValueOnce(ADMIN_USER);
+    await GET(makeReq("onlyMine=true"));
+    const callArgs = mockPrisma.mgrClient.findMany.mock.calls[0]?.[0];
+    expect(hasOwnershipClause(callArgs)).toBe(true);
   });
 });

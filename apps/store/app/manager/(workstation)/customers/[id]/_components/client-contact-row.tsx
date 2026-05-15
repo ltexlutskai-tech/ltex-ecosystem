@@ -1,4 +1,4 @@
-import { MessageSquare, Phone, Send } from "lucide-react";
+import { Lock, MessageSquare, Phone, Send } from "lucide-react";
 import {
   formatPhoneUkr,
   phoneToTelUrl,
@@ -10,13 +10,35 @@ interface Props {
   phone: string;
   label?: string | null;
   messenger?: string | null;
+  /**
+   * Якщо true — `phone` уже є masked-рядком (`*** *** *** 567`); рендеримо
+   * як-є, без action-кнопок tel/viber/wa.me/Telegram (контакти приховано
+   * для foreign view). M1.3f.
+   */
+  masked?: boolean;
 }
 
 /**
  * Один рядок з номером телефону клієнта.
  * 4 actions: tel:, viber://, wa.me, Telegram (disabled — phone-based deeplink не існує).
+ *
+ * У foreign view (`masked=true`) рендериться лише masked phone + lock icon,
+ * без жодних action-link-ів. Звичайний (mine/admin) view — повний набір.
  */
-export function ClientContactRow({ phone, label, messenger }: Props) {
+export function ClientContactRow({ phone, label, messenger, masked }: Props) {
+  if (masked) {
+    return (
+      <div className="flex flex-wrap items-center gap-2 py-1">
+        <span className="font-mono text-sm text-gray-500">{phone}</span>
+        {label && <span className="text-xs text-gray-500">({label})</span>}
+        <Lock
+          className="ml-auto h-3.5 w-3.5 text-gray-400"
+          aria-label="Контакт приховано"
+        />
+      </div>
+    );
+  }
+
   const formatted = formatPhoneUkr(phone);
   const telUrl = phoneToTelUrl(phone);
   const viberUrl = phoneToViberUrl(phone);

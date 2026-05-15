@@ -12,6 +12,7 @@ interface Props {
   canEdit: boolean;
   currentUserRole: "manager" | "senior_manager" | "admin";
   editDisabledReason?: string;
+  isForeign?: boolean;
 }
 
 export function ClientEditToggle({
@@ -20,6 +21,7 @@ export function ClientEditToggle({
   canEdit,
   currentUserRole,
   editDisabledReason,
+  isForeign,
 }: Props) {
   const [mode, setMode] = useState<"view" | "edit">("view");
 
@@ -30,6 +32,7 @@ export function ClientEditToggle({
         canEdit={canEdit}
         onEditClick={canEdit ? () => setMode("edit") : undefined}
         editDisabledReason={editDisabledReason}
+        isForeign={isForeign}
       />
     );
   }

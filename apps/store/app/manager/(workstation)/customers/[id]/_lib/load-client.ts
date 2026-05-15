@@ -1,8 +1,14 @@
 import { prisma } from "@ltex/db";
-import type { ClientDetail } from "../_components/types";
+import {
+  getViewerOwnership,
+  maskClientForForeign,
+} from "@/lib/manager/client-visibility";
+import type { CurrentManager } from "@/lib/auth/manager-auth";
+import type { ClientDetail, ViewerOwnership } from "../_components/types";
 
 export async function loadClientDetail(
   id: string,
+  user?: Pick<CurrentManager, "id" | "role">,
 ): Promise<ClientDetail | null> {
   const client = await prisma.mgrClient.findUnique({
     where: { id },
@@ -38,7 +44,16 @@ export async function loadClientDetail(
     },
   });
   if (!client) return null;
-  return {
+
+  // M1.3f: визначаємо ownership scope; admin → full, manager-own → full,
+  // manager-foreign → masked. Якщо user не передано (generateMetadata) →
+  // консервативно як "foreign" (metadata не leak-ить sensitive).
+  const viewerOwnership: ViewerOwnership = user
+    ? await getViewerOwnership(user, id)
+    : "foreign";
+
+  const full: ClientDetail = {
+    viewerOwnership,
     id: client.id,
     code1C: client.code1C,
     name: client.name,
@@ -197,4 +212,6 @@ export async function loadClientDetail(
         }
       : null,
   };
+
+  return viewerOwnership === "foreign" ? maskClientForForeign(full) : full;
 }
