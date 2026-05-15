@@ -25,6 +25,7 @@ export {
   phoneToTelUrl,
   phoneToViberUrl,
   phoneToWhatsAppUrl,
+  maskPhone,
 } from "./phone";
 export {
   buildSocialUrl,

@@ -31,6 +31,7 @@ export default async function CustomersPage({
     loadDictionariesSnapshot(),
     loadClients({
       userId: user.id,
+      userRole: user.role,
       search: pickString(sp.search),
       // legacy single — backward compat
       status: pickString(sp.status),
@@ -92,6 +93,7 @@ export default async function CustomersPage({
         filtersPrefs={filtersPrefs}
         columnsPrefs={columnsPrefs}
         totalCount={list.total}
+        showOnlyMineToggle={user.role === "admin"}
       />
       <ClientListTable items={list.items} columnsPrefs={columnsPrefs} />
       <ListPagination page={list.page} totalPages={list.totalPages} />

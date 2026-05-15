@@ -8,6 +8,7 @@ interface Props {
   canEdit: boolean;
   currentUserRole: "manager" | "senior_manager" | "admin";
   editDisabledReason?: string;
+  isForeign?: boolean;
 }
 
 export function ClientRequisitesTab({
@@ -16,6 +17,7 @@ export function ClientRequisitesTab({
   canEdit,
   currentUserRole,
   editDisabledReason,
+  isForeign,
 }: Props) {
   return (
     <ClientEditToggle
@@ -24,6 +26,7 @@ export function ClientRequisitesTab({
       canEdit={canEdit}
       currentUserRole={currentUserRole}
       editDisabledReason={editDisabledReason}
+      isForeign={isForeign}
     />
   );
 }

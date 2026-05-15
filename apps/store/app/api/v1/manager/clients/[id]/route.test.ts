@@ -4,20 +4,24 @@ import { NextRequest } from "next/server";
 const VALID_SECRET = "a".repeat(48);
 process.env.MANAGER_JWT_SECRET = VALID_SECRET;
 
-const { mockPrisma, getCurrentUserMock, canEditClientMock } = vi.hoisted(
-  () => ({
-    mockPrisma: {
-      mgrClient: {
-        findUnique: vi.fn(),
-        update: vi.fn(),
-      },
+const {
+  mockPrisma,
+  getCurrentUserMock,
+  canEditClientMock,
+  getViewerOwnershipMock,
+} = vi.hoisted(() => ({
+  mockPrisma: {
+    mgrClient: {
+      findUnique: vi.fn(),
+      update: vi.fn(),
     },
-    getCurrentUserMock: vi.fn(),
-    canEditClientMock: vi.fn(),
-  }),
-);
+  },
+  getCurrentUserMock: vi.fn(),
+  canEditClientMock: vi.fn(),
+  getViewerOwnershipMock: vi.fn(),
+}));
 
-vi.mock("@ltex/db", () => ({ prisma: mockPrisma }));
+vi.mock("@ltex/db", () => ({ prisma: mockPrisma, Prisma: {} }));
 
 vi.mock("@/lib/auth/manager-auth", () => ({
   getCurrentUser: (...args: unknown[]) => getCurrentUserMock(...args),
@@ -28,6 +32,16 @@ vi.mock("@/lib/auth/manager-auth", () => ({
 vi.mock("@/lib/permissions/mgr-client-edit", () => ({
   canEditClient: (...args: unknown[]) => canEditClientMock(...args),
 }));
+
+vi.mock("@/lib/manager/client-visibility", async () => {
+  const actual = await vi.importActual<
+    typeof import("@/lib/manager/client-visibility")
+  >("@/lib/manager/client-visibility");
+  return {
+    ...actual,
+    getViewerOwnership: (...args: unknown[]) => getViewerOwnershipMock(...args),
+  };
+});
 
 import { GET, PATCH } from "./route";
 
@@ -160,6 +174,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   getCurrentUserMock.mockResolvedValue(MANAGER_USER);
   canEditClientMock.mockResolvedValue(true);
+  getViewerOwnershipMock.mockResolvedValue("mine");
 });
 
 describe("GET /api/v1/manager/clients/[id]", () => {
@@ -363,5 +378,110 @@ describe("PATCH /api/v1/manager/clients/[id]", () => {
     };
     expect(updateCall.data.licenseExpiresAt).toBeInstanceOf(Date);
     expect((updateCall.data.licenseExpiresAt as Date).toISOString()).toBe(iso);
+  });
+});
+
+describe("GET /api/v1/manager/clients/[id] — M1.3f foreign view masking", () => {
+  it("admin sees full client (viewerOwnership='admin')", async () => {
+    getCurrentUserMock.mockResolvedValueOnce(ADMIN_USER);
+    getViewerOwnershipMock.mockResolvedValueOnce("admin");
+    mockPrisma.mgrClient.findUnique.mockResolvedValueOnce(fakeClient);
+    const res = await GET(makeGetReq("c1"), {
+      params: Promise.resolve({ id: "c1" }),
+    });
+    expect(res.status).toBe(200);
+    const json = (await res.json()) as {
+      client: {
+        viewerOwnership: string;
+        phonePrimary: string | null;
+        viberContact: string | null;
+        bankAccounts: unknown[];
+      };
+    };
+    expect(json.client.viewerOwnership).toBe("admin");
+    expect(json.client.phonePrimary).toBe("+380501112233");
+    expect(json.client.viberContact).toBe("+380501112233");
+    expect(json.client.bankAccounts).toHaveLength(1);
+  });
+
+  it("manager на свого клієнта — full data (viewerOwnership='mine')", async () => {
+    getViewerOwnershipMock.mockResolvedValueOnce("mine");
+    mockPrisma.mgrClient.findUnique.mockResolvedValueOnce(fakeClient);
+    const res = await GET(makeGetReq("c1"), {
+      params: Promise.resolve({ id: "c1" }),
+    });
+    expect(res.status).toBe(200);
+    const json = (await res.json()) as {
+      client: {
+        viewerOwnership: string;
+        phonePrimary: string | null;
+        bankAccounts: unknown[];
+        presentations: unknown[];
+      };
+    };
+    expect(json.client.viewerOwnership).toBe("mine");
+    expect(json.client.phonePrimary).toBe("+380501112233");
+    expect(json.client.bankAccounts).toHaveLength(1);
+    expect(json.client.presentations).toHaveLength(1);
+  });
+
+  it("manager на чужого — masked phones, hidden tabs (viewerOwnership='foreign')", async () => {
+    getViewerOwnershipMock.mockResolvedValueOnce("foreign");
+    mockPrisma.mgrClient.findUnique.mockResolvedValueOnce(fakeClient);
+    const res = await GET(makeGetReq("c1"), {
+      params: Promise.resolve({ id: "c1" }),
+    });
+    expect(res.status).toBe(200);
+    const json = (await res.json()) as {
+      client: {
+        viewerOwnership: string;
+        phonePrimary: string | null;
+        viberContact: string | null;
+        websiteUrl: string | null;
+        geolocation: string | null;
+        phones: Array<{ phone: string; messenger: string | null }>;
+        messengers: unknown[];
+        bankAccounts: unknown[];
+        presentations: unknown[];
+        timeline: unknown[];
+      };
+    };
+    expect(json.client.viewerOwnership).toBe("foreign");
+    expect(json.client.phonePrimary).toBe("*** *** *** 233");
+    expect(json.client.viberContact).toBeNull();
+    expect(json.client.websiteUrl).toBeNull();
+    expect(json.client.geolocation).toBeNull();
+    expect(json.client.phones[0]?.phone).toBe("*** *** *** 233");
+    expect(json.client.phones[0]?.messenger).toBeNull();
+    expect(json.client.messengers).toEqual([]);
+    expect(json.client.bankAccounts).toEqual([]);
+    expect(json.client.presentations).toEqual([]);
+    expect(json.client.timeline).toEqual([]);
+  });
+
+  it("foreign view preserves name/code/address/debts/statuses", async () => {
+    getViewerOwnershipMock.mockResolvedValueOnce("foreign");
+    mockPrisma.mgrClient.findUnique.mockResolvedValueOnce(fakeClient);
+    const res = await GET(makeGetReq("c1"), {
+      params: Promise.resolve({ id: "c1" }),
+    });
+    const json = (await res.json()) as {
+      client: {
+        name: string;
+        code1C: string | null;
+        city: string | null;
+        region: string | null;
+        debt: string;
+        statusGeneral: { code: string } | null;
+        agent: { fullName: string } | null;
+      };
+    };
+    expect(json.client.name).toBe("Test Client");
+    expect(json.client.code1C).toBe("000000001");
+    expect(json.client.city).toBe("Київ");
+    expect(json.client.region).toBe("Київська");
+    expect(json.client.debt).toBe("1234.56");
+    expect(json.client.statusGeneral?.code).toBe("active");
+    expect(json.client.agent?.fullName).toBe("Alice");
   });
 });

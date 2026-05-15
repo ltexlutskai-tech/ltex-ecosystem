@@ -13,6 +13,12 @@ interface Props {
   filtersPrefs: ConfigItem[];
   columnsPrefs: ConfigItem[];
   totalCount: number;
+  /**
+   * Чи показувати toggle «Тільки мої». M1.3f — для менеджера ownership
+   * scope enforced серверно, тому toggle не має сенсу (завжди тільки свої).
+   * Адмін бачить toggle щоб опційно зафільтрувати на власних клієнтів.
+   */
+  showOnlyMineToggle?: boolean;
 }
 
 export function ClientListToolbar({
@@ -20,6 +26,7 @@ export function ClientListToolbar({
   filtersPrefs,
   columnsPrefs,
   totalCount,
+  showOnlyMineToggle = true,
 }: Props) {
   const router = useRouter();
   const pathname = usePathname();
@@ -71,12 +78,14 @@ export function ClientListToolbar({
             dictionaries={dictionaries}
             filtersPrefs={filtersPrefs}
           />
-          <Chip
-            active={onlyMine}
-            onClick={() => setParam("onlyMine", onlyMine ? null : "true")}
-          >
-            Тільки мої
-          </Chip>
+          {showOnlyMineToggle && (
+            <Chip
+              active={onlyMine}
+              onClick={() => setParam("onlyMine", onlyMine ? null : "true")}
+            >
+              Тільки мої
+            </Chip>
+          )}
           <ViewCustomizerSheet
             initialColumns={columnsPrefs}
             initialFilters={filtersPrefs}

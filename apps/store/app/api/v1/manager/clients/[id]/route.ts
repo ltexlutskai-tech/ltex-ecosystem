@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Prisma, prisma } from "@ltex/db";
 import { getCurrentUser } from "@/lib/auth/manager-auth";
+import {
+  getViewerOwnership,
+  maskClientForForeign,
+} from "@/lib/manager/client-visibility";
 import { canEditClient } from "@/lib/permissions/mgr-client-edit";
 import { mgrClientPatchSchema } from "@/lib/validations/mgr-client";
 
@@ -56,7 +60,17 @@ export async function GET(
     return NextResponse.json({ error: "Клієнта не знайдено" }, { status: 404 });
   }
 
-  return NextResponse.json({ client: serializeMgrClient(client) });
+  // M1.3f: визначаємо чи бачить юзер картку як «свого»
+  const viewerOwnership = await getViewerOwnership(user, id);
+  const serialized = serializeMgrClient(client);
+  const payload =
+    viewerOwnership === "foreign"
+      ? maskClientForForeign(serialized)
+      : serialized;
+
+  return NextResponse.json({
+    client: { ...payload, viewerOwnership },
+  });
 }
 
 export async function PATCH(

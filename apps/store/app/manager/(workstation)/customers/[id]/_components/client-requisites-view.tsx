@@ -78,6 +78,7 @@ function ViberContactValue({ contact }: { contact: string | null }) {
 function PhonesBlock({
   phones,
   viberContact,
+  masked,
 }: {
   phones: {
     id: string;
@@ -86,6 +87,7 @@ function PhonesBlock({
     messenger: string | null;
   }[];
   viberContact: string | null;
+  masked?: boolean;
 }) {
   if (phones.length === 0 && !viberContact) return null;
   return (
@@ -94,12 +96,14 @@ function PhonesBlock({
         <h3 className="text-sm font-semibold text-gray-700">
           Номери телефонів
         </h3>
-        <span
-          title="Додавання нових телефонів — через 1С (sync у M1.5)"
-          className="cursor-not-allowed rounded border bg-gray-50 px-2 py-1 text-xs text-gray-400"
-        >
-          + Додати
-        </span>
+        {!masked && (
+          <span
+            title="Додавання нових телефонів — через 1С (sync у M1.5)"
+            className="cursor-not-allowed rounded border bg-gray-50 px-2 py-1 text-xs text-gray-400"
+          >
+            + Додати
+          </span>
+        )}
       </div>
       <div className="divide-y divide-gray-100">
         {phones.map((p) => (
@@ -108,6 +112,7 @@ function PhonesBlock({
             phone={p.phone}
             label={p.label}
             messenger={p.messenger}
+            masked={masked}
           />
         ))}
       </div>
@@ -192,6 +197,7 @@ interface ViewProps {
   canEdit: boolean;
   onEditClick?: () => void;
   editDisabledReason?: string;
+  isForeign?: boolean;
 }
 
 export function ClientRequisitesView({
@@ -199,6 +205,7 @@ export function ClientRequisitesView({
   canEdit,
   onEditClick,
   editDisabledReason,
+  isForeign,
 }: ViewProps) {
   const phonesList = client.phonePrimary
     ? [
@@ -214,7 +221,11 @@ export function ClientRequisitesView({
 
   return (
     <div className="space-y-6">
-      <PhonesBlock phones={phonesList} viberContact={client.viberContact} />
+      <PhonesBlock
+        phones={phonesList}
+        viberContact={client.viberContact}
+        masked={isForeign}
+      />
 
       <section className="rounded-lg border bg-white p-5 shadow-sm">
         <div className="mb-3 flex items-center justify-end">

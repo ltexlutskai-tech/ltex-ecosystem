@@ -90,3 +90,19 @@ export function phoneToWhatsAppUrl(
   if (!n) return null;
   return `https://wa.me/${n.substring(1)}`;
 }
+
+/**
+ * Маскує номер телефону, лишаючи лише три останні цифри.
+ * Формат: `*** *** *** 567`.
+ *
+ * Використовується у foreign-view картки клієнта (менеджер дивиться на
+ * чужого клієнта — контакти приховано). Invalid вхід → `null`.
+ */
+export function maskPhone(raw: string | null | undefined): string | null {
+  if (!raw) return null;
+  const normalized = normalizePhone(raw);
+  if (!normalized) return null;
+  // normalized = +380XXXXXXXXX (13 chars з "+")
+  const last3 = normalized.slice(-3);
+  return `*** *** *** ${last3}`;
+}

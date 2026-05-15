@@ -1,4 +1,6 @@
 import { Prisma, prisma } from "@ltex/db";
+import { ownershipWhere } from "@/lib/manager/client-visibility";
+import type { CurrentManager } from "@/lib/auth/manager-auth";
 import type { ClientListItem } from "../_components/types";
 
 const TRASH_NAME_PREFIXES = [
@@ -13,6 +15,13 @@ const TRASH_NAME_PREFIXES = [
 
 export interface LoadClientsParams {
   userId: string;
+  /**
+   * Роль поточного користувача. Manager-у завжди застосовується
+   * ownership scope (тільки свої клієнти, незалежно від onlyMine URL-парам).
+   * Admin бачить усіх; може опційно фільтрувати через `onlyMine`.
+   * M1.3f.
+   */
+  userRole: CurrentManager["role"];
   // existing
   search?: string;
   status?: string; // legacy single code
@@ -175,13 +184,26 @@ export async function loadClients(
     andClauses.push({ isViberLinked: p.isViberLinked });
   }
 
-  if (p.onlyMine) {
-    andClauses.push({ assignments: { some: { userId: p.userId } } });
+  // `onlyMine` URL-toggle лише для admin-а. Менеджеру ownership scope
+  // enforced серверно через `ownershipWhere` нижче (URL bypass-у нема).
+  if (p.userRole === "admin" && p.onlyMine) {
+    andClauses.push({
+      OR: [
+        { agentUserId: p.userId },
+        { assignments: { some: { userId: p.userId } } },
+      ],
+    });
   }
   if (p.hideTrash !== false) {
     for (const prefix of TRASH_NAME_PREFIXES) {
       andClauses.push({ NOT: { name: { startsWith: prefix } } });
     }
+  }
+
+  // M1.3f visibility scope. Admin → no filter; manager → лише свої.
+  const ownership = ownershipWhere({ id: p.userId, role: p.userRole });
+  if (Object.keys(ownership).length > 0) {
+    andClauses.push(ownership);
   }
 
   const where: Prisma.MgrClientWhereInput =
