@@ -528,6 +528,7 @@ model User {
   timelineComments MgrClientTimelineEntry[]
   agentForClients  MgrClient[]              @relation("ClientAgent")
   reminders        MgrReminder[]            @relation("UserReminders")
+  viewPrefs        MgrUserViewPrefs[]
 
   @@map("users")
 }
@@ -907,4 +908,21 @@ model EmailJob {
   @@index([status, nextAttemptAt])
   @@index([source, createdAt])
   @@map("email_jobs")
+}
+
+// ─── Manager view preferences (M1.3e) ───────────────────────────────────────
+// Per-user JSON-config для customizable таблиці клієнтів та панелі фільтрів.
+// `viewKey` ∈ {"clients_table", "clients_filters"}; shape конфігу валідовано
+// на API-рівні (lib/manager/view-defaults.ts + lib/validations/view-prefs.ts).
+model MgrUserViewPrefs {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  viewKey   String   @map("view_key")
+  config    Json
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, viewKey])
+  @@map("mgr_user_view_prefs")
 }

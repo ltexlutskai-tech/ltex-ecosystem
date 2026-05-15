@@ -4,15 +4,23 @@ import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 import { Button, Input } from "@ltex/ui";
 import { ClientListFilterSheet } from "./client-list-filter-sheet";
-import type { DictionaryOption } from "./types";
+import { ViewCustomizerSheet } from "../../_components/view-customizer-sheet";
+import { COLUMN_LABELS, FILTER_LABELS } from "../_lib/filter-labels";
+import type { ConfigItem, DictionariesSnapshot } from "./types";
 
 interface Props {
-  statuses: Array<{ code: string; label: string; colorHex: string }>;
-  channels: DictionaryOption[];
-  deliveries: DictionaryOption[];
+  dictionaries: DictionariesSnapshot;
+  filtersPrefs: ConfigItem[];
+  columnsPrefs: ConfigItem[];
+  totalCount: number;
 }
 
-export function ClientListToolbar({ statuses, channels, deliveries }: Props) {
+export function ClientListToolbar({
+  dictionaries,
+  filtersPrefs,
+  columnsPrefs,
+  totalCount,
+}: Props) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -23,7 +31,7 @@ export function ClientListToolbar({ statuses, channels, deliveries }: Props) {
     setSearch(searchParams.get("search") ?? "");
   }, [searchParams]);
 
-  function updateParam(name: string, value: string | null) {
+  function setParam(name: string, value: string | null) {
     const sp = new URLSearchParams(searchParams.toString());
     if (value === null || value === "") sp.delete(name);
     else sp.set(name, value);
@@ -33,84 +41,63 @@ export function ClientListToolbar({ statuses, channels, deliveries }: Props) {
 
   function submitSearch(e: React.FormEvent) {
     e.preventDefault();
-    updateParam("search", search.trim() || null);
+    setParam("search", search.trim() || null);
   }
 
-  const hasDebt = searchParams.get("hasDebt") === "true";
-  const hasOverpayment = searchParams.get("hasOverpayment") === "true";
   const onlyMine = searchParams.get("onlyMine") === "true";
+  const hideTrashOff = searchParams.get("hideTrash") === "false";
 
   return (
-    <div className="flex flex-wrap items-center gap-2">
-      <form onSubmit={submitSearch} className="flex flex-1 min-w-[240px] gap-2">
-        <Input
-          type="search"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Пошук за іменем, телефоном або містом…"
-          className="flex-1"
-        />
-        <Button type="submit" variant="outline" size="sm">
-          Шукати
-        </Button>
-      </form>
+    <div className="space-y-2">
+      <div className="flex flex-wrap items-center gap-2">
+        <form
+          onSubmit={submitSearch}
+          className="flex flex-1 min-w-[240px] gap-2"
+        >
+          <Input
+            type="search"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Пошук за іменем, телефоном або містом…"
+            className="flex-1"
+          />
+          <Button type="submit" variant="outline" size="sm">
+            Шукати
+          </Button>
+        </form>
 
-      <div className="flex flex-wrap items-center gap-1.5">
-        <Chip
-          active={!hasDebt && !hasOverpayment}
-          onClick={() => {
-            const sp = new URLSearchParams(searchParams.toString());
-            sp.delete("hasDebt");
-            sp.delete("hasOverpayment");
-            sp.delete("page");
-            startTransition(() => router.push(`${pathname}?${sp.toString()}`));
-          }}
-        >
-          Усі
-        </Chip>
-        <Chip
-          active={hasDebt}
-          onClick={() => {
-            const sp = new URLSearchParams(searchParams.toString());
-            sp.delete("hasOverpayment");
-            if (hasDebt) sp.delete("hasDebt");
-            else sp.set("hasDebt", "true");
-            sp.delete("page");
-            startTransition(() => router.push(`${pathname}?${sp.toString()}`));
-          }}
-        >
-          Борг
-        </Chip>
-        <Chip
-          active={hasOverpayment}
-          onClick={() => {
-            const sp = new URLSearchParams(searchParams.toString());
-            sp.delete("hasDebt");
-            if (hasOverpayment) sp.delete("hasOverpayment");
-            else sp.set("hasOverpayment", "true");
-            sp.delete("page");
-            startTransition(() => router.push(`${pathname}?${sp.toString()}`));
-          }}
-        >
-          Переплата
-        </Chip>
-        <Chip
-          active={onlyMine}
-          onClick={() => {
-            const sp = new URLSearchParams(searchParams.toString());
-            if (onlyMine) sp.delete("onlyMine");
-            else sp.set("onlyMine", "true");
-            sp.delete("page");
-            startTransition(() => router.push(`${pathname}?${sp.toString()}`));
-          }}
-        >
-          Тільки мої
-        </Chip>
-        <ClientListFilterSheet
-          statuses={statuses}
-          channels={channels}
-          deliveries={deliveries}
-        />
+        <div className="flex flex-wrap items-center gap-2">
+          <ClientListFilterSheet
+            dictionaries={dictionaries}
+            filtersPrefs={filtersPrefs}
+          />
+          <Chip
+            active={onlyMine}
+            onClick={() => setParam("onlyMine", onlyMine ? null : "true")}
+          >
+            Тільки мої
+          </Chip>
+          <ViewCustomizerSheet
+            initialColumns={columnsPrefs}
+            initialFilters={filtersPrefs}
+            columnLabels={COLUMN_LABELS}
+            filterLabels={FILTER_LABELS}
+          />
+        </div>
+      </div>
+
+      <div className="flex items-center justify-between text-xs text-gray-500">
+        <label className="inline-flex items-center gap-2">
+          <input
+            type="checkbox"
+            checked={!hideTrashOff}
+            onChange={(e) =>
+              setParam("hideTrash", e.target.checked ? null : "false")
+            }
+          />
+          Прибрати приховані (1111…/9999…)
+        </label>
+        <span>Знайдено: {totalCount}</span>
       </div>
     </div>
   );
@@ -131,8 +118,8 @@ function Chip({
       onClick={onClick}
       className={
         active
-          ? "rounded-full bg-gray-900 px-3 py-1 text-xs font-medium text-white"
-          : "rounded-full border bg-white px-3 py-1 text-xs text-gray-700 hover:bg-gray-50"
+          ? "rounded-full bg-gray-900 px-3 py-1.5 text-xs font-medium text-white"
+          : "rounded-full border bg-white px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-50"
       }
     >
       {children}
