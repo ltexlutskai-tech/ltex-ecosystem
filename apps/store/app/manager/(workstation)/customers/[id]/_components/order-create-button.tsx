@@ -1,24 +1,21 @@
-"use client";
-
+import Link from "next/link";
 import { Plus } from "lucide-react";
-import { Button, useToast } from "@ltex/ui";
 
-export function OrderCreateButton() {
-  const { toast } = useToast();
+export function OrderCreateButton({
+  customerId,
+}: {
+  customerId?: string;
+} = {}) {
+  const href = customerId
+    ? `/manager/orders/new?clientId=${encodeURIComponent(customerId)}`
+    : "/manager/orders/new";
   return (
-    <Button
-      type="button"
-      variant="outline"
-      size="sm"
-      onClick={() =>
-        toast({
-          description:
-            "Створення замовлення зробимо у M1.5 (з SOAP write-back у 1С)",
-        })
-      }
+    <Link
+      href={href}
+      className="inline-flex h-9 items-center justify-center rounded-md border border-gray-300 bg-white px-3 text-sm font-medium text-gray-700 hover:bg-gray-50"
     >
       <Plus className="mr-1 h-4 w-4" />
       Створити замовлення
-    </Button>
+    </Link>
   );
 }

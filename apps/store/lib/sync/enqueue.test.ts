@@ -10,7 +10,14 @@ const { mockPrisma } = vi.hoisted(() => ({
 
 vi.mock("@ltex/db", () => ({ prisma: mockPrisma }));
 
-import { buildClientUpdatePayload, enqueueClientUpdate } from "./enqueue";
+import {
+  buildClientUpdatePayload,
+  buildOrderCreatePayload,
+  buildPaymentCreatePayload,
+  enqueueClientUpdate,
+  enqueueOrderCreate,
+  enqueuePaymentCreate,
+} from "./enqueue";
 
 const baseClient = {
   id: "c1",
@@ -148,5 +155,155 @@ describe("enqueueClientUpdate", () => {
     };
     expect(call.data.nextAttemptAt.getTime()).toBeGreaterThanOrEqual(before);
     expect(call.data.nextAttemptAt.getTime()).toBeLessThanOrEqual(after);
+  });
+});
+
+// ─── M1.5b: Order + Payment enqueue ─────────────────────────────────────────
+
+const baseOrder = {
+  id: "ord1",
+  code1C: null,
+  status: "draft",
+  totalEur: 125.5,
+  totalUah: 5400.25,
+  exchangeRate: 43.05,
+  notes: "Терміново",
+  customer: { code1C: "000005798" },
+  items: [
+    {
+      productId: "p1",
+      lotId: "l1",
+      priceEur: 100.5,
+      weight: 25.123,
+      quantity: 1,
+      product: { code1C: "0007854" },
+      lot: { barcode: "1234567890123" },
+    },
+    {
+      productId: "p2",
+      lotId: null,
+      priceEur: 25,
+      weight: 5,
+      quantity: 2,
+      product: { code1C: "0007855" },
+      lot: null,
+    },
+  ],
+};
+
+describe("buildOrderCreatePayload", () => {
+  it("збирає payload з усіма items + Decimal-as-string + lot/general mix", () => {
+    const payload = buildOrderCreatePayload(baseOrder);
+    expect(payload.orderInternalId).toBe("ord1");
+    expect(payload.customerCode1C).toBe("000005798");
+    expect(payload.totalEur).toBe("125.50");
+    expect(payload.totalUah).toBe("5400.25");
+    expect(payload.exchangeRate).toBe("43.0500");
+    expect(payload.items).toHaveLength(2);
+    expect(payload.items[0]?.lotBarcode).toBe("1234567890123");
+    expect(payload.items[0]?.productCode1C).toBe("0007854");
+    expect(payload.items[1]?.lotBarcode).toBeNull();
+    expect(payload.items[1]?.lotId).toBeNull();
+  });
+
+  it("empty-string notes → null", () => {
+    const payload = buildOrderCreatePayload({ ...baseOrder, notes: "" });
+    expect(payload.notes).toBeNull();
+  });
+
+  it("numeric поля формуються як string з .2f / .3f / .4f", () => {
+    const payload = buildOrderCreatePayload(baseOrder);
+    expect(typeof payload.totalEur).toBe("string");
+    expect(typeof payload.totalUah).toBe("string");
+    expect(typeof payload.exchangeRate).toBe("string");
+    expect(typeof payload.items[0]?.priceEur).toBe("string");
+    expect(typeof payload.items[0]?.weight).toBe("string");
+    expect(payload.items[0]?.weight).toBe("25.123");
+  });
+});
+
+describe("enqueueOrderCreate", () => {
+  it("створює row з entityType='order', action='create'", async () => {
+    mockPrisma.mgrSyncJob.create.mockResolvedValueOnce({ id: "j1" });
+    await enqueueOrderCreate(baseOrder);
+    const call = mockPrisma.mgrSyncJob.create.mock.calls[0]?.[0] as {
+      data: {
+        entityType: string;
+        entityId: string;
+        action: string;
+        idempotencyKey: string;
+        payload: { customerCode1C: string };
+      };
+    };
+    expect(call.data.entityType).toBe("order");
+    expect(call.data.entityId).toBe("ord1");
+    expect(call.data.action).toBe("create");
+    expect(call.data.payload.customerCode1C).toBe("000005798");
+    expect(call.data.idempotencyKey).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/,
+    );
+  });
+
+  it("idempotencyKey — нова UUID на кожен виклик", async () => {
+    mockPrisma.mgrSyncJob.create.mockResolvedValue({ id: "j" });
+    await enqueueOrderCreate(baseOrder);
+    await enqueueOrderCreate(baseOrder);
+    const calls = mockPrisma.mgrSyncJob.create.mock.calls;
+    const key1 = (calls[0]?.[0] as { data: { idempotencyKey: string } }).data
+      .idempotencyKey;
+    const key2 = (calls[1]?.[0] as { data: { idempotencyKey: string } }).data
+      .idempotencyKey;
+    expect(key1).not.toBe(key2);
+  });
+});
+
+const basePayment = {
+  id: "pay1",
+  orderId: "ord1",
+  method: "cash",
+  amount: 1500.0,
+  currency: "UAH",
+  externalId: null,
+  paidAt: new Date("2026-05-15T10:00:00.000Z"),
+  order: { code1C: "L-2026-0123" },
+};
+
+describe("buildPaymentCreatePayload", () => {
+  it("збирає payload з orderCode1C + ISO paidAt", () => {
+    const payload = buildPaymentCreatePayload(basePayment);
+    expect(payload.paymentInternalId).toBe("pay1");
+    expect(payload.orderCode1C).toBe("L-2026-0123");
+    expect(payload.method).toBe("cash");
+    expect(payload.amount).toBe("1500.00");
+    expect(payload.paidAt).toBe("2026-05-15T10:00:00.000Z");
+  });
+
+  it("null paidAt + missing order.code1C → null", () => {
+    const payload = buildPaymentCreatePayload({
+      ...basePayment,
+      paidAt: null,
+      order: { code1C: null },
+    });
+    expect(payload.paidAt).toBeNull();
+    expect(payload.orderCode1C).toBeNull();
+  });
+});
+
+describe("enqueuePaymentCreate", () => {
+  it("створює row з entityType='payment', action='create'", async () => {
+    mockPrisma.mgrSyncJob.create.mockResolvedValueOnce({ id: "j2" });
+    await enqueuePaymentCreate(basePayment);
+    const call = mockPrisma.mgrSyncJob.create.mock.calls[0]?.[0] as {
+      data: {
+        entityType: string;
+        entityId: string;
+        action: string;
+        payload: { orderCode1C: string };
+      };
+    };
+    expect(call.data.entityType).toBe("payment");
+    expect(call.data.entityId).toBe("pay1");
+    expect(call.data.action).toBe("create");
+    expect(call.data.payload.orderCode1C).toBe("L-2026-0123");
   });
 });

@@ -16,6 +16,8 @@ import { loadConfig } from "./config";
 import { createAuthMiddleware } from "./auth";
 import { idempotencyCache } from "./idempotency";
 import { buildSyncClientsRoute } from "./routes/sync-clients";
+import { buildSyncOrdersRoute } from "./routes/sync-orders";
+import { buildSyncPaymentsRoute } from "./routes/sync-payments";
 
 async function main(): Promise<void> {
   const config = loadConfig();
@@ -31,6 +33,16 @@ async function main(): Promise<void> {
 
   await app.register(
     buildSyncClientsRoute({ config, cache: idempotencyCache }),
+    { prefix: "/sync" },
+  );
+
+  await app.register(
+    buildSyncOrdersRoute({ config, cache: idempotencyCache }),
+    { prefix: "/sync" },
+  );
+
+  await app.register(
+    buildSyncPaymentsRoute({ config, cache: idempotencyCache }),
     { prefix: "/sync" },
   );
 

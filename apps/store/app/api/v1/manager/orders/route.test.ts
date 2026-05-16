@@ -4,26 +4,46 @@ import { NextRequest } from "next/server";
 const VALID_SECRET = "a".repeat(48);
 process.env.MANAGER_JWT_SECRET = VALID_SECRET;
 
-const { mockPrisma, getCurrentUserMock } = vi.hoisted(() => ({
-  mockPrisma: {
-    mgrClient: { findMany: vi.fn() },
-    order: { findMany: vi.fn(), count: vi.fn() },
-  },
-  getCurrentUserMock: vi.fn(),
-}));
+const {
+  mockPrisma,
+  getCurrentUserMock,
+  createOrderWithItemsMock,
+  FakePrismaError,
+} = vi.hoisted(() => {
+  class FakePrismaError extends Error {
+    code: string;
+    constructor(code: string, message = "fake") {
+      super(message);
+      this.code = code;
+    }
+  }
+  return {
+    mockPrisma: {
+      mgrClient: { findMany: vi.fn() },
+      order: { findMany: vi.fn(), count: vi.fn() },
+      customer: { findUnique: vi.fn() },
+    },
+    getCurrentUserMock: vi.fn(),
+    createOrderWithItemsMock: vi.fn(),
+    FakePrismaError,
+  };
+});
 
 vi.mock("@ltex/db", () => ({
   prisma: mockPrisma,
-  // Re-export Prisma namespace mock — not used at runtime in route except types
-  Prisma: {},
+  Prisma: { PrismaClientKnownRequestError: FakePrismaError },
 }));
 vi.mock("@/lib/auth/manager-auth", () => ({
   getCurrentUser: (...args: unknown[]) => getCurrentUserMock(...args),
   MANAGER_ACCESS_COOKIE: "ltex_mgr_access",
   MANAGER_REFRESH_COOKIE: "ltex_mgr_refresh",
 }));
+vi.mock("@/lib/manager/order-create", () => ({
+  createOrderWithItems: (...args: unknown[]) =>
+    createOrderWithItemsMock(...args),
+}));
 
-import { GET } from "./route";
+import { GET, POST } from "./route";
 
 const MANAGER = {
   id: "u1",
@@ -40,6 +60,14 @@ const ADMIN = { ...MANAGER, id: "admin1", role: "admin" as const };
 
 function req(qs = ""): NextRequest {
   return new NextRequest(`http://localhost/api/v1/manager/orders${qs}`);
+}
+
+function postReq(body: unknown): NextRequest {
+  return new NextRequest("http://localhost/api/v1/manager/orders", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
 }
 
 function fakeOrder(id: string, code: string): unknown {
@@ -190,5 +218,106 @@ describe("GET /api/v1/manager/orders", () => {
       take: number;
     };
     expect(args.take).toBe(10);
+  });
+});
+
+describe("POST /api/v1/manager/orders", () => {
+  const validBody = {
+    customerId: "cust1",
+    items: [{ productId: "p1", weight: 10, quantity: 1, priceEur: 100 }],
+  };
+
+  function fakeCreatedOrder() {
+    return {
+      id: "ord1",
+      code1C: null,
+      status: "draft",
+      totalEur: 100,
+      totalUah: 4300,
+      exchangeRate: 43,
+      notes: null,
+      createdAt: new Date("2026-05-15T10:00:00Z"),
+      customer: { id: "cust1", code1C: "000001", name: "Test" },
+      items: [
+        {
+          id: "i1",
+          productId: "p1",
+          lotId: null,
+          priceEur: 100,
+          weight: 10,
+          quantity: 1,
+        },
+      ],
+    };
+  }
+
+  it("returns 401 when not authed", async () => {
+    getCurrentUserMock.mockResolvedValueOnce(null);
+    const res = await POST(postReq(validBody));
+    expect(res.status).toBe(401);
+  });
+
+  it("returns 400 on invalid body", async () => {
+    const res = await POST(postReq({ customerId: "", items: [] }));
+    expect(res.status).toBe(400);
+  });
+
+  it("returns 404 коли customer не існує", async () => {
+    mockPrisma.customer.findUnique.mockResolvedValueOnce(null);
+    const res = await POST(postReq(validBody));
+    expect(res.status).toBe(404);
+  });
+
+  it("returns 403 коли manager не власник клієнта", async () => {
+    mockPrisma.customer.findUnique.mockResolvedValueOnce({
+      id: "cust1",
+      code1C: "FOREIGN",
+      name: "Foreign client",
+    });
+    mockPrisma.mgrClient.findMany.mockResolvedValueOnce([{ code1C: "MINE-1" }]);
+    const res = await POST(postReq(validBody));
+    expect(res.status).toBe(403);
+    expect(createOrderWithItemsMock).not.toHaveBeenCalled();
+  });
+
+  it("admin може створити для будь-якого клієнта", async () => {
+    getCurrentUserMock.mockResolvedValueOnce(ADMIN);
+    mockPrisma.customer.findUnique.mockResolvedValueOnce({
+      id: "cust1",
+      code1C: "FOREIGN",
+      name: "Foreign",
+    });
+    createOrderWithItemsMock.mockResolvedValueOnce(fakeCreatedOrder());
+    const res = await POST(postReq(validBody));
+    expect(res.status).toBe(201);
+    expect(mockPrisma.mgrClient.findMany).not.toHaveBeenCalled();
+  });
+
+  it("manager успішно створює для свого клієнта", async () => {
+    mockPrisma.customer.findUnique.mockResolvedValueOnce({
+      id: "cust1",
+      code1C: "000001",
+      name: "Mine",
+    });
+    mockPrisma.mgrClient.findMany.mockResolvedValueOnce([{ code1C: "000001" }]);
+    createOrderWithItemsMock.mockResolvedValueOnce(fakeCreatedOrder());
+    const res = await POST(postReq(validBody));
+    expect(res.status).toBe(201);
+    const json = (await res.json()) as { id: string };
+    expect(json.id).toBe("ord1");
+  });
+
+  it("returns 400 на FK violation (Prisma P2003)", async () => {
+    mockPrisma.customer.findUnique.mockResolvedValueOnce({
+      id: "cust1",
+      code1C: "000001",
+      name: "Mine",
+    });
+    mockPrisma.mgrClient.findMany.mockResolvedValueOnce([{ code1C: "000001" }]);
+    createOrderWithItemsMock.mockRejectedValueOnce(
+      new FakePrismaError("P2003"),
+    );
+    const res = await POST(postReq(validBody));
+    expect(res.status).toBe(400);
   });
 });

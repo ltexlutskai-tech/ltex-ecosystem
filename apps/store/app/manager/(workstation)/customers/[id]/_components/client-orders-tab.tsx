@@ -13,12 +13,21 @@ export async function ClientOrdersTab({ clientId }: { clientId: string }) {
   const code1C = client?.code1C ?? null;
   const TAKE = 10;
 
+  // Map code1C → Customer.id (needed для /manager/orders/new?clientId=<Customer.id>)
+  const customer = code1C
+    ? await prisma.customer.findUnique({
+        where: { code1C },
+        select: { id: true },
+      })
+    : null;
+  const customerId = customer?.id ?? null;
+
   if (!code1C) {
     return (
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <h3 className="text-lg font-semibold text-gray-800">Замовлення</h3>
-          <OrderCreateButton />
+          <OrderCreateButton customerId={customerId ?? undefined} />
         </div>
         <EmptyState
           message="Клієнт ще не синхронізований з 1С"
@@ -55,7 +64,7 @@ export async function ClientOrdersTab({ clientId }: { clientId: string }) {
         <h3 className="text-lg font-semibold text-gray-800">
           Замовлення ({total})
         </h3>
-        <OrderCreateButton />
+        <OrderCreateButton customerId={customerId ?? undefined} />
       </div>
 
       {rows.length === 0 ? (

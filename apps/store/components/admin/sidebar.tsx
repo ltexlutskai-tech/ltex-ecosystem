@@ -51,6 +51,7 @@ const navItems = [
   { href: "/admin/rates", label: "Курси валют", icon: ArrowLeftRight },
   { href: "/admin/emails", label: "Черга email", icon: Mail, emailBadge: true },
   { href: "/admin/sync-log", label: "Журнал синхр.", icon: FileText },
+  { href: "/admin/sync-jobs", label: "Черга sync 1С", icon: FileText },
 ];
 
 function NavContent() {

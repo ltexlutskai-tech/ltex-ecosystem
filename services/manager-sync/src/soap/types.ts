@@ -25,3 +25,48 @@ export interface ClientUpdateError {
 }
 
 export type ClientUpdateResult = ClientUpdateSuccess | ClientUpdateError;
+
+// ─── M1.5b: order/payment shapes ────────────────────────────────────────────
+
+export interface OrderCreateRequest {
+  idempotencyKey: string;
+  payload: Record<string, unknown>;
+}
+
+export interface OrderCreateSuccess {
+  ok: true;
+  orderCode1C: string;
+  orderNumber?: string;
+  mockMode?: boolean;
+  errors?: string[];
+}
+
+export interface OrderCreateError {
+  ok: false;
+  errorCode: number;
+  errorMessage: string;
+  mockMode?: boolean;
+}
+
+export type OrderCreateResult = OrderCreateSuccess | OrderCreateError;
+
+export interface PaymentCreateRequest {
+  idempotencyKey: string;
+  payload: Record<string, unknown>;
+}
+
+export interface PaymentCreateSuccess {
+  ok: true;
+  paymentCode1C: string;
+  mockMode?: boolean;
+  errors?: string[];
+}
+
+export interface PaymentCreateError {
+  ok: false;
+  errorCode: number;
+  errorMessage: string;
+  mockMode?: boolean;
+}
+
+export type PaymentCreateResult = PaymentCreateSuccess | PaymentCreateError;
