@@ -11,6 +11,8 @@
  * Env vars: див. .env.example
  */
 
+import "dotenv/config";
+
 import Fastify from "fastify";
 import { loadConfig } from "./config";
 import { createAuthMiddleware } from "./auth";
