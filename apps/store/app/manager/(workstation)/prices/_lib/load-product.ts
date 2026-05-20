@@ -36,6 +36,13 @@ export interface ProductLotVM {
   isTarget: boolean;
   /** arrivalDate ?? createdAt (ISO) — для read-only таблиці. */
   arrivalIso: string;
+  /** Менеджерські поля (Етап 3a) — для розширеної таблиці й картки лоту. */
+  sector: string | null;
+  isOpen: boolean;
+  /** Дата відеоогляду лоту (ISO) або null. */
+  videoDateIso: string | null;
+  /** true коли status === "reserved" (бронь — лише показ, Етап 4). */
+  isReserved: boolean;
 }
 
 export interface ProductCardVM {
@@ -58,8 +65,8 @@ export interface ProductCardVM {
   keyFacts: KeyFact[];
   /** Лічильники характеристик + бронь + залишок. */
   lotStats: CardLotStats;
-  /** Read-only список вільних лотів (перегляд; редагування — Етап 3). */
-  freeLots: ProductLotVM[];
+  /** Усі лоти товару (з залишком) — для розширеної таблиці + картки лоту. */
+  lots: ProductLotVM[];
 }
 
 export async function loadProductCard(
@@ -109,6 +116,9 @@ export async function loadProductCard(
           isTarget: true,
           arrivalDate: true,
           createdAt: true,
+          sector: true,
+          isOpen: true,
+          videoDate: true,
         },
       },
     },
@@ -131,8 +141,11 @@ export async function loadProductCard(
     })),
   );
 
-  const freeLots: ProductLotVM[] = product.lots
-    .filter((l) => l.status === "free" && l.weight > 0)
+  // Усі лоти із залишком (вільні + заброньовані + інші) — менеджеру потрібно
+  // бачити й керувати кожним мішком, не лише вільними. Продані з нульовою вагою
+  // відсіюємо щоб не захаращувати таблицю.
+  const lots: ProductLotVM[] = product.lots
+    .filter((l) => l.weight > 0)
     .map((l) => ({
       id: l.id,
       barcode: l.barcode,
@@ -143,6 +156,10 @@ export async function loadProductCard(
       hasVideo: l.videoUrl !== null,
       isTarget: l.isTarget,
       arrivalIso: (l.arrivalDate ?? l.createdAt).toISOString(),
+      sector: l.sector,
+      isOpen: l.isOpen,
+      videoDateIso: l.videoDate ? l.videoDate.toISOString() : null,
+      isReserved: l.status === "reserved",
     }));
 
   return {
@@ -168,6 +185,6 @@ export async function loadProductCard(
       country: product.country,
     }),
     lotStats,
-    freeLots,
+    lots,
   };
 }

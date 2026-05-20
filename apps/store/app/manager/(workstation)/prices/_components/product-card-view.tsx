@@ -6,7 +6,8 @@ import {
   formatRemainingDisplay,
   priceTypeLabel,
 } from "@/lib/manager/product-card";
-import type { ProductCardVM } from "../_lib/load-product";
+import type { ProductCardVM, ProductLotVM } from "../_lib/load-product";
+import { LotCardModal } from "./lot-card-modal";
 
 const SITE_BASE = "https://new.ltex.com.ua";
 
@@ -19,7 +20,8 @@ function formatAmount(amount: number, currency: string): string {
   return `${amount.toFixed(2)} ${symbol}`;
 }
 
-function formatDate(iso: string): string {
+function formatDate(iso: string | null): string {
+  if (!iso) return "—";
   const d = new Date(iso);
   return d.toLocaleDateString("uk-UA", {
     day: "2-digit",
@@ -32,6 +34,7 @@ export function ProductCardView({ product }: Props) {
   const { toast } = useToast();
   const [showAsPieces, setShowAsPieces] = useState(false);
   const [activeImage, setActiveImage] = useState(0);
+  const [openLotId, setOpenLotId] = useState<string | null>(null);
 
   const { lotStats } = product;
   const remaining = formatRemainingDisplay({
@@ -220,59 +223,152 @@ export function ProductCardView({ product }: Props) {
         </EmptyHint>
       </CollapsibleBlock>
 
-      {/* ── Лічильник характеристик + read-only таблиця лотів ──── */}
+      {/* ── Лічильник характеристик + таблиця лотів (Етап 3a) ──── */}
       <div className="rounded-lg border bg-white p-4 shadow-sm">
         <h2 className="mb-3 text-sm font-semibold text-gray-700">
           Характеристики ({lotStats.availableCount} шт.) (
           {lotStats.withVideoCount} шт. з відео)
         </h2>
-        {product.freeLots.length > 0 ? (
-          <div className="overflow-x-auto rounded-md border">
-            <table className="min-w-full divide-y divide-gray-200 text-sm">
-              <thead className="bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
-                <tr>
-                  <th className="px-3 py-2">Прихід</th>
-                  <th className="px-3 py-2 whitespace-nowrap">Вага, кг</th>
-                  <th className="px-3 py-2">Штрихкод</th>
-                  <th className="px-3 py-2 text-center">Відео</th>
-                  <th className="px-3 py-2 text-center">Ціль</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {product.freeLots.map((lot) => (
-                  <tr
-                    key={lot.id}
-                    className={lot.hasVideo ? "bg-emerald-50/50" : undefined}
-                  >
-                    <td className="px-3 py-2 whitespace-nowrap text-gray-700">
-                      {formatDate(lot.arrivalIso)}
-                    </td>
-                    <td className="px-3 py-2 whitespace-nowrap text-gray-800">
-                      {lot.weight.toLocaleString("uk-UA")}
-                    </td>
-                    <td className="px-3 py-2 font-mono text-xs text-gray-600">
-                      {lot.barcode}
-                    </td>
-                    <td className="px-3 py-2 text-center">
-                      {lot.hasVideo ? "✔" : "—"}
-                    </td>
-                    <td className="px-3 py-2 text-center">
-                      {lot.isTarget ? "✔" : "—"}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+        {product.lots.length > 0 ? (
+          <LotsTable lots={product.lots} onOpen={setOpenLotId} />
         ) : (
-          <EmptyHint>Вільних лотів із залишком немає.</EmptyHint>
+          <EmptyHint>Лотів із залишком немає.</EmptyHint>
         )}
         <p className="mt-2 text-xs text-gray-400">
-          Перегляд лотів. Картка лоту, редагування та бронь — у наступних
-          етапах.
+          Натисніть рядок щоб відкрити картку лоту й відредагувати менеджерські
+          поля. Вага, залишок, дата приходу та штрихкоди — лише перегляд (дані з
+          1С). Бронювання — наступний етап.
         </p>
       </div>
+
+      <LotCardModal lotId={openLotId} onClose={() => setOpenLotId(null)} />
     </div>
+  );
+}
+
+// ─── Таблиця лотів (desktop) + картки (mobile) ──────────────────────────────
+
+/**
+ * Кольорова логіка рядка: бронь має пріоритет (бурштинова рамка), далі відео
+ * (зелений фон). Відкритий мішок позначається бейджем у колонці «Відкрито».
+ */
+function rowClass(lot: ProductLotVM): string {
+  if (lot.isReserved) return "bg-amber-50 hover:bg-amber-100";
+  if (lot.hasVideo) return "bg-emerald-50/60 hover:bg-emerald-100/60";
+  return "hover:bg-gray-50";
+}
+
+function LotsTable({
+  lots,
+  onOpen,
+}: {
+  lots: ProductLotVM[];
+  onOpen: (id: string) => void;
+}) {
+  return (
+    <>
+      {/* Desktop / tablet — повна таблиця */}
+      <div className="hidden overflow-x-auto rounded-md border sm:block">
+        <table className="min-w-full divide-y divide-gray-200 text-sm">
+          <thead className="bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
+            <tr>
+              <th className="px-3 py-2">Прихід</th>
+              <th className="px-3 py-2">Сектор</th>
+              <th className="px-3 py-2 whitespace-nowrap">Вага, кг</th>
+              <th className="px-3 py-2 whitespace-nowrap">Залишок</th>
+              <th className="px-3 py-2 text-center">Ціль</th>
+              <th className="px-3 py-2">Штрихкод</th>
+              <th className="px-3 py-2">Бронь</th>
+              <th className="px-3 py-2 whitespace-nowrap">Дата відео</th>
+              <th className="px-3 py-2 text-center">Відкрито</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-100">
+            {lots.map((lot) => (
+              <tr
+                key={lot.id}
+                onClick={() => onOpen(lot.id)}
+                className={`cursor-pointer ${rowClass(lot)}`}
+              >
+                <td className="px-3 py-2 whitespace-nowrap text-gray-700">
+                  {formatDate(lot.arrivalIso)}
+                </td>
+                <td className="px-3 py-2 text-gray-700">{lot.sector ?? "—"}</td>
+                <td className="px-3 py-2 whitespace-nowrap text-gray-800">
+                  {lot.weight.toLocaleString("uk-UA")}
+                </td>
+                <td className="px-3 py-2 whitespace-nowrap text-gray-700">
+                  {lot.quantity}
+                </td>
+                <td className="px-3 py-2 text-center">
+                  {lot.isTarget ? "✔" : "—"}
+                </td>
+                <td className="px-3 py-2 font-mono text-xs text-gray-600">
+                  {lot.barcode}
+                </td>
+                <td className="px-3 py-2 text-xs">
+                  {lot.isReserved ? (
+                    <span className="rounded bg-amber-200 px-1.5 py-0.5 text-amber-900">
+                      Заброньовано
+                    </span>
+                  ) : (
+                    <span className="text-gray-400">Вільний</span>
+                  )}
+                </td>
+                <td className="px-3 py-2 whitespace-nowrap text-gray-700">
+                  {formatDate(lot.videoDateIso)}
+                </td>
+                <td className="px-3 py-2 text-center">
+                  {lot.isOpen ? (
+                    <span className="rounded bg-blue-100 px-1.5 py-0.5 text-xs text-blue-700">
+                      Відкрито
+                    </span>
+                  ) : (
+                    "—"
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Mobile — картки */}
+      <div className="space-y-2 sm:hidden">
+        {lots.map((lot) => (
+          <button
+            key={lot.id}
+            type="button"
+            onClick={() => onOpen(lot.id)}
+            className={`block w-full rounded-md border p-3 text-left ${rowClass(lot)}`}
+          >
+            <div className="flex items-center justify-between">
+              <span className="font-semibold text-gray-800">
+                {lot.weight.toLocaleString("uk-UA")} кг
+              </span>
+              <span className="text-xs text-gray-500">
+                {formatDate(lot.arrivalIso)}
+              </span>
+            </div>
+            <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-gray-600">
+              <span>Сектор: {lot.sector ?? "—"}</span>
+              <span>· Залишок: {lot.quantity}</span>
+              {lot.hasVideo && (
+                <span className="text-emerald-600">· відео</span>
+              )}
+              {lot.isTarget && <span className="text-gray-700">· ціль</span>}
+              {lot.isOpen && <span className="text-blue-600">· відкрито</span>}
+              {lot.isReserved && (
+                <span className="text-amber-700">· заброньовано</span>
+              )}
+            </div>
+            <div className="mt-1 font-mono text-[11px] text-gray-500">
+              {lot.barcode}
+            </div>
+          </button>
+        ))}
+      </div>
+    </>
   );
 }
 

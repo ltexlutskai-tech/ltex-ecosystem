@@ -110,6 +110,11 @@ model Lot {
   videoUrl    String?   @map("video_url")
   isTarget    Boolean   @default(false) @map("is_target")
   arrivalDate DateTime? @map("arrival_date")
+  sector      String?   @map("sector")
+  isOpen      Boolean   @default(false) @map("is_open")
+  comment     String?   @map("comment")
+  description String?   @map("description")
+  videoDate   DateTime? @map("video_date")
   createdAt   DateTime  @default(now()) @map("created_at")
   updatedAt   DateTime  @updatedAt @map("updated_at")
 
