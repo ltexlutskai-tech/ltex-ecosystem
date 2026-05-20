@@ -41,6 +41,7 @@ export default async function AllLotsPage({
       dir,
       page,
       pageSize,
+      viewerUserId: user.id,
     }),
     productId ? loadProductLabel(productId) : Promise.resolve(null),
   ]);
@@ -84,7 +85,9 @@ function pickSort(v: string | string[] | undefined): LotsListSort {
 
 function pickStatus(v: string | string[] | undefined): LotsListStatus {
   const s = pickString(v);
-  if (s === "free" || s === "reserved") return s;
+  if (s === "free" || s === "reserved" || s === "my" || s === "expired") {
+    return s;
+  }
   return "all";
 }
 

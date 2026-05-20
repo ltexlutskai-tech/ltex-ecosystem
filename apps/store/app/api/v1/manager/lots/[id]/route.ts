@@ -2,16 +2,21 @@ import { NextRequest, NextResponse } from "next/server";
 import { Prisma, prisma } from "@ltex/db";
 import { getCurrentUser } from "@/lib/auth/manager-auth";
 import { lotPatchSchema, pickEditableLotData } from "@/lib/manager/lot-edit";
+import {
+  serializeLotCard,
+  type LotCardSource,
+} from "@/lib/manager/lot-card-serialize";
 
 /**
- * Manager «Прайс» — Stage 3a lot card endpoint.
+ * Manager «Прайс» — Stage 3a lot card endpoint (+ бронь-поля у GET, Етап 4).
  *
  * GET  — детальна картка лоту (товар-власник + штрих-коди + менеджерські поля
- *        + бронь-дисплей). Лише читання.
+ *        + бронь: на кого / до якої дати / isMine / isActive). Лише читання.
  * PATCH — оновлює ЛИШЕ менеджерські поля (сектор / відкрито / коментар / опис
  *         / ціль / дата відео). Поля з 1С (вага/залишок/статус/штрихкод/дата
  *         приходу/ціна/відео-URL) ІГНОРУЮТЬСЯ — `pickEditableLotData` лишає
- *         тільки whitelist. Auth: будь-який залогінений менеджер.
+ *         тільки whitelist. Дію бронювання — окремі /book + /unbook. Auth:
+ *         будь-який залогінений менеджер.
  */
 
 const lotInclude = {
@@ -19,50 +24,8 @@ const lotInclude = {
   barcodes: { select: { id: true, code: true, type: true } },
 } satisfies Prisma.LotInclude;
 
-type LoadedLot = Prisma.LotGetPayload<{ include: typeof lotInclude }>;
-
-function serializeLot(lot: LoadedLot) {
-  // Штрих-коди: окрема таблиця Barcode (їх може бути кілька) + основний
-  // Lot.barcode. Основний завжди першим, без дублів.
-  const extraCodes = lot.barcodes
-    .filter((b) => b.code !== lot.barcode)
-    .map((b) => ({ id: b.id, code: b.code, type: b.type }));
-  const barcodes = [
-    { id: "primary", code: lot.barcode, type: "EAN13" },
-    ...extraCodes,
-  ];
-
-  return {
-    id: lot.id,
-    product: {
-      id: lot.product.id,
-      name: lot.product.name,
-      slug: lot.product.slug,
-    },
-    // ── read-only (дані з 1С) ──
-    barcode: lot.barcode,
-    barcodes,
-    weight: lot.weight,
-    quantity: lot.quantity,
-    status: lot.status,
-    priceEur: lot.priceEur,
-    videoUrl: lot.videoUrl,
-    arrivalIso: (lot.arrivalDate ?? lot.createdAt).toISOString(),
-    // ── менеджерські (редаговані) ──
-    sector: lot.sector,
-    isOpen: lot.isOpen,
-    comment: lot.comment,
-    description: lot.description,
-    isTarget: lot.isTarget,
-    videoDateIso: lot.videoDate ? lot.videoDate.toISOString() : null,
-    // ── бронь (лише ПОКАЗ; дію бронювання — Етап 4) ──
-    reservation: {
-      isReserved: lot.status === "reserved",
-      // Поля reserved* (на кого / до якої дати) з'являться у Етапі 4.
-      reservedForClient: null as string | null,
-      reservedUntilIso: null as string | null,
-    },
-  };
+function serializeLot(lot: LotCardSource, viewerUserId: string, now: Date) {
+  return serializeLotCard(lot, viewerUserId, now);
 }
 
 export async function GET(
@@ -84,7 +47,7 @@ export async function GET(
     return NextResponse.json({ error: "Лот не знайдено" }, { status: 404 });
   }
 
-  return NextResponse.json({ lot: serializeLot(lot) });
+  return NextResponse.json({ lot: serializeLot(lot, user.id, new Date()) });
 }
 
 export async function PATCH(
@@ -120,7 +83,9 @@ export async function PATCH(
       data,
       include: lotInclude,
     });
-    return NextResponse.json({ lot: serializeLot(updated) });
+    return NextResponse.json({
+      lot: serializeLot(updated, user.id, new Date()),
+    });
   } catch (err) {
     if (
       err instanceof Prisma.PrismaClientKnownRequestError &&

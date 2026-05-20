@@ -11,13 +11,16 @@ import { Prisma } from "@ltex/db";
  *
  * Базовий жорсткий фільтр списку — залишок є (`weight > 0`).
  *
- * Бронь (статус-фільтр) — спрощено через `Lot.status` (free / reserved). Поля
- * reserved* (хто/до якої дати) з'являться лише в Етапі 4, тому опцій
- * «моя бронь / протермінована» тут НЕМА.
+ * Бронь (статус-фільтр) — на базі `Lot.status` + reserved* полів (Етап 4):
+ *  • free     — вільні (немає активної броні);
+ *  • reserved — заброньовані (status === "reserved");
+ *  • my       — моя активна бронь (reservedByUserId === поточний user І
+ *               reservedUntil ≥ now);
+ *  • expired  — протермінована бронь (reserved, але reservedUntil < now).
  */
 
-/** Статус-фільтр броні (спрощений, на базі `Lot.status`). */
-export type LotsListStatus = "all" | "free" | "reserved";
+/** Статус-фільтр броні. */
+export type LotsListStatus = "all" | "free" | "reserved" | "my" | "expired";
 
 /** Сортування глобального списку лотів. */
 export type LotsListSort = "product" | "arrival" | "weight";
@@ -35,12 +38,18 @@ export interface BuildLotsWhereParams {
   /** Лише лоти із залишком (`weight > 0`). Дефолт списку — true. */
   onlyInStock?: boolean;
   /**
-   * Статус-фільтр броні (спрощений):
+   * Статус-фільтр броні:
    *  • `free`     — вільні;
    *  • `reserved` — заброньовані;
+   *  • `my`       — моя активна бронь (потрібен `viewerUserId` + `now`);
+   *  • `expired`  — протермінована бронь (потрібен `now`);
    *  • `all`      — будь-який статус.
    */
   status?: LotsListStatus;
+  /** id поточного менеджера — для статусу `my`. */
+  viewerUserId?: string;
+  /** Поточний момент — для `my` / `expired` (за замовчуванням new Date()). */
+  now?: Date;
 }
 
 /**
@@ -82,11 +91,21 @@ export function buildLotsWhere(p: BuildLotsWhereParams): Prisma.LotWhereInput {
     and.push({ videoUrl: { not: null } });
   }
 
-  // Статус-фільтр броні (спрощений). «all» нічого не додає.
+  // Статус-фільтр броні. «all» нічого не додає.
+  const now = p.now ?? new Date();
   if (p.status === "free") {
     and.push({ status: "free" });
   } else if (p.status === "reserved") {
     and.push({ status: "reserved" });
+  } else if (p.status === "my") {
+    // Моя активна бронь: я забронював І ще не минув термін.
+    and.push({
+      reservedByUserId: p.viewerUserId ?? "__none__",
+      reservedUntil: { gte: now },
+    });
+  } else if (p.status === "expired") {
+    // Протермінована бронь: є дата, але вже минула.
+    and.push({ reservedUntil: { lt: now } });
   }
 
   return and.length > 0 ? { AND: and } : {};
@@ -133,6 +152,9 @@ export interface RawLotRow {
   videoDate: Date | null;
   isTarget: boolean;
   isOpen: boolean;
+  reservedForName: string | null;
+  reservedByUserId: string | null;
+  reservedUntil: Date | null;
   product: {
     id: string;
     articleCode: string | null;
@@ -156,6 +178,15 @@ export interface LotListItem {
   isReserved: boolean;
   /** Похідне — наявність відео (для зеленого підсвічування). */
   hasVideo: boolean;
+  // ── Бронь (Етап 4) — для дисплею в таблиці ──
+  /** Ім'я клієнта, на якого заброньовано (для показу). */
+  reservedForName: string | null;
+  /** Дата «до якої діє бронь» (ISO) або null. */
+  reservedUntilIso: string | null;
+  /** Бронь активна (reservedUntil ще не минув) на момент серіалізації. */
+  isActiveReservation: boolean;
+  /** Активна бронь належить поточному менеджеру. */
+  isMineReservation: boolean;
   product: {
     id: string;
     articleCode: string | null;
@@ -166,9 +197,16 @@ export interface LotListItem {
 
 /**
  * Перетворює raw-лот (з findMany include) у плаский рядок списку.
- * Чиста функція — без I/O.
+ * Чиста функція — без I/O. `viewerUserId`/`now` — для похідних флагів броні.
  */
-export function serializeLotRow(l: RawLotRow): LotListItem {
+export function serializeLotRow(
+  l: RawLotRow,
+  viewerUserId?: string,
+  now: Date = new Date(),
+): LotListItem {
+  const isActive = l.reservedUntil
+    ? l.reservedUntil.getTime() >= now.getTime()
+    : false;
   return {
     id: l.id,
     barcode: l.barcode,
@@ -182,6 +220,13 @@ export function serializeLotRow(l: RawLotRow): LotListItem {
     isOpen: l.isOpen,
     isReserved: l.status === "reserved",
     hasVideo: l.videoUrl !== null,
+    reservedForName: l.reservedForName,
+    reservedUntilIso: l.reservedUntil ? l.reservedUntil.toISOString() : null,
+    isActiveReservation: isActive,
+    isMineReservation:
+      isActive &&
+      viewerUserId !== undefined &&
+      l.reservedByUserId === viewerUserId,
     product: {
       id: l.product.id,
       articleCode: l.product.articleCode,
@@ -203,6 +248,9 @@ export const lotRowSelect = {
   videoDate: true,
   isTarget: true,
   isOpen: true,
+  reservedForName: true,
+  reservedByUserId: true,
+  reservedUntil: true,
   product: {
     select: { id: true, articleCode: true, name: true, slug: true },
   },

@@ -82,6 +82,8 @@ export function AllLotsToolbar({ totalCount, productLabel }: Props) {
               <option value="all">Усі</option>
               <option value="free">Вільні</option>
               <option value="reserved">Заброньовані</option>
+              <option value="my">Моя бронь</option>
+              <option value="expired">Протермінована</option>
             </select>
           </label>
 

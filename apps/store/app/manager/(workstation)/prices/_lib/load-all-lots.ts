@@ -16,6 +16,8 @@ export interface LoadAllLotsParams extends BuildLotsWhereParams {
   dir: LotsListSortDir;
   page: number;
   pageSize: number;
+  /** id поточного менеджера — для фільтра «моя бронь» + флагів дисплею. */
+  viewerUserId: string;
 }
 
 export interface LoadAllLotsResult {
@@ -29,7 +31,8 @@ export interface LoadAllLotsResult {
 export async function loadAllLots(
   p: LoadAllLotsParams,
 ): Promise<LoadAllLotsResult> {
-  const where = buildLotsWhere(p);
+  const now = new Date();
+  const where = buildLotsWhere({ ...p, viewerUserId: p.viewerUserId, now });
   const orderBy = buildLotsOrderBy(p.sort, p.dir);
 
   const [total, rows] = await Promise.all([
@@ -43,7 +46,7 @@ export async function loadAllLots(
     }),
   ]);
 
-  const items = rows.map(serializeLotRow);
+  const items = rows.map((r) => serializeLotRow(r, p.viewerUserId, now));
   const groups = groupLotsByProduct(items);
 
   return {

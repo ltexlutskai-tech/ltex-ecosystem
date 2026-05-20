@@ -16,7 +16,7 @@ export default async function ProductCardPage({
   if (!user) redirect("/manager/login");
 
   const { id } = await params;
-  const product = await loadProductCard(id);
+  const product = await loadProductCard(id, user.id);
   if (!product) notFound();
 
   return (

@@ -69,6 +69,11 @@ const fakeLot = {
   comment: null,
   description: null,
   videoDate: null,
+  reservedForClientId: null,
+  reservedForName: null,
+  reservedByUserId: null,
+  reservedByName: null,
+  reservedUntil: null,
   createdAt: new Date("2026-04-01"),
   updatedAt: new Date("2026-05-01"),
   product: { id: "p1", name: "Куртки зимові", slug: "kurtky-zymovi" },
@@ -147,6 +152,57 @@ describe("GET /api/v1/manager/lots/[id]", () => {
       lot: { reservation: { isReserved: boolean } };
     };
     expect(json.lot.reservation.isReserved).toBe(true);
+  });
+
+  it("віддає бронь-поля + isMine для своєї активної броні", async () => {
+    const until = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+    mockPrisma.lot.findUnique.mockResolvedValueOnce({
+      ...fakeLot,
+      status: "reserved",
+      reservedForClientId: "c1",
+      reservedForName: "ТОВ Ромашка",
+      reservedByUserId: "u1", // = MANAGER_USER.id
+      reservedByName: "Alice",
+      reservedUntil: until,
+    });
+    const res = await GET(makeGetReq("lot1"), {
+      params: Promise.resolve({ id: "lot1" }),
+    });
+    const json = (await res.json()) as {
+      lot: {
+        reservation: {
+          isActive: boolean;
+          isMine: boolean;
+          reservedForName: string | null;
+          reservedByName: string | null;
+          reservedUntilIso: string | null;
+        };
+      };
+    };
+    expect(json.lot.reservation.isActive).toBe(true);
+    expect(json.lot.reservation.isMine).toBe(true);
+    expect(json.lot.reservation.reservedForName).toBe("ТОВ Ромашка");
+    expect(json.lot.reservation.reservedByName).toBe("Alice");
+    expect(json.lot.reservation.reservedUntilIso).toBe(until.toISOString());
+  });
+
+  it("чужа активна бронь — isMine=false", async () => {
+    const until = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+    mockPrisma.lot.findUnique.mockResolvedValueOnce({
+      ...fakeLot,
+      status: "reserved",
+      reservedByUserId: "u2",
+      reservedForName: "Інший клієнт",
+      reservedUntil: until,
+    });
+    const res = await GET(makeGetReq("lot1"), {
+      params: Promise.resolve({ id: "lot1" }),
+    });
+    const json = (await res.json()) as {
+      lot: { reservation: { isActive: boolean; isMine: boolean } };
+    };
+    expect(json.lot.reservation.isActive).toBe(true);
+    expect(json.lot.reservation.isMine).toBe(false);
   });
 });
 

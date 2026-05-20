@@ -39,7 +39,7 @@ const querySchema = z.object({
   hasVideo: boolParam,
   // onlyInStock — за замовчуванням true (базовий фільтр списку).
   onlyInStock: boolParam,
-  status: z.enum(["all", "free", "reserved"]).default("all"),
+  status: z.enum(["all", "free", "reserved", "my", "expired"]).default("all"),
   sort: z.enum(["product", "arrival", "weight"]).default("product"),
   dir: z.enum(["asc", "desc"]).default("asc"),
   // page/pageSize — clamp (not reject) щоб out-of-range URL-и не падали 400.
@@ -69,6 +69,7 @@ export async function GET(req: NextRequest) {
     );
   }
   const p = parsed.data;
+  const now = new Date();
 
   const where = buildLotsWhere({
     q: p.q,
@@ -78,6 +79,8 @@ export async function GET(req: NextRequest) {
     // onlyInStock дефолтиться true у where-builder коли undefined.
     onlyInStock: p.onlyInStock,
     status: p.status as LotsListStatus,
+    viewerUserId: user.id,
+    now,
   });
 
   const orderBy = buildLotsOrderBy(
@@ -99,7 +102,7 @@ export async function GET(req: NextRequest) {
     }),
   ]);
 
-  const items = rows.map(serializeLotRow);
+  const items = rows.map((r) => serializeLotRow(r, user.id, now));
   const groups = groupLotsByProduct(items);
 
   return NextResponse.json({

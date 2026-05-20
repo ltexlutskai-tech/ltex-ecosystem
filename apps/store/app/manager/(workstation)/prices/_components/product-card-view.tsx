@@ -211,7 +211,7 @@ export function ProductCardView({ product }: Props) {
       <CollapsibleBlock title={`Зарезервовано (${lotStats.reservedCount})`}>
         <EmptyHint>
           {lotStats.reservedCount > 0
-            ? `Заброньовано лотів: ${lotStats.reservedCount}. Деталі броні — у наступному етапі (Етап 4).`
+            ? `Заброньовано лотів: ${lotStats.reservedCount}. Деталі — у таблиці лотів та картці кожного мішка.`
             : "Заброньованих лотів немає."}
         </EmptyHint>
       </CollapsibleBlock>
@@ -228,9 +228,9 @@ export function ProductCardView({ product }: Props) {
           <EmptyHint>Лотів із залишком немає.</EmptyHint>
         )}
         <p className="mt-2 text-xs text-gray-400">
-          Натисніть рядок щоб відкрити картку лоту й відредагувати менеджерські
-          поля. Вага, залишок, дата приходу та штрихкоди — лише перегляд (дані з
-          1С). Бронювання — наступний етап.
+          Натисніть рядок щоб відкрити картку лоту — редагувати менеджерські
+          поля та бронювати лот на клієнта. Вага, залишок, дата приходу та
+          штрихкоди — лише перегляд (дані з 1С).
         </p>
       </div>
 
@@ -242,13 +242,54 @@ export function ProductCardView({ product }: Props) {
 // ─── Таблиця лотів (desktop) + картки (mobile) ──────────────────────────────
 
 /**
- * Кольорова логіка рядка: бронь має пріоритет (бурштинова рамка), далі відео
- * (зелений фон). Відкритий мішок позначається бейджем у колонці «Відкрито».
+ * Кольорова логіка рядка: активна бронь має пріоритет — моя (індиго), чужа
+ * (бурштин); далі відео (зелений фон). Відкритий мішок позначається бейджем у
+ * колонці «Відкрито».
  */
 function rowClass(lot: ProductLotVM): string {
-  if (lot.isReserved) return "bg-amber-50 hover:bg-amber-100";
+  if (lot.isMineReservation) return "bg-indigo-50 hover:bg-indigo-100";
+  if (lot.isActiveReservation || lot.isReserved)
+    return "bg-amber-50 hover:bg-amber-100";
   if (lot.hasVideo) return "bg-emerald-50/60 hover:bg-emerald-100/60";
   return "hover:bg-gray-50";
+}
+
+function formatDateShort(iso: string | null): string {
+  if (!iso) return "";
+  return new Date(iso).toLocaleDateString("uk-UA", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "2-digit",
+  });
+}
+
+/** Бронь-комірка: ім'я клієнта + дата «до» + бейдж «ваша»/«протермін.». */
+function BookingCell({ lot }: { lot: ProductLotVM }) {
+  if (!lot.isReserved && !lot.reservedForName) {
+    return <span className="text-gray-400">Вільний</span>;
+  }
+  const badgeClass = lot.isMineReservation
+    ? "bg-indigo-200 text-indigo-900"
+    : lot.isActiveReservation
+      ? "bg-amber-200 text-amber-900"
+      : "bg-gray-200 text-gray-600";
+  return (
+    <div className="space-y-0.5">
+      <span className={`inline-block rounded px-1.5 py-0.5 ${badgeClass}`}>
+        {lot.reservedForName ?? "Заброньовано"}
+      </span>
+      <div className="text-[11px] text-gray-500">
+        {lot.reservedUntilIso
+          ? `до ${formatDateShort(lot.reservedUntilIso)}`
+          : null}
+        {lot.isMineReservation ? (
+          <span className="ml-1 font-medium text-indigo-600">· ваша</span>
+        ) : !lot.isActiveReservation && lot.reservedForName ? (
+          <span className="ml-1 text-gray-400">· протермін.</span>
+        ) : null}
+      </div>
+    </div>
+  );
 }
 
 function LotsTable({
@@ -300,13 +341,7 @@ function LotsTable({
                   {lot.barcode}
                 </td>
                 <td className="px-3 py-2 text-xs">
-                  {lot.isReserved ? (
-                    <span className="rounded bg-amber-200 px-1.5 py-0.5 text-amber-900">
-                      Заброньовано
-                    </span>
-                  ) : (
-                    <span className="text-gray-400">Вільний</span>
-                  )}
+                  <BookingCell lot={lot} />
                 </td>
                 <td className="px-3 py-2 whitespace-nowrap text-gray-700">
                   {formatDate(lot.videoDateIso)}
@@ -351,8 +386,18 @@ function LotsTable({
               )}
               {lot.isTarget && <span className="text-gray-700">· ціль</span>}
               {lot.isOpen && <span className="text-blue-600">· відкрито</span>}
-              {lot.isReserved && (
-                <span className="text-amber-700">· заброньовано</span>
+              {lot.reservedForName && (
+                <span
+                  className={
+                    lot.isMineReservation ? "text-indigo-700" : "text-amber-700"
+                  }
+                >
+                  · {lot.isMineReservation ? "ваша бронь" : "бронь"}:{" "}
+                  {lot.reservedForName}
+                  {lot.reservedUntilIso
+                    ? ` (до ${formatDateShort(lot.reservedUntilIso)})`
+                    : ""}
+                </span>
               )}
             </div>
             <div className="mt-1 font-mono text-[11px] text-gray-500">

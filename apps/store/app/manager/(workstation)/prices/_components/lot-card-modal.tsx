@@ -12,6 +12,7 @@ import {
   Textarea,
   useToast,
 } from "@ltex/ui";
+import { ClientPicker } from "../../orders/new/_components/client-picker";
 
 /** Деталь лоту з GET /api/v1/manager/lots/[id]. */
 interface LotDetail {
@@ -33,9 +34,20 @@ interface LotDetail {
   videoDateIso: string | null;
   reservation: {
     isReserved: boolean;
-    reservedForClient: string | null;
+    isActive: boolean;
+    isMine: boolean;
+    reservedForClientId: string | null;
+    reservedForName: string | null;
+    reservedByName: string | null;
     reservedUntilIso: string | null;
   };
+}
+
+/** Дефолтна дата броні «до» — +14 днів (YYYY-MM-DD для <input type=date>). */
+function defaultUntilDate(): string {
+  const d = new Date();
+  d.setDate(d.getDate() + 14);
+  return d.toISOString().slice(0, 10);
 }
 
 interface Props {
@@ -80,6 +92,11 @@ export function LotCardModal({ lotId, onClose }: Props) {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // ── Бронь (Етап 4) ──
+  const [bookingOpen, setBookingOpen] = useState(false);
+  const [bookClientId, setBookClientId] = useState<string | null>(null);
+  const [bookUntil, setBookUntil] = useState<string>(defaultUntilDate());
+  const [booking, setBooking] = useState(false);
 
   // Завантажуємо деталь лоту при відкритті.
   useEffect(() => {
@@ -87,6 +104,9 @@ export function LotCardModal({ lotId, onClose }: Props) {
       setLot(null);
       setEdit(null);
       setError(null);
+      setBookingOpen(false);
+      setBookClientId(null);
+      setBookUntil(defaultUntilDate());
       return;
     }
     let cancelled = false;
@@ -148,6 +168,79 @@ export function LotCardModal({ lotId, onClose }: Props) {
     }
   }
 
+  /** Перезавантажує картку лоту (після book/unbook) без закриття модалки. */
+  async function reloadLot(lotIdToReload: string): Promise<void> {
+    const res = await fetch(`/api/v1/manager/lots/${lotIdToReload}`);
+    if (res.ok) {
+      const { lot: reloaded } = (await res.json()) as { lot: LotDetail };
+      setLot(reloaded);
+      setEdit(toEditState(reloaded));
+    }
+  }
+
+  async function handleBook() {
+    if (!lot || !bookClientId) return;
+    setBooking(true);
+    try {
+      // <input type="date"> дає YYYY-MM-DD; book endpoint очікує ISO datetime.
+      const untilIso = new Date(`${bookUntil}T23:59:59.000Z`).toISOString();
+      const res = await fetch(`/api/v1/manager/lots/${lot.id}/book`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ clientId: bookClientId, until: untilIso }),
+      });
+      if (!res.ok) {
+        const data = (await res.json().catch(() => null)) as {
+          error?: string;
+        } | null;
+        throw new Error(data?.error ?? `HTTP ${res.status}`);
+      }
+      toast({
+        title: "Заброньовано",
+        description: "Лот закріплено за клієнтом.",
+      });
+      setBookingOpen(false);
+      setBookClientId(null);
+      await reloadLot(lot.id);
+      router.refresh();
+    } catch (e) {
+      toast({
+        title: "Помилка",
+        description: e instanceof Error ? e.message : "Не вдалося забронювати.",
+        variant: "destructive",
+      });
+    } finally {
+      setBooking(false);
+    }
+  }
+
+  async function handleUnbook() {
+    if (!lot) return;
+    setBooking(true);
+    try {
+      const res = await fetch(`/api/v1/manager/lots/${lot.id}/unbook`, {
+        method: "POST",
+      });
+      if (!res.ok) {
+        const data = (await res.json().catch(() => null)) as {
+          error?: string;
+        } | null;
+        throw new Error(data?.error ?? `HTTP ${res.status}`);
+      }
+      toast({ title: "Бронь знято", description: "Лот знову вільний." });
+      await reloadLot(lot.id);
+      router.refresh();
+    } catch (e) {
+      toast({
+        title: "Помилка",
+        description: e instanceof Error ? e.message : "Не вдалося зняти бронь.",
+        variant: "destructive",
+      });
+    } finally {
+      setBooking(false);
+    }
+  }
+
   return (
     <Dialog open={lotId !== null} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
@@ -187,30 +280,118 @@ export function LotCardModal({ lotId, onClose }: Props) {
               />
             </div>
 
-            {/* ── Бронь (лише показ; дія — Етап 4) ── */}
+            {/* ── Бронь (Етап 4) ── */}
             <div
               className={`rounded-md border p-3 ${
-                lot.reservation.isReserved
-                  ? "border-amber-300 bg-amber-50"
-                  : "bg-white"
+                lot.reservation.isMine
+                  ? "border-indigo-300 bg-indigo-50"
+                  : lot.reservation.isActive
+                    ? "border-amber-300 bg-amber-50"
+                    : "bg-white"
               }`}
             >
-              <div className="font-medium text-gray-700">Бронь</div>
-              {lot.reservation.isReserved ? (
-                <div className="mt-1 text-gray-700">
-                  Заброньовано
-                  {lot.reservation.reservedForClient
-                    ? ` на: ${lot.reservation.reservedForClient}`
-                    : ""}
-                  {lot.reservation.reservedUntilIso
-                    ? ` до ${formatDate(lot.reservation.reservedUntilIso)}`
-                    : ""}
-                  <span className="ml-1 text-xs text-gray-400">
-                    (бронювання — Етап 4)
+              <div className="flex items-center justify-between">
+                <span className="font-medium text-gray-700">Бронь</span>
+                {lot.reservation.isMine && (
+                  <span className="rounded bg-indigo-200 px-1.5 py-0.5 text-xs font-medium text-indigo-900">
+                    Ваша бронь
                   </span>
+                )}
+              </div>
+
+              {lot.reservation.isActive ? (
+                <div className="mt-1 space-y-1 text-gray-700">
+                  <div>
+                    Заброньовано
+                    {lot.reservation.reservedForName
+                      ? ` на: ${lot.reservation.reservedForName}`
+                      : ""}
+                    {lot.reservation.reservedUntilIso
+                      ? ` до ${formatDate(lot.reservation.reservedUntilIso)}`
+                      : ""}
+                  </div>
+                  {lot.reservation.reservedByName && (
+                    <div className="text-xs text-gray-500">
+                      Забронював: {lot.reservation.reservedByName}
+                    </div>
+                  )}
+                  {lot.reservation.isMine ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="mt-1"
+                      disabled={booking}
+                      onClick={handleUnbook}
+                    >
+                      {booking ? "…" : "Вилучити бронь"}
+                    </Button>
+                  ) : (
+                    <p className="text-xs text-amber-700">
+                      Бронь іншого менеджера — зняти не можна.
+                    </p>
+                  )}
                 </div>
               ) : (
-                <div className="mt-1 text-gray-500">Вільний</div>
+                <div className="mt-1 space-y-2">
+                  {lot.reservation.reservedForName && (
+                    <p className="text-xs text-gray-400">
+                      Попередня бронь ({lot.reservation.reservedForName})
+                      протермінована.
+                    </p>
+                  )}
+                  {!bookingOpen ? (
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={() => setBookingOpen(true)}
+                    >
+                      Забронювати
+                    </Button>
+                  ) : (
+                    <div className="space-y-3 rounded-md border bg-white p-3">
+                      <ClientPicker
+                        value={bookClientId}
+                        onChange={(clientId: string | null) =>
+                          setBookClientId(clientId)
+                        }
+                      />
+                      <div>
+                        <label className="mb-1 block text-sm font-medium text-gray-700">
+                          Заброньовано до
+                        </label>
+                        <Input
+                          type="date"
+                          value={bookUntil}
+                          min={new Date().toISOString().slice(0, 10)}
+                          onChange={(e) => setBookUntil(e.target.value)}
+                        />
+                      </div>
+                      <div className="flex gap-2">
+                        <Button
+                          type="button"
+                          size="sm"
+                          disabled={booking || !bookClientId}
+                          onClick={handleBook}
+                        >
+                          {booking ? "Бронювання…" : "Забронювати"}
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          disabled={booking}
+                          onClick={() => {
+                            setBookingOpen(false);
+                            setBookClientId(null);
+                          }}
+                        >
+                          Скасувати
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </div>
               )}
             </div>
 

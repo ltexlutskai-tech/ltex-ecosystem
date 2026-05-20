@@ -77,6 +77,34 @@ describe("buildLotsWhere", () => {
     expect(w.AND).toEqual([{ weight: { gt: 0 } }]);
   });
 
+  it("статус my фільтрує мою активну бронь (reservedByUserId + reservedUntil ≥ now)", () => {
+    const now = new Date("2026-05-20T12:00:00.000Z");
+    const w = buildLotsWhere({
+      status: "my",
+      viewerUserId: "u1",
+      now,
+    }) as { AND: unknown[] };
+    expect(w.AND).toContainEqual({
+      reservedByUserId: "u1",
+      reservedUntil: { gte: now },
+    });
+  });
+
+  it("статус my без viewerUserId не матчить нічого (sentinel id)", () => {
+    const now = new Date("2026-05-20T12:00:00.000Z");
+    const w = buildLotsWhere({ status: "my", now }) as { AND: unknown[] };
+    expect(w.AND).toContainEqual({
+      reservedByUserId: "__none__",
+      reservedUntil: { gte: now },
+    });
+  });
+
+  it("статус expired фільтрує протерміновану бронь (reservedUntil < now)", () => {
+    const now = new Date("2026-05-20T12:00:00.000Z");
+    const w = buildLotsWhere({ status: "expired", now }) as { AND: unknown[] };
+    expect(w.AND).toContainEqual({ reservedUntil: { lt: now } });
+  });
+
   it("комбінує кілька фільтрів у AND", () => {
     const w = buildLotsWhere({
       q: "куртк",
@@ -133,6 +161,9 @@ function rawLot(over: Partial<RawLotRow> = {}): RawLotRow {
     videoDate: null,
     isTarget: false,
     isOpen: false,
+    reservedForName: null,
+    reservedByUserId: null,
+    reservedUntil: null,
     product: {
       id: "p1",
       articleCode: "A1",
@@ -171,6 +202,56 @@ describe("serializeLotRow", () => {
       d.toISOString(),
     );
   });
+
+  it("активна бронь: reservedForName + reservedUntilIso + isActiveReservation", () => {
+    const now = new Date("2026-05-20T12:00:00.000Z");
+    const until = new Date("2026-05-25T00:00:00.000Z");
+    const row = serializeLotRow(
+      rawLot({
+        status: "reserved",
+        reservedForName: "ТОВ Ромашка",
+        reservedByUserId: "u2",
+        reservedUntil: until,
+      }),
+      "u1",
+      now,
+    );
+    expect(row.reservedForName).toBe("ТОВ Ромашка");
+    expect(row.reservedUntilIso).toBe(until.toISOString());
+    expect(row.isActiveReservation).toBe(true);
+    expect(row.isMineReservation).toBe(false);
+  });
+
+  it("isMineReservation=true коли бронь моя й активна", () => {
+    const now = new Date("2026-05-20T12:00:00.000Z");
+    const row = serializeLotRow(
+      rawLot({
+        status: "reserved",
+        reservedForName: "Клієнт",
+        reservedByUserId: "u1",
+        reservedUntil: new Date("2026-05-25T00:00:00.000Z"),
+      }),
+      "u1",
+      now,
+    );
+    expect(row.isMineReservation).toBe(true);
+  });
+
+  it("протермінована бронь: isActiveReservation=false", () => {
+    const now = new Date("2026-05-20T12:00:00.000Z");
+    const row = serializeLotRow(
+      rawLot({
+        status: "reserved",
+        reservedForName: "Клієнт",
+        reservedByUserId: "u1",
+        reservedUntil: new Date("2026-05-10T00:00:00.000Z"),
+      }),
+      "u1",
+      now,
+    );
+    expect(row.isActiveReservation).toBe(false);
+    expect(row.isMineReservation).toBe(false);
+  });
 });
 
 function item(
@@ -191,6 +272,10 @@ function item(
     isOpen: false,
     isReserved: false,
     hasVideo: false,
+    reservedForName: null,
+    reservedUntilIso: null,
+    isActiveReservation: false,
+    isMineReservation: false,
     product: {
       id: productId,
       articleCode: `art-${productId}`,

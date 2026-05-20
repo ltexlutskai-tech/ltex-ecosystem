@@ -20,13 +20,53 @@ function formatDate(iso: string | null): string {
 
 /**
  * Кольорова логіка рядка (як у таблиці лотів картки товару, Етап 3a):
- * бронь має пріоритет (бурштин), далі відео (зелений). Відкритий мішок —
- * бейдж у колонці «Відкрито».
+ * активна бронь має пріоритет — моя (індиго), чужа (бурштин); далі відео
+ * (зелений). Відкритий мішок — бейдж у колонці «Відкрито».
  */
 function rowClass(lot: LotListItem): string {
-  if (lot.isReserved) return "bg-amber-50 hover:bg-amber-100";
+  if (lot.isMineReservation) return "bg-indigo-50 hover:bg-indigo-100";
+  if (lot.isActiveReservation || lot.isReserved)
+    return "bg-amber-50 hover:bg-amber-100";
   if (lot.hasVideo) return "bg-emerald-50/60 hover:bg-emerald-100/60";
   return "hover:bg-gray-50";
+}
+
+function formatDateShort(iso: string | null): string {
+  if (!iso) return "";
+  return new Date(iso).toLocaleDateString("uk-UA", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "2-digit",
+  });
+}
+
+/** Бронь-комірка/підпис: ім'я клієнта + дата «до», бейдж «ваша». */
+function BookingCell({ lot }: { lot: LotListItem }) {
+  if (!lot.isReserved && !lot.reservedForName) {
+    return <span className="text-gray-400">Вільний</span>;
+  }
+  const badgeClass = lot.isMineReservation
+    ? "bg-indigo-200 text-indigo-900"
+    : lot.isActiveReservation
+      ? "bg-amber-200 text-amber-900"
+      : "bg-gray-200 text-gray-600";
+  return (
+    <div className="space-y-0.5">
+      <span className={`inline-block rounded px-1.5 py-0.5 ${badgeClass}`}>
+        {lot.reservedForName ?? "Заброньовано"}
+      </span>
+      <div className="text-[11px] text-gray-500">
+        {lot.reservedUntilIso
+          ? `до ${formatDateShort(lot.reservedUntilIso)}`
+          : null}
+        {lot.isMineReservation ? (
+          <span className="ml-1 font-medium text-indigo-600">· ваша</span>
+        ) : !lot.isActiveReservation && lot.reservedForName ? (
+          <span className="ml-1 text-gray-400">· протермін.</span>
+        ) : null}
+      </div>
+    </div>
+  );
 }
 
 export function AllLotsList({ groups }: Props) {
@@ -105,13 +145,7 @@ export function AllLotsList({ groups }: Props) {
                       {lot.sector ?? "—"}
                     </td>
                     <td className="px-3 py-2 text-xs">
-                      {lot.isReserved ? (
-                        <span className="rounded bg-amber-200 px-1.5 py-0.5 text-amber-900">
-                          Заброньовано
-                        </span>
-                      ) : (
-                        <span className="text-gray-400">Вільний</span>
-                      )}
+                      <BookingCell lot={lot} />
                     </td>
                     <td className="px-3 py-2 text-center">
                       {lot.isTarget ? "✔" : "—"}
@@ -160,8 +194,20 @@ export function AllLotsList({ groups }: Props) {
                   {lot.isOpen && (
                     <span className="text-blue-600">· відкрито</span>
                   )}
-                  {lot.isReserved && (
-                    <span className="text-amber-700">· заброньовано</span>
+                  {lot.reservedForName && (
+                    <span
+                      className={
+                        lot.isMineReservation
+                          ? "text-indigo-700"
+                          : "text-amber-700"
+                      }
+                    >
+                      · {lot.isMineReservation ? "ваша бронь" : "бронь"}:{" "}
+                      {lot.reservedForName}
+                      {lot.reservedUntilIso
+                        ? ` (до ${formatDateShort(lot.reservedUntilIso)})`
+                        : ""}
+                    </span>
                   )}
                 </div>
                 <div className="mt-1 font-mono text-[11px] text-gray-500">

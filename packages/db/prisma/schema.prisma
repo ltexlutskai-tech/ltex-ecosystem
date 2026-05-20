@@ -115,6 +115,13 @@ model Lot {
   comment     String?   @map("comment")
   description String?   @map("description")
   videoDate   DateTime? @map("video_date")
+  // ── Бронь (Етап 4, денормалізована — як у 1С зберігається рядком; БЕЗ FK
+  //    щоб уникнути cross-concern relations між магазином і менеджеркою) ──
+  reservedForClientId String?   @map("reserved_for_client_id")
+  reservedForName     String?   @map("reserved_for_name")
+  reservedByUserId    String?   @map("reserved_by_user_id")
+  reservedByName      String?   @map("reserved_by_name")
+  reservedUntil       DateTime? @map("reserved_until")
   createdAt   DateTime  @default(now()) @map("created_at")
   updatedAt   DateTime  @updatedAt @map("updated_at")
 
