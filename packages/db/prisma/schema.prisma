@@ -100,16 +100,18 @@ model ProductImage {
 // ─── Lots / Bags (← 1С Серії + ТовариНаСкладах) ────────────────────────────
 
 model Lot {
-  id        String   @id @default(cuid())
-  productId String   @map("product_id")
-  barcode   String   @unique
-  weight    Float
-  quantity  Int      @default(1)
-  status    String   @default("free")
-  priceEur  Float    @map("price_eur")
-  videoUrl  String?  @map("video_url")
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  id          String    @id @default(cuid())
+  productId   String    @map("product_id")
+  barcode     String    @unique
+  weight      Float
+  quantity    Int       @default(1)
+  status      String    @default("free")
+  priceEur    Float     @map("price_eur")
+  videoUrl    String?   @map("video_url")
+  isTarget    Boolean   @default(false) @map("is_target")
+  arrivalDate DateTime? @map("arrival_date")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
 
   product    Product     @relation(fields: [productId], references: [id])
   barcodes   Barcode[]
@@ -118,6 +120,7 @@ model Lot {
 
   @@index([productId])
   @@index([status])
+  @@index([isTarget])
   @@map("lots")
 }
 

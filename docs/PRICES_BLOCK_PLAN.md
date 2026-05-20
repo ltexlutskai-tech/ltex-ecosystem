@@ -57,6 +57,8 @@
 
 **Результат:** робочий екран `/manager/prices` (замість сьогоднішньої заглушки), клік на товар → картка (Етап 2).
 
+> ✅ **ГОТОВО (2026-05-20).** Endpoint `GET /api/v1/manager/prices` + helper `lib/manager/prices.ts` + UI `/manager/prices` (toolbar з усіма фільтрами/пошуком/сортуванням, таблиця/картки, кольори рядків) + поля `Lot.isTarget`/`arrivalDate` (міграція `20260520_lot_manager_fields`). 36 нових тестів, увесь сьют 962 pass, typecheck чистий. **⚠️ перед deploy:** `prisma migrate deploy` на сервері (additive, безпечно).
+
 ---
 
 ### Етап 2 — Картка товару
