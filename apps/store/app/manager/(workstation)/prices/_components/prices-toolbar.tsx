@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 import {
@@ -10,7 +11,6 @@ import {
   SheetHeader,
   SheetTitle,
   SheetTrigger,
-  useToast,
 } from "@ltex/ui";
 
 interface CategoryOption {
@@ -36,7 +36,6 @@ export function PricesToolbar({ categories, totalCount }: Props) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const { toast } = useToast();
   const [isPending, startTransition] = useTransition();
   const [search, setSearch] = useState(searchParams.get("q") ?? "");
 
@@ -145,19 +144,11 @@ export function PricesToolbar({ categories, totalCount }: Props) {
           >
             Оновити залишки та ціни
           </Button>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() =>
-              toast({
-                title: "Деталі по мішках",
-                description: "З'явиться у наступному етапі.",
-              })
-            }
-          >
-            Деталі по мішках
-          </Button>
+          <Link href="/manager/prices/lots">
+            <Button type="button" variant="outline" size="sm">
+              Деталі по мішках
+            </Button>
+          </Link>
           {filterCount > 0 && (
             <span className="text-gray-500">Фільтрів: {filterCount}</span>
           )}

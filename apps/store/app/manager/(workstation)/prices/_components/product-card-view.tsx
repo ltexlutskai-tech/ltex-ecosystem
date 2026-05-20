@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { Button, useToast } from "@ltex/ui";
 import {
@@ -131,19 +132,11 @@ export function ProductCardView({ product }: Props) {
                 Сайт ↗
               </Button>
             </a>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() =>
-                toast({
-                  title: "Наявні лоти",
-                  description: "Детальна робота з лотами — у наступному етапі.",
-                })
-              }
-            >
-              Наявні лоти ({lotStats.availableCount})
-            </Button>
+            <Link href={`/manager/prices/lots?productId=${product.id}`}>
+              <Button type="button" variant="outline" size="sm">
+                Наявні лоти ({lotStats.availableCount})
+              </Button>
+            </Link>
             <Button
               type="button"
               variant="outline"
