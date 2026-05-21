@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@ltex/db";
+import { Prisma, prisma } from "@ltex/db";
 import { getCurrentUser } from "@/lib/auth/manager-auth";
 import { getMyClientCodes1C } from "@/lib/manager/sale-ownership";
 import {
@@ -8,6 +8,12 @@ import {
   saleRowInclude,
   serializeSaleRow,
 } from "@/lib/manager/sales-list";
+import { createSaleSchema } from "@/lib/validations/manager-sale";
+import { createSaleWithItems } from "@/lib/manager/sale-create";
+import {
+  resolveCustomerForOrder,
+  ResolveCustomerError,
+} from "@/lib/manager/resolve-customer";
 
 function parseInteger(
   raw: string | null,
@@ -91,4 +97,101 @@ export async function GET(req: NextRequest) {
     page,
     pageSize,
   });
+}
+
+export async function POST(req: NextRequest) {
+  const user = await getCurrentUser(req);
+  if (!user) {
+    return NextResponse.json({ error: "Не авторизовано" }, { status: 401 });
+  }
+
+  const body = await req.json().catch(() => null);
+  const parsed = createSaleSchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: "Невірні дані", details: parsed.error.issues.slice(0, 5) },
+      { status: 400 },
+    );
+  }
+  const input = parsed.data;
+
+  // ClientPicker віддає MgrClient.id; Sale.customerId — FK на Customer (інша
+  // модель). Резолвимо у Customer за спільним code1C (find-or-create), щоб
+  // уникнути FK-помилки «Клієнта не знайдено». `resolveCustomerForOrder`
+  // generic — підходить і для реалізації.
+  let customer;
+  try {
+    customer = await resolveCustomerForOrder(input.customerId);
+  } catch (err) {
+    if (err instanceof ResolveCustomerError) {
+      return NextResponse.json({ error: err.message }, { status: err.status });
+    }
+    throw err;
+  }
+
+  // Ownership check: manager — only own clients; admin — будь-кого.
+  const myCodes = await getMyClientCodes1C(user);
+  if (myCodes !== null) {
+    if (!customer.code1C || !myCodes.includes(customer.code1C)) {
+      return NextResponse.json({ error: "Не ваш клієнт" }, { status: 403 });
+    }
+  }
+
+  try {
+    const sale = await createSaleWithItems(input, customer, {
+      userId: user.id,
+    });
+    return NextResponse.json(
+      {
+        id: sale.id,
+        code1C: sale.code1C,
+        docNumber: sale.docNumber,
+        status: sale.status,
+        totalEur: sale.totalEur,
+        totalUah: sale.totalUah,
+        exchangeRateEur: sale.exchangeRateEur,
+        exchangeRateUsd: sale.exchangeRateUsd,
+        notes: sale.notes,
+        priceTypeId: sale.priceTypeId,
+        deliveryMethod: sale.deliveryMethod,
+        novaPoshtaBranch: sale.novaPoshtaBranch,
+        cashOnDelivery: sale.cashOnDelivery,
+        codAmountUah: sale.codAmountUah,
+        assignedAgentUserId: sale.assignedAgentUserId,
+        onTradeAgent: sale.onTradeAgent,
+        exportTo1C: sale.exportTo1C,
+        expressWaybill: sale.expressWaybill,
+        createdAt: sale.createdAt.toISOString(),
+        customer: sale.customer,
+        items: sale.items.map((i) => ({
+          id: i.id,
+          productId: i.productId,
+          lotId: i.lotId,
+          barcode: i.barcode,
+          pricePerKg: i.pricePerKg,
+          priceEur: i.priceEur,
+          weight: i.weight,
+          quantity: i.quantity,
+        })),
+      },
+      { status: 201 },
+    );
+  } catch (err) {
+    if (err instanceof Prisma.PrismaClientKnownRequestError) {
+      // FK violation — невалідний productId/lotId
+      if (err.code === "P2003" || err.code === "P2025") {
+        return NextResponse.json(
+          { error: "Невалідний product/lot у items" },
+          { status: 400 },
+        );
+      }
+    }
+    console.error("[L-TEX] Sale create failed", {
+      error: err instanceof Error ? err.message : String(err),
+    });
+    return NextResponse.json(
+      { error: "Помилка створення реалізації" },
+      { status: 500 },
+    );
+  }
 }

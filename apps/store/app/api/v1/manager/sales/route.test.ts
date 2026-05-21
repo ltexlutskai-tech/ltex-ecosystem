@@ -4,24 +4,61 @@ import { NextRequest } from "next/server";
 const VALID_SECRET = "a".repeat(48);
 process.env.MANAGER_JWT_SECRET = VALID_SECRET;
 
-const { mockPrisma, getCurrentUserMock } = vi.hoisted(() => {
+const {
+  mockPrisma,
+  getCurrentUserMock,
+  createSaleWithItemsMock,
+  resolveCustomerForOrderMock,
+  ResolveCustomerError,
+  FakePrismaError,
+} = vi.hoisted(() => {
+  class FakePrismaError extends Error {
+    code: string;
+    constructor(code: string, message = "fake") {
+      super(message);
+      this.code = code;
+    }
+  }
+  class ResolveCustomerError extends Error {
+    status: number;
+    constructor(message: string, status = 400) {
+      super(message);
+      this.name = "ResolveCustomerError";
+      this.status = status;
+    }
+  }
   return {
     mockPrisma: {
       mgrClient: { findMany: vi.fn() },
       sale: { findMany: vi.fn(), count: vi.fn() },
     },
     getCurrentUserMock: vi.fn(),
+    createSaleWithItemsMock: vi.fn(),
+    resolveCustomerForOrderMock: vi.fn(),
+    ResolveCustomerError,
+    FakePrismaError,
   };
 });
 
-vi.mock("@ltex/db", () => ({ prisma: mockPrisma }));
+vi.mock("@ltex/db", () => ({
+  prisma: mockPrisma,
+  Prisma: { PrismaClientKnownRequestError: FakePrismaError },
+}));
 vi.mock("@/lib/auth/manager-auth", () => ({
   getCurrentUser: (...args: unknown[]) => getCurrentUserMock(...args),
   MANAGER_ACCESS_COOKIE: "ltex_mgr_access",
   MANAGER_REFRESH_COOKIE: "ltex_mgr_refresh",
 }));
+vi.mock("@/lib/manager/sale-create", () => ({
+  createSaleWithItems: (...args: unknown[]) => createSaleWithItemsMock(...args),
+}));
+vi.mock("@/lib/manager/resolve-customer", () => ({
+  resolveCustomerForOrder: (...args: unknown[]) =>
+    resolveCustomerForOrderMock(...args),
+  ResolveCustomerError,
+}));
 
-import { GET } from "./route";
+import { GET, POST } from "./route";
 
 const MANAGER = {
   id: "u1",
@@ -38,6 +75,14 @@ const ADMIN = { ...MANAGER, id: "admin1", role: "admin" as const };
 
 function req(qs = ""): NextRequest {
   return new NextRequest(`http://localhost/api/v1/manager/sales${qs}`);
+}
+
+function postReq(body: unknown): NextRequest {
+  return new NextRequest("http://localhost/api/v1/manager/sales", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
 }
 
 function fakeSale(id: string, docNumber: number): unknown {
@@ -210,5 +255,124 @@ describe("GET /api/v1/manager/sales", () => {
     expect(row?.customer.city).toBe("Луцьк");
     expect(row?.isActual).toBe(true);
     expect(typeof row?.createdAt).toBe("string");
+  });
+});
+
+describe("POST /api/v1/manager/sales", () => {
+  const validBody = {
+    customerId: "cust1",
+    items: [
+      { productId: "p1", pricePerKg: 4, weight: 10, quantity: 1, priceEur: 40 },
+    ],
+  };
+
+  function fakeCreatedSale() {
+    return {
+      id: "sale1",
+      code1C: null,
+      docNumber: 7,
+      status: "draft",
+      totalEur: 40,
+      totalUah: 1720,
+      exchangeRateEur: 43,
+      exchangeRateUsd: 0,
+      notes: null,
+      priceTypeId: null,
+      deliveryMethod: null,
+      novaPoshtaBranch: null,
+      cashOnDelivery: false,
+      codAmountUah: null,
+      assignedAgentUserId: null,
+      onTradeAgent: true,
+      exportTo1C: true,
+      expressWaybill: null,
+      createdAt: new Date("2026-05-21T10:00:00Z"),
+      customer: { id: "cust1", code1C: "000001", name: "Test" },
+      items: [
+        {
+          id: "i1",
+          productId: "p1",
+          lotId: null,
+          barcode: null,
+          pricePerKg: 4,
+          priceEur: 40,
+          weight: 10,
+          quantity: 1,
+        },
+      ],
+    };
+  }
+
+  it("returns 401 when not authed", async () => {
+    getCurrentUserMock.mockResolvedValueOnce(null);
+    const res = await POST(postReq(validBody));
+    expect(res.status).toBe(401);
+  });
+
+  it("returns 400 on invalid body", async () => {
+    const res = await POST(postReq({ customerId: "", items: [] }));
+    expect(res.status).toBe(400);
+  });
+
+  it("returns 400 коли клієнта не знайдено (resolve кидає)", async () => {
+    resolveCustomerForOrderMock.mockRejectedValueOnce(
+      new ResolveCustomerError("Клієнта не знайдено", 400),
+    );
+    const res = await POST(postReq(validBody));
+    expect(res.status).toBe(400);
+    const json = (await res.json()) as { error: string };
+    expect(json.error).toBe("Клієнта не знайдено");
+  });
+
+  it("returns 403 коли manager не власник клієнта", async () => {
+    resolveCustomerForOrderMock.mockResolvedValueOnce({
+      id: "cust1",
+      code1C: "FOREIGN",
+      name: "Foreign",
+    });
+    mockPrisma.mgrClient.findMany.mockResolvedValueOnce([{ code1C: "MINE-1" }]);
+    const res = await POST(postReq(validBody));
+    expect(res.status).toBe(403);
+    expect(createSaleWithItemsMock).not.toHaveBeenCalled();
+  });
+
+  it("manager успішно створює для свого клієнта (201)", async () => {
+    resolveCustomerForOrderMock.mockResolvedValueOnce({
+      id: "cust1",
+      code1C: "000001",
+      name: "Mine",
+    });
+    mockPrisma.mgrClient.findMany.mockResolvedValueOnce([{ code1C: "000001" }]);
+    createSaleWithItemsMock.mockResolvedValueOnce(fakeCreatedSale());
+    const res = await POST(postReq(validBody));
+    expect(res.status).toBe(201);
+    const json = (await res.json()) as { id: string; docNumber: number };
+    expect(json.id).toBe("sale1");
+    expect(json.docNumber).toBe(7);
+  });
+
+  it("admin може створити для будь-якого клієнта", async () => {
+    getCurrentUserMock.mockResolvedValueOnce(ADMIN);
+    resolveCustomerForOrderMock.mockResolvedValueOnce({
+      id: "cust1",
+      code1C: "FOREIGN",
+      name: "Foreign",
+    });
+    createSaleWithItemsMock.mockResolvedValueOnce(fakeCreatedSale());
+    const res = await POST(postReq(validBody));
+    expect(res.status).toBe(201);
+    expect(mockPrisma.mgrClient.findMany).not.toHaveBeenCalled();
+  });
+
+  it("returns 400 на FK violation (Prisma P2003)", async () => {
+    resolveCustomerForOrderMock.mockResolvedValueOnce({
+      id: "cust1",
+      code1C: "000001",
+      name: "Mine",
+    });
+    mockPrisma.mgrClient.findMany.mockResolvedValueOnce([{ code1C: "000001" }]);
+    createSaleWithItemsMock.mockRejectedValueOnce(new FakePrismaError("P2003"));
+    const res = await POST(postReq(validBody));
+    expect(res.status).toBe(400);
   });
 });
