@@ -5,6 +5,12 @@
  * `WireOrderItem` — payload що відправляється у POST /api/v1/manager/orders.
  */
 
+export interface ProductPriceEntry {
+  priceType: string;
+  amount: number;
+  currency: string;
+}
+
 export interface ProductSummary {
   id: string;
   code1C: string | null;
@@ -14,6 +20,8 @@ export interface ProductSummary {
   priceUnit: string;
   averageWeight: number | null;
   inStock: boolean;
+  /** Усі записи Price товара — для перерахунку ціни рядка за типом цін. */
+  prices: ProductPriceEntry[];
 }
 
 export interface LotSummary {
@@ -32,8 +40,31 @@ export interface ClientPickerItem {
   tradePointName: string | null;
   city: string | null;
   debt: string;
+  /** `MgrPriceType.id` клієнта (підтягується у select типу цін). */
+  priceTypeId?: string | null;
+  /** `MgrDeliveryMethod.code` клієнта (підтягується у select доставки). */
+  deliveryMethodCode?: string | null;
   agent: { id: string; fullName: string } | null;
   isOwned: boolean;
+}
+
+/** Тип цін (з MgrPriceType) для select-а у формі. */
+export interface PriceTypeOption {
+  id: string;
+  code: string;
+  label: string;
+}
+
+/** Менеджер-агент для select «призначити продаж торговому». */
+export interface AgentOption {
+  id: string;
+  fullName: string;
+}
+
+/** Варіант доставки замовлення (delivery|post|pickup). */
+export interface OrderDeliveryOption {
+  code: string;
+  label: string;
 }
 
 export interface OrderItemDraft {

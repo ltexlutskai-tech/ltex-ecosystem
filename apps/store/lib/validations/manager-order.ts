@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { ORDER_DELIVERY_CODES } from "@/lib/manager/order-delivery";
 
 /**
  * Zod schema для POST /api/v1/manager/orders body.
@@ -24,7 +25,24 @@ export const createOrderSchema = z.object({
   notes: z.string().max(2000).optional(),
   exchangeRate: z.number().positive().max(1000).optional(),
   items: z.array(orderItemInputSchema).min(1).max(200),
+
+  // ─── Manager order fields (← 1С Document.Заказ, Етап 1) ──────────────────
+  /** Тип цін — `MgrPriceType.id` (рядки перераховуються за ним у UI). */
+  priceTypeId: z.string().min(1).nullable().optional(),
+  /** Спосіб доставки — delivery|post|pickup. */
+  deliveryMethod: z
+    .enum(ORDER_DELIVERY_CODES as [string, ...string[]])
+    .nullable()
+    .optional(),
+  /** Наложка (післяплата). */
+  cashOnDelivery: z.boolean().optional().default(false),
+  /** Торговий агент, кому зараховано продаж (`User.id`); дефолт — поточний. */
+  assignedAgentUserId: z.string().min(1).nullable().optional(),
+  /** Вивантажувати в 1С (дефолт true). */
+  exportTo1C: z.boolean().optional().default(true),
 });
 
 export type OrderItemInput = z.infer<typeof orderItemInputSchema>;
 export type CreateOrderInput = z.infer<typeof createOrderSchema>;
+/** Pre-parse shape (defaults optional) — приймається `createOrderWithItems`. */
+export type CreateOrderInputRaw = z.input<typeof createOrderSchema>;

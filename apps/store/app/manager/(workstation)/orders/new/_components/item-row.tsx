@@ -5,6 +5,7 @@ import { X } from "lucide-react";
 import { Input } from "@ltex/ui";
 import { ProductPicker } from "./product-picker";
 import { LotPicker } from "./lot-picker";
+import { recalcLinePrice } from "@/lib/manager/order-pricing";
 import type { OrderItemDraft } from "./types";
 
 export function ItemRow({
@@ -12,11 +13,14 @@ export function ItemRow({
   onChange,
   onRemove,
   index,
+  priceTypeCode,
 }: {
   draft: OrderItemDraft;
   onChange: (next: OrderItemDraft) => void;
   onRemove: () => void;
   index: number;
+  /** Код обраного типу цін — для авто-заповнення ціни загальних позицій. */
+  priceTypeCode?: string | null;
 }) {
   // Auto-fill priceEur коли user обрав lot.
   useEffect(() => {
@@ -30,6 +34,26 @@ export function ItemRow({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [draft.lot?.id]);
+
+  // Авто-заповнення ціни загальної позиції (без лота) з прайсу товара за
+  // обраним типом цін — тільки коли ще не введено вручну (priceEur === 0).
+  useEffect(() => {
+    if (
+      draft.product &&
+      !draft.bindToLot &&
+      draft.priceEur === 0 &&
+      draft.weight > 0
+    ) {
+      const next = recalcLinePrice(
+        draft.product.prices,
+        priceTypeCode,
+        draft.weight,
+        0,
+      );
+      if (next > 0) onChange({ ...draft, priceEur: next });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draft.product?.id, draft.bindToLot, draft.weight]);
 
   return (
     <div className="rounded-lg border bg-white p-3">

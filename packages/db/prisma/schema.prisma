@@ -204,6 +204,19 @@ model Order {
   totalUah     Float    @default(0) @map("total_uah")
   exchangeRate Float    @default(0) @map("exchange_rate")
   notes        String?
+
+  // ─── Manager order fields (← 1С Document.Заказ, Етап 1) ──────────────────
+  // Тип цін — id з довідника MgrPriceType (зберігаємо id, без жорсткого FK,
+  // бо order — спільна з магазином модель). Доставка — delivery|post|pickup.
+  priceTypeId         String?  @map("price_type_id")
+  deliveryMethod      String?  @map("delivery_method")
+  cashOnDelivery      Boolean  @default(false) @map("cash_on_delivery")
+  assignedAgentUserId String?  @map("assigned_agent_user_id")
+  exportTo1C          Boolean  @default(true) @map("export_to_1c")
+  // Проведено в 1С (ставиться на етапі обмінів) + актуальність.
+  archived            Boolean  @default(false)
+  isActual            Boolean  @default(true) @map("is_actual")
+
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
 

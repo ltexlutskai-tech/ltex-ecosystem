@@ -38,6 +38,7 @@ describe("OrderTotals", () => {
           priceUnit: "kg",
           averageWeight: null,
           inStock: true,
+          prices: [],
         },
       }),
       draft({
@@ -51,6 +52,7 @@ describe("OrderTotals", () => {
           priceUnit: "kg",
           averageWeight: null,
           inStock: true,
+          prices: [],
         },
       }),
     ];
@@ -74,6 +76,7 @@ describe("OrderTotals", () => {
           priceUnit: "kg",
           averageWeight: null,
           inStock: true,
+          prices: [],
         },
       }),
     ];

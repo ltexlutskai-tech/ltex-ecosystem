@@ -156,7 +156,9 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const order = await createOrderWithItems(input, customer);
+    const order = await createOrderWithItems(input, customer, {
+      userId: user.id,
+    });
     return NextResponse.json(
       {
         id: order.id,
@@ -166,6 +168,11 @@ export async function POST(req: NextRequest) {
         totalUah: order.totalUah,
         exchangeRate: order.exchangeRate,
         notes: order.notes,
+        priceTypeId: order.priceTypeId,
+        deliveryMethod: order.deliveryMethod,
+        cashOnDelivery: order.cashOnDelivery,
+        assignedAgentUserId: order.assignedAgentUserId,
+        exportTo1C: order.exportTo1C,
         createdAt: order.createdAt.toISOString(),
         customer: order.customer,
         items: order.items.map((i) => ({

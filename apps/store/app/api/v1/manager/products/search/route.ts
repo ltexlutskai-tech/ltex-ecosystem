@@ -9,7 +9,8 @@ import { getCurrentUser } from "@/lib/auth/manager-auth";
  * Search by name OR slug OR articleCode OR code1C (case-insensitive).
  *
  * Returns minimal product shape — id/name/articleCode/code1C/priceUnit/averageWeight —
- * Worker UI form використовує для item-row.
+ * + `prices` (усі записи Price: priceType/amount) для перерахунку рядка
+ * при зміні типу цін у формі замовлення (Етап 1).
  */
 export async function GET(req: NextRequest) {
   const user = await getCurrentUser(req);
@@ -41,6 +42,9 @@ export async function GET(req: NextRequest) {
       priceUnit: true,
       averageWeight: true,
       inStock: true,
+      prices: {
+        select: { priceType: true, amount: true, currency: true },
+      },
     },
   });
 
@@ -54,6 +58,11 @@ export async function GET(req: NextRequest) {
       priceUnit: p.priceUnit,
       averageWeight: p.averageWeight,
       inStock: p.inStock,
+      prices: p.prices.map((pr) => ({
+        priceType: pr.priceType,
+        amount: pr.amount,
+        currency: pr.currency,
+      })),
     })),
   });
 }

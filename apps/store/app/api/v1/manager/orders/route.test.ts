@@ -307,6 +307,46 @@ describe("POST /api/v1/manager/orders", () => {
     expect(json.id).toBe("ord1");
   });
 
+  it("приймає менеджерські поля й передає actor (поточний менеджер)", async () => {
+    mockPrisma.customer.findUnique.mockResolvedValueOnce({
+      id: "cust1",
+      code1C: "000001",
+      name: "Mine",
+    });
+    mockPrisma.mgrClient.findMany.mockResolvedValueOnce([{ code1C: "000001" }]);
+    createOrderWithItemsMock.mockResolvedValueOnce(fakeCreatedOrder());
+    const res = await POST(
+      postReq({
+        ...validBody,
+        priceTypeId: "pt-1",
+        deliveryMethod: "post",
+        cashOnDelivery: true,
+        exportTo1C: false,
+      }),
+    );
+    expect(res.status).toBe(201);
+    const args = createOrderWithItemsMock.mock.calls[0] as [
+      {
+        priceTypeId?: string;
+        deliveryMethod?: string;
+        cashOnDelivery?: boolean;
+      },
+      unknown,
+      { userId: string },
+    ];
+    expect(args[0].priceTypeId).toBe("pt-1");
+    expect(args[0].deliveryMethod).toBe("post");
+    expect(args[0].cashOnDelivery).toBe(true);
+    expect(args[2].userId).toBe("u1");
+  });
+
+  it("відхиляє невалідний deliveryMethod (400)", async () => {
+    const res = await POST(
+      postReq({ ...validBody, deliveryMethod: "teleport" }),
+    );
+    expect(res.status).toBe(400);
+  });
+
   it("returns 400 на FK violation (Prisma P2003)", async () => {
     mockPrisma.customer.findUnique.mockResolvedValueOnce({
       id: "cust1",

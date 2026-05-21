@@ -21,6 +21,7 @@ vi.mock("@/lib/sync/enqueue", () => ({
 import { createOrderWithItems } from "./order-create";
 
 const baseCustomer = { id: "cust1", code1C: "000001", name: "Test" };
+const actor = { userId: "mgr-1" };
 
 const baseInput = {
   customerId: "cust1",
@@ -73,7 +74,7 @@ describe("createOrderWithItems", () => {
   it("обчислює totalEur як sum(items.priceEur) і totalUah = totalEur*rate", async () => {
     mockPrisma.order.create.mockResolvedValueOnce(fakeOrder());
 
-    await createOrderWithItems(baseInput, baseCustomer);
+    await createOrderWithItems(baseInput, baseCustomer, actor);
 
     const call = mockPrisma.order.create.mock.calls[0]?.[0] as {
       data: { totalEur: number; totalUah: number; exchangeRate: number };
@@ -89,6 +90,7 @@ describe("createOrderWithItems", () => {
     await createOrderWithItems(
       { ...baseInput, exchangeRate: 41.5 },
       baseCustomer,
+      actor,
     );
 
     expect(getCurrentRateMock).not.toHaveBeenCalled();
@@ -101,7 +103,7 @@ describe("createOrderWithItems", () => {
 
   it("створює items з lotId null для general позицій", async () => {
     mockPrisma.order.create.mockResolvedValueOnce(fakeOrder());
-    await createOrderWithItems(baseInput, baseCustomer);
+    await createOrderWithItems(baseInput, baseCustomer, actor);
 
     const call = mockPrisma.order.create.mock.calls[0]?.[0] as {
       data: {
@@ -114,7 +116,7 @@ describe("createOrderWithItems", () => {
 
   it("calls enqueueOrderCreate fire-and-forget після create", async () => {
     mockPrisma.order.create.mockResolvedValueOnce(fakeOrder());
-    await createOrderWithItems(baseInput, baseCustomer);
+    await createOrderWithItems(baseInput, baseCustomer, actor);
     expect(enqueueOrderCreateMock).toHaveBeenCalledOnce();
     const args = enqueueOrderCreateMock.mock.calls[0]?.[0] as {
       id: string;
@@ -127,8 +129,64 @@ describe("createOrderWithItems", () => {
   it("не падає коли enqueue throws — caller все одно отримує order", async () => {
     mockPrisma.order.create.mockResolvedValueOnce(fakeOrder());
     enqueueOrderCreateMock.mockRejectedValueOnce(new Error("queue down"));
-    const order = await createOrderWithItems(baseInput, baseCustomer);
+    const order = await createOrderWithItems(baseInput, baseCustomer, actor);
     expect(order).toBeDefined();
     expect((order as { id: string }).id).toBe("ord1");
+  });
+
+  it("дефолт assignedAgentUserId = поточний менеджер коли не передано", async () => {
+    mockPrisma.order.create.mockResolvedValueOnce(fakeOrder());
+    await createOrderWithItems(baseInput, baseCustomer, actor);
+    const call = mockPrisma.order.create.mock.calls[0]?.[0] as {
+      data: { assignedAgentUserId: string };
+    };
+    expect(call.data.assignedAgentUserId).toBe("mgr-1");
+  });
+
+  it("зберігає менеджерські поля коли передані", async () => {
+    mockPrisma.order.create.mockResolvedValueOnce(fakeOrder());
+    await createOrderWithItems(
+      {
+        ...baseInput,
+        priceTypeId: "pt-retail",
+        deliveryMethod: "post",
+        cashOnDelivery: true,
+        assignedAgentUserId: "mgr-2",
+        exportTo1C: false,
+      },
+      baseCustomer,
+      actor,
+    );
+    const call = mockPrisma.order.create.mock.calls[0]?.[0] as {
+      data: {
+        priceTypeId: string | null;
+        deliveryMethod: string | null;
+        cashOnDelivery: boolean;
+        assignedAgentUserId: string;
+        exportTo1C: boolean;
+      };
+    };
+    expect(call.data.priceTypeId).toBe("pt-retail");
+    expect(call.data.deliveryMethod).toBe("post");
+    expect(call.data.cashOnDelivery).toBe(true);
+    expect(call.data.assignedAgentUserId).toBe("mgr-2");
+    expect(call.data.exportTo1C).toBe(false);
+  });
+
+  it("дефолти менеджерських полів коли не передані", async () => {
+    mockPrisma.order.create.mockResolvedValueOnce(fakeOrder());
+    await createOrderWithItems(baseInput, baseCustomer, actor);
+    const call = mockPrisma.order.create.mock.calls[0]?.[0] as {
+      data: {
+        priceTypeId: string | null;
+        deliveryMethod: string | null;
+        cashOnDelivery: boolean;
+        exportTo1C: boolean;
+      };
+    };
+    expect(call.data.priceTypeId).toBeNull();
+    expect(call.data.deliveryMethod).toBeNull();
+    expect(call.data.cashOnDelivery).toBe(false);
+    expect(call.data.exportTo1C).toBe(true);
   });
 });

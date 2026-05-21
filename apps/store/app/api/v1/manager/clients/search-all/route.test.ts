@@ -63,6 +63,8 @@ const SAMPLES = [
     tradePointName: "ТТ-1",
     city: "Київ",
     debt: { toString: () => "100.00" },
+    priceTypeId: "pt-1",
+    deliveryMethod: { code: "delivery" },
     agent: { id: "u1", fullName: "Alice" },
   },
   {
@@ -72,6 +74,8 @@ const SAMPLES = [
     tradePointName: "ТТ-2",
     city: "Львів",
     debt: { toString: () => "0.00" },
+    priceTypeId: null,
+    deliveryMethod: null,
     agent: { id: "u9", fullName: "Олена" },
   },
 ];
@@ -159,6 +163,8 @@ describe("GET /api/v1/manager/clients/search-all", () => {
         "tradePointName",
         "city",
         "debt",
+        "priceTypeId",
+        "deliveryMethodCode",
         "agent",
         "isOwned",
       ].sort(),

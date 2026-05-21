@@ -106,4 +106,44 @@ describe("createOrderSchema", () => {
     const result = createOrderSchema.safeParse({ customerId: "c1", items });
     expect(result.success).toBe(false);
   });
+
+  it("приймає менеджерські поля (Етап 1)", () => {
+    const result = createOrderSchema.safeParse({
+      customerId: "c1",
+      items: [{ productId: "p1", weight: 10, priceEur: 0 }],
+      priceTypeId: "pt-1",
+      deliveryMethod: "pickup",
+      cashOnDelivery: true,
+      assignedAgentUserId: "u-2",
+      exportTo1C: false,
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("дефолти cashOnDelivery=false і exportTo1C=true", () => {
+    const result = createOrderSchema.parse({
+      customerId: "c1",
+      items: [{ productId: "p1", weight: 10, priceEur: 0 }],
+    });
+    expect(result.cashOnDelivery).toBe(false);
+    expect(result.exportTo1C).toBe(true);
+  });
+
+  it("приймає deliveryMethod null", () => {
+    const result = createOrderSchema.safeParse({
+      customerId: "c1",
+      items: [{ productId: "p1", weight: 10, priceEur: 0 }],
+      deliveryMethod: null,
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("відхиляє невалідний deliveryMethod", () => {
+    const result = createOrderSchema.safeParse({
+      customerId: "c1",
+      items: [{ productId: "p1", weight: 10, priceEur: 0 }],
+      deliveryMethod: "teleport",
+    });
+    expect(result.success).toBe(false);
+  });
 });

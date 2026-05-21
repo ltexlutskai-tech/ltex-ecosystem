@@ -20,9 +20,12 @@ function emptyDraft(): OrderItemDraft {
 export function ItemsEditor({
   items,
   onChange,
+  priceTypeCode,
 }: {
   items: OrderItemDraft[];
   onChange: (next: OrderItemDraft[]) => void;
+  /** Код обраного типу цін — для авто-заповнення ціни загальних позицій. */
+  priceTypeCode?: string | null;
 }) {
   function addRow(): void {
     onChange([...items, emptyDraft()]);
@@ -55,6 +58,7 @@ export function ItemsEditor({
           key={draft.uid}
           draft={draft}
           index={i}
+          priceTypeCode={priceTypeCode}
           onChange={(next) => updateRow(draft.uid, next)}
           onRemove={() => removeRow(draft.uid)}
         />

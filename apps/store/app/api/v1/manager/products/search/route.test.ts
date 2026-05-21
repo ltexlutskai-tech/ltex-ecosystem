@@ -69,7 +69,7 @@ describe("GET /api/v1/manager/products/search", () => {
     expect(args.take).toBe(20);
   });
 
-  it("повертає mapped shape з усіма потрібними полями", async () => {
+  it("повертає mapped shape з усіма потрібними полями + prices", async () => {
     mockPrisma.product.findMany.mockResolvedValueOnce([
       {
         id: "p1",
@@ -80,15 +80,26 @@ describe("GET /api/v1/manager/products/search", () => {
         priceUnit: "kg",
         averageWeight: 25,
         inStock: true,
+        prices: [
+          { priceType: "wholesale", amount: 4, currency: "EUR" },
+          { priceType: "retail", amount: 7, currency: "EUR" },
+        ],
       },
     ]);
     const res = await GET(req("?q=test"));
     expect(res.status).toBe(200);
     const json = (await res.json()) as {
-      items: Array<{ id: string; name: string; priceUnit: string }>;
+      items: Array<{
+        id: string;
+        name: string;
+        priceUnit: string;
+        prices: Array<{ priceType: string; amount: number }>;
+      }>;
     };
     expect(json.items).toHaveLength(1);
     expect(json.items[0]?.id).toBe("p1");
     expect(json.items[0]?.priceUnit).toBe("kg");
+    expect(json.items[0]?.prices).toHaveLength(2);
+    expect(json.items[0]?.prices?.[0]?.priceType).toBe("wholesale");
   });
 });
