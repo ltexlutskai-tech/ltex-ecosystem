@@ -38,6 +38,15 @@ interface Props {
   /** Стиль кнопки-тригера. */
   buttonVariant?: "outline" | "default";
   buttonSize?: "sm" | "default";
+  /**
+   * «Безголовий» режим — не рендерити власну кнопку-тригер. Використовується
+   * коли flow «Замовити відео» запускається ззовні (напр. з контекстного меню
+   * рядка прайсу). У цьому режимі форму відкривають через `open`/`onOpenChange`.
+   */
+  hideTrigger?: boolean;
+  /** Контрольований стан форми (для `hideTrigger`-режиму). */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }
 
 /** ISO-дата +3 дні від тепер (для нагадування «відстежити відео»). */
@@ -53,9 +62,17 @@ export function OrderVideoButton({
   sellerName,
   buttonVariant = "outline",
   buttonSize = "sm",
+  hideTrigger = false,
+  open: controlledOpen,
+  onOpenChange,
 }: Props) {
   const { toast } = useToast();
-  const [formOpen, setFormOpen] = useState(false);
+  const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
+  const formOpen = controlledOpen ?? uncontrolledOpen;
+  const setFormOpen = (o: boolean) => {
+    if (onOpenChange) onOpenChange(o);
+    else setUncontrolledOpen(o);
+  };
   const [shareOpen, setShareOpen] = useState(false);
   const [shareText, setShareText] = useState("");
   const [clientId, setClientId] = useState<string | null>(null);
@@ -128,14 +145,16 @@ export function OrderVideoButton({
 
   return (
     <>
-      <Button
-        type="button"
-        variant={buttonVariant}
-        size={buttonSize}
-        onClick={() => setFormOpen(true)}
-      >
-        Замовити відео
-      </Button>
+      {!hideTrigger && (
+        <Button
+          type="button"
+          variant={buttonVariant}
+          size={buttonSize}
+          onClick={() => setFormOpen(true)}
+        >
+          Замовити відео
+        </Button>
+      )}
 
       <Dialog
         open={formOpen}

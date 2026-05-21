@@ -83,8 +83,10 @@ export interface ProductCardVM {
   keyFacts: KeyFact[];
   /** Лічильники характеристик + бронь + залишок. */
   lotStats: CardLotStats;
-  /** Усі лоти товару (з залишком) — для розширеної таблиці + картки лоту. */
+  /** Усі лоти товару — для розширеної таблиці + картки лоту. */
   lots: ProductLotVM[];
+  /** Загальна кількість лотів товару (для заголовка «Лоти (N)»). */
+  totalLotsCount: number;
 }
 
 export async function loadProductCard(
@@ -175,39 +177,34 @@ export async function loadProductCard(
     })),
   );
 
-  // Усі лоти із залишком (вільні + заброньовані + інші) — менеджеру потрібно
-  // бачити й керувати кожним мішком, не лише вільними. Продані з нульовою вагою
-  // відсіюємо щоб не захаращувати таблицю.
-  const lots: ProductLotVM[] = product.lots
-    .filter((l) => l.weight > 0)
-    .map((l) => {
-      const isActive =
-        l.reservedUntil !== null && l.reservedUntil.getTime() >= now.getTime();
-      return {
-        id: l.id,
-        barcode: l.barcode,
-        weight: l.weight,
-        quantity: l.quantity,
-        status: l.status,
-        priceEur: l.priceEur,
-        hasVideo: l.videoUrl !== null,
-        isTarget: l.isTarget,
-        arrivalIso: (l.arrivalDate ?? l.createdAt).toISOString(),
-        sector: l.sector,
-        isOpen: l.isOpen,
-        videoDateIso: l.videoDate ? l.videoDate.toISOString() : null,
-        isReserved: l.status === "reserved",
-        reservedForName: l.reservedForName,
-        reservedUntilIso: l.reservedUntil
-          ? l.reservedUntil.toISOString()
-          : null,
-        isActiveReservation: isActive,
-        isMineReservation:
-          isActive &&
-          viewerUserId !== undefined &&
-          l.reservedByUserId === viewerUserId,
-      };
-    });
+  // Показуємо УСІ лоти товару (вільні + заброньовані + продані тощо) — менеджеру
+  // потрібно бачити кожен мішок, не лише ті, що з залишком чи з відео.
+  const lots: ProductLotVM[] = product.lots.map((l) => {
+    const isActive =
+      l.reservedUntil !== null && l.reservedUntil.getTime() >= now.getTime();
+    return {
+      id: l.id,
+      barcode: l.barcode,
+      weight: l.weight,
+      quantity: l.quantity,
+      status: l.status,
+      priceEur: l.priceEur,
+      hasVideo: l.videoUrl !== null,
+      isTarget: l.isTarget,
+      arrivalIso: (l.arrivalDate ?? l.createdAt).toISOString(),
+      sector: l.sector,
+      isOpen: l.isOpen,
+      videoDateIso: l.videoDate ? l.videoDate.toISOString() : null,
+      isReserved: l.status === "reserved",
+      reservedForName: l.reservedForName,
+      reservedUntilIso: l.reservedUntil ? l.reservedUntil.toISOString() : null,
+      isActiveReservation: isActive,
+      isMineReservation:
+        isActive &&
+        viewerUserId !== undefined &&
+        l.reservedByUserId === viewerUserId,
+    };
+  });
 
   return {
     id: product.id,
@@ -235,5 +232,6 @@ export async function loadProductCard(
     }),
     lotStats,
     lots,
+    totalLotsCount: product.lots.length,
   };
 }

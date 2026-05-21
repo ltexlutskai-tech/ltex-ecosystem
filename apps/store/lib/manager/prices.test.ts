@@ -128,6 +128,7 @@ function raw(over: Partial<RawPriceProduct> = {}): RawPriceProduct {
     id: "p1",
     articleCode: "A1",
     name: "Test",
+    slug: "test",
     description: "desc",
     priceUnit: "kg",
     videoUrl: null,

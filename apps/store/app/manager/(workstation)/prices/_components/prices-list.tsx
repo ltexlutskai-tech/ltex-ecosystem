@@ -1,8 +1,17 @@
+"use client";
+
 import Link from "next/link";
+import { useRef, useState } from "react";
 import type { PriceRow } from "@/lib/manager/prices";
+import { buildProductShareText } from "@/lib/manager/share-message";
+import { ProductRowMenu, type ProductRowMenuTarget } from "./product-row-menu";
 
 interface Props {
   items: PriceRow[];
+  /** Курс EUR → UAH для рекламного тексту «Поділитися». */
+  rateUah: number;
+  /** ПІБ поточного менеджера (продавець у запиті «Замовити відео»). */
+  sellerName: string;
 }
 
 function formatPrice(value: number | null, currency: string): string {
@@ -26,7 +35,63 @@ function rowHighlight(row: PriceRow): string {
   return "hover:bg-gray-50";
 }
 
-export function PricesList({ items }: Props) {
+/** Будує знімок товара для контекстного меню (рекламний текст — pure builder). */
+function toMenuTarget(row: PriceRow, rateUah: number): ProductRowMenuTarget {
+  return {
+    id: row.id,
+    name: row.name,
+    slug: row.slug,
+    articleCode: row.articleCode,
+    videoUrl: row.videoUrl,
+    shareText: buildProductShareText({
+      name: row.name,
+      articleCode: row.articleCode,
+      description: row.description,
+      basePriceEur: row.basePrice,
+      salePriceEur: row.salePrice,
+      isNew: row.isNew,
+      videoUrl: row.videoUrl,
+      rateUah,
+    }),
+  };
+}
+
+export function PricesList({ items, rateUah, sellerName }: Props) {
+  const [menuTarget, setMenuTarget] = useState<ProductRowMenuTarget | null>(
+    null,
+  );
+  const [menuPos, setMenuPos] = useState<{ x: number; y: number } | null>(null);
+  const longPressRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // true коли long-press встиг відкрити меню — тоді гасимо наступний клік по
+  // мобільному рядку-`<Link>`, щоб не переходити на картку товара.
+  const longPressFiredRef = useRef(false);
+
+  function openMenu(row: PriceRow, x: number, y: number) {
+    setMenuTarget(toMenuTarget(row, rateUah));
+    setMenuPos({ x, y });
+  }
+
+  function closeMenu() {
+    setMenuTarget(null);
+    setMenuPos(null);
+  }
+
+  // Long-press (~500мс) на тач-пристроях відкриває те саме меню.
+  function startLongPress(row: PriceRow, x: number, y: number) {
+    clearLongPress();
+    longPressFiredRef.current = false;
+    longPressRef.current = setTimeout(() => {
+      longPressFiredRef.current = true;
+      openMenu(row, x, y);
+    }, 500);
+  }
+  function clearLongPress() {
+    if (longPressRef.current) {
+      clearTimeout(longPressRef.current);
+      longPressRef.current = null;
+    }
+  }
+
   if (items.length === 0) {
     return (
       <div className="rounded-lg border border-dashed bg-white p-12 text-center text-sm text-gray-500">
@@ -50,7 +115,14 @@ export function PricesList({ items }: Props) {
           </thead>
           <tbody className="divide-y divide-gray-100">
             {items.map((row) => (
-              <tr key={row.id} className={rowHighlight(row)}>
+              <tr
+                key={row.id}
+                className={rowHighlight(row)}
+                onContextMenu={(e) => {
+                  e.preventDefault();
+                  openMenu(row, e.clientX, e.clientY);
+                }}
+              >
                 <td className="px-4 py-2 align-top">
                   <Link
                     href={`/manager/prices/${row.id}`}
@@ -69,11 +141,6 @@ export function PricesList({ items }: Props) {
                       <Badge className="bg-sky-600">Відео</Badge>
                     )}
                   </div>
-                  {row.description && (
-                    <p className="mt-0.5 line-clamp-1 text-xs text-gray-400">
-                      {row.description}
-                    </p>
-                  )}
                 </td>
                 <td className="px-4 py-2 align-top whitespace-nowrap text-gray-800">
                   {formatRemaining(row)}
@@ -99,6 +166,24 @@ export function PricesList({ items }: Props) {
             className={`block rounded-lg border bg-white p-3 shadow-sm ${rowHighlight(
               row,
             )}`}
+            onContextMenu={(e) => {
+              e.preventDefault();
+              openMenu(row, e.clientX, e.clientY);
+            }}
+            onTouchStart={(e) => {
+              const t = e.touches[0];
+              if (t) startLongPress(row, t.clientX, t.clientY);
+            }}
+            onTouchEnd={clearLongPress}
+            onTouchMove={clearLongPress}
+            onTouchCancel={clearLongPress}
+            onClick={(e) => {
+              // Якщо щойно спрацював long-press — гасимо навігацію.
+              if (longPressFiredRef.current) {
+                e.preventDefault();
+                longPressFiredRef.current = false;
+              }
+            }}
           >
             <div className="flex items-start justify-between gap-2">
               <span className="font-medium text-gray-900">{row.name}</span>
@@ -128,6 +213,13 @@ export function PricesList({ items }: Props) {
           </Link>
         ))}
       </div>
+
+      <ProductRowMenu
+        target={menuTarget}
+        position={menuPos}
+        onClose={closeMenu}
+        sellerName={sellerName}
+      />
     </>
   );
 }

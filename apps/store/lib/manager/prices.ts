@@ -164,6 +164,7 @@ export interface RawPriceProduct {
   id: string;
   articleCode: string | null;
   name: string;
+  slug: string;
   description: string;
   priceUnit: string;
   videoUrl: string | null;
@@ -183,7 +184,11 @@ export interface PriceRow {
   id: string;
   articleCode: string | null;
   name: string;
+  slug: string;
+  /** Опис-прев'ю (більше не показується у списку — лишено для share-тексту). */
   description: string;
+  /** Посилання на YouTube-огляд товара (для контекстного меню). */
+  videoUrl: string | null;
   categoryName: string | null;
   /** Сумарний залишок у кг (вільні лоти). */
   remainingKg: number;
@@ -229,7 +234,9 @@ export function deriveProductRow(
     id: p.id,
     articleCode: p.articleCode,
     name: p.name,
+    slug: p.slug,
     description: p.description,
+    videoUrl: p.videoUrl,
     categoryName: p.category?.name ?? null,
     remainingKg: Math.round(remainingKg * 100) / 100,
     freeLotsCount: freeLots.length,

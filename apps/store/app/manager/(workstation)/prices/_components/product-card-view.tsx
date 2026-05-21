@@ -22,6 +22,8 @@ interface Props {
   rateUah: number;
   /** ПІБ поточного менеджера (продавець у запиті «Замовити відео»). */
   sellerName: string;
+  /** Поточний користувач — адмін (перемикач «у штуках» лише для адміна). */
+  isAdmin: boolean;
 }
 
 function formatAmount(amount: number, currency: string): string {
@@ -44,6 +46,7 @@ export function ProductCardView({
   productShareText,
   rateUah,
   sellerName,
+  isAdmin,
 }: Props) {
   const [showAsPieces, setShowAsPieces] = useState(false);
   const [activeImage, setActiveImage] = useState(0);
@@ -111,7 +114,7 @@ export function ProductCardView({
             </div>
           </div>
 
-          {product.priceUnit !== "piece" && (
+          {isAdmin && product.priceUnit !== "piece" && (
             <label className="inline-flex items-center gap-2 text-sm text-gray-700">
               <input
                 type="checkbox"
@@ -167,24 +170,18 @@ export function ProductCardView({
         </div>
       </div>
 
-      {/* ── Опис-прайс ─────────────────────────────────────────── */}
+      {/* ── Опис-прайс (collapsible, closed за замовчуванням) ───── */}
       {product.description.trim() && (
-        <div className="rounded-lg border bg-white p-4 shadow-sm">
-          <h2 className="mb-2 text-sm font-semibold text-gray-700">
-            Опис / прайс
-          </h2>
+        <CollapsibleBlock title="Опис / прайс">
           <p className="whitespace-pre-line text-sm leading-relaxed text-gray-700">
             {product.description}
           </p>
-        </div>
+        </CollapsibleBlock>
       )}
 
-      {/* ── Структуровані факти ✔ ──────────────────────────────── */}
+      {/* ── Структуровані факти ✔ (collapsible, closed) ─────────── */}
       {product.keyFacts.length > 0 && (
-        <div className="rounded-lg border bg-white p-4 shadow-sm">
-          <h2 className="mb-2 text-sm font-semibold text-gray-700">
-            Характеристики
-          </h2>
+        <CollapsibleBlock title="Характеристики">
           <ul className="grid gap-1 text-sm text-gray-700 sm:grid-cols-2">
             {product.keyFacts.map((fact) => (
               <li key={fact.label} className="flex gap-2">
@@ -194,7 +191,7 @@ export function ProductCardView({
               </li>
             ))}
           </ul>
-        </div>
+        </CollapsibleBlock>
       )}
 
       {/* ── Блоки цін (collapsible) ────────────────────────────── */}
@@ -229,16 +226,15 @@ export function ProductCardView({
         </EmptyHint>
       </CollapsibleBlock>
 
-      {/* ── Лічильник характеристик + таблиця лотів (Етап 3a) ──── */}
+      {/* ── Лоти товару (усі) + таблиця (Етап 3a) ──────────────── */}
       <div className="rounded-lg border bg-white p-4 shadow-sm">
         <h2 className="mb-3 text-sm font-semibold text-gray-700">
-          Характеристики ({lotStats.availableCount} шт.) (
-          {lotStats.withVideoCount} шт. з відео)
+          Лоти ({product.totalLotsCount})
         </h2>
         {product.lots.length > 0 ? (
           <LotsTable lots={product.lots} onOpen={setOpenLotId} />
         ) : (
-          <EmptyHint>Лотів із залишком немає.</EmptyHint>
+          <EmptyHint>Лотів немає.</EmptyHint>
         )}
         <p className="mt-2 text-xs text-gray-400">
           Натисніть рядок щоб відкрити картку лоту — редагувати менеджерські

@@ -42,6 +42,7 @@ export async function loadPrices(
         id: true,
         articleCode: true,
         name: true,
+        slug: true,
         description: true,
         priceUnit: true,
         videoUrl: true,

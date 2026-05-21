@@ -104,6 +104,7 @@ export async function GET(req: NextRequest) {
         id: true,
         articleCode: true,
         name: true,
+        slug: true,
         description: true,
         priceUnit: true,
         videoUrl: true,

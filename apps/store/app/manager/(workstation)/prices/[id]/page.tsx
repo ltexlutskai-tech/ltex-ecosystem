@@ -51,6 +51,7 @@ export default async function ProductCardPage({
         productShareText={productShareText}
         rateUah={rateUah}
         sellerName={user.fullName}
+        isAdmin={user.role === "admin"}
       />
     </div>
   );

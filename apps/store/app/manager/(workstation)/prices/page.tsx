@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/manager-auth";
+import { getCurrentRate } from "@/lib/exchange-rate";
 import type { PriceSort, SortDir } from "@/lib/manager/prices";
 import { PricesToolbar } from "./_components/prices-toolbar";
 import { PricesList } from "./_components/prices-list";
@@ -24,7 +25,7 @@ export default async function PricesPage({
     pickString(sp.sort) === "arrival" ? "arrival" : "name";
   const dir: SortDir = pickString(sp.dir) === "desc" ? "desc" : "asc";
 
-  const [categories, list] = await Promise.all([
+  const [categories, list, rateUah] = await Promise.all([
     loadCategoriesForFilter(),
     loadPrices({
       q: pickString(sp.q),
@@ -44,6 +45,7 @@ export default async function PricesPage({
       page,
       pageSize,
     }),
+    getCurrentRate(),
   ]);
 
   return (
@@ -55,7 +57,11 @@ export default async function PricesPage({
         </p>
       </header>
       <PricesToolbar categories={categories} totalCount={list.total} />
-      <PricesList items={list.items} />
+      <PricesList
+        items={list.items}
+        rateUah={rateUah}
+        sellerName={user.fullName}
+      />
       <PricesPagination page={list.page} totalPages={list.totalPages} />
     </div>
   );
