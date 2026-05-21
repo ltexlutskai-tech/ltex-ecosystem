@@ -211,17 +211,33 @@ describe("buildProductShareText", () => {
     expect(text).toContain("Гарний опис прайсу");
   });
 
-  it("truncates very long descriptions with ellipsis", () => {
+  it("shows the FULL description without truncation (long descriptions intact)", () => {
+    const longDesc = "x".repeat(600);
     const text = buildProductShareText({
       name: "Товар",
       articleCode: null,
-      description: "x".repeat(600),
+      description: longDesc,
       basePriceEur: 10,
       isNew: false,
       rateUah: 43,
     });
-    expect(text).toContain("…");
-    expect(text).not.toContain("x".repeat(600));
+    // Повний опис присутній цілком, без обрізаючого «…».
+    expect(text).toContain(longDesc);
+    expect(text).not.toContain("…");
+  });
+
+  it("preserves multi-line / detailed descriptions verbatim (only .trim())", () => {
+    const desc =
+      "  Військовий мікс: куртки, штани, берці.\nСорт екстра.\nСклад: Європа.  ";
+    const text = buildProductShareText({
+      name: "Військовий мікс",
+      articleCode: "MIL-1",
+      description: desc,
+      basePriceEur: 8,
+      isNew: false,
+      rateUah: 43,
+    });
+    expect(text).toContain(desc.trim());
   });
 
   it("omits price block when basePriceEur is null", () => {

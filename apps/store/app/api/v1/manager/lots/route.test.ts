@@ -144,7 +144,8 @@ describe("GET /api/v1/manager/lots", () => {
       AND: Array<{ OR?: unknown[] }>;
     };
     const orClause = where.AND.find((c) => c.OR);
-    expect(orClause?.OR).toHaveLength(3);
+    // barcode + product.name + product.articleCode + reservedByName
+    expect(orClause?.OR).toHaveLength(4);
   });
 
   it("clamps out-of-range page/pageSize instead of 400", async () => {

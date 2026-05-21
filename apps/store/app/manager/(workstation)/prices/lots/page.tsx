@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/manager-auth";
 import { getCurrentRate } from "@/lib/exchange-rate";
@@ -50,6 +51,12 @@ export default async function AllLotsPage({
 
   return (
     <div className="mx-auto max-w-7xl space-y-4">
+      <Link
+        href="/manager/prices"
+        className="inline-flex items-center text-sm text-gray-500 hover:text-gray-800"
+      >
+        ← Назад до прайсу
+      </Link>
       <header>
         <h1 className="text-2xl font-bold text-gray-800">
           Деталі по мішках / Наявні лоти
@@ -85,7 +92,7 @@ function pickBool(v: string | string[] | undefined): boolean | undefined {
 
 function pickSort(v: string | string[] | undefined): LotsListSort {
   const s = pickString(v);
-  if (s === "arrival" || s === "weight") return s;
+  if (s === "arrival" || s === "weight" || s === "manager") return s;
   return "product";
 }
 

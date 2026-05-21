@@ -118,7 +118,7 @@ export function AllLotsList({ groups, rateUah, sellerName }: Props) {
                 <tr>
                   <th className="px-3 py-2">Штрихкод</th>
                   <th className="px-3 py-2 whitespace-nowrap">Вага, кг</th>
-                  <th className="px-3 py-2 whitespace-nowrap">Залишок</th>
+                  <th className="px-3 py-2 whitespace-nowrap">Менеджер</th>
                   <th className="px-3 py-2 whitespace-nowrap">Дата відео</th>
                   <th className="px-3 py-2">Сектор</th>
                   <th className="px-3 py-2">Бронь</th>
@@ -140,7 +140,7 @@ export function AllLotsList({ groups, rateUah, sellerName }: Props) {
                       {lot.weight.toLocaleString("uk-UA")}
                     </td>
                     <td className="px-3 py-2 whitespace-nowrap text-gray-700">
-                      {lot.quantity}
+                      {lot.reservedByName ?? "—"}
                     </td>
                     <td className="px-3 py-2 whitespace-nowrap text-gray-700">
                       {formatDate(lot.videoDateIso)}
@@ -188,7 +188,7 @@ export function AllLotsList({ groups, rateUah, sellerName }: Props) {
                 </div>
                 <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-gray-600">
                   <span>Сектор: {lot.sector ?? "—"}</span>
-                  <span>· Залишок: {lot.quantity}</span>
+                  <span>· Менеджер: {lot.reservedByName ?? "—"}</span>
                   {lot.hasVideo && (
                     <span className="text-emerald-600">· відео</span>
                   )}

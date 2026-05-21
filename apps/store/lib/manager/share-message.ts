@@ -96,7 +96,7 @@ export interface ProductShareParams {
   name: string;
   /** Артикул (Product.articleCode). */
   articleCode: string | null;
-  /** Опис-прайс (необов'язковий; обрізається до розумної довжини). */
+  /** Опис-прайс (необов'язковий; показується повністю, як є). */
   description?: string | null;
   /** Базова ціна €/кг (wholesale) або null коли невідома. */
   basePriceEur: number | null;
@@ -110,15 +110,6 @@ export interface ProductShareParams {
   lot?: ShareLotInfo | null;
   /** Курс EUR → UAH для розрахунку вартості лота в грн. */
   rateUah: number;
-}
-
-/** Максимальна довжина опису у рекламному тексті (обрізаємо «хвіст»). */
-const SHARE_DESCRIPTION_MAX = 400;
-
-function trimDescription(raw: string): string {
-  const text = raw.trim();
-  if (text.length <= SHARE_DESCRIPTION_MAX) return text;
-  return `${text.slice(0, SHARE_DESCRIPTION_MAX).trimEnd()}…`;
 }
 
 /**
@@ -160,11 +151,11 @@ export function buildProductShareText(p: ProductShareParams): string {
   const article = p.articleCode?.trim();
   if (article) lines.push(`Артикул: ${article}`);
 
-  // ── Опис ──
+  // ── Опис ── (показуємо повністю, без штучного обрізання — лише .trim())
   const desc = p.description?.trim();
   if (desc) {
     lines.push("");
-    lines.push(trimDescription(desc));
+    lines.push(desc);
   }
 
   // ── Вага / ціни / вартість грн / штрих-код ──

@@ -23,11 +23,14 @@ import { Prisma } from "@ltex/db";
 export type LotsListStatus = "all" | "free" | "reserved" | "my" | "expired";
 
 /** Сортування глобального списку лотів. */
-export type LotsListSort = "product" | "arrival" | "weight";
+export type LotsListSort = "product" | "arrival" | "weight" | "manager";
 export type LotsListSortDir = "asc" | "desc";
 
 export interface BuildLotsWhereParams {
-  /** Пошук по штрихкоду лоту + назві/артикулу товару (insensitive). */
+  /**
+   * Пошук по штрихкоду лоту + назві/артикулу товару + менеджеру брони
+   * (`reservedByName`) — все insensitive.
+   */
   q?: string;
   /** Префільтр по конкретному товару (з картки товару, Етап 2). */
   productId?: string;
@@ -75,6 +78,7 @@ export function buildLotsWhere(p: BuildLotsWhereParams): Prisma.LotWhereInput {
         { barcode: { contains: q, mode: "insensitive" } },
         { product: { name: { contains: q, mode: "insensitive" } } },
         { product: { articleCode: { contains: q, mode: "insensitive" } } },
+        { reservedByName: { contains: q, mode: "insensitive" } },
       ],
     });
   }
@@ -117,6 +121,8 @@ export function buildLotsWhere(p: BuildLotsWhereParams): Prisma.LotWhereInput {
  *  • `arrival` — за датою приходу (proxy: createdAt — Prisma не coalesce-ить
  *    у orderBy; arrivalDate може бути null).
  *  • `weight`  — за вагою лоту.
+ *  • `manager` — за менеджером брони (`reservedByName`); порожні (без брони)
+ *    NULL потрапляють у кінець за замовчуванням сортування Postgres.
  *
  * Для стабільного групування у UI завжди додаємо вторинне сортування за
  * товаром, а в межах товару — за вагою.
@@ -130,6 +136,9 @@ export function buildLotsOrderBy(
   }
   if (sort === "weight") {
     return [{ weight: dir }, { id: "asc" }];
+  }
+  if (sort === "manager") {
+    return [{ reservedByName: dir }, { id: "asc" }];
   }
   // product (default): за артикулом → назвою → вагою (для групування).
   return [
@@ -153,6 +162,7 @@ export interface RawLotRow {
   isTarget: boolean;
   isOpen: boolean;
   reservedForName: string | null;
+  reservedByName: string | null;
   reservedByUserId: string | null;
   reservedUntil: Date | null;
   product: {
@@ -181,6 +191,8 @@ export interface LotListItem {
   // ── Бронь (Етап 4) — для дисплею в таблиці ──
   /** Ім'я клієнта, на якого заброньовано (для показу). */
   reservedForName: string | null;
+  /** Менеджер, який забронював лот (для колонки «Менеджер»). */
+  reservedByName: string | null;
   /** Дата «до якої діє бронь» (ISO) або null. */
   reservedUntilIso: string | null;
   /** Бронь активна (reservedUntil ще не минув) на момент серіалізації. */
@@ -221,6 +233,7 @@ export function serializeLotRow(
     isReserved: l.status === "reserved",
     hasVideo: l.videoUrl !== null,
     reservedForName: l.reservedForName,
+    reservedByName: l.reservedByName,
     reservedUntilIso: l.reservedUntil ? l.reservedUntil.toISOString() : null,
     isActiveReservation: isActive,
     isMineReservation:
@@ -249,6 +262,7 @@ export const lotRowSelect = {
   isTarget: true,
   isOpen: true,
   reservedForName: true,
+  reservedByName: true,
   reservedByUserId: true,
   reservedUntil: true,
   product: {

@@ -63,7 +63,7 @@ export function AllLotsToolbar({ totalCount, productLabel }: Props) {
             type="search"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Пошук за артикулом, назвою або штрихкодом…"
+            placeholder="Пошук за артикулом, назвою, штрихкодом або менеджером…"
             className="flex-1"
           />
           <Button type="submit" variant="outline" size="sm">
@@ -97,6 +97,7 @@ export function AllLotsToolbar({ totalCount, productLabel }: Props) {
               <option value="product">За товаром</option>
               <option value="arrival">За приходом</option>
               <option value="weight">За вагою</option>
+              <option value="manager">За менеджером</option>
             </select>
           </label>
 

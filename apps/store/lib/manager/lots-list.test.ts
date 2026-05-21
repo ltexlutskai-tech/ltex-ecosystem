@@ -24,15 +24,16 @@ describe("buildLotsWhere", () => {
     expect(w.AND).toHaveLength(1);
   });
 
-  it("пошук додає OR по barcode + product.name + product.articleCode", () => {
+  it("пошук додає OR по barcode + product.name + product.articleCode + reservedByName", () => {
     const w = buildLotsWhere({ q: "111" }) as {
       AND: Array<{ OR?: Array<Record<string, unknown>> }>;
     };
     const orClause = w.AND.find((c) => c.OR)?.OR;
-    expect(orClause).toHaveLength(3);
+    expect(orClause).toHaveLength(4);
     expect(orClause?.[0]).toHaveProperty("barcode");
     expect(orClause?.[1]).toHaveProperty("product");
     expect(orClause?.[2]).toHaveProperty("product");
+    expect(orClause?.[3]).toHaveProperty("reservedByName");
   });
 
   it("ігнорує порожній q (лише базовий фільтр)", () => {
@@ -147,6 +148,17 @@ describe("buildLotsOrderBy", () => {
       { id: "asc" },
     ]);
   });
+
+  it("manager сортує за reservedByName + стабільний id", () => {
+    expect(buildLotsOrderBy("manager", "asc")).toEqual([
+      { reservedByName: "asc" },
+      { id: "asc" },
+    ]);
+    expect(buildLotsOrderBy("manager", "desc")).toEqual([
+      { reservedByName: "desc" },
+      { id: "asc" },
+    ]);
+  });
 });
 
 function rawLot(over: Partial<RawLotRow> = {}): RawLotRow {
@@ -162,6 +174,7 @@ function rawLot(over: Partial<RawLotRow> = {}): RawLotRow {
     isTarget: false,
     isOpen: false,
     reservedForName: null,
+    reservedByName: null,
     reservedByUserId: null,
     reservedUntil: null,
     product: {
@@ -210,6 +223,7 @@ describe("serializeLotRow", () => {
       rawLot({
         status: "reserved",
         reservedForName: "ТОВ Ромашка",
+        reservedByName: "Олена Петрівна",
         reservedByUserId: "u2",
         reservedUntil: until,
       }),
@@ -217,6 +231,7 @@ describe("serializeLotRow", () => {
       now,
     );
     expect(row.reservedForName).toBe("ТОВ Ромашка");
+    expect(row.reservedByName).toBe("Олена Петрівна");
     expect(row.reservedUntilIso).toBe(until.toISOString());
     expect(row.isActiveReservation).toBe(true);
     expect(row.isMineReservation).toBe(false);
@@ -273,6 +288,7 @@ function item(
     isReserved: false,
     hasVideo: false,
     reservedForName: null,
+    reservedByName: null,
     reservedUntilIso: null,
     isActiveReservation: false,
     isMineReservation: false,
