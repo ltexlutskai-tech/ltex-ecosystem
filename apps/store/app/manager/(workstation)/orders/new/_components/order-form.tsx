@@ -2,11 +2,14 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { MessageSquare, ListPlus } from "lucide-react";
 import { Button, Textarea } from "@ltex/ui";
 import { ClientPicker } from "./client-picker";
-import { ItemsEditor, emptyDraft } from "./items-editor";
+import { ItemsEditor } from "./items-editor";
 import { OrderTotals } from "./order-totals";
-import { recalcLinePrice } from "@/lib/manager/order-pricing";
+import { ProductPricePicker } from "./product-price-picker";
+import { unitPriceForType } from "@/lib/manager/order-pricing";
+import { bagWeightForQuantity } from "@/lib/manager/order-bag-weight";
 import {
   getAllowedStatusTransitions,
   type ManagerOrderStatus,
@@ -20,6 +23,7 @@ import {
   type OrderEditInitial,
   type OrderItemDraft,
   type PriceTypeOption,
+  type ProductSummary,
 } from "./types";
 
 export interface OrderFormProps {
@@ -64,6 +68,11 @@ function mapClientDeliveryToOrder(
   return "";
 }
 
+/** uid для нової позиції підбору. */
+function newUid(): string {
+  return `i-${Math.random().toString(36).slice(2, 10)}`;
+}
+
 export function OrderForm({
   mode = "create",
   orderId,
@@ -87,9 +96,14 @@ export function OrderForm({
     initialClient ?? null,
   );
   const [items, setItems] = useState<OrderItemDraft[]>(
-    initialOrder?.items?.length ? initialOrder.items : [emptyDraft()],
+    initialOrder?.items ?? [],
   );
   const [notes, setNotes] = useState(initialOrder?.notes ?? "");
+  const [showComment, setShowComment] = useState(
+    !!(initialOrder?.notes ?? "").trim(),
+  );
+  const [showContacts, setShowContacts] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -134,17 +148,10 @@ export function OrderForm({
     setItems((prev) =>
       prev.map((row) => {
         if (!row.product) return row;
-        // Конкретний лот має власну фіксовану ціну — не чіпаємо.
-        if (row.bindToLot && row.lot) return row;
-        return {
-          ...row,
-          priceEur: recalcLinePrice(
-            row.product.prices,
-            nextPriceTypeCode,
-            row.weight,
-            row.priceEur,
-          ),
-        };
+        const unit = unitPriceForType(row.product.prices, nextPriceTypeCode);
+        if (unit === null) return row; // немає прайсу — лишаємо ручний ввід
+        const priceEur = Math.round(unit * row.weight * 100) / 100;
+        return { ...row, unitPriceEur: unit, priceEur };
       }),
     );
   }
@@ -180,6 +187,46 @@ export function OrderForm({
     }
   }
 
+  /**
+   * Додає позицію з підбору (прайсу): товар + кількість мішків. lotId завжди
+   * null. Вага = середня вага мішка × мішки; ціна за кг = за обраним типом
+   * цін; сума = ціна за кг × вага. Якщо товар уже є — додаємо мішки.
+   */
+  function onAddFromPicker(product: ProductSummary, bags: number): void {
+    const unit = unitPriceForType(product.prices, priceTypeCode) ?? 0;
+    setItems((prev) => {
+      const existing = prev.find((r) => r.product?.id === product.id);
+      if (existing) {
+        const quantity = existing.quantity + Math.max(1, Math.floor(bags) || 1);
+        const weight = bagWeightForQuantity(
+          { averageWeight: product.averageWeight },
+          quantity,
+        );
+        const priceEur = Math.round(existing.unitPriceEur * weight * 100) / 100;
+        return prev.map((r) =>
+          r.uid === existing.uid ? { ...r, quantity, weight, priceEur } : r,
+        );
+      }
+      const quantity = Math.max(1, Math.floor(bags) || 1);
+      const weight = bagWeightForQuantity(
+        { averageWeight: product.averageWeight },
+        quantity,
+      );
+      const priceEur = Math.round(unit * weight * 100) / 100;
+      const draft: OrderItemDraft = {
+        uid: newUid(),
+        product,
+        lot: null,
+        bindToLot: false,
+        quantity,
+        weight,
+        priceEur,
+        unitPriceEur: unit,
+      };
+      return [...prev, draft];
+    });
+  }
+
   const wireItems = items
     .map(draftToWire)
     .filter((x): x is NonNullable<typeof x> => x !== null);
@@ -199,6 +246,9 @@ export function OrderForm({
     : null;
 
   const allowedTransitions = getAllowedStatusTransitions(status);
+
+  // Номер документа: для edit — code1C замовлення або короткий id; для create — «авто».
+  const orderNumber = isEdit ? (initialOrder?.displayNumber ?? "") : "авто";
 
   /**
    * Зберігає замовлення (POST у create, PATCH у edit). Опційний `nextStatus`
@@ -251,30 +301,220 @@ export function OrderForm({
   }
 
   return (
-    <div className="space-y-6">
-      {isEdit ? (
-        <div className="space-y-2">
-          <label className="text-sm font-medium text-gray-700">Клієнт</label>
-          <div className="flex items-center justify-between rounded-lg border bg-gray-50 p-3">
-            <div>
-              <div className="font-medium text-gray-900">
-                {clientSummary?.name ?? "—"}
+    <div className="space-y-5">
+      {/* ─── Шапка документа (як у 1С) ──────────────────────────────────────
+          Зверху-праворуч: чекбокси «призначити продаж торговому» +
+          «вивантажувати в 1С», під ними — № документа і дата. */}
+      <div className="rounded-lg border bg-white p-4">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          {/* Ліва колонка шапки порожня тут — клієнт нижче. */}
+          <div className="order-2 lg:order-1" />
+
+          {/* Права колонка: чекбокси + № + дата + маршрут */}
+          <div className="order-1 w-full space-y-3 lg:order-2 lg:max-w-sm">
+            <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
+              <label className="inline-flex cursor-pointer items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={assignToAgent}
+                  onChange={(e) => {
+                    setAssignToAgent(e.target.checked);
+                    if (!e.target.checked)
+                      setAssignedAgentUserId(currentUserId);
+                  }}
+                  className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                />
+                <span>Призначити продаж торговому</span>
+              </label>
+              <label className="inline-flex cursor-pointer items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={exportTo1C}
+                  onChange={(e) => setExportTo1C(e.target.checked)}
+                  className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                />
+                <span>Вивантажувати в 1С</span>
+              </label>
+            </div>
+
+            {assignToAgent && (
+              <select
+                aria-label="Торговий агент"
+                value={assignedAgentUserId}
+                onChange={(e) => setAssignedAgentUserId(e.target.value)}
+                className="h-9 w-full rounded border border-gray-300 bg-white px-2 text-sm focus:border-blue-500 focus:outline-none"
+              >
+                {agents.map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.fullName}
+                    {a.id === currentUserId ? " (я)" : ""}
+                  </option>
+                ))}
+              </select>
+            )}
+            {!assignToAgent && (
+              <p className="text-xs text-gray-400">
+                Продаж зараховано вам ({currentUserName}).
+              </p>
+            )}
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="mb-1 block text-xs text-gray-500">
+                  Номер
+                </label>
+                <input
+                  readOnly
+                  value={orderNumber}
+                  placeholder={isEdit ? "—" : "авто"}
+                  className="h-9 w-full rounded border border-gray-200 bg-gray-50 px-2 text-sm text-gray-600"
+                />
               </div>
-              <div className="text-xs text-gray-500">
-                {clientSummary?.city ?? ""}{" "}
-                {clientSummary?.code1C ? `· ${clientSummary.code1C}` : ""}
+              <div>
+                <label className="mb-1 block text-xs text-gray-500">Дата</label>
+                <input
+                  readOnly
+                  value={new Date().toLocaleDateString("uk-UA")}
+                  className="h-9 w-full rounded border border-gray-200 bg-gray-50 px-2 text-sm text-gray-600"
+                />
               </div>
             </div>
-            <span className="text-xs text-gray-400">Клієнт не змінюється</span>
+
+            <div>
+              <label className="mb-1 block text-xs text-gray-500">
+                Маршрутний лист
+              </label>
+              <input
+                disabled
+                placeholder="Блок «Маршрути» — у розробці"
+                className="h-9 w-full cursor-not-allowed rounded border border-gray-200 bg-gray-50 px-2 text-sm text-gray-400"
+              />
+            </div>
           </div>
         </div>
-      ) : (
-        <ClientPicker
-          value={clientId}
-          onChange={onClientChange}
-          initialSummary={clientSummary}
-        />
-      )}
+
+        {/* ─── Контрагент (ліворуч) + Тип цін (праворуч) ───────────────────── */}
+        <div className="mt-4 grid gap-4 lg:grid-cols-2">
+          <div>
+            {isEdit ? (
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-gray-700">
+                  Контрагент
+                </label>
+                <div className="flex items-center justify-between rounded-lg border bg-gray-50 p-3">
+                  <div>
+                    <div className="font-medium text-gray-900">
+                      {clientSummary?.name ?? "—"}
+                    </div>
+                    <div className="text-xs text-gray-500">
+                      {clientSummary?.city ?? ""}{" "}
+                      {clientSummary?.code1C ? `· ${clientSummary.code1C}` : ""}
+                    </div>
+                  </div>
+                  <span className="text-xs text-gray-400">не змінюється</span>
+                </div>
+              </div>
+            ) : (
+              <ClientPicker
+                value={clientId}
+                onChange={onClientChange}
+                initialSummary={clientSummary}
+              />
+            )}
+
+            {clientSummary && (
+              <button
+                type="button"
+                onClick={() => setShowContacts((v) => !v)}
+                className="mt-2 text-sm text-blue-600 hover:text-blue-800"
+              >
+                {showContacts ? "Сховати контактні дані" : "Контактні дані"}
+              </button>
+            )}
+            {showContacts && clientSummary && (
+              <dl className="mt-2 space-y-1 rounded-lg border bg-gray-50 p-3 text-sm">
+                <div className="flex gap-2">
+                  <dt className="text-gray-500">Телефон:</dt>
+                  <dd className="text-gray-800">
+                    {clientSummary.phone ?? "—"}
+                  </dd>
+                </div>
+                <div className="flex gap-2">
+                  <dt className="text-gray-500">Місто:</dt>
+                  <dd className="text-gray-800">{clientSummary.city ?? "—"}</dd>
+                </div>
+                <div className="flex gap-2">
+                  <dt className="text-gray-500">Адреса:</dt>
+                  <dd className="text-gray-800">
+                    {clientSummary.address ?? "—"}
+                  </dd>
+                </div>
+              </dl>
+            )}
+          </div>
+
+          <div>
+            <label
+              htmlFor="order-price-type"
+              className="mb-1 block text-sm font-medium text-gray-700"
+            >
+              Тип цін
+            </label>
+            <select
+              id="order-price-type"
+              value={priceTypeId}
+              onChange={(e) => onPriceTypeChange(e.target.value)}
+              className="h-9 w-full rounded border border-gray-300 bg-white px-2 text-sm focus:border-blue-500 focus:outline-none"
+            >
+              {priceTypes.length === 0 && (
+                <option value="">— Немає типів цін —</option>
+              )}
+              {priceTypes.map((pt) => (
+                <option key={pt.id} value={pt.id}>
+                  {pt.label}
+                </option>
+              ))}
+            </select>
+            <p className="mt-1 text-xs text-gray-400">
+              При зміні ціни рядків перераховуються.
+            </p>
+          </div>
+        </div>
+
+        {/* ─── Доставка (по центру) + Наложка (праворуч) ──────────────────── */}
+        <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-center sm:gap-6">
+          <div className="sm:w-64">
+            <label
+              htmlFor="order-delivery"
+              className="mb-1 block text-sm font-medium text-gray-700"
+            >
+              Доставка
+            </label>
+            <select
+              id="order-delivery"
+              value={deliveryMethod}
+              onChange={(e) => setDeliveryMethod(e.target.value)}
+              className="h-9 w-full rounded border border-gray-300 bg-white px-2 text-sm focus:border-blue-500 focus:outline-none"
+            >
+              <option value="">— Не вибрано —</option>
+              {deliveryMethods.map((d) => (
+                <option key={d.code} value={d.code}>
+                  {d.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <label className="inline-flex cursor-pointer items-center gap-2 pb-2 text-sm">
+            <input
+              type="checkbox"
+              checked={cashOnDelivery}
+              onChange={(e) => setCashOnDelivery(e.target.checked)}
+              className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+            />
+            <span>Наложка (післяплата)</span>
+          </label>
+        </div>
+      </div>
 
       {/* ─── Статус (тільки edit) ─────────────────────────────────────────── */}
       {isEdit && (
@@ -320,138 +560,63 @@ export function OrderForm({
         </div>
       )}
 
-      {/* ─── Параметри замовлення ─────────────────────────────────────────── */}
-      <div className="rounded-lg border bg-white p-4">
-        <h2 className="mb-3 text-lg font-semibold text-gray-800">
-          Параметри замовлення
-        </h2>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div>
-            <label
-              htmlFor="order-price-type"
-              className="mb-1 block text-sm font-medium text-gray-700"
-            >
-              Тип цін
-            </label>
-            <select
-              id="order-price-type"
-              value={priceTypeId}
-              onChange={(e) => onPriceTypeChange(e.target.value)}
-              className="h-9 w-full rounded border border-gray-300 bg-white px-2 text-sm focus:border-blue-500 focus:outline-none"
-            >
-              {priceTypes.length === 0 && (
-                <option value="">— Немає типів цін —</option>
-              )}
-              {priceTypes.map((pt) => (
-                <option key={pt.id} value={pt.id}>
-                  {pt.label}
-                </option>
-              ))}
-            </select>
-            <p className="mt-1 text-xs text-gray-400">
-              При зміні ціни рядків перераховуються (крім конкретних лотів).
-            </p>
-          </div>
-
-          <div>
-            <label
-              htmlFor="order-delivery"
-              className="mb-1 block text-sm font-medium text-gray-700"
-            >
-              Доставка
-            </label>
-            <select
-              id="order-delivery"
-              value={deliveryMethod}
-              onChange={(e) => setDeliveryMethod(e.target.value)}
-              className="h-9 w-full rounded border border-gray-300 bg-white px-2 text-sm focus:border-blue-500 focus:outline-none"
-            >
-              <option value="">— Не вибрано —</option>
-              {deliveryMethods.map((d) => (
-                <option key={d.code} value={d.code}>
-                  {d.label}
-                </option>
-              ))}
-            </select>
-          </div>
+      {/* ─── Кнопки: Коментар · Підбір (ліворуч) · Зберегти (праворуч) ────── */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => setShowComment((v) => !v)}
+          >
+            <MessageSquare className="mr-1 h-4 w-4" />
+            Коментар
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => setPickerOpen(true)}
+          >
+            <ListPlus className="mr-1 h-4 w-4" />
+            Підбір
+          </Button>
         </div>
-
-        <div className="mt-4 space-y-3">
-          <label className="inline-flex cursor-pointer items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              checked={cashOnDelivery}
-              onChange={(e) => setCashOnDelivery(e.target.checked)}
-              className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-            />
-            <span>Наложка (післяплата)</span>
-          </label>
-
-          <div>
-            <label className="inline-flex cursor-pointer items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                checked={assignToAgent}
-                onChange={(e) => {
-                  setAssignToAgent(e.target.checked);
-                  if (!e.target.checked) setAssignedAgentUserId(currentUserId);
-                }}
-                className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-              />
-              <span>Призначити продаж торговому контрагенту</span>
-            </label>
-            {assignToAgent && (
-              <select
-                value={assignedAgentUserId}
-                onChange={(e) => setAssignedAgentUserId(e.target.value)}
-                className="mt-2 h-9 w-full rounded border border-gray-300 bg-white px-2 text-sm focus:border-blue-500 focus:outline-none sm:w-72"
-              >
-                {agents.map((a) => (
-                  <option key={a.id} value={a.id}>
-                    {a.fullName}
-                    {a.id === currentUserId ? " (я)" : ""}
-                  </option>
-                ))}
-              </select>
-            )}
-            {!assignToAgent && (
-              <p className="mt-1 text-xs text-gray-400">
-                Продаж зараховано вам ({currentUserName}).
-              </p>
-            )}
-          </div>
-
-          <label className="inline-flex cursor-pointer items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              checked={exportTo1C}
-              onChange={(e) => setExportTo1C(e.target.checked)}
-              className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-            />
-            <span>Вивантажувати в 1С</span>
-          </label>
-        </div>
+        <Button
+          type="button"
+          disabled={!canSubmit}
+          onClick={() => submit()}
+          className="bg-green-600 text-white hover:bg-green-700"
+        >
+          {submitting
+            ? isEdit
+              ? "Збереження…"
+              : "Створення…"
+            : isEdit
+              ? "Зберегти"
+              : "Зберегти"}
+        </Button>
       </div>
 
-      <ItemsEditor
-        items={items}
-        onChange={setItems}
-        priceTypeCode={priceTypeCode}
-      />
+      {showComment && (
+        <div>
+          <label className="mb-1 block text-sm font-medium text-gray-700">
+            Коментар
+          </label>
+          <Textarea
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            placeholder="Будь-які примітки до замовлення (необов'язково)"
+            rows={3}
+            maxLength={2000}
+          />
+        </div>
+      )}
 
-      <div>
-        <label className="mb-1 block text-sm font-medium text-gray-700">
-          Коментар
-        </label>
-        <Textarea
-          value={notes}
-          onChange={(e) => setNotes(e.target.value)}
-          placeholder="Будь-які примітки до замовлення (необов'язково)"
-          rows={3}
-          maxLength={2000}
-        />
-      </div>
+      {/* ─── Таблиця товарів (1С-стиль) ───────────────────────────────────── */}
+      <ItemsEditor items={items} onChange={setItems} />
 
+      {/* ─── Підсумки ─────────────────────────────────────────────────────── */}
       <OrderTotals items={items} exchangeRate={exchangeRate} />
 
       {error && (
@@ -490,6 +655,13 @@ export function OrderForm({
               : "Створити замовлення"}
         </Button>
       </div>
+
+      <ProductPricePicker
+        open={pickerOpen}
+        onOpenChange={setPickerOpen}
+        priceTypeCode={priceTypeCode}
+        onAdd={onAddFromPicker}
+      />
     </div>
   );
 }

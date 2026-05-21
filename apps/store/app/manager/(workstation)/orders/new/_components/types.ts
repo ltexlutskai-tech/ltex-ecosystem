@@ -39,6 +39,10 @@ export interface ClientPickerItem {
   name: string;
   tradePointName: string | null;
   city: string | null;
+  /** Телефон клієнта — для блоку «Контактні дані» у формі. */
+  phone?: string | null;
+  /** Адреса клієнта — для блоку «Контактні дані» у формі. */
+  address?: string | null;
   debt: string;
   /** `MgrPriceType.id` клієнта (підтягується у select типу цін). */
   priceTypeId?: string | null;
@@ -70,11 +74,21 @@ export interface OrderDeliveryOption {
 export interface OrderItemDraft {
   uid: string;
   product: ProductSummary | null;
+  /**
+   * Конкретний лот у потоці підбору **не використовується** (центральна 1С не
+   * приймає такий формат) — поле лишається для зворотної сумісності зі старими
+   * замовленнями, але `bindToLot` завжди `false`, `lot` завжди `null` у нових.
+   */
   lot: LotSummary | null;
   bindToLot: boolean;
-  weight: number;
+  /** Кількість мішків (ціле ≥ 1). */
   quantity: number;
+  /** Сумарна вага позиції, кг = середня вага мішка × кількість мішків. */
+  weight: number;
+  /** Сумарна ціна позиції, € = ціна за кг × вага. */
   priceEur: number;
+  /** Ціна за кг (€) — для відображення/перерахунку рядка. */
+  unitPriceEur: number;
 }
 
 export interface WireOrderItem {
@@ -85,11 +99,16 @@ export interface WireOrderItem {
   priceEur: number;
 }
 
+/**
+ * Перетворює draft на payload рядка замовлення. `lotId` **завжди `null`** —
+ * у замовлення пишемо лише загальні позиції (товар + кількість мішків),
+ * центральна 1С не приймає конкретний лот.
+ */
 export function draftToWire(draft: OrderItemDraft): WireOrderItem | null {
   if (!draft.product) return null;
   return {
     productId: draft.product.id,
-    lotId: draft.bindToLot ? (draft.lot?.id ?? null) : null,
+    lotId: null,
     weight: draft.weight,
     quantity: draft.quantity,
     priceEur: draft.priceEur,
@@ -102,6 +121,8 @@ export function draftToWire(draft: OrderItemDraft): WireOrderItem | null {
  */
 export interface OrderEditInitial {
   id: string;
+  /** Номер документа для відображення (code1C або короткий id). */
+  displayNumber: string;
   status: string;
   notes: string;
   priceTypeId: string | null;

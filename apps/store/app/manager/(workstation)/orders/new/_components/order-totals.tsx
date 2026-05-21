@@ -9,15 +9,19 @@ export function OrderTotals({
   items: OrderItemDraft[];
   exchangeRate: number;
 }) {
-  const totalEur = items.reduce((sum, i) => sum + (i.priceEur || 0), 0);
+  const populated = items.filter((i) => i.product);
+  const totalEur = populated.reduce((sum, i) => sum + (i.priceEur || 0), 0);
   const totalUah = totalEur * exchangeRate;
-  const itemsCount = items.filter((i) => i.product).length;
+  const itemsCount = populated.length;
+  // Кількість мішків (підсумок) — сумарна кількість по позиціях.
+  const bagsCount = populated.reduce((sum, i) => sum + (i.quantity || 0), 0);
 
   return (
     <div className="rounded-lg border bg-gray-50 p-4">
-      <div className="flex items-baseline justify-between gap-4">
+      <div className="flex flex-wrap items-baseline justify-between gap-4">
         <div className="text-sm text-gray-600">
-          {itemsCount} {pluralize(itemsCount, "позиція", "позиції", "позицій")}
+          {itemsCount} {pluralize(itemsCount, "позиція", "позиції", "позицій")}{" "}
+          · {bagsCount} {pluralize(bagsCount, "мішок", "мішки", "мішків")}
           {exchangeRate > 0 ? (
             <span className="ml-2 text-xs text-gray-400">
               курс EUR→UAH: {exchangeRate.toFixed(2)}

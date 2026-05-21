@@ -106,10 +106,19 @@ export default async function ManagerOrderDetailPage({
     order.customer.code1C
       ? prisma.mgrClient.findUnique({
           where: { code1C: order.customer.code1C },
-          select: { debt: true },
+          select: {
+            debt: true,
+            phonePrimary: true,
+            street: true,
+            house: true,
+          },
         })
       : Promise.resolve(null),
   ]);
+
+  const mgrAddress = mgr
+    ? [mgr.street, mgr.house].filter(Boolean).join(", ") || null
+    : null;
 
   const priceTypes: PriceTypeOption[] = priceTypeRows.map((p) => ({
     id: p.id,
@@ -131,6 +140,8 @@ export default async function ManagerOrderDetailPage({
     name: order.customer.name,
     tradePointName: null,
     city: order.customer.city,
+    phone: order.customer.phone ?? mgr?.phonePrimary ?? null,
+    address: mgrAddress,
     debt: mgr?.debt?.toString() ?? "0",
     priceTypeId: order.priceTypeId,
     deliveryMethodCode: order.deliveryMethod,
@@ -138,6 +149,8 @@ export default async function ManagerOrderDetailPage({
     isOwned: true,
   };
 
+  // У замовлення пишемо лише загальні позиції (lotId=null), тож існуючі рядки
+  // показуємо як загальні; ціна за кг = priceEur / weight (для редагування).
   const itemDrafts: OrderItemDraft[] = order.items.map((it) => ({
     uid: it.id,
     product: {
@@ -155,24 +168,18 @@ export default async function ManagerOrderDetailPage({
         currency: pr.currency,
       })),
     },
-    lot: it.lot
-      ? {
-          id: it.lot.id,
-          barcode: it.lot.barcode,
-          weight: it.lot.weight,
-          quantity: it.lot.quantity,
-          priceEur: it.lot.priceEur,
-          status: it.lot.status,
-        }
-      : null,
-    bindToLot: it.lotId !== null,
+    lot: null,
+    bindToLot: false,
     weight: it.weight,
     quantity: it.quantity,
     priceEur: it.priceEur,
+    unitPriceEur:
+      it.weight > 0 ? Math.round((it.priceEur / it.weight) * 100) / 100 : 0,
   }));
 
   const initialOrder: OrderEditInitial = {
     id: order.id,
+    displayNumber: order.code1C ?? order.id.slice(0, 8),
     status: order.status,
     notes: order.notes ?? "",
     priceTypeId: order.priceTypeId,

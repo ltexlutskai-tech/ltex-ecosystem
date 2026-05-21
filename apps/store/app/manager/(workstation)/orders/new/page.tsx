@@ -31,19 +31,25 @@ export default async function NewOrderPage({
   if (requestedClientId) {
     const customer = await prisma.customer.findUnique({
       where: { id: requestedClientId },
-      select: { id: true, code1C: true, name: true, city: true },
+      select: { id: true, code1C: true, name: true, city: true, phone: true },
     });
     if (customer) {
-      // Підтягуємо тип цін / борг / доставку з дзеркала MgrClient (по code1C).
+      // Підтягуємо тип цін / борг / доставку / контакти з дзеркала MgrClient.
       const mgr = customer.code1C
         ? await prisma.mgrClient.findUnique({
             where: { code1C: customer.code1C },
             select: {
               debt: true,
               priceTypeId: true,
+              phonePrimary: true,
+              street: true,
+              house: true,
               deliveryMethod: { select: { code: true } },
             },
           })
+        : null;
+      const address = mgr
+        ? [mgr.street, mgr.house].filter(Boolean).join(", ") || null
         : null;
       initialClient = {
         id: customer.id,
@@ -51,6 +57,8 @@ export default async function NewOrderPage({
         name: customer.name,
         tradePointName: null,
         city: customer.city,
+        phone: customer.phone ?? mgr?.phonePrimary ?? null,
+        address,
         debt: mgr?.debt?.toString() ?? "0",
         priceTypeId: mgr?.priceTypeId ?? null,
         deliveryMethodCode: mgr?.deliveryMethod?.code ?? null,

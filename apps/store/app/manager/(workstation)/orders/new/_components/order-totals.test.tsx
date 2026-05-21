@@ -14,6 +14,7 @@ function draft(overrides: Partial<OrderItemDraft> = {}): OrderItemDraft {
     weight: 0,
     quantity: 1,
     priceEur: 0,
+    unitPriceEur: 0,
     ...overrides,
   };
 }
