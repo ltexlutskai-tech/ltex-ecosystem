@@ -74,11 +74,18 @@ function fakeOrder(id: string, code: string): unknown {
   return {
     id,
     code1C: code,
-    status: "approved",
+    status: "posted",
     totalEur: 100,
     totalUah: 4300,
+    archived: false,
+    isActual: true,
     createdAt: new Date("2026-05-10T10:00:00Z"),
-    customer: { id: "cust1", name: "Test Customer", code1C: "000001" },
+    customer: {
+      id: "cust1",
+      name: "Test Customer",
+      code1C: "000001",
+      city: "Луцьк",
+    },
     _count: { items: 3 },
   };
 }
@@ -149,7 +156,7 @@ describe("GET /api/v1/manager/orders", () => {
     expect(mockPrisma.mgrClient.findMany).not.toHaveBeenCalled();
   });
 
-  it("applies search filter (OR on code1C / customer.name)", async () => {
+  it("applies search filter (OR over code1C / customer / products)", async () => {
     getCurrentUserMock.mockResolvedValueOnce(ADMIN);
     mockPrisma.order.findMany.mockResolvedValueOnce([]);
     mockPrisma.order.count.mockResolvedValueOnce(0);
@@ -158,7 +165,11 @@ describe("GET /api/v1/manager/orders", () => {
     const args = mockPrisma.order.findMany.mock.calls[0]?.[0] as {
       where: { OR?: unknown[] };
     };
-    expect(args.where.OR).toHaveLength(2);
+    // № / клієнт (ім'я·телефон·місто) / товари (назва·артикул) = 6 clauses
+    expect(args.where.OR).toHaveLength(6);
+    const json = JSON.stringify(args.where.OR);
+    expect(json).toContain('"items"');
+    expect(json).toContain('"articleCode"');
   });
 
   it("applies status filter only when in allow-list", async () => {
@@ -166,11 +177,11 @@ describe("GET /api/v1/manager/orders", () => {
     mockPrisma.order.findMany.mockResolvedValueOnce([]);
     mockPrisma.order.count.mockResolvedValueOnce(0);
 
-    await GET(req("?status=approved"));
+    await GET(req("?status=sent"));
     const args = mockPrisma.order.findMany.mock.calls[0]?.[0] as {
       where: { status?: string };
     };
-    expect(args.where.status).toBe("approved");
+    expect(args.where.status).toBe("sent");
   });
 
   it("ignores invalid status value", async () => {
@@ -218,6 +229,53 @@ describe("GET /api/v1/manager/orders", () => {
       take: number;
     };
     expect(args.take).toBe(10);
+  });
+
+  it("hides archived by default (where.archived = false)", async () => {
+    getCurrentUserMock.mockResolvedValueOnce(ADMIN);
+    mockPrisma.order.findMany.mockResolvedValueOnce([]);
+    mockPrisma.order.count.mockResolvedValueOnce(0);
+
+    await GET(req());
+    const args = mockPrisma.order.findMany.mock.calls[0]?.[0] as {
+      where: { archived?: boolean };
+    };
+    expect(args.where.archived).toBe(false);
+  });
+
+  it("showArchived=true lifts archived constraint", async () => {
+    getCurrentUserMock.mockResolvedValueOnce(ADMIN);
+    mockPrisma.order.findMany.mockResolvedValueOnce([]);
+    mockPrisma.order.count.mockResolvedValueOnce(0);
+
+    await GET(req("?showArchived=true"));
+    const args = mockPrisma.order.findMany.mock.calls[0]?.[0] as {
+      where: { archived?: boolean };
+    };
+    expect(args.where.archived).toBeUndefined();
+  });
+
+  it("response row includes city / isActual / archived", async () => {
+    getCurrentUserMock.mockResolvedValueOnce(ADMIN);
+    mockPrisma.order.findMany.mockResolvedValueOnce([
+      fakeOrder("ord1", "000000123"),
+    ]);
+    mockPrisma.order.count.mockResolvedValueOnce(1);
+
+    const res = await GET(req());
+    const json = (await res.json()) as {
+      items: Array<{
+        isActual: boolean;
+        archived: boolean;
+        customer: { city: string | null };
+        createdAt: string;
+      }>;
+    };
+    const row = json.items[0];
+    expect(row?.customer.city).toBe("Луцьк");
+    expect(row?.isActual).toBe(true);
+    expect(row?.archived).toBe(false);
+    expect(typeof row?.createdAt).toBe("string");
   });
 });
 

@@ -45,6 +45,22 @@ describe("parseOrdersFilterFromSearchParams", () => {
     const s = parseOrdersFilterFromSearchParams({ clientCode1C: "000001" });
     expect(s.clientCode1C).toBe("000001");
   });
+
+  it("defaults showArchived to false (archived hidden)", () => {
+    expect(parseOrdersFilterFromSearchParams({}).showArchived).toBe(false);
+  });
+
+  it("parses showArchived=true", () => {
+    expect(
+      parseOrdersFilterFromSearchParams({ showArchived: "true" }).showArchived,
+    ).toBe(true);
+  });
+
+  it("treats non-'true' showArchived as false", () => {
+    expect(
+      parseOrdersFilterFromSearchParams({ showArchived: "1" }).showArchived,
+    ).toBe(false);
+  });
 });
 
 describe("ordersFilterToQueryString", () => {
@@ -69,6 +85,15 @@ describe("ordersFilterToQueryString", () => {
   it("encodes clientCode1C", () => {
     const qs = ordersFilterToQueryString({ clientCode1C: "000001" });
     expect(qs).toContain("clientCode1C=000001");
+  });
+
+  it("emits showArchived only when true", () => {
+    expect(ordersFilterToQueryString({ showArchived: false })).not.toContain(
+      "showArchived",
+    );
+    expect(ordersFilterToQueryString({ showArchived: true })).toContain(
+      "showArchived=true",
+    );
   });
 });
 

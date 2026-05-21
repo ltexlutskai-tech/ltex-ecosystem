@@ -9,6 +9,8 @@ export interface OrdersFilterState {
   from: string;
   to: string;
   clientCode1C: string;
+  /** Показувати архівні (проведені в 1С). Дефолт false — архівні приховані. */
+  showArchived: boolean;
   page: number;
   pageSize: number;
 }
@@ -37,6 +39,7 @@ export function parseOrdersFilterFromSearchParams(
   const from = pickString(sp.from) ?? "";
   const to = pickString(sp.to) ?? "";
   const clientCode1C = pickString(sp.clientCode1C) ?? "";
+  const showArchived = pickString(sp.showArchived) === "true";
 
   const pageStr = pickString(sp.page) ?? "";
   const pageSizeStr = pickString(sp.pageSize) ?? "";
@@ -49,7 +52,16 @@ export function parseOrdersFilterFromSearchParams(
       ? pageSizeNum
       : 20;
 
-  return { search, status, from, to, clientCode1C, page, pageSize };
+  return {
+    search,
+    status,
+    from,
+    to,
+    clientCode1C,
+    showArchived,
+    page,
+    pageSize,
+  };
 }
 
 export function ordersFilterToQueryString(
@@ -61,6 +73,7 @@ export function ordersFilterToQueryString(
   if (state.from) sp.set("from", state.from);
   if (state.to) sp.set("to", state.to);
   if (state.clientCode1C) sp.set("clientCode1C", state.clientCode1C);
+  if (state.showArchived) sp.set("showArchived", "true");
   if (state.page && state.page > 1) sp.set("page", String(state.page));
   if (state.pageSize && state.pageSize !== 20) {
     sp.set("pageSize", String(state.pageSize));

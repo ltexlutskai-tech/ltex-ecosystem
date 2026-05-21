@@ -1,9 +1,14 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Plus } from "lucide-react";
-import { Prisma, prisma } from "@ltex/db";
+import { prisma } from "@ltex/db";
 import { getCurrentUser } from "@/lib/auth/manager-auth";
 import { getMyClientCodes1C } from "@/lib/manager/order-ownership";
+import {
+  buildOrdersWhere,
+  orderRowInclude,
+  serializeOrderRow,
+} from "@/lib/manager/orders-list";
 import { EmptyState } from "../_components/empty-state";
 import { ListPagination } from "../customers/_components/list-pagination";
 import { OrdersTable } from "./_components/orders-table";
@@ -35,34 +40,18 @@ export default async function ManagerOrdersPage({
     return renderEmpty(filter.clientCode1C);
   }
 
-  const where: Prisma.OrderWhereInput = {};
+  const fromDate = filter.from ? new Date(filter.from) : undefined;
+  const toDate = filter.to ? new Date(filter.to) : undefined;
 
-  const customerWhere: Prisma.CustomerWhereInput = {};
-  if (myCodes !== null) customerWhere.code1C = { in: myCodes };
-  if (filter.clientCode1C) customerWhere.code1C = filter.clientCode1C;
-  if (Object.keys(customerWhere).length > 0) where.customer = customerWhere;
-
-  if (filter.search) {
-    where.OR = [
-      { code1C: { contains: filter.search, mode: "insensitive" } },
-      {
-        customer: { name: { contains: filter.search, mode: "insensitive" } },
-      },
-    ];
-  }
-
-  if (filter.status) where.status = filter.status;
-
-  if (filter.from || filter.to) {
-    const fromDate = filter.from ? new Date(filter.from) : null;
-    const toDate = filter.to ? new Date(filter.to) : null;
-    where.createdAt = {
-      ...(fromDate && !Number.isNaN(fromDate.getTime())
-        ? { gte: fromDate }
-        : {}),
-      ...(toDate && !Number.isNaN(toDate.getTime()) ? { lte: toDate } : {}),
-    };
-  }
+  const where = buildOrdersWhere({
+    customerCodes: myCodes,
+    clientCode1C: filter.clientCode1C || undefined,
+    q: filter.search,
+    status: filter.status,
+    from: fromDate && !Number.isNaN(fromDate.getTime()) ? fromDate : undefined,
+    to: toDate && !Number.isNaN(toDate.getTime()) ? toDate : undefined,
+    showArchived: filter.showArchived,
+  });
 
   const [items, total] = await Promise.all([
     prisma.order.findMany({
@@ -70,30 +59,14 @@ export default async function ManagerOrdersPage({
       orderBy: { createdAt: "desc" },
       skip: (filter.page - 1) * filter.pageSize,
       take: filter.pageSize,
-      include: {
-        customer: { select: { id: true, name: true, code1C: true } },
-        _count: { select: { items: true } },
-      },
+      include: orderRowInclude,
     }),
     prisma.order.count({ where }),
   ]);
 
   const totalPages = Math.max(1, Math.ceil(total / filter.pageSize));
 
-  const rows = items.map((o) => ({
-    id: o.id,
-    code1C: o.code1C,
-    status: o.status,
-    totalEur: o.totalEur,
-    totalUah: o.totalUah,
-    itemCount: o._count.items,
-    createdAt: o.createdAt,
-    customer: {
-      id: o.customer.id,
-      name: o.customer.name,
-      code1C: o.customer.code1C,
-    },
-  }));
+  const rows = items.map((o) => serializeOrderRow(o));
 
   return (
     <div className="mx-auto max-w-7xl space-y-4">

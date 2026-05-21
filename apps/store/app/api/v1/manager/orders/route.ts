@@ -3,13 +3,13 @@ import { Prisma, prisma } from "@ltex/db";
 import { getCurrentUser } from "@/lib/auth/manager-auth";
 import { getMyClientCodes1C } from "@/lib/manager/order-ownership";
 import {
-  ORDER_STATUS_LIST,
-  type OrderStatus,
-} from "@/lib/manager/order-status";
+  buildOrdersWhere,
+  normalizeOrderStatus,
+  orderRowInclude,
+  serializeOrderRow,
+} from "@/lib/manager/orders-list";
 import { createOrderSchema } from "@/lib/validations/manager-order";
 import { createOrderWithItems } from "@/lib/manager/order-create";
-
-const ORDER_STATUS_SET: Set<string> = new Set(ORDER_STATUS_LIST);
 
 function parseInteger(
   raw: string | null,
@@ -37,56 +37,38 @@ export async function GET(req: NextRequest) {
 
   const url = new URL(req.url);
   const search = url.searchParams.get("search")?.trim() ?? "";
-  const statusRaw = url.searchParams.get("status")?.trim() ?? "";
-  const status: OrderStatus | "" = ORDER_STATUS_SET.has(statusRaw)
-    ? (statusRaw as OrderStatus)
-    : "";
+  const status = normalizeOrderStatus(
+    url.searchParams.get("status")?.trim() ?? "",
+  );
   const from = parseDate(url.searchParams.get("from"));
   const to = parseDate(url.searchParams.get("to"));
   const clientCode1C = url.searchParams.get("clientCode1C")?.trim() ?? "";
+  const showArchived = url.searchParams.get("showArchived") === "true";
   const page = parseInteger(url.searchParams.get("page"), 1, 1, 9_999);
   const pageSize = parseInteger(url.searchParams.get("pageSize"), 20, 10, 100);
-
-  const where: Prisma.OrderWhereInput = {};
-  const customerWhere: Prisma.CustomerWhereInput = {};
 
   // Visibility scope (manager → тільки свої клієнти)
   const myCodes = await getMyClientCodes1C(user);
   if (myCodes !== null) {
+    // Manager без жодного призначеного клієнта → нічого не видно.
     if (myCodes.length === 0) {
       return NextResponse.json({ items: [], total: 0, page, pageSize });
     }
-    customerWhere.code1C = { in: myCodes };
-  }
-
-  // Optional clientCode1C scope (deeplink з картки клієнта)
-  if (clientCode1C) {
-    if (myCodes !== null && !myCodes.includes(clientCode1C)) {
+    // Deeplink по чужому клієнту → нічого не видно (не послаблюємо ownership).
+    if (clientCode1C && !myCodes.includes(clientCode1C)) {
       return NextResponse.json({ items: [], total: 0, page, pageSize });
     }
-    customerWhere.code1C = clientCode1C;
   }
 
-  if (Object.keys(customerWhere).length > 0) {
-    where.customer = customerWhere;
-  }
-
-  // Search by code1C OR customer.name
-  if (search) {
-    where.OR = [
-      { code1C: { contains: search, mode: "insensitive" } },
-      { customer: { name: { contains: search, mode: "insensitive" } } },
-    ];
-  }
-
-  if (status) where.status = status;
-
-  if (from || to) {
-    where.createdAt = {
-      ...(from ? { gte: from } : {}),
-      ...(to ? { lte: to } : {}),
-    };
-  }
+  const where = buildOrdersWhere({
+    customerCodes: myCodes,
+    clientCode1C: clientCode1C || undefined,
+    q: search,
+    status,
+    from,
+    to,
+    showArchived,
+  });
 
   const [items, total] = await Promise.all([
     prisma.order.findMany({
@@ -94,29 +76,19 @@ export async function GET(req: NextRequest) {
       orderBy: { createdAt: "desc" },
       skip: (page - 1) * pageSize,
       take: pageSize,
-      include: {
-        customer: { select: { id: true, name: true, code1C: true } },
-        _count: { select: { items: true } },
-      },
+      include: orderRowInclude,
     }),
     prisma.order.count({ where }),
   ]);
 
   return NextResponse.json({
-    items: items.map((o) => ({
-      id: o.id,
-      code1C: o.code1C,
-      status: o.status,
-      totalEur: o.totalEur,
-      totalUah: o.totalUah,
-      itemCount: o._count.items,
-      createdAt: o.createdAt.toISOString(),
-      customer: {
-        id: o.customer.id,
-        name: o.customer.name,
-        code1C: o.customer.code1C,
-      },
-    })),
+    items: items.map((o) => {
+      const row = serializeOrderRow(o);
+      return {
+        ...row,
+        createdAt: row.createdAt.toISOString(),
+      };
+    }),
     total,
     page,
     pageSize,

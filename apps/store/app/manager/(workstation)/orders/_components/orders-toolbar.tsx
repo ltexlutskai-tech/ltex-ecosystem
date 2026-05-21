@@ -20,6 +20,7 @@ export function OrdersToolbar() {
   const [to, setTo] = useState(searchParams.get("to") ?? "");
   const status = searchParams.get("status") ?? "";
   const clientCode1C = searchParams.get("clientCode1C") ?? "";
+  const showArchived = searchParams.get("showArchived") === "true";
 
   useEffect(() => {
     setSearch(searchParams.get("search") ?? "");
@@ -70,7 +71,7 @@ export function OrdersToolbar() {
               type="search"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Пошук за № або іменем клієнта…"
+              placeholder="Пошук за №, клієнтом або товаром (артикул/назва)…"
               className="pl-8"
             />
           </div>
@@ -121,7 +122,19 @@ export function OrdersToolbar() {
           />
         </div>
 
-        {(search || status || from || to || clientCode1C) && (
+        <label className="flex items-center gap-1.5 whitespace-nowrap text-sm text-gray-700">
+          <input
+            type="checkbox"
+            checked={showArchived}
+            onChange={(e) =>
+              setParam("showArchived", e.target.checked ? "true" : null)
+            }
+            className="h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
+          />
+          Відображати архівні
+        </label>
+
+        {(search || status || from || to || clientCode1C || showArchived) && (
           <Button
             type="button"
             variant="ghost"
