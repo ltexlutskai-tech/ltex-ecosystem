@@ -2,18 +2,26 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { Button, useToast } from "@ltex/ui";
+import { Button } from "@ltex/ui";
 import {
   formatRemainingDisplay,
   priceTypeLabel,
 } from "@/lib/manager/product-card";
 import type { ProductCardVM, ProductLotVM } from "../_lib/load-product";
 import { LotCardModal } from "./lot-card-modal";
+import { OrderVideoButton } from "./order-video-button";
+import { ShareSheet } from "./share-sheet";
 
 const SITE_BASE = "https://new.ltex.com.ua";
 
 interface Props {
   product: ProductCardVM;
+  /** Готовий рекламний текст товара (зібраний на сервері з курсом EUR). */
+  productShareText: string;
+  /** Курс EUR → UAH (для share-тексту лотів, будується у картці лоту). */
+  rateUah: number;
+  /** ПІБ поточного менеджера (продавець у запиті «Замовити відео»). */
+  sellerName: string;
 }
 
 function formatAmount(amount: number, currency: string): string {
@@ -31,11 +39,16 @@ function formatDate(iso: string | null): string {
   });
 }
 
-export function ProductCardView({ product }: Props) {
-  const { toast } = useToast();
+export function ProductCardView({
+  product,
+  productShareText,
+  rateUah,
+  sellerName,
+}: Props) {
   const [showAsPieces, setShowAsPieces] = useState(false);
   const [activeImage, setActiveImage] = useState(0);
   const [openLotId, setOpenLotId] = useState<string | null>(null);
+  const [shareOpen, setShareOpen] = useState(false);
 
   const { lotStats } = product;
   const remaining = formatRemainingDisplay({
@@ -141,15 +154,15 @@ export function ProductCardView({ product }: Props) {
               type="button"
               variant="outline"
               size="sm"
-              onClick={() =>
-                toast({
-                  title: "Замовити відео",
-                  description: "З'явиться у наступному етапі (Етап 5).",
-                })
-              }
+              onClick={() => setShareOpen(true)}
             >
-              Замовити відео
+              Поділитися
             </Button>
+            <OrderVideoButton
+              productName={product.name}
+              articleCode={product.articleCode}
+              sellerName={sellerName}
+            />
           </div>
         </div>
       </div>
@@ -234,7 +247,19 @@ export function ProductCardView({ product }: Props) {
         </p>
       </div>
 
-      <LotCardModal lotId={openLotId} onClose={() => setOpenLotId(null)} />
+      <LotCardModal
+        lotId={openLotId}
+        onClose={() => setOpenLotId(null)}
+        rateUah={rateUah}
+        sellerName={sellerName}
+      />
+
+      <ShareSheet
+        open={shareOpen}
+        onOpenChange={setShareOpen}
+        title="Поділитися товаром"
+        text={productShareText}
+      />
     </div>
   );
 }

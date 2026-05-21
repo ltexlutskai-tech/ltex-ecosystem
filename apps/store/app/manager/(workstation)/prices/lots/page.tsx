@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/manager-auth";
+import { getCurrentRate } from "@/lib/exchange-rate";
 import type {
   LotsListSort,
   LotsListSortDir,
@@ -29,7 +30,7 @@ export default async function AllLotsPage({
   const status: LotsListStatus = pickStatus(sp.status);
   const productId = pickString(sp.productId);
 
-  const [list, productLabel] = await Promise.all([
+  const [list, productLabel, rateUah] = await Promise.all([
     loadAllLots({
       q: pickString(sp.q),
       productId,
@@ -44,6 +45,7 @@ export default async function AllLotsPage({
       viewerUserId: user.id,
     }),
     productId ? loadProductLabel(productId) : Promise.resolve(null),
+    getCurrentRate(),
   ]);
 
   return (
@@ -59,7 +61,11 @@ export default async function AllLotsPage({
       </header>
 
       <AllLotsToolbar totalCount={list.total} productLabel={productLabel} />
-      <AllLotsList groups={list.groups} />
+      <AllLotsList
+        groups={list.groups}
+        rateUah={rateUah}
+        sellerName={user.fullName}
+      />
       <AllLotsPagination page={list.page} totalPages={list.totalPages} />
     </div>
   );

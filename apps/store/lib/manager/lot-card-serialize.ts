@@ -1,4 +1,34 @@
+import { Prisma } from "@ltex/db";
 import { isActiveReservation } from "@/lib/manager/lot-booking";
+import {
+  BASE_PRICE_TYPE,
+  SALE_PRICE_TYPE,
+  newProductCutoff,
+} from "@/lib/manager/prices";
+
+/**
+ * Спільний Prisma `include` для картки лоту (GET / book / unbook). Тримаємо в
+ * одному місці щоб усі endpoint-и віддавали узгоджену форму (зокрема дані
+ * товара для share-тексту Stage 5a).
+ */
+export const lotCardInclude = {
+  product: {
+    select: {
+      id: true,
+      name: true,
+      slug: true,
+      articleCode: true,
+      description: true,
+      videoUrl: true,
+      createdAt: true,
+      prices: {
+        where: { priceType: { in: [BASE_PRICE_TYPE, SALE_PRICE_TYPE] } },
+        select: { priceType: true, amount: true },
+      },
+    },
+  },
+  barcodes: { select: { id: true, code: true, type: true } },
+} satisfies Prisma.LotInclude;
 
 /**
  * Manager «Прайс» — спільна серіалізація картки лоту (GET / book / unbook
@@ -27,8 +57,52 @@ export interface LotCardSource {
   reservedByUserId: string | null;
   reservedByName: string | null;
   reservedUntil: Date | null;
-  product: { id: string; name: string; slug: string };
+  /**
+   * Товар-власник + його дані для рекламного тексту «Поділитися» (Stage 5a):
+   * артикул / опис / ціни (базова + акційна) / дата створення (для «новинки») /
+   * відео-URL.
+   */
+  product: {
+    id: string;
+    name: string;
+    slug: string;
+    articleCode: string | null;
+    description: string;
+    videoUrl: string | null;
+    createdAt: Date;
+    prices: { priceType: string; amount: number }[];
+  };
   barcodes: { id: string; code: string; type: string }[];
+}
+
+/** Базова/акційна ціна (€/кг) товара для share-тексту. */
+function deriveSharestats(
+  product: LotCardSource["product"],
+  now: Date,
+): {
+  articleCode: string | null;
+  description: string;
+  basePriceEur: number | null;
+  salePriceEur: number | null;
+  isNew: boolean;
+  videoUrl: string | null;
+} {
+  const prices = product.prices ?? [];
+  const base = prices.find((p) => p.priceType === BASE_PRICE_TYPE);
+  const sale = prices.find((p) => p.priceType === SALE_PRICE_TYPE);
+  const basePriceEur = base ? base.amount : null;
+  const salePriceEur =
+    sale && (basePriceEur === null || sale.amount < basePriceEur)
+      ? sale.amount
+      : null;
+  return {
+    articleCode: product.articleCode,
+    description: product.description,
+    basePriceEur,
+    salePriceEur,
+    isNew: product.createdAt.getTime() >= newProductCutoff(now).getTime(),
+    videoUrl: product.videoUrl,
+  };
 }
 
 export function serializeLotCard(
@@ -65,6 +139,8 @@ export function serializeLotCard(
       name: lot.product.name,
       slug: lot.product.slug,
     },
+    // ── Дані для рекламного тексту «Поділитися» (Stage 5a) ──
+    share: deriveSharestats(lot.product, now),
     // ── read-only (дані з 1С) ──
     barcode: lot.barcode,
     barcodes,

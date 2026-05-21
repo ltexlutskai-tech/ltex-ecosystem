@@ -7,6 +7,10 @@ import { LotCardModal } from "./lot-card-modal";
 
 interface Props {
   groups: LotGroup[];
+  /** Курс EUR → UAH (для share-тексту лота). */
+  rateUah: number;
+  /** ПІБ поточного менеджера (для «Замовити відео»). */
+  sellerName: string;
 }
 
 function formatDate(iso: string | null): string {
@@ -69,7 +73,7 @@ function BookingCell({ lot }: { lot: LotListItem }) {
   );
 }
 
-export function AllLotsList({ groups }: Props) {
+export function AllLotsList({ groups, rateUah, sellerName }: Props) {
   const [openLotId, setOpenLotId] = useState<string | null>(null);
 
   if (groups.length === 0) {
@@ -220,7 +224,12 @@ export function AllLotsList({ groups }: Props) {
       ))}
 
       {/* Картка лоту (Етап 3a) — перевикористана. */}
-      <LotCardModal lotId={openLotId} onClose={() => setOpenLotId(null)} />
+      <LotCardModal
+        lotId={openLotId}
+        onClose={() => setOpenLotId(null)}
+        rateUah={rateUah}
+        sellerName={sellerName}
+      />
     </div>
   );
 }

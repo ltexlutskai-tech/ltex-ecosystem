@@ -10,6 +10,11 @@ import {
   type PriceLine,
   type RawPrice,
 } from "@/lib/manager/product-card";
+import {
+  BASE_PRICE_TYPE,
+  SALE_PRICE_TYPE,
+  newProductCutoff,
+} from "@/lib/manager/prices";
 
 /**
  * Server loader для картки товару (`/manager/prices/[id]`).
@@ -68,6 +73,10 @@ export interface ProductCardVM {
   images: ProductImageVM[];
   /** Базова продажна ціна (wholesale) або null. */
   basePrice: PriceLine | null;
+  /** Акційна ціна €/кг (akciya, якщо < базової) — для share-тексту/бейджа. */
+  salePrice: number | null;
+  /** Товар створено за останні 14 днів («новинка») — для share-тексту/бейджа. */
+  isNew: boolean;
   /** Класифіковані ціни: продажні + постачальника. */
   prices: ClassifiedPrices;
   /** ✔ структуровані факти, тільки заповнені. */
@@ -92,6 +101,7 @@ export async function loadProductCard(
       slug: true,
       description: true,
       videoUrl: true,
+      createdAt: true,
       priceUnit: true,
       unitsPerKgMin: true,
       gender: true,
@@ -147,6 +157,16 @@ export async function loadProductCard(
     validFrom: p.validFrom,
   }));
 
+  // Базова/акційна ціна €/кг — для share-тексту й бейджа «АКЦІЯ».
+  const baseLine = basePriceOf(rawPrices);
+  const saleRaw = rawPrices.find((p) => p.priceType === SALE_PRICE_TYPE);
+  const baseRaw = rawPrices.find((p) => p.priceType === BASE_PRICE_TYPE);
+  const salePrice =
+    saleRaw && (!baseRaw || saleRaw.amount < baseRaw.amount)
+      ? saleRaw.amount
+      : null;
+  const isNew = product.createdAt.getTime() >= newProductCutoff(now).getTime();
+
   const lotStats = computeLotStats(
     product.lots.map((l) => ({
       weight: l.weight,
@@ -200,7 +220,9 @@ export async function loadProductCard(
     priceUnit: product.priceUnit,
     unitsPerKg: product.unitsPerKgMin,
     images: product.images.map((img) => ({ url: img.url, alt: img.alt })),
-    basePrice: basePriceOf(rawPrices),
+    basePrice: baseLine,
+    salePrice,
+    isNew,
     prices: classifyPrices(rawPrices),
     keyFacts: buildKeyFacts({
       gender: product.gender,

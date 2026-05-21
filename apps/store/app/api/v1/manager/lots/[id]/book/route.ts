@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { Prisma, prisma } from "@ltex/db";
+import { prisma } from "@ltex/db";
 import { getCurrentUser } from "@/lib/auth/manager-auth";
 import { bookLotSchema, canBook } from "@/lib/manager/lot-booking";
-import { serializeLotCard } from "@/lib/manager/lot-card-serialize";
+import {
+  lotCardInclude,
+  serializeLotCard,
+} from "@/lib/manager/lot-card-serialize";
 
 /**
  * Manager «Прайс» — Stage 4: POST /api/v1/manager/lots/[id]/book.
@@ -20,10 +23,7 @@ import { serializeLotCard } from "@/lib/manager/lot-card-serialize";
  * (без FK) — як 1С зберігає бронь рядком.
  */
 
-const lotInclude = {
-  product: { select: { id: true, name: true, slug: true } },
-  barcodes: { select: { id: true, code: true, type: true } },
-} satisfies Prisma.LotInclude;
+const lotInclude = lotCardInclude;
 
 function formatDateUkr(d: Date): string {
   return d.toLocaleDateString("uk-UA", {

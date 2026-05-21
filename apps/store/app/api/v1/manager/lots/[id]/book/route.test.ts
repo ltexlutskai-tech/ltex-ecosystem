@@ -16,7 +16,16 @@ const { mockPrisma, getCurrentUserMock, txState } = vi.hoisted(() => {
         return {
           ...baseLot,
           ...args.data,
-          product: { id: "p1", name: "Куртки", slug: "kurtky" },
+          product: {
+            id: "p1",
+            name: "Куртки",
+            slug: "kurtky",
+            articleCode: "AB-1",
+            description: "Опис",
+            videoUrl: null,
+            createdAt: new Date("2026-04-01"),
+            prices: [{ priceType: "wholesale", amount: 10 }],
+          },
           barcodes: [{ id: "bc1", code: baseLot.barcode, type: "EAN13" }],
         };
       }),

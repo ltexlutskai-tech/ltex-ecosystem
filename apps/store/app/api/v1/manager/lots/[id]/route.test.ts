@@ -76,7 +76,19 @@ const fakeLot = {
   reservedUntil: null,
   createdAt: new Date("2026-04-01"),
   updatedAt: new Date("2026-05-01"),
-  product: { id: "p1", name: "Куртки зимові", slug: "kurtky-zymovi" },
+  product: {
+    id: "p1",
+    name: "Куртки зимові",
+    slug: "kurtky-zymovi",
+    articleCode: "AB-1",
+    description: "Опис прайсу",
+    videoUrl: "https://youtu.be/prod",
+    createdAt: new Date("2026-04-01"),
+    prices: [
+      { priceType: "wholesale", amount: 10 },
+      { priceType: "akciya", amount: 8 },
+    ],
+  },
   barcodes: [
     { id: "bc1", code: "1234567890123", type: "EAN13" },
     { id: "bc2", code: "9999999999999", type: "EAN13" },

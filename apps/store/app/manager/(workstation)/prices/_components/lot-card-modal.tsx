@@ -12,12 +12,27 @@ import {
   Textarea,
   useToast,
 } from "@ltex/ui";
+import { buildProductShareText } from "@/lib/manager/share-message";
 import { ClientPicker } from "../../orders/new/_components/client-picker";
+import { OrderVideoButton } from "./order-video-button";
+import { ShareSheet } from "./share-sheet";
+
+/** Дані товара-власника для рекламного тексту «Поділитися» (Stage 5a). */
+interface LotShareInfo {
+  articleCode: string | null;
+  description: string;
+  basePriceEur: number | null;
+  salePriceEur: number | null;
+  isNew: boolean;
+  videoUrl: string | null;
+}
 
 /** Деталь лоту з GET /api/v1/manager/lots/[id]. */
 interface LotDetail {
   id: string;
   product: { id: string; name: string; slug: string };
+  /** Дані для share-тексту (товар-власник). */
+  share: LotShareInfo;
   barcode: string;
   barcodes: { id: string; code: string; type: string }[];
   weight: number;
@@ -54,6 +69,10 @@ interface Props {
   /** ID лоту або null коли модалка закрита. */
   lotId: string | null;
   onClose: () => void;
+  /** Курс EUR → UAH (для вартості лота в грн у share-тексті). */
+  rateUah: number;
+  /** ПІБ поточного менеджера (продавець у «Замовити відео»). */
+  sellerName: string;
 }
 
 function formatDate(iso: string | null): string {
@@ -84,7 +103,7 @@ function toEditState(lot: LotDetail): EditState {
   };
 }
 
-export function LotCardModal({ lotId, onClose }: Props) {
+export function LotCardModal({ lotId, onClose, rateUah, sellerName }: Props) {
   const { toast } = useToast();
   const router = useRouter();
   const [lot, setLot] = useState<LotDetail | null>(null);
@@ -92,6 +111,7 @@ export function LotCardModal({ lotId, onClose }: Props) {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [shareOpen, setShareOpen] = useState(false);
   // ── Бронь (Етап 4) ──
   const [bookingOpen, setBookingOpen] = useState(false);
   const [bookClientId, setBookClientId] = useState<string | null>(null);
@@ -478,7 +498,7 @@ export function LotCardModal({ lotId, onClose }: Props) {
 
             {/* ── Дії ── */}
             <div className="flex flex-wrap items-center justify-between gap-2 border-t pt-3">
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 {lot.videoUrl && (
                   <a
                     href={lot.videoUrl}
@@ -490,6 +510,19 @@ export function LotCardModal({ lotId, onClose }: Props) {
                     </Button>
                   </a>
                 )}
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShareOpen(true)}
+                >
+                  Поділитися
+                </Button>
+                <OrderVideoButton
+                  productName={lot.product.name}
+                  articleCode={lot.share.articleCode}
+                  sellerName={sellerName}
+                />
               </div>
               <div className="flex gap-2">
                 <Button
@@ -511,6 +544,23 @@ export function LotCardModal({ lotId, onClose }: Props) {
                 </Button>
               </div>
             </div>
+
+            <ShareSheet
+              open={shareOpen}
+              onOpenChange={setShareOpen}
+              title="Поділитися лотом"
+              text={buildProductShareText({
+                name: lot.product.name,
+                articleCode: lot.share.articleCode,
+                description: lot.share.description,
+                basePriceEur: lot.share.basePriceEur,
+                salePriceEur: lot.share.salePriceEur,
+                isNew: lot.share.isNew,
+                videoUrl: lot.share.videoUrl ?? lot.videoUrl,
+                lot: { weight: lot.weight, barcode: lot.barcode },
+                rateUah,
+              })}
+            />
           </div>
         )}
       </DialogContent>

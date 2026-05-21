@@ -3,6 +3,7 @@ import { Prisma, prisma } from "@ltex/db";
 import { getCurrentUser } from "@/lib/auth/manager-auth";
 import { lotPatchSchema, pickEditableLotData } from "@/lib/manager/lot-edit";
 import {
+  lotCardInclude,
   serializeLotCard,
   type LotCardSource,
 } from "@/lib/manager/lot-card-serialize";
@@ -19,10 +20,7 @@ import {
  *         будь-який залогінений менеджер.
  */
 
-const lotInclude = {
-  product: { select: { id: true, name: true, slug: true } },
-  barcodes: { select: { id: true, code: true, type: true } },
-} satisfies Prisma.LotInclude;
+const lotInclude = lotCardInclude;
 
 function serializeLot(lot: LotCardSource, viewerUserId: string, now: Date) {
   return serializeLotCard(lot, viewerUserId, now);
