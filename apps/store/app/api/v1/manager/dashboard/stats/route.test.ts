@@ -19,6 +19,9 @@ const { mockPrisma, getCurrentUserMock } = vi.hoisted(() => ({
     order: {
       count: vi.fn(),
     },
+    sale: {
+      count: vi.fn(),
+    },
   },
   getCurrentUserMock: vi.fn(),
 }));
@@ -71,6 +74,7 @@ beforeEach(() => {
     { currencyFrom: "USD", currencyTo: "UAH", rate: 44, date: new Date() },
   ]);
   mockPrisma.order.count.mockResolvedValue(0);
+  mockPrisma.sale.count.mockResolvedValue(0);
 });
 
 describe("GET /api/v1/manager/dashboard/stats", () => {
@@ -135,11 +139,28 @@ describe("GET /api/v1/manager/dashboard/stats", () => {
     expect(args.where.customer).toBeUndefined();
   });
 
-  it("skips order count when manager has 0 assigned clients", async () => {
+  it("skips order/sale count when manager has 0 assigned clients", async () => {
     mockPrisma.mgrClient.findMany.mockResolvedValueOnce([]);
     const res = await GET(makeReq());
-    const json = (await res.json()) as { sessionCounts: { orders: number } };
+    const json = (await res.json()) as {
+      sessionCounts: { orders: number; sales: number };
+    };
     expect(json.sessionCounts.orders).toBe(0);
+    expect(json.sessionCounts.sales).toBe(0);
     expect(mockPrisma.order.count).not.toHaveBeenCalled();
+    expect(mockPrisma.sale.count).not.toHaveBeenCalled();
+  });
+
+  it("returns real active (non-archived) sales count scoped to manager", async () => {
+    mockPrisma.sale.count.mockResolvedValueOnce(9);
+    const res = await GET(makeReq());
+    const json = (await res.json()) as { sessionCounts: { sales: number } };
+    expect(json.sessionCounts.sales).toBe(9);
+
+    const args = mockPrisma.sale.count.mock.calls[0]?.[0] as {
+      where: { archived?: boolean; customer?: { code1C?: { in?: string[] } } };
+    };
+    expect(args.where.archived).toBe(false);
+    expect(args.where.customer?.code1C?.in).toEqual(["000001", "000002"]);
   });
 });
