@@ -990,3 +990,21 @@ model MgrSyncJob {
   @@index([entityType, entityId])
   @@map("mgr_sync_jobs")
 }
+
+// ─── Manager message templates (M1.7 / Прайс Stage 5b) ──────────────────────
+// Простий довідник готових фраз {назва, текст} — відтворює 1С
+// Catalog.ШаблоныСообщений. Спільний для всіх менеджерів (як довідник 1С):
+// будь-який залогінений менеджер створює / редагує / видаляє шаблони і швидко
+// вставляє їх у вікно «Поділитися». `createdByUserId` — лише для інфо (без FK).
+
+model MgrMessageTemplate {
+  id              String   @id @default(cuid())
+  name            String
+  text            String
+  createdByUserId String?  @map("created_by_user_id")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@index([createdAt])
+  @@map("mgr_message_templates")
+}

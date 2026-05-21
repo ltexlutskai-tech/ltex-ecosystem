@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import {
   Button,
   Dialog,
@@ -16,6 +17,12 @@ import {
   viberShareUrl,
   whatsappShareUrl,
 } from "@/lib/manager/messenger-links";
+
+interface TemplateOption {
+  id: string;
+  name: string;
+  text: string;
+}
 
 /**
  * Manager «Прайс» — Stage 5a єдине вікно «Поділитися».
@@ -51,15 +58,64 @@ export function ShareSheet({ open, onOpenChange, title, text }: Props) {
   const [draft, setDraft] = useState(text);
   const [canShare, setCanShare] = useState(false);
 
+  // Шаблони повідомлень — лінива загрузка при першому відкритті списку.
+  const [templatesOpen, setTemplatesOpen] = useState(false);
+  const [templates, setTemplates] = useState<TemplateOption[] | null>(null);
+  const [templatesLoading, setTemplatesLoading] = useState(false);
+
   // Скидаємо текст при кожному новому відкритті.
   useEffect(() => {
-    if (open) setDraft(text);
+    if (open) {
+      setDraft(text);
+      setTemplatesOpen(false);
+    }
   }, [open, text]);
 
   // navigator.share доступне лише у браузері — перевіряємо після монтування.
   useEffect(() => {
     setCanShare(hasWebShare());
   }, []);
+
+  async function loadTemplates() {
+    setTemplatesLoading(true);
+    try {
+      const res = await fetch("/api/v1/manager/message-templates");
+      if (res.ok) {
+        const data = (await res.json()) as { templates: TemplateOption[] };
+        setTemplates(data.templates);
+      } else {
+        setTemplates([]);
+        toast({
+          title: "Не вдалося завантажити шаблони",
+          variant: "destructive",
+        });
+      }
+    } catch {
+      setTemplates([]);
+      toast({ title: "Помилка зʼєднання", variant: "destructive" });
+    } finally {
+      setTemplatesLoading(false);
+    }
+  }
+
+  function toggleTemplates() {
+    const next = !templatesOpen;
+    setTemplatesOpen(next);
+    // Фетчимо лише раз на сесію вікна.
+    if (next && templates === null && !templatesLoading) {
+      void loadTemplates();
+    }
+  }
+
+  function insertTemplate(t: TemplateOption) {
+    // Додаємо текст шаблону знизу (з порожнім рядком-розділювачем), щоб не
+    // затерти вже сформоване повідомлення.
+    setDraft((prev) =>
+      prev.trim() ? `${prev.trimEnd()}\n\n${t.text}` : t.text,
+    );
+    setTemplatesOpen(false);
+    toast({ title: "Шаблон додано", description: t.name });
+  }
 
   async function handleCopy() {
     try {
@@ -105,6 +161,55 @@ export function ShareSheet({ open, onOpenChange, title, text }: Props) {
             onChange={(e) => setDraft(e.target.value)}
             className="font-mono text-sm"
           />
+
+          <div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={toggleTemplates}
+            >
+              📝 Шаблони {templatesOpen ? "▴" : "▾"}
+            </Button>
+            {templatesOpen && (
+              <div className="mt-2 rounded-md border border-gray-200 bg-gray-50 p-2">
+                {templatesLoading ? (
+                  <p className="px-1 py-2 text-sm text-gray-500">
+                    Завантаження…
+                  </p>
+                ) : templates && templates.length > 0 ? (
+                  <ul className="max-h-48 space-y-1 overflow-y-auto">
+                    {templates.map((t) => (
+                      <li key={t.id}>
+                        <button
+                          type="button"
+                          onClick={() => insertTemplate(t)}
+                          className="w-full rounded px-2 py-1.5 text-left text-sm hover:bg-white"
+                        >
+                          <span className="font-medium text-gray-800">
+                            {t.name}
+                          </span>
+                          <span className="ml-2 line-clamp-1 text-xs text-gray-500">
+                            {t.text}
+                          </span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="px-1 py-2 text-sm text-gray-500">
+                    Немає шаблонів.{" "}
+                    <Link
+                      href="/manager/message-templates"
+                      className="text-blue-600 underline"
+                    >
+                      Створити шаблон
+                    </Link>
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
 
           <div className="flex flex-wrap gap-2">
             <Button type="button" size="sm" onClick={handleCopy}>

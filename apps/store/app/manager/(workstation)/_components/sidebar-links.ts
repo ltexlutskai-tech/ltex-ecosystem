@@ -3,6 +3,7 @@ import {
   BarChart3,
   Bell,
   ClipboardList,
+  FileText,
   FolderClock,
   Gift,
   Home,
@@ -37,6 +38,11 @@ export const SECONDARY_LINKS: readonly SidebarLink[] = [
     icon: Gift,
   },
   { href: "/manager/prices", label: "Прайс", icon: BarChart3 },
+  {
+    href: "/manager/message-templates",
+    label: "Шаблони повідомлень",
+    icon: FileText,
+  },
   { href: "/manager/reminders", label: "Нагадування", icon: Bell },
   {
     href: "/manager/closures",
