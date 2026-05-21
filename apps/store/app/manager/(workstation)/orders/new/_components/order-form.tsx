@@ -8,15 +8,27 @@ import { ItemsEditor, emptyDraft } from "./items-editor";
 import { OrderTotals } from "./order-totals";
 import { recalcLinePrice } from "@/lib/manager/order-pricing";
 import {
+  getAllowedStatusTransitions,
+  type ManagerOrderStatus,
+} from "@/lib/manager/order-status";
+import { OrderStatusBadge } from "../../../customers/[id]/_components/order-status-badge";
+import {
   draftToWire,
   type AgentOption,
   type ClientPickerItem,
   type OrderDeliveryOption,
+  type OrderEditInitial,
   type OrderItemDraft,
   type PriceTypeOption,
 } from "./types";
 
 export interface OrderFormProps {
+  /** Режим форми: створення нового замовлення чи редагування наявного. */
+  mode?: "create" | "edit";
+  /** id замовлення (обов'язковий у режимі edit — використовується у PATCH). */
+  orderId?: string;
+  /** Початкові значення замовлення для режиму edit. */
+  initialOrder?: OrderEditInitial | null;
   initialClientId?: string | null;
   initialClient?: ClientPickerItem | null;
   exchangeRate: number;
@@ -26,6 +38,13 @@ export interface OrderFormProps {
   currentUserId: string;
   currentUserName: string;
 }
+
+const STATUS_ACTION_LABEL: Record<ManagerOrderStatus, string> = {
+  draft: "Повернути в чернетку",
+  sent: "Відправити в 1С",
+  posted: "Провести в 1С",
+  cancelled: "Скасувати замовлення",
+};
 
 /**
  * Зіставляє код способу доставки клієнта (MgrDeliveryMethod.code, напр.
@@ -46,6 +65,9 @@ function mapClientDeliveryToOrder(
 }
 
 export function OrderForm({
+  mode = "create",
+  orderId,
+  initialOrder,
   initialClientId,
   initialClient,
   exchangeRate,
@@ -56,32 +78,53 @@ export function OrderForm({
   currentUserName,
 }: OrderFormProps) {
   const router = useRouter();
+  const isEdit = mode === "edit";
+
   const [clientId, setClientId] = useState<string | null>(
     initialClientId ?? null,
   );
   const [clientSummary, setClientSummary] = useState<ClientPickerItem | null>(
     initialClient ?? null,
   );
-  const [items, setItems] = useState<OrderItemDraft[]>([emptyDraft()]);
-  const [notes, setNotes] = useState("");
+  const [items, setItems] = useState<OrderItemDraft[]>(
+    initialOrder?.items?.length ? initialOrder.items : [emptyDraft()],
+  );
+  const [notes, setNotes] = useState(initialOrder?.notes ?? "");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // У режимі редагування — поточний статус + бажаний статус для збереження.
+  const [status, setStatus] = useState<string>(initialOrder?.status ?? "draft");
+
   // ─── Менеджерські поля (Етап 1) ───────────────────────────────────────────
   const [priceTypeId, setPriceTypeId] = useState<string>(
-    initialClient?.priceTypeId ?? priceTypes[0]?.id ?? "",
+    initialOrder?.priceTypeId ??
+      initialClient?.priceTypeId ??
+      priceTypes[0]?.id ??
+      "",
   );
   const [deliveryMethod, setDeliveryMethod] = useState<string>(
-    mapClientDeliveryToOrder(
-      initialClient?.deliveryMethodCode,
-      deliveryMethods,
-    ),
+    initialOrder?.deliveryMethod ??
+      mapClientDeliveryToOrder(
+        initialClient?.deliveryMethodCode,
+        deliveryMethods,
+      ),
   );
-  const [cashOnDelivery, setCashOnDelivery] = useState(false);
-  const [assignToAgent, setAssignToAgent] = useState(false);
-  const [assignedAgentUserId, setAssignedAgentUserId] =
-    useState<string>(currentUserId);
-  const [exportTo1C, setExportTo1C] = useState(true);
+  const [cashOnDelivery, setCashOnDelivery] = useState(
+    initialOrder?.cashOnDelivery ?? false,
+  );
+  const [assignToAgent, setAssignToAgent] = useState(
+    isEdit
+      ? !!initialOrder?.assignedAgentUserId &&
+          initialOrder.assignedAgentUserId !== currentUserId
+      : false,
+  );
+  const [assignedAgentUserId, setAssignedAgentUserId] = useState<string>(
+    initialOrder?.assignedAgentUserId ?? currentUserId,
+  );
+  const [exportTo1C, setExportTo1C] = useState(
+    initialOrder?.exportTo1C ?? true,
+  );
 
   const priceTypeCode =
     priceTypes.find((p) => p.id === priceTypeId)?.code ?? null;
@@ -144,32 +187,46 @@ export function OrderForm({
   const itemsInvalid = wireItems.some(
     (i) => !i.productId || i.weight <= 0 || i.quantity <= 0,
   );
+  // У create клієнт обов'язковий; у edit він фіксований (не міняємо).
   const canSubmit =
-    !!clientId && wireItems.length > 0 && !itemsInvalid && !submitting;
+    (isEdit || !!clientId) &&
+    wireItems.length > 0 &&
+    !itemsInvalid &&
+    !submitting;
 
   const clientDebt = clientSummary
     ? Number.parseFloat(clientSummary.debt)
     : null;
 
-  async function submit(): Promise<void> {
-    if (!clientId) return;
+  const allowedTransitions = getAllowedStatusTransitions(status);
+
+  /**
+   * Зберігає замовлення (POST у create, PATCH у edit). Опційний `nextStatus`
+   * (тільки edit) — змінює статус разом зі збереженням шапки/товарів.
+   */
+  async function submit(nextStatus?: ManagerOrderStatus): Promise<void> {
+    if (!isEdit && !clientId) return;
+    if (isEdit && !orderId) return;
     setSubmitting(true);
     setError(null);
     try {
-      const res = await fetch("/api/v1/manager/orders", {
-        method: "POST",
+      const payloadAgent = assignToAgent ? assignedAgentUserId : currentUserId;
+      const url = isEdit
+        ? `/api/v1/manager/orders/${orderId}`
+        : "/api/v1/manager/orders";
+      const res = await fetch(url, {
+        method: isEdit ? "PATCH" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          customerId: clientId,
+          ...(isEdit ? {} : { customerId: clientId }),
           items: wireItems,
-          notes: notes.trim() || undefined,
+          notes: notes.trim() || (isEdit ? null : undefined),
           priceTypeId: priceTypeId || null,
           deliveryMethod: deliveryMethod || null,
           cashOnDelivery,
-          assignedAgentUserId: assignToAgent
-            ? assignedAgentUserId
-            : currentUserId,
+          assignedAgentUserId: payloadAgent,
           exportTo1C,
+          ...(isEdit && nextStatus ? { status: nextStatus } : {}),
         }),
       });
       if (!res.ok) {
@@ -177,6 +234,11 @@ export function OrderForm({
           error?: string;
         };
         setError(errBody.error ?? `Помилка ${res.status}`);
+        return;
+      }
+      if (isEdit) {
+        if (nextStatus) setStatus(nextStatus);
+        router.refresh();
         return;
       }
       const order = (await res.json()) as { id: string };
@@ -190,11 +252,60 @@ export function OrderForm({
 
   return (
     <div className="space-y-6">
-      <ClientPicker
-        value={clientId}
-        onChange={onClientChange}
-        initialSummary={clientSummary}
-      />
+      {isEdit ? (
+        <div className="space-y-2">
+          <label className="text-sm font-medium text-gray-700">Клієнт</label>
+          <div className="flex items-center justify-between rounded-lg border bg-gray-50 p-3">
+            <div>
+              <div className="font-medium text-gray-900">
+                {clientSummary?.name ?? "—"}
+              </div>
+              <div className="text-xs text-gray-500">
+                {clientSummary?.city ?? ""}{" "}
+                {clientSummary?.code1C ? `· ${clientSummary.code1C}` : ""}
+              </div>
+            </div>
+            <span className="text-xs text-gray-400">Клієнт не змінюється</span>
+          </div>
+        </div>
+      ) : (
+        <ClientPicker
+          value={clientId}
+          onChange={onClientChange}
+          initialSummary={clientSummary}
+        />
+      )}
+
+      {/* ─── Статус (тільки edit) ─────────────────────────────────────────── */}
+      {isEdit && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-white p-4">
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-gray-500">Статус:</span>
+            <OrderStatusBadge status={status} />
+          </div>
+          {allowedTransitions.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {allowedTransitions.map((next) => (
+                <Button
+                  key={next}
+                  type="button"
+                  size="sm"
+                  variant={next === "cancelled" ? "outline" : "default"}
+                  disabled={submitting}
+                  onClick={() => submit(next)}
+                  className={
+                    next === "cancelled"
+                      ? "border-red-300 text-red-600 hover:bg-red-50"
+                      : ""
+                  }
+                >
+                  {STATUS_ACTION_LABEL[next]}
+                </Button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {clientSummary && clientDebt !== null && clientDebt > 0 && (
         <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
@@ -353,7 +464,13 @@ export function OrderForm({
         <Button
           type="button"
           variant="outline"
-          onClick={() => router.push("/manager/orders")}
+          onClick={() =>
+            router.push(
+              isEdit && orderId
+                ? `/manager/orders/${orderId}`
+                : "/manager/orders",
+            )
+          }
           disabled={submitting}
         >
           Скасувати
@@ -361,10 +478,16 @@ export function OrderForm({
         <Button
           type="button"
           disabled={!canSubmit}
-          onClick={submit}
+          onClick={() => submit()}
           className="bg-green-600 text-white hover:bg-green-700"
         >
-          {submitting ? "Створення…" : "Створити замовлення"}
+          {submitting
+            ? isEdit
+              ? "Збереження…"
+              : "Створення…"
+            : isEdit
+              ? "Зберегти зміни"
+              : "Створити замовлення"}
         </Button>
       </div>
     </div>

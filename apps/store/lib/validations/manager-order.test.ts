@@ -1,5 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { createOrderSchema, orderItemInputSchema } from "./manager-order";
+import {
+  createOrderSchema,
+  orderItemInputSchema,
+  updateOrderSchema,
+} from "./manager-order";
 
 describe("orderItemInputSchema", () => {
   it("accepts lot-bound item з lotId", () => {
@@ -145,5 +149,52 @@ describe("createOrderSchema", () => {
       deliveryMethod: "teleport",
     });
     expect(result.success).toBe(false);
+  });
+});
+
+describe("updateOrderSchema", () => {
+  it("accepts valid edit body без customerId", () => {
+    const result = updateOrderSchema.safeParse({
+      items: [{ productId: "p1", weight: 10, priceEur: 50 }],
+      notes: "оновлено",
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects empty items array", () => {
+    const result = updateOrderSchema.safeParse({ items: [] });
+    expect(result.success).toBe(false);
+  });
+
+  it("accepts notes=null (clear comment)", () => {
+    const result = updateOrderSchema.safeParse({
+      items: [{ productId: "p1", weight: 10, priceEur: 0 }],
+      notes: null,
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("accepts canonical status value", () => {
+    const result = updateOrderSchema.safeParse({
+      items: [{ productId: "p1", weight: 10, priceEur: 0 }],
+      status: "sent",
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects non-canonical / legacy status", () => {
+    const result = updateOrderSchema.safeParse({
+      items: [{ productId: "p1", weight: 10, priceEur: 0 }],
+      status: "delivered",
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("дефолти cashOnDelivery=false і exportTo1C=true", () => {
+    const result = updateOrderSchema.parse({
+      items: [{ productId: "p1", weight: 10, priceEur: 0 }],
+    });
+    expect(result.cashOnDelivery).toBe(false);
+    expect(result.exportTo1C).toBe(true);
   });
 });

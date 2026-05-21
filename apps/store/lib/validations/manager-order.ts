@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { ORDER_DELIVERY_CODES } from "@/lib/manager/order-delivery";
+import { MANAGER_ORDER_STATUSES } from "@/lib/manager/order-status";
 
 /**
  * Zod schema для POST /api/v1/manager/orders body.
@@ -42,7 +43,38 @@ export const createOrderSchema = z.object({
   exportTo1C: z.boolean().optional().default(true),
 });
 
+/**
+ * Zod schema для PATCH /api/v1/manager/orders/[id] body (Етап 2 — редагування).
+ *
+ * Той самий набір полів, що й `createOrderSchema` (повна заміна шапки + items),
+ * але без `customerId` (клієнт замовлення не змінюється при редагуванні) та з
+ * опційним `status` — дозволяє разом зі збереженням змінити статус документа
+ * (валідність переходу перевіряє endpoint через `isTransitionAllowed`).
+ */
+export const updateOrderSchema = z.object({
+  notes: z.string().max(2000).nullable().optional(),
+  exchangeRate: z.number().positive().max(1000).optional(),
+  items: z.array(orderItemInputSchema).min(1).max(200),
+
+  // ─── Manager order fields (← 1С Document.Заказ, Етап 1) ──────────────────
+  priceTypeId: z.string().min(1).nullable().optional(),
+  deliveryMethod: z
+    .enum(ORDER_DELIVERY_CODES as [string, ...string[]])
+    .nullable()
+    .optional(),
+  cashOnDelivery: z.boolean().optional().default(false),
+  assignedAgentUserId: z.string().min(1).nullable().optional(),
+  exportTo1C: z.boolean().optional().default(true),
+
+  // ─── Status (Етап 2) ──────────────────────────────────────────────────────
+  /** Бажаний наступний статус документа (валідність переходу — у endpoint). */
+  status: z.enum(MANAGER_ORDER_STATUSES).optional(),
+});
+
 export type OrderItemInput = z.infer<typeof orderItemInputSchema>;
 export type CreateOrderInput = z.infer<typeof createOrderSchema>;
 /** Pre-parse shape (defaults optional) — приймається `createOrderWithItems`. */
 export type CreateOrderInputRaw = z.input<typeof createOrderSchema>;
+export type UpdateOrderInput = z.infer<typeof updateOrderSchema>;
+/** Pre-parse shape (defaults optional) — приймається `updateOrderWithItems`. */
+export type UpdateOrderInputRaw = z.input<typeof updateOrderSchema>;

@@ -95,3 +95,19 @@ export function draftToWire(draft: OrderItemDraft): WireOrderItem | null {
     priceEur: draft.priceEur,
   };
 }
+
+/**
+ * Початкові значення замовлення для режиму редагування (Етап 2).
+ * Передаються з server-page детального замовлення.
+ */
+export interface OrderEditInitial {
+  id: string;
+  status: string;
+  notes: string;
+  priceTypeId: string | null;
+  deliveryMethod: string | null;
+  cashOnDelivery: boolean;
+  assignedAgentUserId: string | null;
+  exportTo1C: boolean;
+  items: OrderItemDraft[];
+}

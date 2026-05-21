@@ -1,13 +1,21 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const { mockPrisma, getCurrentRateMock, enqueueOrderCreateMock } = vi.hoisted(
-  () => ({
-    mockPrisma: {
-      order: { create: vi.fn() },
-    },
-    getCurrentRateMock: vi.fn(),
-    enqueueOrderCreateMock: vi.fn(),
-  }),
+  () => {
+    const tx = {
+      orderItem: { deleteMany: vi.fn() },
+      order: { update: vi.fn() },
+    };
+    return {
+      mockPrisma: {
+        order: { create: vi.fn(), update: tx.order.update },
+        orderItem: tx.orderItem,
+        $transaction: vi.fn(async (cb: (t: typeof tx) => unknown) => cb(tx)),
+      },
+      getCurrentRateMock: vi.fn(),
+      enqueueOrderCreateMock: vi.fn(),
+    };
+  },
 );
 
 vi.mock("@ltex/db", () => ({ prisma: mockPrisma }));
@@ -18,7 +26,11 @@ vi.mock("@/lib/sync/enqueue", () => ({
   enqueueOrderCreate: enqueueOrderCreateMock,
 }));
 
-import { createOrderWithItems } from "./order-create";
+import {
+  buildOrderTotals,
+  createOrderWithItems,
+  updateOrderWithItems,
+} from "./order-create";
 
 const baseCustomer = { id: "cust1", code1C: "000001", name: "Test" };
 const actor = { userId: "mgr-1" };
@@ -188,5 +200,114 @@ describe("createOrderWithItems", () => {
     expect(call.data.deliveryMethod).toBeNull();
     expect(call.data.cashOnDelivery).toBe(false);
     expect(call.data.exportTo1C).toBe(true);
+  });
+});
+
+describe("buildOrderTotals", () => {
+  it("обчислює totalEur=sum(priceEur), totalUah=total*rate, нормалізує items", () => {
+    const r = buildOrderTotals(
+      [
+        {
+          productId: "p1",
+          lotId: "l1",
+          weight: 25.5,
+          quantity: 1,
+          priceEur: 100,
+        },
+        { productId: "p2", weight: 10, quantity: 2, priceEur: 50 } as never,
+      ],
+      43,
+    );
+    expect(r.totalEur).toBe(150);
+    expect(r.totalUah).toBe(150 * 43);
+    expect(r.itemRows[0]?.lotId).toBe("l1");
+    // lotId undefined → null; quantity передано → 2
+    expect(r.itemRows[1]?.lotId).toBeNull();
+    expect(r.itemRows[1]?.quantity).toBe(2);
+  });
+});
+
+describe("updateOrderWithItems", () => {
+  function fakeUpdatedOrder(): unknown {
+    return {
+      id: "ord1",
+      code1C: null,
+      status: "sent",
+      totalEur: 150,
+      totalUah: 6450,
+      exchangeRate: 43,
+      notes: "оновлено",
+      customer: { id: "cust1", code1C: "000001", name: "Test" },
+      items: [
+        {
+          productId: "p1",
+          lotId: "l1",
+          priceEur: 100,
+          weight: 25.5,
+          quantity: 1,
+          product: { code1C: "C1" },
+          lot: { barcode: "B1" },
+        },
+        {
+          productId: "p2",
+          lotId: null,
+          priceEur: 50,
+          weight: 10,
+          quantity: 2,
+          product: { code1C: "C2" },
+          lot: null,
+        },
+      ],
+    };
+  }
+
+  it("замінює items (deleteMany + update.create) у транзакції + recalcs totals", async () => {
+    mockPrisma.order.update.mockResolvedValueOnce(fakeUpdatedOrder());
+    await updateOrderWithItems("ord1", baseInput, actor);
+
+    expect(mockPrisma.$transaction).toHaveBeenCalledOnce();
+    expect(mockPrisma.orderItem.deleteMany).toHaveBeenCalledWith({
+      where: { orderId: "ord1" },
+    });
+    const call = mockPrisma.order.update.mock.calls[0]?.[0] as {
+      where: { id: string };
+      data: { totalEur: number; totalUah: number; exchangeRate: number };
+    };
+    expect(call.where.id).toBe("ord1");
+    expect(call.data.totalEur).toBe(150);
+    expect(call.data.totalUah).toBe(150 * 43);
+  });
+
+  it("застосовує nextStatus коли переданий", async () => {
+    mockPrisma.order.update.mockResolvedValueOnce(fakeUpdatedOrder());
+    await updateOrderWithItems("ord1", baseInput, actor, {
+      nextStatus: "sent",
+    });
+    const call = mockPrisma.order.update.mock.calls[0]?.[0] as {
+      data: { status?: string };
+    };
+    expect(call.data.status).toBe("sent");
+  });
+
+  it("status undefined коли nextStatus не переданий (статус не чіпаємо)", async () => {
+    mockPrisma.order.update.mockResolvedValueOnce(fakeUpdatedOrder());
+    await updateOrderWithItems("ord1", baseInput, actor);
+    const call = mockPrisma.order.update.mock.calls[0]?.[0] as {
+      data: { status?: string };
+    };
+    expect(call.data.status).toBeUndefined();
+  });
+
+  it("викликає enqueueOrderCreate fire-and-forget після update", async () => {
+    mockPrisma.order.update.mockResolvedValueOnce(fakeUpdatedOrder());
+    await updateOrderWithItems("ord1", baseInput, actor);
+    expect(enqueueOrderCreateMock).toHaveBeenCalledOnce();
+  });
+
+  it("не падає коли enqueue throws — caller отримує order", async () => {
+    mockPrisma.order.update.mockResolvedValueOnce(fakeUpdatedOrder());
+    enqueueOrderCreateMock.mockRejectedValueOnce(new Error("queue down"));
+    const order = await updateOrderWithItems("ord1", baseInput, actor);
+    expect((order as { id: string }).id).toBe("ord1");
   });
 });
