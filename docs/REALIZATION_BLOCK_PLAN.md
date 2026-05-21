@@ -2,7 +2,7 @@
 
 > **Мета:** відтворити екран «Реалізація» (`Document.РеализацияТоваровУслуг`) зі старого 1С-додатку новим інтерфейсом у `/manager/sales/*`. Працюємо на гілці розробки, мерж у `main` — orchestrator.
 >
-> **Статус:** ЧЕРНЕТКА на ревʼю user-а. Аудит-основа: `docs/REALIZATION_BLOCK_AUDIT.md`.
+> **Статус:** ✅ Усі 5 етапів реалізовано (на гілці `claude/charming-cerf-4067W`, на ревʼю user-а). Аудит-основа: `docs/REALIZATION_BLOCK_AUDIT.md`. **⚠️ Перед deploy: `prisma migrate deploy`** (2 нові міграції: `20260525_mgr_sales`, `20260526_mgr_cash_orders`).
 >
 > **Тег у backlog:** M1.6. Маршрут `/manager/sales` (зараз stub `UnderConstruction`).
 >
@@ -120,7 +120,9 @@
 - API: `POST /api/v1/manager/cash-orders`, `GET /sales/[id]/cash-orders`.
 - **Примітка:** цей етап закриває ядро окремого блоку «Оплати/Каса» — узгодити, що далі він не дублюється.
 
-### Етап 5 — Обмін із 1С (sync) — НА ЕТАПІ ОБМІНІВ (наприкінці)
+### Етап 5 — Обмін із 1С (sync)
+
+> ✅ **ГОТОВО (каркас, mock).** Документ реалізації заведено в наявну чергу `MgrSyncJob` (`entityType=realization`), за зразком Замовлень: `enqueueSaleCreate` + `buildSaleCreatePayload` у `enqueue.ts`, fire-and-forget `enqueueSaleSyncSafe` у кінці `create/updateSaleWithItems` (best-effort, ніколи не ламає запис), `routeFor` case, маршрут `services/manager-sync` `POST /sync/realizations/:id` (mock + SOAP-гілки + ідемпотентність). Транспорт лишається mock. `docs/1C_SYNC_MODULES_SPEC.md` → новий §3.4 «СтворитиРеалізацію» (JSON-пакет + бізнес-ключі + BSL-чернетка). Sync касових ордерів — окремий follow-up. +17 тестів store (сьют **1417**), +6 manager-sync (**43**). **Реальний BSL — на загальному етапі обмінів.**
 
 - Каркас черги (`enqueueSaleCreate` + proxy route `sync-sales.ts` + `realization` у `SyncEntityType` — вже є) пишеться тут (fire-and-forget, як Замовлення). У Етапах 2-4 створення/редагування пишуть лише в нашу DB **без** enqueue.
 - **Реальний BSL** (JSON-шар на боці 1С, бо транспорт центральної — бінарний `ValueStorage`) — пишемо самі **наприкінці**, разом з усіма обмінами. Спека — у `docs/1C_SYNC_MODULES_SPEC.md` (додати розділ «СтворитиРеалізацію»).
