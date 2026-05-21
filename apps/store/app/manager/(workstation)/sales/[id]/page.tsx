@@ -20,6 +20,11 @@ import type {
 } from "../new/_components/sale-types";
 import { OrderStatusBadge } from "../../customers/[id]/_components/order-status-badge";
 import { SaleStatusActions } from "./_components/sale-status-actions";
+import { computeCashSummary } from "@/lib/manager/cash-order";
+import {
+  PaymentsPanel,
+  type CashOrderView,
+} from "./_components/payments-panel";
 
 export const dynamic = "force-dynamic";
 
@@ -100,28 +105,38 @@ export default async function ManagerSaleDetailPage({
   const editable = canEditSale(sale.status);
   const locked = isSaleLocked(sale.status);
 
-  const [priceTypeRows, agentRows, exchangeRateEur, exchangeRateUsd, mgr] =
-    await Promise.all([
-      prisma.mgrPriceType.findMany({ orderBy: { sortOrder: "asc" } }),
-      prisma.user.findMany({
-        where: { isActive: true },
-        orderBy: { fullName: "asc" },
-        select: { id: true, fullName: true },
-      }),
-      getCurrentRate(),
-      getUsdRate(),
-      sale.customer.code1C
-        ? prisma.mgrClient.findUnique({
-            where: { code1C: sale.customer.code1C },
-            select: {
-              debt: true,
-              phonePrimary: true,
-              street: true,
-              house: true,
-            },
-          })
-        : Promise.resolve(null),
-    ]);
+  const [
+    priceTypeRows,
+    agentRows,
+    exchangeRateEur,
+    exchangeRateUsd,
+    mgr,
+    cashOrders,
+  ] = await Promise.all([
+    prisma.mgrPriceType.findMany({ orderBy: { sortOrder: "asc" } }),
+    prisma.user.findMany({
+      where: { isActive: true },
+      orderBy: { fullName: "asc" },
+      select: { id: true, fullName: true },
+    }),
+    getCurrentRate(),
+    getUsdRate(),
+    sale.customer.code1C
+      ? prisma.mgrClient.findUnique({
+          where: { code1C: sale.customer.code1C },
+          select: {
+            debt: true,
+            phonePrimary: true,
+            street: true,
+            house: true,
+          },
+        })
+      : Promise.resolve(null),
+    prisma.mgrCashOrder.findMany({
+      where: { saleId: sale.id },
+      orderBy: { createdAt: "asc" },
+    }),
+  ]);
 
   const mgrAddress = mgr
     ? [mgr.street, mgr.house].filter(Boolean).join(", ") || null
@@ -201,6 +216,28 @@ export default async function ManagerSaleDetailPage({
 
   const date = new Date(sale.createdAt).toLocaleString("uk-UA");
 
+  // ─── Оплати (каса) ──────────────────────────────────────────────────────
+  const dueUah = Math.round(sale.totalEur * sale.exchangeRateEur);
+  const cashSummary = computeCashSummary({
+    dueUah,
+    orders: cashOrders,
+    rates: { eur: sale.exchangeRateEur, usd: sale.exchangeRateUsd },
+  });
+  const cashOrderViews: CashOrderView[] = cashOrders.map((o) => ({
+    id: o.id,
+    type: o.type,
+    amountUah: o.amountUah,
+    amountEur: o.amountEur,
+    amountUsd: o.amountUsd,
+    amountUahCashless: o.amountUahCashless,
+    changeCurrency: o.changeCurrency,
+    changeForId: o.changeForId,
+    bankAccount: o.bankAccount,
+    cashFlowArticle: o.cashFlowArticle,
+    comment: o.comment,
+    createdAt: o.createdAt.toISOString(),
+  }));
+
   return (
     <div className="mx-auto max-w-4xl space-y-6">
       <Link
@@ -243,6 +280,16 @@ export default async function ManagerSaleDetailPage({
           locked={locked}
         />
       )}
+
+      <PaymentsPanel
+        saleId={sale.id}
+        dueUah={dueUah}
+        rates={{ eur: sale.exchangeRateEur, usd: sale.exchangeRateUsd }}
+        cashOnDelivery={sale.cashOnDelivery}
+        codAmountUah={sale.codAmountUah}
+        summary={cashSummary}
+        orders={cashOrderViews}
+      />
     </div>
   );
 }

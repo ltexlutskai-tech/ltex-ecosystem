@@ -284,12 +284,46 @@ model Sale {
   createdAt           DateTime @default(now()) @map("created_at")
   updatedAt           DateTime @updatedAt @map("updated_at")
 
-  customer Customer   @relation(fields: [customerId], references: [id])
-  items    SaleItem[]
+  customer   Customer       @relation(fields: [customerId], references: [id])
+  items      SaleItem[]
+  cashOrders MgrCashOrder[]
 
   @@index([customerId])
   @@index([status])
   @@map("mgr_sales")
+}
+
+// ─── Cash orders / Каса (← 1С КассовыйОрдер, M1.6 Етап 4) ──────────────────
+// Повний касовий ордер: оплата у 3 валютах (грн/EUR/USD) + безнал грн,
+// авто-розрахунок здачі та авто-створення ордера-розходу (`type=expense`,
+// `changeForId` → прихідний ордер) коли здача > 0. Усі суми зберігаються
+// «сирими» по валюті; порівняння йдуть через грн за курсами Sale-знімка.
+
+model MgrCashOrder {
+  id                String   @id @default(cuid())
+  code1C            String?  @unique @map("code_1c")
+  saleId            String?  @map("sale_id")
+  type              String // income | expense (Приход/Расход)
+  amountUah         Float    @default(0) @map("amount_uah")
+  amountEur         Float    @default(0) @map("amount_eur")
+  amountUsd         Float    @default(0) @map("amount_usd")
+  amountUahCashless Float    @default(0) @map("amount_uah_cashless")
+  changeCurrency    String?  @map("change_currency") // UAH|EUR|USD (лише expense)
+  changeForId       String?  @map("change_for_id") // expense → його прихідний ордер
+  bankAccount       String?  @map("bank_account")
+  cashFlowArticle   String?  @map("cash_flow_article")
+  comment           String?
+  agentUserId       String?  @map("agent_user_id")
+  paidAt            DateTime @default(now()) @map("paid_at")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  sale      Sale?          @relation(fields: [saleId], references: [id], onDelete: SetNull)
+  changeFor MgrCashOrder?  @relation("CashOrderChange", fields: [changeForId], references: [id])
+  changes   MgrCashOrder[] @relation("CashOrderChange")
+
+  @@index([saleId])
+  @@map("mgr_cash_orders")
 }
 
 model SaleItem {
