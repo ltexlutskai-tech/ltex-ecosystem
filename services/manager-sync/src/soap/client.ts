@@ -11,6 +11,8 @@ import type {
   OrderCreateResult,
   PaymentCreateRequest,
   PaymentCreateResult,
+  RealizationCreateRequest,
+  RealizationCreateResult,
 } from "./types";
 
 /**
@@ -268,6 +270,98 @@ function normalizePaymentResult(parsed: unknown): PaymentCreateResult {
       ok: true,
       paymentCode1C:
         typeof obj.paymentCode1C === "string" ? obj.paymentCode1C : "",
+      errors: Array.isArray(obj.errors)
+        ? obj.errors.filter((e): e is string => typeof e === "string")
+        : [],
+    };
+  }
+  return {
+    ok: false,
+    errorCode: typeof obj.errorCode === "number" ? obj.errorCode : 4,
+    errorMessage:
+      typeof obj.errorMessage === "string" ? obj.errorMessage : "Unknown error",
+  };
+}
+
+// ─── M1.6 (Реалізація, Етап 5): realization SOAP wrapper ────────────────────
+
+/**
+ * Викликає 1С SOAP operation `СтворитиРеалізацію`.
+ * Mirror-ить `createOrderViaSoap` pattern — fetch + XML envelope + extract <return>.
+ *
+ * **NOT EXERCISED IN CI** — викликається тільки коли SYNC_MOCK_MODE=false.
+ */
+export async function createRealizationViaSoap(
+  req: RealizationCreateRequest,
+  config: SyncConfig,
+  fetchImpl: typeof fetch = fetch,
+): Promise<RealizationCreateResult> {
+  if (!config.onecUrl || !config.onecPassword) {
+    throw new Error(
+      "createRealizationViaSoap: ONEC_SOAP_URL / ONEC_SOAP_PASSWORD not configured",
+    );
+  }
+
+  const payloadJson = JSON.stringify(req.payload);
+  const envelope = buildSoapEnvelope({
+    operation: "СтворитиРеалізацію",
+    password: config.onecPassword,
+    idempotencyKey: req.idempotencyKey,
+    payloadJson,
+  });
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), config.onecTimeoutMs);
+
+  let response: Response;
+  try {
+    response = await fetchImpl(config.onecUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "text/xml; charset=utf-8",
+        SOAPAction: buildSoapAction("СтворитиРеалізацію"),
+      },
+      body: envelope,
+      signal: controller.signal,
+    });
+  } finally {
+    clearTimeout(timeout);
+  }
+
+  if (!response.ok) {
+    throw new Error(
+      `SOAP HTTP ${response.status}: ${await safeReadText(response)}`,
+    );
+  }
+
+  const bodyText = await response.text();
+  const returnText = extractSoapReturn(bodyText);
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(returnText);
+  } catch (err) {
+    throw new Error(
+      `SOAP response: invalid JSON у <return>: ${(err as Error).message}`,
+    );
+  }
+  return normalizeRealizationResult(parsed);
+}
+
+function normalizeRealizationResult(parsed: unknown): RealizationCreateResult {
+  if (!parsed || typeof parsed !== "object") {
+    throw new Error("SOAP response: <return> JSON is not an object");
+  }
+  const obj = parsed as Record<string, unknown>;
+  if (obj.ok === true) {
+    return {
+      ok: true,
+      realizationCode1C:
+        typeof obj.realizationCode1C === "string" ? obj.realizationCode1C : "",
+      realizationNumber:
+        typeof obj.realizationNumber === "string"
+          ? obj.realizationNumber
+          : undefined,
       errors: Array.isArray(obj.errors)
         ? obj.errors.filter((e): e is string => typeof e === "string")
         : [],
