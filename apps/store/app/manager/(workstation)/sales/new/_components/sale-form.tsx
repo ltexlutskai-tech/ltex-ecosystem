@@ -2,16 +2,23 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { MessageSquare, ListPlus } from "lucide-react";
+import { MessageSquare, ListPlus, Send, Users } from "lucide-react";
 import { Button, Textarea } from "@ltex/ui";
 import { ClientPicker } from "../../../orders/new/_components/client-picker";
 import { ProductPricePicker } from "../../../orders/new/_components/product-price-picker";
 import { OrderStatusBadge } from "../../../customers/[id]/_components/order-status-badge";
+import { ShareSheet } from "../../../prices/_components/share-sheet";
 import { SaleItemsEditor } from "./sale-items-editor";
 import { SaleTotals } from "./sale-totals";
 import { BarcodeInput } from "./barcode-input";
 import { unitPriceForType } from "@/lib/manager/order-pricing";
 import { bagWeightForQuantity } from "@/lib/manager/order-bag-weight";
+import {
+  buildClientSaleMessage,
+  buildGroupSaleMessage,
+  type SaleMessageInput,
+  type SaleMessageItem,
+} from "@/lib/manager/sale-message";
 import {
   getAllowedSaleTransitions,
   type ManagerSaleStatus,
@@ -127,6 +134,11 @@ export function SaleForm({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [barcodeError, setBarcodeError] = useState<string | null>(null);
+
+  // ─── Повідомлення (Viber/share) ─────────────────────────────────────────
+  const [shareOpen, setShareOpen] = useState(false);
+  const [shareTitle, setShareTitle] = useState("");
+  const [shareText, setShareText] = useState("");
 
   const [status, setStatus] = useState<string>(initialSale?.status ?? "draft");
 
@@ -400,6 +412,52 @@ export function SaleForm({
     .filter((i) => i.product)
     .reduce((s, i) => s + (i.priceEur || 0), 0);
   const codAmountUah = Math.round(totalEur * exchangeRateEur);
+
+  // Чи можна відправити повідомлення (мають бути позиції).
+  const hasItems = items.some((i) => i.product);
+
+  /** Зведений вхід для білдерів повідомлень з поточного стану форми. */
+  function buildMessageInput(): SaleMessageInput {
+    const messageItems: SaleMessageItem[] = items
+      .filter((i) => i.product)
+      .map((i) => ({
+        productName: i.product?.name ?? "",
+        articleCode: i.product?.articleCode ?? null,
+        barcode: i.barcode,
+        quantity: i.quantity,
+        weight: i.weight,
+        pricePerKg: i.pricePerKg,
+        priceEur: i.priceEur,
+      }));
+    return {
+      clientName: clientSummary?.name ?? "",
+      // ClientPickerItem не несе region — лишається опційним (необов'язкове поле).
+      region: null,
+      city: clientSummary?.city ?? null,
+      phone: clientSummary?.phone ?? null,
+      deliveryMethod: deliveryMethod || null,
+      novaPoshtaBranch: novaPoshtaBranch.trim() || null,
+      items: messageItems,
+      totalEur,
+      exchangeRateEur,
+      cashOnDelivery,
+      codAmountUah: cashOnDelivery ? codAmountUah : null,
+      notes: notes.trim() || null,
+      date: new Date(),
+    };
+  }
+
+  function openClientMessage(): void {
+    setShareTitle("Повідомлення контрагенту");
+    setShareText(buildClientSaleMessage(buildMessageInput()));
+    setShareOpen(true);
+  }
+
+  function openGroupMessage(): void {
+    setShareTitle("Повідомлення у групу");
+    setShareText(buildGroupSaleMessage(buildMessageInput()));
+    setShareOpen(true);
+  }
 
   return (
     <div className="space-y-5">
@@ -770,6 +828,39 @@ export function SaleForm({
         </div>
       </section>
 
+      {/* ─── Секція: Повідомлення (Viber/share) ──────────────────────────── */}
+      <section className="rounded-lg border bg-white p-5 shadow-sm">
+        <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-gray-500">
+          Повідомлення
+        </h2>
+        <div className="flex flex-wrap gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={!hasItems}
+            onClick={openClientMessage}
+          >
+            <Send className="mr-1 h-4 w-4" />
+            Контрагенту
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={!hasItems}
+            onClick={openGroupMessage}
+          >
+            <Users className="mr-1 h-4 w-4" />У групу
+          </Button>
+          {/* "У чат" (бот-вихідні) — TODO M1.8 */}
+        </div>
+        <p className="mt-2 text-xs text-gray-400">
+          Згенерувати текст і поділитися (Viber / Telegram / WhatsApp /
+          копіювати).
+        </p>
+      </section>
+
       {error && (
         <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
           {error}
@@ -811,6 +902,13 @@ export function SaleForm({
         onOpenChange={setPickerOpen}
         priceTypeCode={priceTypeCode}
         onAdd={onAddFromPicker}
+      />
+
+      <ShareSheet
+        open={shareOpen}
+        onOpenChange={setShareOpen}
+        title={shareTitle}
+        text={shareText}
       />
     </div>
   );
