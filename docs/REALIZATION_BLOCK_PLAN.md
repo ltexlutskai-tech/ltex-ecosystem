@@ -30,6 +30,7 @@
 Нові моделі (additive, магазину не заважають). Зразок — `Order`/`OrderItem` + `Payment`.
 
 ### `Realization` → таблиця `mgr_sales`
+
 - `id`, `code1C?` @unique, `docNumber` (auto-increment, відображається як «L…»/«000…»), `customerId` (FK Customer)
 - `status` (draft/sent/posted/cancelled, default draft), `archived` (=проведено в 1С), `isActual`
 - `totalEur`, `totalUah`, `exchangeRateEur` (КурсEUR), `exchangeRateUsd` (КурсUSD)
@@ -41,17 +42,20 @@
 - `createdAt`, `updatedAt`; relations: `customer`, `items`, `cashOrders`
 
 ### `RealizationItem` → таблиця `mgr_sale_items`
+
 - `id`, `realizationId` (FK Cascade), `productId` (FK Product), `lotId?` (FK Lot — заповнюється при скані)
 - `barcode?` (відсканований ШК), `pricePerKg` (ЦенаПродажиВес), `weight` (вага мішка), `quantity` (мішків)
 - `priceEur` (рядковий підсумок = pricePerKg × weight × quantity, як total — конвенція Замовлень)
 
 ### `MgrCashOrder` → таблиця `mgr_cash_orders` (повний касовий ордер)
+
 - `id`, `code1C?`, `realizationId?` (FK), `type` (income/expense — Приход/Расход)
 - `amountUah`, `amountEur`, `amountUsd`, `amountUahCashless` (безнал)
 - `changeForId?` (FK self — ордер-розхід посилається на прихідний при здачі)
 - `bankAccount?`, `cashFlowArticle?`, `comment?`, `agentUserId?`, `paidAt`, `createdAt`
 
 ### Sync
+
 - enum `SyncEntityType` += `realization` (+ за потреби `cash_order`). Additive міграція.
 
 **Міграція:** одна additive (`ADD COLUMN/CREATE TABLE IF NOT EXISTS`, idempotent) — за зразком `20260524_order_manager_fields`. **⚠️ Перед deploy: `prisma migrate deploy`.**
@@ -71,16 +75,22 @@
 ## 3. Етапи розробки
 
 ### Етап 1 — База + список Реалізацій
+
 **Менеджер бачить:** список як у 1С — заміна заглушки `/manager/sales`.
+
+> ✅ **ГОТОВО.** Моделі `Sale`/`SaleItem` (`mgr_sales`/`mgr_sale_items`) + additive idempotent міграція `20260525_mgr_sales` + `realization` у enum `SyncEntityType`. Сторінка `/manager/sales` — справжній список (Дата/Номер/Контрагент/Місто/Статус/Сума, пошук, фільтр статусу, «Відображати архівні», ownership — менеджер лише свої клієнти). Dashboard tile «Реалізація» — реальний count. Lib `sales-list.ts`/`sale-ownership.ts`/`sale-status.ts` (перевикористано `getMyClientCodes1C`). +50 тестів, сьют **1282 pass**, typecheck/prettier чисті. **⚠️ Перед deploy: `prisma migrate deploy`** (1 нова міграція). Касовий ордер (`MgrCashOrder`) — відкладено до Етапу 4 (без спекулятивної схеми).
+
 - Моделі + міграція (розділ 1) + enum sync.
 - Список: колонки **Дата+Номер**, **Контрагент**, **Місто**, **Сума** (+ Доставка, Торговий агент). Чекбокс **«Відображати архівні»** (за замовч. архівні приховані), пошук (клієнт + товари всередині), пагінація, ownership (менеджер свої / admin усі), архівні приглушені. Кнопка **«Додати»** → `/manager/sales/new`.
 - `sales-list.ts` (where-builder + серіалізатор), server-page + API ділять його.
 - Dashboard tile «Реалізація» — реальний count (зараз hardcode 0). Вкладка картки клієнта «Історія продаж» — підключити (читає реалізації клієнта).
 
 ### Етап 2 — Форма створення/редагування + товари (ШК + камера + підбір)
+
 **Менеджер бачить:** `/manager/sales/new` (+ редагована `[id]`).
+
 - **Шапка:** ClientPicker (підтягує тип цін / доставку / № НП / борг із MgrClient), **Тип цін** (зміна → перерахунок усіх рядків), **Доставка**, **№ відділення НП**, **Наложка** + авто-сума післяплати грн, **«На торгового контрагента»** (вибір агента, дефолт = агент клієнта), **«Вивантажувати в1С»**, **ТТН**, **Коментар**, знімок курсу EUR/USD.
-- **Товари:** 
+- **Товари:**
   - **Поле ШК** (ручний ввід + USB-сканер) + **камера** (`BarcodeDetector` API, fallback `@zxing/browser`) → `GET /lots/by-barcode` резолвить лот → товар+вага+ціна за кг (з типу цін), додає рядок зі **збереженим `lotId`** + перевірка дубля; бронь «не моя» → попередження.
   - **Підбір за прайсом** (`product-price-picker`) → загальна позиція (`lotId=null`).
   - Рядок: ред. ціна/кг, к-сть (мішків); read-only Ціна = ціна/кг×вага, Сума = Ціна×к-сть. Футер: к-сть + Сума (EUR+грн).
@@ -89,11 +99,14 @@
 - Форма параметризована (create+edit), як `OrderForm`.
 
 ### Етап 3 — Статуси + проведення + Viber
+
 - Статуси draft/sent/posted(архів)/cancelled (`sale-status.ts` — label/колір + граф переходів), posted-лок (409), редагована для draft/sent.
 - **Viber:** генерація тексту (клієнту / у групу — з артикулом/ШК/сектором/датою) + **ShareIcons** (Viber/Telegram/WhatsApp/копіювання) — патерн Прайсу. «У групу» у 1С вмикає експорт — у нас просто прапор. «У чат» (бот) — TODO M1.8.
 
 ### Етап 4 — Оплати (повний касовий ордер)
+
 **Менеджер бачить:** на Реалізації кнопки «Створити оплату» / «Відкрити оплати».
+
 - `MgrCashOrder`: форма оплати — суми в **грн/EUR/USD + безнал грн**, банк. рахунок, стаття руху коштів.
 - **Розрахунок здачі:** сума до оплати (з курсами EUR/USD) − отримано → здача; **якщо здача > 0 → авто-створення ордера-розходу** (`changeForId`).
 - **Борг** = сума реалізації − оплачено; підпис «Наложка:» коли післяплата.
@@ -102,6 +115,7 @@
 - **Примітка:** цей етап закриває ядро окремого блоку «Оплати/Каса» — узгодити, що далі він не дублюється.
 
 ### Етап 5 — Обмін із 1С (sync) — НА ЕТАПІ ОБМІНІВ (наприкінці)
+
 - Каркас черги (`enqueueRealizationCreate` + proxy route `sync-sales.ts`, mock) можна додати вже в Етапі 2/3 (fire-and-forget, як Замовлення).
 - **Реальний BSL** (JSON-шар на боці 1С, бо транспорт центральної — бінарний `ValueStorage`) — пишемо самі **наприкінці**, разом з усіма обмінами. Спека — у `docs/1C_SYNC_MODULES_SPEC.md` (додати розділ «СтворитиРеалізацію»).
 
