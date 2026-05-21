@@ -10,6 +10,10 @@ import {
 } from "@/lib/manager/orders-list";
 import { createOrderSchema } from "@/lib/validations/manager-order";
 import { createOrderWithItems } from "@/lib/manager/order-create";
+import {
+  resolveCustomerForOrder,
+  ResolveCustomerError,
+} from "@/lib/manager/resolve-customer";
 
 function parseInteger(
   raw: string | null,
@@ -111,12 +115,17 @@ export async function POST(req: NextRequest) {
   }
   const input = parsed.data;
 
-  const customer = await prisma.customer.findUnique({
-    where: { id: input.customerId },
-    select: { id: true, code1C: true, name: true },
-  });
-  if (!customer) {
-    return NextResponse.json({ error: "Клієнта не знайдено" }, { status: 404 });
+  // ClientPicker віддає MgrClient.id; Order.customerId — FK на Customer (інша
+  // модель). Резолвимо у Customer за спільним code1C (find-or-create), щоб
+  // уникнути FK-помилки «Клієнта не знайдено».
+  let customer;
+  try {
+    customer = await resolveCustomerForOrder(input.customerId);
+  } catch (err) {
+    if (err instanceof ResolveCustomerError) {
+      return NextResponse.json({ error: err.message }, { status: err.status });
+    }
+    throw err;
   }
 
   // Ownership check: manager — only own clients; admin — будь-кого

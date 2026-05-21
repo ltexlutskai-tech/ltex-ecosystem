@@ -8,6 +8,8 @@ const {
   mockPrisma,
   getCurrentUserMock,
   createOrderWithItemsMock,
+  resolveCustomerForOrderMock,
+  ResolveCustomerError,
   FakePrismaError,
 } = vi.hoisted(() => {
   class FakePrismaError extends Error {
@@ -15,6 +17,14 @@ const {
     constructor(code: string, message = "fake") {
       super(message);
       this.code = code;
+    }
+  }
+  class ResolveCustomerError extends Error {
+    status: number;
+    constructor(message: string, status = 400) {
+      super(message);
+      this.name = "ResolveCustomerError";
+      this.status = status;
     }
   }
   return {
@@ -25,6 +35,8 @@ const {
     },
     getCurrentUserMock: vi.fn(),
     createOrderWithItemsMock: vi.fn(),
+    resolveCustomerForOrderMock: vi.fn(),
+    ResolveCustomerError,
     FakePrismaError,
   };
 });
@@ -41,6 +53,11 @@ vi.mock("@/lib/auth/manager-auth", () => ({
 vi.mock("@/lib/manager/order-create", () => ({
   createOrderWithItems: (...args: unknown[]) =>
     createOrderWithItemsMock(...args),
+}));
+vi.mock("@/lib/manager/resolve-customer", () => ({
+  resolveCustomerForOrder: (...args: unknown[]) =>
+    resolveCustomerForOrderMock(...args),
+  ResolveCustomerError,
 }));
 
 import { GET, POST } from "./route";
@@ -320,14 +337,38 @@ describe("POST /api/v1/manager/orders", () => {
     expect(res.status).toBe(400);
   });
 
-  it("returns 404 коли customer не існує", async () => {
-    mockPrisma.customer.findUnique.mockResolvedValueOnce(null);
+  it("returns 400 коли клієнта не знайдено (resolve кидає 400)", async () => {
+    resolveCustomerForOrderMock.mockRejectedValueOnce(
+      new ResolveCustomerError("Клієнта не знайдено", 400),
+    );
     const res = await POST(postReq(validBody));
-    expect(res.status).toBe(404);
+    expect(res.status).toBe(400);
+    const json = (await res.json()) as { error: string };
+    expect(json.error).toBe("Клієнта не знайдено");
+  });
+
+  it("резолвить MgrClient.id → Customer перед створенням", async () => {
+    resolveCustomerForOrderMock.mockResolvedValueOnce({
+      id: "cust1",
+      code1C: "000001",
+      name: "Mine",
+    });
+    mockPrisma.mgrClient.findMany.mockResolvedValueOnce([{ code1C: "000001" }]);
+    createOrderWithItemsMock.mockResolvedValueOnce(fakeCreatedOrder());
+    const res = await POST(postReq({ ...validBody, customerId: "mgr-1" }));
+    expect(res.status).toBe(201);
+    // resolve викликано з MgrClient.id, а createOrderWithItems — з Customer
+    expect(resolveCustomerForOrderMock).toHaveBeenCalledWith("mgr-1");
+    const args = createOrderWithItemsMock.mock.calls[0] as [
+      unknown,
+      { id: string },
+      unknown,
+    ];
+    expect(args[1].id).toBe("cust1");
   });
 
   it("returns 403 коли manager не власник клієнта", async () => {
-    mockPrisma.customer.findUnique.mockResolvedValueOnce({
+    resolveCustomerForOrderMock.mockResolvedValueOnce({
       id: "cust1",
       code1C: "FOREIGN",
       name: "Foreign client",
@@ -340,7 +381,7 @@ describe("POST /api/v1/manager/orders", () => {
 
   it("admin може створити для будь-якого клієнта", async () => {
     getCurrentUserMock.mockResolvedValueOnce(ADMIN);
-    mockPrisma.customer.findUnique.mockResolvedValueOnce({
+    resolveCustomerForOrderMock.mockResolvedValueOnce({
       id: "cust1",
       code1C: "FOREIGN",
       name: "Foreign",
@@ -352,7 +393,7 @@ describe("POST /api/v1/manager/orders", () => {
   });
 
   it("manager успішно створює для свого клієнта", async () => {
-    mockPrisma.customer.findUnique.mockResolvedValueOnce({
+    resolveCustomerForOrderMock.mockResolvedValueOnce({
       id: "cust1",
       code1C: "000001",
       name: "Mine",
@@ -366,7 +407,7 @@ describe("POST /api/v1/manager/orders", () => {
   });
 
   it("приймає менеджерські поля й передає actor (поточний менеджер)", async () => {
-    mockPrisma.customer.findUnique.mockResolvedValueOnce({
+    resolveCustomerForOrderMock.mockResolvedValueOnce({
       id: "cust1",
       code1C: "000001",
       name: "Mine",
@@ -406,7 +447,7 @@ describe("POST /api/v1/manager/orders", () => {
   });
 
   it("returns 400 на FK violation (Prisma P2003)", async () => {
-    mockPrisma.customer.findUnique.mockResolvedValueOnce({
+    resolveCustomerForOrderMock.mockResolvedValueOnce({
       id: "cust1",
       code1C: "000001",
       name: "Mine",

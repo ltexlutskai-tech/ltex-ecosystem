@@ -188,12 +188,17 @@ export function OrderForm({
   }
 
   /**
-   * Додає позицію з підбору (прайсу): товар + кількість мішків. lotId завжди
-   * null. Вага = середня вага мішка × мішки; ціна за кг = за обраним типом
-   * цін; сума = ціна за кг × вага. Якщо товар уже є — додаємо мішки.
+   * Додає позицію з підбору (прайсу): товар + кількість мішків + ціна за кг
+   * (із модалки — прайсова за типом цін або скоригована вручну кратно 0,05).
+   * lotId завжди null. Вага = середня вага мішка × мішки; сума = ціна за кг ×
+   * вага. Якщо товар уже є — додаємо мішки (зберігаючи передану ціну за кг).
    */
-  function onAddFromPicker(product: ProductSummary, bags: number): void {
-    const unit = unitPriceForType(product.prices, priceTypeCode) ?? 0;
+  function onAddFromPicker(
+    product: ProductSummary,
+    bags: number,
+    unitPriceEur: number,
+  ): void {
+    const unit = Math.max(0, unitPriceEur);
     setItems((prev) => {
       const existing = prev.find((r) => r.product?.id === product.id);
       if (existing) {
@@ -202,9 +207,11 @@ export function OrderForm({
           { averageWeight: product.averageWeight },
           quantity,
         );
-        const priceEur = Math.round(existing.unitPriceEur * weight * 100) / 100;
+        const priceEur = Math.round(unit * weight * 100) / 100;
         return prev.map((r) =>
-          r.uid === existing.uid ? { ...r, quantity, weight, priceEur } : r,
+          r.uid === existing.uid
+            ? { ...r, quantity, weight, priceEur, unitPriceEur: unit }
+            : r,
         );
       }
       const quantity = Math.max(1, Math.floor(bags) || 1);
@@ -302,157 +309,83 @@ export function OrderForm({
 
   return (
     <div className="space-y-5">
-      {/* ─── Шапка документа (як у 1С) ──────────────────────────────────────
-          Зверху-праворуч: чекбокси «призначити продаж торговому» +
-          «вивантажувати в 1С», під ними — № документа і дата. */}
-      <div className="rounded-lg border bg-white p-4">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-          {/* Ліва колонка шапки порожня тут — клієнт нижче. */}
-          <div className="order-2 lg:order-1" />
-
-          {/* Права колонка: чекбокси + № + дата + маршрут */}
-          <div className="order-1 w-full space-y-3 lg:order-2 lg:max-w-sm">
-            <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
-              <label className="inline-flex cursor-pointer items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  checked={assignToAgent}
-                  onChange={(e) => {
-                    setAssignToAgent(e.target.checked);
-                    if (!e.target.checked)
-                      setAssignedAgentUserId(currentUserId);
-                  }}
-                  className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                />
-                <span>Призначити продаж торговому</span>
-              </label>
-              <label className="inline-flex cursor-pointer items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  checked={exportTo1C}
-                  onChange={(e) => setExportTo1C(e.target.checked)}
-                  className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                />
-                <span>Вивантажувати в 1С</span>
-              </label>
-            </div>
-
-            {assignToAgent && (
-              <select
-                aria-label="Торговий агент"
-                value={assignedAgentUserId}
-                onChange={(e) => setAssignedAgentUserId(e.target.value)}
-                className="h-9 w-full rounded border border-gray-300 bg-white px-2 text-sm focus:border-blue-500 focus:outline-none"
-              >
-                {agents.map((a) => (
-                  <option key={a.id} value={a.id}>
-                    {a.fullName}
-                    {a.id === currentUserId ? " (я)" : ""}
-                  </option>
-                ))}
-              </select>
-            )}
-            {!assignToAgent && (
-              <p className="text-xs text-gray-400">
-                Продаж зараховано вам ({currentUserName}).
-              </p>
-            )}
-
-            <div className="grid grid-cols-2 gap-3">
+      {/* ─── Секція: Контрагент ───────────────────────────────────────────── */}
+      <section className="rounded-lg border bg-white p-5 shadow-sm">
+        <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-gray-500">
+          Контрагент
+        </h2>
+        {isEdit ? (
+          <div className="space-y-2">
+            <span className="text-sm font-medium text-gray-700">Клієнт</span>
+            <div className="flex items-center justify-between rounded-lg border bg-gray-50 p-3">
               <div>
-                <label className="mb-1 block text-xs text-gray-500">
-                  Номер
-                </label>
-                <input
-                  readOnly
-                  value={orderNumber}
-                  placeholder={isEdit ? "—" : "авто"}
-                  className="h-9 w-full rounded border border-gray-200 bg-gray-50 px-2 text-sm text-gray-600"
-                />
+                <div className="font-medium text-gray-900">
+                  {clientSummary?.name ?? "—"}
+                </div>
+                <div className="text-xs text-gray-500">
+                  {clientSummary?.city ?? ""}{" "}
+                  {clientSummary?.code1C ? `· ${clientSummary.code1C}` : ""}
+                </div>
               </div>
-              <div>
-                <label className="mb-1 block text-xs text-gray-500">Дата</label>
-                <input
-                  readOnly
-                  value={new Date().toLocaleDateString("uk-UA")}
-                  className="h-9 w-full rounded border border-gray-200 bg-gray-50 px-2 text-sm text-gray-600"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="mb-1 block text-xs text-gray-500">
-                Маршрутний лист
-              </label>
-              <input
-                disabled
-                placeholder="Блок «Маршрути» — у розробці"
-                className="h-9 w-full cursor-not-allowed rounded border border-gray-200 bg-gray-50 px-2 text-sm text-gray-400"
-              />
+              <span className="text-xs text-gray-400">не змінюється</span>
             </div>
           </div>
-        </div>
+        ) : (
+          <ClientPicker
+            value={clientId}
+            onChange={onClientChange}
+            initialSummary={clientSummary}
+          />
+        )}
 
-        {/* ─── Контрагент (ліворуч) + Тип цін (праворуч) ───────────────────── */}
-        <div className="mt-4 grid gap-4 lg:grid-cols-2">
-          <div>
-            {isEdit ? (
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-700">
-                  Контрагент
-                </label>
-                <div className="flex items-center justify-between rounded-lg border bg-gray-50 p-3">
-                  <div>
-                    <div className="font-medium text-gray-900">
-                      {clientSummary?.name ?? "—"}
-                    </div>
-                    <div className="text-xs text-gray-500">
-                      {clientSummary?.city ?? ""}{" "}
-                      {clientSummary?.code1C ? `· ${clientSummary.code1C}` : ""}
-                    </div>
-                  </div>
-                  <span className="text-xs text-gray-400">не змінюється</span>
-                </div>
-              </div>
-            ) : (
-              <ClientPicker
-                value={clientId}
-                onChange={onClientChange}
-                initialSummary={clientSummary}
-              />
-            )}
+        {clientSummary && (
+          <button
+            type="button"
+            onClick={() => setShowContacts((v) => !v)}
+            className="mt-3 text-sm font-medium text-green-700 hover:text-green-800"
+          >
+            {showContacts ? "Сховати контактні дані" : "Контактні дані"}
+          </button>
+        )}
+        {showContacts && clientSummary && (
+          <dl className="mt-3 grid gap-1 rounded-lg border bg-gray-50 p-3 text-sm sm:grid-cols-3">
+            <div className="flex gap-2">
+              <dt className="text-gray-500">Телефон:</dt>
+              <dd className="text-gray-800">{clientSummary.phone ?? "—"}</dd>
+            </div>
+            <div className="flex gap-2">
+              <dt className="text-gray-500">Місто:</dt>
+              <dd className="text-gray-800">{clientSummary.city ?? "—"}</dd>
+            </div>
+            <div className="flex gap-2">
+              <dt className="text-gray-500">Адреса:</dt>
+              <dd className="text-gray-800">{clientSummary.address ?? "—"}</dd>
+            </div>
+          </dl>
+        )}
 
-            {clientSummary && (
-              <button
-                type="button"
-                onClick={() => setShowContacts((v) => !v)}
-                className="mt-2 text-sm text-blue-600 hover:text-blue-800"
-              >
-                {showContacts ? "Сховати контактні дані" : "Контактні дані"}
-              </button>
-            )}
-            {showContacts && clientSummary && (
-              <dl className="mt-2 space-y-1 rounded-lg border bg-gray-50 p-3 text-sm">
-                <div className="flex gap-2">
-                  <dt className="text-gray-500">Телефон:</dt>
-                  <dd className="text-gray-800">
-                    {clientSummary.phone ?? "—"}
-                  </dd>
-                </div>
-                <div className="flex gap-2">
-                  <dt className="text-gray-500">Місто:</dt>
-                  <dd className="text-gray-800">{clientSummary.city ?? "—"}</dd>
-                </div>
-                <div className="flex gap-2">
-                  <dt className="text-gray-500">Адреса:</dt>
-                  <dd className="text-gray-800">
-                    {clientSummary.address ?? "—"}
-                  </dd>
-                </div>
-              </dl>
-            )}
+        {clientSummary && clientDebt !== null && clientDebt > 0 && (
+          <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+            Борг клієнта:{" "}
+            <span className="font-semibold">
+              {clientDebt.toLocaleString("uk-UA", {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              })}{" "}
+              ₴
+            </span>
           </div>
+        )}
+      </section>
 
+      {/* ─── Секція: Параметри замовлення ─────────────────────────────────── */}
+      <section className="rounded-lg border bg-white p-5 shadow-sm">
+        <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-gray-500">
+          Параметри замовлення
+        </h2>
+
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {/* Тип цін */}
           <div>
             <label
               htmlFor="order-price-type"
@@ -464,7 +397,7 @@ export function OrderForm({
               id="order-price-type"
               value={priceTypeId}
               onChange={(e) => onPriceTypeChange(e.target.value)}
-              className="h-9 w-full rounded border border-gray-300 bg-white px-2 text-sm focus:border-blue-500 focus:outline-none"
+              className="h-10 w-full rounded-md border border-gray-300 bg-white px-3 text-sm focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500"
             >
               {priceTypes.length === 0 && (
                 <option value="">— Немає типів цін —</option>
@@ -479,11 +412,9 @@ export function OrderForm({
               При зміні ціни рядків перераховуються.
             </p>
           </div>
-        </div>
 
-        {/* ─── Доставка (по центру) + Наложка (праворуч) ──────────────────── */}
-        <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-center sm:gap-6">
-          <div className="sm:w-64">
+          {/* Доставка */}
+          <div>
             <label
               htmlFor="order-delivery"
               className="mb-1 block text-sm font-medium text-gray-700"
@@ -494,7 +425,7 @@ export function OrderForm({
               id="order-delivery"
               value={deliveryMethod}
               onChange={(e) => setDeliveryMethod(e.target.value)}
-              className="h-9 w-full rounded border border-gray-300 bg-white px-2 text-sm focus:border-blue-500 focus:outline-none"
+              className="h-10 w-full rounded-md border border-gray-300 bg-white px-3 text-sm focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500"
             >
               <option value="">— Не вибрано —</option>
               {deliveryMethods.map((d) => (
@@ -504,23 +435,95 @@ export function OrderForm({
               ))}
             </select>
           </div>
-          <label className="inline-flex cursor-pointer items-center gap-2 pb-2 text-sm">
-            <input
-              type="checkbox"
-              checked={cashOnDelivery}
-              onChange={(e) => setCashOnDelivery(e.target.checked)}
-              className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-            />
-            <span>Наложка (післяплата)</span>
-          </label>
-        </div>
-      </div>
 
-      {/* ─── Статус (тільки edit) ─────────────────────────────────────────── */}
+          {/* Номер + дата */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">
+                Номер
+              </label>
+              <input
+                readOnly
+                value={orderNumber}
+                placeholder={isEdit ? "—" : "авто"}
+                className="h-10 w-full rounded-md border border-gray-200 bg-gray-50 px-3 text-sm text-gray-600"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">
+                Дата
+              </label>
+              <input
+                readOnly
+                value={new Date().toLocaleDateString("uk-UA")}
+                className="h-10 w-full rounded-md border border-gray-200 bg-gray-50 px-3 text-sm text-gray-600"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Чекбокси: наложка / агент / експорт */}
+        <div className="mt-4 flex flex-col gap-3 border-t pt-4">
+          <div className="flex flex-wrap items-center gap-x-8 gap-y-3">
+            <label className="inline-flex cursor-pointer items-center gap-2 text-sm text-gray-700">
+              <input
+                type="checkbox"
+                checked={cashOnDelivery}
+                onChange={(e) => setCashOnDelivery(e.target.checked)}
+                className="h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
+              />
+              <span>Наложка (післяплата)</span>
+            </label>
+            <label className="inline-flex cursor-pointer items-center gap-2 text-sm text-gray-700">
+              <input
+                type="checkbox"
+                checked={assignToAgent}
+                onChange={(e) => {
+                  setAssignToAgent(e.target.checked);
+                  if (!e.target.checked) setAssignedAgentUserId(currentUserId);
+                }}
+                className="h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
+              />
+              <span>Призначити продаж торговому</span>
+            </label>
+            <label className="inline-flex cursor-pointer items-center gap-2 text-sm text-gray-700">
+              <input
+                type="checkbox"
+                checked={exportTo1C}
+                onChange={(e) => setExportTo1C(e.target.checked)}
+                className="h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
+              />
+              <span>Вивантажувати в 1С</span>
+            </label>
+          </div>
+
+          {assignToAgent ? (
+            <select
+              aria-label="Торговий агент"
+              value={assignedAgentUserId}
+              onChange={(e) => setAssignedAgentUserId(e.target.value)}
+              className="h-10 w-full max-w-sm rounded-md border border-gray-300 bg-white px-3 text-sm focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500"
+            >
+              {agents.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.fullName}
+                  {a.id === currentUserId ? " (я)" : ""}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <p className="text-xs text-gray-400">
+              Продаж зараховано вам ({currentUserName}).
+            </p>
+          )}
+        </div>
+      </section>
+
+      {/* ─── Секція: Статус (тільки edit) ─────────────────────────────────── */}
       {isEdit && (
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-white p-4">
+        <section className="flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-white p-5 shadow-sm">
           <div className="flex items-center gap-2">
-            <span className="text-sm text-gray-500">Статус:</span>
+            <span className="text-sm font-medium text-gray-500">Статус:</span>
             <OrderStatusBadge status={status} />
           </div>
           {allowedTransitions.length > 0 && (
@@ -544,80 +547,58 @@ export function OrderForm({
               ))}
             </div>
           )}
-        </div>
+        </section>
       )}
 
-      {clientSummary && clientDebt !== null && clientDebt > 0 && (
-        <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
-          Борг клієнта:{" "}
-          <span className="font-semibold">
-            {clientDebt.toLocaleString("uk-UA", {
-              minimumFractionDigits: 2,
-              maximumFractionDigits: 2,
-            })}{" "}
-            ₴
-          </span>
+      {/* ─── Секція: Позиції ──────────────────────────────────────────────── */}
+      <section className="rounded-lg border bg-white p-5 shadow-sm">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-500">
+            Позиції
+          </h2>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setShowComment((v) => !v)}
+            >
+              <MessageSquare className="mr-1 h-4 w-4" />
+              Коментар
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              onClick={() => setPickerOpen(true)}
+              className="bg-green-600 text-white hover:bg-green-700"
+            >
+              <ListPlus className="mr-1 h-4 w-4" />
+              Підбір товарів
+            </Button>
+          </div>
         </div>
-      )}
 
-      {/* ─── Кнопки: Коментар · Підбір (ліворуч) · Зберегти (праворуч) ────── */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-wrap gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => setShowComment((v) => !v)}
-          >
-            <MessageSquare className="mr-1 h-4 w-4" />
-            Коментар
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => setPickerOpen(true)}
-          >
-            <ListPlus className="mr-1 h-4 w-4" />
-            Підбір
-          </Button>
+        {showComment && (
+          <div className="mb-4">
+            <label className="mb-1 block text-sm font-medium text-gray-700">
+              Коментар
+            </label>
+            <Textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="Будь-які примітки до замовлення (необов'язково)"
+              rows={3}
+              maxLength={2000}
+            />
+          </div>
+        )}
+
+        <ItemsEditor items={items} onChange={setItems} />
+
+        <div className="mt-4">
+          <OrderTotals items={items} exchangeRate={exchangeRate} />
         </div>
-        <Button
-          type="button"
-          disabled={!canSubmit}
-          onClick={() => submit()}
-          className="bg-green-600 text-white hover:bg-green-700"
-        >
-          {submitting
-            ? isEdit
-              ? "Збереження…"
-              : "Створення…"
-            : isEdit
-              ? "Зберегти"
-              : "Зберегти"}
-        </Button>
-      </div>
-
-      {showComment && (
-        <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">
-            Коментар
-          </label>
-          <Textarea
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            placeholder="Будь-які примітки до замовлення (необов'язково)"
-            rows={3}
-            maxLength={2000}
-          />
-        </div>
-      )}
-
-      {/* ─── Таблиця товарів (1С-стиль) ───────────────────────────────────── */}
-      <ItemsEditor items={items} onChange={setItems} />
-
-      {/* ─── Підсумки ─────────────────────────────────────────────────────── */}
-      <OrderTotals items={items} exchangeRate={exchangeRate} />
+      </section>
 
       {error && (
         <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
@@ -625,6 +606,7 @@ export function OrderForm({
         </div>
       )}
 
+      {/* ─── Дії: одна кнопка збереження ──────────────────────────────────── */}
       <div className="flex items-center justify-end gap-3">
         <Button
           type="button"
