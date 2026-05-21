@@ -29,7 +29,7 @@
 
 Нові моделі (additive, магазину не заважають). Зразок — `Order`/`OrderItem` + `Payment`.
 
-### `Realization` → таблиця `mgr_sales`
+### `Sale` → таблиця `mgr_sales`
 
 - `id`, `code1C?` @unique, `docNumber` (auto-increment, відображається як «L…»/«000…»), `customerId` (FK Customer)
 - `status` (draft/sent/posted/cancelled, default draft), `archived` (=проведено в 1С), `isActual`
@@ -41,15 +41,15 @@
 - `notes?` (Коментар), `orderId?` (Сделка, опц.), `routeId?` (Маршрут — заглушка під блок Маршрутів)
 - `createdAt`, `updatedAt`; relations: `customer`, `items`, `cashOrders`
 
-### `RealizationItem` → таблиця `mgr_sale_items`
+### `SaleItem` → таблиця `mgr_sale_items`
 
-- `id`, `realizationId` (FK Cascade), `productId` (FK Product), `lotId?` (FK Lot — заповнюється при скані)
+- `id`, `saleId` (FK Cascade), `productId` (FK Product), `lotId?` (FK Lot — заповнюється при скані)
 - `barcode?` (відсканований ШК), `pricePerKg` (ЦенаПродажиВес), `weight` (вага мішка), `quantity` (мішків)
 - `priceEur` (рядковий підсумок = pricePerKg × weight × quantity, як total — конвенція Замовлень)
 
 ### `MgrCashOrder` → таблиця `mgr_cash_orders` (повний касовий ордер)
 
-- `id`, `code1C?`, `realizationId?` (FK), `type` (income/expense — Приход/Расход)
+- `id`, `code1C?`, `saleId?` (FK), `type` (income/expense — Приход/Расход)
 - `amountUah`, `amountEur`, `amountUsd`, `amountUahCashless` (безнал)
 - `changeForId?` (FK self — ордер-розхід посилається на прихідний при здачі)
 - `bankAccount?`, `cashFlowArticle?`, `comment?`, `agentUserId?`, `paidAt`, `createdAt`
@@ -111,12 +111,12 @@
 - **Розрахунок здачі:** сума до оплати (з курсами EUR/USD) − отримано → здача; **якщо здача > 0 → авто-створення ордера-розходу** (`changeForId`).
 - **Борг** = сума реалізації − оплачено; підпис «Наложка:» коли післяплата.
 - «Відкрити оплати» — список касових ордерів по реалізації.
-- API: `POST /api/v1/manager/cash-orders`, `GET /realizations/[id]/cash-orders`.
+- API: `POST /api/v1/manager/cash-orders`, `GET /sales/[id]/cash-orders`.
 - **Примітка:** цей етап закриває ядро окремого блоку «Оплати/Каса» — узгодити, що далі він не дублюється.
 
 ### Етап 5 — Обмін із 1С (sync) — НА ЕТАПІ ОБМІНІВ (наприкінці)
 
-- Каркас черги (`enqueueRealizationCreate` + proxy route `sync-sales.ts`, mock) можна додати вже в Етапі 2/3 (fire-and-forget, як Замовлення).
+- Каркас черги (`enqueueSaleCreate` + proxy route `sync-sales.ts` + `realization` у `SyncEntityType` — вже є) пишеться тут (fire-and-forget, як Замовлення). У Етапах 2-4 створення/редагування пишуть лише в нашу DB **без** enqueue.
 - **Реальний BSL** (JSON-шар на боці 1С, бо транспорт центральної — бінарний `ValueStorage`) — пишемо самі **наприкінці**, разом з усіма обмінами. Спека — у `docs/1C_SYNC_MODULES_SPEC.md` (додати розділ «СтворитиРеалізацію»).
 
 ---
@@ -133,7 +133,7 @@
 
 ## 5. Відкрите / ризики
 
-- **Камера-сканер у вебі:** `BarcodeDetector` (Chrome/Android) + `@zxing/browser` fallback; USB-сканер = звичайний focus-input. Працює у браузері/PWA; у Tauri-обгортці (пізніше) — теж через webview.
+- **Камера-сканер у вебі:** нативний `BarcodeDetector` (Chrome/Edge/Android/Tauri-webview), **без npm-залежності**; якщо API недоступне — кнопка камери disabled, лишається ручний ввід. USB-сканер = звичайний focus-input + Enter. `@zxing/browser` як fallback — можливе майбутнє покращення, не зараз.
 - **Здача в 3 валютах:** формулу й стрес-кейси узгодимо на Етапі 4 (база — курси EUR/USD з документа).
 - **Лот у sync:** зберігаємо `lotId` локально, але в central (на обмінах) поки шлемо загальну позицію — лот після готовності central.
 - **docNumber:** авто-інкремент локально; при обміні справжній номер дасть 1С (зведемо по `code1C`).
