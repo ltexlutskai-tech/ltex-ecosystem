@@ -70,3 +70,29 @@ export interface PaymentCreateError {
 }
 
 export type PaymentCreateResult = PaymentCreateSuccess | PaymentCreateError;
+
+// ─── M1.6 (Реалізація, Етап 5): realization (sale) shapes ───────────────────
+
+export interface RealizationCreateRequest {
+  idempotencyKey: string;
+  payload: Record<string, unknown>;
+}
+
+export interface RealizationCreateSuccess {
+  ok: true;
+  realizationCode1C: string;
+  realizationNumber?: string;
+  mockMode?: boolean;
+  errors?: string[];
+}
+
+export interface RealizationCreateError {
+  ok: false;
+  errorCode: number;
+  errorMessage: string;
+  mockMode?: boolean;
+}
+
+export type RealizationCreateResult =
+  | RealizationCreateSuccess
+  | RealizationCreateError;

@@ -63,6 +63,7 @@ model Product {
   lots               Lot[]
   prices             Price[]
   orderItems         OrderItem[]
+  saleItems          SaleItem[]
   cartItems          CartItem[]
   videoSubscriptions VideoSubscription[]
   favorites          Favorite[]
@@ -128,6 +129,7 @@ model Lot {
   product    Product     @relation(fields: [productId], references: [id])
   barcodes   Barcode[]
   orderItems OrderItem[]
+  saleItems  SaleItem[]
   cartItems  CartItem[]
 
   @@index([productId])
@@ -182,6 +184,7 @@ model Customer {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   orders             Order[]
+  sales              Sale[]
   cart               Cart?
   chatMessages       ChatMessage[]
   videoSubscriptions VideoSubscription[]
@@ -247,6 +250,99 @@ model OrderItem {
 
   @@index([orderId])
   @@map("order_items")
+}
+
+// ─── Realizations / Sales (← 1С Document.РеализацияТоваровУслуг, M1.6) ─────
+// Реалізація — окремий документ, що фіксує факт продажу/відвантаження клієнту
+// (борг клієнта; у central — списання складу). Усі поля additive, магазину
+// не заважають. Зразок — Order/OrderItem + Payment.
+
+model Sale {
+  id                  String   @id @default(cuid())
+  code1C              String?  @unique @map("code_1c")
+  docNumber           Int      @default(autoincrement()) @map("doc_number")
+  customerId          String   @map("customer_id")
+  status              String   @default("draft") // draft|sent|posted|cancelled
+  totalEur            Float    @default(0) @map("total_eur")
+  totalUah            Float    @default(0) @map("total_uah")
+  exchangeRateEur     Float    @default(0) @map("exchange_rate_eur")
+  exchangeRateUsd     Float    @default(0) @map("exchange_rate_usd")
+  priceTypeId         String?  @map("price_type_id")
+  deliveryMethod      String?  @map("delivery_method") // delivery|post|pickup
+  novaPoshtaBranch    String?  @map("nova_poshta_branch")
+  cashOnDelivery      Boolean  @default(false) @map("cash_on_delivery")
+  codAmountUah        Float?   @map("cod_amount_uah")
+  assignedAgentUserId String?  @map("assigned_agent_user_id")
+  onTradeAgent        Boolean  @default(true) @map("on_trade_agent")
+  exportTo1C          Boolean  @default(true) @map("export_to_1c")
+  expressWaybill      String?  @map("express_waybill")
+  notes               String?
+  orderId             String?  @map("order_id")
+  routeId             String?  @map("route_id")
+  archived            Boolean  @default(false)
+  isActual            Boolean  @default(true) @map("is_actual")
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
+
+  customer   Customer       @relation(fields: [customerId], references: [id])
+  items      SaleItem[]
+  cashOrders MgrCashOrder[]
+
+  @@index([customerId])
+  @@index([status])
+  @@map("mgr_sales")
+}
+
+// ─── Cash orders / Каса (← 1С КассовыйОрдер, M1.6 Етап 4) ──────────────────
+// Повний касовий ордер: оплата у 3 валютах (грн/EUR/USD) + безнал грн,
+// авто-розрахунок здачі та авто-створення ордера-розходу (`type=expense`,
+// `changeForId` → прихідний ордер) коли здача > 0. Усі суми зберігаються
+// «сирими» по валюті; порівняння йдуть через грн за курсами Sale-знімка.
+
+model MgrCashOrder {
+  id                String   @id @default(cuid())
+  code1C            String?  @unique @map("code_1c")
+  saleId            String?  @map("sale_id")
+  type              String // income | expense (Приход/Расход)
+  amountUah         Float    @default(0) @map("amount_uah")
+  amountEur         Float    @default(0) @map("amount_eur")
+  amountUsd         Float    @default(0) @map("amount_usd")
+  amountUahCashless Float    @default(0) @map("amount_uah_cashless")
+  changeCurrency    String?  @map("change_currency") // UAH|EUR|USD (лише expense)
+  changeForId       String?  @map("change_for_id") // expense → його прихідний ордер
+  bankAccount       String?  @map("bank_account")
+  cashFlowArticle   String?  @map("cash_flow_article")
+  comment           String?
+  agentUserId       String?  @map("agent_user_id")
+  paidAt            DateTime @default(now()) @map("paid_at")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  sale      Sale?          @relation(fields: [saleId], references: [id], onDelete: SetNull)
+  changeFor MgrCashOrder?  @relation("CashOrderChange", fields: [changeForId], references: [id])
+  changes   MgrCashOrder[] @relation("CashOrderChange")
+
+  @@index([saleId])
+  @@map("mgr_cash_orders")
+}
+
+model SaleItem {
+  id         String  @id @default(cuid())
+  saleId     String  @map("sale_id")
+  productId  String  @map("product_id")
+  lotId      String? @map("lot_id")
+  barcode    String?
+  pricePerKg Float   @map("price_per_kg")
+  weight     Float
+  quantity   Int     @default(1)
+  priceEur   Float   @map("price_eur") // line total = pricePerKg*weight*quantity
+
+  sale    Sale    @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id])
+  lot     Lot?    @relation(fields: [lotId], references: [id])
+
+  @@index([saleId])
+  @@map("mgr_sale_items")
 }
 
 // ─── Exchange Rates (← 1С КурсиВалют) ──────────────────────────────────────
@@ -979,6 +1075,7 @@ enum SyncEntityType {
   client
   order
   payment
+  realization
 
   @@map("mgr_sync_entity_type")
 }

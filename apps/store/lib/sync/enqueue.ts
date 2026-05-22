@@ -240,3 +240,126 @@ export async function enqueuePaymentCreate(payment: PaymentForEnqueue) {
     },
   });
 }
+
+// ─── M1.6 (Реалізація, Етап 5) — Sale enqueue ───────────────────────────────
+
+/**
+ * Shape для `enqueueSaleCreate` — мінімум полів з Sale + items для payload-у
+ * `СтворитиРеалізацію` SOAP-operation (див. docs/1C_SYNC_MODULES_SPEC.md §3.4).
+ *
+ * Mirror-ить `OrderForEnqueue`, але реалізація несе додаткові менеджерські
+ * поля (курс EUR+USD, наложка/сума COD, призначений агент, ТТН) і кожен рядок
+ * має `pricePerKg` (ЦенаПродажиВес). Усі numeric поля передаються як string з
+ * `.` decimal separator щоб уникнути floating-point issues (1С парсить через
+ * Число()).
+ */
+export interface SaleForEnqueue {
+  id: string;
+  code1C: string | null;
+  docNumber: number;
+  totalEur: number;
+  totalUah: number;
+  exchangeRateEur: number;
+  exchangeRateUsd: number;
+  priceTypeId: string | null;
+  deliveryMethod: string | null;
+  novaPoshtaBranch: string | null;
+  cashOnDelivery: boolean;
+  codAmountUah: number | null;
+  assignedAgentUserId: string | null;
+  onTradeAgent: boolean;
+  expressWaybill: string | null;
+  notes: string | null;
+  customer: { code1C: string | null; name: string };
+  items: Array<{
+    productId: string;
+    lotId: string | null;
+    pricePerKg: number;
+    weight: number;
+    quantity: number;
+    priceEur: number;
+    product?: { code1C: string | null } | null;
+    lot?: { barcode: string } | null;
+  }>;
+}
+
+export interface SaleCreatePayload {
+  saleInternalId: string;
+  code1C: string | null;
+  docNumber: number;
+  customerCode1C: string | null;
+  customerName: string;
+  notes: string | null;
+  totalEur: string;
+  totalUah: string;
+  exchangeRateEur: string;
+  exchangeRateUsd: string;
+  priceTypeId: string | null;
+  deliveryMethod: string | null;
+  novaPoshtaBranch: string | null;
+  cashOnDelivery: boolean;
+  codAmountUah: string | null;
+  assignedAgentUserId: string | null;
+  onTradeAgent: boolean;
+  expressWaybill: string | null;
+  items: Array<{
+    productId: string;
+    productCode1C: string | null;
+    lotId: string | null;
+    lotBarcode: string | null;
+    pricePerKg: string;
+    priceEur: string;
+    weight: string;
+    quantity: number;
+  }>;
+}
+
+export function buildSaleCreatePayload(
+  sale: SaleForEnqueue,
+): SaleCreatePayload {
+  return {
+    saleInternalId: sale.id,
+    code1C: sale.code1C,
+    docNumber: sale.docNumber,
+    customerCode1C: sale.customer.code1C,
+    customerName: sale.customer.name,
+    notes: emptyToNull(sale.notes),
+    totalEur: sale.totalEur.toFixed(2),
+    totalUah: sale.totalUah.toFixed(2),
+    exchangeRateEur: sale.exchangeRateEur.toFixed(4),
+    exchangeRateUsd: sale.exchangeRateUsd.toFixed(4),
+    priceTypeId: emptyToNull(sale.priceTypeId),
+    deliveryMethod: emptyToNull(sale.deliveryMethod),
+    novaPoshtaBranch: emptyToNull(sale.novaPoshtaBranch),
+    cashOnDelivery: sale.cashOnDelivery,
+    codAmountUah:
+      sale.codAmountUah !== null ? sale.codAmountUah.toFixed(2) : null,
+    assignedAgentUserId: emptyToNull(sale.assignedAgentUserId),
+    onTradeAgent: sale.onTradeAgent,
+    expressWaybill: emptyToNull(sale.expressWaybill),
+    items: sale.items.map((item) => ({
+      productId: item.productId,
+      productCode1C: item.product?.code1C ?? null,
+      lotId: item.lotId,
+      lotBarcode: item.lot?.barcode ?? null,
+      pricePerKg: item.pricePerKg.toFixed(2),
+      priceEur: item.priceEur.toFixed(2),
+      weight: item.weight.toFixed(3),
+      quantity: item.quantity,
+    })),
+  };
+}
+
+export async function enqueueSaleCreate(sale: SaleForEnqueue) {
+  const payload = buildSaleCreatePayload(sale);
+  return prisma.mgrSyncJob.create({
+    data: {
+      entityType: "realization",
+      entityId: sale.id,
+      action: "create",
+      payload: payload as unknown as Prisma.InputJsonValue,
+      idempotencyKey: randomUUID(),
+      nextAttemptAt: new Date(),
+    },
+  });
+}

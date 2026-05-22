@@ -5,6 +5,8 @@ import type {
   OrderCreateResult,
   PaymentCreateRequest,
   PaymentCreateResult,
+  RealizationCreateRequest,
+  RealizationCreateResult,
 } from "./types";
 
 /**
@@ -100,6 +102,32 @@ export async function createPaymentMock(
   return {
     ok: true,
     paymentCode1C: `MOCK-PMT-${Date.now()}`,
+    mockMode: true,
+    errors: [],
+  };
+}
+
+/**
+ * Mock SOAP shim для `СтворитиРеалізацію` operation. Симулює delay,
+ * повертає synthetic `realizationCode1C` = "MOCK-RLZ-<ts>" + `realizationNumber`.
+ * Used коли SYNC_MOCK_MODE=true (default).
+ */
+export async function createRealizationMock(
+  req: RealizationCreateRequest,
+  options: DelayOptions = {},
+): Promise<RealizationCreateResult> {
+  await simulateDelay(options);
+
+  const existing = req.payload["code1C"];
+  const realizationCode1C =
+    typeof existing === "string" && existing.length > 0
+      ? existing
+      : `MOCK-RLZ-${Date.now()}`;
+
+  return {
+    ok: true,
+    realizationCode1C,
+    realizationNumber: `R-MOCK-${Date.now()}`,
     mockMode: true,
     errors: [],
   };

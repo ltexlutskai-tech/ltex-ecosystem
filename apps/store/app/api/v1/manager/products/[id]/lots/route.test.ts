@@ -37,8 +37,10 @@ beforeEach(() => {
   getCurrentUserMock.mockResolvedValue(USER);
 });
 
-function req(id: string): NextRequest {
-  return new NextRequest(`http://localhost/api/v1/manager/products/${id}/lots`);
+function req(id: string, q?: string): NextRequest {
+  const url = new URL(`http://localhost/api/v1/manager/products/${id}/lots`);
+  if (q !== undefined) url.searchParams.set("q", q);
+  return new NextRequest(url);
 }
 
 describe("GET /api/v1/manager/products/[id]/lots", () => {
@@ -62,6 +64,41 @@ describe("GET /api/v1/manager/products/[id]/lots", () => {
     expect(args.where.productId).toBe("prod-1");
     expect(args.where.status).toBe("free");
     expect(args.take).toBe(50);
+  });
+
+  it("без q — без OR (поведінка незмінна, спільний з замовленнями)", async () => {
+    mockPrisma.lot.findMany.mockResolvedValueOnce([]);
+    await GET(req("prod-1"), { params: Promise.resolve({ id: "prod-1" }) });
+    const args = mockPrisma.lot.findMany.mock.calls[0]?.[0] as {
+      where: { OR?: unknown };
+    };
+    expect(args.where.OR).toBeUndefined();
+  });
+
+  it("q=текст — фільтрує за частковим штрихкодом (contains)", async () => {
+    mockPrisma.lot.findMany.mockResolvedValueOnce([]);
+    await GET(req("prod-1", "AB"), {
+      params: Promise.resolve({ id: "prod-1" }),
+    });
+    const args = mockPrisma.lot.findMany.mock.calls[0]?.[0] as {
+      where: { OR: Array<{ barcode?: { contains: string } }> };
+    };
+    expect(args.where.OR[0]?.barcode?.contains).toBe("AB");
+    // «AB» не число → лише фільтр за штрихкодом.
+    expect(args.where.OR).toHaveLength(1);
+  });
+
+  it("q=число — додає збіг за вагою у діапазоні ±0.5 кг", async () => {
+    mockPrisma.lot.findMany.mockResolvedValueOnce([]);
+    await GET(req("prod-1", "20"), {
+      params: Promise.resolve({ id: "prod-1" }),
+    });
+    const args = mockPrisma.lot.findMany.mock.calls[0]?.[0] as {
+      where: { OR: Array<{ weight?: { gte: number; lt: number } }> };
+    };
+    const weightClause = args.where.OR.find((c) => c.weight);
+    expect(weightClause?.weight?.gte).toBe(19.5);
+    expect(weightClause?.weight?.lt).toBe(20.5);
   });
 
   it("повертає mapped lots", async () => {

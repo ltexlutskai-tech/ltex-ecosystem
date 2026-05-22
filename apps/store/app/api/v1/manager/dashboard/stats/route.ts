@@ -41,18 +41,29 @@ export async function GET(req: NextRequest) {
     : 0;
 
   let ordersToday = 0;
+  let salesActive = 0;
   if (myCodes === null || myCodes.length > 0) {
+    const scopeWhere =
+      myCodes !== null ? { customer: { code1C: { in: myCodes } } } : {};
     const ordersWhere: Prisma.OrderWhereInput = {
       createdAt: { gte: startOfTodayUtc() },
-      ...(myCodes !== null ? { customer: { code1C: { in: myCodes } } } : {}),
+      ...scopeWhere,
     };
-    ordersToday = await prisma.order.count({ where: ordersWhere });
+    // Реалізації: активні (не архівні/проведені) у скоупі менеджера.
+    const salesWhere: Prisma.SaleWhereInput = {
+      archived: false,
+      ...scopeWhere,
+    };
+    [ordersToday, salesActive] = await Promise.all([
+      prisma.order.count({ where: ordersWhere }),
+      prisma.sale.count({ where: salesWhere }),
+    ]);
   }
 
-  // TODO M1.5+ — sales/payments/routes після SOAP snapshot
+  // TODO M1.5+ — payments/routes після SOAP snapshot
   const sessionCounts = {
     orders: ordersToday,
-    sales: 0,
+    sales: salesActive,
     payments: 0,
     routes: 0,
   };

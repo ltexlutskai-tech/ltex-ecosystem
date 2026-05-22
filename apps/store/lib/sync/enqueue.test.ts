@@ -14,9 +14,11 @@ import {
   buildClientUpdatePayload,
   buildOrderCreatePayload,
   buildPaymentCreatePayload,
+  buildSaleCreatePayload,
   enqueueClientUpdate,
   enqueueOrderCreate,
   enqueuePaymentCreate,
+  enqueueSaleCreate,
 } from "./enqueue";
 
 const baseClient = {
@@ -305,5 +307,145 @@ describe("enqueuePaymentCreate", () => {
     expect(call.data.entityId).toBe("pay1");
     expect(call.data.action).toBe("create");
     expect(call.data.payload.orderCode1C).toBe("L-2026-0123");
+  });
+});
+
+// ─── M1.6 (Реалізація, Етап 5): Sale enqueue ────────────────────────────────
+
+const baseSale = {
+  id: "sale1",
+  code1C: null,
+  docNumber: 42,
+  totalEur: 150.5,
+  totalUah: 6471.5,
+  exchangeRateEur: 43.0,
+  exchangeRateUsd: 39.85,
+  priceTypeId: "pt-retail",
+  deliveryMethod: "post",
+  novaPoshtaBranch: "7",
+  cashOnDelivery: true,
+  codAmountUah: 6471,
+  assignedAgentUserId: "mgr-9",
+  onTradeAgent: false,
+  expressWaybill: "TTN-001",
+  notes: "Відвантажено",
+  customer: { code1C: "000005798", name: "Магазин Соборна" },
+  items: [
+    {
+      productId: "p1",
+      lotId: "l1",
+      pricePerKg: 4.05,
+      weight: 25.123,
+      quantity: 1,
+      priceEur: 100.5,
+      product: { code1C: "0007854" },
+      lot: { barcode: "1234567890123" },
+    },
+    {
+      productId: "p2",
+      lotId: null,
+      pricePerKg: 5,
+      weight: 10,
+      quantity: 2,
+      priceEur: 50,
+      product: { code1C: "0007855" },
+      lot: null,
+    },
+  ],
+};
+
+describe("buildSaleCreatePayload", () => {
+  it("збирає payload з усіма items + manager-полями + lot/general mix", () => {
+    const payload = buildSaleCreatePayload(baseSale);
+    expect(payload.saleInternalId).toBe("sale1");
+    expect(payload.docNumber).toBe(42);
+    expect(payload.customerCode1C).toBe("000005798");
+    expect(payload.customerName).toBe("Магазин Соборна");
+    expect(payload.deliveryMethod).toBe("post");
+    expect(payload.novaPoshtaBranch).toBe("7");
+    expect(payload.cashOnDelivery).toBe(true);
+    expect(payload.onTradeAgent).toBe(false);
+    expect(payload.expressWaybill).toBe("TTN-001");
+    expect(payload.priceTypeId).toBe("pt-retail");
+    expect(payload.assignedAgentUserId).toBe("mgr-9");
+    expect(payload.items).toHaveLength(2);
+    expect(payload.items[0]?.lotBarcode).toBe("1234567890123");
+    expect(payload.items[0]?.productCode1C).toBe("0007854");
+    expect(payload.items[1]?.lotBarcode).toBeNull();
+    expect(payload.items[1]?.lotId).toBeNull();
+  });
+
+  it("numeric поля формуються як string з .2f / .3f / .4f", () => {
+    const payload = buildSaleCreatePayload(baseSale);
+    expect(payload.totalEur).toBe("150.50");
+    expect(payload.totalUah).toBe("6471.50");
+    expect(payload.exchangeRateEur).toBe("43.0000");
+    expect(payload.exchangeRateUsd).toBe("39.8500");
+    expect(payload.codAmountUah).toBe("6471.00");
+    expect(payload.items[0]?.pricePerKg).toBe("4.05");
+    expect(payload.items[0]?.priceEur).toBe("100.50");
+    expect(payload.items[0]?.weight).toBe("25.123");
+    expect(typeof payload.totalEur).toBe("string");
+  });
+
+  it("codAmountUah → null коли наложки немає", () => {
+    const payload = buildSaleCreatePayload({
+      ...baseSale,
+      cashOnDelivery: false,
+      codAmountUah: null,
+    });
+    expect(payload.codAmountUah).toBeNull();
+    expect(payload.cashOnDelivery).toBe(false);
+  });
+
+  it("empty/optional поля нормалізуються у null", () => {
+    const payload = buildSaleCreatePayload({
+      ...baseSale,
+      notes: "",
+      expressWaybill: "",
+      novaPoshtaBranch: null,
+      priceTypeId: null,
+      assignedAgentUserId: null,
+    });
+    expect(payload.notes).toBeNull();
+    expect(payload.expressWaybill).toBeNull();
+    expect(payload.novaPoshtaBranch).toBeNull();
+    expect(payload.priceTypeId).toBeNull();
+    expect(payload.assignedAgentUserId).toBeNull();
+  });
+});
+
+describe("enqueueSaleCreate", () => {
+  it("створює row з entityType='realization', action='create'", async () => {
+    mockPrisma.mgrSyncJob.create.mockResolvedValueOnce({ id: "j3" });
+    await enqueueSaleCreate(baseSale);
+    const call = mockPrisma.mgrSyncJob.create.mock.calls[0]?.[0] as {
+      data: {
+        entityType: string;
+        entityId: string;
+        action: string;
+        idempotencyKey: string;
+        payload: { customerCode1C: string };
+      };
+    };
+    expect(call.data.entityType).toBe("realization");
+    expect(call.data.entityId).toBe("sale1");
+    expect(call.data.action).toBe("create");
+    expect(call.data.payload.customerCode1C).toBe("000005798");
+    expect(call.data.idempotencyKey).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/,
+    );
+  });
+
+  it("idempotencyKey — нова UUID на кожен виклик", async () => {
+    mockPrisma.mgrSyncJob.create.mockResolvedValue({ id: "j" });
+    await enqueueSaleCreate(baseSale);
+    await enqueueSaleCreate(baseSale);
+    const calls = mockPrisma.mgrSyncJob.create.mock.calls;
+    const key1 = (calls[0]?.[0] as { data: { idempotencyKey: string } }).data
+      .idempotencyKey;
+    const key2 = (calls[1]?.[0] as { data: { idempotencyKey: string } }).data
+      .idempotencyKey;
+    expect(key1).not.toBe(key2);
   });
 });
