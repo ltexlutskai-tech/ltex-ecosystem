@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@ltex/ui";
 import type { CashRates } from "@/lib/manager/cash-order";
@@ -56,6 +56,7 @@ export function PaymentsPanel({
   codAmountUah,
   summary,
   orders,
+  autoOpenPayment = false,
 }: {
   saleId: string;
   dueUah: number;
@@ -64,9 +65,21 @@ export function PaymentsPanel({
   codAmountUah: number | null;
   summary: PaymentsSummary;
   orders: CashOrderView[];
+  /** Авто-відкриття модалки оплати (deeplink `?pay=1` з форми) — Fix 6. */
+  autoOpenPayment?: boolean;
 }) {
   const router = useRouter();
-  const [open, setOpen] = useState(false);
+  // `?pay=1` (кнопка «Оплата» у формі) одразу відкриває модалку створення оплати.
+  const [open, setOpen] = useState(autoOpenPayment);
+
+  // `#payments` (кнопка «Історія оплат») — скрол до панелі оплат.
+  useEffect(() => {
+    if (typeof window !== "undefined" && window.location.hash === "#payments") {
+      document
+        .getElementById("payments")
+        ?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }, []);
 
   const balance = summary.balanceUah;
   const balanceLabel =
@@ -79,7 +92,10 @@ export function PaymentsPanel({
         : "Сплачено повністю";
 
   return (
-    <section className="rounded-lg border bg-white p-5 shadow-sm">
+    <section
+      id="payments"
+      className="scroll-mt-20 rounded-lg border bg-white p-5 shadow-sm"
+    >
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-base font-semibold text-gray-800">Оплати (каса)</h2>
         <Button type="button" size="sm" onClick={() => setOpen(true)}>

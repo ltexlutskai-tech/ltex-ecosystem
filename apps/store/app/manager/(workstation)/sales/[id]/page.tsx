@@ -12,7 +12,6 @@ import {
 } from "@/lib/manager/order-delivery";
 import { SaleForm } from "../new/_components/sale-form";
 import type {
-  AgentOption,
   ClientPickerItem,
   PriceTypeOption,
   SaleEditInitial,
@@ -60,13 +59,17 @@ export async function generateMetadata({
 
 export default async function ManagerSaleDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ pay?: string }>;
 }) {
   const user = await getCurrentUser();
   if (!user) redirect("/manager/login");
 
   const { id } = await params;
+  const { pay } = await searchParams;
+  const autoOpenPayment = pay === "1";
   const ok = await canViewSale(user, id);
   if (!ok) notFound();
 
@@ -105,38 +108,27 @@ export default async function ManagerSaleDetailPage({
   const editable = canEditSale(sale.status);
   const locked = isSaleLocked(sale.status);
 
-  const [
-    priceTypeRows,
-    agentRows,
-    exchangeRateEur,
-    exchangeRateUsd,
-    mgr,
-    cashOrders,
-  ] = await Promise.all([
-    prisma.mgrPriceType.findMany({ orderBy: { sortOrder: "asc" } }),
-    prisma.user.findMany({
-      where: { isActive: true },
-      orderBy: { fullName: "asc" },
-      select: { id: true, fullName: true },
-    }),
-    getCurrentRate(),
-    getUsdRate(),
-    sale.customer.code1C
-      ? prisma.mgrClient.findUnique({
-          where: { code1C: sale.customer.code1C },
-          select: {
-            debt: true,
-            phonePrimary: true,
-            street: true,
-            house: true,
-          },
-        })
-      : Promise.resolve(null),
-    prisma.mgrCashOrder.findMany({
-      where: { saleId: sale.id },
-      orderBy: { createdAt: "asc" },
-    }),
-  ]);
+  const [priceTypeRows, exchangeRateEur, exchangeRateUsd, mgr, cashOrders] =
+    await Promise.all([
+      prisma.mgrPriceType.findMany({ orderBy: { sortOrder: "asc" } }),
+      getCurrentRate(),
+      getUsdRate(),
+      sale.customer.code1C
+        ? prisma.mgrClient.findUnique({
+            where: { code1C: sale.customer.code1C },
+            select: {
+              debt: true,
+              phonePrimary: true,
+              street: true,
+              house: true,
+            },
+          })
+        : Promise.resolve(null),
+      prisma.mgrCashOrder.findMany({
+        where: { saleId: sale.id },
+        orderBy: { createdAt: "asc" },
+      }),
+    ]);
 
   const mgrAddress = mgr
     ? [mgr.street, mgr.house].filter(Boolean).join(", ") || null
@@ -146,10 +138,6 @@ export default async function ManagerSaleDetailPage({
     id: p.id,
     code: p.code,
     label: p.label,
-  }));
-  const agents: AgentOption[] = agentRows.map((u) => ({
-    id: u.id,
-    fullName: u.fullName,
   }));
   const deliveryMethods = ORDER_DELIVERY_METHODS.map((d) => ({
     code: d.code,
@@ -268,7 +256,6 @@ export default async function ManagerSaleDetailPage({
           exchangeRateEur={exchangeRateEur}
           exchangeRateUsd={exchangeRateUsd}
           priceTypes={priceTypes}
-          agents={agents}
           deliveryMethods={deliveryMethods}
           currentUserId={user.id}
           currentUserName={user.fullName}
@@ -289,6 +276,7 @@ export default async function ManagerSaleDetailPage({
         codAmountUah={sale.codAmountUah}
         summary={cashSummary}
         orders={cashOrderViews}
+        autoOpenPayment={autoOpenPayment}
       />
     </div>
   );

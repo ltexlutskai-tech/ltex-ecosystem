@@ -74,6 +74,66 @@ export function lineTotalEur(
 }
 
 /**
+ * Парсить рядок числового вводу (ціна/мішки) у число.
+ *
+ * Приймає крапку АБО кому як десятковий роздільник, прибирає пробіли, трактує
+ * порожнє / частковий ввід («», «.», «0.») як 0 для розрахунку. Від'ємні та
+ * нечислові — 0. Використовується інлайновим numeric-полем, щоб не «прилипав»
+ * провідний нуль (Fix 5): поле тримає рядок, а сюди передається для калькуляцій.
+ */
+export function parseNumericInput(raw: string): number {
+  const cleaned = raw.replace(/\s+/g, "").replace(",", ".");
+  if (cleaned === "" || cleaned === "." || cleaned === "-") return 0;
+  const n = Number(cleaned);
+  return Number.isFinite(n) && n > 0 ? n : 0;
+}
+
+/**
+ * Нормалізує рядок числового вводу для відображення: дозволяє порожнє та
+ * частковий ввід, замінює кому на крапку, прибирає провідні нулі (окрім «0.»).
+ * Не округлює — користувач може друкувати «0.05» по символах.
+ */
+export function sanitizeNumericText(raw: string): string {
+  let v = raw.replace(",", ".");
+  // Лишаємо лише цифри + одну крапку.
+  v = v.replace(/[^\d.]/g, "");
+  const firstDot = v.indexOf(".");
+  if (firstDot !== -1) {
+    v = v.slice(0, firstDot + 1) + v.slice(firstDot + 1).replace(/\./g, "");
+  }
+  // Прибираємо провідні нулі («07» → «7»), але лишаємо «0.5» та «0».
+  v = v.replace(/^0+(?=\d)/, "");
+  return v;
+}
+
+/**
+ * Копіює ціну за кг з рядка `sourceUid` на **усі рядки того самого товару**
+ * (за `product.id`) та перераховує `priceEur` кожного скопійованого рядка.
+ * Mirrors 1С `ПовторитьЦену`. Чиста функція (без I/O) — покрита тестами.
+ *
+ * Якщо рядок-джерело не знайдено або у нього немає товару — повертає вхід без
+ * змін. Рядки без товару (порожні чернетки) пропускаються.
+ */
+export function repeatPriceForProduct(
+  items: SaleItemDraft[],
+  sourceUid: string,
+): SaleItemDraft[] {
+  const source = items.find((i) => i.uid === sourceUid);
+  if (!source || !source.product) return items;
+  const productId = source.product.id;
+  const unit = source.pricePerKg;
+  return items.map((row) => {
+    if (row.uid === sourceUid) return row;
+    if (!row.product || row.product.id !== productId) return row;
+    return {
+      ...row,
+      pricePerKg: unit,
+      priceEur: lineTotalEur(unit, row.weight, row.quantity),
+    };
+  });
+}
+
+/**
  * Перетворює draft на payload рядка реалізації. На відміну від замовлення,
  * `lotId`/`barcode` зберігаються (скан ШК прив'язує до конкретного мішка).
  * Повертає `null` для рядків без товару (порожні чернетки авто-видаляються).

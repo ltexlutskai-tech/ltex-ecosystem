@@ -1,9 +1,65 @@
 "use client";
 
-import { Trash2 } from "lucide-react";
-import { Input } from "@ltex/ui";
+import { useEffect, useState } from "react";
+import { Copy, Trash2 } from "lucide-react";
 import { bagWeightForQuantity } from "@/lib/manager/order-bag-weight";
-import { lineTotalEur, type SaleItemDraft } from "./sale-types";
+import {
+  lineTotalEur,
+  parseNumericInput,
+  repeatPriceForProduct,
+  sanitizeNumericText,
+  type SaleItemDraft,
+} from "./sale-types";
+
+/**
+ * Інлайнове числове поле з локальним рядковим станом (Fix 5).
+ *
+ * Тримає **рядок** (дозволяє порожнє / частковий ввід «0.» / «»), приймає
+ * крапку АБО кому, прибирає провідні нулі. На кожну зміну емітить розпарсене
+ * число батьку для розрахунків. Так не «прилипає» провідний нуль і поле
+ * можна очистити повністю.
+ */
+function NumericField({
+  value,
+  onValueChange,
+  ariaLabel,
+  className,
+}: {
+  /** Поточне числове значення з draft (синхронізує при зовнішніх змінах). */
+  value: number;
+  /** Викликається з розпарсеним числом на кожну зміну тексту. */
+  onValueChange: (next: number) => void;
+  ariaLabel: string;
+  className?: string;
+}) {
+  const [text, setText] = useState<string>(() =>
+    value > 0 ? String(value) : "",
+  );
+
+  // Підхоплюємо зовнішні зміни (перерахунок типу цін / «Повторити ціну»), але
+  // не перетираємо частковий ввід, що дає те саме число (напр. «0.» → 0).
+  useEffect(() => {
+    if (parseNumericInput(text) !== value) {
+      setText(value > 0 ? String(value) : "");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value]);
+
+  return (
+    <input
+      type="text"
+      inputMode="decimal"
+      aria-label={ariaLabel}
+      value={text}
+      onChange={(e) => {
+        const next = sanitizeNumericText(e.target.value);
+        setText(next);
+        onValueChange(parseNumericInput(next));
+      }}
+      className={className}
+    />
+  );
+}
 
 /**
  * Позиції реалізації у стилі проекту: кожна позиція — картка-рядок з назвою
@@ -16,6 +72,9 @@ import { lineTotalEur, type SaleItemDraft } from "./sale-types";
  * Зміна кількості мішків перераховує вагу (`bagWeightForQuantity`) і суму;
  * зміна ціни за кг перераховує суму. Лоти, додані через скан ШК, мають
  * фіксовану вагу мішка — при зміні мішків вага масштабується пропорційно.
+ *
+ * «Повторити ціну» (Fix 4 / 1С `ПовторитьЦену`) копіює ціну за кг цього рядка
+ * на всі рядки того самого товару й перераховує їхні суми.
  */
 export function SaleItemsEditor({
   items,
@@ -59,6 +118,11 @@ export function SaleItemsEditor({
     updateRow(draft.uid, { ...draft, pricePerKg: unit, priceEur });
   }
 
+  /** Повторити ціну рядка на всі рядки того самого товару (1С ПовторитьЦену). */
+  function repeatPrice(uid: string): void {
+    onChange(repeatPriceForProduct(items, uid));
+  }
+
   const populated = items.filter((i) => i.product);
 
   if (populated.length === 0) {
@@ -72,6 +136,10 @@ export function SaleItemsEditor({
   return (
     <ul className="space-y-3">
       {populated.map((draft, index) => {
+        // Чи є інші рядки того самого товару (показуємо «Повторити ціну»).
+        const sameProductCount = populated.filter(
+          (r) => r.product?.id === draft.product?.id,
+        ).length;
         // Ціна = ціна/кг × вага одного мішка (read-only довідка).
         const perBagWeight =
           draft.quantity > 0 ? draft.weight / draft.quantity : draft.weight;
@@ -113,14 +181,11 @@ export function SaleItemsEditor({
                   <label className="mb-1 block text-xs text-gray-500">
                     Мішків
                   </label>
-                  <Input
-                    type="number"
-                    min="1"
-                    step="1"
-                    aria-label="Кількість мішків"
+                  <NumericField
                     value={draft.quantity}
-                    onChange={(e) => changeBags(draft, Number(e.target.value))}
-                    className="h-9 w-20 text-right text-sm"
+                    ariaLabel="Кількість мішків"
+                    onValueChange={(n) => changeBags(draft, n)}
+                    className="h-9 w-20 rounded-md border border-gray-300 px-2 text-right text-sm focus:outline-none focus:ring-1 focus:ring-green-500"
                   />
                 </div>
 
@@ -129,17 +194,25 @@ export function SaleItemsEditor({
                   <label className="mb-1 block text-xs text-gray-500">
                     Ціна за кг, €
                   </label>
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    aria-label="Ціна за кг"
-                    value={draft.pricePerKg}
-                    onChange={(e) =>
-                      changeUnitPrice(draft, Number(e.target.value))
-                    }
-                    className="h-9 w-24 rounded-md border border-gray-300 px-2 text-right text-sm focus:outline-none focus:ring-1 focus:ring-green-500"
-                  />
+                  <div className="flex items-center gap-1">
+                    <NumericField
+                      value={draft.pricePerKg}
+                      ariaLabel="Ціна за кг"
+                      onValueChange={(n) => changeUnitPrice(draft, n)}
+                      className="h-9 w-24 rounded-md border border-gray-300 px-2 text-right text-sm focus:outline-none focus:ring-1 focus:ring-green-500"
+                    />
+                    {sameProductCount > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => repeatPrice(draft.uid)}
+                        title="Повторити ціну для всіх рядків цього товару"
+                        aria-label="Повторити ціну"
+                        className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-gray-200 text-gray-500 hover:border-green-400 hover:text-green-600"
+                      >
+                        <Copy className="h-4 w-4" />
+                      </button>
+                    )}
+                  </div>
                 </div>
 
                 {/* Ціна (read-only = ціна/кг × вага мішка) */}

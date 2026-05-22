@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Camera, ScanLine, X } from "lucide-react";
 import { Button, Input } from "@ltex/ui";
 
@@ -55,7 +55,12 @@ export function BarcodeInput({
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const rafRef = useRef<number | null>(null);
-  const stoppedRef = useRef(false);
+  // Колбек на знайдений код — у ref, щоб ефект камери не перезапускався при
+  // зміні `onCode` (стабільна залежність — лише `cameraOpen`).
+  const onCodeRef = useRef(onCode);
+  useEffect(() => {
+    onCodeRef.current = onCode;
+  }, [onCode]);
 
   useEffect(() => {
     setDetectorAvailable(getBarcodeDetectorCtor() !== null);
@@ -68,74 +73,96 @@ export function BarcodeInput({
     setValue("");
   }
 
-  function stopCamera(): void {
-    stoppedRef.current = true;
-    if (rafRef.current !== null) {
-      cancelAnimationFrame(rafRef.current);
-      rafRef.current = null;
-    }
-    const stream = streamRef.current;
-    if (stream) {
-      stream.getTracks().forEach((t) => t.stop());
-      streamRef.current = null;
-    }
-    setCameraOpen(false);
-  }
-
-  async function openCamera(): Promise<void> {
-    const Ctor = getBarcodeDetectorCtor();
-    if (!Ctor) return;
+  /** Тільки виставляє стан — реальний запуск камери у useEffect нижче. */
+  function openCamera(): void {
+    if (!getBarcodeDetectorCtor()) return;
     setCameraError(null);
     setCameraOpen(true);
-    stoppedRef.current = false;
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "environment" },
-      });
-      streamRef.current = stream;
-      const video = videoRef.current;
-      if (!video) {
-        stopCamera();
-        return;
-      }
-      video.srcObject = stream;
-      await video.play();
-
-      const detector = new Ctor();
-      const scan = async (): Promise<void> => {
-        if (stoppedRef.current) return;
-        try {
-          const found = await detector.detect(video);
-          const hit = found.find((b) => b.rawValue.trim().length > 0);
-          if (hit) {
-            const code = hit.rawValue.trim();
-            stopCamera();
-            onCode(code);
-            return;
-          }
-        } catch {
-          // одиничний кадр не зчитався — продовжуємо петлю
-        }
-        rafRef.current = requestAnimationFrame(() => {
-          void scan();
-        });
-      };
-      void scan();
-    } catch (e) {
-      setCameraError(
-        (e as Error).name === "NotAllowedError"
-          ? "Доступ до камери заборонено."
-          : "Не вдалося відкрити камеру.",
-      );
-      stopCamera();
-    }
   }
 
-  // Зупинка камери при розмонтуванні.
-  useEffect(() => {
-    return () => stopCamera();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+  /** Закриває overlay — cleanup ефекту зупинить потік/петлю. */
+  const closeCamera = useCallback((): void => {
+    setCameraOpen(false);
   }, []);
+
+  /**
+   * Запуск камери ПІСЛЯ монтування `<video>` (Fix 2).
+   *
+   * Раніше `openCamera()` робив getUserMedia синхронно й читав
+   * `videoRef.current`, але `<video>` рендериться умовно `{cameraOpen && …}` —
+   * на мобільному ref ще `null` → камера вмикалась і миттєво закривалась
+   * («миготіння»). Тепер потік відкривається у цьому ефекті, який спрацьовує
+   * вже після того, як `<video>` змонтовано. Cleanup зупиняє треки + rAF.
+   */
+  useEffect(() => {
+    if (!cameraOpen) return;
+    const Ctor = getBarcodeDetectorCtor();
+    if (!Ctor) return;
+
+    let cancelled = false;
+    const video = videoRef.current;
+    if (!video) {
+      setCameraError("Не вдалося ініціалізувати відео.");
+      return;
+    }
+
+    void (async () => {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: "environment" },
+        });
+        if (cancelled) {
+          stream.getTracks().forEach((t) => t.stop());
+          return;
+        }
+        streamRef.current = stream;
+        video.srcObject = stream;
+        await video.play();
+
+        const detector = new Ctor();
+        const scan = async (): Promise<void> => {
+          if (cancelled) return;
+          try {
+            const found = await detector.detect(video);
+            const hit = found.find((b) => b.rawValue.trim().length > 0);
+            if (hit) {
+              const code = hit.rawValue.trim();
+              onCodeRef.current(code);
+              closeCamera();
+              return;
+            }
+          } catch {
+            // одиничний кадр не зчитався — продовжуємо петлю
+          }
+          if (cancelled) return;
+          rafRef.current = requestAnimationFrame(() => {
+            void scan();
+          });
+        };
+        void scan();
+      } catch (e) {
+        if (cancelled) return;
+        setCameraError(
+          (e as Error).name === "NotAllowedError"
+            ? "Доступ до камери заборонено."
+            : "Не вдалося відкрити камеру.",
+        );
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      if (rafRef.current !== null) {
+        cancelAnimationFrame(rafRef.current);
+        rafRef.current = null;
+      }
+      const stream = streamRef.current;
+      if (stream) {
+        stream.getTracks().forEach((t) => t.stop());
+        streamRef.current = null;
+      }
+    };
+  }, [cameraOpen, closeCamera]);
 
   return (
     <div className="space-y-2">
@@ -174,7 +201,7 @@ export function BarcodeInput({
         <Button
           type="button"
           variant="outline"
-          onClick={() => void openCamera()}
+          onClick={openCamera}
           disabled={disabled || !detectorAvailable}
           title={
             detectorAvailable
@@ -193,7 +220,7 @@ export function BarcodeInput({
         <div className="relative overflow-hidden rounded-lg border bg-black">
           <button
             type="button"
-            onClick={stopCamera}
+            onClick={closeCamera}
             className="absolute right-2 top-2 z-10 inline-flex h-8 w-8 items-center justify-center rounded-full bg-black/60 text-white hover:bg-black/80"
             aria-label="Закрити камеру"
           >

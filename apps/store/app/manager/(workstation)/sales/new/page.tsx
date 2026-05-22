@@ -7,7 +7,6 @@ import { getCurrentRate } from "@/lib/exchange-rate";
 import { ORDER_DELIVERY_METHODS } from "@/lib/manager/order-delivery";
 import { SaleForm } from "./_components/sale-form";
 import type {
-  AgentOption,
   ClientPickerItem,
   PriceTypeOption,
 } from "./_components/sale-types";
@@ -79,26 +78,16 @@ export default async function NewSalePage({
     }
   }
 
-  const [priceTypeRows, agentRows, exchangeRateEur, exchangeRateUsd] =
-    await Promise.all([
-      prisma.mgrPriceType.findMany({ orderBy: { sortOrder: "asc" } }),
-      prisma.user.findMany({
-        where: { isActive: true },
-        orderBy: { fullName: "asc" },
-        select: { id: true, fullName: true },
-      }),
-      getCurrentRate(),
-      getUsdRate(),
-    ]);
+  const [priceTypeRows, exchangeRateEur, exchangeRateUsd] = await Promise.all([
+    prisma.mgrPriceType.findMany({ orderBy: { sortOrder: "asc" } }),
+    getCurrentRate(),
+    getUsdRate(),
+  ]);
 
   const priceTypes: PriceTypeOption[] = priceTypeRows.map((p) => ({
     id: p.id,
     code: p.code,
     label: p.label,
-  }));
-  const agents: AgentOption[] = agentRows.map((u) => ({
-    id: u.id,
-    fullName: u.fullName,
   }));
   const deliveryMethods = ORDER_DELIVERY_METHODS.map((d) => ({
     code: d.code,
@@ -129,7 +118,6 @@ export default async function NewSalePage({
         exchangeRateEur={exchangeRateEur}
         exchangeRateUsd={exchangeRateUsd}
         priceTypes={priceTypes}
-        agents={agents}
         deliveryMethods={deliveryMethods}
         currentUserId={user.id}
         currentUserName={user.fullName}

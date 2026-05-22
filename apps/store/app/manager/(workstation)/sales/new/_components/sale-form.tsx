@@ -2,15 +2,26 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { MessageSquare, ListPlus, Send, Users } from "lucide-react";
+import {
+  MessageSquare,
+  ListPlus,
+  Send,
+  Users,
+  Wallet,
+  Search,
+} from "lucide-react";
 import { Button, Textarea } from "@ltex/ui";
 import { ClientPicker } from "../../../orders/new/_components/client-picker";
-import { ProductPricePicker } from "../../../orders/new/_components/product-price-picker";
 import { OrderStatusBadge } from "../../../customers/[id]/_components/order-status-badge";
 import { ShareSheet } from "../../../prices/_components/share-sheet";
 import { SaleItemsEditor } from "./sale-items-editor";
 import { SaleTotals } from "./sale-totals";
 import { BarcodeInput } from "./barcode-input";
+import {
+  SaleLotPicker,
+  type SaleGeneralPick,
+  type SaleLotPick,
+} from "./sale-lot-picker";
 import { unitPriceForType } from "@/lib/manager/order-pricing";
 import { bagWeightForQuantity } from "@/lib/manager/order-bag-weight";
 import {
@@ -26,7 +37,6 @@ import {
 import {
   draftToWire,
   lineTotalEur,
-  type AgentOption,
   type ClientPickerItem,
   type OrderDeliveryOption,
   type PriceTypeOption,
@@ -47,7 +57,6 @@ export interface SaleFormProps {
   /** Знімок курсу USD→UAH (для документа). */
   exchangeRateUsd: number;
   priceTypes: PriceTypeOption[];
-  agents: AgentOption[];
   deliveryMethods: OrderDeliveryOption[];
   currentUserId: string;
   currentUserName: string;
@@ -110,7 +119,6 @@ export function SaleForm({
   exchangeRateEur,
   exchangeRateUsd,
   priceTypes,
-  agents,
   deliveryMethods,
   currentUserId,
   currentUserName,
@@ -161,15 +169,6 @@ export function SaleForm({
   );
   const [onTradeAgent, setOnTradeAgent] = useState(
     initialSale?.onTradeAgent ?? true,
-  );
-  const [assignToAgent, setAssignToAgent] = useState(
-    isEdit
-      ? !!initialSale?.assignedAgentUserId &&
-          initialSale.assignedAgentUserId !== currentUserId
-      : false,
-  );
-  const [assignedAgentUserId, setAssignedAgentUserId] = useState<string>(
-    initialSale?.assignedAgentUserId ?? currentUserId,
   );
   const [exportTo1C, setExportTo1C] = useState(initialSale?.exportTo1C ?? true);
   const [expressWaybill, setExpressWaybill] = useState(
@@ -226,14 +225,34 @@ export function SaleForm({
   }
 
   /**
-   * Підбір через прайс — загальна позиція (lotId=null). Вага = середня вага
-   * мішка × мішки; ціна за кг — прайсова за типом цін або скоригована.
+   * Підбір — конкретний лот (мішок). Рядок несе lotId/barcode/weight лота та
+   * прайсову ціну за кг (за типом цін). Дубль за лотом ігнорується.
    */
-  function onAddFromPicker(
-    product: ProductSummary,
-    bags: number,
-    pricePerKg: number,
-  ): void {
+  function onAddLotFromPicker(pick: SaleLotPick): void {
+    setItems((prev) => {
+      if (prev.some((r) => r.lotId === pick.lotId)) return prev; // дубль лота
+      const unit = Math.max(0, pick.pricePerKg);
+      const weight = pick.weight > 0 ? pick.weight : 0;
+      const draft: SaleItemDraft = {
+        uid: newUid(),
+        product: pick.product,
+        lotId: pick.lotId,
+        barcode: pick.barcode,
+        quantity: 1,
+        weight,
+        pricePerKg: unit,
+        priceEur: lineTotalEur(unit, weight, 1),
+      };
+      return [...prev, draft];
+    });
+  }
+
+  /**
+   * Підбір — загальна позиція (lotId=null) для товарів без вільних лотів.
+   * Вага = середня вага мішка × мішки; ціна за кг — прайсова за типом цін.
+   */
+  function onAddGeneralFromPicker(pick: SaleGeneralPick): void {
+    const { product, bags, pricePerKg } = pick;
     const unit = Math.max(0, pricePerKg);
     setItems((prev) => {
       // Дубль за товаром (загальна позиція без лота) — додаємо мішки.
@@ -356,13 +375,26 @@ export function SaleForm({
 
   const docNumber = isEdit ? (initialSale?.displayNumber ?? "") : "авто";
 
-  async function submit(nextStatus?: ManagerSaleStatus): Promise<void> {
-    if (!isEdit && !clientId) return;
-    if (isEdit && !saleId) return;
+  /**
+   * Зберігає документ (POST/PATCH). Повертає id збереженої реалізації або
+   * `null` на помилці. `nextStatus` — лише для статусних переходів у edit.
+   *
+   * Куди йти після збереження визначає `submit()` / кнопки оплат:
+   *  - звичайне збереження → список `/manager/sales` (Fix 6);
+   *  - «Оплата» / «Історія оплат» → деталь з відповідним query/hash.
+   */
+  async function saveSale(
+    nextStatus?: ManagerSaleStatus,
+  ): Promise<string | null> {
+    if (!isEdit && !clientId) return null;
+    if (isEdit && !saleId) return null;
     setSubmitting(true);
     setError(null);
     try {
-      const payloadAgent = assignToAgent ? assignedAgentUserId : null;
+      // Fix 3: «На торгового контрагента» → продаж зараховується агенту клієнта
+      // (1С сам визначає кого) → assignedAgentUserId=null; інакше — поточний
+      // продавець.
+      const payloadAgent = onTradeAgent ? null : currentUserId;
       const url = isEdit
         ? `/api/v1/manager/sales/${saleId}`
         : "/api/v1/manager/sales";
@@ -391,20 +423,43 @@ export function SaleForm({
           error?: string;
         };
         setError(errBody.error ?? `Помилка ${res.status}`);
-        return;
+        return null;
       }
       if (isEdit) {
         if (nextStatus) setStatus(nextStatus);
-        router.refresh();
-        return;
+        return saleId ?? null;
       }
       const sale = (await res.json()) as { id: string };
-      router.push(`/manager/sales/${sale.id}`);
+      return sale.id;
     } catch (e) {
       setError((e as Error).message ?? "Невідома помилка");
+      return null;
     } finally {
       setSubmitting(false);
     }
+  }
+
+  /** Основне збереження — після успіху → список реалізацій (Fix 6). */
+  async function submit(nextStatus?: ManagerSaleStatus): Promise<void> {
+    const id = await saveSale(nextStatus);
+    if (id === null) return;
+    // Статусний перехід у edit лишає менеджера на сторінці (бачить новий стан).
+    if (isEdit && nextStatus) {
+      router.refresh();
+      return;
+    }
+    router.push("/manager/sales");
+  }
+
+  /** Зберегти й перейти до оплат на детальній сторінці (Fix 6). */
+  async function saveAndGoToPayments(mode: "pay" | "history"): Promise<void> {
+    const id = await saveSale();
+    if (id === null) return;
+    router.push(
+      mode === "pay"
+        ? `/manager/sales/${id}?pay=1`
+        : `/manager/sales/${id}#payments`,
+    );
   }
 
   // Сума післяплати (грн) — округлення повної суми (оплати у Етапі 4 → paid=0).
@@ -688,18 +743,6 @@ export function SaleForm({
             <label className="inline-flex cursor-pointer items-center gap-2 text-sm text-gray-700">
               <input
                 type="checkbox"
-                checked={assignToAgent}
-                onChange={(e) => {
-                  setAssignToAgent(e.target.checked);
-                  if (!e.target.checked) setAssignedAgentUserId(currentUserId);
-                }}
-                className="h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
-              />
-              <span>Призначити продаж торговому</span>
-            </label>
-            <label className="inline-flex cursor-pointer items-center gap-2 text-sm text-gray-700">
-              <input
-                type="checkbox"
                 checked={exportTo1C}
                 onChange={(e) => setExportTo1C(e.target.checked)}
                 className="h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
@@ -717,25 +760,11 @@ export function SaleForm({
             </p>
           )}
 
-          {assignToAgent ? (
-            <select
-              aria-label="Торговий агент"
-              value={assignedAgentUserId}
-              onChange={(e) => setAssignedAgentUserId(e.target.value)}
-              className="h-10 w-full max-w-sm rounded-md border border-gray-300 bg-white px-3 text-sm focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500"
-            >
-              {agents.map((a) => (
-                <option key={a.id} value={a.id}>
-                  {a.fullName}
-                  {a.id === currentUserId ? " (я)" : ""}
-                </option>
-              ))}
-            </select>
-          ) : (
-            <p className="text-xs text-gray-400">
-              Продаж зараховано вам ({currentUserName}).
-            </p>
-          )}
+          <p className="text-xs text-gray-400">
+            {onTradeAgent
+              ? "Продаж буде зараховано торговому агенту клієнта."
+              : `Продаж зараховано вам (${currentUserName}).`}
+          </p>
         </div>
       </section>
 
@@ -868,40 +897,70 @@ export function SaleForm({
       )}
 
       {/* ─── Дії ─────────────────────────────────────────────────────────── */}
-      <div className="flex items-center justify-end gap-3">
-        <Button
-          type="button"
-          variant="outline"
-          onClick={() =>
-            router.push(
-              isEdit && saleId ? `/manager/sales/${saleId}` : "/manager/sales",
-            )
-          }
-          disabled={submitting}
-        >
-          Скасувати
-        </Button>
-        <Button
-          type="button"
-          disabled={!canSubmit}
-          onClick={() => submit()}
-          className="bg-green-600 text-white hover:bg-green-700"
-        >
-          {submitting
-            ? isEdit
-              ? "Збереження…"
-              : "Створення…"
-            : isEdit
-              ? "Зберегти зміни"
-              : "Створити реалізацію"}
-        </Button>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        {/* Оплати (як у старій 1С: «Оплата» + «Історія оплат»). Кожна спершу
+            зберігає документ, тоді відкриває деталь. */}
+        <div className="flex flex-wrap gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            disabled={!canSubmit}
+            onClick={() => void saveAndGoToPayments("pay")}
+            title="Зберегти і створити оплату"
+          >
+            <Wallet className="mr-1 h-4 w-4" />
+            Оплата
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            disabled={!canSubmit}
+            onClick={() => void saveAndGoToPayments("history")}
+            title="Зберегти і переглянути історію оплат"
+          >
+            <Search className="mr-1 h-4 w-4" />
+            Історія оплат
+          </Button>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() =>
+              router.push(
+                isEdit && saleId
+                  ? `/manager/sales/${saleId}`
+                  : "/manager/sales",
+              )
+            }
+            disabled={submitting}
+          >
+            Скасувати
+          </Button>
+          <Button
+            type="button"
+            disabled={!canSubmit}
+            onClick={() => submit()}
+            className="bg-green-600 text-white hover:bg-green-700"
+          >
+            {submitting
+              ? isEdit
+                ? "Збереження…"
+                : "Створення…"
+              : isEdit
+                ? "Зберегти зміни"
+                : "Створити реалізацію"}
+          </Button>
+        </div>
       </div>
 
-      <ProductPricePicker
+      <SaleLotPicker
         open={pickerOpen}
         onOpenChange={setPickerOpen}
         priceTypeCode={priceTypeCode}
-        onAdd={onAddFromPicker}
+        onAddLot={onAddLotFromPicker}
+        onAddGeneral={onAddGeneralFromPicker}
       />
 
       <ShareSheet
