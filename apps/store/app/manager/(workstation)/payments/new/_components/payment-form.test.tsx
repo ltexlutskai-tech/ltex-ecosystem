@@ -22,6 +22,18 @@ vi.mock("@ltex/ui", async () => {
   };
 });
 
+// ShareSheet — повноцінний Dialog з @ltex/ui; у тесті рендеримо тільки текст,
+// щоб не тягнути Radix. Перевіряємо що форма передає згенерований текст-квитанцію.
+vi.mock("../../../prices/_components/share-sheet", async () => {
+  const React = await import("react");
+  return {
+    ShareSheet: ({ open, text }: { open: boolean; text: string }) =>
+      open
+        ? React.createElement("div", { "data-testid": "share-sheet" }, text)
+        : null,
+  };
+});
+
 afterEach(() => cleanup());
 
 const BASE: PaymentFormProps = {
@@ -108,5 +120,21 @@ describe("PaymentForm", () => {
     // «До оплати» = 3 € і оплати немає → залишок 3 € (≤ 5) → кнопка є.
     render(<PaymentForm {...BASE} presetSumToPayEur={3} />);
     expect(screen.getByText("Дати знижку на залишок")).toBeDefined();
+  });
+
+  it("кнопка «Вайбер» відкриває ShareSheet з текстом-квитанцією", () => {
+    render(<PaymentForm {...BASE} />);
+    expect(screen.queryByTestId("share-sheet")).toBeNull();
+
+    // Внесемо готівку 4300 грн (= 100 €) → оплачено повністю.
+    fireEvent.change(inputByLabelPrefix("Готівка, грн"), {
+      target: { value: "4300" },
+    });
+    fireEvent.click(screen.getByText("Вайбер"));
+
+    const sheet = screen.getByTestId("share-sheet");
+    expect(sheet.textContent).toContain("Оплата");
+    expect(sheet.textContent).toContain("ТОВ Тест");
+    expect(sheet.textContent).toContain("Оплачено: 100.00 €");
   });
 });

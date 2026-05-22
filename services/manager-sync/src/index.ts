@@ -21,6 +21,7 @@ import { buildSyncClientsRoute } from "./routes/sync-clients";
 import { buildSyncOrdersRoute } from "./routes/sync-orders";
 import { buildSyncPaymentsRoute } from "./routes/sync-payments";
 import { buildSyncRealizationsRoute } from "./routes/sync-realizations";
+import { buildSyncCashOrdersRoute } from "./routes/sync-cash-orders";
 
 async function main(): Promise<void> {
   const config = loadConfig();
@@ -51,6 +52,11 @@ async function main(): Promise<void> {
 
   await app.register(
     buildSyncRealizationsRoute({ config, cache: idempotencyCache }),
+    { prefix: "/sync" },
+  );
+
+  await app.register(
+    buildSyncCashOrdersRoute({ config, cache: idempotencyCache }),
     { prefix: "/sync" },
   );
 

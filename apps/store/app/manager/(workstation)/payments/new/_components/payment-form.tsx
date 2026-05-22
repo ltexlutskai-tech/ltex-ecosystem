@@ -13,8 +13,10 @@ import {
   type CashRates,
 } from "@/lib/manager/cash-order";
 import type { CashFlowDirection } from "@/lib/validations/manager-cash-order";
+import { buildPaymentReceiptText } from "@/lib/manager/payment-message";
 import { ClientPicker } from "../../../orders/new/_components/client-picker";
 import type { ClientPickerItem } from "../../../orders/new/_components/types";
+import { ShareSheet } from "../../../prices/_components/share-sheet";
 
 /** Довідник банк. рахунків (з GET /dictionaries). */
 export interface BankAccountOption {
@@ -148,6 +150,10 @@ export function PaymentForm({
 
   const [submitting, setSubmitting] = useState(false);
   const [discounting, setDiscounting] = useState(false);
+
+  // ─── Повідомлення (Viber/share квитанція) ─────────────────────────────────
+  const [shareOpen, setShareOpen] = useState(false);
+  const [shareText, setShareText] = useState("");
 
   const rates: CashRates = useMemo(
     () => ({ eur: parseRate(rateEurRaw), usd: parseRate(rateUsdRaw) }),
@@ -345,6 +351,30 @@ export function PaymentForm({
     } finally {
       setDiscounting(false);
     }
+  }
+
+  /** Відкриває ShareSheet з текстом-квитанцією, зібраним зі стану форми. */
+  function openReceipt(): void {
+    const acct = bankAccounts.find((a) => a.id === bankAccountId)?.name ?? null;
+    const codAmountUah = balanceEur > 0 ? balanceEur * rates.eur : null;
+    setShareText(
+      buildPaymentReceiptText({
+        clientName: pickedClientLabel ?? clientLabel ?? "",
+        paid: {
+          uah: paid.uah,
+          eur: paid.eur,
+          usd: paid.usd,
+          uahCashless: paid.uahCashless,
+        },
+        change: { uah: change.uah, eur: change.eur, usd: change.usd },
+        bankAccountName: acct,
+        rates: { eur: rates.eur, usd: rates.usd },
+        sumToPayEur,
+        cashOnDelivery: codAmountUah !== null,
+        codAmountUah,
+      }),
+    );
+    setShareOpen(true);
   }
 
   // Банк. рахунки: при приході приховуємо/блокуємо `hiddenInApp` (1С §F).
@@ -662,10 +692,20 @@ export function PaymentForm({
             {discounting ? "Нарахування…" : "Дати знижку на залишок"}
           </Button>
         )}
+        <Button type="button" variant="outline" onClick={openReceipt}>
+          Вайбер
+        </Button>
         <Button type="button" disabled={!canSubmit} onClick={submit}>
           {submitting ? "Формування…" : "Сформувати"}
         </Button>
       </div>
+
+      <ShareSheet
+        open={shareOpen}
+        onOpenChange={setShareOpen}
+        title="Квитанція оплати"
+        text={shareText}
+      />
     </div>
   );
 }

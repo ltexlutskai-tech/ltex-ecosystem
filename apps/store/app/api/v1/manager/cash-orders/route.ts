@@ -14,6 +14,7 @@ import {
   normalizeCashOrderType,
   serializeCashOrderRow,
 } from "@/lib/manager/cash-orders-list";
+import { enqueueCashOrderCreate } from "@/lib/sync/enqueue";
 
 const MAX_PAGE_SIZE = 100;
 const DEFAULT_PAGE_SIZE = 20;
@@ -199,6 +200,11 @@ export async function POST(req: NextRequest) {
       agentUserId: user.id,
     });
 
+    // Sync (best-effort, fire-and-forget): прихідний ордер + ордер-здача (за
+    // наявності) у чергу `mgr_sync_jobs` (entityType `cash_order`). Не блокує
+    // 201 і не змінює відповідь. Перевантажуємо з relations для payload-у §3.5.
+    void enqueueOrdersForSync(income.id, change?.id ?? null);
+
     return NextResponse.json({ income, change }, { status: 201 });
   } catch (err) {
     if (err instanceof Prisma.PrismaClientKnownRequestError) {
@@ -217,5 +223,64 @@ export async function POST(req: NextRequest) {
       { error: "Помилка створення оплати" },
       { status: 500 },
     );
+  }
+}
+
+/** Поля + relations, що потрібні `buildCashOrderCreatePayload` (§3.5). */
+const cashOrderSyncSelect = {
+  id: true,
+  code1C: true,
+  docNumber: true,
+  type: true,
+  amountUah: true,
+  amountEur: true,
+  amountUsd: true,
+  amountUahCashless: true,
+  rateEur: true,
+  rateUsd: true,
+  documentSumEur: true,
+  debtCorrection: true,
+  correctionUid: true,
+  changeForId: true,
+  uidUah: true,
+  uidEur: true,
+  uidUsd: true,
+  customer: { select: { code1C: true } },
+  sale: { select: { code1C: true } },
+  bankAccountRef: { select: { code1C: true } },
+  cashFlowArticleRef: { select: { code1C: true } },
+} satisfies Prisma.MgrCashOrderSelect;
+
+/**
+ * Fire-and-forget: ставить у чергу sync прихідний ордер + ордер-здачу (за
+ * наявності). Кожен enqueue ловить власну помилку (sync — best-effort), щоб не
+ * зачепити вже відданий 201. Перевантажуємо ордери з relations через
+ * findUnique бо `createPaymentOrders` повертає «голі» рядки без code1C-relations.
+ */
+async function enqueueOrdersForSync(
+  incomeId: string,
+  changeId: string | null,
+): Promise<void> {
+  const ids = changeId ? [incomeId, changeId] : [incomeId];
+  for (const id of ids) {
+    try {
+      const order = await prisma.mgrCashOrder.findUnique({
+        where: { id },
+        select: cashOrderSyncSelect,
+      });
+      if (order) {
+        await enqueueCashOrderCreate(order).catch((e) => {
+          console.warn("[L-TEX] enqueueCashOrderCreate failed", {
+            cashOrderId: id,
+            error: e instanceof Error ? e.message : String(e),
+          });
+        });
+      }
+    } catch (e) {
+      console.warn("[L-TEX] cash order sync reload failed", {
+        cashOrderId: id,
+        error: e instanceof Error ? e.message : String(e),
+      });
+    }
   }
 }

@@ -96,3 +96,28 @@ export interface RealizationCreateError {
 export type RealizationCreateResult =
   | RealizationCreateSuccess
   | RealizationCreateError;
+
+// ─── Оплати / Каса (Етап 3): cash order shapes ──────────────────────────────
+
+export interface CashOrderCreateRequest {
+  idempotencyKey: string;
+  payload: Record<string, unknown>;
+}
+
+export interface CashOrderCreateSuccess {
+  ok: true;
+  cashOrderCode1C: string;
+  mockMode?: boolean;
+  errors?: string[];
+}
+
+export interface CashOrderCreateError {
+  ok: false;
+  errorCode: number;
+  errorMessage: string;
+  mockMode?: boolean;
+}
+
+export type CashOrderCreateResult =
+  | CashOrderCreateSuccess
+  | CashOrderCreateError;

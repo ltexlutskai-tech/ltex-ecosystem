@@ -363,3 +363,110 @@ export async function enqueueSaleCreate(sale: SaleForEnqueue) {
     },
   });
 }
+
+/**
+ * Shape для `enqueueCashOrderCreate` — мінімум полів з MgrCashOrder + relations
+ * для payload-у `СоздатьПКО` SOAP-operation (див. docs/1C_SYNC_MODULES_SPEC.md
+ * §3.5). Один мобільний касовий ордер → до 3 ПКО/РКО у central 1С (по одному на
+ * валюту з ненульовою сумою) + безнал як платіжне доручення (контракт §H аудиту).
+ *
+ * Усі numeric поля передаються як string з `.` decimal separator (1С парсить
+ * через Число()). Курси — 4 знаки. `customer`/`sale` несуть code1C як 1С-ключі;
+ * `bankAccountRef`/`cashFlowArticleRef` — code1C довідників. Мультивалютні
+ * UUID-ключі (`uidUah`/`uidEur`/`uidUsd`) — `УИДГРН`/`ПКО_УИД`/`УИДUSD`.
+ */
+export interface CashOrderForEnqueue {
+  id: string;
+  code1C: string | null;
+  docNumber: number;
+  type: string; // income | expense (Приход/Расход)
+  amountUah: number;
+  amountEur: number;
+  amountUsd: number;
+  amountUahCashless: number;
+  rateEur: number;
+  rateUsd: number;
+  documentSumEur: number;
+  debtCorrection: number;
+  correctionUid: string | null;
+  changeForId: string | null;
+  uidUah: string | null;
+  uidEur: string | null;
+  uidUsd: string | null;
+  customer: { code1C: string | null } | null;
+  sale: { code1C: string | null } | null;
+  bankAccountRef: { code1C: string | null } | null;
+  cashFlowArticleRef: { code1C: string | null } | null;
+}
+
+export interface CashOrderCreatePayload {
+  cashOrderInternalId: string;
+  code1C: string | null;
+  docNumber: number;
+  /** Приход/Расход (ВидДвижения). */
+  type: string;
+  customerCode1C: string | null;
+  saleCode1C: string | null;
+  amountUah: string;
+  amountEur: string;
+  amountUsd: string;
+  amountUahCashless: string;
+  rateEur: string;
+  rateUsd: string;
+  documentSumEur: string;
+  debtCorrection: string;
+  correctionUid: string | null;
+  bankAccountCode1C: string | null;
+  cashFlowArticleCode1C: string | null;
+  /** Прапор `Сдача` (1С) — ордер є здачею до прихідного. */
+  isChange: boolean;
+  /** Мультивалютні бізнес-ключі обміну (УИДГРН / ПКО_УИД / УИДUSD). */
+  uidUah: string;
+  uidEur: string;
+  uidUsd: string;
+}
+
+export function buildCashOrderCreatePayload(
+  order: CashOrderForEnqueue,
+): CashOrderCreatePayload {
+  return {
+    cashOrderInternalId: order.id,
+    code1C: order.code1C,
+    docNumber: order.docNumber,
+    type: order.type,
+    customerCode1C: order.customer?.code1C ?? null,
+    saleCode1C: order.sale?.code1C ?? null,
+    amountUah: order.amountUah.toFixed(2),
+    amountEur: order.amountEur.toFixed(2),
+    amountUsd: order.amountUsd.toFixed(2),
+    amountUahCashless: order.amountUahCashless.toFixed(2),
+    rateEur: order.rateEur.toFixed(4),
+    rateUsd: order.rateUsd.toFixed(4),
+    documentSumEur: order.documentSumEur.toFixed(2),
+    debtCorrection: order.debtCorrection.toFixed(2),
+    correctionUid: emptyToNull(order.correctionUid),
+    bankAccountCode1C: order.bankAccountRef?.code1C ?? null,
+    cashFlowArticleCode1C: order.cashFlowArticleRef?.code1C ?? null,
+    isChange: order.changeForId != null,
+    // Мультивалютні UUID-ключі: беремо збережені на ордері, інакше генеруємо для
+    // payload-у (scaffold-спрощення — у фінальній версії ключі персистяться на
+    // MgrCashOrder при створенні через ПередЗаписью-аналог; див. §3.5 спеки).
+    uidUah: emptyToNull(order.uidUah) ?? randomUUID(),
+    uidEur: emptyToNull(order.uidEur) ?? randomUUID(),
+    uidUsd: emptyToNull(order.uidUsd) ?? randomUUID(),
+  };
+}
+
+export async function enqueueCashOrderCreate(order: CashOrderForEnqueue) {
+  const payload = buildCashOrderCreatePayload(order);
+  return prisma.mgrSyncJob.create({
+    data: {
+      entityType: "cash_order",
+      entityId: order.id,
+      action: "create",
+      payload: payload as unknown as Prisma.InputJsonValue,
+      idempotencyKey: randomUUID(),
+      nextAttemptAt: new Date(),
+    },
+  });
+}
