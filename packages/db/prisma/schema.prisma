@@ -185,6 +185,7 @@ model Customer {
 
   orders             Order[]
   sales              Sale[]
+  cashOrders         MgrCashOrder[]
   cart               Cart?
   chatMessages       ChatMessage[]
   videoSubscriptions VideoSubscription[]
@@ -302,28 +303,89 @@ model Sale {
 model MgrCashOrder {
   id                String   @id @default(cuid())
   code1C            String?  @unique @map("code_1c")
+  docNumber         Int      @default(autoincrement()) @map("doc_number")
   saleId            String?  @map("sale_id")
+  customerId        String?  @map("customer_id") // Контрагент (standalone-оплата без реалізації)
   type              String // income | expense (Приход/Расход)
   amountUah         Float    @default(0) @map("amount_uah")
   amountEur         Float    @default(0) @map("amount_eur")
   amountUsd         Float    @default(0) @map("amount_usd")
   amountUahCashless Float    @default(0) @map("amount_uah_cashless")
-  changeCurrency    String?  @map("change_currency") // UAH|EUR|USD (лише expense)
+  changeCurrency    String?  @map("change_currency") // deprecated (3-валютна здача — у amount* expense-ордера)
   changeForId       String?  @map("change_for_id") // expense → його прихідний ордер
-  bankAccount       String?  @map("bank_account")
-  cashFlowArticle   String?  @map("cash_flow_article")
+  // Довідники (← 1С БанковскиеСчета / СтатьиДвиженияДенежныхСредств).
+  bankAccountId     String?  @map("bank_account_id")
+  cashFlowArticleId String?  @map("cash_flow_article_id")
+  bankAccount       String?  @map("bank_account") // deprecated free-text (заміщено bankAccountId)
+  cashFlowArticle   String?  @map("cash_flow_article") // deprecated free-text
+  // Курси-знімок (КурсEUR/КурсUSD = грн за €/$) + зведена сума у EUR (СуммаДокумента).
+  rateEur           Float    @default(0) @map("rate_eur")
+  rateUsd           Float    @default(0) @map("rate_usd")
+  documentSumEur    Float    @default(0) @map("document_sum_eur")
+  // Коректировка боргу (знижка на залишок без реалізації) + ключ корекції.
+  debtCorrection    Float    @default(0) @map("debt_correction")
+  correctionUid     String?  @map("correction_uid")
+  // Мультивалютні бізнес-ключі обміну (УИДГРН / ПКО_УИД / УИДUSD).
+  uidUah            String?  @map("uid_uah")
+  uidEur            String?  @map("uid_eur")
+  uidUsd            String?  @map("uid_usd")
+  archived          Boolean  @default(false)
   comment           String?
   agentUserId       String?  @map("agent_user_id")
   paidAt            DateTime @default(now()) @map("paid_at")
   createdAt         DateTime @default(now()) @map("created_at")
   updatedAt         DateTime @updatedAt @map("updated_at")
 
-  sale      Sale?          @relation(fields: [saleId], references: [id], onDelete: SetNull)
-  changeFor MgrCashOrder?  @relation("CashOrderChange", fields: [changeForId], references: [id])
-  changes   MgrCashOrder[] @relation("CashOrderChange")
+  sale               Sale?               @relation(fields: [saleId], references: [id], onDelete: SetNull)
+  customer           Customer?           @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  bankAccountRef     MgrBankAccount?     @relation(fields: [bankAccountId], references: [id], onDelete: SetNull)
+  cashFlowArticleRef MgrCashFlowArticle? @relation(fields: [cashFlowArticleId], references: [id], onDelete: SetNull)
+  changeFor          MgrCashOrder?       @relation("CashOrderChange", fields: [changeForId], references: [id])
+  changes            MgrCashOrder[]      @relation("CashOrderChange")
 
   @@index([saleId])
+  @@index([customerId])
+  @@index([archived])
   @@map("mgr_cash_orders")
+}
+
+// ─── Довідник банк. рахунків (← 1С Catalog.БанковскиеСчета) ─────────────────
+// Рахунки L-TEX для прийому безготівки. `hiddenInApp` = НеВідображатиВДодатку
+// (не можна вибирати при приході). Поки порожній — наповнюється вручну / з 1С.
+
+model MgrBankAccount {
+  id          String   @id @default(cuid())
+  code1C      String?  @unique @map("code_1c")
+  name        String
+  description String?
+  hiddenInApp Boolean  @default(false) @map("hidden_in_app")
+  archived    Boolean  @default(false)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  cashOrders MgrCashOrder[]
+
+  @@map("mgr_bank_accounts")
+}
+
+// ─── Довідник статей руху коштів (← 1С Catalog.СтатьиДвиженияДенежныхСредств) ─
+// Стаття обов'язкова для Расход-ордерів. 2-рівнева ієрархія через parentId.
+
+model MgrCashFlowArticle {
+  id        String   @id @default(cuid())
+  code1C    String?  @unique @map("code_1c")
+  code      String?
+  name      String
+  parentId  String?  @map("parent_id")
+  archived  Boolean  @default(false)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  parent     MgrCashFlowArticle?  @relation("CashFlowArticleTree", fields: [parentId], references: [id], onDelete: SetNull)
+  children   MgrCashFlowArticle[] @relation("CashFlowArticleTree")
+  cashOrders MgrCashOrder[]
+
+  @@map("mgr_cash_flow_articles")
 }
 
 model SaleItem {
@@ -1076,6 +1138,7 @@ enum SyncEntityType {
   order
   payment
   realization
+  cash_order
 
   @@map("mgr_sync_entity_type")
 }
