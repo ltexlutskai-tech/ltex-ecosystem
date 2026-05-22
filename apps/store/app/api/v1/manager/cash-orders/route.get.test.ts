@@ -25,9 +25,13 @@ vi.mock("@/lib/auth/manager-auth", () => ({
 vi.mock("@/lib/manager/sale-ownership", () => ({
   getMyClientCodes1C: (...a: unknown[]) => getMyClientCodes1CMock(...a),
 }));
-// createCashOrderWithChange imported by route but unused in GET — stub it.
+// createPaymentOrders imported by route but unused in GET — stub it.
 vi.mock("@/lib/manager/cash-order", () => ({
-  createCashOrderWithChange: vi.fn(),
+  createPaymentOrders: vi.fn(),
+}));
+vi.mock("@/lib/manager/resolve-customer", () => ({
+  resolveCustomerForOrder: vi.fn(),
+  ResolveCustomerError: class extends Error {},
 }));
 
 import { GET } from "./route";

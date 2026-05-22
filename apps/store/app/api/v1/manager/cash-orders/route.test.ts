@@ -8,15 +8,30 @@ const {
   mockPrisma,
   getCurrentUserMock,
   getMyClientCodes1CMock,
-  createCashOrderWithChangeMock,
-} = vi.hoisted(() => ({
-  mockPrisma: {
-    sale: { findUnique: vi.fn() },
-  },
-  getCurrentUserMock: vi.fn(),
-  getMyClientCodes1CMock: vi.fn(),
-  createCashOrderWithChangeMock: vi.fn(),
-}));
+  createPaymentOrdersMock,
+  resolveCustomerMock,
+  ResolveCustomerErrorClass,
+} = vi.hoisted(() => {
+  class ResolveCustomerError extends Error {
+    status: number;
+    constructor(message: string, status = 400) {
+      super(message);
+      this.name = "ResolveCustomerError";
+      this.status = status;
+    }
+  }
+  return {
+    mockPrisma: {
+      sale: { findUnique: vi.fn() },
+      mgrBankAccount: { findUnique: vi.fn() },
+    },
+    getCurrentUserMock: vi.fn(),
+    getMyClientCodes1CMock: vi.fn(),
+    createPaymentOrdersMock: vi.fn(),
+    resolveCustomerMock: vi.fn(),
+    ResolveCustomerErrorClass: ResolveCustomerError,
+  };
+});
 
 vi.mock("@ltex/db", () => ({
   prisma: mockPrisma,
@@ -29,8 +44,11 @@ vi.mock("@/lib/manager/sale-ownership", () => ({
   getMyClientCodes1C: (...a: unknown[]) => getMyClientCodes1CMock(...a),
 }));
 vi.mock("@/lib/manager/cash-order", () => ({
-  createCashOrderWithChange: (...a: unknown[]) =>
-    createCashOrderWithChangeMock(...a),
+  createPaymentOrders: (...a: unknown[]) => createPaymentOrdersMock(...a),
+}));
+vi.mock("@/lib/manager/resolve-customer", () => ({
+  resolveCustomerForOrder: (...a: unknown[]) => resolveCustomerMock(...a),
+  ResolveCustomerError: ResolveCustomerErrorClass,
 }));
 
 import { POST } from "./route";
@@ -46,34 +64,39 @@ function postReq(body: unknown): NextRequest {
   });
 }
 
-const validBody = { saleId: "sale1", amountUah: 1200 };
+const validBody = {
+  saleId: "sale1",
+  amountUah: 4300,
+  rateEur: 43,
+  rateUsd: 40,
+  sumToPayEur: 100,
+};
 
 function fakeSale(code1C: string | null = "000001") {
-  return {
-    id: "sale1",
-    totalEur: 100,
-    exchangeRateEur: 43,
-    exchangeRateUsd: 40,
-    cashOnDelivery: false,
-    customer: { code1C },
-  };
+  return { id: "sale1", customer: { id: "cust1", code1C } };
 }
 
 beforeEach(() => {
   vi.clearAllMocks();
   getCurrentUserMock.mockResolvedValue(MANAGER);
   getMyClientCodes1CMock.mockResolvedValue(["000001"]);
+  createPaymentOrdersMock.mockResolvedValue({
+    income: { id: "co1" },
+    change: null,
+  });
 });
 
-describe("POST /api/v1/manager/cash-orders", () => {
+describe("POST /api/v1/manager/cash-orders (Етап 2)", () => {
   it("returns 401 when not authed", async () => {
     getCurrentUserMock.mockResolvedValueOnce(null);
     const res = await POST(postReq(validBody));
     expect(res.status).toBe(401);
   });
 
-  it("returns 400 on invalid body (no amounts)", async () => {
-    const res = await POST(postReq({ saleId: "sale1" }));
+  it("returns 400 on invalid body (no saleId/clientId)", async () => {
+    const res = await POST(
+      postReq({ amountUah: 100, rateEur: 43, rateUsd: 40, sumToPayEur: 100 }),
+    );
     expect(res.status).toBe(400);
   });
 
@@ -83,38 +106,102 @@ describe("POST /api/v1/manager/cash-orders", () => {
     expect(res.status).toBe(404);
   });
 
-  it("returns 403 when manager is not the client's owner", async () => {
+  it("returns 403 when manager is not the sale client's owner", async () => {
     mockPrisma.sale.findUnique.mockResolvedValueOnce(fakeSale("FOREIGN"));
     const res = await POST(postReq(validBody));
     expect(res.status).toBe(403);
-    expect(createCashOrderWithChangeMock).not.toHaveBeenCalled();
+    expect(createPaymentOrdersMock).not.toHaveBeenCalled();
   });
 
-  it("creates an income cash order (201) and passes dueUah", async () => {
+  it("creates income via saleId (201) and passes rates + customerId", async () => {
     mockPrisma.sale.findUnique.mockResolvedValueOnce(fakeSale("000001"));
-    createCashOrderWithChangeMock.mockResolvedValueOnce({
-      income: { id: "co1" },
-      change: null,
-    });
     const res = await POST(postReq(validBody));
     expect(res.status).toBe(201);
-    const call = createCashOrderWithChangeMock.mock.calls[0]?.[0] as {
-      dueUah: number;
+    const call = createPaymentOrdersMock.mock.calls[0]?.[0] as {
+      saleId: string;
+      customerId: string;
       rates: { eur: number; usd: number };
+      sumToPayEur: number;
     };
-    expect(call.dueUah).toBe(4300); // 100 * 43
+    expect(call.saleId).toBe("sale1");
+    expect(call.customerId).toBe("cust1");
     expect(call.rates.eur).toBe(43);
+    expect(call.sumToPayEur).toBe(100);
   });
 
-  it("returns change order on overpay", async () => {
-    mockPrisma.sale.findUnique.mockResolvedValueOnce(fakeSale("000001"));
-    createCashOrderWithChangeMock.mockResolvedValueOnce({
-      income: { id: "co1" },
-      change: { id: "co2", type: "expense", amountUah: 200 },
+  it("creates income via clientId (resolves customer)", async () => {
+    resolveCustomerMock.mockResolvedValueOnce({
+      id: "cust9",
+      code1C: "000001",
+      name: "Клієнт",
     });
     const res = await POST(
-      postReq({ saleId: "sale1", amountUah: 4500, changeCurrency: "UAH" }),
+      postReq({
+        clientId: "mgr9",
+        amountUah: 4300,
+        rateEur: 43,
+        rateUsd: 40,
+        sumToPayEur: 100,
+      }),
     );
+    expect(res.status).toBe(201);
+    const call = createPaymentOrdersMock.mock.calls[0]?.[0] as {
+      customerId: string;
+      saleId: string | null;
+    };
+    expect(call.customerId).toBe("cust9");
+    expect(call.saleId).toBeNull();
+  });
+
+  it("returns 403 when manager does not own resolved client", async () => {
+    resolveCustomerMock.mockResolvedValueOnce({
+      id: "cust9",
+      code1C: "FOREIGN",
+      name: "Клієнт",
+    });
+    const res = await POST(
+      postReq({
+        clientId: "mgr9",
+        amountUah: 4300,
+        rateEur: 43,
+        rateUsd: 40,
+        sumToPayEur: 100,
+      }),
+    );
+    expect(res.status).toBe(403);
+    expect(createPaymentOrdersMock).not.toHaveBeenCalled();
+  });
+
+  it("returns 400 expense without article (schema refine)", async () => {
+    const res = await POST(
+      postReq({
+        saleId: "sale1",
+        type: "expense",
+        rateEur: 43,
+        rateUsd: 40,
+        sumToPayEur: 100,
+      }),
+    );
+    expect(res.status).toBe(400);
+  });
+
+  it("returns 400 when income uses a hidden bank account", async () => {
+    mockPrisma.sale.findUnique.mockResolvedValueOnce(fakeSale("000001"));
+    mockPrisma.mgrBankAccount.findUnique.mockResolvedValueOnce({
+      hiddenInApp: true,
+    });
+    const res = await POST(postReq({ ...validBody, bankAccountId: "ba1" }));
+    expect(res.status).toBe(400);
+    expect(createPaymentOrdersMock).not.toHaveBeenCalled();
+  });
+
+  it("returns change order on manual change", async () => {
+    mockPrisma.sale.findUnique.mockResolvedValueOnce(fakeSale("000001"));
+    createPaymentOrdersMock.mockResolvedValueOnce({
+      income: { id: "co1" },
+      change: { id: "co2", type: "expense" },
+    });
+    const res = await POST(postReq({ ...validBody, changeUah: 200 }));
     expect(res.status).toBe(201);
     const json = (await res.json()) as { change: { id: string } | null };
     expect(json.change?.id).toBe("co2");
@@ -124,10 +211,6 @@ describe("POST /api/v1/manager/cash-orders", () => {
     getCurrentUserMock.mockResolvedValueOnce(ADMIN);
     getMyClientCodes1CMock.mockResolvedValueOnce(null);
     mockPrisma.sale.findUnique.mockResolvedValueOnce(fakeSale("FOREIGN"));
-    createCashOrderWithChangeMock.mockResolvedValueOnce({
-      income: { id: "co1" },
-      change: null,
-    });
     const res = await POST(postReq(validBody));
     expect(res.status).toBe(201);
   });

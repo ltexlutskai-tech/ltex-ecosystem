@@ -21,6 +21,13 @@ import {
   computeCashSummary,
   convertUahTo,
   createCashOrderWithChange,
+  createPaymentOrders,
+  reduceToEur,
+  reduceChangeToEur,
+  computeBalanceEur,
+  computePaymentRecommendations,
+  computeChangeRecommendations,
+  PAYMENT_REMAINDER_DISCOUNT_THRESHOLD_EUR,
 } from "./cash-order";
 
 const rates = { eur: 43, usd: 40 };
@@ -353,5 +360,204 @@ describe("createCashOrderWithChange", () => {
       data: { codAmountUah: number | null };
     };
     expect(upd.data.codAmountUah).toBeNull();
+  });
+});
+
+// ─── Етап 2: EUR-base формули (аудит §B; rEur=43, rUsd=40) ──────────────────
+
+describe("reduceToEur", () => {
+  it("sums cash EUR + UAH/43 + cashless/43 + USD*40/43", () => {
+    // 10€ + 430грн(=10€) + 215грн безнал(=5€) + 21.5$(*40/43=20€) = 45€
+    const r = reduceToEur(
+      { uah: 430, eur: 10, usd: 21.5, uahCashless: 215 },
+      rates,
+    );
+    expect(r).toBe(45);
+  });
+  it("pure UAH cash → /rEur (round2)", () => {
+    // 100грн / 43 = 2.3255… → 2.33
+    expect(
+      reduceToEur({ uah: 100, eur: 0, usd: 0, uahCashless: 0 }, rates),
+    ).toBe(2.33);
+  });
+  it("rEur<=0 → UAH/cashless/USD contributions are 0", () => {
+    expect(
+      reduceToEur(
+        { uah: 1000, eur: 7, usd: 50, uahCashless: 500 },
+        { eur: 0, usd: 40 },
+      ),
+    ).toBe(7);
+  });
+  it("rUsd<=0 → USD contribution 0 (UAH still counts)", () => {
+    // 430грн/43 = 10€; USD ignored
+    expect(
+      reduceToEur(
+        { uah: 430, eur: 0, usd: 100, uahCashless: 0 },
+        { eur: 43, usd: 0 },
+      ),
+    ).toBe(10);
+  });
+});
+
+describe("reduceChangeToEur", () => {
+  it("sums change EUR + UAH/43 + USD*40/43 (no cashless)", () => {
+    // 5€ + 430грн(10€) + 4.3$(*40/43=4€) = 19€
+    expect(reduceChangeToEur({ uah: 430, eur: 5, usd: 4.3 }, rates)).toBe(19);
+  });
+  it("rEur<=0 → only EUR cash counts", () => {
+    expect(
+      reduceChangeToEur({ uah: 1000, eur: 3, usd: 50 }, { eur: 0, usd: 40 }),
+    ).toBe(3);
+  });
+});
+
+describe("computeBalanceEur", () => {
+  it("debt when underpaid (>0)", () => {
+    expect(
+      computeBalanceEur({ sumToPayEur: 100, paidEur: 60, changeEur: 0 }),
+    ).toBe(40);
+  });
+  it("overpay when paid more (negative)", () => {
+    expect(
+      computeBalanceEur({ sumToPayEur: 100, paidEur: 130, changeEur: 0 }),
+    ).toBe(-30);
+  });
+  it("change adds back to balance", () => {
+    // paid 130, but 30 returned as change → net settled
+    expect(
+      computeBalanceEur({ sumToPayEur: 100, paidEur: 130, changeEur: 30 }),
+    ).toBe(0);
+  });
+});
+
+describe("computePaymentRecommendations", () => {
+  it("recommends remaining in 3 currencies", () => {
+    // remain = 100 - 60 = 40€ → 1720грн, 43$ (40*43/40)
+    const r = computePaymentRecommendations({
+      sumToPayEur: 100,
+      paidEur: 60,
+      rates,
+    });
+    expect(r.payEur).toBe(40);
+    expect(r.payUah).toBe(1720);
+    expect(r.payUsd).toBe(43);
+  });
+  it("returns all zero when overpaid (remain < 0)", () => {
+    const r = computePaymentRecommendations({
+      sumToPayEur: 100,
+      paidEur: 120,
+      rates,
+    });
+    expect(r).toEqual({ payEur: 0, payUah: 0, payUsd: 0 });
+  });
+  it("zero rates guard → UAH/USD recs are 0", () => {
+    const r = computePaymentRecommendations({
+      sumToPayEur: 100,
+      paidEur: 0,
+      rates: { eur: 0, usd: 0 },
+    });
+    expect(r.payEur).toBe(100);
+    expect(r.payUah).toBe(0);
+    expect(r.payUsd).toBe(0);
+  });
+});
+
+describe("computeChangeRecommendations", () => {
+  it("recommends change in 3 currencies when overpaid", () => {
+    // balance -30€ → 30€, 1290грн, 32.25$ (30*43/40)
+    const r = computeChangeRecommendations({ balanceEur: -30, rates });
+    expect(r.changeEur).toBe(30);
+    expect(r.changeUah).toBe(1290);
+    expect(r.changeUsd).toBe(32.25);
+  });
+  it("returns zero when no overpay (balance >= 0)", () => {
+    expect(computeChangeRecommendations({ balanceEur: 10, rates })).toEqual({
+      changeEur: 0,
+      changeUah: 0,
+      changeUsd: 0,
+    });
+  });
+});
+
+describe("PAYMENT_REMAINDER_DISCOUNT_THRESHOLD_EUR", () => {
+  it("defaults to 5 €", () => {
+    expect(PAYMENT_REMAINDER_DISCOUNT_THRESHOLD_EUR).toBe(5);
+  });
+});
+
+describe("createPaymentOrders", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockPrisma.sale.findUnique.mockResolvedValue({ cashOnDelivery: false });
+    mockPrisma.mgrCashOrder.findMany.mockResolvedValue([]);
+  });
+
+  it("creates income order with documentSumEur (no change)", async () => {
+    mockPrisma.mgrCashOrder.create.mockResolvedValueOnce({ id: "co1" });
+    const r = await createPaymentOrders({
+      saleId: "sale1",
+      customerId: "cust1",
+      type: "income",
+      paid: { uah: 4300, eur: 0, usd: 0, uahCashless: 0 },
+      change: { uah: 0, eur: 0, usd: 0 },
+      rates,
+      sumToPayEur: 100,
+    });
+    expect(r.change).toBeNull();
+    expect(mockPrisma.mgrCashOrder.create).toHaveBeenCalledTimes(1);
+    const data = mockPrisma.mgrCashOrder.create.mock.calls[0]?.[0] as {
+      data: {
+        type: string;
+        documentSumEur: number;
+        rateEur: number;
+        customerId: string;
+      };
+    };
+    expect(data.data.type).toBe("income");
+    expect(data.data.documentSumEur).toBe(100); // 4300/43
+    expect(data.data.rateEur).toBe(43);
+    expect(data.data.customerId).toBe("cust1");
+  });
+
+  it("creates expense change order on manual change", async () => {
+    mockPrisma.mgrCashOrder.create
+      .mockResolvedValueOnce({ id: "co-income" })
+      .mockResolvedValueOnce({ id: "co-change" });
+    const r = await createPaymentOrders({
+      saleId: "sale1",
+      type: "income",
+      paid: { uah: 4730, eur: 0, usd: 0, uahCashless: 0 },
+      change: { uah: 430, eur: 0, usd: 0 },
+      rates,
+      sumToPayEur: 100,
+    });
+    expect(r.change).not.toBeNull();
+    expect(mockPrisma.mgrCashOrder.create).toHaveBeenCalledTimes(2);
+    const expense = mockPrisma.mgrCashOrder.create.mock.calls[1]?.[0] as {
+      data: {
+        type: string;
+        changeForId: string;
+        amountUah: number;
+        documentSumEur: number;
+      };
+    };
+    expect(expense.data.type).toBe("expense");
+    expect(expense.data.changeForId).toBe("co-income");
+    expect(expense.data.amountUah).toBe(430);
+    expect(expense.data.documentSumEur).toBe(10); // 430/43
+  });
+
+  it("supports standalone payment without saleId (no sale.update)", async () => {
+    mockPrisma.mgrCashOrder.create.mockResolvedValueOnce({ id: "co1" });
+    await createPaymentOrders({
+      saleId: null,
+      customerId: "cust1",
+      type: "income",
+      paid: { uah: 4300, eur: 0, usd: 0, uahCashless: 0 },
+      change: { uah: 0, eur: 0, usd: 0 },
+      rates,
+      sumToPayEur: 100,
+    });
+    expect(mockPrisma.sale.update).not.toHaveBeenCalled();
   });
 });

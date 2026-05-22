@@ -2,8 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { Prisma, prisma } from "@ltex/db";
 import { getCurrentUser } from "@/lib/auth/manager-auth";
 import { getMyClientCodes1C } from "@/lib/manager/sale-ownership";
-import { createCashOrderWithChange } from "@/lib/manager/cash-order";
-import { createCashOrderSchema } from "@/lib/validations/manager-cash-order";
+import { createPaymentOrders } from "@/lib/manager/cash-order";
+import {
+  resolveCustomerForOrder,
+  ResolveCustomerError,
+} from "@/lib/manager/resolve-customer";
+import { processPaymentSchema } from "@/lib/validations/manager-cash-order";
 import {
   buildCashOrdersWhere,
   cashOrderRowInclude,
@@ -84,11 +88,14 @@ export async function GET(req: NextRequest) {
 }
 
 /**
- * Блок «Реалізація» — Етап 4. Створення касового ордера (оплати) по реалізації.
+ * Блок «Оплати / Каса» — Етап 2. Створення касового ордера (порт 1С обробки
+ * «Оплата»). EUR-base модель (`docs/PAYMENTS_BLOCK_AUDIT.md` §B).
  *
- * Сума до оплати = round(Sale.totalEur × Sale.exchangeRateEur) грн. Здача
- * рахується через курси-знімок реалізації (EUR/USD), при здачі > 0
- * авто-створюється ордер-розхід.
+ * Підстава — реалізація (`saleId`) АБО клієнт (`clientId` = MgrClient.id,
+ * резолвиться у Customer через code1C). Курси-знімок беруться з форми
+ * (`rateEur`/`rateUsd`). 4 канали фактичної оплати + ручна решта у 3 валютах;
+ * при здачі > 0 авто-створюється ордер-розхід (`changeForId`). Анти-дубля немає
+ * (кілька оплат на одну реалізацію дозволено).
  */
 export async function POST(req: NextRequest) {
   const user = await getCurrentUser(req);
@@ -97,7 +104,7 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json().catch(() => null);
-  const parsed = createCashOrderSchema.safeParse(body);
+  const parsed = processPaymentSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json(
       { error: "Невірні дані", details: parsed.error.issues.slice(0, 5) },
@@ -106,51 +113,89 @@ export async function POST(req: NextRequest) {
   }
   const input = parsed.data;
 
-  const sale = await prisma.sale.findUnique({
-    where: { id: input.saleId },
-    select: {
-      id: true,
-      totalEur: true,
-      exchangeRateEur: true,
-      exchangeRateUsd: true,
-      cashOnDelivery: true,
-      customer: { select: { code1C: true } },
-    },
-  });
-  if (!sale) {
-    return NextResponse.json(
-      { error: "Реалізацію не знайдено" },
-      { status: 404 },
-    );
+  // Скоуп ownership: manager — лише свої клієнти; admin — будь-кого.
+  const myCodes = await getMyClientCodes1C(user);
+
+  let saleId: string | null = null;
+  let customerId: string | null = null;
+
+  // ─── Резолв платника + ownership ───────────────────────────────────────────
+  if (input.saleId) {
+    const sale = await prisma.sale.findUnique({
+      where: { id: input.saleId },
+      select: { id: true, customer: { select: { id: true, code1C: true } } },
+    });
+    if (!sale) {
+      return NextResponse.json(
+        { error: "Реалізацію не знайдено" },
+        { status: 404 },
+      );
+    }
+    if (myCodes !== null) {
+      if (!sale.customer.code1C || !myCodes.includes(sale.customer.code1C)) {
+        return NextResponse.json({ error: "Не ваш клієнт" }, { status: 403 });
+      }
+    }
+    saleId = sale.id;
+    customerId = sale.customer.id;
+  } else if (input.clientId) {
+    let resolved;
+    try {
+      resolved = await resolveCustomerForOrder(input.clientId);
+    } catch (err) {
+      if (err instanceof ResolveCustomerError) {
+        return NextResponse.json(
+          { error: err.message },
+          { status: err.status },
+        );
+      }
+      throw err;
+    }
+    if (myCodes !== null) {
+      if (!resolved.code1C || !myCodes.includes(resolved.code1C)) {
+        return NextResponse.json({ error: "Не ваш клієнт" }, { status: 403 });
+      }
+    }
+    customerId = resolved.id;
   }
 
-  // Ownership: manager — лише свої клієнти; admin — будь-кого.
-  const myCodes = await getMyClientCodes1C(user);
-  if (myCodes !== null) {
-    if (!sale.customer.code1C || !myCodes.includes(sale.customer.code1C)) {
-      return NextResponse.json({ error: "Не ваш клієнт" }, { status: 403 });
+  // ─── Гард банк. рахунку при приході (1С §F) ─────────────────────────────────
+  if (input.type === "income" && input.bankAccountId) {
+    const acct = await prisma.mgrBankAccount.findUnique({
+      where: { id: input.bankAccountId },
+      select: { hiddenInApp: true },
+    });
+    if (acct?.hiddenInApp) {
+      return NextResponse.json(
+        { error: "Цей рахунок не можна вибирати при приході" },
+        { status: 400 },
+      );
     }
   }
 
-  const rates = { eur: sale.exchangeRateEur, usd: sale.exchangeRateUsd };
-  const dueUah = Math.round(sale.totalEur * sale.exchangeRateEur);
+  const rates = { eur: input.rateEur, usd: input.rateUsd };
 
   try {
-    const { income, change } = await createCashOrderWithChange({
-      saleId: sale.id,
-      type: "income",
-      amounts: {
+    const { income, change } = await createPaymentOrders({
+      saleId,
+      customerId,
+      type: input.type,
+      paid: {
         uah: input.amountUah,
         eur: input.amountEur,
         usd: input.amountUsd,
         uahCashless: input.amountUahCashless,
       },
-      bankAccount: input.bankAccount ?? null,
-      cashFlowArticle: input.cashFlowArticle ?? null,
+      change: {
+        uah: input.changeUah,
+        eur: input.changeEur,
+        usd: input.changeUsd,
+      },
+      bankAccountId: input.bankAccountId ?? null,
+      cashFlowArticleId: input.cashFlowArticleId ?? null,
       comment: input.comment ?? null,
-      changeCurrency: input.changeCurrency,
-      dueUah,
       rates,
+      sumToPayEur: input.sumToPayEur,
       agentUserId: user.id,
     });
 
@@ -159,13 +204,13 @@ export async function POST(req: NextRequest) {
     if (err instanceof Prisma.PrismaClientKnownRequestError) {
       if (err.code === "P2003" || err.code === "P2025") {
         return NextResponse.json(
-          { error: "Невалідна реалізація" },
+          { error: "Невалідні дані оплати" },
           { status: 400 },
         );
       }
     }
     console.error("[L-TEX] Cash order create failed", {
-      saleId: input.saleId,
+      saleId,
       error: err instanceof Error ? err.message : String(err),
     });
     return NextResponse.json(
