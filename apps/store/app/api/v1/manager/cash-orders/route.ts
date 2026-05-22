@@ -4,6 +4,84 @@ import { getCurrentUser } from "@/lib/auth/manager-auth";
 import { getMyClientCodes1C } from "@/lib/manager/sale-ownership";
 import { createCashOrderWithChange } from "@/lib/manager/cash-order";
 import { createCashOrderSchema } from "@/lib/validations/manager-cash-order";
+import {
+  buildCashOrdersWhere,
+  cashOrderRowInclude,
+  normalizeCashOrderType,
+  serializeCashOrderRow,
+} from "@/lib/manager/cash-orders-list";
+
+const MAX_PAGE_SIZE = 100;
+const DEFAULT_PAGE_SIZE = 20;
+
+/**
+ * Блок «Оплати / Каса» — Етап 1. Список касових ордерів (1С ФормаСписка
+ * КассовыйОрдер) з ownership-фільтром, пошуком, фільтром виду/архіву/періоду.
+ */
+export async function GET(req: NextRequest) {
+  const user = await getCurrentUser(req);
+  if (!user) {
+    return NextResponse.json({ error: "Не авторизовано" }, { status: 401 });
+  }
+
+  const url = new URL(req.url);
+  const search = url.searchParams.get("search")?.trim() || undefined;
+  const type = normalizeCashOrderType(
+    url.searchParams.get("type") ?? undefined,
+  );
+  const archived = url.searchParams.get("archived") === "true";
+  const fromRaw = url.searchParams.get("from") ?? "";
+  const toRaw = url.searchParams.get("to") ?? "";
+
+  const pageNum = Number.parseInt(url.searchParams.get("page") ?? "", 10);
+  const pageSizeNum = Number.parseInt(
+    url.searchParams.get("pageSize") ?? "",
+    10,
+  );
+  const page = Number.isFinite(pageNum) && pageNum > 0 ? pageNum : 1;
+  const pageSize =
+    Number.isFinite(pageSizeNum) &&
+    pageSizeNum >= 10 &&
+    pageSizeNum <= MAX_PAGE_SIZE
+      ? pageSizeNum
+      : DEFAULT_PAGE_SIZE;
+
+  const myCodes = await getMyClientCodes1C(user);
+  // Manager без призначених клієнтів → порожній список (без зайвих запитів).
+  if (myCodes !== null && myCodes.length === 0) {
+    return NextResponse.json({ items: [], total: 0, page, pageSize });
+  }
+
+  const fromDate = fromRaw ? new Date(fromRaw) : undefined;
+  const toDate = toRaw ? new Date(toRaw) : undefined;
+
+  const where = buildCashOrdersWhere({
+    scope: myCodes,
+    search,
+    type,
+    archived,
+    from: fromDate && !Number.isNaN(fromDate.getTime()) ? fromDate : undefined,
+    to: toDate && !Number.isNaN(toDate.getTime()) ? toDate : undefined,
+  });
+
+  const [items, total] = await Promise.all([
+    prisma.mgrCashOrder.findMany({
+      where,
+      orderBy: { paidAt: "desc" },
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+      include: cashOrderRowInclude,
+    }),
+    prisma.mgrCashOrder.count({ where }),
+  ]);
+
+  return NextResponse.json({
+    items: items.map((o) => serializeCashOrderRow(o)),
+    total,
+    page,
+    pageSize,
+  });
+}
 
 /**
  * Блок «Реалізація» — Етап 4. Створення касового ордера (оплати) по реалізації.

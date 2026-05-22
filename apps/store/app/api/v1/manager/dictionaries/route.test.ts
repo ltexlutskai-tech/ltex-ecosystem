@@ -13,6 +13,8 @@ const { mockPrisma, getCurrentUserMock } = vi.hoisted(() => ({
     mgrAssortmentCode: { findMany: vi.fn() },
     mgrRoute: { findMany: vi.fn() },
     mgrPriceType: { findMany: vi.fn() },
+    mgrBankAccount: { findMany: vi.fn() },
+    mgrCashFlowArticle: { findMany: vi.fn() },
   },
   getCurrentUserMock: vi.fn(),
 }));
@@ -69,6 +71,12 @@ beforeEach(() => {
   mockPrisma.mgrPriceType.findMany.mockResolvedValue([
     { id: "pt1", code: "wholesale", label: "Оптові" },
   ]);
+  mockPrisma.mgrBankAccount.findMany.mockResolvedValue([
+    { id: "ba1", name: "ПриватБанк", hiddenInApp: false },
+  ]);
+  mockPrisma.mgrCashFlowArticle.findMany.mockResolvedValue([
+    { id: "cf1", code: "01", name: "Оплата покупця", parentId: null },
+  ]);
 });
 
 describe("GET /api/v1/manager/dictionaries", () => {
@@ -78,7 +86,7 @@ describe("GET /api/v1/manager/dictionaries", () => {
     expect(res.status).toBe(401);
   });
 
-  it("returns all 7 dictionary arrays + cache header", async () => {
+  it("returns all dictionary arrays + cache header", async () => {
     const res = await GET(makeReq());
     expect(res.status).toBe(200);
     expect(res.headers.get("Cache-Control")).toContain("max-age=60");
@@ -90,5 +98,26 @@ describe("GET /api/v1/manager/dictionaries", () => {
     expect(json.assortmentCodes).toHaveLength(1);
     expect(json.routes).toHaveLength(1);
     expect(json.priceTypes).toHaveLength(1);
+    expect(json.bankAccounts).toHaveLength(1);
+    expect(json.cashFlowArticles).toHaveLength(1);
+  });
+
+  it("maps bankAccounts + cashFlowArticles with expected shape", async () => {
+    const res = await GET(makeReq());
+    const json = (await res.json()) as {
+      bankAccounts: Array<Record<string, unknown>>;
+      cashFlowArticles: Array<Record<string, unknown>>;
+    };
+    expect(json.bankAccounts[0]).toEqual({
+      id: "ba1",
+      name: "ПриватБанк",
+      hiddenInApp: false,
+    });
+    expect(json.cashFlowArticles[0]).toEqual({
+      id: "cf1",
+      code: "01",
+      name: "Оплата покупця",
+      parentId: null,
+    });
   });
 });

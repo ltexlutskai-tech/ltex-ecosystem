@@ -1,5 +1,7 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
+import { Landmark, ListTree } from "lucide-react";
 import { prisma } from "@ltex/db";
 import {
   getCurrentUser,
@@ -57,6 +59,30 @@ export default async function SettingsPage() {
         telegramLinked={user.telegramLinked}
       />
       <SessionsSection sessions={sessions} />
+      {user.role === "admin" && (
+        <section className="rounded-lg border bg-white p-4">
+          <h2 className="text-sm font-semibold text-gray-700">Довідники</h2>
+          <p className="mt-1 text-xs text-gray-500">
+            Керування довідниками каси (лише адміністратор).
+          </p>
+          <div className="mt-3 grid gap-2 sm:grid-cols-2">
+            <Link
+              href="/manager/bank-accounts"
+              className="flex items-center gap-2 rounded-md border px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+            >
+              <Landmark className="h-4 w-4 text-green-600" />
+              Банківські рахунки
+            </Link>
+            <Link
+              href="/manager/cash-flow-articles"
+              className="flex items-center gap-2 rounded-md border px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+            >
+              <ListTree className="h-4 w-4 text-green-600" />
+              Статті руху коштів
+            </Link>
+          </div>
+        </section>
+      )}
       <div className="flex justify-end">
         <LogoutButton />
       </div>
