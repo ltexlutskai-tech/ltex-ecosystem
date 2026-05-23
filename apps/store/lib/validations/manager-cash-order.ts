@@ -47,3 +47,80 @@ export const createCashOrderSchema = z
 export type CreateCashOrderInput = z.infer<typeof createCashOrderSchema>;
 /** Pre-parse shape (defaults optional) — приймається `createCashOrderWithChange`. */
 export type CreateCashOrderInputRaw = z.input<typeof createCashOrderSchema>;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Блок «Оплати / Каса» — Етап 2. Payment-форма (порт 1С обробки «Оплата»).
+//
+// EUR-base модель: курси-знімок (`rateEur`/`rateUsd` = грн за €/$), 4 канали
+// фактичної оплати + ручна решта у 3 валютах. Підстава — реалізація (`saleId`)
+// АБО клієнт (`clientId` = MgrClient.id; резолвиться у Customer через code1C).
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const CASH_FLOW_DIRECTIONS = ["income", "expense"] as const;
+export type CashFlowDirection = (typeof CASH_FLOW_DIRECTIONS)[number];
+
+export const processPaymentSchema = z
+  .object({
+    /** Реалізація-підстава (опц.). Хоча б одне з {saleId, clientId} обов'язкове. */
+    saleId: z.string().min(1).optional(),
+    /** Клієнт (MgrClient.id) для оплати без реалізації. */
+    clientId: z.string().min(1).optional(),
+    /** Вид руху коштів. */
+    type: z.enum(CASH_FLOW_DIRECTIONS).default("income"),
+    // Фактична оплата (4 канали).
+    amountUah: amountField,
+    amountEur: amountField,
+    amountUsd: amountField,
+    amountUahCashless: amountField,
+    // Ручна решта (3 валюти).
+    changeUah: amountField,
+    changeEur: amountField,
+    changeUsd: amountField,
+    /** Банківський рахунок (довідник) — для безналу. */
+    bankAccountId: z.string().min(1).optional(),
+    /** Стаття руху коштів (довідник) — обов'язкова для Расход. */
+    cashFlowArticleId: z.string().min(1).optional(),
+    comment: z.string().max(2000).optional(),
+    /** Курси-знімок (грн за €/$). */
+    rateEur: z.number().positive().max(MAX_AMOUNT),
+    rateUsd: z.number().positive().max(MAX_AMOUNT),
+    /** «До оплати» (база EUR). */
+    sumToPayEur: z.number().nonnegative().max(MAX_AMOUNT),
+    /** Інформаційно — форма вже згорнула борг у sumToPayEur. */
+    includeDebt: z.boolean().optional().default(false),
+  })
+  .refine((v) => v.saleId || v.clientId, {
+    message: "Потрібна реалізація або клієнт",
+    path: ["saleId"],
+  })
+  .refine(
+    (v) =>
+      v.amountUah + v.amountEur + v.amountUsd + v.amountUahCashless > 0 ||
+      v.type === "expense",
+    {
+      message: "Має бути вказана хоча б одна сума оплати > 0",
+      path: ["amountUah"],
+    },
+  )
+  .refine((v) => v.type !== "expense" || Boolean(v.cashFlowArticleId), {
+    message: "Стаття руху коштів обов'язкова для Расход",
+    path: ["cashFlowArticleId"],
+  });
+
+export type ProcessPaymentInput = z.infer<typeof processPaymentSchema>;
+export type ProcessPaymentInputRaw = z.input<typeof processPaymentSchema>;
+
+/**
+ * Zod schema для POST /api/v1/manager/cash-orders/discount-remainder
+ * (1С `ДатьСкидкуНаОстаток`). Зменшує найдорожчий рядок реалізації на залишок.
+ */
+export const discountRemainderSchema = z.object({
+  saleId: z.string().min(1).optional(),
+  customerId: z.string().min(1).optional(),
+  /** Залишок документа у EUR (>0 борг, <0 переплата). Гард по порогу — у коді. */
+  remainderEur: z.number().max(MAX_AMOUNT).min(-MAX_AMOUNT),
+  rateEur: z.number().positive().max(MAX_AMOUNT),
+  rateUsd: z.number().positive().max(MAX_AMOUNT),
+});
+
+export type DiscountRemainderInput = z.infer<typeof discountRemainderSchema>;

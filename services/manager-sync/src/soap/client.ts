@@ -5,6 +5,8 @@ import {
   extractSoapReturn,
 } from "./envelope";
 import type {
+  CashOrderCreateRequest,
+  CashOrderCreateResult,
   ClientUpdateRequest,
   ClientUpdateResult,
   OrderCreateRequest,
@@ -362,6 +364,96 @@ function normalizeRealizationResult(parsed: unknown): RealizationCreateResult {
         typeof obj.realizationNumber === "string"
           ? obj.realizationNumber
           : undefined,
+      errors: Array.isArray(obj.errors)
+        ? obj.errors.filter((e): e is string => typeof e === "string")
+        : [],
+    };
+  }
+  return {
+    ok: false,
+    errorCode: typeof obj.errorCode === "number" ? obj.errorCode : 4,
+    errorMessage:
+      typeof obj.errorMessage === "string" ? obj.errorMessage : "Unknown error",
+  };
+}
+
+// ─── Оплати / Каса (Етап 3): cash order SOAP wrapper ────────────────────────
+
+/**
+ * Викликає 1С SOAP operation `СоздатьПКО` (касовий ордер).
+ * Mirror-ить `createRealizationViaSoap` pattern — fetch + XML envelope +
+ * extract <return>.
+ *
+ * **NOT EXERCISED IN CI** — викликається тільки коли SYNC_MOCK_MODE=false.
+ * Реальний BSL пишеться на загальному етапі обмінів (`docs/1C_SYNC_MODULES_SPEC.md` §3.5).
+ */
+export async function createCashOrderViaSoap(
+  req: CashOrderCreateRequest,
+  config: SyncConfig,
+  fetchImpl: typeof fetch = fetch,
+): Promise<CashOrderCreateResult> {
+  if (!config.onecUrl || !config.onecPassword) {
+    throw new Error(
+      "createCashOrderViaSoap: ONEC_SOAP_URL / ONEC_SOAP_PASSWORD not configured",
+    );
+  }
+
+  const payloadJson = JSON.stringify(req.payload);
+  const envelope = buildSoapEnvelope({
+    operation: "СоздатьПКО",
+    password: config.onecPassword,
+    idempotencyKey: req.idempotencyKey,
+    payloadJson,
+  });
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), config.onecTimeoutMs);
+
+  let response: Response;
+  try {
+    response = await fetchImpl(config.onecUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "text/xml; charset=utf-8",
+        SOAPAction: buildSoapAction("СоздатьПКО"),
+      },
+      body: envelope,
+      signal: controller.signal,
+    });
+  } finally {
+    clearTimeout(timeout);
+  }
+
+  if (!response.ok) {
+    throw new Error(
+      `SOAP HTTP ${response.status}: ${await safeReadText(response)}`,
+    );
+  }
+
+  const bodyText = await response.text();
+  const returnText = extractSoapReturn(bodyText);
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(returnText);
+  } catch (err) {
+    throw new Error(
+      `SOAP response: invalid JSON у <return>: ${(err as Error).message}`,
+    );
+  }
+  return normalizeCashOrderResult(parsed);
+}
+
+function normalizeCashOrderResult(parsed: unknown): CashOrderCreateResult {
+  if (!parsed || typeof parsed !== "object") {
+    throw new Error("SOAP response: <return> JSON is not an object");
+  }
+  const obj = parsed as Record<string, unknown>;
+  if (obj.ok === true) {
+    return {
+      ok: true,
+      cashOrderCode1C:
+        typeof obj.cashOrderCode1C === "string" ? obj.cashOrderCode1C : "",
       errors: Array.isArray(obj.errors)
         ? obj.errors.filter((e): e is string => typeof e === "string")
         : [],

@@ -134,6 +134,155 @@ export function computeCashSummary({
   return { receivedUah, changeUah: roundUah(changeUah), balanceUah };
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Блок «Оплати / Каса» — Етап 2. EUR-base модель (точна 1С-формула, аудит §B).
+//
+// Базова валюта зведення — **EUR** (як `СуммаДокумента` / `СуммаКОплате` у 1С).
+// `rates.eur` = грн за €; `rates.usd` = грн за $.
+// UAH→EUR: `uah / rateEur`. USD→EUR: `usd * rateUsd / rateEur` (USD→UAH→EUR).
+// Усі компоненти зводимо до 2 знаків (`round2`), як `Окр(..., 2)` у 1С.
+//
+// Ці функції — нові й не зачіпають Stage-1/Stage-4 UAH-base helpers вище.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Поріг «знижки на залишок» у EUR (1С `ПорогЗадолженостиEUR`, дефолт 5 €). */
+export const PAYMENT_REMAINDER_DISCOUNT_THRESHOLD_EUR = 5;
+
+/** Канали фактичної оплати (готівка 3 валюти + безнал грн). */
+export interface PaidChannels {
+  uah: number;
+  eur: number;
+  usd: number;
+  uahCashless: number;
+}
+
+/** Решта (здача) — 3 валюти готівкою, без безналу (як 1С §C). */
+export interface ChangeChannels {
+  uah: number;
+  eur: number;
+  usd: number;
+}
+
+/**
+ * PURE. Зводить фактичну оплату у EUR (1С `ОплатаДокумента`, аудит §B-1):
+ *   `eur + round2(uah/rEur) + round2(uahCashless/rEur) + round2(usd*rUsd/rEur)`.
+ *
+ * Guard: `rEur <= 0` → внески UAH / безнал = 0; `rUsd <= 0` → внесок USD = 0.
+ */
+export function reduceToEur(paid: PaidChannels, rates: CashRates): number {
+  const { eur, uah, usd, uahCashless } = paid;
+  const rEur = rates.eur;
+  const rUsd = rates.usd;
+  let total = eur;
+  if (rEur > 0) {
+    total += round2(uah / rEur);
+    total += round2(uahCashless / rEur);
+    if (rUsd > 0) {
+      total += round2((usd * rUsd) / rEur);
+    }
+  }
+  return round2(total);
+}
+
+/**
+ * PURE. Зводить фактичну решту (здачу) у EUR (1С `СдачаДокумента`, §B-2).
+ * Без безналу: `eur + round2(uah/rEur) + round2(usd*rUsd/rEur)`.
+ * Guard на нульові курси як у `reduceToEur`.
+ */
+export function reduceChangeToEur(
+  change: ChangeChannels,
+  rates: CashRates,
+): number {
+  const { eur, uah, usd } = change;
+  const rEur = rates.eur;
+  const rUsd = rates.usd;
+  let total = eur;
+  if (rEur > 0) {
+    total += round2(uah / rEur);
+    if (rUsd > 0) {
+      total += round2((usd * rUsd) / rEur);
+    }
+  }
+  return round2(total);
+}
+
+/**
+ * PURE. Залишок документа у EUR (1С `ОстатокДокумента`, §B-3):
+ *   `sumToPayEur − paidEur + changeEur`.
+ * `> 0` = борг (недоплата), `< 0` = переплата (належить решта).
+ */
+export function computeBalanceEur({
+  sumToPayEur,
+  paidEur,
+  changeEur,
+}: {
+  sumToPayEur: number;
+  paidEur: number;
+  changeEur: number;
+}): number {
+  return round2(sumToPayEur - paidEur + changeEur);
+}
+
+/** Рекомендовані суми «до сплати» у 3 валютах (0 коли переплачено). */
+export interface PaymentRecommendations {
+  payEur: number;
+  payUah: number;
+  payUsd: number;
+}
+
+/**
+ * PURE. Рекомендації «скільки ще треба внести» (1С `ОплатаXxxРек`, §B-4).
+ * `remain = sumToPayEur − paidEur`; коли `remain < 0` (переплата) → усі 0.
+ */
+export function computePaymentRecommendations({
+  sumToPayEur,
+  paidEur,
+  rates,
+}: {
+  sumToPayEur: number;
+  paidEur: number;
+  rates: CashRates;
+}): PaymentRecommendations {
+  const remain = round2(sumToPayEur - paidEur);
+  if (remain < 0) {
+    return { payEur: 0, payUah: 0, payUsd: 0 };
+  }
+  const payUah = rates.eur > 0 ? round2(remain * rates.eur) : 0;
+  const payUsd =
+    rates.eur > 0 && rates.usd > 0
+      ? round2((remain * rates.eur) / rates.usd)
+      : 0;
+  return { payEur: remain, payUah, payUsd };
+}
+
+/** Рекомендована решта у 3 валютах (0 коли немає переплати). */
+export interface ChangeRecommendations {
+  changeEur: number;
+  changeUah: number;
+  changeUsd: number;
+}
+
+/**
+ * PURE. Рекомендована решта (1С `СдачаXxxРек`, §B-5) — лише коли `balanceEur < 0`
+ * (переплата). Видає `|balanceEur|` зведене у 3 валюти.
+ */
+export function computeChangeRecommendations({
+  balanceEur,
+  rates,
+}: {
+  balanceEur: number;
+  rates: CashRates;
+}): ChangeRecommendations {
+  if (balanceEur >= 0) {
+    return { changeEur: 0, changeUah: 0, changeUsd: 0 };
+  }
+  const owed = -balanceEur;
+  const changeUah = rates.eur > 0 ? round2(owed * rates.eur) : 0;
+  const changeUsd =
+    rates.eur > 0 && rates.usd > 0 ? round2((owed * rates.eur) / rates.usd) : 0;
+  return { changeEur: round2(owed), changeUah, changeUsd };
+}
+
 export interface CreateCashOrderArgs {
   saleId: string;
   type: "income";
@@ -230,5 +379,136 @@ export async function createCashOrderWithChange(args: CreateCashOrderArgs) {
     });
 
     return { income, change };
+  });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Блок «Оплати / Каса» — Етап 2. Generalized create (EUR-base, ручна 3-валютна
+// здача). Підтримує Приход/Расход, оплату без реалізації (`customerId`), банк.
+// рахунок, статтю руху, курси-знімок. Здача (якщо введена руками >0) → другий
+// ордер-розхід з `changeForId` (1С §C). Анти-дубля НЕМАЄ.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface CreatePaymentArgs {
+  /** Реалізація-підстава (опц.). */
+  saleId?: string | null;
+  /** Контрагент (резолвиться у Customer.id у викликачі). */
+  customerId?: string | null;
+  /** Вид руху: Приход (income) / Расход (expense). */
+  type: "income" | "expense";
+  /** Фактична оплата по каналах. */
+  paid: PaidChannels;
+  /** Ручна решта (здача) у 3 валютах. */
+  change: ChangeChannels;
+  bankAccountId?: string | null;
+  cashFlowArticleId?: string | null;
+  comment?: string | null;
+  /** Курси-знімок (грн за €/$) — для `documentSumEur`. */
+  rates: CashRates;
+  /** Сума «До оплати» у EUR (для перерахунку наложки на Sale). */
+  sumToPayEur: number;
+  agentUserId?: string | null;
+}
+
+/**
+ * I/O. Транзакційно створює касовий ордер (Приход/Расход) у EUR-base моделі.
+ *  • `documentSumEur = reduceToEur(paid, rates)`;
+ *  • зберігає сирі суми по валютах + знімок курсів + довідникові FK + customerId;
+ *  • якщо введена ручна здача (`change.uah/eur/usd` сумарно > 0) — другий ордер
+ *    `type="expense"`, `changeForId` → прихідний, `documentSumEur =
+ *    reduceChangeToEur(change, rates)` (1С §C);
+ *  • після створення (коли є saleId і реалізація — наложкова) перераховує
+ *    `Sale.codAmountUah` через `computeCashSummary` (як Stage-1/Stage-4).
+ *
+ * Повертає `{ income, change }` (`change` = null коли решти немає).
+ */
+export async function createPaymentOrders(args: CreatePaymentArgs) {
+  const {
+    saleId,
+    customerId,
+    type,
+    paid,
+    change,
+    bankAccountId,
+    cashFlowArticleId,
+    comment,
+    rates,
+    sumToPayEur,
+    agentUserId,
+  } = args;
+
+  const documentSumEur = reduceToEur(paid, rates);
+  const changeTotal = change.uah + change.eur + change.usd;
+
+  return prisma.$transaction(async (tx) => {
+    const income = await tx.mgrCashOrder.create({
+      data: {
+        saleId: saleId ?? null,
+        customerId: customerId ?? null,
+        type,
+        amountUah: paid.uah,
+        amountEur: paid.eur,
+        amountUsd: paid.usd,
+        amountUahCashless: paid.uahCashless,
+        bankAccountId: bankAccountId ?? null,
+        cashFlowArticleId: cashFlowArticleId ?? null,
+        rateEur: rates.eur,
+        rateUsd: rates.usd,
+        documentSumEur,
+        comment: comment ?? null,
+        agentUserId: agentUserId ?? null,
+      },
+    });
+
+    let changeOrder = null;
+    if (changeTotal > 0) {
+      changeOrder = await tx.mgrCashOrder.create({
+        data: {
+          saleId: saleId ?? null,
+          customerId: customerId ?? null,
+          type: "expense",
+          changeForId: income.id,
+          amountUah: change.uah,
+          amountEur: change.eur,
+          amountUsd: change.usd,
+          amountUahCashless: 0,
+          bankAccountId: bankAccountId ?? null,
+          cashFlowArticleId: cashFlowArticleId ?? null,
+          rateEur: rates.eur,
+          rateUsd: rates.usd,
+          documentSumEur: reduceChangeToEur(change, rates),
+          comment: comment ?? null,
+          agentUserId: agentUserId ?? null,
+        },
+      });
+    }
+
+    // Перерахунок наложки на Sale (тільки коли документ — наложковий).
+    if (saleId) {
+      const sale = await tx.sale.findUnique({
+        where: { id: saleId },
+        select: { cashOnDelivery: true },
+      });
+      const orders = await tx.mgrCashOrder.findMany({
+        where: { saleId, archived: false },
+        select: {
+          type: true,
+          amountUah: true,
+          amountEur: true,
+          amountUsd: true,
+          amountUahCashless: true,
+        },
+      });
+      const dueUah = Math.round(sumToPayEur * rates.eur);
+      const { balanceUah } = computeCashSummary({ dueUah, orders, rates });
+      await tx.sale.update({
+        where: { id: saleId },
+        data: {
+          codAmountUah: sale?.cashOnDelivery ? Math.max(0, balanceUah) : null,
+        },
+      });
+    }
+
+    return { income, change: changeOrder };
   });
 }

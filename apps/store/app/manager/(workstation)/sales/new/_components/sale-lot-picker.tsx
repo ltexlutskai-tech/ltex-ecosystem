@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Search, Eye, ArrowLeft, ScanLine } from "lucide-react";
+import { Search, Eye, ArrowLeft, ScanLine, Check } from "lucide-react";
 import {
   Button,
   Dialog,
@@ -64,6 +64,12 @@ export function SaleLotPicker({
   const [step, setStep] = useState<"product" | "lots">("product");
   const [selected, setSelected] = useState<ProductSummary | null>(null);
 
+  // Які лоти/позиції вже додані у цьому сеансі підбору — щоб кнопка
+  // «Додати» перемикалась на «Додано» (модалка лишається відкритою для
+  // додавання кількох мішків поспіль).
+  const [addedLotIds, setAddedLotIds] = useState<Set<string>>(new Set());
+  const [addedGeneral, setAddedGeneral] = useState(false);
+
   // ─── Крок 1: пошук товару ──────────────────────────────────────────────
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<ProductSummary[]>([]);
@@ -87,6 +93,8 @@ export function SaleLotPicker({
       setResults([]);
       setLotQuery("");
       setLots([]);
+      setAddedLotIds(new Set());
+      setAddedGeneral(false);
     }
   }, [open]);
 
@@ -149,6 +157,8 @@ export function SaleLotPicker({
     setSelected(product);
     setLotQuery("");
     setLots([]);
+    setAddedLotIds(new Set());
+    setAddedGeneral(false);
     setStep("lots");
   }
 
@@ -157,6 +167,8 @@ export function SaleLotPicker({
     setSelected(null);
     setLotQuery("");
     setLots([]);
+    setAddedLotIds(new Set());
+    setAddedGeneral(false);
   }
 
   function addLot(lot: SaleLotSummary): void {
@@ -169,6 +181,7 @@ export function SaleLotPicker({
       weight: lot.weight > 0 ? lot.weight : 0,
       pricePerKg: Math.max(0, pricePerKg),
     });
+    setAddedLotIds((prev) => new Set(prev).add(lot.id));
   }
 
   function addGeneral(): void {
@@ -179,6 +192,7 @@ export function SaleLotPicker({
       bags: 1,
       pricePerKg: Math.max(0, pricePerKg),
     });
+    setAddedGeneral(true);
   }
 
   const previewPrice = selected
@@ -187,7 +201,7 @@ export function SaleLotPicker({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl">
+      <DialogContent className="max-h-[90vh] max-w-3xl overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
             {step === "product" ? "Підбір товару" : "Вибір лота (мішка)"}
@@ -208,7 +222,7 @@ export function SaleLotPicker({
               />
             </div>
 
-            <div className="max-h-[60vh] divide-y overflow-y-auto rounded-lg border bg-white">
+            <div className="max-h-[60vh] min-w-0 divide-y overflow-y-auto rounded-lg border bg-white">
               {loading && (
                 <div className="p-4 text-sm text-gray-500">Пошук…</div>
               )}
@@ -260,7 +274,7 @@ export function SaleLotPicker({
                       type="button"
                       size="sm"
                       onClick={() => pickProduct(p)}
-                      className="bg-green-600 text-white hover:bg-green-700"
+                      className="shrink-0 bg-green-600 text-white hover:bg-green-700"
                     >
                       Вибрати лот →
                     </Button>
@@ -274,7 +288,7 @@ export function SaleLotPicker({
         {step === "lots" && selected && (
           <>
             <div className="flex items-start justify-between gap-3 rounded-lg border bg-gray-50 px-3 py-2">
-              <div className="min-w-0">
+              <div className="min-w-0 flex-1">
                 <div className="truncate font-medium text-gray-900">
                   {selected.name}
                 </div>
@@ -290,6 +304,7 @@ export function SaleLotPicker({
                 variant="outline"
                 size="sm"
                 onClick={backToProducts}
+                className="shrink-0"
               >
                 <ArrowLeft className="mr-1 h-4 w-4" />
                 Інший товар
@@ -307,7 +322,7 @@ export function SaleLotPicker({
               />
             </div>
 
-            <div className="max-h-[50vh] divide-y overflow-y-auto rounded-lg border bg-white">
+            <div className="max-h-[50vh] min-w-0 divide-y overflow-y-auto rounded-lg border bg-white">
               {lotsLoading && (
                 <div className="p-4 text-sm text-gray-500">Завантаження…</div>
               )}
@@ -318,39 +333,62 @@ export function SaleLotPicker({
                     : "Вільних лотів немає — додайте як загальну позицію."}
                 </div>
               )}
-              {lots.map((lot) => (
-                <div
-                  key={lot.id}
-                  className="flex items-center gap-3 p-3 hover:bg-gray-50"
-                >
-                  <div className="min-w-0 flex-1">
-                    <div className="font-mono text-sm text-gray-900">
-                      ШК {lot.barcode}
-                    </div>
-                    <div className="text-xs text-gray-500">
-                      {lot.weight.toFixed(1)} кг
-                      {lot.quantity ? ` · ${lot.quantity} шт/пар` : ""} ·{" "}
-                      <span className="text-green-700">вільний</span>
-                    </div>
-                  </div>
-                  <Button
-                    type="button"
-                    size="sm"
-                    onClick={() => addLot(lot)}
-                    className="bg-green-600 text-white hover:bg-green-700"
+              {lots.map((lot) => {
+                const added = addedLotIds.has(lot.id);
+                return (
+                  <div
+                    key={lot.id}
+                    className="flex items-center gap-3 p-3 hover:bg-gray-50"
                   >
-                    Додати
-                  </Button>
-                </div>
-              ))}
+                    <div className="min-w-0 flex-1">
+                      <div className="break-all font-mono text-sm text-gray-900">
+                        ШК {lot.barcode}
+                      </div>
+                      <div className="text-xs text-gray-500">
+                        {lot.weight.toFixed(1)} кг
+                        {lot.quantity ? ` · ${lot.quantity} шт/пар` : ""} ·{" "}
+                        <span className="text-green-700">вільний</span>
+                      </div>
+                    </div>
+                    {added ? (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        disabled
+                        className="shrink-0 border-green-600 bg-green-50 text-green-700 disabled:opacity-100"
+                      >
+                        <Check className="mr-1 h-4 w-4" />
+                        Додано
+                      </Button>
+                    ) : (
+                      <Button
+                        type="button"
+                        size="sm"
+                        onClick={() => addLot(lot)}
+                        className="shrink-0 bg-green-600 text-white hover:bg-green-700"
+                      >
+                        Додати
+                      </Button>
+                    )}
+                  </div>
+                );
+              })}
             </div>
 
             <button
               type="button"
               onClick={addGeneral}
-              className="text-left text-sm font-medium text-gray-500 underline-offset-2 hover:text-green-700 hover:underline"
+              className={`inline-flex items-center gap-1 text-left text-sm font-medium underline-offset-2 hover:underline ${
+                addedGeneral
+                  ? "text-green-700"
+                  : "text-gray-500 hover:text-green-700"
+              }`}
             >
-              Додати як загальну позицію (без лота)
+              {addedGeneral && <Check className="h-4 w-4 shrink-0" />}
+              {addedGeneral
+                ? "Додано як загальну позицію — додати ще мішок"
+                : "Додати як загальну позицію (без лота)"}
             </button>
           </>
         )}

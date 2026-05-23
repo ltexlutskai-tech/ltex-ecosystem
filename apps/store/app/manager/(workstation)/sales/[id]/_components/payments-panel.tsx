@@ -1,11 +1,6 @@
-"use client";
-
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { Button } from "@ltex/ui";
-import type { CashRates } from "@/lib/manager/cash-order";
-import type { ChangeCurrency } from "@/lib/validations/manager-cash-order";
-import { PaymentModal } from "./payment-modal";
+import type { PaymentSummary } from "@/lib/manager/payment-summary";
 
 export interface CashOrderView {
   id: string;
@@ -14,18 +9,11 @@ export interface CashOrderView {
   amountEur: number;
   amountUsd: number;
   amountUahCashless: number;
-  changeCurrency: string | null;
   changeForId: string | null;
   bankAccount: string | null;
   cashFlowArticle: string | null;
   comment: string | null;
   createdAt: string;
-}
-
-export interface PaymentsSummary {
-  receivedUah: number;
-  changeUah: number;
-  balanceUah: number;
 }
 
 function uah(n: number): string {
@@ -44,43 +32,28 @@ function amountParts(o: CashOrderView): string {
 }
 
 /**
- * Блок «Реалізація» — Етап 4. Панель оплат на сторінці реалізації:
- * сума до оплати / отримано / залишок (борг або переплата) + список
- * касових ордерів + кнопка «Створити оплату».
+ * Блок «Оплати / Каса» — Етап 2. Панель оплат на сторінці реалізації:
+ * EUR-base зведення (`getPaymentSummary`, §E): Отримано / Решта / Залишок
+ * (борг/переплата) + статус + наложка (`codAmountUah`) + список касових
+ * ордерів. Кнопка «Оплата» веде на повносторінкову форму
+ * (`/manager/payments/new?saleId=…`) — модалка прибрана (Етап 2).
  */
 export function PaymentsPanel({
   saleId,
   dueUah,
-  rates,
   cashOnDelivery,
   codAmountUah,
   summary,
   orders,
-  autoOpenPayment = false,
 }: {
   saleId: string;
+  /** Сума реалізації у грн за знімком (для рядка «До оплати»). */
   dueUah: number;
-  rates: CashRates;
   cashOnDelivery: boolean;
   codAmountUah: number | null;
-  summary: PaymentsSummary;
+  summary: PaymentSummary;
   orders: CashOrderView[];
-  /** Авто-відкриття модалки оплати (deeplink `?pay=1` з форми) — Fix 6. */
-  autoOpenPayment?: boolean;
 }) {
-  const router = useRouter();
-  // `?pay=1` (кнопка «Оплата» у формі) одразу відкриває модалку створення оплати.
-  const [open, setOpen] = useState(autoOpenPayment);
-
-  // `#payments` (кнопка «Історія оплат») — скрол до панелі оплат.
-  useEffect(() => {
-    if (typeof window !== "undefined" && window.location.hash === "#payments") {
-      document
-        .getElementById("payments")
-        ?.scrollIntoView({ behavior: "smooth", block: "start" });
-    }
-  }, []);
-
   const balance = summary.balanceUah;
   const balanceLabel =
     balance > 0
@@ -98,12 +71,12 @@ export function PaymentsPanel({
     >
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-base font-semibold text-gray-800">Оплати (каса)</h2>
-        <Button type="button" size="sm" onClick={() => setOpen(true)}>
-          Створити оплату
+        <Button asChild size="sm">
+          <Link href={`/manager/payments/new?saleId=${saleId}`}>Оплата</Link>
         </Button>
       </div>
 
-      <dl className="mt-4 grid grid-cols-1 gap-3 text-sm sm:grid-cols-3">
+      <dl className="mt-4 grid grid-cols-1 gap-3 text-sm sm:grid-cols-4">
         <div className="rounded-md border border-gray-200 bg-gray-50 px-3 py-2">
           <dt className="text-xs uppercase tracking-wide text-gray-400">
             До оплати
@@ -116,6 +89,14 @@ export function PaymentsPanel({
           </dt>
           <dd className="mt-0.5 font-semibold text-gray-900">
             {uah(summary.receivedUah)}
+          </dd>
+        </div>
+        <div className="rounded-md border border-gray-200 bg-gray-50 px-3 py-2">
+          <dt className="text-xs uppercase tracking-wide text-gray-400">
+            Решта
+          </dt>
+          <dd className="mt-0.5 font-semibold text-gray-900">
+            {uah(summary.changeUah)}
           </dd>
         </div>
         <div
@@ -187,18 +168,6 @@ export function PaymentsPanel({
           </div>
         )}
       </div>
-
-      <PaymentModal
-        open={open}
-        onOpenChange={setOpen}
-        saleId={saleId}
-        dueUah={dueUah}
-        rates={rates}
-        onCreated={() => router.refresh()}
-      />
     </section>
   );
 }
-
-// Re-export for callers needing the change-currency type alongside the panel.
-export type { ChangeCurrency };

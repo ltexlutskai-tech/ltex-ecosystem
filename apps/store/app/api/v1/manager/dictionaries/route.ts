@@ -16,6 +16,8 @@ export async function GET(req: NextRequest) {
     assortmentCodes,
     routes,
     priceTypes,
+    bankAccounts,
+    cashFlowArticles,
   ] = await Promise.all([
     prisma.mgrClientStatus.findMany({ orderBy: { sortOrder: "asc" } }),
     prisma.mgrSearchChannel.findMany({ orderBy: { sortOrder: "asc" } }),
@@ -27,6 +29,14 @@ export async function GET(req: NextRequest) {
       orderBy: { name: "asc" },
     }),
     prisma.mgrPriceType.findMany({ orderBy: { sortOrder: "asc" } }),
+    prisma.mgrBankAccount.findMany({
+      where: { archived: false },
+      orderBy: { name: "asc" },
+    }),
+    prisma.mgrCashFlowArticle.findMany({
+      where: { archived: false },
+      orderBy: { name: "asc" },
+    }),
   ]);
 
   const response = NextResponse.json({
@@ -61,6 +71,17 @@ export async function GET(req: NextRequest) {
       id: p.id,
       code: p.code,
       label: p.label,
+    })),
+    bankAccounts: bankAccounts.map((b) => ({
+      id: b.id,
+      name: b.name,
+      hiddenInApp: b.hiddenInApp,
+    })),
+    cashFlowArticles: cashFlowArticles.map((a) => ({
+      id: a.id,
+      code: a.code,
+      name: a.name,
+      parentId: a.parentId,
     })),
   });
   response.headers.set(

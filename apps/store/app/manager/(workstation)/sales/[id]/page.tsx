@@ -19,7 +19,7 @@ import type {
 } from "../new/_components/sale-types";
 import { OrderStatusBadge } from "../../customers/[id]/_components/order-status-badge";
 import { SaleStatusActions } from "./_components/sale-status-actions";
-import { computeCashSummary } from "@/lib/manager/cash-order";
+import { getPaymentSummary } from "@/lib/manager/payment-summary";
 import {
   PaymentsPanel,
   type CashOrderView,
@@ -69,7 +69,8 @@ export default async function ManagerSaleDetailPage({
 
   const { id } = await params;
   const { pay } = await searchParams;
-  const autoOpenPayment = pay === "1";
+  // Етап 2: оплата тепер — повносторінкова форма; `?pay=1` редіректить на неї.
+  if (pay === "1") redirect(`/manager/payments/new?saleId=${id}`);
   const ok = await canViewSale(user, id);
   if (!ok) notFound();
 
@@ -108,27 +109,34 @@ export default async function ManagerSaleDetailPage({
   const editable = canEditSale(sale.status);
   const locked = isSaleLocked(sale.status);
 
-  const [priceTypeRows, exchangeRateEur, exchangeRateUsd, mgr, cashOrders] =
-    await Promise.all([
-      prisma.mgrPriceType.findMany({ orderBy: { sortOrder: "asc" } }),
-      getCurrentRate(),
-      getUsdRate(),
-      sale.customer.code1C
-        ? prisma.mgrClient.findUnique({
-            where: { code1C: sale.customer.code1C },
-            select: {
-              debt: true,
-              phonePrimary: true,
-              street: true,
-              house: true,
-            },
-          })
-        : Promise.resolve(null),
-      prisma.mgrCashOrder.findMany({
-        where: { saleId: sale.id },
-        orderBy: { createdAt: "asc" },
-      }),
-    ]);
+  const [
+    priceTypeRows,
+    exchangeRateEur,
+    exchangeRateUsd,
+    mgr,
+    cashOrders,
+    paymentSummary,
+  ] = await Promise.all([
+    prisma.mgrPriceType.findMany({ orderBy: { sortOrder: "asc" } }),
+    getCurrentRate(),
+    getUsdRate(),
+    sale.customer.code1C
+      ? prisma.mgrClient.findUnique({
+          where: { code1C: sale.customer.code1C },
+          select: {
+            debt: true,
+            phonePrimary: true,
+            street: true,
+            house: true,
+          },
+        })
+      : Promise.resolve(null),
+    prisma.mgrCashOrder.findMany({
+      where: { saleId: sale.id, archived: false },
+      orderBy: { createdAt: "asc" },
+    }),
+    getPaymentSummary(sale.id),
+  ]);
 
   const mgrAddress = mgr
     ? [mgr.street, mgr.house].filter(Boolean).join(", ") || null
@@ -206,11 +214,23 @@ export default async function ManagerSaleDetailPage({
 
   // ─── Оплати (каса) ──────────────────────────────────────────────────────
   const dueUah = Math.round(sale.totalEur * sale.exchangeRateEur);
-  const cashSummary = computeCashSummary({
-    dueUah,
-    orders: cashOrders,
-    rates: { eur: sale.exchangeRateEur, usd: sale.exchangeRateUsd },
-  });
+  // EUR-base зведення (порт 1С `ПолучитьДанныеПоОплате`, §E).
+  const cashSummary = paymentSummary ?? {
+    receivedUah: 0,
+    changeUah: 0,
+    balanceUah: dueUah,
+    status: "debt" as const,
+    byCurrency: {
+      incomeUah: 0,
+      incomeEur: 0,
+      incomeUsd: 0,
+      incomeUahCashless: 0,
+      changeUah: 0,
+      changeEur: 0,
+      changeUsd: 0,
+    },
+    codAmountUah: Math.max(0, dueUah),
+  };
   const cashOrderViews: CashOrderView[] = cashOrders.map((o) => ({
     id: o.id,
     type: o.type,
@@ -218,7 +238,6 @@ export default async function ManagerSaleDetailPage({
     amountEur: o.amountEur,
     amountUsd: o.amountUsd,
     amountUahCashless: o.amountUahCashless,
-    changeCurrency: o.changeCurrency,
     changeForId: o.changeForId,
     bankAccount: o.bankAccount,
     cashFlowArticle: o.cashFlowArticle,
@@ -271,12 +290,10 @@ export default async function ManagerSaleDetailPage({
       <PaymentsPanel
         saleId={sale.id}
         dueUah={dueUah}
-        rates={{ eur: sale.exchangeRateEur, usd: sale.exchangeRateUsd }}
         cashOnDelivery={sale.cashOnDelivery}
         codAmountUah={sale.codAmountUah}
         summary={cashSummary}
         orders={cashOrderViews}
-        autoOpenPayment={autoOpenPayment}
       />
     </div>
   );

@@ -1,4 +1,6 @@
 import type {
+  CashOrderCreateRequest,
+  CashOrderCreateResult,
   ClientUpdateRequest,
   ClientUpdateResult,
   OrderCreateRequest,
@@ -128,6 +130,31 @@ export async function createRealizationMock(
     ok: true,
     realizationCode1C,
     realizationNumber: `R-MOCK-${Date.now()}`,
+    mockMode: true,
+    errors: [],
+  };
+}
+
+/**
+ * Mock SOAP shim для `СоздатьПКО` operation (касовий ордер). Симулює delay,
+ * повертає synthetic `cashOrderCode1C` = "MOCK-PKO-<ts>" (echoes existing
+ * payload.code1C коли є). Used коли SYNC_MOCK_MODE=true (default).
+ */
+export async function createCashOrderMock(
+  req: CashOrderCreateRequest,
+  options: DelayOptions = {},
+): Promise<CashOrderCreateResult> {
+  await simulateDelay(options);
+
+  const existing = req.payload["code1C"];
+  const cashOrderCode1C =
+    typeof existing === "string" && existing.length > 0
+      ? existing
+      : `MOCK-PKO-${Date.now()}`;
+
+  return {
+    ok: true,
+    cashOrderCode1C,
     mockMode: true,
     errors: [],
   };
