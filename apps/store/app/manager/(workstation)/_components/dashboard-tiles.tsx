@@ -1,17 +1,16 @@
-import { ClipboardList, Map, Route, Truck, Wallet } from "lucide-react";
+import { ClipboardList, Route, Truck, Wallet } from "lucide-react";
 import { DashboardTile } from "./dashboard-tile";
 
 export interface DashboardTileCounts {
   orders: number;
   sales: number;
   payments: number;
-  routes: number;
   routeSheets: number;
 }
 
 export function DashboardTiles({ counts }: { counts: DashboardTileCounts }) {
   return (
-    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
       <DashboardTile
         href="/manager/orders"
         icon={ClipboardList}
@@ -39,13 +38,6 @@ export function DashboardTiles({ counts }: { counts: DashboardTileCounts }) {
         title="Маршрутні листи"
         count={counts.routeSheets}
         countLabel="активних"
-      />
-      <DashboardTile
-        href="/manager/routes"
-        icon={Map}
-        title="Маршрут"
-        count={counts.routes}
-        countLabel="точок на день"
       />
     </div>
   );

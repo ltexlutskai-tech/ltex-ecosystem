@@ -42,7 +42,6 @@ async function getDashboardData(userId: string) {
       orders: 0,
       sales: 0,
       payments: 0,
-      routes: 0,
       routeSheets: routeSheetCount,
     },
   };
