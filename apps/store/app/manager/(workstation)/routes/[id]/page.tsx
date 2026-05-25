@@ -13,7 +13,6 @@ import { getUnclosedMileageWarning } from "@/lib/manager/route-sheet-mileage";
 import {
   RouteSheetForm,
   type ExpeditorOption,
-  type RouteOption,
   type RouteSheetItemView,
   type RouteSheetOrderView,
   type RouteSheetTaskView,
@@ -83,43 +82,37 @@ export default async function ManagerRouteSheetDetailPage({
     if (t.customerId) taskClientIds.add(t.customerId);
   }
 
-  const [orders, customers, products, lots, routeRows, expeditorRows] =
-    await Promise.all([
-      orderIds.size > 0
-        ? prisma.order.findMany({
-            where: { id: { in: [...orderIds] } },
-            select: { id: true, code1C: true },
-          })
-        : Promise.resolve([]),
-      customerIds.size > 0
-        ? prisma.customer.findMany({
-            where: { id: { in: [...customerIds] } },
-            select: { id: true, name: true, city: true },
-          })
-        : Promise.resolve([]),
-      productIds.size > 0
-        ? prisma.product.findMany({
-            where: { id: { in: [...productIds] } },
-            select: { id: true, name: true, articleCode: true },
-          })
-        : Promise.resolve([]),
-      lotIds.size > 0
-        ? prisma.lot.findMany({
-            where: { id: { in: [...lotIds] } },
-            select: { id: true, barcode: true },
-          })
-        : Promise.resolve([]),
-      prisma.mgrRoute.findMany({
-        where: { isActive: true },
-        orderBy: { name: "asc" },
-        select: { id: true, name: true },
-      }),
-      prisma.user.findMany({
-        where: { isActive: true },
-        orderBy: { fullName: "asc" },
-        select: { id: true, fullName: true },
-      }),
-    ]);
+  const [orders, customers, products, lots, expeditorRows] = await Promise.all([
+    orderIds.size > 0
+      ? prisma.order.findMany({
+          where: { id: { in: [...orderIds] } },
+          select: { id: true, code1C: true },
+        })
+      : Promise.resolve([]),
+    customerIds.size > 0
+      ? prisma.customer.findMany({
+          where: { id: { in: [...customerIds] } },
+          select: { id: true, name: true, city: true },
+        })
+      : Promise.resolve([]),
+    productIds.size > 0
+      ? prisma.product.findMany({
+          where: { id: { in: [...productIds] } },
+          select: { id: true, name: true, articleCode: true },
+        })
+      : Promise.resolve([]),
+    lotIds.size > 0
+      ? prisma.lot.findMany({
+          where: { id: { in: [...lotIds] } },
+          select: { id: true, barcode: true },
+        })
+      : Promise.resolve([]),
+    prisma.user.findMany({
+      where: { isActive: true },
+      orderBy: { fullName: "asc" },
+      select: { id: true, fullName: true },
+    }),
+  ]);
 
   const taskClients =
     taskClientIds.size > 0
@@ -222,10 +215,6 @@ export default async function ManagerRouteSheetDetailPage({
     tasks: taskViews,
   };
 
-  const routes: RouteOption[] = routeRows.map((r) => ({
-    id: r.id,
-    name: r.name,
-  }));
   const expeditors: ExpeditorOption[] = expeditorRows.map((u) => ({
     id: u.id,
     fullName: u.fullName,
@@ -250,11 +239,7 @@ export default async function ManagerRouteSheetDetailPage({
         </p>
       </header>
 
-      <RouteSheetForm
-        initial={initial}
-        routes={routes}
-        expeditors={expeditors}
-      />
+      <RouteSheetForm initial={initial} expeditors={expeditors} />
     </div>
   );
 }

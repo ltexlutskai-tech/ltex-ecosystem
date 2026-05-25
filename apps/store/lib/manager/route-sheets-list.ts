@@ -13,8 +13,8 @@ import {
  * Особливості 1С-екрана:
  *  • за замовчуванням **архівні приховані** (`archived = true`); чекбокс
  *    «Відображати архівні» (`showArchived`) знімає це обмеження;
- *  • **пошук** матчить № документа (`docNumber`/`code1C`), коментар АБО
- *    назву маршруту (`route.name`);
+ *  • **пошук** матчить № документа (`docNumber`/`code1C`) АБО назву маршруту
+ *    (`comment` — у 1С документ = `Комментарий`);
  *  • період — по полю `date` (дата складання документа).
  *
  * **Ownership:** маршрутний лист — спільний диспетчерський документ, його
@@ -60,13 +60,12 @@ export function buildRouteSheetsWhere(
     where.archived = false;
   }
 
-  // Пошук: № документа / коментар / назва маршруту.
+  // Пошук: № документа / назва маршруту (= `comment`).
   if (p.search && p.search.trim().length > 0) {
     const q = p.search.trim();
     const or: Prisma.RouteSheetWhereInput[] = [
       { code1C: { contains: q, mode: "insensitive" } },
       { comment: { contains: q, mode: "insensitive" } },
-      { route: { name: { contains: q, mode: "insensitive" } } },
     ];
     // № документа може бути введений як ціле число (docNumber), опц. з «№».
     const numericRaw = q.replace(/^№\s*/, "");
@@ -102,7 +101,8 @@ export interface RawRouteSheetRow {
   totalUah: number;
   totalEur: number;
   archived: boolean;
-  route: { id: string; name: string } | null;
+  /** Назва маршруту — вільний текст (1С: документ = `Комментарий`). */
+  comment: string | null;
   expeditor: { id: string; fullName: string } | null;
   _count: { orders: number };
 }
@@ -118,13 +118,13 @@ export interface RouteSheetListItem {
   totalEur: number;
   archived: boolean;
   orderCount: number;
-  route: { id: string; name: string } | null;
+  /** Назва маршруту для колонки «Маршрут» (= `comment`). */
+  routeName: string | null;
   expeditor: { id: string; fullName: string } | null;
 }
 
 /** Prisma include для рядка списку — узгоджено з RawRouteSheetRow. */
 export const routeSheetRowInclude = {
-  route: { select: { id: true, name: true } },
   expeditor: { select: { id: true, fullName: true } },
   _count: { select: { orders: true } },
 } satisfies Prisma.RouteSheetInclude;
@@ -144,7 +144,7 @@ export function serializeRouteSheetRow(
     totalEur: r.totalEur,
     archived: r.archived,
     orderCount: r._count.orders,
-    route: r.route ? { id: r.route.id, name: r.route.name } : null,
+    routeName: r.comment,
     expeditor: r.expeditor
       ? { id: r.expeditor.id, fullName: r.expeditor.fullName }
       : null,

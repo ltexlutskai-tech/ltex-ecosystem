@@ -13,7 +13,8 @@ export interface RouteSheetsRowData {
   totalEur: number;
   archived: boolean;
   orderCount: number;
-  route: { id: string; name: string } | null;
+  /** Назва маршруту (вільний текст = `comment`). */
+  routeName: string | null;
   expeditor: { id: string; fullName: string } | null;
 }
 
@@ -51,7 +52,7 @@ export function RouteSheetsRow({ sheet }: { sheet: RouteSheetsRowData }) {
           dimmed ? "text-gray-400" : "text-gray-800"
         }`}
       >
-        {sheet.route?.name ?? "—"}
+        {sheet.routeName ?? "—"}
       </td>
       <td className="px-4 py-3 text-sm text-gray-600">
         {sheet.expeditor?.fullName ?? "—"}

@@ -54,7 +54,7 @@ function fakeRow(id: string, docNumber: number): unknown {
     totalUah: 4300,
     totalEur: 100,
     archived: false,
-    route: { id: "r1", name: "Луцьк" },
+    comment: "Луцьк-Центр",
     expeditor: { id: "u1", fullName: "Alice" },
     _count: { orders: 2 },
   };
@@ -78,12 +78,19 @@ describe("GET /api/v1/manager/route-sheets", () => {
     const res = await GET(req());
     expect(res.status).toBe(200);
     const json = (await res.json()) as {
-      items: Array<{ id: string; orderCount: number; date: string }>;
+      items: Array<{
+        id: string;
+        orderCount: number;
+        date: string;
+        routeName: string | null;
+      }>;
       total: number;
     };
     expect(json.items[0]?.id).toBe("rs1");
     expect(json.items[0]?.orderCount).toBe(2);
     expect(typeof json.items[0]?.date).toBe("string");
+    // «Маршрут» у списку = вільнотекстовий comment.
+    expect(json.items[0]?.routeName).toBe("Луцьк-Центр");
     expect(json.total).toBe(1);
   });
 
