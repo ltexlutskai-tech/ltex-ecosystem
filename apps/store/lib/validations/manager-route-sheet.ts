@@ -37,9 +37,18 @@ export const updateRouteSheetSchema = z.object({
   expeditorUserId: z.string().min(1).nullable().optional(),
   status: z.enum(ROUTE_SHEET_STATUS_LIST as [string, ...string[]]).optional(),
   comment: z.string().max(2000).nullable().optional(),
-  /** Кілометраж (Етап 4 — поки приймається additive). */
+  /** Кілометраж (Етап 4). */
   mileageStartKm: z.number().nonnegative().max(9_999_999).nullable().optional(),
   mileageEndKm: z.number().nonnegative().max(9_999_999).nullable().optional(),
+  /** GPS-знімок координат (Етап 4 — best-effort на статус-переходах). */
+  gpsLat: z.number().min(-90).max(90).nullable().optional(),
+  gpsLng: z.number().min(-180).max(180).nullable().optional(),
+});
+
+/** POST /route-sheets/[id]/tasks — додати завдання (вільна нотатка). */
+export const addTaskSchema = z.object({
+  customerId: z.string().min(1).nullable().optional(),
+  comment: z.string().trim().min(1, "Порожній коментар").max(2000),
 });
 
 export const addOrdersSchema = z.object({
@@ -71,3 +80,4 @@ export type UpdateRouteSheetInput = z.infer<typeof updateRouteSheetSchema>;
 export type AddOrdersInput = z.infer<typeof addOrdersSchema>;
 export type AddLoadingInput = z.infer<typeof addLoadingSchema>;
 export type UpdateLoadingInput = z.infer<typeof updateLoadingSchema>;
+export type AddTaskInput = z.infer<typeof addTaskSchema>;

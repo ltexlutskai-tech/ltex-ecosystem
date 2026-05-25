@@ -11,6 +11,7 @@ const {
   shortageMock,
   countersMock,
   documentsMock,
+  mileageWarningMock,
 } = vi.hoisted(() => ({
   mockPrisma: {
     routeSheet: { findUnique: vi.fn(), update: vi.fn() },
@@ -18,12 +19,14 @@ const {
     customer: { findMany: vi.fn() },
     product: { findMany: vi.fn() },
     lot: { findMany: vi.fn() },
+    mgrClient: { findMany: vi.fn() },
   },
   getCurrentUserMock: vi.fn(),
   loadingRowsMock: vi.fn(),
   shortageMock: vi.fn(),
   countersMock: vi.fn(),
   documentsMock: vi.fn(),
+  mileageWarningMock: vi.fn(),
 }));
 
 vi.mock("@ltex/db", () => ({ prisma: mockPrisma }));
@@ -39,6 +42,10 @@ vi.mock("@/lib/manager/route-sheet-loading", () => ({
 }));
 vi.mock("@/lib/manager/route-sheet-documents", () => ({
   getRouteSheetDocuments: (...args: unknown[]) => documentsMock(...args),
+}));
+vi.mock("@/lib/manager/route-sheet-mileage", () => ({
+  getUnclosedMileageWarning: (...args: unknown[]) =>
+    mileageWarningMock(...args),
 }));
 
 import { GET, PATCH } from "./route";
@@ -83,6 +90,8 @@ function fakeSheet(over: Record<string, unknown> = {}) {
     totalUah: 0,
     mileageStartKm: null,
     mileageEndKm: null,
+    gpsLat: null,
+    gpsLng: null,
     archived: false,
     route: null,
     expeditor: null,
@@ -90,6 +99,7 @@ function fakeSheet(over: Record<string, unknown> = {}) {
     updatedAt: new Date("2026-05-20T09:00:00Z"),
     orders: [],
     items: [],
+    tasks: [],
     ...over,
   };
 }
@@ -101,6 +111,7 @@ beforeEach(() => {
   mockPrisma.customer.findMany.mockResolvedValue([]);
   mockPrisma.product.findMany.mockResolvedValue([]);
   mockPrisma.lot.findMany.mockResolvedValue([]);
+  mockPrisma.mgrClient.findMany.mockResolvedValue([]);
   loadingRowsMock.mockResolvedValue([]);
   shortageMock.mockResolvedValue([]);
   countersMock.mockResolvedValue({
@@ -110,6 +121,7 @@ beforeEach(() => {
     shortageQty: 0,
   });
   documentsMock.mockResolvedValue({ sales: [], saleItems: [], payments: [] });
+  mileageWarningMock.mockResolvedValue(null);
 });
 
 describe("GET /api/v1/manager/route-sheets/[id]", () => {
@@ -223,6 +235,30 @@ describe("GET /api/v1/manager/route-sheets/[id]", () => {
     expect(json.sheet.saleItems[0]?.id).toBe("si1");
     expect(json.sheet.payments[0]?.id).toBe("co1");
   });
+
+  it("returns tasks (resolved MgrClient name) + mileage warning (Stage 4)", async () => {
+    mockPrisma.routeSheet.findUnique.mockResolvedValueOnce(
+      fakeSheet({
+        tasks: [{ id: "t1", customerId: "mc1", comment: "Подзвонити" }],
+      }),
+    );
+    mockPrisma.mgrClient.findMany.mockResolvedValueOnce([
+      { id: "mc1", name: "Клієнт А" },
+    ]);
+    mileageWarningMock.mockResolvedValueOnce("Немає кінцевого кілометражу!");
+
+    const res = await GET(getReq(), { params });
+    expect(res.status).toBe(200);
+    const json = (await res.json()) as {
+      sheet: {
+        tasks: Array<{ id: string; customerName: string | null }>;
+        mileageWarning: string | null;
+      };
+    };
+    expect(json.sheet.tasks[0]?.id).toBe("t1");
+    expect(json.sheet.tasks[0]?.customerName).toBe("Клієнт А");
+    expect(json.sheet.mileageWarning).toBe("Немає кінцевого кілометражу!");
+  });
 });
 
 describe("PATCH /api/v1/manager/route-sheets/[id]", () => {
@@ -281,5 +317,68 @@ describe("PATCH /api/v1/manager/route-sheets/[id]", () => {
     });
     const res = await PATCH(patchReq({ status: "nope" }), { params });
     expect(res.status).toBe(400);
+  });
+
+  it("allows legal transition draft → dispatched (200)", async () => {
+    mockPrisma.routeSheet.findUnique.mockResolvedValueOnce({
+      id: "rs1",
+      status: "draft",
+    });
+    mockPrisma.routeSheet.update.mockResolvedValueOnce(
+      fakeSheet({ status: "dispatched" }),
+    );
+    const res = await PATCH(patchReq({ status: "dispatched" }), { params });
+    expect(res.status).toBe(200);
+    expect(mockPrisma.routeSheet.update).toHaveBeenCalled();
+  });
+
+  it("400 on illegal transition draft → completed", async () => {
+    mockPrisma.routeSheet.findUnique.mockResolvedValueOnce({
+      id: "rs1",
+      status: "draft",
+    });
+    const res = await PATCH(patchReq({ status: "completed" }), { params });
+    expect(res.status).toBe(400);
+    expect(mockPrisma.routeSheet.update).not.toHaveBeenCalled();
+  });
+
+  it("stores GPS coords passed with a status transition", async () => {
+    mockPrisma.routeSheet.findUnique.mockResolvedValueOnce({
+      id: "rs1",
+      status: "draft",
+    });
+    mockPrisma.routeSheet.update.mockResolvedValueOnce(
+      fakeSheet({ status: "dispatched", gpsLat: 50.7, gpsLng: 25.3 }),
+    );
+    const res = await PATCH(
+      patchReq({ status: "dispatched", gpsLat: 50.7, gpsLng: 25.3 }),
+      { params },
+    );
+    expect(res.status).toBe(200);
+    const data = mockPrisma.routeSheet.update.mock.calls[0]?.[0] as {
+      data: { gpsLat: number; gpsLng: number; status: string };
+    };
+    expect(data.data.gpsLat).toBe(50.7);
+    expect(data.data.gpsLng).toBe(25.3);
+  });
+
+  it("updates mileage fields (200)", async () => {
+    mockPrisma.routeSheet.findUnique.mockResolvedValueOnce({
+      id: "rs1",
+      status: "draft",
+    });
+    mockPrisma.routeSheet.update.mockResolvedValueOnce(
+      fakeSheet({ mileageStartKm: 100, mileageEndKm: 150 }),
+    );
+    const res = await PATCH(
+      patchReq({ mileageStartKm: 100, mileageEndKm: 150 }),
+      { params },
+    );
+    expect(res.status).toBe(200);
+    const data = mockPrisma.routeSheet.update.mock.calls[0]?.[0] as {
+      data: { mileageStartKm: number; mileageEndKm: number };
+    };
+    expect(data.data.mileageStartKm).toBe(100);
+    expect(data.data.mileageEndKm).toBe(150);
   });
 });

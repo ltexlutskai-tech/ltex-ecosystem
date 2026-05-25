@@ -3,17 +3,48 @@
 import { useCallback, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Plus, Trash2, RefreshCw } from "lucide-react";
+import { Plus, Trash2, RefreshCw, MapPin } from "lucide-react";
 import { Button } from "@ltex/ui";
 import {
-  ROUTE_SHEET_STATUS_LIST,
   ROUTE_SHEET_STATUS_META,
+  getAllowedRouteSheetTransitions,
   isRouteSheetLocked,
 } from "@/lib/manager/route-sheet-status";
 import { getSaleStatusMeta } from "@/lib/manager/sale-status";
 import { RouteSheetStatusBadge } from "../../_components/route-sheet-status-badge";
 import { OrderPickerModal } from "./order-picker-modal";
+import { TaskClientPicker } from "./task-client-picker";
 import { BarcodeInput } from "../../../sales/new/_components/barcode-input";
+
+/** Підписи на кнопках статус-переходів. */
+const TRANSITION_LABEL: Record<string, string> = {
+  dispatched: "Відправити",
+  completed: "Завершити",
+  draft: "Повернути в роботу",
+};
+
+/** Best-effort GPS-знімок. Ніколи не кидає — denial/unsupported → null. */
+async function captureGps(): Promise<{ lat: number; lng: number } | null> {
+  if (
+    typeof navigator === "undefined" ||
+    !("geolocation" in navigator) ||
+    !navigator.geolocation
+  ) {
+    return null;
+  }
+  return new Promise((resolve) => {
+    try {
+      navigator.geolocation.getCurrentPosition(
+        (pos) =>
+          resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+        () => resolve(null),
+        { enableHighAccuracy: false, timeout: 5000, maximumAge: 60_000 },
+      );
+    } catch {
+      resolve(null);
+    }
+  });
+}
 
 export interface RouteOption {
   id: string;
@@ -129,6 +160,14 @@ export interface RouteSheetPaymentView {
   documentSumEur: number;
 }
 
+/** Рядок вкладки «Завдання» (вільна нотатка клієнт+коментар). */
+export interface RouteSheetTaskView {
+  id: string;
+  customerId: string | null;
+  customerName: string | null;
+  comment: string;
+}
+
 export interface RouteSheetView {
   id: string;
   displayNumber: string;
@@ -140,6 +179,12 @@ export interface RouteSheetView {
   comment: string | null;
   totalEur: number;
   totalUah: number;
+  mileageStartKm: number | null;
+  mileageEndKm: number | null;
+  gpsLat: number | null;
+  gpsLng: number | null;
+  /** М'яке попередження про незакритий кілометраж попередньої зміни. */
+  mileageWarning: string | null;
   orders: RouteSheetOrderView[];
   items: RouteSheetItemView[];
   loading: RouteSheetLoadingView[];
@@ -148,6 +193,7 @@ export interface RouteSheetView {
   sales: RouteSheetSaleView[];
   saleItems: RouteSheetSaleItemView[];
   payments: RouteSheetPaymentView[];
+  tasks: RouteSheetTaskView[];
 }
 
 const TABS = [
@@ -162,9 +208,6 @@ const TABS = [
 ] as const;
 
 type TabId = (typeof TABS)[number]["id"];
-
-/** Вкладки наступних етапів — поки заглушки (Етап 4). */
-const PLACEHOLDER_TABS = new Set<TabId>(["tasks"]);
 
 /** Колір бейджа статусу sale → tailwind-класи. */
 const SALE_STATUS_BADGE: Record<string, string> = {
@@ -226,12 +269,33 @@ export function RouteSheetForm({
   const [totalEur, setTotalEur] = useState(initial.totalEur);
   const [totalUah, setTotalUah] = useState(initial.totalUah);
 
+  const [tasks, setTasks] = useState<RouteSheetTaskView[]>(initial.tasks);
+  const [mileageStartKm, setMileageStartKm] = useState(
+    initial.mileageStartKm != null ? String(initial.mileageStartKm) : "",
+  );
+  const [mileageEndKm, setMileageEndKm] = useState(
+    initial.mileageEndKm != null ? String(initial.mileageEndKm) : "",
+  );
+  const [gps, setGps] = useState<{ lat: number; lng: number } | null>(
+    initial.gpsLat != null && initial.gpsLng != null
+      ? { lat: initial.gpsLat, lng: initial.gpsLng }
+      : null,
+  );
+  const [mileageWarning] = useState<string | null>(initial.mileageWarning);
+  const [transitionNote, setTransitionNote] = useState<string | null>(null);
+
+  // Чернетка нового завдання (вкладка Завдання).
+  const [taskClientId, setTaskClientId] = useState<string | null>(null);
+  const [taskClientName, setTaskClientName] = useState<string | null>(null);
+  const [taskComment, setTaskComment] = useState("");
+
   const [pickerOpen, setPickerOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [barcodeError, setBarcodeError] = useState<string | null>(null);
 
   const locked = isRouteSheetLocked(status);
+  const allowedTransitions = getAllowedRouteSheetTransitions(status);
 
   /** PATCH одного поля шапки (autosave on blur/change). */
   const patchHeader = useCallback(
@@ -259,14 +323,50 @@ export function RouteSheetForm({
     [sheetId],
   );
 
-  async function onStatusChange(next: string) {
+  /**
+   * Статус-перехід. На `dispatched`/`completed` — best-effort GPS-знімок +
+   * м'яке попередження про відсутній кілометраж. GPS-збій ніколи не блокує.
+   */
+  async function doTransition(next: string) {
     const prev = status;
+    setTransitionNote(null);
     setStatus(next);
-    const ok = await patchHeader({ status: next });
-    if (!ok) {
-      setStatus(prev);
-    } else {
+    setSaving(true);
+
+    const patch: Record<string, unknown> = { status: next };
+
+    if (next === "dispatched" || next === "completed") {
+      const coords = await captureGps();
+      if (coords) {
+        patch.gpsLat = coords.lat;
+        patch.gpsLng = coords.lng;
+      }
+      // М'яке попередження про кілометраж (не блокує перехід).
+      if (next === "dispatched" && !mileageStartKm) {
+        setTransitionNote(
+          "Не вказано початковий кілометраж зміни. Перехід виконано — заповніть кілометраж у шапці.",
+        );
+      }
+      if (next === "completed" && !mileageEndKm) {
+        setTransitionNote(
+          "Не вказано кінцевий кілометраж зміни. Перехід виконано — заповніть кілометраж у шапці.",
+        );
+      }
+    }
+
+    try {
+      const ok = await patchHeader(patch);
+      if (!ok) {
+        setStatus(prev);
+        setTransitionNote(null);
+        return;
+      }
+      if (patch.gpsLat != null && patch.gpsLng != null) {
+        setGps({ lat: patch.gpsLat as number, lng: patch.gpsLng as number });
+      }
       router.refresh();
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -430,6 +530,55 @@ export function RouteSheetForm({
     }
   }
 
+  /** Додати завдання (вільна нотатка клієнт+коментар). */
+  async function addTask() {
+    const comment = taskComment.trim();
+    if (!comment) return;
+    setError(null);
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/v1/manager/route-sheets/${sheetId}/tasks`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ customerId: taskClientId, comment }),
+      });
+      if (!res.ok) {
+        const body = (await res.json().catch(() => ({}))) as { error?: string };
+        setError(body.error ?? `Помилка ${res.status}`);
+        return;
+      }
+      const { task } = (await res.json()) as { task: RouteSheetTaskView };
+      setTasks((prev) => [...prev, task]);
+      setTaskClientId(null);
+      setTaskClientName(null);
+      setTaskComment("");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  /** Видалити завдання. */
+  async function removeTask(taskId: string) {
+    setError(null);
+    setSaving(true);
+    try {
+      const res = await fetch(
+        `/api/v1/manager/route-sheets/${sheetId}/tasks?taskId=${encodeURIComponent(
+          taskId,
+        )}`,
+        { method: "DELETE" },
+      );
+      if (!res.ok) {
+        const body = (await res.json().catch(() => ({}))) as { error?: string };
+        setError(body.error ?? `Помилка ${res.status}`);
+        return;
+      }
+      setTasks((prev) => prev.filter((t) => t.id !== taskId));
+    } finally {
+      setSaving(false);
+    }
+  }
+
   // Дерево товарів по замовленню (вкладка Товари).
   const itemsByOrder = useMemo(() => {
     const groups = new Map<
@@ -464,8 +613,25 @@ export function RouteSheetForm({
           <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-500">
             Маршрутний лист
           </h2>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <RouteSheetStatusBadge status={status} />
+            {allowedTransitions.map((next) => (
+              <Button
+                key={next}
+                type="button"
+                size="sm"
+                disabled={saving}
+                variant={next === "draft" ? "outline" : "default"}
+                onClick={() => void doTransition(next)}
+                className={
+                  next === "draft"
+                    ? ""
+                    : "bg-green-600 text-white hover:bg-green-700"
+                }
+              >
+                {TRANSITION_LABEL[next] ?? ROUTE_SHEET_STATUS_META[next].label}
+              </Button>
+            ))}
           </div>
         </div>
 
@@ -552,19 +718,48 @@ export function RouteSheetForm({
 
           <div className="min-w-0">
             <label className="mb-1 block text-sm font-medium text-gray-700">
-              Статус
+              Кілометраж (початок)
             </label>
-            <select
-              value={status}
-              onChange={(e) => void onStatusChange(e.target.value)}
-              className="h-10 w-full rounded-md border border-gray-300 bg-white px-3 text-sm focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500"
-            >
-              {ROUTE_SHEET_STATUS_LIST.map((s) => (
-                <option key={s} value={s}>
-                  {ROUTE_SHEET_STATUS_META[s].label}
-                </option>
-              ))}
-            </select>
+            <input
+              type="number"
+              inputMode="decimal"
+              min={0}
+              step="any"
+              value={mileageStartKm}
+              disabled={locked}
+              onChange={(e) => setMileageStartKm(e.target.value)}
+              onBlur={() =>
+                void patchHeader({
+                  mileageStartKm:
+                    mileageStartKm === "" ? null : Number(mileageStartKm),
+                })
+              }
+              placeholder="км"
+              className="h-10 w-full rounded-md border border-gray-300 bg-white px-3 text-sm focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500 disabled:bg-gray-50 disabled:text-gray-500"
+            />
+          </div>
+
+          <div className="min-w-0">
+            <label className="mb-1 block text-sm font-medium text-gray-700">
+              Кілометраж (кінець)
+            </label>
+            <input
+              type="number"
+              inputMode="decimal"
+              min={0}
+              step="any"
+              value={mileageEndKm}
+              disabled={locked}
+              onChange={(e) => setMileageEndKm(e.target.value)}
+              onBlur={() =>
+                void patchHeader({
+                  mileageEndKm:
+                    mileageEndKm === "" ? null : Number(mileageEndKm),
+                })
+              }
+              placeholder="км"
+              className="h-10 w-full rounded-md border border-gray-300 bg-white px-3 text-sm focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500 disabled:bg-gray-50 disabled:text-gray-500"
+            />
           </div>
 
           <div className="min-w-0 sm:col-span-2 lg:col-span-3">
@@ -584,7 +779,15 @@ export function RouteSheetForm({
           </div>
         </div>
 
-        <div className="mt-4 flex flex-wrap items-center justify-end gap-4 border-t pt-3 text-sm">
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-4 border-t pt-3 text-sm">
+          {gps ? (
+            <span className="inline-flex items-center gap-1 text-xs text-gray-500">
+              <MapPin className="h-3.5 w-3.5" />
+              GPS: {gps.lat.toFixed(5)}, {gps.lng.toFixed(5)}
+            </span>
+          ) : (
+            <span />
+          )}
           <span className="text-gray-500">
             Сума:{" "}
             <span className="font-semibold text-gray-800">
@@ -597,10 +800,22 @@ export function RouteSheetForm({
           </span>
         </div>
 
+        {mileageWarning && (
+          <p className="mt-3 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800">
+            ⚠ {mileageWarning}
+          </p>
+        )}
+
+        {transitionNote && (
+          <p className="mt-3 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800">
+            {transitionNote}
+          </p>
+        )}
+
         {locked && (
           <p className="mt-3 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800">
-            Маршрутний лист завершено — редагування заборонено. Змініть статус,
-            щоб розблокувати.
+            Маршрутний лист завершено — редагування заборонено. Скористайтесь
+            кнопкою «Повернути в роботу», щоб розблокувати.
           </p>
         )}
       </section>
@@ -1235,15 +1450,96 @@ export function RouteSheetForm({
         </section>
       )}
 
-      {/* ─── Заглушки наступних етапів ───────────────────────────────────── */}
-      {PLACEHOLDER_TABS.has(tab) && (
-        <section className="rounded-lg border border-dashed border-gray-200 bg-gray-50 px-6 py-10 text-center">
-          <p className="text-sm font-medium text-gray-700">
-            Доступно у наступному етапі
-          </p>
-          <p className="mt-1 text-xs text-gray-500">
-            Ця вкладка зʼявиться у наступних оновленнях маршрутного листа.
-          </p>
+      {/* ─── Завдання (вільні нотатки) ───────────────────────────────────── */}
+      {tab === "tasks" && (
+        <section className="space-y-3">
+          <h3 className="text-sm font-semibold text-gray-700">
+            Завдання ({tasks.length})
+          </h3>
+
+          {!locked && (
+            <div className="space-y-3 rounded-lg border bg-white p-4 shadow-sm">
+              <div>
+                <label className="mb-1 block text-sm font-medium text-gray-700">
+                  Клієнт (необов&apos;язково)
+                </label>
+                <TaskClientPicker
+                  value={taskClientId}
+                  selectedName={taskClientName}
+                  onChange={(id, name) => {
+                    setTaskClientId(id);
+                    setTaskClientName(name);
+                  }}
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-gray-700">
+                  Коментар
+                </label>
+                <textarea
+                  value={taskComment}
+                  onChange={(e) => setTaskComment(e.target.value)}
+                  rows={2}
+                  maxLength={2000}
+                  placeholder="Що зробити на маршруті…"
+                  className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500"
+                />
+              </div>
+              <div className="flex justify-end">
+                <Button
+                  type="button"
+                  size="sm"
+                  disabled={saving || taskComment.trim().length === 0}
+                  onClick={() => void addTask()}
+                  className="bg-green-600 text-white hover:bg-green-700"
+                >
+                  <Plus className="mr-1 h-4 w-4" />
+                  Додати
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {tasks.length === 0 ? (
+            <div className="rounded-lg border border-dashed border-gray-200 bg-gray-50 px-6 py-8 text-center text-sm text-gray-500">
+              Завдань ще немає.
+            </div>
+          ) : (
+            <div className="overflow-x-auto rounded-lg border bg-white">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b bg-gray-50 text-left text-gray-500">
+                    <th className="px-4 py-2 font-medium">Клієнт</th>
+                    <th className="px-4 py-2 font-medium">Коментар</th>
+                    <th className="w-12 px-4 py-2"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {tasks.map((t) => (
+                    <tr key={t.id} className="border-b last:border-b-0">
+                      <td className="px-4 py-2 text-gray-800">
+                        {t.customerName ?? "—"}
+                      </td>
+                      <td className="whitespace-pre-wrap px-4 py-2 text-gray-700">
+                        {t.comment}
+                      </td>
+                      <td className="px-4 py-2 text-right">
+                        <button
+                          type="button"
+                          disabled={locked || saving}
+                          onClick={() => void removeTask(t.id)}
+                          className="inline-flex items-center text-red-500 hover:text-red-700 disabled:opacity-40"
+                          aria-label="Прибрати завдання"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </section>
       )}
 

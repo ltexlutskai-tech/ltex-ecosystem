@@ -9,12 +9,14 @@ import {
   getRouteSheetLoadingRows,
 } from "@/lib/manager/route-sheet-loading";
 import { getRouteSheetDocuments } from "@/lib/manager/route-sheet-documents";
+import { getUnclosedMileageWarning } from "@/lib/manager/route-sheet-mileage";
 import {
   RouteSheetForm,
   type ExpeditorOption,
   type RouteOption,
   type RouteSheetItemView,
   type RouteSheetOrderView,
+  type RouteSheetTaskView,
   type RouteSheetView,
 } from "./_components/route-sheet-form";
 
@@ -55,6 +57,7 @@ export default async function ManagerRouteSheetDetailPage({
       expeditor: { select: { id: true, fullName: true } },
       orders: true,
       items: true,
+      tasks: true,
     },
   });
   if (!sheet) notFound();
@@ -73,6 +76,11 @@ export default async function ManagerRouteSheetDetailPage({
     if (it.customerId) customerIds.add(it.customerId);
     productIds.add(it.productId);
     if (it.lotId) lotIds.add(it.lotId);
+  }
+  // Завдання — клієнт з менеджерського довідника (MgrClient).
+  const taskClientIds = new Set<string>();
+  for (const t of sheet.tasks) {
+    if (t.customerId) taskClientIds.add(t.customerId);
   }
 
   const [orders, customers, products, lots, routeRows, expeditorRows] =
@@ -113,10 +121,29 @@ export default async function ManagerRouteSheetDetailPage({
       }),
     ]);
 
+  const taskClients =
+    taskClientIds.size > 0
+      ? await prisma.mgrClient.findMany({
+          where: { id: { in: [...taskClientIds] } },
+          select: { id: true, name: true },
+        })
+      : [];
+
   const orderMap = new Map(orders.map((o) => [o.id, o]));
   const customerMap = new Map(customers.map((c) => [c.id, c]));
   const productMap = new Map(products.map((p) => [p.id, p]));
   const lotMap = new Map(lots.map((l) => [l.id, l]));
+  const taskClientMap = new Map(taskClients.map((c) => [c.id, c]));
+
+  const taskViews: RouteSheetTaskView[] = sheet.tasks.map((t) => {
+    const client = t.customerId ? taskClientMap.get(t.customerId) : null;
+    return {
+      id: t.id,
+      customerId: t.customerId,
+      customerName: client?.name ?? null,
+      comment: t.comment,
+    };
+  });
 
   const orderViews: RouteSheetOrderView[] = sheet.orders.map((o) => {
     const order = orderMap.get(o.orderId);
@@ -159,12 +186,14 @@ export default async function ManagerRouteSheetDetailPage({
 
   // Етап 2: Загрузка (резолвлені рядки) + Бракує + лічильники (обчислювані).
   // Етап 3: Реалізації / Продажи / Оплати — derived із зворотних посилань.
-  const [loading, shortage, counters, documents] = await Promise.all([
-    getRouteSheetLoadingRows(sheet.id),
-    computeRouteSheetShortage(sheet.id),
-    computeRouteSheetCounters(sheet.id),
-    getRouteSheetDocuments(sheet.id),
-  ]);
+  const [loading, shortage, counters, documents, mileageWarning] =
+    await Promise.all([
+      getRouteSheetLoadingRows(sheet.id),
+      computeRouteSheetShortage(sheet.id),
+      computeRouteSheetCounters(sheet.id),
+      getRouteSheetDocuments(sheet.id),
+      getUnclosedMileageWarning(sheet.expeditorUserId, sheet.id),
+    ]);
 
   const initial: RouteSheetView = {
     id: sheet.id,
@@ -177,6 +206,11 @@ export default async function ManagerRouteSheetDetailPage({
     comment: sheet.comment,
     totalEur: sheet.totalEur,
     totalUah: sheet.totalUah,
+    mileageStartKm: sheet.mileageStartKm,
+    mileageEndKm: sheet.mileageEndKm,
+    gpsLat: sheet.gpsLat,
+    gpsLng: sheet.gpsLng,
+    mileageWarning,
     orders: orderViews,
     items: itemViews,
     loading,
@@ -185,6 +219,7 @@ export default async function ManagerRouteSheetDetailPage({
     sales: documents.sales,
     saleItems: documents.saleItems,
     payments: documents.payments,
+    tasks: taskViews,
   };
 
   const routes: RouteOption[] = routeRows.map((r) => ({

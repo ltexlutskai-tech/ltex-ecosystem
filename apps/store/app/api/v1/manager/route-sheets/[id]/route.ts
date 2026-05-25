@@ -1,13 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@ltex/db";
 import { getCurrentUser } from "@/lib/auth/manager-auth";
-import { isRouteSheetLocked } from "@/lib/manager/route-sheet-status";
+import {
+  canTransition,
+  isRouteSheetLocked,
+} from "@/lib/manager/route-sheet-status";
 import {
   computeRouteSheetCounters,
   computeRouteSheetShortage,
   getRouteSheetLoadingRows,
 } from "@/lib/manager/route-sheet-loading";
 import { getRouteSheetDocuments } from "@/lib/manager/route-sheet-documents";
+import { getUnclosedMileageWarning } from "@/lib/manager/route-sheet-mileage";
 import { updateRouteSheetSchema } from "@/lib/validations/manager-route-sheet";
 
 /**
@@ -36,6 +40,7 @@ export async function GET(
       expeditor: { select: { id: true, fullName: true } },
       orders: true,
       items: true,
+      tasks: true,
     },
   });
   if (!sheet) {
@@ -59,6 +64,12 @@ export async function GET(
     if (it.customerId) customerIds.add(it.customerId);
     productIds.add(it.productId);
     if (it.lotId) lotIds.add(it.lotId);
+  }
+  // Завдання — вільні нотатки; клієнт обирається з менеджерського довідника
+  // (MgrClient), тому імена резолвимо окремим batch-lookup-ом нижче.
+  const taskClientIds = new Set<string>();
+  for (const t of sheet.tasks) {
+    if (t.customerId) taskClientIds.add(t.customerId);
   }
 
   const [orders, customers, products, lots] = await Promise.all([
@@ -88,19 +99,31 @@ export async function GET(
       : Promise.resolve([]),
   ]);
 
+  const taskClients =
+    taskClientIds.size > 0
+      ? await prisma.mgrClient.findMany({
+          where: { id: { in: [...taskClientIds] } },
+          select: { id: true, name: true },
+        })
+      : [];
+
   const orderMap = new Map(orders.map((o) => [o.id, o]));
   const customerMap = new Map(customers.map((c) => [c.id, c]));
   const productMap = new Map(products.map((p) => [p.id, p]));
   const lotMap = new Map(lots.map((l) => [l.id, l]));
+  const taskClientMap = new Map(taskClients.map((c) => [c.id, c]));
 
   // Етап 2: Загрузка + Бракує + лічильники (обчислювані / резолвлені окремо).
   // Етап 3: Реалізації / Продажи / Оплати — derived із зворотних посилань.
-  const [loading, shortage, counters, documents] = await Promise.all([
-    getRouteSheetLoadingRows(sheet.id),
-    computeRouteSheetShortage(sheet.id),
-    computeRouteSheetCounters(sheet.id),
-    getRouteSheetDocuments(sheet.id),
-  ]);
+  // Етап 4: попередження про незакритий кілометраж попередньої зміни (м'яке).
+  const [loading, shortage, counters, documents, mileageWarning] =
+    await Promise.all([
+      getRouteSheetLoadingRows(sheet.id),
+      computeRouteSheetShortage(sheet.id),
+      computeRouteSheetCounters(sheet.id),
+      getRouteSheetDocuments(sheet.id),
+      getUnclosedMileageWarning(sheet.expeditorUserId, sheet.id),
+    ]);
 
   return NextResponse.json({
     sheet: {
@@ -117,6 +140,9 @@ export async function GET(
       totalUah: sheet.totalUah,
       mileageStartKm: sheet.mileageStartKm,
       mileageEndKm: sheet.mileageEndKm,
+      gpsLat: sheet.gpsLat,
+      gpsLng: sheet.gpsLng,
+      mileageWarning,
       archived: sheet.archived,
       route: sheet.route,
       expeditor: sheet.expeditor,
@@ -163,6 +189,15 @@ export async function GET(
       sales: documents.sales,
       saleItems: documents.saleItems,
       payments: documents.payments,
+      tasks: sheet.tasks.map((t) => {
+        const client = t.customerId ? taskClientMap.get(t.customerId) : null;
+        return {
+          id: t.id,
+          customerId: t.customerId,
+          customerName: client?.name ?? null,
+          comment: t.comment,
+        };
+      }),
     },
   });
 }
@@ -210,6 +245,19 @@ export async function PATCH(
   }
   const input = parsed.data;
 
+  // Зміна статусу — перевірка графа переходів (нелегальний стрибок → 400).
+  // Сам перехід дозволено навіть на completed-листі (можна розблокувати).
+  if (input.status !== undefined && input.status !== existing.status) {
+    if (!canTransition(existing.status, input.status)) {
+      return NextResponse.json(
+        {
+          error: `Неможливий перехід статусу: ${existing.status} → ${input.status}`,
+        },
+        { status: 400 },
+      );
+    }
+  }
+
   // Завершений (completed) МЛ заблоковано для редагування non-status полів.
   // Зміна самого статусу (наприклад розблокування) — дозволена.
   if (isRouteSheetLocked(existing.status)) {
@@ -239,6 +287,10 @@ export async function PATCH(
     data.mileageStartKm = input.mileageStartKm;
   }
   if (input.mileageEndKm !== undefined) data.mileageEndKm = input.mileageEndKm;
+  // GPS — best-effort знімок (надсилається разом зі статус-переходом). Не у
+  // NON_STATUS_FIELDS, тому captured-координати дозволено й на completed-листі.
+  if (input.gpsLat !== undefined) data.gpsLat = input.gpsLat;
+  if (input.gpsLng !== undefined) data.gpsLng = input.gpsLng;
 
   const sheet = await prisma.routeSheet.update({ where: { id }, data });
 
@@ -254,6 +306,8 @@ export async function PATCH(
     comment: sheet.comment,
     mileageStartKm: sheet.mileageStartKm,
     mileageEndKm: sheet.mileageEndKm,
+    gpsLat: sheet.gpsLat,
+    gpsLng: sheet.gpsLng,
     totalEur: sheet.totalEur,
     totalUah: sheet.totalUah,
     updatedAt: sheet.updatedAt.toISOString(),

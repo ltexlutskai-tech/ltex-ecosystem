@@ -44,6 +44,11 @@ function makeView(over: Partial<RouteSheetView> = {}): RouteSheetView {
     comment: null,
     totalEur: 0,
     totalUah: 0,
+    mileageStartKm: null,
+    mileageEndKm: null,
+    gpsLat: null,
+    gpsLng: null,
+    mileageWarning: null,
     orders: [],
     items: [],
     loading: [],
@@ -52,6 +57,7 @@ function makeView(over: Partial<RouteSheetView> = {}): RouteSheetView {
     sales: [],
     saleItems: [],
     payments: [],
+    tasks: [],
     ...over,
   };
 }
