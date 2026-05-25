@@ -70,7 +70,7 @@ export function RouteSheetsToolbar() {
               type="search"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Пошук за №, коментарем або маршрутом…"
+              placeholder="Пошук за № або назвою маршруту…"
               className="pl-8"
             />
           </div>

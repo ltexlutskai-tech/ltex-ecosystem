@@ -23,9 +23,6 @@ vi.mock("@ltex/ui", async () => {
 
 // Важкі діти — заглушки.
 vi.mock("./order-picker-modal", () => ({ OrderPickerModal: () => null }));
-vi.mock("../../../sales/new/_components/barcode-input", () => ({
-  BarcodeInput: () => null,
-}));
 vi.mock("../../_components/route-sheet-status-badge", () => ({
   RouteSheetStatusBadge: () => null,
 }));
@@ -174,5 +171,67 @@ describe("RouteSheetForm — Stage 3 tabs", () => {
     const create = screen.getByRole("link", { name: /Створити оплату/ });
     expect(create.getAttribute("href")).toContain("routeSheetId=rs1");
     expect(screen.getByText("Прихід")).toBeDefined();
+  });
+});
+
+describe("RouteSheetForm — round-2 corrections", () => {
+  it("Маршрут — вільнотекстове поле з comment (без MgrRoute select)", () => {
+    render(
+      <RouteSheetForm
+        initial={makeView({ comment: "11-12.02.26 Житомир-Вінниця" })}
+        expeditors={[]}
+      />,
+    );
+    // Поле «Маршрут» — текстовий input із значенням comment.
+    const routeInput = screen.getByDisplayValue("11-12.02.26 Житомир-Вінниця");
+    expect((routeInput as HTMLInputElement).type).toBe("text");
+    // Окремого «Коментар» поля немає.
+    expect(screen.queryByText("Коментар")).toBeNull();
+  });
+
+  it("Загрузка — read-only (без кнопок скану / видалення / редагування)", () => {
+    render(
+      <RouteSheetForm
+        initial={makeView({
+          loading: [
+            {
+              id: "ld1",
+              orderId: "o1",
+              orderNumber: "ORD-1",
+              customerId: "c1",
+              customerName: "Клієнт А",
+              productId: "p1",
+              productName: "Куртки",
+              articleCode: "ART-1",
+              lotId: "l1",
+              barcode: "BC-LOADING-1",
+              unit: "кг",
+              quantity: 1,
+              weight: 20,
+              price: 5,
+              sum: 100,
+              pricePerKg: 5,
+              loaded: true,
+              isReturn: false,
+            },
+          ],
+        })}
+        expeditors={[]}
+      />,
+    );
+    openTab("Загрузка");
+
+    // Примітка про 1С-обмін.
+    expect(
+      screen.getByText(/Завантаження надходить з 1С при обміні/),
+    ).toBeDefined();
+    // Рядок видно (ШК).
+    expect(screen.getByText("BC-LOADING-1")).toBeDefined();
+    // Жодних редагувань: чекбоксів немає (read-only бейджі замість них).
+    expect(screen.queryAllByRole("checkbox")).toHaveLength(0);
+    // «Завантажено» рендериться як read-only бейдж «Так».
+    expect(screen.getByText("Так")).toBeDefined();
+    // Кнопки прибрати рядок немає.
+    expect(screen.queryByLabelText("Прибрати рядок завантаження")).toBeNull();
   });
 });

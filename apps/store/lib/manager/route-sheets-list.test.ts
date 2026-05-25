@@ -21,13 +21,12 @@ describe("buildRouteSheetsWhere", () => {
     expect(buildRouteSheetsWhere({ archived: true }).archived).toBeUndefined();
   });
 
-  it("builds OR over code1C / comment / route name on search", () => {
+  it("builds OR over code1C / comment (route name) on search", () => {
     const where = buildRouteSheetsWhere({ search: "Луцьк" });
-    expect(where.OR).toHaveLength(3);
+    expect(where.OR).toHaveLength(2);
     const json = JSON.stringify(where.OR);
     expect(json).toContain("code1C");
     expect(json).toContain("comment");
-    expect(json).toContain("route");
   });
 
   it("adds numeric docNumber clause when search is a number (with optional №)", () => {
@@ -52,7 +51,7 @@ describe("buildRouteSheetsWhere", () => {
 });
 
 describe("serializeRouteSheetRow", () => {
-  it("flattens row with route/expeditor/orderCount", () => {
+  it("flattens row with routeName(=comment)/expeditor/orderCount", () => {
     const raw: RawRouteSheetRow = {
       id: "rs1",
       code1C: null,
@@ -63,18 +62,19 @@ describe("serializeRouteSheetRow", () => {
       totalUah: 4300,
       totalEur: 100,
       archived: false,
-      route: { id: "r1", name: "Луцьк-Центр" },
+      comment: "11-12.02.26 Житомир-Вінниця",
       expeditor: { id: "u1", fullName: "Іван" },
       _count: { orders: 3 },
     };
     const row = serializeRouteSheetRow(raw);
     expect(row.docNumber).toBe(7);
     expect(row.orderCount).toBe(3);
-    expect(row.route?.name).toBe("Луцьк-Центр");
+    // «Маршрут» = вільнотекстовий comment.
+    expect(row.routeName).toBe("11-12.02.26 Житомир-Вінниця");
     expect(row.expeditor?.fullName).toBe("Іван");
   });
 
-  it("handles null route / expeditor", () => {
+  it("handles null routeName / expeditor", () => {
     const raw: RawRouteSheetRow = {
       id: "rs2",
       code1C: "RS-001",
@@ -85,12 +85,12 @@ describe("serializeRouteSheetRow", () => {
       totalUah: 0,
       totalEur: 0,
       archived: true,
-      route: null,
+      comment: null,
       expeditor: null,
       _count: { orders: 0 },
     };
     const row = serializeRouteSheetRow(raw);
-    expect(row.route).toBeNull();
+    expect(row.routeName).toBeNull();
     expect(row.expeditor).toBeNull();
     expect(row.orderCount).toBe(0);
   });

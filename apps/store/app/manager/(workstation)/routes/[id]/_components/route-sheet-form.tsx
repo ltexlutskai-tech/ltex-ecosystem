@@ -14,7 +14,6 @@ import { getSaleStatusMeta } from "@/lib/manager/sale-status";
 import { RouteSheetStatusBadge } from "../../_components/route-sheet-status-badge";
 import { OrderPickerModal } from "./order-picker-modal";
 import { TaskClientPicker } from "./task-client-picker";
-import { BarcodeInput } from "../../../sales/new/_components/barcode-input";
 
 /** Підписи на кнопках статус-переходів. */
 const TRANSITION_LABEL: Record<string, string> = {
@@ -22,29 +21,6 @@ const TRANSITION_LABEL: Record<string, string> = {
   completed: "Завершити",
   draft: "Повернути в роботу",
 };
-
-/** Best-effort GPS-знімок. Ніколи не кидає — denial/unsupported → null. */
-async function captureGps(): Promise<{ lat: number; lng: number } | null> {
-  if (
-    typeof navigator === "undefined" ||
-    !("geolocation" in navigator) ||
-    !navigator.geolocation
-  ) {
-    return null;
-  }
-  return new Promise((resolve) => {
-    try {
-      navigator.geolocation.getCurrentPosition(
-        (pos) =>
-          resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-        () => resolve(null),
-        { enableHighAccuracy: false, timeout: 5000, maximumAge: 60_000 },
-      );
-    } catch {
-      resolve(null);
-    }
-  });
-}
 
 export interface RouteOption {
   id: string;
@@ -217,20 +193,27 @@ const SALE_STATUS_BADGE: Record<string, string> = {
   red: "bg-red-100 text-red-700",
 };
 
-function toDateInput(iso: string | null): string {
-  if (!iso) return "";
+/** ISO → локальна дата для read-only показу; «—» коли порожньо/невалідно. */
+function formatDateDisplay(iso: string | null): string {
+  if (!iso) return "—";
   const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "";
-  return d.toISOString().slice(0, 10);
+  if (Number.isNaN(d.getTime())) return "—";
+  return d.toLocaleDateString("uk-UA");
+}
+
+/** Число → рядок для read-only показу; «—» коли null. */
+function formatNumberDisplay(n: number | null): string {
+  if (n == null) return "—";
+  return `${n.toLocaleString("uk-UA")} км`;
 }
 
 export function RouteSheetForm({
   initial,
-  routes,
   expeditors,
 }: {
   initial: RouteSheetView;
-  routes: RouteOption[];
+  /** @deprecated MgrRoute dropdown прибрано — «Маршрут» тепер вільний текст у `comment`. */
+  routes?: RouteOption[];
   expeditors: ExpeditorOption[];
 }) {
   const router = useRouter();
@@ -238,15 +221,17 @@ export function RouteSheetForm({
 
   const [tab, setTab] = useState<TabId>("orders");
   const [status, setStatus] = useState(initial.status);
-  const [date, setDate] = useState(toDateInput(initial.date));
-  const [arrivalDate, setArrivalDate] = useState(
-    toDateInput(initial.arrivalDate),
-  );
-  const [routeId, setRouteId] = useState(initial.routeId ?? "");
+  // «Маршрут» — вільнотекстова назва маршруту (1С: документ = `Комментарий`).
+  const [routeName, setRouteName] = useState(initial.comment ?? "");
   const [expeditorUserId, setExpeditorUserId] = useState(
     initial.expeditorUserId ?? "",
   );
-  const [comment, setComment] = useState(initial.comment ?? "");
+
+  // Read-only display (надходить з 1С при обміні).
+  const dateDisplay = formatDateDisplay(initial.date);
+  const arrivalDateDisplay = formatDateDisplay(initial.arrivalDate);
+  const mileageStartDisplay = formatNumberDisplay(initial.mileageStartKm);
+  const mileageEndDisplay = formatNumberDisplay(initial.mileageEndKm);
 
   const [orders, setOrders] = useState<RouteSheetOrderView[]>(initial.orders);
   const [items, setItems] = useState<RouteSheetItemView[]>(initial.items);
@@ -270,19 +255,12 @@ export function RouteSheetForm({
   const [totalUah, setTotalUah] = useState(initial.totalUah);
 
   const [tasks, setTasks] = useState<RouteSheetTaskView[]>(initial.tasks);
-  const [mileageStartKm, setMileageStartKm] = useState(
-    initial.mileageStartKm != null ? String(initial.mileageStartKm) : "",
-  );
-  const [mileageEndKm, setMileageEndKm] = useState(
-    initial.mileageEndKm != null ? String(initial.mileageEndKm) : "",
-  );
-  const [gps, setGps] = useState<{ lat: number; lng: number } | null>(
+  // GPS — read-only знімок з 1С (офіс-застосунок свій GPS не штампує).
+  const gps =
     initial.gpsLat != null && initial.gpsLng != null
       ? { lat: initial.gpsLat, lng: initial.gpsLng }
-      : null,
-  );
+      : null;
   const [mileageWarning] = useState<string | null>(initial.mileageWarning);
-  const [transitionNote, setTransitionNote] = useState<string | null>(null);
 
   // Чернетка нового завдання (вкладка Завдання).
   const [taskClientId, setTaskClientId] = useState<string | null>(null);
@@ -292,7 +270,6 @@ export function RouteSheetForm({
   const [pickerOpen, setPickerOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [barcodeError, setBarcodeError] = useState<string | null>(null);
 
   const locked = isRouteSheetLocked(status);
   const allowedTransitions = getAllowedRouteSheetTransitions(status);
@@ -324,45 +301,19 @@ export function RouteSheetForm({
   );
 
   /**
-   * Статус-перехід. На `dispatched`/`completed` — best-effort GPS-знімок +
-   * м'яке попередження про відсутній кілометраж. GPS-збій ніколи не блокує.
+   * Статус-перехід. GPS/кілометраж надходять з 1С (офіс-застосунок свій GPS
+   * не штампує) — тут лише змінюємо статус.
    */
   async function doTransition(next: string) {
     const prev = status;
-    setTransitionNote(null);
     setStatus(next);
     setSaving(true);
 
-    const patch: Record<string, unknown> = { status: next };
-
-    if (next === "dispatched" || next === "completed") {
-      const coords = await captureGps();
-      if (coords) {
-        patch.gpsLat = coords.lat;
-        patch.gpsLng = coords.lng;
-      }
-      // М'яке попередження про кілометраж (не блокує перехід).
-      if (next === "dispatched" && !mileageStartKm) {
-        setTransitionNote(
-          "Не вказано початковий кілометраж зміни. Перехід виконано — заповніть кілометраж у шапці.",
-        );
-      }
-      if (next === "completed" && !mileageEndKm) {
-        setTransitionNote(
-          "Не вказано кінцевий кілометраж зміни. Перехід виконано — заповніть кілометраж у шапці.",
-        );
-      }
-    }
-
     try {
-      const ok = await patchHeader(patch);
+      const ok = await patchHeader({ status: next });
       if (!ok) {
         setStatus(prev);
-        setTransitionNote(null);
         return;
-      }
-      if (patch.gpsLat != null && patch.gpsLng != null) {
-        setGps({ lat: patch.gpsLat as number, lng: patch.gpsLng as number });
       }
       router.refresh();
     } finally {
@@ -386,86 +337,6 @@ export function RouteSheetForm({
     setTotalEur(data.sheet.totalEur);
     setTotalUah(data.sheet.totalUah);
   }, [sheetId]);
-
-  /** Скан/ручний ввід ШК → POST рядка Загрузки + оптимістичне оновлення. */
-  const addLoadingByBarcode = useCallback(
-    async (code: string) => {
-      setBarcodeError(null);
-      setError(null);
-      try {
-        const res = await fetch(
-          `/api/v1/manager/route-sheets/${sheetId}/loading`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ barcode: code }),
-          },
-        );
-        if (!res.ok) {
-          const body = (await res.json().catch(() => ({}))) as {
-            error?: string;
-          };
-          setBarcodeError(body.error ?? `Помилка ${res.status}`);
-          return;
-        }
-        await reloadSheet();
-      } catch (e) {
-        setBarcodeError((e as Error).message ?? "Невідома помилка");
-      }
-    },
-    [sheetId, reloadSheet],
-  );
-
-  /** Видаляє рядок Загрузки. */
-  async function removeLoadingRow(loadingId: string) {
-    setError(null);
-    setSaving(true);
-    try {
-      const res = await fetch(
-        `/api/v1/manager/route-sheets/${sheetId}/loading?loadingId=${encodeURIComponent(
-          loadingId,
-        )}`,
-        { method: "DELETE" },
-      );
-      if (!res.ok) {
-        const body = (await res.json().catch(() => ({}))) as { error?: string };
-        setError(body.error ?? `Помилка ${res.status}`);
-        return;
-      }
-      await reloadSheet();
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  /** Toggle прапорця (loaded/isReturn) рядка Загрузки. */
-  async function patchLoadingRow(
-    loadingId: string,
-    patch: { loaded?: boolean; isReturn?: boolean },
-  ) {
-    setError(null);
-    setSaving(true);
-    try {
-      const res = await fetch(
-        `/api/v1/manager/route-sheets/${sheetId}/loading?loadingId=${encodeURIComponent(
-          loadingId,
-        )}`,
-        {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(patch),
-        },
-      );
-      if (!res.ok) {
-        const body = (await res.json().catch(() => ({}))) as { error?: string };
-        setError(body.error ?? `Помилка ${res.status}`);
-        return;
-      }
-      await reloadSheet();
-    } finally {
-      setSaving(false);
-    }
-  }
 
   async function addOrders(orderIds: string[]) {
     setError(null);
@@ -636,64 +507,24 @@ export function RouteSheetForm({
         </div>
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          <div className="min-w-0">
-            <label className="mb-1 block text-sm font-medium text-gray-700">
-              Дата
-            </label>
-            <input
-              type="date"
-              value={date}
-              disabled={locked}
-              onChange={(e) => setDate(e.target.value)}
-              onBlur={() =>
-                date && void patchHeader({ date: `${date}T00:00:00.000Z` })
-              }
-              className="h-10 w-full rounded-md border border-gray-300 bg-white px-3 text-sm focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500 disabled:bg-gray-50 disabled:text-gray-500"
-            />
-          </div>
-
-          <div className="min-w-0">
-            <label className="mb-1 block text-sm font-medium text-gray-700">
-              Дата приїзду
-            </label>
-            <input
-              type="date"
-              value={arrivalDate}
-              disabled={locked}
-              onChange={(e) => setArrivalDate(e.target.value)}
-              onBlur={() =>
-                void patchHeader({
-                  arrivalDate: arrivalDate
-                    ? `${arrivalDate}T00:00:00.000Z`
-                    : null,
-                })
-              }
-              className="h-10 w-full rounded-md border border-gray-300 bg-white px-3 text-sm focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500 disabled:bg-gray-50 disabled:text-gray-500"
-            />
-          </div>
-
-          <div className="min-w-0">
+          {/* Маршрут — вільнотекстова назва (1С: документ = Комментарий). */}
+          <div className="min-w-0 sm:col-span-2 lg:col-span-2">
             <label className="mb-1 block text-sm font-medium text-gray-700">
               Маршрут
             </label>
-            <select
-              value={routeId}
+            <input
+              type="text"
+              value={routeName}
               disabled={locked}
-              onChange={(e) => {
-                setRouteId(e.target.value);
-                void patchHeader({ routeId: e.target.value || null });
-              }}
+              onChange={(e) => setRouteName(e.target.value)}
+              onBlur={() => void patchHeader({ comment: routeName || null })}
+              maxLength={2000}
+              placeholder="Напр. 11-12.02.26 Житомир-Вінниця"
               className="h-10 w-full rounded-md border border-gray-300 bg-white px-3 text-sm focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500 disabled:bg-gray-50 disabled:text-gray-500"
-            >
-              <option value="">— Не вибрано —</option>
-              {routes.map((r) => (
-                <option key={r.id} value={r.id}>
-                  {r.name}
-                </option>
-              ))}
-            </select>
+            />
           </div>
 
+          {/* Експедитор — редагований select. */}
           <div className="min-w-0">
             <label className="mb-1 block text-sm font-medium text-gray-700">
               Експедитор
@@ -716,66 +547,43 @@ export function RouteSheetForm({
             </select>
           </div>
 
+          {/* Дата — read-only (присвоюється при створенні). */}
+          <div className="min-w-0">
+            <label className="mb-1 block text-sm font-medium text-gray-700">
+              Дата
+            </label>
+            <p className="flex h-10 items-center rounded-md border border-gray-200 bg-gray-50 px-3 text-sm text-gray-700">
+              {dateDisplay}
+            </p>
+          </div>
+
+          {/* Дата приїзду — read-only (з 1С). */}
+          <div className="min-w-0">
+            <label className="mb-1 block text-sm font-medium text-gray-700">
+              Дата приїзду
+            </label>
+            <p className="flex h-10 items-center rounded-md border border-gray-200 bg-gray-50 px-3 text-sm text-gray-700">
+              {arrivalDateDisplay}
+            </p>
+          </div>
+
+          {/* Кілометраж — read-only (з 1С). */}
           <div className="min-w-0">
             <label className="mb-1 block text-sm font-medium text-gray-700">
               Кілометраж (початок)
             </label>
-            <input
-              type="number"
-              inputMode="decimal"
-              min={0}
-              step="any"
-              value={mileageStartKm}
-              disabled={locked}
-              onChange={(e) => setMileageStartKm(e.target.value)}
-              onBlur={() =>
-                void patchHeader({
-                  mileageStartKm:
-                    mileageStartKm === "" ? null : Number(mileageStartKm),
-                })
-              }
-              placeholder="км"
-              className="h-10 w-full rounded-md border border-gray-300 bg-white px-3 text-sm focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500 disabled:bg-gray-50 disabled:text-gray-500"
-            />
+            <p className="flex h-10 items-center rounded-md border border-gray-200 bg-gray-50 px-3 text-sm text-gray-700">
+              {mileageStartDisplay}
+            </p>
           </div>
 
           <div className="min-w-0">
             <label className="mb-1 block text-sm font-medium text-gray-700">
               Кілометраж (кінець)
             </label>
-            <input
-              type="number"
-              inputMode="decimal"
-              min={0}
-              step="any"
-              value={mileageEndKm}
-              disabled={locked}
-              onChange={(e) => setMileageEndKm(e.target.value)}
-              onBlur={() =>
-                void patchHeader({
-                  mileageEndKm:
-                    mileageEndKm === "" ? null : Number(mileageEndKm),
-                })
-              }
-              placeholder="км"
-              className="h-10 w-full rounded-md border border-gray-300 bg-white px-3 text-sm focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500 disabled:bg-gray-50 disabled:text-gray-500"
-            />
-          </div>
-
-          <div className="min-w-0 sm:col-span-2 lg:col-span-3">
-            <label className="mb-1 block text-sm font-medium text-gray-700">
-              Коментар
-            </label>
-            <textarea
-              value={comment}
-              disabled={locked}
-              onChange={(e) => setComment(e.target.value)}
-              onBlur={() => void patchHeader({ comment: comment || null })}
-              rows={2}
-              maxLength={2000}
-              placeholder="Нотатка до маршруту (необов'язково)"
-              className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500 disabled:bg-gray-50 disabled:text-gray-500"
-            />
+            <p className="flex h-10 items-center rounded-md border border-gray-200 bg-gray-50 px-3 text-sm text-gray-700">
+              {mileageEndDisplay}
+            </p>
           </div>
         </div>
 
@@ -803,12 +611,6 @@ export function RouteSheetForm({
         {mileageWarning && (
           <p className="mt-3 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800">
             ⚠ {mileageWarning}
-          </p>
-        )}
-
-        {transitionNote && (
-          <p className="mt-3 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800">
-            {transitionNote}
           </p>
         )}
 
@@ -1021,34 +823,28 @@ export function RouteSheetForm({
         </section>
       )}
 
-      {/* ─── Загрузка (скан) ─────────────────────────────────────────────── */}
+      {/* ─── Загрузка (read-only — надходить з 1С) ───────────────────────── */}
       {tab === "loading" && (
         <section className="space-y-3">
-          <div className="rounded-lg border bg-white p-4 shadow-sm">
-            <h3 className="mb-3 text-sm font-semibold text-gray-700">
-              Сканування лотів ({loading.length})
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h3 className="text-sm font-semibold text-gray-700">
+              Завантаження ({loading.length})
             </h3>
-            <BarcodeInput
-              onCode={(c) => void addLoadingByBarcode(c)}
-              error={barcodeError}
-              disabled={locked}
-            />
-            <p className="mt-2 text-xs text-gray-400">
-              Скануйте камерою або введіть ШК. Кожен лот (мішок) додається один
-              раз; він автоматично прив'язується до замовлення за товаром.
-            </p>
           </div>
+          <p className="rounded-md bg-blue-50 px-3 py-2 text-xs text-blue-800">
+            Завантаження надходить з 1С при обміні (формується складом).
+          </p>
 
           {loading.length === 0 ? (
             <div className="rounded-lg border border-dashed border-gray-200 bg-gray-50 px-6 py-8 text-center text-sm text-gray-500">
-              Лотів ще не завантажено. Відскануйте перший ШК.
+              Лотів ще не завантажено. Дані з&apos;являться після обміну з 1С.
             </div>
           ) : (
             <div className="overflow-x-auto rounded-lg border bg-white">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b bg-gray-50 text-left text-gray-500">
-                    <th className="px-3 py-2 font-medium">Клієнт</th>
+                    <th className="px-3 py-2 font-medium">Контрагент</th>
                     <th className="px-3 py-2 font-medium">Замовлення</th>
                     <th className="px-3 py-2 font-medium">Артикул</th>
                     <th className="px-3 py-2 font-medium">Лот (ШК)</th>
@@ -1063,7 +859,6 @@ export function RouteSheetForm({
                     <th className="px-3 py-2 text-center font-medium">
                       Повер&shy;нення
                     </th>
-                    <th className="w-10 px-3 py-2"></th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1101,43 +896,22 @@ export function RouteSheetForm({
                         {row.sum.toFixed(2)}
                       </td>
                       <td className="px-3 py-2 text-center">
-                        <input
-                          type="checkbox"
-                          checked={row.loaded}
-                          disabled={locked || saving}
-                          onChange={(e) =>
-                            void patchLoadingRow(row.id, {
-                              loaded: e.target.checked,
-                            })
-                          }
-                          className="h-4 w-4 shrink-0 rounded border-gray-300 text-green-600 focus:ring-green-500"
-                          aria-label="Завантажено"
-                        />
+                        {row.loaded ? (
+                          <span className="inline-block rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">
+                            Так
+                          </span>
+                        ) : (
+                          <span className="text-xs text-gray-400">—</span>
+                        )}
                       </td>
                       <td className="px-3 py-2 text-center">
-                        <input
-                          type="checkbox"
-                          checked={row.isReturn}
-                          disabled={locked || saving}
-                          onChange={(e) =>
-                            void patchLoadingRow(row.id, {
-                              isReturn: e.target.checked,
-                            })
-                          }
-                          className="h-4 w-4 shrink-0 rounded border-gray-300 text-amber-600 focus:ring-amber-500"
-                          aria-label="Повернення"
-                        />
-                      </td>
-                      <td className="px-3 py-2 text-right">
-                        <button
-                          type="button"
-                          disabled={locked || saving}
-                          onClick={() => void removeLoadingRow(row.id)}
-                          className="inline-flex shrink-0 items-center text-red-500 hover:text-red-700 disabled:opacity-40"
-                          aria-label="Прибрати рядок завантаження"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
+                        {row.isReturn ? (
+                          <span className="inline-block rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">
+                            Повернення
+                          </span>
+                        ) : (
+                          <span className="text-xs text-gray-400">—</span>
+                        )}
                       </td>
                     </tr>
                   ))}
