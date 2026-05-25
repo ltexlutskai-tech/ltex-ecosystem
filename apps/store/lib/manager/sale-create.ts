@@ -136,6 +136,7 @@ export async function createSaleWithItems(
       onTradeAgent: input.onTradeAgent ?? true,
       exportTo1C: input.exportTo1C ?? true,
       expressWaybill: input.expressWaybill ?? null,
+      routeSheetId: input.routeSheetId ?? null,
       items: { create: itemRows },
     },
     include: SALE_INCLUDE,

@@ -55,6 +55,11 @@ export interface PaymentFormProps {
   cashFlowArticles: CashFlowArticleOption[];
   /** Куди повертатись після створення (за замовч. `/manager/payments`). */
   returnHref?: string | null;
+  /**
+   * Зворотне посилання на Маршрутний лист — коли оплату створюють зсередини МЛ.
+   * Передається у POST як `routeSheetId`.
+   */
+  routeSheetId?: string | null;
 }
 
 const INPUT_CLASS =
@@ -99,6 +104,7 @@ export function PaymentForm({
   bankAccounts,
   cashFlowArticles,
   returnHref,
+  routeSheetId,
 }: PaymentFormProps) {
   const router = useRouter();
   const { toast } = useToast();
@@ -287,6 +293,7 @@ export function PaymentForm({
           rateUsd: rates.usd,
           sumToPayEur,
           includeDebt,
+          routeSheetId: routeSheetId ?? undefined,
         }),
       });
       if (!res.ok) {

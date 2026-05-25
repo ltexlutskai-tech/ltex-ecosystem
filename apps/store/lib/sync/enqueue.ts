@@ -470,3 +470,411 @@ export async function enqueueCashOrderCreate(order: CashOrderForEnqueue) {
     },
   });
 }
+
+// ─── M1.9 (Маршрутний лист, Етап 5) — Route sheet enqueue ───────────────────
+
+/**
+ * Збирає payload для 1С `СтворитиМаршрутнийЛист` (двофазний контракт,
+ * `docs/1C_SYNC_MODULES_SPEC.md` §3.6) і ставить row у `mgr_sync_jobs` чергу.
+ *
+ * Маршрутний лист — документ-агрегатор дня виїзду: він не несе власних товарних
+ * полів, а **оркеструє** дочірні таб. частини (`Заказы`/`ТоварыЗаказов`/
+ * `ЗагрузкаМашины`/`Завдання`) + похідні документи (`Реализации`/`Оплаты`),
+ * що приходять окремими ключами (аудит §H, дискримінатор `ТабЧасть` + верхній
+ * ключ `Реализации`; Оплати 1С відновлює на сервері з пов'язаних ПКО/РКО).
+ *
+ * Через це enqueue читає весь граф з БД (batch-резолв code1C/штрихкодів через
+ * Prisma): шапку, рядки `RouteSheetOrder`/`RouteSheetItem`/`RouteSheetLoading`/
+ * `RouteSheetTask` + похідні `Sale where routeSheetId==id` (Реалізації) і
+ * `MgrCashOrder where routeSheetId==id` (Оплати).
+ *
+ * Усі numeric поля передаються як string з `.` decimal separator щоб уникнути
+ * floating-point issues (1С парсить через Число()).
+ *
+ * **DO NOT** робити цей call синхронно у HTTP-handler-i; завжди обертай
+ * у `void enqueueRouteSheetCreate(id).catch(warn)` (sync — best-effort).
+ */
+
+export interface RouteSheetCreatePayload {
+  routeSheetInternalId: string;
+  code1C: string | null;
+  docNumber: number;
+  date: string;
+  arrivalDate: string | null;
+  status: string;
+  routeCode1C: string | null;
+  expeditorCode1C: string | null;
+  comment: string | null;
+  mileageStartKm: string | null;
+  mileageEndKm: string | null;
+  gpsLat: string | null;
+  gpsLng: string | null;
+  orders: Array<{
+    orderCode1C: string | null;
+    customerCode1C: string | null;
+    city: string | null;
+  }>;
+  items: Array<{
+    orderCode1C: string | null;
+    customerCode1C: string | null;
+    productCode1C: string | null;
+    lotBarcode: string | null;
+    unit: string | null;
+    quantity: number;
+    quantityLoaded: number;
+    price: string;
+    sum: string;
+  }>;
+  loading: Array<{
+    orderCode1C: string | null;
+    customerCode1C: string | null;
+    productCode1C: string | null;
+    lotBarcode: string | null;
+    unit: string | null;
+    quantity: number;
+    weight: string;
+    price: string;
+    sum: string;
+    pricePerKg: string;
+    loaded: boolean;
+    isReturn: boolean;
+  }>;
+  sales: Array<{
+    saleCode1C: string | null;
+    orderCode1C: string | null;
+    customerCode1C: string | null;
+    sum: string;
+  }>;
+  payments: Array<{
+    cashOrderCode1C: string | null;
+    saleCode1C: string | null;
+    customerCode1C: string | null;
+    type: string;
+    amount: string;
+  }>;
+  tasks: Array<{
+    customerCode1C: string | null;
+    comment: string;
+  }>;
+}
+
+/**
+ * Будує payload із зчитаних рядків графа МЛ. Чиста функція (без I/O) —
+ * `enqueueRouteSheetCreate` спершу batch-резолвить code1C/штрихкоди, потім
+ * передає сюди готові рядки з уже резолвленими бізнес-ключами.
+ */
+export function buildRouteSheetCreatePayload(input: {
+  sheet: {
+    id: string;
+    code1C: string | null;
+    docNumber: number;
+    date: Date;
+    arrivalDate: Date | null;
+    status: string;
+    comment: string | null;
+    mileageStartKm: number | null;
+    mileageEndKm: number | null;
+    gpsLat: number | null;
+    gpsLng: number | null;
+  };
+  routeCode1C: string | null;
+  expeditorCode1C: string | null;
+  orders: Array<{
+    orderCode1C: string | null;
+    customerCode1C: string | null;
+    city: string | null;
+  }>;
+  items: Array<{
+    orderCode1C: string | null;
+    customerCode1C: string | null;
+    productCode1C: string | null;
+    lotBarcode: string | null;
+    unit: string | null;
+    quantity: number;
+    quantityLoaded: number;
+    price: number;
+    sum: number;
+  }>;
+  loading: Array<{
+    orderCode1C: string | null;
+    customerCode1C: string | null;
+    productCode1C: string | null;
+    lotBarcode: string | null;
+    unit: string | null;
+    quantity: number;
+    weight: number;
+    price: number;
+    sum: number;
+    pricePerKg: number;
+    loaded: boolean;
+    isReturn: boolean;
+  }>;
+  sales: Array<{
+    saleCode1C: string | null;
+    orderCode1C: string | null;
+    customerCode1C: string | null;
+    sum: number;
+  }>;
+  payments: Array<{
+    cashOrderCode1C: string | null;
+    saleCode1C: string | null;
+    customerCode1C: string | null;
+    type: string;
+    amount: number;
+  }>;
+  tasks: Array<{ customerCode1C: string | null; comment: string }>;
+}): RouteSheetCreatePayload {
+  const { sheet } = input;
+  return {
+    routeSheetInternalId: sheet.id,
+    code1C: sheet.code1C,
+    docNumber: sheet.docNumber,
+    date: sheet.date.toISOString(),
+    arrivalDate: sheet.arrivalDate ? sheet.arrivalDate.toISOString() : null,
+    status: sheet.status,
+    routeCode1C: input.routeCode1C,
+    expeditorCode1C: input.expeditorCode1C,
+    comment: emptyToNull(sheet.comment),
+    mileageStartKm:
+      sheet.mileageStartKm !== null ? sheet.mileageStartKm.toFixed(1) : null,
+    mileageEndKm:
+      sheet.mileageEndKm !== null ? sheet.mileageEndKm.toFixed(1) : null,
+    gpsLat: sheet.gpsLat !== null ? sheet.gpsLat.toFixed(6) : null,
+    gpsLng: sheet.gpsLng !== null ? sheet.gpsLng.toFixed(6) : null,
+    orders: input.orders.map((o) => ({
+      orderCode1C: o.orderCode1C,
+      customerCode1C: o.customerCode1C,
+      city: emptyToNull(o.city),
+    })),
+    items: input.items.map((it) => ({
+      orderCode1C: it.orderCode1C,
+      customerCode1C: it.customerCode1C,
+      productCode1C: it.productCode1C,
+      lotBarcode: it.lotBarcode,
+      unit: emptyToNull(it.unit),
+      quantity: it.quantity,
+      quantityLoaded: it.quantityLoaded,
+      price: it.price.toFixed(2),
+      sum: it.sum.toFixed(2),
+    })),
+    loading: input.loading.map((ld) => ({
+      orderCode1C: ld.orderCode1C,
+      customerCode1C: ld.customerCode1C,
+      productCode1C: ld.productCode1C,
+      lotBarcode: ld.lotBarcode,
+      unit: emptyToNull(ld.unit),
+      quantity: ld.quantity,
+      weight: ld.weight.toFixed(3),
+      price: ld.price.toFixed(2),
+      sum: ld.sum.toFixed(2),
+      pricePerKg: ld.pricePerKg.toFixed(2),
+      loaded: ld.loaded,
+      isReturn: ld.isReturn,
+    })),
+    sales: input.sales.map((s) => ({
+      saleCode1C: s.saleCode1C,
+      orderCode1C: s.orderCode1C,
+      customerCode1C: s.customerCode1C,
+      sum: s.sum.toFixed(2),
+    })),
+    payments: input.payments.map((p) => ({
+      cashOrderCode1C: p.cashOrderCode1C,
+      saleCode1C: p.saleCode1C,
+      customerCode1C: p.customerCode1C,
+      type: p.type,
+      amount: p.amount.toFixed(2),
+    })),
+    tasks: input.tasks.map((t) => ({
+      customerCode1C: t.customerCode1C,
+      comment: t.comment,
+    })),
+  };
+}
+
+/**
+ * Читає весь граф МЛ з БД + batch-резолвить бізнес-ключі (code1C маршруту/
+ * експедитора/замовлень/клієнтів/товарів + штрихкоди лотів) і ставить row
+ * у чергу `mgr_sync_jobs` (entityType `route_sheet`).
+ *
+ * Якщо МЛ не знайдено — no-op (повертає `null`); виклик завжди best-effort.
+ */
+export async function enqueueRouteSheetCreate(routeSheetId: string) {
+  const sheet = await prisma.routeSheet.findUnique({
+    where: { id: routeSheetId },
+    include: {
+      route: { select: { code1C: true } },
+      expeditor: { select: { code1C: true } },
+      orders: true,
+      items: true,
+      loading: true,
+      tasks: true,
+    },
+  });
+  if (!sheet) return null;
+
+  // Похідні документи (Реалізації + Оплати) — за зворотним посиланням.
+  const [sales, payments] = await Promise.all([
+    prisma.sale.findMany({
+      where: { routeSheetId },
+      select: {
+        code1C: true,
+        orderId: true,
+        totalEur: true,
+        customer: { select: { code1C: true } },
+      },
+    }),
+    prisma.mgrCashOrder.findMany({
+      where: { routeSheetId },
+      select: {
+        code1C: true,
+        type: true,
+        documentSumEur: true,
+        saleId: true,
+        customer: { select: { code1C: true } },
+        sale: {
+          select: { code1C: true, customer: { select: { code1C: true } } },
+        },
+      },
+    }),
+  ]);
+
+  // ─── Batch-резолв cross-model code1C/штрихкодів (плоскі скаляри у дочірніх) ──
+  const orderIds = new Set<string>();
+  const customerIds = new Set<string>();
+  const productIds = new Set<string>();
+  const lotIds = new Set<string>();
+  const taskClientIds = new Set<string>();
+  for (const o of sheet.orders) {
+    orderIds.add(o.orderId);
+    if (o.customerId) customerIds.add(o.customerId);
+  }
+  for (const it of sheet.items) {
+    if (it.orderId) orderIds.add(it.orderId);
+    if (it.customerId) customerIds.add(it.customerId);
+    productIds.add(it.productId);
+    if (it.lotId) lotIds.add(it.lotId);
+  }
+  for (const ld of sheet.loading) {
+    if (ld.orderId) orderIds.add(ld.orderId);
+    if (ld.customerId) customerIds.add(ld.customerId);
+    productIds.add(ld.productId);
+    lotIds.add(ld.lotId);
+  }
+  for (const s of sales) {
+    if (s.orderId) orderIds.add(s.orderId);
+  }
+  // Завдання — клієнт із менеджерського довідника (MgrClient).
+  for (const t of sheet.tasks) {
+    if (t.customerId) taskClientIds.add(t.customerId);
+  }
+
+  const [orders, customers, products, lots, taskClients] = await Promise.all([
+    orderIds.size > 0
+      ? prisma.order.findMany({
+          where: { id: { in: [...orderIds] } },
+          select: { id: true, code1C: true },
+        })
+      : Promise.resolve([]),
+    customerIds.size > 0
+      ? prisma.customer.findMany({
+          where: { id: { in: [...customerIds] } },
+          select: { id: true, code1C: true },
+        })
+      : Promise.resolve([]),
+    productIds.size > 0
+      ? prisma.product.findMany({
+          where: { id: { in: [...productIds] } },
+          select: { id: true, code1C: true },
+        })
+      : Promise.resolve([]),
+    lotIds.size > 0
+      ? prisma.lot.findMany({
+          where: { id: { in: [...lotIds] } },
+          select: { id: true, barcode: true },
+        })
+      : Promise.resolve([]),
+    taskClientIds.size > 0
+      ? prisma.mgrClient.findMany({
+          where: { id: { in: [...taskClientIds] } },
+          select: { id: true, code1C: true },
+        })
+      : Promise.resolve([]),
+  ]);
+  const orderCode = new Map(orders.map((o) => [o.id, o.code1C]));
+  const customerCode = new Map(customers.map((c) => [c.id, c.code1C]));
+  const productCode = new Map(products.map((p) => [p.id, p.code1C]));
+  const lotBarcode = new Map(lots.map((l) => [l.id, l.barcode]));
+  const taskClientCode = new Map(taskClients.map((c) => [c.id, c.code1C]));
+
+  const payload = buildRouteSheetCreatePayload({
+    sheet,
+    routeCode1C: sheet.route?.code1C ?? null,
+    expeditorCode1C: sheet.expeditor?.code1C ?? null,
+    orders: sheet.orders.map((o) => ({
+      orderCode1C: orderCode.get(o.orderId) ?? null,
+      customerCode1C: o.customerId
+        ? (customerCode.get(o.customerId) ?? null)
+        : null,
+      city: o.city,
+    })),
+    items: sheet.items.map((it) => ({
+      orderCode1C: it.orderId ? (orderCode.get(it.orderId) ?? null) : null,
+      customerCode1C: it.customerId
+        ? (customerCode.get(it.customerId) ?? null)
+        : null,
+      productCode1C: productCode.get(it.productId) ?? null,
+      lotBarcode: it.lotId ? (lotBarcode.get(it.lotId) ?? null) : null,
+      unit: it.unit,
+      quantity: it.quantity,
+      quantityLoaded: it.quantityLoaded,
+      price: it.price,
+      sum: it.sum,
+    })),
+    loading: sheet.loading.map((ld) => ({
+      orderCode1C: ld.orderId ? (orderCode.get(ld.orderId) ?? null) : null,
+      customerCode1C: ld.customerId
+        ? (customerCode.get(ld.customerId) ?? null)
+        : null,
+      productCode1C: productCode.get(ld.productId) ?? null,
+      lotBarcode: lotBarcode.get(ld.lotId) ?? ld.barcode,
+      unit: ld.unit,
+      quantity: ld.quantity,
+      weight: ld.weight,
+      price: ld.price,
+      sum: ld.sum,
+      pricePerKg: ld.pricePerKg,
+      loaded: ld.loaded,
+      isReturn: ld.isReturn,
+    })),
+    sales: sales.map((s) => ({
+      saleCode1C: s.code1C,
+      orderCode1C: s.orderId ? (orderCode.get(s.orderId) ?? null) : null,
+      customerCode1C: s.customer?.code1C ?? null,
+      sum: s.totalEur,
+    })),
+    payments: payments.map((p) => ({
+      cashOrderCode1C: p.code1C,
+      saleCode1C: p.sale?.code1C ?? null,
+      customerCode1C: p.customer?.code1C ?? p.sale?.customer?.code1C ?? null,
+      type: p.type,
+      amount: p.documentSumEur,
+    })),
+    tasks: sheet.tasks.map((t) => ({
+      customerCode1C: t.customerId
+        ? (taskClientCode.get(t.customerId) ?? null)
+        : null,
+      comment: t.comment,
+    })),
+  });
+
+  return prisma.mgrSyncJob.create({
+    data: {
+      entityType: "route_sheet",
+      entityId: sheet.id,
+      action: "create",
+      payload: payload as unknown as Prisma.InputJsonValue,
+      idempotencyKey: randomUUID(),
+      nextAttemptAt: new Date(),
+    },
+  });
+}

@@ -31,6 +31,7 @@ const {
     mockPrisma: {
       mgrClient: { findMany: vi.fn() },
       sale: { findMany: vi.fn(), count: vi.fn() },
+      routeSheet: { findUnique: vi.fn() },
     },
     getCurrentUserMock: vi.fn(),
     createSaleWithItemsMock: vi.fn(),
@@ -374,5 +375,44 @@ describe("POST /api/v1/manager/sales", () => {
     createSaleWithItemsMock.mockRejectedValueOnce(new FakePrismaError("P2003"));
     const res = await POST(postReq(validBody));
     expect(res.status).toBe(400);
+  });
+
+  it("створення з routeSheetId передає його у createSaleWithItems", async () => {
+    getCurrentUserMock.mockResolvedValueOnce(ADMIN);
+    resolveCustomerForOrderMock.mockResolvedValueOnce({
+      id: "cust1",
+      code1C: "000001",
+      name: "Mine",
+    });
+    mockPrisma.routeSheet.findUnique.mockResolvedValueOnce({ id: "rs1" });
+    createSaleWithItemsMock.mockResolvedValueOnce({
+      ...fakeCreatedSale(),
+      routeSheetId: "rs1",
+    });
+    const res = await POST(postReq({ ...validBody, routeSheetId: "rs1" }));
+    expect(res.status).toBe(201);
+    expect(mockPrisma.routeSheet.findUnique).toHaveBeenCalledWith({
+      where: { id: "rs1" },
+      select: { id: true },
+    });
+    const input = createSaleWithItemsMock.mock.calls[0]?.[0] as {
+      routeSheetId?: string;
+    };
+    expect(input.routeSheetId).toBe("rs1");
+    const json = (await res.json()) as { routeSheetId: string | null };
+    expect(json.routeSheetId).toBe("rs1");
+  });
+
+  it("returns 404 коли routeSheetId не існує", async () => {
+    getCurrentUserMock.mockResolvedValueOnce(ADMIN);
+    resolveCustomerForOrderMock.mockResolvedValueOnce({
+      id: "cust1",
+      code1C: "000001",
+      name: "Mine",
+    });
+    mockPrisma.routeSheet.findUnique.mockResolvedValueOnce(null);
+    const res = await POST(postReq({ ...validBody, routeSheetId: "missing" }));
+    expect(res.status).toBe(404);
+    expect(createSaleWithItemsMock).not.toHaveBeenCalled();
   });
 });

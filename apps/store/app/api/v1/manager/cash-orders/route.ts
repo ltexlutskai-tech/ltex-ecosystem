@@ -174,6 +174,21 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  // Зворотне посилання на Маршрутний лист (коли оплату створено зсередини МЛ).
+  // Перевіряємо існування; ownership — будь-який менеджер (МЛ спільні).
+  if (input.routeSheetId) {
+    const routeSheet = await prisma.routeSheet.findUnique({
+      where: { id: input.routeSheetId },
+      select: { id: true },
+    });
+    if (!routeSheet) {
+      return NextResponse.json(
+        { error: "Маршрутний лист не знайдено" },
+        { status: 404 },
+      );
+    }
+  }
+
   const rates = { eur: input.rateEur, usd: input.rateUsd };
 
   try {
@@ -198,6 +213,7 @@ export async function POST(req: NextRequest) {
       rates,
       sumToPayEur: input.sumToPayEur,
       agentUserId: user.id,
+      routeSheetId: input.routeSheetId ?? null,
     });
 
     // Sync (best-effort, fire-and-forget): прихідний ордер + ордер-здача (за

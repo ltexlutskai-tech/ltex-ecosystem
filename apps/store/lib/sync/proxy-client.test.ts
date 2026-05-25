@@ -156,6 +156,29 @@ describe("sendToProxy", () => {
     expect(url).toBe("http://proxy.test/sync/realizations/sale1");
   });
 
+  it("POST-ить на /sync/route-sheets/:id для entityType=route_sheet", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(
+        new Response(
+          JSON.stringify({ ok: true, routeSheetCode1C: "ML-2026-0099" }),
+          { status: 200 },
+        ),
+      );
+    const result = await sendToProxy(
+      {
+        entityType: "route_sheet",
+        entityId: "rs1",
+        idempotencyKey: "key-rsh",
+        payload: { docNumber: 7 },
+      },
+      fetchMock as unknown as typeof fetch,
+    );
+    expect(result.ok).toBe(true);
+    const [url] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("http://proxy.test/sync/route-sheets/rs1");
+  });
+
   it("кидає на unsupported entityType", async () => {
     const fetchMock = vi.fn();
     await expect(

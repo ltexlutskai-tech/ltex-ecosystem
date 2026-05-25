@@ -121,3 +121,29 @@ export interface CashOrderCreateError {
 export type CashOrderCreateResult =
   | CashOrderCreateSuccess
   | CashOrderCreateError;
+
+// ─── Маршрутний лист (M1.9, Етап 5): route sheet shapes ─────────────────────
+
+export interface RouteSheetCreateRequest {
+  idempotencyKey: string;
+  payload: Record<string, unknown>;
+}
+
+export interface RouteSheetCreateSuccess {
+  ok: true;
+  routeSheetCode1C: string;
+  routeSheetNumber?: string;
+  mockMode?: boolean;
+  errors?: string[];
+}
+
+export interface RouteSheetCreateError {
+  ok: false;
+  errorCode: number;
+  errorMessage: string;
+  mockMode?: boolean;
+}
+
+export type RouteSheetCreateResult =
+  | RouteSheetCreateSuccess
+  | RouteSheetCreateError;

@@ -40,12 +40,29 @@ async function getUsdRate(): Promise<number> {
 export default async function NewPaymentPage({
   searchParams,
 }: {
-  searchParams: Promise<{ saleId?: string; clientId?: string }>;
+  searchParams: Promise<{
+    saleId?: string;
+    clientId?: string;
+    routeSheetId?: string;
+    sumToPayEur?: string;
+  }>;
 }) {
   const user = await getCurrentUser();
   if (!user) redirect("/manager/login");
 
   const sp = await searchParams;
+
+  // МЛ-контекст: коли оплату створюють зсередини Маршрутного листа. Перевіряємо
+  // існування МЛ (інакше ігноруємо), щоб після збереження повернути на сторінку
+  // МЛ та проставити зворотне посилання `MgrCashOrder.routeSheetId`.
+  let routeSheetId: string | null = null;
+  if (sp.routeSheetId) {
+    const sheet = await prisma.routeSheet.findUnique({
+      where: { id: sp.routeSheetId },
+      select: { id: true },
+    });
+    if (sheet) routeSheetId = sheet.id;
+  }
 
   // Довідники (тільки активні) — для select-ів банк. рахунку / статті.
   const [bankRows, articleRows, fallbackEur, fallbackUsd] = await Promise.all([
@@ -100,6 +117,32 @@ export default async function NewPaymentPage({
     clientLabel = sale.customer.name;
     returnHref = `/manager/sales/${sale.id}`;
   } else if (sp.clientId) {
+    // У МЛ-контексті клієнт може приходити як `Customer.id` (рядок Оплати) —
+    // спершу пробуємо Customer, далі MgrClient (стандартний шлях боргу).
+    const customer = routeSheetId
+      ? await prisma.customer.findUnique({
+          where: { id: sp.clientId },
+          select: { id: true, name: true, code1C: true },
+        })
+      : null;
+    if (customer) {
+      const mgr = customer.code1C
+        ? await prisma.mgrClient.findUnique({
+            where: { code1C: customer.code1C },
+            select: { id: true, debt: true },
+          })
+        : null;
+      mode = "client";
+      // PaymentForm чекає MgrClient.id у `clientId`; резолвимо через code1C.
+      clientId = mgr?.id ?? null;
+      clientLabel = customer.name;
+      const debt = mgr ? Number(mgr.debt) : 0;
+      clientDebtEur = Number.isFinite(debt) && debt > 0 ? debt : 0;
+      presetSumToPayEur = clientDebtEur;
+    }
+  }
+  // Стандартний шлях по MgrClient.id (поза МЛ або коли Customer не знайдено).
+  if (mode === "standalone" && sp.clientId && !clientId) {
     const client = await prisma.mgrClient.findUnique({
       where: { id: sp.clientId },
       select: { id: true, name: true, debt: true },
@@ -116,14 +159,24 @@ export default async function NewPaymentPage({
     presetSumToPayEur = clientDebtEur;
   }
 
+  // МЛ-контекст: повертаємось на сторінку Маршрутного листа (переважає над
+  // деталлю реалізації) + дозволяємо `?sumToPayEur` preset з рядка реалізації.
+  if (routeSheetId) {
+    returnHref = `/manager/routes/${routeSheetId}`;
+    const sumParsed = sp.sumToPayEur ? Number(sp.sumToPayEur) : NaN;
+    if (Number.isFinite(sumParsed) && sumParsed >= 0) {
+      presetSumToPayEur = sumParsed;
+    }
+  }
+
   return (
     <div className="mx-auto max-w-3xl space-y-6">
       <Link
-        href="/manager/payments"
+        href={returnHref ?? "/manager/payments"}
         className="inline-flex items-center gap-1 text-sm text-gray-600 hover:text-gray-900"
       >
         <ArrowLeft className="h-4 w-4" />
-        Назад до списку
+        {routeSheetId ? "Назад до маршруту" : "Назад до списку"}
       </Link>
 
       <header>
@@ -146,6 +199,7 @@ export default async function NewPaymentPage({
         bankAccounts={bankAccounts}
         cashFlowArticles={cashFlowArticles}
         returnHref={returnHref}
+        routeSheetId={routeSheetId}
       />
     </div>
   );

@@ -61,6 +61,12 @@ export const createSaleSchema = z.object({
   exportTo1C: z.boolean().optional().default(true),
   /** Експрес-накладна / ТТН. */
   expressWaybill: z.string().max(60).nullable().optional(),
+  /**
+   * Зворотне посилання на Маршрутний лист (1С `РеализацияТоваровУслуг.
+   * МаршрутныйЛист`). Заповнюється коли реалізацію створено зсередини МЛ
+   * (`/manager/sales/new?routeSheetId=...`). Існування МЛ перевіряє endpoint.
+   */
+  routeSheetId: z.string().min(1).nullable().optional(),
 });
 
 /**

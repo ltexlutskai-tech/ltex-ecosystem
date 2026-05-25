@@ -5,19 +5,29 @@ const { mockPrisma } = vi.hoisted(() => ({
     mgrSyncJob: {
       create: vi.fn(),
     },
+    routeSheet: { findUnique: vi.fn() },
+    sale: { findMany: vi.fn() },
+    mgrCashOrder: { findMany: vi.fn() },
+    order: { findMany: vi.fn() },
+    customer: { findMany: vi.fn() },
+    product: { findMany: vi.fn() },
+    lot: { findMany: vi.fn() },
+    mgrClient: { findMany: vi.fn() },
   },
 }));
 
-vi.mock("@ltex/db", () => ({ prisma: mockPrisma }));
+vi.mock("@ltex/db", () => ({ prisma: mockPrisma, Prisma: {} }));
 
 import {
   buildClientUpdatePayload,
   buildOrderCreatePayload,
   buildPaymentCreatePayload,
+  buildRouteSheetCreatePayload,
   buildSaleCreatePayload,
   enqueueClientUpdate,
   enqueueOrderCreate,
   enqueuePaymentCreate,
+  enqueueRouteSheetCreate,
   enqueueSaleCreate,
 } from "./enqueue";
 
@@ -447,5 +457,272 @@ describe("enqueueSaleCreate", () => {
     const key2 = (calls[1]?.[0] as { data: { idempotencyKey: string } }).data
       .idempotencyKey;
     expect(key1).not.toBe(key2);
+  });
+});
+
+// ─── M1.9 (Маршрутний лист, Етап 5): RouteSheet enqueue ─────────────────────
+
+describe("buildRouteSheetCreatePayload", () => {
+  const baseInput = {
+    sheet: {
+      id: "rs1",
+      code1C: null,
+      docNumber: 7,
+      date: new Date("2026-05-25T08:00:00.000Z"),
+      arrivalDate: new Date("2026-05-25T09:30:00.000Z"),
+      status: "dispatched",
+      comment: "Виїзд по Луцьку",
+      mileageStartKm: 1200.5,
+      mileageEndKm: null,
+      gpsLat: 50.748,
+      gpsLng: 25.325,
+    },
+    routeCode1C: "RT-001",
+    expeditorCode1C: "U0001",
+    orders: [{ orderCode1C: "ORD-7", customerCode1C: "000001", city: "Луцьк" }],
+    items: [
+      {
+        orderCode1C: "ORD-7",
+        customerCode1C: "000001",
+        productCode1C: "0007854",
+        lotBarcode: "1234567890123",
+        unit: null,
+        quantity: 2,
+        quantityLoaded: 1,
+        price: 80.5,
+        sum: 161,
+      },
+    ],
+    loading: [
+      {
+        orderCode1C: "ORD-7",
+        customerCode1C: "000001",
+        productCode1C: "0007854",
+        lotBarcode: "1234567890123",
+        unit: null,
+        quantity: 1,
+        weight: 20.123,
+        price: 80.5,
+        sum: 80.5,
+        pricePerKg: 4.0,
+        loaded: true,
+        isReturn: false,
+      },
+    ],
+    sales: [
+      {
+        saleCode1C: "0000456",
+        orderCode1C: "ORD-7",
+        customerCode1C: "000001",
+        sum: 150.5,
+      },
+    ],
+    payments: [
+      {
+        cashOrderCode1C: "0000017",
+        saleCode1C: "0000456",
+        customerCode1C: "000001",
+        type: "income",
+        amount: 100,
+      },
+    ],
+    tasks: [{ customerCode1C: "000002", comment: "Подзвонити" }],
+  };
+
+  it("збирає header + усі таб. частини з бізнес-ключами", () => {
+    const payload = buildRouteSheetCreatePayload(baseInput);
+    expect(payload.routeSheetInternalId).toBe("rs1");
+    expect(payload.docNumber).toBe(7);
+    expect(payload.status).toBe("dispatched");
+    expect(payload.routeCode1C).toBe("RT-001");
+    expect(payload.expeditorCode1C).toBe("U0001");
+    expect(payload.date).toBe("2026-05-25T08:00:00.000Z");
+    expect(payload.arrivalDate).toBe("2026-05-25T09:30:00.000Z");
+    expect(payload.orders).toHaveLength(1);
+    expect(payload.orders[0]?.orderCode1C).toBe("ORD-7");
+    expect(payload.orders[0]?.city).toBe("Луцьк");
+    expect(payload.items[0]?.productCode1C).toBe("0007854");
+    expect(payload.items[0]?.lotBarcode).toBe("1234567890123");
+    expect(payload.items[0]?.quantityLoaded).toBe(1);
+    expect(payload.loading[0]?.isReturn).toBe(false);
+    expect(payload.sales[0]?.saleCode1C).toBe("0000456");
+    expect(payload.payments[0]?.cashOrderCode1C).toBe("0000017");
+    expect(payload.payments[0]?.type).toBe("income");
+    expect(payload.tasks[0]?.comment).toBe("Подзвонити");
+  });
+
+  it("numeric поля формуються як string (mileage .1f / gps .6f / sums .2f / weight .3f)", () => {
+    const payload = buildRouteSheetCreatePayload(baseInput);
+    expect(payload.mileageStartKm).toBe("1200.5");
+    expect(payload.mileageEndKm).toBeNull();
+    expect(payload.gpsLat).toBe("50.748000");
+    expect(payload.gpsLng).toBe("25.325000");
+    expect(payload.items[0]?.price).toBe("80.50");
+    expect(payload.items[0]?.sum).toBe("161.00");
+    expect(payload.loading[0]?.weight).toBe("20.123");
+    expect(payload.loading[0]?.pricePerKg).toBe("4.00");
+    expect(payload.sales[0]?.sum).toBe("150.50");
+    expect(payload.payments[0]?.amount).toBe("100.00");
+    expect(typeof payload.items[0]?.price).toBe("string");
+  });
+
+  it("null arrivalDate / gps / mileage → null", () => {
+    const payload = buildRouteSheetCreatePayload({
+      ...baseInput,
+      sheet: {
+        ...baseInput.sheet,
+        arrivalDate: null,
+        gpsLat: null,
+        gpsLng: null,
+        mileageStartKm: null,
+        comment: "",
+      },
+    });
+    expect(payload.arrivalDate).toBeNull();
+    expect(payload.gpsLat).toBeNull();
+    expect(payload.gpsLng).toBeNull();
+    expect(payload.mileageStartKm).toBeNull();
+    expect(payload.comment).toBeNull();
+  });
+});
+
+describe("enqueueRouteSheetCreate", () => {
+  beforeEach(() => {
+    mockPrisma.routeSheet.findUnique.mockReset();
+    mockPrisma.sale.findMany.mockResolvedValue([]);
+    mockPrisma.mgrCashOrder.findMany.mockResolvedValue([]);
+    mockPrisma.order.findMany.mockResolvedValue([]);
+    mockPrisma.customer.findMany.mockResolvedValue([]);
+    mockPrisma.product.findMany.mockResolvedValue([]);
+    mockPrisma.lot.findMany.mockResolvedValue([]);
+    mockPrisma.mgrClient.findMany.mockResolvedValue([]);
+  });
+
+  const fakeSheet = {
+    id: "rs1",
+    code1C: null,
+    docNumber: 7,
+    date: new Date("2026-05-25T08:00:00.000Z"),
+    arrivalDate: null,
+    status: "dispatched",
+    comment: null,
+    mileageStartKm: null,
+    mileageEndKm: null,
+    gpsLat: null,
+    gpsLng: null,
+    route: { code1C: "RT-001" },
+    expeditor: { code1C: "U0001" },
+    orders: [{ orderId: "o1", customerId: "c1", city: "Луцьк" }],
+    items: [
+      {
+        orderId: "o1",
+        customerId: "c1",
+        productId: "p1",
+        lotId: "l1",
+        unit: null,
+        quantity: 2,
+        quantityLoaded: 1,
+        price: 80.5,
+        sum: 161,
+      },
+    ],
+    loading: [
+      {
+        orderId: "o1",
+        customerId: "c1",
+        productId: "p1",
+        lotId: "l1",
+        barcode: "1234567890123",
+        unit: null,
+        quantity: 1,
+        weight: 20,
+        price: 80.5,
+        sum: 80.5,
+        pricePerKg: 4.0,
+        loaded: true,
+        isReturn: false,
+      },
+    ],
+    tasks: [{ customerId: "mc1", comment: "Подзвонити" }],
+  };
+
+  it("створює row з entityType='route_sheet', action='create' + резолвить code1C", async () => {
+    mockPrisma.routeSheet.findUnique.mockResolvedValueOnce(fakeSheet);
+    mockPrisma.sale.findMany.mockResolvedValueOnce([
+      {
+        code1C: "0000456",
+        orderId: "o1",
+        totalEur: 150.5,
+        customer: { code1C: "000001" },
+      },
+    ]);
+    mockPrisma.mgrCashOrder.findMany.mockResolvedValueOnce([
+      {
+        code1C: "0000017",
+        type: "income",
+        documentSumEur: 100,
+        saleId: "s1",
+        customer: { code1C: "000001" },
+        sale: { code1C: "0000456", customer: { code1C: "000001" } },
+      },
+    ]);
+    mockPrisma.order.findMany.mockResolvedValueOnce([
+      { id: "o1", code1C: "ORD-7" },
+    ]);
+    mockPrisma.customer.findMany.mockResolvedValueOnce([
+      { id: "c1", code1C: "000001" },
+    ]);
+    mockPrisma.product.findMany.mockResolvedValueOnce([
+      { id: "p1", code1C: "0007854" },
+    ]);
+    mockPrisma.lot.findMany.mockResolvedValueOnce([
+      { id: "l1", barcode: "1234567890123" },
+    ]);
+    mockPrisma.mgrClient.findMany.mockResolvedValueOnce([
+      { id: "mc1", code1C: "000002" },
+    ]);
+    mockPrisma.mgrSyncJob.create.mockResolvedValueOnce({ id: "j-rsh" });
+
+    await enqueueRouteSheetCreate("rs1");
+
+    const call = mockPrisma.mgrSyncJob.create.mock.calls[0]?.[0] as {
+      data: {
+        entityType: string;
+        entityId: string;
+        action: string;
+        idempotencyKey: string;
+        payload: {
+          routeCode1C: string;
+          expeditorCode1C: string;
+          orders: Array<{ orderCode1C: string; customerCode1C: string }>;
+          items: Array<{ productCode1C: string; lotBarcode: string }>;
+          sales: Array<{ saleCode1C: string }>;
+          payments: Array<{ cashOrderCode1C: string }>;
+          tasks: Array<{ customerCode1C: string }>;
+        };
+      };
+    };
+    expect(call.data.entityType).toBe("route_sheet");
+    expect(call.data.entityId).toBe("rs1");
+    expect(call.data.action).toBe("create");
+    expect(call.data.idempotencyKey).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/,
+    );
+    expect(call.data.payload.routeCode1C).toBe("RT-001");
+    expect(call.data.payload.expeditorCode1C).toBe("U0001");
+    expect(call.data.payload.orders[0]?.orderCode1C).toBe("ORD-7");
+    expect(call.data.payload.orders[0]?.customerCode1C).toBe("000001");
+    expect(call.data.payload.items[0]?.productCode1C).toBe("0007854");
+    expect(call.data.payload.items[0]?.lotBarcode).toBe("1234567890123");
+    expect(call.data.payload.sales[0]?.saleCode1C).toBe("0000456");
+    expect(call.data.payload.payments[0]?.cashOrderCode1C).toBe("0000017");
+    expect(call.data.payload.tasks[0]?.customerCode1C).toBe("000002");
+  });
+
+  it("no-op коли МЛ не знайдено (null, без enqueue)", async () => {
+    mockPrisma.routeSheet.findUnique.mockResolvedValueOnce(null);
+    const result = await enqueueRouteSheetCreate("missing");
+    expect(result).toBeNull();
+    expect(mockPrisma.mgrSyncJob.create).not.toHaveBeenCalled();
   });
 });

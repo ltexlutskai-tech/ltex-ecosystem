@@ -9,6 +9,8 @@ import type {
   PaymentCreateResult,
   RealizationCreateRequest,
   RealizationCreateResult,
+  RouteSheetCreateRequest,
+  RouteSheetCreateResult,
 } from "./types";
 
 /**
@@ -155,6 +157,32 @@ export async function createCashOrderMock(
   return {
     ok: true,
     cashOrderCode1C,
+    mockMode: true,
+    errors: [],
+  };
+}
+
+/**
+ * Mock SOAP shim для `СтворитиМаршрутнийЛист` operation. Симулює delay,
+ * повертає synthetic `routeSheetCode1C` = "MOCK-RSH-<ts>" + `routeSheetNumber`
+ * (echoes existing payload.code1C коли є). Used коли SYNC_MOCK_MODE=true (default).
+ */
+export async function createRouteSheetMock(
+  req: RouteSheetCreateRequest,
+  options: DelayOptions = {},
+): Promise<RouteSheetCreateResult> {
+  await simulateDelay(options);
+
+  const existing = req.payload["code1C"];
+  const routeSheetCode1C =
+    typeof existing === "string" && existing.length > 0
+      ? existing
+      : `MOCK-RSH-${Date.now()}`;
+
+  return {
+    ok: true,
+    routeSheetCode1C,
+    routeSheetNumber: `ML-MOCK-${Date.now()}`,
     mockMode: true,
     errors: [],
   };

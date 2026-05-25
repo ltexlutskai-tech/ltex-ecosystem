@@ -220,6 +220,7 @@ model Order {
   // Проведено в 1С (ставиться на етапі обмінів) + актуальність.
   archived            Boolean  @default(false)
   isActual            Boolean  @default(true) @map("is_actual")
+  routeSheetId        String?  @map("route_sheet_id") // зворотне посилання на МЛ (1С Заказ.МаршрутныйЛист)
 
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
@@ -231,6 +232,7 @@ model Order {
 
   @@index([customerId])
   @@index([status])
+  @@index([routeSheetId])
   @@map("orders")
 }
 
@@ -282,6 +284,7 @@ model Sale {
   routeId             String?  @map("route_id")
   archived            Boolean  @default(false)
   isActual            Boolean  @default(true) @map("is_actual")
+  routeSheetId        String?  @map("route_sheet_id") // зворотне посилання на МЛ
   createdAt           DateTime @default(now()) @map("created_at")
   updatedAt           DateTime @updatedAt @map("updated_at")
 
@@ -291,6 +294,7 @@ model Sale {
 
   @@index([customerId])
   @@index([status])
+  @@index([routeSheetId])
   @@map("mgr_sales")
 }
 
@@ -330,6 +334,7 @@ model MgrCashOrder {
   uidEur            String?  @map("uid_eur")
   uidUsd            String?  @map("uid_usd")
   archived          Boolean  @default(false)
+  routeSheetId      String?  @map("route_sheet_id") // зворотне посилання на МЛ
   comment           String?
   agentUserId       String?  @map("agent_user_id")
   paidAt            DateTime @default(now()) @map("paid_at")
@@ -346,6 +351,7 @@ model MgrCashOrder {
   @@index([saleId])
   @@index([customerId])
   @@index([archived])
+  @@index([routeSheetId])
   @@map("mgr_cash_orders")
 }
 
@@ -715,6 +721,8 @@ model User {
   agentForClients  MgrClient[]              @relation("ClientAgent")
   reminders        MgrReminder[]            @relation("UserReminders")
   viewPrefs        MgrUserViewPrefs[]
+  routeSheetsExpedited RouteSheet[]         @relation("RouteSheetExpeditor")
+  routeSheetsCreated   RouteSheet[]         @relation("RouteSheetCreatedBy")
 
   @@map("users")
 }
@@ -835,8 +843,175 @@ model MgrRoute {
 
   primaryForClients MgrClient[]                @relation("MgrClientPrimaryRoute")
   assignments       MgrClientRouteAssignment[]
+  routeSheets       RouteSheet[]
 
   @@map("mgr_routes")
+}
+
+// ─── Route Sheets / Маршрутні листи (← 1С Document.МаршрутныйЛист, M1.9) ────
+// Документ-агрегатор дня виїзду: Замовлення → Загрузка(скан) → Реалізації →
+// Оплати → Бракує(обчислюване). Реалізації/Оплати реюзають Sale/MgrCashOrder
+// через зворотні посилання routeSheetId. Cross-model id-поля у дочірніх — плоскі
+// скаляри (резолв через batch-lookup у застосунку), щоб не плодити inverse-
+// relations на спільних з магазином моделях; FK+cascade лише child→RouteSheet.
+
+model RouteSheet {
+  id              String    @id @default(cuid())
+  code1C          String?   @unique @map("code_1c")
+  docNumber       Int       @default(autoincrement()) @map("doc_number")
+  date            DateTime  @default(now())
+  arrivalDate     DateTime? @map("arrival_date")
+  status          String    @default("draft") // draft|dispatched|completed
+  routeId         String?   @map("route_id")
+  expeditorUserId String?   @map("expeditor_user_id")
+  createdByUserId String?   @map("created_by_user_id")
+  totalUah        Float     @default(0) @map("total_uah")
+  totalEur        Float     @default(0) @map("total_eur")
+  comment         String?
+  mileageStartKm  Float?    @map("mileage_start_km")
+  mileageEndKm    Float?    @map("mileage_end_km")
+  gpsLat          Float?    @map("gps_lat")
+  gpsLng          Float?    @map("gps_lng")
+  archived        Boolean   @default(false)
+  exportTo1C      Boolean   @default(true) @map("export_to_1c")
+  posted          Boolean   @default(false)
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  route     MgrRoute? @relation(fields: [routeId], references: [id], onDelete: SetNull)
+  expeditor User?     @relation("RouteSheetExpeditor", fields: [expeditorUserId], references: [id], onDelete: SetNull)
+  createdBy User?     @relation("RouteSheetCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
+
+  orders    RouteSheetOrder[]
+  items     RouteSheetItem[]
+  loading   RouteSheetLoading[]
+  sales     RouteSheetSale[]
+  saleItems RouteSheetSaleItem[]
+  payments  RouteSheetPayment[]
+  tasks     RouteSheetTask[]
+
+  @@index([status])
+  @@index([routeId])
+  @@index([expeditorUserId])
+  @@index([archived])
+  @@map("mgr_route_sheets")
+}
+
+model RouteSheetOrder {
+  id           String  @id @default(cuid())
+  routeSheetId String  @map("route_sheet_id")
+  orderId      String  @map("order_id")
+  customerId   String? @map("customer_id")
+  city         String?
+
+  routeSheet RouteSheet @relation(fields: [routeSheetId], references: [id], onDelete: Cascade)
+
+  @@index([routeSheetId])
+  @@index([orderId])
+  @@map("mgr_route_sheet_orders")
+}
+
+model RouteSheetItem {
+  id             String  @id @default(cuid())
+  routeSheetId   String  @map("route_sheet_id")
+  orderId        String? @map("order_id")
+  customerId     String? @map("customer_id")
+  productId      String  @map("product_id")
+  lotId          String? @map("lot_id")
+  unit           String?
+  quantity       Float   @default(0)
+  price          Float   @default(0)
+  sum            Float   @default(0)
+  quantityLoaded Float   @default(0) @map("quantity_loaded")
+
+  routeSheet RouteSheet @relation(fields: [routeSheetId], references: [id], onDelete: Cascade)
+
+  @@index([routeSheetId])
+  @@map("mgr_route_sheet_items")
+}
+
+model RouteSheetLoading {
+  id           String  @id @default(cuid())
+  routeSheetId String  @map("route_sheet_id")
+  orderId      String? @map("order_id")
+  customerId   String? @map("customer_id")
+  productId    String  @map("product_id")
+  lotId        String  @map("lot_id")
+  barcode      String
+  unit         String?
+  quantity     Float   @default(1)
+  weight       Float   @default(0)
+  price        Float   @default(0)
+  sum          Float   @default(0)
+  pricePerKg   Float   @default(0) @map("price_per_kg")
+  loaded       Boolean @default(true)
+  isReturn     Boolean @default(false) @map("is_return")
+
+  routeSheet RouteSheet @relation(fields: [routeSheetId], references: [id], onDelete: Cascade)
+
+  @@index([routeSheetId])
+  @@map("mgr_route_sheet_loading")
+}
+
+model RouteSheetSale {
+  id           String  @id @default(cuid())
+  routeSheetId String  @map("route_sheet_id")
+  orderId      String? @map("order_id")
+  customerId   String? @map("customer_id")
+  saleId       String  @map("sale_id")
+  sum          Float   @default(0)
+
+  routeSheet RouteSheet @relation(fields: [routeSheetId], references: [id], onDelete: Cascade)
+
+  @@index([routeSheetId])
+  @@map("mgr_route_sheet_sales")
+}
+
+model RouteSheetSaleItem {
+  id           String  @id @default(cuid())
+  routeSheetId String  @map("route_sheet_id")
+  saleId       String  @map("sale_id")
+  orderId      String? @map("order_id")
+  customerId   String? @map("customer_id")
+  productId    String  @map("product_id")
+  lotId        String? @map("lot_id")
+  unit         String?
+  quantity     Float   @default(0)
+  price        Float   @default(0)
+  sum          Float   @default(0)
+  pricePerKg   Float   @default(0) @map("price_per_kg")
+
+  routeSheet RouteSheet @relation(fields: [routeSheetId], references: [id], onDelete: Cascade)
+
+  @@index([routeSheetId])
+  @@map("mgr_route_sheet_sale_items")
+}
+
+model RouteSheetPayment {
+  id           String  @id @default(cuid())
+  routeSheetId String  @map("route_sheet_id")
+  orderId      String? @map("order_id")
+  saleId       String? @map("sale_id")
+  customerId   String? @map("customer_id")
+  cashOrderId  String  @map("cash_order_id")
+  amount       Float   @default(0)
+
+  routeSheet RouteSheet @relation(fields: [routeSheetId], references: [id], onDelete: Cascade)
+
+  @@index([routeSheetId])
+  @@map("mgr_route_sheet_payments")
+}
+
+model RouteSheetTask {
+  id           String  @id @default(cuid())
+  routeSheetId String  @map("route_sheet_id")
+  customerId   String? @map("customer_id")
+  comment      String
+
+  routeSheet RouteSheet @relation(fields: [routeSheetId], references: [id], onDelete: Cascade)
+
+  @@index([routeSheetId])
+  @@map("mgr_route_sheet_tasks")
 }
 
 model MgrClient {
@@ -1139,6 +1314,7 @@ enum SyncEntityType {
   payment
   realization
   cash_order
+  route_sheet
 
   @@map("mgr_sync_entity_type")
 }

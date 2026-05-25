@@ -15,6 +15,8 @@ import type {
   PaymentCreateResult,
   RealizationCreateRequest,
   RealizationCreateResult,
+  RouteSheetCreateRequest,
+  RouteSheetCreateResult,
 } from "./types";
 
 /**
@@ -454,6 +456,100 @@ function normalizeCashOrderResult(parsed: unknown): CashOrderCreateResult {
       ok: true,
       cashOrderCode1C:
         typeof obj.cashOrderCode1C === "string" ? obj.cashOrderCode1C : "",
+      errors: Array.isArray(obj.errors)
+        ? obj.errors.filter((e): e is string => typeof e === "string")
+        : [],
+    };
+  }
+  return {
+    ok: false,
+    errorCode: typeof obj.errorCode === "number" ? obj.errorCode : 4,
+    errorMessage:
+      typeof obj.errorMessage === "string" ? obj.errorMessage : "Unknown error",
+  };
+}
+
+// ─── Маршрутний лист (M1.9, Етап 5): route sheet SOAP wrapper ───────────────
+
+/**
+ * Викликає 1С SOAP operation `СтворитиМаршрутнийЛист` (двофазний контракт,
+ * `docs/1C_SYNC_MODULES_SPEC.md` §3.6). Mirror-ить `createCashOrderViaSoap`
+ * pattern — fetch + XML envelope + extract <return>.
+ *
+ * **NOT EXERCISED IN CI** — викликається тільки коли SYNC_MOCK_MODE=false.
+ * Реальний BSL пишеться на загальному етапі обмінів (`docs/1C_SYNC_MODULES_SPEC.md` §3.6).
+ */
+export async function createRouteSheetViaSoap(
+  req: RouteSheetCreateRequest,
+  config: SyncConfig,
+  fetchImpl: typeof fetch = fetch,
+): Promise<RouteSheetCreateResult> {
+  if (!config.onecUrl || !config.onecPassword) {
+    throw new Error(
+      "createRouteSheetViaSoap: ONEC_SOAP_URL / ONEC_SOAP_PASSWORD not configured",
+    );
+  }
+
+  const payloadJson = JSON.stringify(req.payload);
+  const envelope = buildSoapEnvelope({
+    operation: "СтворитиМаршрутнийЛист",
+    password: config.onecPassword,
+    idempotencyKey: req.idempotencyKey,
+    payloadJson,
+  });
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), config.onecTimeoutMs);
+
+  let response: Response;
+  try {
+    response = await fetchImpl(config.onecUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "text/xml; charset=utf-8",
+        SOAPAction: buildSoapAction("СтворитиМаршрутнийЛист"),
+      },
+      body: envelope,
+      signal: controller.signal,
+    });
+  } finally {
+    clearTimeout(timeout);
+  }
+
+  if (!response.ok) {
+    throw new Error(
+      `SOAP HTTP ${response.status}: ${await safeReadText(response)}`,
+    );
+  }
+
+  const bodyText = await response.text();
+  const returnText = extractSoapReturn(bodyText);
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(returnText);
+  } catch (err) {
+    throw new Error(
+      `SOAP response: invalid JSON у <return>: ${(err as Error).message}`,
+    );
+  }
+  return normalizeRouteSheetResult(parsed);
+}
+
+function normalizeRouteSheetResult(parsed: unknown): RouteSheetCreateResult {
+  if (!parsed || typeof parsed !== "object") {
+    throw new Error("SOAP response: <return> JSON is not an object");
+  }
+  const obj = parsed as Record<string, unknown>;
+  if (obj.ok === true) {
+    return {
+      ok: true,
+      routeSheetCode1C:
+        typeof obj.routeSheetCode1C === "string" ? obj.routeSheetCode1C : "",
+      routeSheetNumber:
+        typeof obj.routeSheetNumber === "string"
+          ? obj.routeSheetNumber
+          : undefined,
       errors: Array.isArray(obj.errors)
         ? obj.errors.filter((e): e is string => typeof e === "string")
         : [],
