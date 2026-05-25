@@ -46,6 +46,28 @@ export const addOrdersSchema = z.object({
   orderIds: z.array(z.string().min(1)).min(1).max(200),
 });
 
+/** POST /route-sheets/[id]/loading — додати рядок Загрузки скан/ручний ШК. */
+export const addLoadingSchema = z.object({
+  barcode: z.string().trim().min(1, "Не вказано ШК").max(64),
+});
+
+/** PATCH /route-sheets/[id]/loading?loadingId= — редагування рядка Загрузки. */
+export const updateLoadingSchema = z
+  .object({
+    loaded: z.boolean().optional(),
+    isReturn: z.boolean().optional(),
+    weight: z.number().nonnegative().max(9999).optional(),
+  })
+  .refine(
+    (v) =>
+      v.loaded !== undefined ||
+      v.isReturn !== undefined ||
+      v.weight !== undefined,
+    { message: "Немає полів для оновлення" },
+  );
+
 export type CreateRouteSheetInput = z.infer<typeof createRouteSheetSchema>;
 export type UpdateRouteSheetInput = z.infer<typeof updateRouteSheetSchema>;
 export type AddOrdersInput = z.infer<typeof addOrdersSchema>;
+export type AddLoadingInput = z.infer<typeof addLoadingSchema>;
+export type UpdateLoadingInput = z.infer<typeof updateLoadingSchema>;

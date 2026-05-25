@@ -12,6 +12,7 @@ import {
 } from "@/lib/manager/route-sheet-status";
 import { RouteSheetStatusBadge } from "../../_components/route-sheet-status-badge";
 import { OrderPickerModal } from "./order-picker-modal";
+import { BarcodeInput } from "../../../sales/new/_components/barcode-input";
 
 export interface RouteOption {
   id: string;
@@ -49,6 +50,43 @@ export interface RouteSheetItemView {
   quantityLoaded: number;
 }
 
+export interface RouteSheetLoadingView {
+  id: string;
+  orderId: string | null;
+  orderNumber: string | null;
+  customerId: string | null;
+  customerName: string | null;
+  productId: string;
+  productName: string | null;
+  articleCode: string | null;
+  lotId: string;
+  barcode: string;
+  unit: string | null;
+  quantity: number;
+  weight: number;
+  price: number;
+  sum: number;
+  pricePerKg: number;
+  loaded: boolean;
+  isReturn: boolean;
+}
+
+export interface RouteSheetShortageView {
+  orderId: string | null;
+  orderNumber: string | null;
+  productId: string;
+  productName: string | null;
+  articleCode: string | null;
+  shortage: number;
+}
+
+export interface RouteSheetCountersView {
+  ordersCount: number;
+  orderedQty: number;
+  loadedQty: number;
+  shortageQty: number;
+}
+
 export interface RouteSheetView {
   id: string;
   displayNumber: string;
@@ -62,6 +100,9 @@ export interface RouteSheetView {
   totalUah: number;
   orders: RouteSheetOrderView[];
   items: RouteSheetItemView[];
+  loading: RouteSheetLoadingView[];
+  shortage: RouteSheetShortageView[];
+  counters: RouteSheetCountersView;
 }
 
 const TABS = [
@@ -77,13 +118,11 @@ const TABS = [
 
 type TabId = (typeof TABS)[number]["id"];
 
-/** Вкладки наступних етапів — поки заглушки (Етапи 2-4). */
+/** Вкладки наступних етапів — поки заглушки (Етапи 3-4). */
 const PLACEHOLDER_TABS = new Set<TabId>([
-  "loading",
   "sales",
   "products",
   "payments",
-  "shortage",
   "tasks",
 ]);
 
@@ -120,12 +159,22 @@ export function RouteSheetForm({
 
   const [orders, setOrders] = useState<RouteSheetOrderView[]>(initial.orders);
   const [items, setItems] = useState<RouteSheetItemView[]>(initial.items);
+  const [loading, setLoading] = useState<RouteSheetLoadingView[]>(
+    initial.loading,
+  );
+  const [shortage, setShortage] = useState<RouteSheetShortageView[]>(
+    initial.shortage,
+  );
+  const [counters, setCounters] = useState<RouteSheetCountersView>(
+    initial.counters,
+  );
   const [totalEur, setTotalEur] = useState(initial.totalEur);
   const [totalUah, setTotalUah] = useState(initial.totalUah);
 
   const [pickerOpen, setPickerOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [barcodeError, setBarcodeError] = useState<string | null>(null);
 
   const locked = isRouteSheetLocked(status);
 
@@ -166,16 +215,99 @@ export function RouteSheetForm({
     }
   }
 
-  /** Перезавантажує МЛ (orders/items/totals) з сервера. */
+  /** Перезавантажує МЛ (orders/items/loading/shortage/totals) з сервера. */
   const reloadSheet = useCallback(async () => {
     const res = await fetch(`/api/v1/manager/route-sheets/${sheetId}`);
     if (!res.ok) return;
     const data = (await res.json()) as { sheet: RouteSheetView };
     setOrders(data.sheet.orders);
     setItems(data.sheet.items);
+    setLoading(data.sheet.loading);
+    setShortage(data.sheet.shortage);
+    setCounters(data.sheet.counters);
     setTotalEur(data.sheet.totalEur);
     setTotalUah(data.sheet.totalUah);
   }, [sheetId]);
+
+  /** Скан/ручний ввід ШК → POST рядка Загрузки + оптимістичне оновлення. */
+  const addLoadingByBarcode = useCallback(
+    async (code: string) => {
+      setBarcodeError(null);
+      setError(null);
+      try {
+        const res = await fetch(
+          `/api/v1/manager/route-sheets/${sheetId}/loading`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ barcode: code }),
+          },
+        );
+        if (!res.ok) {
+          const body = (await res.json().catch(() => ({}))) as {
+            error?: string;
+          };
+          setBarcodeError(body.error ?? `Помилка ${res.status}`);
+          return;
+        }
+        await reloadSheet();
+      } catch (e) {
+        setBarcodeError((e as Error).message ?? "Невідома помилка");
+      }
+    },
+    [sheetId, reloadSheet],
+  );
+
+  /** Видаляє рядок Загрузки. */
+  async function removeLoadingRow(loadingId: string) {
+    setError(null);
+    setSaving(true);
+    try {
+      const res = await fetch(
+        `/api/v1/manager/route-sheets/${sheetId}/loading?loadingId=${encodeURIComponent(
+          loadingId,
+        )}`,
+        { method: "DELETE" },
+      );
+      if (!res.ok) {
+        const body = (await res.json().catch(() => ({}))) as { error?: string };
+        setError(body.error ?? `Помилка ${res.status}`);
+        return;
+      }
+      await reloadSheet();
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  /** Toggle прапорця (loaded/isReturn) рядка Загрузки. */
+  async function patchLoadingRow(
+    loadingId: string,
+    patch: { loaded?: boolean; isReturn?: boolean },
+  ) {
+    setError(null);
+    setSaving(true);
+    try {
+      const res = await fetch(
+        `/api/v1/manager/route-sheets/${sheetId}/loading?loadingId=${encodeURIComponent(
+          loadingId,
+        )}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(patch),
+        },
+      );
+      if (!res.ok) {
+        const body = (await res.json().catch(() => ({}))) as { error?: string };
+        setError(body.error ?? `Помилка ${res.status}`);
+        return;
+      }
+      await reloadSheet();
+    } finally {
+      setSaving(false);
+    }
+  }
 
   async function addOrders(orderIds: string[]) {
     setError(null);
@@ -609,6 +741,180 @@ export function RouteSheetForm({
         </section>
       )}
 
+      {/* ─── Загрузка (скан) ─────────────────────────────────────────────── */}
+      {tab === "loading" && (
+        <section className="space-y-3">
+          <div className="rounded-lg border bg-white p-4 shadow-sm">
+            <h3 className="mb-3 text-sm font-semibold text-gray-700">
+              Сканування лотів ({loading.length})
+            </h3>
+            <BarcodeInput
+              onCode={(c) => void addLoadingByBarcode(c)}
+              error={barcodeError}
+              disabled={locked}
+            />
+            <p className="mt-2 text-xs text-gray-400">
+              Скануйте камерою або введіть ШК. Кожен лот (мішок) додається один
+              раз; він автоматично прив'язується до замовлення за товаром.
+            </p>
+          </div>
+
+          {loading.length === 0 ? (
+            <div className="rounded-lg border border-dashed border-gray-200 bg-gray-50 px-6 py-8 text-center text-sm text-gray-500">
+              Лотів ще не завантажено. Відскануйте перший ШК.
+            </div>
+          ) : (
+            <div className="overflow-x-auto rounded-lg border bg-white">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b bg-gray-50 text-left text-gray-500">
+                    <th className="px-3 py-2 font-medium">Клієнт</th>
+                    <th className="px-3 py-2 font-medium">Замовлення</th>
+                    <th className="px-3 py-2 font-medium">Артикул</th>
+                    <th className="px-3 py-2 font-medium">Лот (ШК)</th>
+                    <th className="px-3 py-2 text-right font-medium">Вага</th>
+                    <th className="px-3 py-2 text-right font-medium">К-сть</th>
+                    <th className="px-3 py-2 text-right font-medium">
+                      Сума, €
+                    </th>
+                    <th className="px-3 py-2 text-center font-medium">
+                      Заванта&shy;жено
+                    </th>
+                    <th className="px-3 py-2 text-center font-medium">
+                      Повер&shy;нення
+                    </th>
+                    <th className="w-10 px-3 py-2"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {loading.map((row) => (
+                    <tr
+                      key={row.id}
+                      className={`border-b last:border-b-0 ${
+                        row.isReturn ? "bg-amber-50" : ""
+                      }`}
+                    >
+                      <td className="px-3 py-2 text-gray-800">
+                        {row.customerName ?? "—"}
+                      </td>
+                      <td className="px-3 py-2 font-mono text-gray-600">
+                        {row.orderNumber ? `№${row.orderNumber}` : "—"}
+                      </td>
+                      <td className="px-3 py-2 font-mono text-gray-600">
+                        {row.articleCode ?? "—"}
+                      </td>
+                      <td className="min-w-0 px-3 py-2">
+                        <div className="break-all font-mono text-xs text-gray-900">
+                          {row.barcode}
+                        </div>
+                        <div className="truncate text-xs text-gray-400">
+                          {row.productName ?? row.productId}
+                        </div>
+                      </td>
+                      <td className="px-3 py-2 text-right text-gray-700">
+                        {row.weight.toFixed(1)}
+                      </td>
+                      <td className="px-3 py-2 text-right text-gray-700">
+                        {row.quantity}
+                      </td>
+                      <td className="px-3 py-2 text-right text-gray-700">
+                        {row.sum.toFixed(2)}
+                      </td>
+                      <td className="px-3 py-2 text-center">
+                        <input
+                          type="checkbox"
+                          checked={row.loaded}
+                          disabled={locked || saving}
+                          onChange={(e) =>
+                            void patchLoadingRow(row.id, {
+                              loaded: e.target.checked,
+                            })
+                          }
+                          className="h-4 w-4 shrink-0 rounded border-gray-300 text-green-600 focus:ring-green-500"
+                          aria-label="Завантажено"
+                        />
+                      </td>
+                      <td className="px-3 py-2 text-center">
+                        <input
+                          type="checkbox"
+                          checked={row.isReturn}
+                          disabled={locked || saving}
+                          onChange={(e) =>
+                            void patchLoadingRow(row.id, {
+                              isReturn: e.target.checked,
+                            })
+                          }
+                          className="h-4 w-4 shrink-0 rounded border-gray-300 text-amber-600 focus:ring-amber-500"
+                          aria-label="Повернення"
+                        />
+                      </td>
+                      <td className="px-3 py-2 text-right">
+                        <button
+                          type="button"
+                          disabled={locked || saving}
+                          onClick={() => void removeLoadingRow(row.id)}
+                          className="inline-flex shrink-0 items-center text-red-500 hover:text-red-700 disabled:opacity-40"
+                          aria-label="Прибрати рядок завантаження"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+      )}
+
+      {/* ─── Бракує (нестача) ─────────────────────────────────────────────── */}
+      {tab === "shortage" && (
+        <section className="space-y-3">
+          <h3 className="text-sm font-semibold text-gray-700">
+            Бракує (нестача на складі)
+          </h3>
+          {shortage.length === 0 ? (
+            <div className="rounded-lg border border-dashed border-green-200 bg-green-50 px-6 py-8 text-center text-sm text-green-700">
+              Усе завантажено — нестачі немає.
+            </div>
+          ) : (
+            <div className="overflow-x-auto rounded-lg border bg-white">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b bg-gray-50 text-left text-gray-500">
+                    <th className="px-4 py-2 font-medium">Замовлення</th>
+                    <th className="px-4 py-2 font-medium">Артикул</th>
+                    <th className="px-4 py-2 font-medium">Товар</th>
+                    <th className="px-4 py-2 text-right font-medium">
+                      Кількість нестачі
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {shortage.map((s, i) => (
+                    <tr key={i} className="border-b last:border-b-0">
+                      <td className="px-4 py-2 font-mono text-gray-600">
+                        {s.orderNumber ? `№${s.orderNumber}` : "—"}
+                      </td>
+                      <td className="px-4 py-2 font-mono text-gray-600">
+                        {s.articleCode ?? "—"}
+                      </td>
+                      <td className="px-4 py-2 text-gray-800">
+                        {s.productName ?? s.productId}
+                      </td>
+                      <td className="px-4 py-2 text-right font-semibold text-red-600">
+                        {s.shortage}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+      )}
+
       {/* ─── Заглушки наступних етапів ───────────────────────────────────── */}
       {PLACEHOLDER_TABS.has(tab) && (
         <section className="rounded-lg border border-dashed border-gray-200 bg-gray-50 px-6 py-10 text-center">
@@ -620,6 +926,37 @@ export function RouteSheetForm({
           </p>
         </section>
       )}
+
+      {/* ─── Лічильник (на всіх вкладках) ────────────────────────────────── */}
+      <div className="sticky bottom-0 flex flex-wrap items-center gap-x-4 gap-y-1 rounded-lg border bg-white px-4 py-2 text-sm shadow-sm">
+        <span className="text-gray-500">
+          Замовлень:{" "}
+          <span className="font-semibold text-gray-800">
+            {counters.ordersCount}
+          </span>
+        </span>
+        <span className="text-gray-500">
+          замовлено:{" "}
+          <span className="font-semibold text-gray-800">
+            {counters.orderedQty}
+          </span>
+        </span>
+        <span className="text-gray-500">
+          завантажено:{" "}
+          <span className="font-semibold text-gray-800">
+            {counters.loadedQty}
+          </span>
+        </span>
+        <button
+          type="button"
+          onClick={() => setTab("shortage")}
+          className={`font-medium underline-offset-2 hover:underline ${
+            counters.shortageQty > 0 ? "text-red-600" : "text-gray-500"
+          }`}
+        >
+          бракує: <span className="font-semibold">{counters.shortageQty}</span>
+        </button>
+      </div>
 
       <OrderPickerModal
         open={pickerOpen}

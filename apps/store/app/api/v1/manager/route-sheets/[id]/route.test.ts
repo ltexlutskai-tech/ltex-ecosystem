@@ -4,7 +4,13 @@ import { NextRequest } from "next/server";
 const VALID_SECRET = "a".repeat(48);
 process.env.MANAGER_JWT_SECRET = VALID_SECRET;
 
-const { mockPrisma, getCurrentUserMock } = vi.hoisted(() => ({
+const {
+  mockPrisma,
+  getCurrentUserMock,
+  loadingRowsMock,
+  shortageMock,
+  countersMock,
+} = vi.hoisted(() => ({
   mockPrisma: {
     routeSheet: { findUnique: vi.fn(), update: vi.fn() },
     order: { findMany: vi.fn() },
@@ -13,6 +19,9 @@ const { mockPrisma, getCurrentUserMock } = vi.hoisted(() => ({
     lot: { findMany: vi.fn() },
   },
   getCurrentUserMock: vi.fn(),
+  loadingRowsMock: vi.fn(),
+  shortageMock: vi.fn(),
+  countersMock: vi.fn(),
 }));
 
 vi.mock("@ltex/db", () => ({ prisma: mockPrisma }));
@@ -20,6 +29,11 @@ vi.mock("@/lib/auth/manager-auth", () => ({
   getCurrentUser: (...args: unknown[]) => getCurrentUserMock(...args),
   MANAGER_ACCESS_COOKIE: "ltex_mgr_access",
   MANAGER_REFRESH_COOKIE: "ltex_mgr_refresh",
+}));
+vi.mock("@/lib/manager/route-sheet-loading", () => ({
+  getRouteSheetLoadingRows: (...args: unknown[]) => loadingRowsMock(...args),
+  computeRouteSheetShortage: (...args: unknown[]) => shortageMock(...args),
+  computeRouteSheetCounters: (...args: unknown[]) => countersMock(...args),
 }));
 
 import { GET, PATCH } from "./route";
@@ -82,6 +96,14 @@ beforeEach(() => {
   mockPrisma.customer.findMany.mockResolvedValue([]);
   mockPrisma.product.findMany.mockResolvedValue([]);
   mockPrisma.lot.findMany.mockResolvedValue([]);
+  loadingRowsMock.mockResolvedValue([]);
+  shortageMock.mockResolvedValue([]);
+  countersMock.mockResolvedValue({
+    ordersCount: 0,
+    orderedQty: 0,
+    loadedQty: 0,
+    shortageQty: 0,
+  });
 });
 
 describe("GET /api/v1/manager/route-sheets/[id]", () => {
@@ -141,6 +163,36 @@ describe("GET /api/v1/manager/route-sheets/[id]", () => {
     expect(json.sheet.orders[0]?.customerName).toBe("Клієнт А");
     expect(json.sheet.items[0]?.productName).toBe("Куртки");
     expect(json.sheet.items[0]?.orderNumber).toBe("ORD-7");
+  });
+
+  it("returns loading rows, shortage and counters (Stage 2)", async () => {
+    mockPrisma.routeSheet.findUnique.mockResolvedValueOnce(fakeSheet());
+    loadingRowsMock.mockResolvedValueOnce([
+      { id: "ld1", barcode: "123", lotId: "l1", productId: "p1" },
+    ]);
+    shortageMock.mockResolvedValueOnce([
+      { orderId: "o1", productId: "p1", shortage: 2 },
+    ]);
+    countersMock.mockResolvedValueOnce({
+      ordersCount: 1,
+      orderedQty: 5,
+      loadedQty: 3,
+      shortageQty: 2,
+    });
+
+    const res = await GET(getReq(), { params });
+    expect(res.status).toBe(200);
+    const json = (await res.json()) as {
+      sheet: {
+        loading: Array<{ id: string }>;
+        shortage: Array<{ shortage: number }>;
+        counters: { loadedQty: number; shortageQty: number };
+      };
+    };
+    expect(json.sheet.loading[0]?.id).toBe("ld1");
+    expect(json.sheet.shortage[0]?.shortage).toBe(2);
+    expect(json.sheet.counters.loadedQty).toBe(3);
+    expect(json.sheet.counters.shortageQty).toBe(2);
   });
 });
 

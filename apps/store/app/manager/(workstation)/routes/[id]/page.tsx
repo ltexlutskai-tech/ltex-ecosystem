@@ -4,6 +4,11 @@ import { ArrowLeft } from "lucide-react";
 import { prisma } from "@ltex/db";
 import { getCurrentUser } from "@/lib/auth/manager-auth";
 import {
+  computeRouteSheetCounters,
+  computeRouteSheetShortage,
+  getRouteSheetLoadingRows,
+} from "@/lib/manager/route-sheet-loading";
+import {
   RouteSheetForm,
   type ExpeditorOption,
   type RouteOption,
@@ -151,6 +156,13 @@ export default async function ManagerRouteSheetDetailPage({
 
   const displayNumber = sheet.code1C ?? String(sheet.docNumber);
 
+  // Етап 2: Загрузка (резолвлені рядки) + Бракує + лічильники (обчислювані).
+  const [loading, shortage, counters] = await Promise.all([
+    getRouteSheetLoadingRows(sheet.id),
+    computeRouteSheetShortage(sheet.id),
+    computeRouteSheetCounters(sheet.id),
+  ]);
+
   const initial: RouteSheetView = {
     id: sheet.id,
     displayNumber,
@@ -164,6 +176,9 @@ export default async function ManagerRouteSheetDetailPage({
     totalUah: sheet.totalUah,
     orders: orderViews,
     items: itemViews,
+    loading,
+    shortage,
+    counters,
   };
 
   const routes: RouteOption[] = routeRows.map((r) => ({

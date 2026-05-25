@@ -2,10 +2,16 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@ltex/db";
 import { getCurrentUser } from "@/lib/auth/manager-auth";
 import { isRouteSheetLocked } from "@/lib/manager/route-sheet-status";
+import {
+  computeRouteSheetCounters,
+  computeRouteSheetShortage,
+  getRouteSheetLoadingRows,
+} from "@/lib/manager/route-sheet-loading";
 import { updateRouteSheetSchema } from "@/lib/validations/manager-route-sheet";
 
 /**
- * GET — повний маршрутний лист: шапка + Заказы + Товари (вкладки Етапу 1).
+ * GET — повний маршрутний лист: шапка + Заказы + Товари (Етап 1) + Загрузка +
+ * Бракує + лічильники (Етап 2).
  *
  * Cross-model id-поля у дочірніх таблицях (orderId/customerId/productId/lotId)
  * — **плоскі скаляри без Prisma-relation**. Імена резолвимо batch-lookup-ами:
@@ -86,6 +92,13 @@ export async function GET(
   const productMap = new Map(products.map((p) => [p.id, p]));
   const lotMap = new Map(lots.map((l) => [l.id, l]));
 
+  // Етап 2: Загрузка + Бракує + лічильники (обчислювані / резолвлені окремо).
+  const [loading, shortage, counters] = await Promise.all([
+    getRouteSheetLoadingRows(sheet.id),
+    computeRouteSheetShortage(sheet.id),
+    computeRouteSheetCounters(sheet.id),
+  ]);
+
   return NextResponse.json({
     sheet: {
       id: sheet.id,
@@ -141,6 +154,9 @@ export async function GET(
           quantityLoaded: it.quantityLoaded,
         };
       }),
+      loading,
+      shortage,
+      counters,
     },
   });
 }
