@@ -1,0 +1,51 @@
+import { z } from "zod";
+import { ROUTE_SHEET_STATUS_LIST } from "@/lib/manager/route-sheet-status";
+
+/**
+ * Zod-схеми для API маршрутних листів (Блок «Маршрутний лист», Етап 1).
+ *
+ * - `createRouteSheetSchema` — POST /api/v1/manager/route-sheets (шапка;
+ *   усі поля опційні — створюється чернетка, заповнюється далі на формі);
+ * - `updateRouteSheetSchema` — PATCH /api/v1/manager/route-sheets/[id]
+ *   (редагування полів шапки; усі поля опційні — часткове оновлення);
+ * - `addOrdersSchema` — POST /api/v1/manager/route-sheets/[id]/orders
+ *   (масив orderIds для додавання).
+ */
+
+const isoDate = z
+  .string()
+  .datetime({ offset: true })
+  .or(z.string().regex(/^\d{4}-\d{2}-\d{2}$/));
+
+export const createRouteSheetSchema = z.object({
+  /** Дата складання (ISO). Дефолт — now() на рівні Prisma. */
+  date: isoDate.optional(),
+  /** Планова дата приїзду (ISO). */
+  arrivalDate: isoDate.nullable().optional(),
+  /** Маршрут — `MgrRoute.id`. */
+  routeId: z.string().min(1).nullable().optional(),
+  /** Експедитор — `User.id`. */
+  expeditorUserId: z.string().min(1).nullable().optional(),
+  /** Коментар (= «назва» у списку). */
+  comment: z.string().max(2000).nullable().optional(),
+});
+
+export const updateRouteSheetSchema = z.object({
+  date: isoDate.optional(),
+  arrivalDate: isoDate.nullable().optional(),
+  routeId: z.string().min(1).nullable().optional(),
+  expeditorUserId: z.string().min(1).nullable().optional(),
+  status: z.enum(ROUTE_SHEET_STATUS_LIST as [string, ...string[]]).optional(),
+  comment: z.string().max(2000).nullable().optional(),
+  /** Кілометраж (Етап 4 — поки приймається additive). */
+  mileageStartKm: z.number().nonnegative().max(9_999_999).nullable().optional(),
+  mileageEndKm: z.number().nonnegative().max(9_999_999).nullable().optional(),
+});
+
+export const addOrdersSchema = z.object({
+  orderIds: z.array(z.string().min(1)).min(1).max(200),
+});
+
+export type CreateRouteSheetInput = z.infer<typeof createRouteSheetSchema>;
+export type UpdateRouteSheetInput = z.infer<typeof updateRouteSheetSchema>;
+export type AddOrdersInput = z.infer<typeof addOrdersSchema>;
