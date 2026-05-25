@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { Trash2, Minus, Plus } from "lucide-react";
 import { Input } from "@ltex/ui";
 import { bagWeightForQuantity } from "@/lib/manager/order-bag-weight";
@@ -35,11 +36,52 @@ export function ItemsEditor({
   items: OrderItemDraft[];
   onChange: (next: OrderItemDraft[]) => void;
 }) {
+  // Сирий текст полів вводу per-row (uid → текст) під час редагування. Дозволяє
+  // очистити поле (без миттєвого «прилипання» до 1/0). Undefined = показуємо
+  // числове значення рядка. Коммітимо у числове значення на blur/зміні.
+  const [bagsText, setBagsText] = useState<Record<string, string>>({});
+  const [priceText, setPriceText] = useState<Record<string, string>>({});
+
   function updateRow(uid: string, next: OrderItemDraft): void {
     onChange(items.map((i) => (i.uid === uid ? next : i)));
   }
   function removeRow(uid: string): void {
     onChange(items.filter((i) => i.uid !== uid));
+  }
+
+  /** Текст у полі «Мішків» — сирий ввід або числове значення рядка. */
+  function bagsTextFor(draft: OrderItemDraft): string {
+    return bagsText[draft.uid] ?? String(draft.quantity);
+  }
+
+  /** Парсить сирий текст мішків: порожнє/NaN/<1 → 1. */
+  function parseBags(raw: string | undefined, fallback: number): number {
+    if (raw === undefined) return fallback;
+    const n = Number.parseInt(raw, 10);
+    if (!Number.isFinite(n) || n < 1) return 1;
+    return n;
+  }
+
+  /** Текст у полі «Ціна за кг» — сирий ввід або числове значення рядка. */
+  function priceTextFor(draft: OrderItemDraft): string {
+    return priceText[draft.uid] ?? String(draft.unitPriceEur);
+  }
+
+  /** Парсить сирий текст ціни: порожнє/NaN/<0 → 0. */
+  function parsePrice(raw: string | undefined, fallback: number): number {
+    if (raw === undefined) return fallback;
+    const n = Number.parseFloat(raw);
+    if (!Number.isFinite(n) || n < 0) return 0;
+    return n;
+  }
+
+  /** Прибирає сирий текст ціни рядка → показуємо числове значення draft. */
+  function clearPriceText(uid: string): void {
+    setPriceText((prev) => {
+      const next = { ...prev };
+      delete next[uid];
+      return next;
+    });
   }
 
   /** Перерахунок ваги/суми при зміні кількості мішків. */
@@ -111,8 +153,19 @@ export function ItemsEditor({
                   min="1"
                   step="1"
                   aria-label="Кількість мішків"
-                  value={draft.quantity}
-                  onChange={(e) => changeBags(draft, Number(e.target.value))}
+                  value={bagsTextFor(draft)}
+                  onChange={(e) => {
+                    const text = e.target.value;
+                    setBagsText((prev) => ({ ...prev, [draft.uid]: text }));
+                    changeBags(draft, parseBags(text, draft.quantity));
+                  }}
+                  onBlur={() =>
+                    setBagsText((prev) => {
+                      const next = { ...prev };
+                      delete next[draft.uid];
+                      return next;
+                    })
+                  }
                   className="h-9 w-20 text-right text-sm"
                 />
               </div>
@@ -126,9 +179,10 @@ export function ItemsEditor({
                   <button
                     type="button"
                     aria-label="Зменшити ціну"
-                    onClick={() =>
-                      changeUnitPrice(draft, stepDown(draft.unitPriceEur))
-                    }
+                    onClick={() => {
+                      changeUnitPrice(draft, stepDown(draft.unitPriceEur));
+                      clearPriceText(draft.uid);
+                    }}
                     className="inline-flex h-9 w-8 items-center justify-center rounded-l-md border border-gray-300 text-gray-600 hover:bg-gray-50"
                   >
                     <Minus className="h-3.5 w-3.5" />
@@ -138,18 +192,25 @@ export function ItemsEditor({
                     min="0"
                     step={PRICE_STEP}
                     aria-label="Ціна за кг"
-                    value={draft.unitPriceEur}
-                    onChange={(e) =>
-                      changeUnitPrice(draft, Number(e.target.value))
-                    }
+                    value={priceTextFor(draft)}
+                    onChange={(e) => {
+                      const text = e.target.value;
+                      setPriceText((prev) => ({ ...prev, [draft.uid]: text }));
+                      changeUnitPrice(
+                        draft,
+                        parsePrice(text, draft.unitPriceEur),
+                      );
+                    }}
+                    onBlur={() => clearPriceText(draft.uid)}
                     className="h-9 w-20 border-y border-gray-300 px-2 text-center text-sm focus:outline-none focus:ring-1 focus:ring-green-500"
                   />
                   <button
                     type="button"
                     aria-label="Збільшити ціну"
-                    onClick={() =>
-                      changeUnitPrice(draft, stepUp(draft.unitPriceEur))
-                    }
+                    onClick={() => {
+                      changeUnitPrice(draft, stepUp(draft.unitPriceEur));
+                      clearPriceText(draft.uid);
+                    }}
                     className="inline-flex h-9 w-8 items-center justify-center rounded-r-md border border-gray-300 text-gray-600 hover:bg-gray-50"
                   >
                     <Plus className="h-3.5 w-3.5" />

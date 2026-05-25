@@ -11,13 +11,7 @@ import { ProductPricePicker } from "./product-price-picker";
 import { unitPriceForType } from "@/lib/manager/order-pricing";
 import { bagWeightForQuantity } from "@/lib/manager/order-bag-weight";
 import {
-  getAllowedStatusTransitions,
-  type ManagerOrderStatus,
-} from "@/lib/manager/order-status";
-import { OrderStatusBadge } from "../../../customers/[id]/_components/order-status-badge";
-import {
   draftToWire,
-  type AgentOption,
   type ClientPickerItem,
   type OrderDeliveryOption,
   type OrderEditInitial,
@@ -37,18 +31,10 @@ export interface OrderFormProps {
   initialClient?: ClientPickerItem | null;
   exchangeRate: number;
   priceTypes: PriceTypeOption[];
-  agents: AgentOption[];
   deliveryMethods: OrderDeliveryOption[];
   currentUserId: string;
   currentUserName: string;
 }
-
-const STATUS_ACTION_LABEL: Record<ManagerOrderStatus, string> = {
-  draft: "Повернути в чернетку",
-  sent: "Відправити в 1С",
-  posted: "Провести в 1С",
-  cancelled: "Скасувати замовлення",
-};
 
 /**
  * Зіставляє код способу доставки клієнта (MgrDeliveryMethod.code, напр.
@@ -81,9 +67,7 @@ export function OrderForm({
   initialClient,
   exchangeRate,
   priceTypes,
-  agents,
   deliveryMethods,
-  currentUserId,
   currentUserName,
 }: OrderFormProps) {
   const router = useRouter();
@@ -107,9 +91,6 @@ export function OrderForm({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // У режимі редагування — поточний статус + бажаний статус для збереження.
-  const [status, setStatus] = useState<string>(initialOrder?.status ?? "draft");
-
   // ─── Менеджерські поля (Етап 1) ───────────────────────────────────────────
   const [priceTypeId, setPriceTypeId] = useState<string>(
     initialOrder?.priceTypeId ??
@@ -123,18 +104,6 @@ export function OrderForm({
         initialClient?.deliveryMethodCode,
         deliveryMethods,
       ),
-  );
-  const [cashOnDelivery, setCashOnDelivery] = useState(
-    initialOrder?.cashOnDelivery ?? false,
-  );
-  const [assignToAgent, setAssignToAgent] = useState(
-    isEdit
-      ? !!initialOrder?.assignedAgentUserId &&
-          initialOrder.assignedAgentUserId !== currentUserId
-      : false,
-  );
-  const [assignedAgentUserId, setAssignedAgentUserId] = useState<string>(
-    initialOrder?.assignedAgentUserId ?? currentUserId,
   );
   const [exportTo1C, setExportTo1C] = useState(
     initialOrder?.exportTo1C ?? true,
@@ -252,22 +221,19 @@ export function OrderForm({
     ? Number.parseFloat(clientSummary.debt)
     : null;
 
-  const allowedTransitions = getAllowedStatusTransitions(status);
-
   // Номер документа: для edit — code1C замовлення або короткий id; для create — «авто».
   const orderNumber = isEdit ? (initialOrder?.displayNumber ?? "") : "авто";
 
   /**
-   * Зберігає замовлення (POST у create, PATCH у edit). Опційний `nextStatus`
-   * (тільки edit) — змінює статус разом зі збереженням шапки/товарів.
+   * Зберігає замовлення (POST у create, PATCH у edit). Статус документа з UI
+   * не змінюється (керується 1С). Після успіху — перехід до списку замовлень.
    */
-  async function submit(nextStatus?: ManagerOrderStatus): Promise<void> {
+  async function submit(): Promise<void> {
     if (!isEdit && !clientId) return;
     if (isEdit && !orderId) return;
     setSubmitting(true);
     setError(null);
     try {
-      const payloadAgent = assignToAgent ? assignedAgentUserId : currentUserId;
       const url = isEdit
         ? `/api/v1/manager/orders/${orderId}`
         : "/api/v1/manager/orders";
@@ -280,10 +246,7 @@ export function OrderForm({
           notes: notes.trim() || (isEdit ? null : undefined),
           priceTypeId: priceTypeId || null,
           deliveryMethod: deliveryMethod || null,
-          cashOnDelivery,
-          assignedAgentUserId: payloadAgent,
           exportTo1C,
-          ...(isEdit && nextStatus ? { status: nextStatus } : {}),
         }),
       });
       if (!res.ok) {
@@ -293,13 +256,7 @@ export function OrderForm({
         setError(errBody.error ?? `Помилка ${res.status}`);
         return;
       }
-      if (isEdit) {
-        if (nextStatus) setStatus(nextStatus);
-        router.refresh();
-        return;
-      }
-      const order = (await res.json()) as { id: string };
-      router.push(`/manager/orders/${order.id}`);
+      router.push("/manager/orders");
     } catch (e) {
       setError((e as Error).message ?? "Невідома помилка");
     } finally {
@@ -462,93 +419,22 @@ export function OrderForm({
           </div>
         </div>
 
-        {/* Чекбокси: наложка / агент / експорт */}
+        {/* Чекбокс: експорт у 1С */}
         <div className="mt-4 flex flex-col gap-3 border-t pt-4">
-          <div className="flex flex-wrap items-center gap-x-8 gap-y-3">
-            <label className="inline-flex cursor-pointer items-center gap-2 text-sm text-gray-700">
-              <input
-                type="checkbox"
-                checked={cashOnDelivery}
-                onChange={(e) => setCashOnDelivery(e.target.checked)}
-                className="h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
-              />
-              <span>Наложка (післяплата)</span>
-            </label>
-            <label className="inline-flex cursor-pointer items-center gap-2 text-sm text-gray-700">
-              <input
-                type="checkbox"
-                checked={assignToAgent}
-                onChange={(e) => {
-                  setAssignToAgent(e.target.checked);
-                  if (!e.target.checked) setAssignedAgentUserId(currentUserId);
-                }}
-                className="h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
-              />
-              <span>Призначити продаж торговому</span>
-            </label>
-            <label className="inline-flex cursor-pointer items-center gap-2 text-sm text-gray-700">
-              <input
-                type="checkbox"
-                checked={exportTo1C}
-                onChange={(e) => setExportTo1C(e.target.checked)}
-                className="h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
-              />
-              <span>Вивантажувати в 1С</span>
-            </label>
-          </div>
-
-          {assignToAgent ? (
-            <select
-              aria-label="Торговий агент"
-              value={assignedAgentUserId}
-              onChange={(e) => setAssignedAgentUserId(e.target.value)}
-              className="h-10 w-full max-w-sm rounded-md border border-gray-300 bg-white px-3 text-sm focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500"
-            >
-              {agents.map((a) => (
-                <option key={a.id} value={a.id}>
-                  {a.fullName}
-                  {a.id === currentUserId ? " (я)" : ""}
-                </option>
-              ))}
-            </select>
-          ) : (
-            <p className="text-xs text-gray-400">
-              Продаж зараховано вам ({currentUserName}).
-            </p>
-          )}
+          <label className="inline-flex cursor-pointer items-center gap-2 text-sm text-gray-700">
+            <input
+              type="checkbox"
+              checked={exportTo1C}
+              onChange={(e) => setExportTo1C(e.target.checked)}
+              className="h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
+            />
+            <span>Вивантажувати в 1С</span>
+          </label>
+          <p className="text-xs text-gray-400">
+            Продаж зараховано вам ({currentUserName}).
+          </p>
         </div>
       </section>
-
-      {/* ─── Секція: Статус (тільки edit) ─────────────────────────────────── */}
-      {isEdit && (
-        <section className="flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-white p-5 shadow-sm">
-          <div className="flex items-center gap-2">
-            <span className="text-sm font-medium text-gray-500">Статус:</span>
-            <OrderStatusBadge status={status} />
-          </div>
-          {allowedTransitions.length > 0 && (
-            <div className="flex flex-wrap gap-2">
-              {allowedTransitions.map((next) => (
-                <Button
-                  key={next}
-                  type="button"
-                  size="sm"
-                  variant={next === "cancelled" ? "outline" : "default"}
-                  disabled={submitting}
-                  onClick={() => submit(next)}
-                  className={
-                    next === "cancelled"
-                      ? "border-red-300 text-red-600 hover:bg-red-50"
-                      : ""
-                  }
-                >
-                  {STATUS_ACTION_LABEL[next]}
-                </Button>
-              ))}
-            </div>
-          )}
-        </section>
-      )}
 
       {/* ─── Секція: Позиції ──────────────────────────────────────────────── */}
       <section className="rounded-lg border bg-white p-5 shadow-sm">
@@ -633,7 +519,7 @@ export function OrderForm({
               ? "Збереження…"
               : "Створення…"
             : isEdit
-              ? "Зберегти зміни"
+              ? "Зберегти"
               : "Створити замовлення"}
         </Button>
       </div>
