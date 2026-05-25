@@ -30,13 +30,33 @@ async function getUsdRate(): Promise<number> {
 export default async function NewSalePage({
   searchParams,
 }: {
-  searchParams: Promise<{ clientId?: string }>;
+  searchParams: Promise<{
+    clientId?: string;
+    routeSheetId?: string;
+    orderId?: string;
+  }>;
 }) {
   const user = await getCurrentUser();
   if (!user) redirect("/manager/login");
 
   const sp = await searchParams;
   const requestedClientId = sp.clientId ?? null;
+
+  // МЛ-контекст: коли реалізацію створюють зсередини Маршрутного листа.
+  // Перевіряємо існування МЛ (інакше ігноруємо параметр), щоб після збереження
+  // повернути користувача на сторінку МЛ. `orderId` поки інформаційний —
+  // central 1С не приймає точний лот; підбір іде через прайс (як у Замовленнях).
+  let routeSheetId: string | null = null;
+  if (sp.routeSheetId) {
+    const sheet = await prisma.routeSheet.findUnique({
+      where: { id: sp.routeSheetId },
+      select: { id: true },
+    });
+    if (sheet) routeSheetId = sheet.id;
+  }
+  const returnHref = routeSheetId
+    ? `/manager/routes/${routeSheetId}`
+    : "/manager/sales";
 
   let initialClient: ClientPickerItem | null = null;
   if (requestedClientId) {
@@ -97,11 +117,11 @@ export default async function NewSalePage({
   return (
     <div className="mx-auto max-w-4xl space-y-6">
       <Link
-        href="/manager/sales"
+        href={returnHref}
         className="inline-flex items-center gap-1 text-sm text-gray-600 hover:text-gray-900"
       >
         <ArrowLeft className="h-4 w-4" />
-        Назад до списку
+        {routeSheetId ? "Назад до маршруту" : "Назад до списку"}
       </Link>
 
       <header>
@@ -121,6 +141,8 @@ export default async function NewSalePage({
         deliveryMethods={deliveryMethods}
         currentUserId={user.id}
         currentUserName={user.fullName}
+        routeSheetId={routeSheetId}
+        returnHref={returnHref}
       />
     </div>
   );

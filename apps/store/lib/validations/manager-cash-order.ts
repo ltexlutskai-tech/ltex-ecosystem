@@ -88,6 +88,13 @@ export const processPaymentSchema = z
     sumToPayEur: z.number().nonnegative().max(MAX_AMOUNT),
     /** Інформаційно — форма вже згорнула борг у sumToPayEur. */
     includeDebt: z.boolean().optional().default(false),
+    /**
+     * Зворотне посилання на Маршрутний лист (1С `КассовыйОрдер.МаршрутныйЛист`).
+     * Заповнюється коли оплату створено зсередини МЛ
+     * (`/manager/payments/new?routeSheetId=...`). Ставиться на income + change
+     * ордери. Існування МЛ перевіряє endpoint.
+     */
+    routeSheetId: z.string().min(1).optional(),
   })
   .refine((v) => v.saleId || v.clientId, {
     message: "Потрібна реалізація або клієнт",

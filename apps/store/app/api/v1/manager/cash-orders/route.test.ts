@@ -24,6 +24,8 @@ const {
     mockPrisma: {
       sale: { findUnique: vi.fn() },
       mgrBankAccount: { findUnique: vi.fn() },
+      routeSheet: { findUnique: vi.fn() },
+      mgrCashOrder: { findUnique: vi.fn() },
     },
     getCurrentUserMock: vi.fn(),
     getMyClientCodes1CMock: vi.fn(),
@@ -213,5 +215,28 @@ describe("POST /api/v1/manager/cash-orders (Етап 2)", () => {
     mockPrisma.sale.findUnique.mockResolvedValueOnce(fakeSale("FOREIGN"));
     const res = await POST(postReq(validBody));
     expect(res.status).toBe(201);
+  });
+
+  it("оплата з routeSheetId передає його у createPaymentOrders", async () => {
+    mockPrisma.sale.findUnique.mockResolvedValueOnce(fakeSale("000001"));
+    mockPrisma.routeSheet.findUnique.mockResolvedValueOnce({ id: "rs1" });
+    const res = await POST(postReq({ ...validBody, routeSheetId: "rs1" }));
+    expect(res.status).toBe(201);
+    expect(mockPrisma.routeSheet.findUnique).toHaveBeenCalledWith({
+      where: { id: "rs1" },
+      select: { id: true },
+    });
+    const call = createPaymentOrdersMock.mock.calls[0]?.[0] as {
+      routeSheetId: string | null;
+    };
+    expect(call.routeSheetId).toBe("rs1");
+  });
+
+  it("returns 404 коли routeSheetId не існує", async () => {
+    mockPrisma.sale.findUnique.mockResolvedValueOnce(fakeSale("000001"));
+    mockPrisma.routeSheet.findUnique.mockResolvedValueOnce(null);
+    const res = await POST(postReq({ ...validBody, routeSheetId: "missing" }));
+    expect(res.status).toBe(404);
+    expect(createPaymentOrdersMock).not.toHaveBeenCalled();
   });
 });

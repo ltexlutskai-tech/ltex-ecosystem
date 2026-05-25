@@ -8,6 +8,7 @@ import {
   computeRouteSheetShortage,
   getRouteSheetLoadingRows,
 } from "@/lib/manager/route-sheet-loading";
+import { getRouteSheetDocuments } from "@/lib/manager/route-sheet-documents";
 import {
   RouteSheetForm,
   type ExpeditorOption,
@@ -157,10 +158,12 @@ export default async function ManagerRouteSheetDetailPage({
   const displayNumber = sheet.code1C ?? String(sheet.docNumber);
 
   // Етап 2: Загрузка (резолвлені рядки) + Бракує + лічильники (обчислювані).
-  const [loading, shortage, counters] = await Promise.all([
+  // Етап 3: Реалізації / Продажи / Оплати — derived із зворотних посилань.
+  const [loading, shortage, counters, documents] = await Promise.all([
     getRouteSheetLoadingRows(sheet.id),
     computeRouteSheetShortage(sheet.id),
     computeRouteSheetCounters(sheet.id),
+    getRouteSheetDocuments(sheet.id),
   ]);
 
   const initial: RouteSheetView = {
@@ -179,6 +182,9 @@ export default async function ManagerRouteSheetDetailPage({
     loading,
     shortage,
     counters,
+    sales: documents.sales,
+    saleItems: documents.saleItems,
+    payments: documents.payments,
   };
 
   const routes: RouteOption[] = routeRows.map((r) => ({

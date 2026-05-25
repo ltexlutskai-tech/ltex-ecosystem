@@ -137,6 +137,21 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  // Зворотне посилання на Маршрутний лист (коли реалізацію створено зсередини
+  // МЛ). Перевіряємо існування; ownership — будь-який менеджер (МЛ спільні).
+  if (input.routeSheetId) {
+    const routeSheet = await prisma.routeSheet.findUnique({
+      where: { id: input.routeSheetId },
+      select: { id: true },
+    });
+    if (!routeSheet) {
+      return NextResponse.json(
+        { error: "Маршрутний лист не знайдено" },
+        { status: 404 },
+      );
+    }
+  }
+
   try {
     const sale = await createSaleWithItems(input, customer, {
       userId: user.id,
@@ -161,6 +176,7 @@ export async function POST(req: NextRequest) {
         onTradeAgent: sale.onTradeAgent,
         exportTo1C: sale.exportTo1C,
         expressWaybill: sale.expressWaybill,
+        routeSheetId: sale.routeSheetId,
         createdAt: sale.createdAt.toISOString(),
         customer: sale.customer,
         items: sale.items.map((i) => ({

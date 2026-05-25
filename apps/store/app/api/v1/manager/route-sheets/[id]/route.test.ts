@@ -10,6 +10,7 @@ const {
   loadingRowsMock,
   shortageMock,
   countersMock,
+  documentsMock,
 } = vi.hoisted(() => ({
   mockPrisma: {
     routeSheet: { findUnique: vi.fn(), update: vi.fn() },
@@ -22,6 +23,7 @@ const {
   loadingRowsMock: vi.fn(),
   shortageMock: vi.fn(),
   countersMock: vi.fn(),
+  documentsMock: vi.fn(),
 }));
 
 vi.mock("@ltex/db", () => ({ prisma: mockPrisma }));
@@ -34,6 +36,9 @@ vi.mock("@/lib/manager/route-sheet-loading", () => ({
   getRouteSheetLoadingRows: (...args: unknown[]) => loadingRowsMock(...args),
   computeRouteSheetShortage: (...args: unknown[]) => shortageMock(...args),
   computeRouteSheetCounters: (...args: unknown[]) => countersMock(...args),
+}));
+vi.mock("@/lib/manager/route-sheet-documents", () => ({
+  getRouteSheetDocuments: (...args: unknown[]) => documentsMock(...args),
 }));
 
 import { GET, PATCH } from "./route";
@@ -104,6 +109,7 @@ beforeEach(() => {
     loadedQty: 0,
     shortageQty: 0,
   });
+  documentsMock.mockResolvedValue({ sales: [], saleItems: [], payments: [] });
 });
 
 describe("GET /api/v1/manager/route-sheets/[id]", () => {
@@ -193,6 +199,29 @@ describe("GET /api/v1/manager/route-sheets/[id]", () => {
     expect(json.sheet.shortage[0]?.shortage).toBe(2);
     expect(json.sheet.counters.loadedQty).toBe(3);
     expect(json.sheet.counters.shortageQty).toBe(2);
+  });
+
+  it("derives sales/saleItems/payments from back-links (Stage 3)", async () => {
+    mockPrisma.routeSheet.findUnique.mockResolvedValueOnce(fakeSheet());
+    documentsMock.mockResolvedValueOnce({
+      sales: [{ id: "s1", docNumber: 3, customerName: "К", status: "draft" }],
+      saleItems: [{ id: "si1", saleId: "s1", productName: "Товар" }],
+      payments: [{ id: "co1", type: "income", documentSumEur: 100 }],
+    });
+
+    const res = await GET(getReq(), { params });
+    expect(res.status).toBe(200);
+    expect(documentsMock).toHaveBeenCalledWith("rs1");
+    const json = (await res.json()) as {
+      sheet: {
+        sales: Array<{ id: string }>;
+        saleItems: Array<{ id: string }>;
+        payments: Array<{ id: string }>;
+      };
+    };
+    expect(json.sheet.sales[0]?.id).toBe("s1");
+    expect(json.sheet.saleItems[0]?.id).toBe("si1");
+    expect(json.sheet.payments[0]?.id).toBe("co1");
   });
 });
 

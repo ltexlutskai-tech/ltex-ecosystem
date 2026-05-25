@@ -60,6 +60,14 @@ export interface SaleFormProps {
   deliveryMethods: OrderDeliveryOption[];
   currentUserId: string;
   currentUserName: string;
+  /**
+   * МЛ-контекст: коли реалізацію створюють зсередини Маршрутного листа.
+   * Передається у POST як `routeSheetId`; після успіху користувач
+   * повертається на `returnHref` (сторінку МЛ), а не у список реалізацій.
+   */
+  routeSheetId?: string | null;
+  /** Куди повертатись після створення (за замовч. список реалізацій). */
+  returnHref?: string | null;
 }
 
 const STATUS_ACTION_LABEL: Record<ManagerSaleStatus, string> = {
@@ -122,9 +130,13 @@ export function SaleForm({
   deliveryMethods,
   currentUserId,
   currentUserName,
+  routeSheetId,
+  returnHref,
 }: SaleFormProps) {
   const router = useRouter();
   const isEdit = mode === "edit";
+  /** Куди повертатись після звичайного збереження (МЛ або список). */
+  const successHref = returnHref ?? "/manager/sales";
 
   const [clientId, setClientId] = useState<string | null>(
     initialClientId ?? null,
@@ -415,6 +427,7 @@ export function SaleForm({
           onTradeAgent,
           exportTo1C,
           expressWaybill: expressWaybill.trim() || null,
+          ...(isEdit ? {} : { routeSheetId: routeSheetId ?? undefined }),
           ...(isEdit && nextStatus ? { status: nextStatus } : {}),
         }),
       });
@@ -448,7 +461,8 @@ export function SaleForm({
       router.refresh();
       return;
     }
-    router.push("/manager/sales");
+    // МЛ-контекст → назад на сторінку Маршрутного листа; інакше — список.
+    router.push(successHref);
   }
 
   /** Зберегти й перейти до оплат на детальній сторінці (Fix 6). */

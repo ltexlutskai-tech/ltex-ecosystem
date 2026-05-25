@@ -408,6 +408,8 @@ export interface CreatePaymentArgs {
   /** Сума «До оплати» у EUR (для перерахунку наложки на Sale). */
   sumToPayEur: number;
   agentUserId?: string | null;
+  /** Зворотне посилання на Маршрутний лист (МЛ) — ставиться на обидва ордери. */
+  routeSheetId?: string | null;
 }
 
 /**
@@ -435,6 +437,7 @@ export async function createPaymentOrders(args: CreatePaymentArgs) {
     rates,
     sumToPayEur,
     agentUserId,
+    routeSheetId,
   } = args;
 
   const documentSumEur = reduceToEur(paid, rates);
@@ -457,6 +460,7 @@ export async function createPaymentOrders(args: CreatePaymentArgs) {
         documentSumEur,
         comment: comment ?? null,
         agentUserId: agentUserId ?? null,
+        routeSheetId: routeSheetId ?? null,
       },
     });
 
@@ -479,6 +483,7 @@ export async function createPaymentOrders(args: CreatePaymentArgs) {
           documentSumEur: reduceChangeToEur(change, rates),
           comment: comment ?? null,
           agentUserId: agentUserId ?? null,
+          routeSheetId: routeSheetId ?? null,
         },
       });
     }

@@ -10,6 +10,7 @@ import {
   ROUTE_SHEET_STATUS_META,
   isRouteSheetLocked,
 } from "@/lib/manager/route-sheet-status";
+import { getSaleStatusMeta } from "@/lib/manager/sale-status";
 import { RouteSheetStatusBadge } from "../../_components/route-sheet-status-badge";
 import { OrderPickerModal } from "./order-picker-modal";
 import { BarcodeInput } from "../../../sales/new/_components/barcode-input";
@@ -87,6 +88,47 @@ export interface RouteSheetCountersView {
   shortageQty: number;
 }
 
+/** Рядок вкладки «Реалізації» (Sale, derived з routeSheetId). */
+export interface RouteSheetSaleView {
+  id: string;
+  docNumber: number;
+  code1C: string | null;
+  status: string;
+  customerId: string;
+  customerName: string | null;
+  orderId: string | null;
+  totalEur: number;
+  totalUah: number;
+}
+
+/** Рядок вкладки «Продажи» (SaleItem реалізацій МЛ). */
+export interface RouteSheetSaleItemView {
+  id: string;
+  saleId: string;
+  saleNumber: number;
+  customerName: string | null;
+  productId: string;
+  productName: string | null;
+  articleCode: string | null;
+  lotId: string | null;
+  barcode: string | null;
+  quantity: number;
+  weight: number;
+  pricePerKg: number;
+  priceEur: number;
+}
+
+/** Рядок вкладки «Оплати» (MgrCashOrder, derived з routeSheetId). */
+export interface RouteSheetPaymentView {
+  id: string;
+  docNumber: number;
+  type: string;
+  customerId: string | null;
+  customerName: string | null;
+  saleId: string | null;
+  documentSumEur: number;
+}
+
 export interface RouteSheetView {
   id: string;
   displayNumber: string;
@@ -103,6 +145,9 @@ export interface RouteSheetView {
   loading: RouteSheetLoadingView[];
   shortage: RouteSheetShortageView[];
   counters: RouteSheetCountersView;
+  sales: RouteSheetSaleView[];
+  saleItems: RouteSheetSaleItemView[];
+  payments: RouteSheetPaymentView[];
 }
 
 const TABS = [
@@ -118,13 +163,16 @@ const TABS = [
 
 type TabId = (typeof TABS)[number]["id"];
 
-/** Вкладки наступних етапів — поки заглушки (Етапи 3-4). */
-const PLACEHOLDER_TABS = new Set<TabId>([
-  "sales",
-  "products",
-  "payments",
-  "tasks",
-]);
+/** Вкладки наступних етапів — поки заглушки (Етап 4). */
+const PLACEHOLDER_TABS = new Set<TabId>(["tasks"]);
+
+/** Колір бейджа статусу sale → tailwind-класи. */
+const SALE_STATUS_BADGE: Record<string, string> = {
+  gray: "bg-gray-100 text-gray-700",
+  blue: "bg-blue-100 text-blue-700",
+  green: "bg-green-100 text-green-700",
+  red: "bg-red-100 text-red-700",
+};
 
 function toDateInput(iso: string | null): string {
   if (!iso) return "";
@@ -167,6 +215,13 @@ export function RouteSheetForm({
   );
   const [counters, setCounters] = useState<RouteSheetCountersView>(
     initial.counters,
+  );
+  const [sales, setSales] = useState<RouteSheetSaleView[]>(initial.sales);
+  const [saleItems, setSaleItems] = useState<RouteSheetSaleItemView[]>(
+    initial.saleItems,
+  );
+  const [payments, setPayments] = useState<RouteSheetPaymentView[]>(
+    initial.payments,
   );
   const [totalEur, setTotalEur] = useState(initial.totalEur);
   const [totalUah, setTotalUah] = useState(initial.totalUah);
@@ -225,6 +280,9 @@ export function RouteSheetForm({
     setLoading(data.sheet.loading);
     setShortage(data.sheet.shortage);
     setCounters(data.sheet.counters);
+    setSales(data.sheet.sales);
+    setSaleItems(data.sheet.saleItems);
+    setPayments(data.sheet.payments);
     setTotalEur(data.sheet.totalEur);
     setTotalUah(data.sheet.totalUah);
   }, [sheetId]);
@@ -390,6 +448,13 @@ export function RouteSheetForm({
     }
     return [...groups.values()];
   }, [items]);
+
+  // Анти-дубль (м'який): множина orderId, для яких уже є реалізація на цьому МЛ.
+  const orderIdsWithSale = useMemo(() => {
+    const set = new Set<string>();
+    for (const s of sales) if (s.orderId) set.add(s.orderId);
+    return set;
+  }, [sales]);
 
   return (
     <div className="space-y-5">
@@ -905,6 +970,261 @@ export function RouteSheetForm({
                       </td>
                       <td className="px-4 py-2 text-right font-semibold text-red-600">
                         {s.shortage}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+      )}
+
+      {/* ─── Реалізації ──────────────────────────────────────────────────── */}
+      {tab === "sales" && (
+        <section className="space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h3 className="text-sm font-semibold text-gray-700">
+              Реалізації ({sales.length})
+            </h3>
+            <Link
+              href={`/manager/sales/new?routeSheetId=${encodeURIComponent(
+                sheetId,
+              )}`}
+              className="inline-flex h-9 items-center justify-center rounded-md border border-gray-300 bg-white px-3 text-sm font-medium text-gray-700 hover:bg-gray-50"
+            >
+              Непланова реалізація
+            </Link>
+          </div>
+
+          {/* По кожному замовленню — кнопка «Реалізація» (preset клієнт+замовлення). */}
+          {orders.length > 0 && (
+            <div className="overflow-x-auto rounded-lg border bg-white">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b bg-gray-50 text-left text-gray-500">
+                    <th className="px-4 py-2 font-medium">Замовлення</th>
+                    <th className="px-4 py-2 font-medium">Клієнт</th>
+                    <th className="w-44 px-4 py-2 text-right"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {orders.map((o) => {
+                    const hasSale = orderIdsWithSale.has(o.orderId);
+                    const clientParam = o.customerId
+                      ? `&clientId=${encodeURIComponent(o.customerId)}`
+                      : "";
+                    return (
+                      <tr key={o.id} className="border-b last:border-b-0">
+                        <td className="px-4 py-2 font-mono text-gray-700">
+                          {o.orderNumber ? `№${o.orderNumber}` : "—"}
+                        </td>
+                        <td className="px-4 py-2 text-gray-800">
+                          {o.customerName ?? "—"}
+                        </td>
+                        <td className="px-4 py-2 text-right">
+                          {hasSale && (
+                            <span className="mr-2 text-xs text-gray-400">
+                              вже є реалізація
+                            </span>
+                          )}
+                          <Link
+                            href={`/manager/sales/new?routeSheetId=${encodeURIComponent(
+                              sheetId,
+                            )}${clientParam}&orderId=${encodeURIComponent(
+                              o.orderId,
+                            )}`}
+                            className="inline-flex h-8 items-center justify-center rounded-md bg-green-600 px-3 text-xs font-medium text-white hover:bg-green-700"
+                          >
+                            Реалізація
+                          </Link>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {sales.length === 0 ? (
+            <div className="rounded-lg border border-dashed border-gray-200 bg-gray-50 px-6 py-8 text-center text-sm text-gray-500">
+              Реалізацій ще немає. Створіть реалізацію по замовленню або
+              непланову.
+            </div>
+          ) : (
+            <div className="overflow-x-auto rounded-lg border bg-white">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b bg-gray-50 text-left text-gray-500">
+                    <th className="px-4 py-2 font-medium">№</th>
+                    <th className="px-4 py-2 font-medium">Клієнт</th>
+                    <th className="px-4 py-2 text-right font-medium">Сума</th>
+                    <th className="px-4 py-2 font-medium">Статус</th>
+                    <th className="w-20 px-4 py-2"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {sales.map((s) => {
+                    const meta = getSaleStatusMeta(s.status);
+                    return (
+                      <tr key={s.id} className="border-b last:border-b-0">
+                        <td className="px-4 py-2 font-mono text-gray-700">
+                          №{s.code1C ?? s.docNumber}
+                        </td>
+                        <td className="px-4 py-2 text-gray-800">
+                          {s.customerName ?? "—"}
+                        </td>
+                        <td className="px-4 py-2 text-right text-gray-700">
+                          {Math.round(s.totalUah).toLocaleString("uk-UA")} ₴
+                          <span className="ml-1 text-xs text-gray-400">
+                            · {s.totalEur.toFixed(2)} €
+                          </span>
+                        </td>
+                        <td className="px-4 py-2">
+                          <span
+                            className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${
+                              SALE_STATUS_BADGE[meta.color] ??
+                              SALE_STATUS_BADGE.gray
+                            }`}
+                          >
+                            {meta.label}
+                          </span>
+                        </td>
+                        <td className="px-4 py-2 text-right">
+                          <Link
+                            href={`/manager/sales/${s.id}`}
+                            className="text-sm font-medium text-blue-600 hover:text-blue-800"
+                          >
+                            Відкрити
+                          </Link>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+      )}
+
+      {/* ─── Продажи (порядкова деталізація) ─────────────────────────────── */}
+      {tab === "products" && (
+        <section className="space-y-3">
+          <h3 className="text-sm font-semibold text-gray-700">
+            Продажи ({saleItems.length})
+          </h3>
+          {saleItems.length === 0 ? (
+            <div className="rounded-lg border border-dashed border-gray-200 bg-gray-50 px-6 py-8 text-center text-sm text-gray-500">
+              Проданих позицій ще немає.
+            </div>
+          ) : (
+            <div className="overflow-x-auto rounded-lg border bg-white">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b bg-gray-50 text-left text-gray-500">
+                    <th className="px-3 py-2 font-medium">Клієнт</th>
+                    <th className="px-3 py-2 font-medium">Артикул</th>
+                    <th className="px-3 py-2 font-medium">Товар</th>
+                    <th className="px-3 py-2 text-right font-medium">К-сть</th>
+                    <th className="px-3 py-2 text-right font-medium">
+                      Ціна/кг
+                    </th>
+                    <th className="px-3 py-2 text-right font-medium">
+                      Сума, €
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {saleItems.map((it) => (
+                    <tr key={it.id} className="border-b last:border-b-0">
+                      <td className="px-3 py-2 text-gray-800">
+                        {it.customerName ?? "—"}
+                      </td>
+                      <td className="px-3 py-2 font-mono text-gray-600">
+                        {it.articleCode ?? "—"}
+                      </td>
+                      <td className="px-3 py-2 text-gray-800">
+                        {it.productName ?? it.productId}
+                        {it.barcode && (
+                          <span className="ml-1 font-mono text-xs text-gray-400">
+                            ({it.barcode})
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-3 py-2 text-right text-gray-700">
+                        {it.quantity}
+                      </td>
+                      <td className="px-3 py-2 text-right text-gray-700">
+                        {it.pricePerKg.toFixed(2)}
+                      </td>
+                      <td className="px-3 py-2 text-right text-gray-700">
+                        {it.priceEur.toFixed(2)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+      )}
+
+      {/* ─── Оплати ──────────────────────────────────────────────────────── */}
+      {tab === "payments" && (
+        <section className="space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h3 className="text-sm font-semibold text-gray-700">
+              Оплати ({payments.length})
+            </h3>
+            <Link
+              href={`/manager/payments/new?routeSheetId=${encodeURIComponent(
+                sheetId,
+              )}`}
+              className="inline-flex h-9 items-center justify-center rounded-md bg-green-600 px-3 text-sm font-medium text-white hover:bg-green-700"
+            >
+              <Plus className="mr-1 h-4 w-4" />
+              Створити оплату
+            </Link>
+          </div>
+
+          {payments.length === 0 ? (
+            <div className="rounded-lg border border-dashed border-gray-200 bg-gray-50 px-6 py-8 text-center text-sm text-gray-500">
+              Оплат ще немає. Створіть оплату по реалізації або клієнту.
+            </div>
+          ) : (
+            <div className="overflow-x-auto rounded-lg border bg-white">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b bg-gray-50 text-left text-gray-500">
+                    <th className="px-4 py-2 font-medium">№</th>
+                    <th className="px-4 py-2 font-medium">Клієнт</th>
+                    <th className="px-4 py-2 font-medium">Вид</th>
+                    <th className="px-4 py-2 text-right font-medium">
+                      Сума, €
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {payments.map((p) => (
+                    <tr
+                      key={p.id}
+                      className={`border-b last:border-b-0 ${
+                        p.type === "expense" ? "bg-amber-50" : ""
+                      }`}
+                    >
+                      <td className="px-4 py-2 font-mono text-gray-700">
+                        №{p.docNumber}
+                      </td>
+                      <td className="px-4 py-2 text-gray-800">
+                        {p.customerName ?? "—"}
+                      </td>
+                      <td className="px-4 py-2 text-gray-700">
+                        {p.type === "expense" ? "Розхід (здача)" : "Прихід"}
+                      </td>
+                      <td className="px-4 py-2 text-right text-gray-700">
+                        {p.documentSumEur.toFixed(2)}
                       </td>
                     </tr>
                   ))}

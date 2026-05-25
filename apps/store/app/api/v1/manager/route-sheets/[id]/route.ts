@@ -7,6 +7,7 @@ import {
   computeRouteSheetShortage,
   getRouteSheetLoadingRows,
 } from "@/lib/manager/route-sheet-loading";
+import { getRouteSheetDocuments } from "@/lib/manager/route-sheet-documents";
 import { updateRouteSheetSchema } from "@/lib/validations/manager-route-sheet";
 
 /**
@@ -93,10 +94,12 @@ export async function GET(
   const lotMap = new Map(lots.map((l) => [l.id, l]));
 
   // Етап 2: Загрузка + Бракує + лічильники (обчислювані / резолвлені окремо).
-  const [loading, shortage, counters] = await Promise.all([
+  // Етап 3: Реалізації / Продажи / Оплати — derived із зворотних посилань.
+  const [loading, shortage, counters, documents] = await Promise.all([
     getRouteSheetLoadingRows(sheet.id),
     computeRouteSheetShortage(sheet.id),
     computeRouteSheetCounters(sheet.id),
+    getRouteSheetDocuments(sheet.id),
   ]);
 
   return NextResponse.json({
@@ -157,6 +160,9 @@ export async function GET(
       loading,
       shortage,
       counters,
+      sales: documents.sales,
+      saleItems: documents.saleItems,
+      payments: documents.payments,
     },
   });
 }
