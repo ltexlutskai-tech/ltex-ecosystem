@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Search, Eye, Minus, Plus } from "lucide-react";
+import { Search, Eye, Minus, Plus, Check } from "lucide-react";
 import {
   Button,
   Dialog,
@@ -45,13 +45,20 @@ export function ProductPricePicker({
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<ProductSummary[]>([]);
   const [loading, setLoading] = useState(false);
-  // Кількість мішків per-product (id → bags), дефолт 1.
-  const [bagsByProduct, setBagsByProduct] = useState<Record<string, number>>(
-    {},
-  );
-  // Ціна за кг per-product (id → €). Undefined = ще не чіпали → дефолт прайсова.
-  const [priceByProduct, setPriceByProduct] = useState<Record<string, number>>(
-    {},
+  // Сирий текст полів вводу per-product (id → текст). Дозволяє очистити поле
+  // під час редагування (без миттєвого «прилипання» до 0/1). Undefined = поле
+  // ще не чіпали → показуємо дефолт (1 мішок / прайсова ціна).
+  const [bagsTextByProduct, setBagsTextByProduct] = useState<
+    Record<string, string>
+  >({});
+  const [priceTextByProduct, setPriceTextByProduct] = useState<
+    Record<string, string>
+  >({});
+  // Які товари вже додані у цьому сеансі підбору — щоб кнопка «Додати»
+  // перемикалась на «Додано» (модалка лишається відкритою для повторного
+  // додавання мішків до тієї самої позиції).
+  const [addedProductIds, setAddedProductIds] = useState<Set<string>>(
+    new Set(),
   );
   const debouncedQuery = useDebouncedValue(query, 300);
   const abortRef = useRef<AbortController | null>(null);
@@ -61,8 +68,9 @@ export function ProductPricePicker({
     if (open) {
       setQuery("");
       setResults([]);
-      setBagsByProduct({});
-      setPriceByProduct({});
+      setBagsTextByProduct({});
+      setPriceTextByProduct({});
+      setAddedProductIds(new Set());
     }
   }, [open]);
 
@@ -92,30 +100,66 @@ export function ProductPricePicker({
     return () => controller.abort();
   }, [debouncedQuery, open]);
 
-  function bagsFor(id: string): number {
-    return bagsByProduct[id] ?? 1;
+  /** Текст у полі «Мішків» — сирий ввід або дефолт «1». */
+  function bagsTextFor(id: string): string {
+    return bagsTextByProduct[id] ?? "1";
   }
 
-  function setBags(id: string, value: number): void {
-    setBagsByProduct((prev) => ({
+  /** Числове значення мішків для розрахунку: порожнє/NaN → 1. */
+  function bagsValueFor(id: string): number {
+    const raw = bagsTextByProduct[id];
+    if (raw === undefined) return 1;
+    const n = Number.parseInt(raw, 10);
+    if (!Number.isFinite(n) || n < 1) return 1;
+    return n;
+  }
+
+  /** Зберігає сирий текст поля «Мішків» (дозволяє порожнє під час вводу). */
+  function setBagsText(id: string, text: string): void {
+    setBagsTextByProduct((prev) => ({ ...prev, [id]: text }));
+  }
+
+  /** Текст у полі «Ціна за кг» — сирий ввід або дефолт прайсова. */
+  function priceTextFor(product: ProductSummary): string {
+    const raw = priceTextByProduct[product.id];
+    if (raw !== undefined) return raw;
+    const def = roundToStep(
+      unitPriceForType(product.prices, priceTypeCode) ?? 0,
+    );
+    return String(def);
+  }
+
+  /** Числове значення ціни за кг для розрахунку: порожнє/NaN → 0. */
+  function priceValueFor(product: ProductSummary): number {
+    const raw = priceTextByProduct[product.id];
+    if (raw === undefined) {
+      return roundToStep(unitPriceForType(product.prices, priceTypeCode) ?? 0);
+    }
+    const n = Number.parseFloat(raw);
+    if (!Number.isFinite(n) || n < 0) return 0;
+    return n;
+  }
+
+  /** Зберігає сирий текст поля «Ціна за кг» (дозволяє порожнє під час вводу). */
+  function setPriceText(id: string, text: string): void {
+    setPriceTextByProduct((prev) => ({ ...prev, [id]: text }));
+  }
+
+  /** Встановлює ціну за кг з числа (для stepper-кнопок) кратно 0,05. */
+  function setPriceNumber(id: string, value: number): void {
+    setPriceTextByProduct((prev) => ({
       ...prev,
-      [id]: Math.max(1, Math.floor(value) || 1),
+      [id]: String(roundToStep(Math.max(0, value))),
     }));
   }
 
-  /** Поточна ціна за кг товара — ручна якщо чіпали, інакше прайсова. */
-  function priceFor(product: ProductSummary): number {
-    const manual = priceByProduct[product.id];
-    if (manual !== undefined) return manual;
-    return roundToStep(unitPriceForType(product.prices, priceTypeCode) ?? 0);
-  }
-
-  function setPrice(id: string, value: number): void {
-    setPriceByProduct((prev) => ({ ...prev, [id]: roundToStep(value) }));
-  }
-
   function add(product: ProductSummary): void {
-    onAdd(product, bagsFor(product.id), priceFor(product));
+    onAdd(
+      product,
+      bagsValueFor(product.id),
+      roundToStep(priceValueFor(product)),
+    );
+    setAddedProductIds((prev) => new Set(prev).add(product.id));
   }
 
   return (
@@ -148,8 +192,9 @@ export function ProductPricePicker({
             <div className="p-4 text-sm text-gray-500">Нічого не знайдено.</div>
           )}
           {results.map((p) => {
-            const bags = bagsFor(p.id);
-            const unit = priceFor(p);
+            const bags = bagsValueFor(p.id);
+            const unit = priceValueFor(p);
+            const added = addedProductIds.has(p.id);
             const hasPrice = unitPriceForType(p.prices, priceTypeCode) !== null;
             const previewWeight = bagWeightForQuantity(
               { averageWeight: p.averageWeight },
@@ -197,8 +242,11 @@ export function ProductPricePicker({
                       type="number"
                       min="1"
                       step="1"
-                      value={bags}
-                      onChange={(e) => setBags(p.id, Number(e.target.value))}
+                      value={bagsTextFor(p.id)}
+                      onChange={(e) => setBagsText(p.id, e.target.value)}
+                      onBlur={() =>
+                        setBagsText(p.id, String(bagsValueFor(p.id)))
+                      }
                       className="h-8 w-16 text-sm"
                     />
                   </div>
@@ -211,7 +259,7 @@ export function ProductPricePicker({
                       <button
                         type="button"
                         aria-label="Зменшити ціну"
-                        onClick={() => setPrice(p.id, stepDown(unit))}
+                        onClick={() => setPriceNumber(p.id, stepDown(unit))}
                         className="inline-flex h-8 w-7 items-center justify-center rounded-l-md border border-gray-300 text-gray-600 hover:bg-gray-50"
                       >
                         <Minus className="h-3.5 w-3.5" />
@@ -221,14 +269,20 @@ export function ProductPricePicker({
                         min="0"
                         step={PRICE_STEP}
                         aria-label="Ціна за кг"
-                        value={unit}
-                        onChange={(e) => setPrice(p.id, Number(e.target.value))}
+                        value={priceTextFor(p)}
+                        onChange={(e) => setPriceText(p.id, e.target.value)}
+                        onBlur={() =>
+                          setPriceText(
+                            p.id,
+                            String(roundToStep(priceValueFor(p))),
+                          )
+                        }
                         className="h-8 w-20 border-y border-gray-300 px-2 text-center text-sm focus:outline-none focus:ring-1 focus:ring-green-500"
                       />
                       <button
                         type="button"
                         aria-label="Збільшити ціну"
-                        onClick={() => setPrice(p.id, stepUp(unit))}
+                        onClick={() => setPriceNumber(p.id, stepUp(unit))}
                         className="inline-flex h-8 w-7 items-center justify-center rounded-r-md border border-gray-300 text-gray-600 hover:bg-gray-50"
                       >
                         <Plus className="h-3.5 w-3.5" />
@@ -247,9 +301,20 @@ export function ProductPricePicker({
                     type="button"
                     size="sm"
                     onClick={() => add(p)}
-                    className="bg-green-600 text-white hover:bg-green-700"
+                    className={
+                      added
+                        ? "border border-green-600 bg-green-50 text-green-700 hover:bg-green-100"
+                        : "bg-green-600 text-white hover:bg-green-700"
+                    }
                   >
-                    Додати
+                    {added ? (
+                      <>
+                        <Check className="mr-1 h-4 w-4" />
+                        Додано
+                      </>
+                    ) : (
+                      "Додати"
+                    )}
                   </Button>
                 </div>
               </div>

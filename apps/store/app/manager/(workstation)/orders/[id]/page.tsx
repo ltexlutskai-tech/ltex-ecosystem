@@ -12,14 +12,12 @@ import {
 } from "@/lib/manager/order-delivery";
 import { OrderForm } from "../new/_components/order-form";
 import type {
-  AgentOption,
   ClientPickerItem,
   OrderEditInitial,
   OrderItemDraft,
   PriceTypeOption,
 } from "../new/_components/types";
 import { OrderStatusBadge } from "../../customers/[id]/_components/order-status-badge";
-import { OrderStatusActions } from "./_components/order-status-actions";
 
 export const dynamic = "force-dynamic";
 
@@ -95,13 +93,8 @@ export default async function ManagerOrderDetailPage({
   const locked = isOrderLocked(order.status);
 
   // Допоміжні дані для форми (тільки коли редагуємо).
-  const [priceTypeRows, agentRows, exchangeRate, mgr] = await Promise.all([
+  const [priceTypeRows, exchangeRate, mgr] = await Promise.all([
     prisma.mgrPriceType.findMany({ orderBy: { sortOrder: "asc" } }),
-    prisma.user.findMany({
-      where: { isActive: true },
-      orderBy: { fullName: "asc" },
-      select: { id: true, fullName: true },
-    }),
     getCurrentRate(),
     order.customer.code1C
       ? prisma.mgrClient.findUnique({
@@ -124,10 +117,6 @@ export default async function ManagerOrderDetailPage({
     id: p.id,
     code: p.code,
     label: p.label,
-  }));
-  const agents: AgentOption[] = agentRows.map((u) => ({
-    id: u.id,
-    fullName: u.fullName,
   }));
   const deliveryMethods = ORDER_DELIVERY_METHODS.map((d) => ({
     code: d.code,
@@ -221,7 +210,6 @@ export default async function ManagerOrderDetailPage({
           initialClient={clientSummary}
           exchangeRate={exchangeRate}
           priceTypes={priceTypes}
-          agents={agents}
           deliveryMethods={deliveryMethods}
           currentUserId={user.id}
           currentUserName={user.fullName}
@@ -266,29 +254,14 @@ function ReadOnlyOrder({
   deliveryLabel: string;
   locked: boolean;
 }) {
-  const itemsSnapshot = order.items.map((i) => ({
-    productId: i.productId,
-    lotId: i.lotId,
-    weight: i.weight,
-    quantity: i.quantity,
-    priceEur: i.priceEur,
-  }));
-
   return (
     <div className="space-y-6">
-      <section className="flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-white p-5">
-        <div>
-          <p className="text-sm text-gray-500">
-            {locked
-              ? "Замовлення проведено в 1С — редагування заборонено."
-              : "Замовлення скасовано — лише перегляд."}
-          </p>
-        </div>
-        <OrderStatusActions
-          orderId={order.id}
-          status={order.status}
-          itemsSnapshot={itemsSnapshot}
-        />
+      <section className="rounded-lg border bg-white p-5">
+        <p className="text-sm text-gray-500">
+          {locked
+            ? "Замовлення проведено в 1С — редагування заборонено."
+            : "Замовлення скасовано — лише перегляд."}
+        </p>
       </section>
 
       <section className="rounded-lg border bg-white p-5">
