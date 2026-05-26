@@ -44,7 +44,9 @@ export async function GET(req: NextRequest) {
       body: r.body,
       remindAt: r.remindAt.toISOString(),
       snoozedUntilAt: r.snoozedUntilAt?.toISOString() ?? null,
-      client: { id: r.client.id, name: r.client.name },
+      // clientId став опційним (блок «Нагадування», Етап 1) — standalone
+      // нагадування без клієнта теж можуть бути прострочені.
+      client: r.client ? { id: r.client.id, name: r.client.name } : null,
     })),
   });
 }
