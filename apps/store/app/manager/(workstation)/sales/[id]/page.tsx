@@ -115,6 +115,7 @@ export default async function ManagerSaleDetailPage({
     mgr,
     cashOrders,
     paymentSummary,
+    bankAccounts,
   ] = await Promise.all([
     prisma.mgrPriceType.findMany({ orderBy: { sortOrder: "asc" } }),
     getCurrentRate(),
@@ -136,6 +137,11 @@ export default async function ManagerSaleDetailPage({
       orderBy: { createdAt: "asc" },
     }),
     getPaymentSummary(sale.id),
+    prisma.mgrBankAccount.findMany({
+      where: { archived: false, hiddenInApp: false },
+      select: { id: true, name: true },
+      orderBy: { name: "asc" },
+    }),
   ]);
 
   const mgrAddress = mgr
@@ -279,6 +285,7 @@ export default async function ManagerSaleDetailPage({
           deliveryMethods={deliveryMethods}
           currentUserId={user.id}
           currentUserName={user.fullName}
+          bankAccounts={bankAccounts}
         />
       ) : (
         <ReadOnlySale
