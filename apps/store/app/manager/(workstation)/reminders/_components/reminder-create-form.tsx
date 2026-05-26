@@ -18,12 +18,17 @@ function isoLocalNowPlus(hours: number): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
-export function ReminderCreateForm({ onCreated }: { onCreated: () => void }) {
+export function ReminderCreateForm({
+  onCreated,
+  onCancel,
+}: {
+  onCreated: () => void;
+  onCancel: () => void;
+}) {
   const { toast } = useToast();
   const [body, setBody] = useState("");
   const [remindAt, setRemindAt] = useState(isoLocalNowPlus(1));
   const [periodicity, setPeriodicity] = useState<ReminderPeriod>("none");
-  const [orderVideo, setOrderVideo] = useState(false);
   const [client, setClient] = useState<ReminderClientPickItem | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -51,7 +56,6 @@ export function ReminderCreateForm({ onCreated }: { onCreated: () => void }) {
           body: body.trim(),
           remindAt: new Date(remindAt).toISOString(),
           periodicity,
-          orderVideo,
           clientId: client?.id ?? null,
         }),
       });
@@ -62,7 +66,6 @@ export function ReminderCreateForm({ onCreated }: { onCreated: () => void }) {
       setBody("");
       setRemindAt(isoLocalNowPlus(1));
       setPeriodicity("none");
-      setOrderVideo(false);
       setClient(null);
       onCreated();
     } catch (e: unknown) {
@@ -135,25 +138,25 @@ export function ReminderCreateForm({ onCreated }: { onCreated: () => void }) {
         {hint && <p className="mt-1.5 text-xs text-green-700">{hint}</p>}
       </div>
 
-      <label className="flex cursor-pointer items-center gap-2 text-sm text-gray-700">
-        <input
-          type="checkbox"
-          checked={orderVideo}
-          onChange={(e) => setOrderVideo(e.target.checked)}
-          className="accent-green-600"
-        />
-        Заказ відео
-      </label>
-
       <ReminderClientPicker value={client} onChange={setClient} />
 
-      <Button
-        type="submit"
-        disabled={busy}
-        className="w-full bg-green-600 hover:bg-green-700"
-      >
-        {busy ? "Збереження…" : "Встановити нагадування"}
-      </Button>
+      <div className="flex gap-2">
+        <Button
+          type="button"
+          variant="outline"
+          onClick={onCancel}
+          disabled={busy}
+        >
+          Скасувати
+        </Button>
+        <Button
+          type="submit"
+          disabled={busy}
+          className="flex-1 bg-green-600 hover:bg-green-700"
+        >
+          {busy ? "Збереження…" : "Встановити нагадування"}
+        </Button>
+      </div>
     </form>
   );
 }
