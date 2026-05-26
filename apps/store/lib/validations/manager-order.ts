@@ -16,9 +16,9 @@ import { MANAGER_ORDER_STATUSES } from "@/lib/manager/order-status";
 export const orderItemInputSchema = z.object({
   productId: z.string().min(1),
   lotId: z.string().nullable().optional(),
-  weight: z.number().positive().max(10_000),
+  weight: z.number().positive().max(1_000_000),
   quantity: z.number().int().positive().max(10_000).default(1),
-  priceEur: z.number().nonnegative().max(100_000),
+  priceEur: z.number().nonnegative().max(1_000_000),
 });
 
 export const createOrderSchema = z.object({

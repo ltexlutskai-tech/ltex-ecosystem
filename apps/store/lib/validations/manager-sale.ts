@@ -25,7 +25,7 @@ export const saleItemInputSchema = z.object({
   /** Ціна за кг (€) — ЦенаПродажиВес. */
   pricePerKg: z.number().nonnegative().max(100_000),
   /** Вага позиції, кг (вага мішка × мішки). */
-  weight: z.number().positive().max(10_000),
+  weight: z.number().positive().max(1_000_000),
   /** Кількість мішків. */
   quantity: z.number().int().positive().max(10_000).default(1),
   /** Сумарна ціна рядка (€) = pricePerKg × weight × quantity. */
