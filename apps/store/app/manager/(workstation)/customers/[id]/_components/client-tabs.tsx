@@ -12,7 +12,6 @@ interface TabDef {
     | "orders"
     | "reminders"
     | "viber"
-    | "banks"
     | "presentation-history"
     | "social";
   label: string;
@@ -24,9 +23,10 @@ interface TabDef {
  * коли поточний user дивиться на чужого клієнта (M1.3f).
  *
  * У foreign view приховуються tabs з sensitive contact data:
- * Презентації, Історія, Нагадування, Viber, Банк. рахунки, Іст.
- * презентацій, Соц мережі (7 з 11). Лишається: Реквізити (з masked
- * полями), Асортимент, Історія продаж, Замовлення.
+ * Презентації, Історія, Нагадування, Viber, Іст. презентацій, Соц мережі
+ * (6 з 10). Лишається: Реквізити (з masked полями), Асортимент, Історія
+ * продаж, Замовлення. Розрахунковий рахунок тепер показується read-only
+ * усередині вкладки «Реквізити» (окремої вкладки «Банк. рахунки» немає).
  */
 const TABS: TabDef[] = [
   { id: "requisites", label: "Реквізити", foreignVisible: true },
@@ -37,7 +37,6 @@ const TABS: TabDef[] = [
   { id: "orders", label: "Замовлення", foreignVisible: true },
   { id: "reminders", label: "Нагадування", foreignVisible: false },
   { id: "viber", label: "Viber", foreignVisible: false },
-  { id: "banks", label: "Банк. рахунки", foreignVisible: false },
   {
     id: "presentation-history",
     label: "Іст. презентацій",
@@ -57,7 +56,6 @@ export function ClientTabs({
   orders,
   reminders,
   viber,
-  banks,
   presentationHistory,
   social,
   overdueRemindersCount = 0,
@@ -71,7 +69,6 @@ export function ClientTabs({
   orders: React.ReactNode;
   reminders: React.ReactNode;
   viber: React.ReactNode;
-  banks: React.ReactNode;
   presentationHistory: React.ReactNode;
   social: React.ReactNode;
   overdueRemindersCount?: number;
@@ -117,7 +114,6 @@ export function ClientTabs({
     orders,
     reminders,
     viber,
-    banks,
     "presentation-history": presentationHistory,
     social,
   };

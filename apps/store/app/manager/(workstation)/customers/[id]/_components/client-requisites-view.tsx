@@ -2,6 +2,7 @@ import { formatPhoneUkr, phoneToViberUrl } from "@ltex/shared";
 import { ClientStatusBadge } from "../../_components/client-status-badge";
 import { formatUah, parseDecimal } from "../../_components/format";
 import { ClientActionButtons } from "./client-action-buttons";
+import { ClientBankAccountRow } from "./client-bank-account-row";
 import { ClientContactRow } from "./client-contact-row";
 import {
   ClientAddressLink,
@@ -198,6 +199,8 @@ interface ViewProps {
   onEditClick?: () => void;
   editDisabledReason?: string;
   isForeign?: boolean;
+  /** `Customer.id` (дзеркало по code1C) для prefill Замовлення/Реалізації. */
+  customerId?: string | null;
 }
 
 export function ClientRequisitesView({
@@ -206,7 +209,11 @@ export function ClientRequisitesView({
   onEditClick,
   editDisabledReason,
   isForeign,
+  customerId,
 }: ViewProps) {
+  // Основний (видимий) розрахунковий рахунок — перший рядок без isHidden.
+  const primaryBankAccount =
+    client.bankAccounts.find((b) => !b.isHidden) ?? null;
   const phonesList = client.phonePrimary
     ? [
         {
@@ -343,6 +350,19 @@ export function ClientRequisitesView({
               }
             />
           </div>
+
+          <div className="sm:col-span-2">
+            <Row
+              label="Розрахунковий рахунок"
+              value={
+                primaryBankAccount ? (
+                  <ClientBankAccountRow account={primaryBankAccount} />
+                ) : (
+                  <span className="text-gray-400">—</span>
+                )
+              }
+            />
+          </div>
         </dl>
       </section>
 
@@ -353,7 +373,7 @@ export function ClientRequisitesView({
 
       <FlagsBlock client={client} />
 
-      <ClientActionButtons clientId={client.id} />
+      <ClientActionButtons clientId={client.id} customerId={customerId} />
     </div>
   );
 }

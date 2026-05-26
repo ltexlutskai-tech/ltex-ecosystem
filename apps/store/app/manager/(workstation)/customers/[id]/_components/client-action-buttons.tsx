@@ -5,11 +5,19 @@ import { Button, useToast } from "@ltex/ui";
 
 /**
  * `clientId` (MgrClient.id) і `customerId` (Customer.id) — різні namespace-и.
- * Якщо парент знає customer.id з лукапу по code1C — передає; інакше клік на
- * "Створити замовлення" відкриває form з порожнім client-picker-ом.
+ *
+ * • «Створити замовлення» / «Створити реалізацію» — сторінки `orders/new` та
+ *   `sales/new` чекають `Customer.id` у `?clientId` (prefill через
+ *   `prisma.customer.findUnique`). Тому використовуємо `customerId`.
+ * • «Створити оплату» — `payments/new` (standalone-режим) чекає `MgrClient.id`
+ *   у `?clientId`. Тому використовуємо `clientId`.
+ *
+ * Якщо парент не знає `customerId` (немає Customer-дзеркала по code1C) — лінк
+ * відкриває форму з порожнім client-picker-ом (graceful degradation).
  */
 export function ClientActionButtons({
   customerId,
+  clientId,
 }: {
   customerId?: string | null;
   clientId?: string;
@@ -18,6 +26,12 @@ export function ClientActionButtons({
   const orderHref = customerId
     ? `/manager/orders/new?clientId=${encodeURIComponent(customerId)}`
     : "/manager/orders/new";
+  const saleHref = customerId
+    ? `/manager/sales/new?clientId=${encodeURIComponent(customerId)}`
+    : "/manager/sales/new";
+  const paymentHref = clientId
+    ? `/manager/payments/new?clientId=${encodeURIComponent(clientId)}`
+    : "/manager/payments/new";
   return (
     <div className="flex flex-wrap gap-2">
       <Link
@@ -25,6 +39,18 @@ export function ClientActionButtons({
         className="inline-flex h-10 items-center justify-center rounded-md border border-gray-300 bg-white px-4 text-sm font-medium text-gray-700 hover:bg-gray-50"
       >
         Створити замовлення
+      </Link>
+      <Link
+        href={saleHref}
+        className="inline-flex h-10 items-center justify-center rounded-md border border-gray-300 bg-white px-4 text-sm font-medium text-gray-700 hover:bg-gray-50"
+      >
+        Створити реалізацію
+      </Link>
+      <Link
+        href={paymentHref}
+        className="inline-flex h-10 items-center justify-center rounded-md border border-gray-300 bg-white px-4 text-sm font-medium text-gray-700 hover:bg-gray-50"
+      >
+        Створити оплату
       </Link>
       <Button
         type="button"
