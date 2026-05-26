@@ -6,6 +6,15 @@ export type ReminderPeriod =
   | "yearly"
   | "event";
 
+export interface ReminderItem {
+  id: string;
+  productId: string;
+  quantity: number;
+  done: boolean;
+  productName: string;
+  articleCode: string | null;
+}
+
 export interface ReminderRow {
   id: string;
   body: string;
@@ -23,6 +32,7 @@ export interface ReminderRow {
   createdAt: string;
   client: { id: string; name: string } | null;
   owner: { id: string; fullName: string } | null;
+  items?: ReminderItem[];
 }
 
 export interface ReminderClientPickItem {

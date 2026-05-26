@@ -24,15 +24,23 @@ import { ShareSheet } from "./share-sheet";
  *  1) будує текст-запит `buildVideoRequestText` (артикул, назва, к-сть, клієнт,
  *     телефон, продавець = поточний менеджер);
  *  2) відкриває `ShareSheet` (копіювати / месенджер);
- *  3) створює нагадування на +3 дні «Відстежити відео по {товар}» на обраного
- *     клієнта через існуючий `POST /clients/[id]/reminders` (M1.3c) —
- *     fire-and-forget, не блокує відкриття вікна «Поділитися».
+ *  3) створює нагадування-стеження за відео на обраного клієнта через глобальний
+ *     `POST /api/v1/manager/reminders` (`orderVideo=true, periodicity=event`,
+ *     з `productId`/`lotId`) — fire-and-forget, не блокує відкриття вікна
+ *     «Поділитися». Cron `generate-reminders` «спрацьовує» його у нагадування
+ *     «Скинути Viber», коли на товарі/лоті з'явиться відео.
  */
 
 interface Props {
   /** Дані товара для тексту. */
   productName: string;
   articleCode: string | null;
+  /** ID товара (обов'язково — для нагадування-стеження за відео). */
+  productId: string;
+  /** ID конкретного лоту (коли flow запущено з картки лоту). */
+  lotId?: string;
+  /** Штрих-код лоту (для тексту нагадування), коли lot-scoped. */
+  barcode?: string;
   /** ПІБ поточного менеджера (продавець). */
   sellerName: string;
   /** Стиль кнопки-тригера. */
@@ -49,16 +57,12 @@ interface Props {
   onOpenChange?: (open: boolean) => void;
 }
 
-/** ISO-дата +3 дні від тепер (для нагадування «відстежити відео»). */
-function inThreeDaysIso(): string {
-  const d = new Date();
-  d.setDate(d.getDate() + 3);
-  return d.toISOString();
-}
-
 export function OrderVideoButton({
   productName,
   articleCode,
+  productId,
+  lotId,
+  barcode,
   sellerName,
   buttonVariant = "outline",
   buttonSize = "sm",
@@ -115,13 +119,21 @@ export function OrderVideoButton({
       });
       setShareText(text);
 
-      // Нагадування +3 дні (fire-and-forget — не блокує вікно «Поділитися»).
-      void fetch(`/api/v1/manager/clients/${clientId}/reminders`, {
+      // Нагадування-стеження за відео (fire-and-forget — не блокує вікно
+      // «Поділитися»). periodicity=event → дзвіночок не «нагадує» по часу; cron
+      // `generate-reminders` сам спрацює його у «Скинути Viber», коли з'явиться
+      // відео на товарі/лоті.
+      void fetch(`/api/v1/manager/reminders`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          body: `Відстежити відео по ${productName}`,
-          remindAt: inThreeDaysIso(),
+          body: `Очікуємо відео: ${productName}${barcode ? " · " + barcode : ""} для ${clientSummary.name}`,
+          remindAt: new Date().toISOString(),
+          periodicity: "event",
+          orderVideo: true,
+          clientId,
+          productId,
+          lotId: lotId ?? null,
         }),
       })
         .then((r) => {
@@ -130,7 +142,7 @@ export function OrderVideoButton({
         .catch(() => {
           toast({
             title: "Нагадування не створено",
-            description: "Перевірте розділ «Нагадування» клієнта вручну.",
+            description: "Перевірте розділ «Нагадування» вручну.",
             variant: "destructive",
           });
         });

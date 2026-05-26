@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import type { LotGroup, LotListItem } from "@/lib/manager/lots-list";
 import { LotCardModal } from "./lot-card-modal";
 
@@ -75,6 +76,16 @@ function BookingCell({ lot }: { lot: LotListItem }) {
 
 export function AllLotsList({ groups, rateUah, sellerName }: Props) {
   const [openLotId, setOpenLotId] = useState<string | null>(null);
+  const searchParams = useSearchParams();
+
+  // Авто-відкриття картки лоту з `?lotId=` (діплінк з нагадування «Перенести
+  // бронь»). LotCardModal сам тягне лот за id — отже працює навіть коли лот не
+  // на поточній сторінці списку. Спрацьовує один раз на монтуванні.
+  useEffect(() => {
+    const deepLotId = searchParams.get("lotId");
+    if (deepLotId) setOpenLotId(deepLotId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   if (groups.length === 0) {
     return (

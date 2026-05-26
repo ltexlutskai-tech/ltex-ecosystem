@@ -6,6 +6,8 @@ import { getCurrentUser } from "@/lib/auth/manager-auth";
  * Active overdue reminders для current manager:
  *   ownerUserId = me
  *   completedAt IS NULL
+ *   periodicity != 'event'  ← подієві (тип «Для товарів» + ручні «По події»)
+ *                              не нагадують за часом; з'являються лише у списку
  *   (snoozedUntilAt IS NULL OR snoozedUntilAt <= NOW())
  *   remindAt <= NOW()
  *
@@ -21,6 +23,7 @@ export async function GET(req: NextRequest) {
   const where = {
     ownerUserId: user.id,
     completedAt: null,
+    periodicity: { not: "event" as const },
     remindAt: { lte: now },
     OR: [{ snoozedUntilAt: null }, { snoozedUntilAt: { lte: now } }],
   };
@@ -44,6 +47,8 @@ export async function GET(req: NextRequest) {
       body: r.body,
       remindAt: r.remindAt.toISOString(),
       snoozedUntilAt: r.snoozedUntilAt?.toISOString() ?? null,
+      actionType: r.actionType,
+      source: r.source,
       // clientId став опційним (блок «Нагадування», Етап 1) — standalone
       // нагадування без клієнта теж можуть бути прострочені.
       client: r.client ? { id: r.client.id, name: r.client.name } : null,

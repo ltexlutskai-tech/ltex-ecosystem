@@ -8,7 +8,9 @@ const { mockPrisma, getCurrentUserMock, getViewerOwnershipMock } = vi.hoisted(
   () => ({
     mockPrisma: {
       mgrReminder: { findMany: vi.fn(), count: vi.fn(), create: vi.fn() },
+      mgrReminderItem: { findMany: vi.fn() },
       mgrClient: { findUnique: vi.fn() },
+      product: { findMany: vi.fn() },
     },
     getCurrentUserMock: vi.fn(),
     getViewerOwnershipMock: vi.fn(),
@@ -70,12 +72,27 @@ function fakeReminder(id: string): unknown {
     createdAt: new Date("2026-05-10T08:00:00Z"),
     client: null,
     owner: { id: "u1", fullName: "Alice" },
+    items: [],
+  };
+}
+
+function fakeProductReminder(id: string, items: unknown[]): unknown {
+  return {
+    ...(fakeReminder(id) as Record<string, unknown>),
+    isProductReminder: true,
+    periodicity: "event",
+    clientId: "c1",
+    client: { id: "c1", name: "ТОВ Ромашка" },
+    body: "Товари для ТОВ Ромашка",
+    items,
   };
 }
 
 beforeEach(() => {
   vi.clearAllMocks();
   getCurrentUserMock.mockResolvedValue(MANAGER);
+  mockPrisma.product.findMany.mockResolvedValue([]);
+  mockPrisma.mgrReminderItem.findMany.mockResolvedValue([]);
 });
 
 describe("GET /api/v1/manager/reminders", () => {
@@ -226,5 +243,150 @@ describe("POST /api/v1/manager/reminders", () => {
       data: { clientId: string | null };
     };
     expect(args.data.clientId).toBe("c1");
+  });
+});
+
+describe("POST /api/v1/manager/reminders — тип «Для товарів»", () => {
+  it("400 when items empty", async () => {
+    const res = await POST(
+      postReq({ isProductReminder: true, clientId: "c1", items: [] }),
+    );
+    expect(res.status).toBe(400);
+    expect(mockPrisma.mgrReminder.create).not.toHaveBeenCalled();
+  });
+
+  it("400 when clientId missing for product reminder", async () => {
+    const res = await POST(
+      postReq({
+        isProductReminder: true,
+        items: [{ productId: "p1", quantity: 2 }],
+      }),
+    );
+    expect(res.status).toBe(400);
+  });
+
+  it("403 when product client is foreign", async () => {
+    mockPrisma.mgrClient.findUnique.mockResolvedValueOnce({
+      id: "c1",
+      name: "ТОВ Ромашка",
+    });
+    getViewerOwnershipMock.mockResolvedValueOnce("foreign");
+    const res = await POST(
+      postReq({
+        isProductReminder: true,
+        clientId: "c1",
+        items: [{ productId: "p1", quantity: 1 }],
+      }),
+    );
+    expect(res.status).toBe(403);
+    expect(mockPrisma.mgrReminder.create).not.toHaveBeenCalled();
+  });
+
+  it("creates product reminder with event periodicity + nested items", async () => {
+    mockPrisma.mgrClient.findUnique.mockResolvedValueOnce({
+      id: "c1",
+      name: "ТОВ Ромашка",
+    });
+    getViewerOwnershipMock.mockResolvedValueOnce("mine");
+    mockPrisma.mgrReminderItem.findMany.mockResolvedValueOnce([]);
+    mockPrisma.mgrReminder.create.mockResolvedValueOnce(
+      fakeProductReminder("r3", [
+        { id: "it1", productId: "p1", quantity: 2, done: false },
+      ]),
+    );
+    mockPrisma.product.findMany.mockResolvedValueOnce([
+      { id: "p1", name: "Куртки зимові", articleCode: "JKT" },
+    ]);
+    const res = await POST(
+      postReq({
+        isProductReminder: true,
+        clientId: "c1",
+        items: [{ productId: "p1", quantity: 2 }],
+      }),
+    );
+    expect(res.status).toBe(201);
+    const args = mockPrisma.mgrReminder.create.mock.calls[0]?.[0] as {
+      data: {
+        isProductReminder: boolean;
+        periodicity: string;
+        body: string;
+        remindAt: Date;
+        items: { create: { productId: string; quantity: number }[] };
+      };
+    };
+    expect(args.data.isProductReminder).toBe(true);
+    expect(args.data.periodicity).toBe("event");
+    expect(args.data.body).toBe("Товари для ТОВ Ромашка");
+    expect(args.data.remindAt).toBeInstanceOf(Date);
+    expect(args.data.items.create).toEqual([{ productId: "p1", quantity: 2 }]);
+    const json = (await res.json()) as {
+      reminder: { items: { productName: string }[] };
+      skippedProductIds: string[];
+    };
+    expect(json.reminder.items[0]?.productName).toBe("Куртки зимові");
+    expect(json.skippedProductIds).toEqual([]);
+  });
+
+  it("antidubl: drops products already in active reminders, keeps the rest", async () => {
+    mockPrisma.mgrClient.findUnique.mockResolvedValueOnce({
+      id: "c1",
+      name: "ТОВ Ромашка",
+    });
+    getViewerOwnershipMock.mockResolvedValueOnce("mine");
+    // p1 вже у активному нагадуванні — має бути відкинутий.
+    mockPrisma.mgrReminderItem.findMany.mockResolvedValueOnce([
+      { productId: "p1" },
+    ]);
+    mockPrisma.mgrReminder.create.mockResolvedValueOnce(
+      fakeProductReminder("r4", [
+        { id: "it2", productId: "p2", quantity: 1, done: false },
+      ]),
+    );
+    mockPrisma.product.findMany.mockResolvedValueOnce([
+      { id: "p2", name: "Светри", articleCode: null },
+    ]);
+    const res = await POST(
+      postReq({
+        isProductReminder: true,
+        clientId: "c1",
+        items: [
+          { productId: "p1", quantity: 3 },
+          { productId: "p2", quantity: 1 },
+        ],
+      }),
+    );
+    expect(res.status).toBe(201);
+    const args = mockPrisma.mgrReminder.create.mock.calls[0]?.[0] as {
+      data: { items: { create: { productId: string }[] } };
+    };
+    expect(args.data.items.create).toEqual([{ productId: "p2", quantity: 1 }]);
+    const json = (await res.json()) as { skippedProductIds: string[] };
+    expect(json.skippedProductIds).toEqual(["p1"]);
+  });
+
+  it("antidubl: 400 when ALL incoming products already active", async () => {
+    mockPrisma.mgrClient.findUnique.mockResolvedValueOnce({
+      id: "c1",
+      name: "ТОВ Ромашка",
+    });
+    getViewerOwnershipMock.mockResolvedValueOnce("mine");
+    mockPrisma.mgrReminderItem.findMany.mockResolvedValueOnce([
+      { productId: "p1" },
+      { productId: "p2" },
+    ]);
+    const res = await POST(
+      postReq({
+        isProductReminder: true,
+        clientId: "c1",
+        items: [
+          { productId: "p1", quantity: 1 },
+          { productId: "p2", quantity: 1 },
+        ],
+      }),
+    );
+    expect(res.status).toBe(400);
+    const json = (await res.json()) as { error: string };
+    expect(json.error).toContain("вже є в активних нагадуваннях");
+    expect(mockPrisma.mgrReminder.create).not.toHaveBeenCalled();
   });
 });

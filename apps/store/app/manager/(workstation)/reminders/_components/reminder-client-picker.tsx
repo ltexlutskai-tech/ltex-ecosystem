@@ -13,10 +13,13 @@ import type { ReminderClientPickItem } from "./types";
 export function ReminderClientPicker({
   value,
   onChange,
+  required = false,
 }: {
   value: ReminderClientPickItem | null;
   onChange: (client: ReminderClientPickItem | null) => void;
+  required?: boolean;
 }) {
+  const labelText = required ? "Контрагент *" : "Контрагент (необов'язково)";
   const [query, setQuery] = useState("");
   const [debounced, setDebounced] = useState("");
   const [open, setOpen] = useState(false);
@@ -58,9 +61,7 @@ export function ReminderClientPicker({
   if (value && !open) {
     return (
       <div className="space-y-1">
-        <label className="text-xs font-medium text-gray-600">
-          Контрагент (необов&apos;язково)
-        </label>
+        <label className="text-xs font-medium text-gray-600">{labelText}</label>
         <div className="flex items-center justify-between rounded-md border bg-white px-3 py-2 text-sm">
           <div>
             <span className="font-medium text-gray-900">{value.name}</span>
@@ -83,9 +84,7 @@ export function ReminderClientPicker({
 
   return (
     <div className="space-y-1">
-      <label className="text-xs font-medium text-gray-600">
-        Контрагент (необов&apos;язково)
-      </label>
+      <label className="text-xs font-medium text-gray-600">{labelText}</label>
       <div className="relative">
         <Search className="pointer-events-none absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
         <Input

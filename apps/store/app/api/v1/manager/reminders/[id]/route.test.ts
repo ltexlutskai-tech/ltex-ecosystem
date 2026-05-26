@@ -6,7 +6,15 @@ process.env.MANAGER_JWT_SECRET = VALID_SECRET;
 
 const { mockPrisma, getCurrentUserMock } = vi.hoisted(() => ({
   mockPrisma: {
-    mgrReminder: { findUnique: vi.fn(), update: vi.fn(), delete: vi.fn() },
+    mgrReminder: {
+      findUnique: vi.fn(),
+      findUniqueOrThrow: vi.fn(),
+      update: vi.fn(),
+      delete: vi.fn(),
+    },
+    mgrReminderItem: { update: vi.fn(), updateMany: vi.fn() },
+    product: { findMany: vi.fn() },
+    $transaction: vi.fn(),
   },
   getCurrentUserMock: vi.fn(),
 }));
@@ -49,6 +57,7 @@ function fakeUpdated(): unknown {
     createdAt: new Date("2026-05-10T08:00:00Z"),
     client: null,
     owner: { id: "u1", fullName: "Alice" },
+    items: [],
   };
 }
 
@@ -69,6 +78,14 @@ const params = Promise.resolve({ id: "r1" });
 beforeEach(() => {
   vi.clearAllMocks();
   getCurrentUserMock.mockResolvedValue(MANAGER);
+  mockPrisma.product.findMany.mockResolvedValue([]);
+  mockPrisma.mgrReminder.findUniqueOrThrow.mockResolvedValue(fakeUpdated());
+  // $transaction приймає масив проміс-операцій або callback — для тестів просто
+  // повертаємо resolved (ефект перевіряємо за викликами update/updateMany).
+  mockPrisma.$transaction.mockImplementation(async (ops: unknown) => {
+    if (Array.isArray(ops)) return Promise.all(ops);
+    return ops;
+  });
 });
 
 describe("PATCH /api/v1/manager/reminders/[id]", () => {
@@ -161,6 +178,103 @@ describe("PATCH /api/v1/manager/reminders/[id]", () => {
     };
     expect(args.data.body).toBe("Нове");
     expect(args.data.periodicity).toBe("weekly");
+  });
+
+  it("completeItem marks item done; rolls up to completed when ALL done", async () => {
+    mockPrisma.mgrReminder.findUnique.mockResolvedValueOnce({
+      id: "r1",
+      ownerUserId: "u1",
+      remindAt: new Date(),
+      periodicity: "event",
+      isProductReminder: true,
+      items: [
+        { id: "it1", done: false },
+        { id: "it2", done: true },
+      ],
+    });
+    const res = await PATCH(
+      patchReq({ action: "completeItem", itemId: "it1" }),
+      { params },
+    );
+    expect(res.status).toBe(200);
+    const itemArgs = mockPrisma.mgrReminderItem.update.mock.calls[0]?.[0] as {
+      where: { id: string };
+      data: { done: boolean };
+    };
+    expect(itemArgs.where.id).toBe("it1");
+    expect(itemArgs.data.done).toBe(true);
+    // Усі рядки done → completedAt = Date.
+    const remArgs = mockPrisma.mgrReminder.update.mock.calls[0]?.[0] as {
+      data: { completedAt: Date | null };
+    };
+    expect(remArgs.data.completedAt).toBeInstanceOf(Date);
+  });
+
+  it("uncompleteItem unticks item; rolls reminder back to active (completedAt=null)", async () => {
+    mockPrisma.mgrReminder.findUnique.mockResolvedValueOnce({
+      id: "r1",
+      ownerUserId: "u1",
+      remindAt: new Date(),
+      periodicity: "event",
+      isProductReminder: true,
+      items: [
+        { id: "it1", done: true },
+        { id: "it2", done: true },
+      ],
+    });
+    const res = await PATCH(
+      patchReq({ action: "uncompleteItem", itemId: "it1" }),
+      { params },
+    );
+    expect(res.status).toBe(200);
+    const remArgs = mockPrisma.mgrReminder.update.mock.calls[0]?.[0] as {
+      data: { completedAt: Date | null };
+    };
+    expect(remArgs.data.completedAt).toBeNull();
+  });
+
+  it("completeItem 404 when item not in this reminder", async () => {
+    mockPrisma.mgrReminder.findUnique.mockResolvedValueOnce({
+      id: "r1",
+      ownerUserId: "u1",
+      remindAt: new Date(),
+      periodicity: "event",
+      isProductReminder: true,
+      items: [{ id: "it1", done: false }],
+    });
+    const res = await PATCH(
+      patchReq({ action: "completeItem", itemId: "nope" }),
+      { params },
+    );
+    expect(res.status).toBe(404);
+    expect(mockPrisma.mgrReminderItem.update).not.toHaveBeenCalled();
+  });
+
+  it("complete on product reminder marks all items done + completedAt", async () => {
+    mockPrisma.mgrReminder.findUnique.mockResolvedValueOnce({
+      id: "r1",
+      ownerUserId: "u1",
+      remindAt: new Date(),
+      periodicity: "event",
+      isProductReminder: true,
+      items: [
+        { id: "it1", done: false },
+        { id: "it2", done: false },
+      ],
+    });
+    const res = await PATCH(patchReq({ action: "complete" }), { params });
+    expect(res.status).toBe(200);
+    const manyArgs = mockPrisma.mgrReminderItem.updateMany.mock
+      .calls[0]?.[0] as {
+      where: { reminderId: string };
+      data: { done: boolean };
+    };
+    expect(manyArgs.where.reminderId).toBe("r1");
+    expect(manyArgs.data.done).toBe(true);
+    const remArgs = mockPrisma.mgrReminder.update.mock.calls[0]?.[0] as {
+      data: { completedAt: Date | null };
+    };
+    expect(remArgs.data.completedAt).toBeInstanceOf(Date);
   });
 
   it("admin can complete another manager's reminder", async () => {
