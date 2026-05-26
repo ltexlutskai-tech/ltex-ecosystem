@@ -2,52 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { Prisma, prisma } from "@ltex/db";
 import { getCurrentUser } from "@/lib/auth/manager-auth";
 import { getViewerOwnership } from "@/lib/manager/client-visibility";
+import {
+  REMINDER_INCLUDE,
+  fetchProductNames,
+  serializeReminder,
+} from "@/lib/manager/reminder-serialize";
 import { createReminderSchema } from "@/lib/validations/manager-reminder";
-
-interface ReminderRow {
-  id: string;
-  body: string;
-  remindAt: Date;
-  completedAt: Date | null;
-  snoozedUntilAt: Date | null;
-  periodicity: string;
-  isProductReminder: boolean;
-  orderVideo: boolean;
-  actionType: string;
-  source: string;
-  lotId: string | null;
-  productId: string | null;
-  clientId: string | null;
-  createdAt: Date;
-  client: { id: string; name: string } | null;
-  owner: { id: string; fullName: string } | null;
-}
-
-function serialize(r: ReminderRow) {
-  return {
-    id: r.id,
-    body: r.body,
-    remindAt: r.remindAt.toISOString(),
-    completedAt: r.completedAt?.toISOString() ?? null,
-    snoozedUntilAt: r.snoozedUntilAt?.toISOString() ?? null,
-    periodicity: r.periodicity,
-    isProductReminder: r.isProductReminder,
-    orderVideo: r.orderVideo,
-    actionType: r.actionType,
-    source: r.source,
-    lotId: r.lotId,
-    productId: r.productId,
-    clientId: r.clientId,
-    createdAt: r.createdAt.toISOString(),
-    client: r.client ? { id: r.client.id, name: r.client.name } : null,
-    owner: r.owner ? { id: r.owner.id, fullName: r.owner.fullName } : null,
-  };
-}
-
-const REMINDER_INCLUDE = {
-  client: { select: { id: true, name: true } },
-  owner: { select: { id: true, fullName: true } },
-} as const;
 
 function clampInt(
   raw: string | null,
@@ -92,8 +52,12 @@ export async function GET(req: NextRequest) {
     prisma.mgrReminder.count({ where }),
   ]);
 
+  // Batch-lookup назв товарів для всіх рядків сторінки (productId — плоский
+  // скаляр без relation).
+  const productNames = await fetchProductNames(rows);
+
   return NextResponse.json({
-    reminders: rows.map(serialize),
+    reminders: rows.map((r) => serializeReminder(r, productNames)),
     total,
     page,
     pageSize,
@@ -118,6 +82,97 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  // ─── Тип «Для товарів» ────────────────────────────────────────────────────
+  if (parsed.data.isProductReminder) {
+    const { clientId, items, body } = parsed.data;
+
+    const client = await prisma.mgrClient.findUnique({
+      where: { id: clientId },
+      select: { id: true, name: true },
+    });
+    if (!client) {
+      return NextResponse.json(
+        { error: "Клієнта не знайдено" },
+        { status: 400 },
+      );
+    }
+    const ownership = await getViewerOwnership(user, clientId);
+    if (ownership === "foreign") {
+      return NextResponse.json(
+        { error: "Немає доступу до цього клієнта" },
+        { status: 403 },
+      );
+    }
+
+    // Антидубль (§12): зібрати товари, які вже у АКТИВНИХ товарних нагадуваннях
+    // цього менеджера для цього клієнта, і відкинути дублі з incoming.
+    const activeItems = await prisma.mgrReminderItem.findMany({
+      where: {
+        reminder: {
+          clientId,
+          ownerUserId: user.id,
+          isProductReminder: true,
+          completedAt: null,
+        },
+      },
+      select: { productId: true },
+    });
+    const alreadyCovered = new Set(activeItems.map((i) => i.productId));
+
+    // Дедуп incoming (останнє значення quantity для productId перемагає) +
+    // прибрати вже покриті.
+    const dedupedMap = new Map<string, number>();
+    const skippedProductIds: string[] = [];
+    for (const item of items) {
+      if (alreadyCovered.has(item.productId)) {
+        if (!skippedProductIds.includes(item.productId)) {
+          skippedProductIds.push(item.productId);
+        }
+        continue;
+      }
+      dedupedMap.set(item.productId, item.quantity);
+    }
+
+    if (dedupedMap.size === 0) {
+      return NextResponse.json(
+        {
+          error:
+            "Усі обрані товари вже є в активних нагадуваннях для цього клієнта",
+        },
+        { status: 400 },
+      );
+    }
+
+    const created = await prisma.mgrReminder.create({
+      data: {
+        clientId,
+        ownerUserId: user.id,
+        body: body?.trim() || `Товари для ${client.name}`,
+        remindAt: new Date(),
+        periodicity: "event",
+        isProductReminder: true,
+        source: "manual",
+        items: {
+          create: [...dedupedMap.entries()].map(([productId, quantity]) => ({
+            productId,
+            quantity,
+          })),
+        },
+      },
+      include: REMINDER_INCLUDE,
+    });
+
+    const productNames = await fetchProductNames([created]);
+    return NextResponse.json(
+      {
+        reminder: serializeReminder(created, productNames),
+        skippedProductIds,
+      },
+      { status: 201 },
+    );
+  }
+
+  // ─── Тип «Звичайне» ───────────────────────────────────────────────────────
   const { body, remindAt, periodicity, orderVideo, clientId } = parsed.data;
 
   // Якщо вказано клієнта — він має існувати і бути у scope (manager — лише свій).
@@ -155,5 +210,9 @@ export async function POST(req: NextRequest) {
     include: REMINDER_INCLUDE,
   });
 
-  return NextResponse.json({ reminder: serialize(created) }, { status: 201 });
+  const productNames = await fetchProductNames([created]);
+  return NextResponse.json(
+    { reminder: serializeReminder(created, productNames) },
+    { status: 201 },
+  );
 }

@@ -37,8 +37,11 @@ export function ReminderListItem({
     reminder.owner?.id === currentUserId || currentUserRole === "admin";
   const done = reminder.completedAt != null;
   const effectiveAt = reminder.snoozedUntilAt ?? reminder.remindAt;
-  const overdue = !done && new Date(effectiveAt).getTime() < Date.now();
+  const isProduct = reminder.isProductReminder;
+  const overdue =
+    !done && !isProduct && new Date(effectiveAt).getTime() < Date.now();
   const periodBadge = PERIOD_BADGE[reminder.periodicity];
+  const items = reminder.items ?? [];
 
   async function patch(payload: Record<string, unknown>) {
     setBusy(true);
@@ -124,15 +127,26 @@ export function ReminderListItem({
           </p>
         )}
         <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-500">
-          <span>📅 {fmtDateTime(effectiveAt)}</span>
-          {reminder.snoozedUntilAt && (
+          {isProduct ? (
+            <Badge variant="secondary" className="font-normal">
+              Для товарів
+            </Badge>
+          ) : (
+            <span>📅 {fmtDateTime(effectiveAt)}</span>
+          )}
+          {!isProduct && reminder.snoozedUntilAt && (
             <span title={`Оригінальна дата: ${fmtDateTime(reminder.remindAt)}`}>
               💤 відкладено
             </span>
           )}
-          {periodBadge && (
+          {!isProduct && periodBadge && (
             <Badge variant="secondary" className="font-normal">
               {periodBadge}
+            </Badge>
+          )}
+          {isProduct && reminder.periodicity === "event" && (
+            <Badge variant="outline" className="font-normal">
+              По події
             </Badge>
           )}
           {reminder.orderVideo && (
@@ -142,6 +156,41 @@ export function ReminderListItem({
           )}
           {reminder.client && <span>👤 {reminder.client.name}</span>}
         </div>
+
+        {isProduct && items.length > 0 && (
+          <ul className="mt-2 space-y-1">
+            {items.map((it) => (
+              <li key={it.id} className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={it.done}
+                  disabled={!canMutate || busy}
+                  onChange={() =>
+                    patch({
+                      action: it.done ? "uncompleteItem" : "completeItem",
+                      itemId: it.id,
+                    })
+                  }
+                  className="accent-green-600"
+                  aria-label={`Виконано: ${it.productName}`}
+                />
+                <span
+                  className={
+                    it.done ? "text-gray-400 line-through" : "text-gray-800"
+                  }
+                >
+                  {it.productName}
+                  <span className="text-gray-400"> ×{it.quantity}</span>
+                  {it.articleCode ? (
+                    <span className="ml-1 text-xs text-gray-400">
+                      ({it.articleCode})
+                    </span>
+                  ) : null}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
 
       {canMutate && (
@@ -200,30 +249,34 @@ export function ReminderListItem({
                 type="button"
                 disabled={busy}
                 onClick={() => patch({ action: "complete" })}
-                title="Виконати"
+                title={isProduct ? "Виконати всі" : "Виконати"}
               >
                 <Check className="h-3.5 w-3.5" />
               </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                type="button"
-                disabled={busy}
-                onClick={snoozeTomorrow}
-                title="Відкласти на завтра 9:00"
-              >
-                <Clock className="h-3.5 w-3.5" />
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                type="button"
-                disabled={busy}
-                onClick={() => setEditing(true)}
-                title="Редагувати"
-              >
-                <Pencil className="h-3.5 w-3.5" />
-              </Button>
+              {!isProduct && (
+                <>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    type="button"
+                    disabled={busy}
+                    onClick={snoozeTomorrow}
+                    title="Відкласти на завтра 9:00"
+                  >
+                    <Clock className="h-3.5 w-3.5" />
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    type="button"
+                    disabled={busy}
+                    onClick={() => setEditing(true)}
+                    title="Редагувати"
+                  >
+                    <Pencil className="h-3.5 w-3.5" />
+                  </Button>
+                </>
+              )}
               <Button
                 size="sm"
                 variant="outline"

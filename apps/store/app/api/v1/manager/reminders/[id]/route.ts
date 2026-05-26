@@ -6,52 +6,11 @@ import {
   nextOccurrence,
   type MgrReminderPeriod,
 } from "@/lib/manager/reminder-recurrence";
+import {
+  REMINDER_INCLUDE,
+  serializeOne,
+} from "@/lib/manager/reminder-serialize";
 import { patchReminderSchema } from "@/lib/validations/manager-reminder";
-
-interface ReminderRow {
-  id: string;
-  body: string;
-  remindAt: Date;
-  completedAt: Date | null;
-  snoozedUntilAt: Date | null;
-  periodicity: string;
-  isProductReminder: boolean;
-  orderVideo: boolean;
-  actionType: string;
-  source: string;
-  lotId: string | null;
-  productId: string | null;
-  clientId: string | null;
-  createdAt: Date;
-  client: { id: string; name: string } | null;
-  owner: { id: string; fullName: string } | null;
-}
-
-function serialize(r: ReminderRow) {
-  return {
-    id: r.id,
-    body: r.body,
-    remindAt: r.remindAt.toISOString(),
-    completedAt: r.completedAt?.toISOString() ?? null,
-    snoozedUntilAt: r.snoozedUntilAt?.toISOString() ?? null,
-    periodicity: r.periodicity,
-    isProductReminder: r.isProductReminder,
-    orderVideo: r.orderVideo,
-    actionType: r.actionType,
-    source: r.source,
-    lotId: r.lotId,
-    productId: r.productId,
-    clientId: r.clientId,
-    createdAt: r.createdAt.toISOString(),
-    client: r.client ? { id: r.client.id, name: r.client.name } : null,
-    owner: r.owner ? { id: r.owner.id, fullName: r.owner.fullName } : null,
-  };
-}
-
-const REMINDER_INCLUDE = {
-  client: { select: { id: true, name: true } },
-  owner: { select: { id: true, fullName: true } },
-} as const;
 
 export async function PATCH(
   req: NextRequest,
@@ -70,6 +29,8 @@ export async function PATCH(
       ownerUserId: true,
       remindAt: true,
       periodicity: true,
+      isProductReminder: true,
+      items: { select: { id: true, done: true } },
     },
   });
   if (!reminder) {
@@ -94,6 +55,41 @@ export async function PATCH(
     );
   }
 
+  // ─── Дії по рядку чек-листа товарів (з roll-up статусу нагадування) ─────────
+  if (
+    parsed.data.action === "completeItem" ||
+    parsed.data.action === "uncompleteItem"
+  ) {
+    const { itemId } = parsed.data;
+    const item = reminder.items.find((i) => i.id === itemId);
+    if (!item) {
+      return NextResponse.json({ error: "Рядок не знайдено" }, { status: 404 });
+    }
+    const targetDone = parsed.data.action === "completeItem";
+
+    // Перерахунок: який стан буде у рядків після зміни цього рядка.
+    const allDoneAfter = reminder.items.every((i) =>
+      i.id === itemId ? targetDone : i.done,
+    );
+
+    await prisma.$transaction([
+      prisma.mgrReminderItem.update({
+        where: { id: itemId },
+        data: { done: targetDone },
+      }),
+      prisma.mgrReminder.update({
+        where: { id },
+        data: { completedAt: allDoneAfter ? new Date() : null },
+      }),
+    ]);
+
+    const updated = await prisma.mgrReminder.findUniqueOrThrow({
+      where: { id },
+      include: REMINDER_INCLUDE,
+    });
+    return NextResponse.json({ reminder: await serializeOne(updated) });
+  }
+
   const data: {
     completedAt?: Date | null;
     snoozedUntilAt?: Date | null;
@@ -105,6 +101,24 @@ export async function PATCH(
 
   switch (parsed.data.action) {
     case "complete": {
+      // Товарне нагадування: «виконати все» → усі рядки done + completedAt=now.
+      if (reminder.isProductReminder) {
+        await prisma.$transaction([
+          prisma.mgrReminderItem.updateMany({
+            where: { reminderId: id },
+            data: { done: true },
+          }),
+          prisma.mgrReminder.update({
+            where: { id },
+            data: { completedAt: new Date() },
+          }),
+        ]);
+        const updated = await prisma.mgrReminder.findUniqueOrThrow({
+          where: { id },
+          include: REMINDER_INCLUDE,
+        });
+        return NextResponse.json({ reminder: await serializeOne(updated) });
+      }
       // Повторюване нагадування не «гасне» — переноситься на наступний період
       // і лишається активним (completedAt = null). Одноразове — completedAt=now.
       const period = reminder.periodicity as MgrReminderPeriod;
@@ -123,6 +137,24 @@ export async function PATCH(
       break;
     }
     case "uncomplete":
+      // Товарне нагадування: «поновити» → усі рядки not done + completedAt=null.
+      if (reminder.isProductReminder) {
+        await prisma.$transaction([
+          prisma.mgrReminderItem.updateMany({
+            where: { reminderId: id },
+            data: { done: false },
+          }),
+          prisma.mgrReminder.update({
+            where: { id },
+            data: { completedAt: null },
+          }),
+        ]);
+        const updated = await prisma.mgrReminder.findUniqueOrThrow({
+          where: { id },
+          include: REMINDER_INCLUDE,
+        });
+        return NextResponse.json({ reminder: await serializeOne(updated) });
+      }
       data.completedAt = null;
       break;
     case "snooze":
@@ -145,7 +177,7 @@ export async function PATCH(
     include: REMINDER_INCLUDE,
   });
 
-  return NextResponse.json({ reminder: serialize(updated) });
+  return NextResponse.json({ reminder: await serializeOne(updated) });
 }
 
 export async function DELETE(
