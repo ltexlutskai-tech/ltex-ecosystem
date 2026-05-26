@@ -10,6 +10,7 @@ export function OrdersTable({ items }: { items: OrdersRowData[] }) {
             <th className="px-4 py-2 font-medium">№</th>
             <th className="px-4 py-2 font-medium">Клієнт</th>
             <th className="px-4 py-2 font-medium">Місто</th>
+            <th className="px-4 py-2 font-medium">Область</th>
             <th className="px-4 py-2 font-medium">Дата</th>
             <th className="px-4 py-2 font-medium">Статус</th>
             <th className="px-4 py-2 text-center font-medium">Актуальний</th>

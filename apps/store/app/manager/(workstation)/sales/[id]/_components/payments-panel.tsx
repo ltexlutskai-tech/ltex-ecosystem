@@ -71,7 +71,11 @@ export function PaymentsPanel({
     >
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-base font-semibold text-gray-800">Оплати (каса)</h2>
-        <Button asChild size="sm">
+        <Button
+          asChild
+          size="sm"
+          className="bg-blue-600 text-white hover:bg-blue-700"
+        >
           <Link href={`/manager/payments/new?saleId=${saleId}`}>Оплата</Link>
         </Button>
       </div>

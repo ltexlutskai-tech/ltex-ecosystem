@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, Check, Minus } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import { SaleStatusBadge } from "./sale-status-badge";
 
 export interface SalesRowData {
@@ -18,6 +18,7 @@ export interface SalesRowData {
     name: string;
     code1C: string | null;
     city: string | null;
+    region: string | null;
   };
 }
 
@@ -66,21 +67,11 @@ export function SalesRow({ sale }: { sale: SalesRowData }) {
       <td className="px-4 py-3 text-sm text-gray-600">
         {sale.customer.city ?? "—"}
       </td>
+      <td className="px-4 py-3 text-sm text-gray-600">
+        {sale.customer.region ?? "—"}
+      </td>
       <td className="px-4 py-3">
         <SaleStatusBadge status={sale.status} />
-      </td>
-      <td className="px-4 py-3 text-center">
-        {sale.isActual ? (
-          <Check
-            className="mx-auto h-4 w-4 text-green-600"
-            aria-label="Актуальний"
-          />
-        ) : (
-          <Minus
-            className="mx-auto h-4 w-4 text-gray-300"
-            aria-label="Неактуальний"
-          />
-        )}
       </td>
       <td className="px-4 py-3 text-center text-sm text-gray-700">
         {sale.itemCount}

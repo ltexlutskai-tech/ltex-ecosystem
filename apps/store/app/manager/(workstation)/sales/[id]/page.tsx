@@ -18,7 +18,6 @@ import type {
   SaleItemDraft,
 } from "../new/_components/sale-types";
 import { OrderStatusBadge } from "../../customers/[id]/_components/order-status-badge";
-import { SaleStatusActions } from "./_components/sale-status-actions";
 import { getPaymentSummary } from "@/lib/manager/payment-summary";
 import {
   PaymentsPanel,
@@ -327,31 +326,14 @@ function ReadOnlySale({
   deliveryLabel: string;
   locked: boolean;
 }) {
-  const itemsSnapshot = sale.items.map((i) => ({
-    productId: i.productId,
-    lotId: i.lotId,
-    barcode: i.barcode,
-    pricePerKg: i.pricePerKg,
-    weight: i.weight,
-    quantity: i.quantity,
-    priceEur: i.priceEur,
-  }));
-
   return (
     <div className="space-y-6">
-      <section className="flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-white p-5">
-        <div>
-          <p className="text-sm text-gray-500">
-            {locked
-              ? "Реалізацію проведено в 1С — редагування заборонено."
-              : "Реалізацію скасовано — лише перегляд."}
-          </p>
-        </div>
-        <SaleStatusActions
-          saleId={sale.id}
-          status={sale.status}
-          itemsSnapshot={itemsSnapshot}
-        />
+      <section className="rounded-lg border bg-white p-5">
+        <p className="text-sm text-gray-500">
+          {locked
+            ? "Реалізацію проведено в 1С — редагування заборонено."
+            : "Реалізацію скасовано — лише перегляд."}
+        </p>
       </section>
 
       <section className="rounded-lg border bg-white p-5">

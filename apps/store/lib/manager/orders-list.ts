@@ -159,6 +159,8 @@ export interface OrderListItem {
     name: string;
     code1C: string | null;
     city: string | null;
+    /** Область клієнта (з MgrClient.region за code1C; batch-lookup у page.tsx). */
+    region: string | null;
   };
 }
 
@@ -187,6 +189,8 @@ export function serializeOrderRow(o: RawOrderRow): OrderListItem {
       name: o.customer.name,
       code1C: o.customer.code1C,
       city: o.customer.city,
+      // Область підставляється у page.tsx через batch-lookup за code1C.
+      region: null,
     },
   };
 }

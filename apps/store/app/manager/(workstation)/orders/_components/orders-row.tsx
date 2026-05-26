@@ -17,6 +17,7 @@ export interface OrdersRowData {
     name: string;
     code1C: string | null;
     city: string | null;
+    region: string | null;
   };
 }
 
@@ -57,6 +58,9 @@ export function OrdersRow({ order }: { order: OrdersRowData }) {
       </td>
       <td className="px-4 py-3 text-sm text-gray-600">
         {order.customer.city ?? "—"}
+      </td>
+      <td className="px-4 py-3 text-sm text-gray-600">
+        {order.customer.region ?? "—"}
       </td>
       <td className="px-4 py-3 text-sm text-gray-600">{date}</td>
       <td className="px-4 py-3">

@@ -12,7 +12,6 @@ import {
 } from "lucide-react";
 import { Button, Textarea } from "@ltex/ui";
 import { ClientPicker } from "../../../orders/new/_components/client-picker";
-import { OrderStatusBadge } from "../../../customers/[id]/_components/order-status-badge";
 import { ShareSheet } from "../../../prices/_components/share-sheet";
 import { SaleItemsEditor } from "./sale-items-editor";
 import { SaleTotals } from "./sale-totals";
@@ -30,10 +29,7 @@ import {
   type SaleMessageInput,
   type SaleMessageItem,
 } from "@/lib/manager/sale-message";
-import {
-  getAllowedSaleTransitions,
-  type ManagerSaleStatus,
-} from "@/lib/manager/sale-status";
+import { type ManagerSaleStatus } from "@/lib/manager/sale-status";
 import {
   draftToWire,
   lineTotalEur,
@@ -69,13 +65,6 @@ export interface SaleFormProps {
   /** Куди повертатись після створення (за замовч. список реалізацій). */
   returnHref?: string | null;
 }
-
-const STATUS_ACTION_LABEL: Record<ManagerSaleStatus, string> = {
-  draft: "Повернути в чернетку",
-  sent: "Відправити в 1С",
-  posted: "Провести в 1С",
-  cancelled: "Скасувати реалізацію",
-};
 
 /** Зіставляє код способу доставки клієнта з кодом доставки документа. */
 function mapClientDelivery(
@@ -159,8 +148,6 @@ export function SaleForm({
   const [shareOpen, setShareOpen] = useState(false);
   const [shareTitle, setShareTitle] = useState("");
   const [shareText, setShareText] = useState("");
-
-  const [status, setStatus] = useState<string>(initialSale?.status ?? "draft");
 
   // ─── Менеджерські поля ──────────────────────────────────────────────────
   const [priceTypeId, setPriceTypeId] = useState<string>(
@@ -383,8 +370,6 @@ export function SaleForm({
     ? Number.parseFloat(clientSummary.debt)
     : null;
 
-  const allowedTransitions = getAllowedSaleTransitions(status);
-
   const docNumber = isEdit ? (initialSale?.displayNumber ?? "") : "авто";
 
   /**
@@ -439,7 +424,6 @@ export function SaleForm({
         return null;
       }
       if (isEdit) {
-        if (nextStatus) setStatus(nextStatus);
         return saleId ?? null;
       }
       const sale = (await res.json()) as { id: string };
@@ -781,37 +765,6 @@ export function SaleForm({
           </p>
         </div>
       </section>
-
-      {/* ─── Секція: Статус (тільки edit) ────────────────────────────────── */}
-      {isEdit && (
-        <section className="flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-white p-5 shadow-sm">
-          <div className="flex items-center gap-2">
-            <span className="text-sm font-medium text-gray-500">Статус:</span>
-            <OrderStatusBadge status={status} />
-          </div>
-          {allowedTransitions.length > 0 && (
-            <div className="flex flex-wrap gap-2">
-              {allowedTransitions.map((next) => (
-                <Button
-                  key={next}
-                  type="button"
-                  size="sm"
-                  variant={next === "cancelled" ? "outline" : "default"}
-                  disabled={submitting}
-                  onClick={() => submit(next)}
-                  className={
-                    next === "cancelled"
-                      ? "border-red-300 text-red-600 hover:bg-red-50"
-                      : ""
-                  }
-                >
-                  {STATUS_ACTION_LABEL[next]}
-                </Button>
-              ))}
-            </div>
-          )}
-        </section>
-      )}
 
       {/* ─── Секція: Позиції ─────────────────────────────────────────────── */}
       <section className="rounded-lg border bg-white p-5 shadow-sm">

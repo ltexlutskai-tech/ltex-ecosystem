@@ -159,6 +159,8 @@ export interface SaleListItem {
     name: string;
     code1C: string | null;
     city: string | null;
+    /** Область клієнта (з MgrClient.region за code1C; batch-lookup у page.tsx). */
+    region: string | null;
   };
 }
 
@@ -188,6 +190,8 @@ export function serializeSaleRow(s: RawSaleRow): SaleListItem {
       name: s.customer.name,
       code1C: s.customer.code1C,
       city: s.customer.city,
+      // Область підставляється у page.tsx через batch-lookup за code1C.
+      region: null,
     },
   };
 }

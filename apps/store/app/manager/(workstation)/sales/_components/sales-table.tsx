@@ -11,8 +11,8 @@ export function SalesTable({ items }: { items: SalesRowData[] }) {
             <th className="px-4 py-2 font-medium">Номер</th>
             <th className="px-4 py-2 font-medium">Контрагент</th>
             <th className="px-4 py-2 font-medium">Місто</th>
+            <th className="px-4 py-2 font-medium">Область</th>
             <th className="px-4 py-2 font-medium">Статус</th>
-            <th className="px-4 py-2 text-center font-medium">Актуальний</th>
             <th className="px-4 py-2 text-center font-medium">Позицій</th>
             <th className="px-4 py-2 text-right font-medium">Сума</th>
             <th className="w-12 px-4 py-2 font-medium"></th>

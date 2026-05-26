@@ -68,6 +68,30 @@ export default async function ManagerOrdersPage({
 
   const rows = items.map((o) => serializeOrderRow(o));
 
+  // Область клієнта — окремий batch-lookup (Customer не має region; беремо з
+  // MgrClient за спільним ключем code1C).
+  const codes = Array.from(
+    new Set(
+      rows
+        .map((r) => r.customer.code1C)
+        .filter((c): c is string => c != null && c.length > 0),
+    ),
+  );
+  if (codes.length > 0) {
+    const mgrRows = await prisma.mgrClient.findMany({
+      where: { code1C: { in: codes } },
+      select: { code1C: true, region: true },
+    });
+    const regionByCode = new Map<string, string | null>(
+      mgrRows.map((m) => [m.code1C as string, m.region]),
+    );
+    for (const r of rows) {
+      r.customer.region = r.customer.code1C
+        ? (regionByCode.get(r.customer.code1C) ?? null)
+        : null;
+    }
+  }
+
   return (
     <div className="mx-auto max-w-7xl space-y-4">
       <header className="flex items-start justify-between gap-3">
