@@ -40,7 +40,6 @@ export const PERIOD_OPTIONS: { value: ReminderPeriod; label: string }[] = [
   { value: "daily", label: "Щодня" },
   { value: "weekly", label: "Щотижня" },
   { value: "monthly", label: "Щомісяця" },
-  { value: "yearly", label: "Щороку" },
   { value: "event", label: "По події" },
 ];
 

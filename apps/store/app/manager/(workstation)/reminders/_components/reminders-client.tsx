@@ -53,54 +53,56 @@ export function RemindersClient({
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="relative min-w-[200px] flex-1">
-          <Search className="pointer-events-none absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-          <Input
-            type="search"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Пошук за описом…"
-            className="pl-8"
-          />
-          {search && (
-            <button
-              type="button"
-              onClick={() => setSearch("")}
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-              aria-label="Очистити"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          )}
+      {!showForm && (
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="relative min-w-[200px] flex-1">
+            <Search className="pointer-events-none absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+            <Input
+              type="search"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Пошук за описом…"
+              className="pl-8"
+            />
+            {search && (
+              <button
+                type="button"
+                onClick={() => setSearch("")}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                aria-label="Очистити"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
+          </div>
+          <label className="flex cursor-pointer items-center gap-1.5 text-sm text-gray-700">
+            <input
+              type="checkbox"
+              checked={showCompleted}
+              onChange={(e) => setShowCompleted(e.target.checked)}
+              className="accent-green-600"
+            />
+            Завершені
+          </label>
+          <label className="flex cursor-pointer items-center gap-1.5 text-sm text-gray-700">
+            <input
+              type="checkbox"
+              checked={onlyOrderVideo}
+              onChange={(e) => setOnlyOrderVideo(e.target.checked)}
+              className="accent-green-600"
+            />
+            Заказ відео
+          </label>
+          <Button
+            type="button"
+            onClick={() => setShowForm((v) => !v)}
+            className="inline-flex items-center gap-1 bg-green-600 hover:bg-green-700"
+          >
+            <Plus className="h-4 w-4" />
+            Створити
+          </Button>
         </div>
-        <label className="flex cursor-pointer items-center gap-1.5 text-sm text-gray-700">
-          <input
-            type="checkbox"
-            checked={showCompleted}
-            onChange={(e) => setShowCompleted(e.target.checked)}
-            className="accent-green-600"
-          />
-          Завершені
-        </label>
-        <label className="flex cursor-pointer items-center gap-1.5 text-sm text-gray-700">
-          <input
-            type="checkbox"
-            checked={onlyOrderVideo}
-            onChange={(e) => setOnlyOrderVideo(e.target.checked)}
-            className="accent-green-600"
-          />
-          Заказ відео
-        </label>
-        <Button
-          type="button"
-          onClick={() => setShowForm((v) => !v)}
-          className="inline-flex items-center gap-1 bg-green-600 hover:bg-green-700"
-        >
-          <Plus className="h-4 w-4" />
-          Створити
-        </Button>
-      </div>
+      )}
 
       {showForm && (
         <ReminderCreateForm
@@ -108,6 +110,7 @@ export function RemindersClient({
             setShowForm(false);
             load();
           }}
+          onCancel={() => setShowForm(false)}
         />
       )}
 
