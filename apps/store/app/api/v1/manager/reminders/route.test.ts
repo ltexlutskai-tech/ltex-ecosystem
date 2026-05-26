@@ -152,6 +152,16 @@ describe("GET /api/v1/manager/reminders", () => {
     expect(args.where.body?.contains).toBe("відео");
   });
 
+  it("clientId filter scopes where.clientId", async () => {
+    mockPrisma.mgrReminder.findMany.mockResolvedValueOnce([]);
+    mockPrisma.mgrReminder.count.mockResolvedValueOnce(0);
+    await GET(getReq("?clientId=c1"));
+    const args = mockPrisma.mgrReminder.findMany.mock.calls[0]?.[0] as {
+      where: { clientId?: string };
+    };
+    expect(args.where.clientId).toBe("c1");
+  });
+
   it("clamps pageSize to [1..100]", async () => {
     mockPrisma.mgrReminder.findMany.mockResolvedValueOnce([]);
     mockPrisma.mgrReminder.count.mockResolvedValueOnce(0);

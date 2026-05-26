@@ -10,9 +10,17 @@ import type { ReminderRow } from "./types";
 export function RemindersClient({
   currentUserId,
   currentUserRole,
+  fixedClientId,
+  fixedClientName,
 }: {
   currentUserId: string;
   currentUserRole: string;
+  /**
+   * Режим вкладки картки клієнта — список фільтрується по контрагенту, а
+   * форма створення приховує пікер і прив'язує цього клієнта.
+   */
+  fixedClientId?: string;
+  fixedClientName?: string;
 }) {
   const [showCompleted, setShowCompleted] = useState(false);
   const [onlyOrderVideo, setOnlyOrderVideo] = useState(false);
@@ -34,6 +42,7 @@ export function RemindersClient({
     if (showCompleted) params.set("completed", "true");
     if (onlyOrderVideo) params.set("orderVideo", "true");
     if (debounced.length > 0) params.set("q", debounced);
+    if (fixedClientId) params.set("clientId", fixedClientId);
     params.set("pageSize", "100");
     fetch(`/api/v1/manager/reminders?${params.toString()}`)
       .then((r) => r.json())
@@ -45,7 +54,7 @@ export function RemindersClient({
         console.warn("[RemindersClient] load failed", e);
       })
       .finally(() => setLoading(false));
-  }, [showCompleted, onlyOrderVideo, debounced]);
+  }, [showCompleted, onlyOrderVideo, debounced, fixedClientId]);
 
   useEffect(() => {
     load();
@@ -111,6 +120,8 @@ export function RemindersClient({
             load();
           }}
           onCancel={() => setShowForm(false)}
+          fixedClientId={fixedClientId}
+          fixedClientName={fixedClientName}
         />
       )}
 
