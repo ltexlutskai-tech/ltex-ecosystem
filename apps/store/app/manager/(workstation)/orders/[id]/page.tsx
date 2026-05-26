@@ -168,7 +168,7 @@ export default async function ManagerOrderDetailPage({
 
   const initialOrder: OrderEditInitial = {
     id: order.id,
-    displayNumber: order.code1C ?? order.id.slice(0, 8),
+    displayNumber: order.code1C ?? "авто",
     status: order.status,
     notes: order.notes ?? "",
     priceTypeId: order.priceTypeId,
@@ -194,7 +194,7 @@ export default async function ManagerOrderDetailPage({
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-gray-800">
-            Замовлення №{order.code1C ?? order.id.slice(0, 8)}
+            {order.code1C ? `Замовлення №${order.code1C}` : "Замовлення"}
           </h1>
           <p className="mt-1 text-sm text-gray-500">Створено: {date}</p>
         </div>
