@@ -7,6 +7,7 @@ import { canEditClient } from "@/lib/permissions/mgr-client-edit";
 import { ClientAssortmentTab } from "./_components/client-assortment-tab";
 import { ClientHeader } from "./_components/client-header";
 import { ClientHistoryTab } from "./_components/client-history-tab";
+import { ClientKeywordsTab } from "./_components/client-keywords-tab";
 import { ClientOrdersTab } from "./_components/client-orders-tab";
 import { ClientPresentationHistoryTab } from "./_components/client-presentation-history-tab";
 import { ClientPresentationsTab } from "./_components/client-presentations-tab";
@@ -115,6 +116,14 @@ export default async function ClientDetailPage({
         social={
           <ClientSocialTab
             client={client}
+            canEdit={canEdit}
+            isForeign={isForeign}
+          />
+        }
+        keywords={
+          <ClientKeywordsTab
+            clientId={client.id}
+            keywords={client.keywords}
             canEdit={canEdit}
             isForeign={isForeign}
           />

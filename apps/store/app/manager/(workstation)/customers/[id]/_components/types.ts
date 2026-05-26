@@ -130,6 +130,8 @@ export interface ClientDetail {
   hasNewMessage: boolean;
   isViberLinked: boolean;
   dialogStatus: string | null;
+  /** Ключові слова (теги через кому) — для пошуку/фільтра у списку клієнтів. */
+  keywords: string | null;
   createdAt: string;
   updatedAt: string;
   lastSyncedAt: string | null;

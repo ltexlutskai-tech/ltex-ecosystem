@@ -4,6 +4,7 @@ import { formatUah, parseDecimal } from "../../_components/format";
 import { ClientActionButtons } from "./client-action-buttons";
 import { ClientBankAccountRow } from "./client-bank-account-row";
 import { ClientPhonesSection } from "./client-phones-section";
+import { ClientRoutesSection } from "./client-routes-section";
 import {
   ClientAddressLink,
   ClientWebsiteLink,
@@ -73,44 +74,6 @@ function ViberContactValue({ contact }: { contact: string | null }) {
     <a href={url} className="text-purple-700 hover:underline">
       💬 {formatted}
     </a>
-  );
-}
-
-function RoutesBlock({
-  routes,
-  primaryRouteId,
-}: {
-  routes: ClientDetail["routes"];
-  primaryRouteId: string | null;
-}) {
-  if (routes.length === 0) return null;
-  return (
-    <div className="rounded-lg border bg-white p-5 shadow-sm">
-      <h3 className="mb-2 text-sm font-semibold text-gray-700">Маршрути</h3>
-      <ul className="space-y-1 text-sm">
-        {routes.map((r) => (
-          <li key={r.id} className="flex items-center gap-2">
-            <span
-              className={
-                r.isActive ? "text-gray-800" : "text-gray-400 line-through"
-              }
-            >
-              {r.name}
-            </span>
-            {primaryRouteId === r.routeId && (
-              <span className="rounded bg-blue-50 px-1.5 py-0.5 text-[10px] uppercase text-blue-700">
-                основний
-              </span>
-            )}
-            {!r.isActive && (
-              <span className="rounded bg-gray-100 px-1.5 py-0.5 text-[10px] text-gray-500">
-                неактивний
-              </span>
-            )}
-          </li>
-        ))}
-      </ul>
-    </div>
   );
 }
 
@@ -312,9 +275,12 @@ export function ClientRequisitesView({
         </dl>
       </section>
 
-      <RoutesBlock
+      <ClientRoutesSection
+        clientId={client.id}
         routes={client.routes}
         primaryRouteId={client.primaryRoute?.id ?? null}
+        isForeign={isForeign}
+        canEdit={canEdit}
       />
 
       <FlagsBlock client={client} />

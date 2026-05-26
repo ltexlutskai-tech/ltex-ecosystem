@@ -41,6 +41,8 @@ export const mgrClientPatchSchema = z
     searchChannelId: optionalIdField,
     primaryRouteId: optionalIdField,
     agentUserId: optionalIdField,
+    // Картка клієнта — Фаза 3: вільний текст ключових слів (теги через кому).
+    keywords: z.string().max(500).nullable().optional(),
   })
   .strict();
 
@@ -148,6 +150,28 @@ export type MgrClientMessengerCreateInput = z.infer<
 >;
 export type MgrClientMessengerUpdateInput = z.infer<
   typeof mgrClientMessengerUpdateSchema
+>;
+
+// ── Route assignments CRUD (Phase 3) ────────────────────────────────────
+// Редаговане призначення маршрутів (`MgrClientRouteAssignment` ↔ `MgrRoute`).
+// Сам довідник `MgrRoute` наповнюється з 1С на етапі обмінів.
+export const mgrClientRouteCreateSchema = z
+  .object({
+    routeId: z.string().min(1, "Оберіть маршрут").max(50),
+  })
+  .strict();
+
+export const mgrClientRouteReorderSchema = z
+  .object({
+    direction: z.enum(["up", "down"]),
+  })
+  .strict();
+
+export type MgrClientRouteCreateInput = z.infer<
+  typeof mgrClientRouteCreateSchema
+>;
+export type MgrClientRouteReorderInput = z.infer<
+  typeof mgrClientRouteReorderSchema
 >;
 
 export const MGR_CLIENT_ADMIN_ONLY_FIELDS = ["agentUserId"] as const;

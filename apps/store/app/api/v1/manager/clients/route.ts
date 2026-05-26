@@ -48,6 +48,7 @@ export async function GET(req: NextRequest) {
         { phonePrimary: { contains: term } },
         { city: { contains: term, mode: "insensitive" } },
         { phones: { some: { phone: { contains: term } } } },
+        { keywords: { contains: term, mode: "insensitive" } },
       ],
     });
   }

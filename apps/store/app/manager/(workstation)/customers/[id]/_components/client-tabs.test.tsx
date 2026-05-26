@@ -21,19 +21,20 @@ const PANELS = {
   viber: <div>viber-panel</div>,
   presentationHistory: <div>presentation-history-panel</div>,
   social: <div>social-panel</div>,
+  keywords: <div>keywords-panel</div>,
 };
 
 describe("ClientTabs — M1.3f foreign visibility filtering", () => {
-  it("mine view: рендерить усі 10 tabs", () => {
+  it("mine view: рендерить усі 11 tabs", () => {
     render(<ClientTabs {...PANELS} isForeign={false} />);
     const tabs = screen.getAllByRole("tab");
-    expect(tabs).toHaveLength(10);
+    expect(tabs).toHaveLength(11);
   });
 
-  it("admin view (default isForeign=false): рендерить усі 10 tabs", () => {
+  it("admin view (default isForeign=false): рендерить усі 11 tabs", () => {
     render(<ClientTabs {...PANELS} />);
     const tabs = screen.getAllByRole("tab");
-    expect(tabs).toHaveLength(10);
+    expect(tabs).toHaveLength(11);
   });
 
   it("foreign view: лише 4 tabs (Реквізити, Асортимент, Історія продаж, Замовлення)", () => {

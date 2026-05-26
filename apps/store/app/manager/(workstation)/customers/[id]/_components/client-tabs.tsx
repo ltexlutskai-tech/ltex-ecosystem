@@ -13,7 +13,8 @@ interface TabDef {
     | "reminders"
     | "viber"
     | "presentation-history"
-    | "social";
+    | "social"
+    | "keywords";
   label: string;
   foreignVisible: boolean;
 }
@@ -43,6 +44,7 @@ const TABS: TabDef[] = [
     foreignVisible: false,
   },
   { id: "social", label: "Соцмережі та месенджери", foreignVisible: false },
+  { id: "keywords", label: "Ключові слова", foreignVisible: false },
 ];
 
 type TabId = TabDef["id"];
@@ -58,6 +60,7 @@ export function ClientTabs({
   viber,
   presentationHistory,
   social,
+  keywords,
   overdueRemindersCount = 0,
   isForeign = false,
 }: {
@@ -71,6 +74,7 @@ export function ClientTabs({
   viber: React.ReactNode;
   presentationHistory: React.ReactNode;
   social: React.ReactNode;
+  keywords: React.ReactNode;
   overdueRemindersCount?: number;
   isForeign?: boolean;
 }) {
@@ -116,6 +120,7 @@ export function ClientTabs({
     viber,
     "presentation-history": presentationHistory,
     social,
+    keywords,
   };
 
   return (

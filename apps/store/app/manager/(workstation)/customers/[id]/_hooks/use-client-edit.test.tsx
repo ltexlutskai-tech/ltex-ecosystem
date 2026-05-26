@@ -32,6 +32,7 @@ function baseClient(overrides: Partial<ClientDetail> = {}): ClientDetail {
     hasNewMessage: false,
     isViberLinked: false,
     dialogStatus: null,
+    keywords: null,
     createdAt: "2025-01-01T00:00:00.000Z",
     updatedAt: "2026-05-01T00:00:00.000Z",
     lastSyncedAt: null,
