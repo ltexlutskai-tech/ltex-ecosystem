@@ -94,7 +94,7 @@ export default async function ClientDetailPage({
         reminders={
           <ClientRemindersTab
             clientId={client.id}
-            reminders={client.reminders}
+            clientName={client.name}
             currentUserId={user.id}
             currentUserRole={user.role}
           />

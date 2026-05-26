@@ -155,16 +155,37 @@ function ProductSearchAdd({
 export function ReminderCreateForm({
   onCreated,
   onCancel,
+  fixedClientId,
+  fixedClientName,
 }: {
   onCreated: () => void;
   onCancel: () => void;
+  /**
+   * Режим вкладки картки клієнта — контрагент прив'язаний наперед: пікер
+   * приховано, обидва типи нагадувань POST-ять цей `clientId`.
+   */
+  fixedClientId?: string;
+  fixedClientName?: string;
 }) {
   const { toast } = useToast();
   const [kind, setKind] = useState<ReminderKind>("regular");
   const [body, setBody] = useState("");
   const [remindAt, setRemindAt] = useState(isoLocalNowPlus(1));
   const [periodicity, setPeriodicity] = useState<ReminderPeriod>("none");
-  const [client, setClient] = useState<ReminderClientPickItem | null>(null);
+  const fixedClient: ReminderClientPickItem | null = fixedClientId
+    ? {
+        id: fixedClientId,
+        name: fixedClientName ?? "",
+        tradePointName: null,
+        city: null,
+        code1C: null,
+        isOwned: true,
+        agent: null,
+      }
+    : null;
+  const [client, setClient] = useState<ReminderClientPickItem | null>(
+    fixedClient,
+  );
   const [rows, setRows] = useState<ProductRow[]>([]);
   const [busy, setBusy] = useState(false);
 
@@ -268,7 +289,7 @@ export function ReminderCreateForm({
       setBody("");
       setRemindAt(isoLocalNowPlus(1));
       setPeriodicity("none");
-      setClient(null);
+      setClient(fixedClient);
       setRows([]);
       onCreated();
     } catch (e: unknown) {
@@ -383,11 +404,20 @@ export function ReminderCreateForm({
         </>
       )}
 
-      <ReminderClientPicker
-        value={client}
-        onChange={setClient}
-        required={kind === "product"}
-      />
+      {fixedClientId ? (
+        <div className="space-y-1">
+          <span className="text-xs font-medium text-gray-600">Контрагент</span>
+          <div className="rounded-md border bg-gray-50 px-3 py-2 text-sm font-medium text-gray-900">
+            {fixedClientName ?? "—"}
+          </div>
+        </div>
+      ) : (
+        <ReminderClientPicker
+          value={client}
+          onChange={setClient}
+          required={kind === "product"}
+        />
+      )}
 
       {kind === "product" && (
         <div className="space-y-2">

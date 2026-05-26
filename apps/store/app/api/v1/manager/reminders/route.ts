@@ -30,6 +30,7 @@ export async function GET(req: NextRequest) {
   const showCompleted = url.searchParams.get("completed") === "true";
   const onlyOrderVideo = url.searchParams.get("orderVideo") === "true";
   const q = url.searchParams.get("q")?.trim() ?? "";
+  const clientId = url.searchParams.get("clientId")?.trim() ?? "";
   const page = clampInt(url.searchParams.get("page"), 1, 1, 9_999);
   const pageSize = clampInt(url.searchParams.get("pageSize"), 20, 1, 100);
 
@@ -40,6 +41,8 @@ export async function GET(req: NextRequest) {
   if (!showCompleted) where.completedAt = null;
   if (onlyOrderVideo) where.orderVideo = true;
   if (q.length > 0) where.body = { contains: q, mode: "insensitive" };
+  // Прив'язка до конкретного контрагента (вкладка картки клієнта).
+  if (clientId.length > 0) where.clientId = clientId;
 
   const [rows, total] = await Promise.all([
     prisma.mgrReminder.findMany({
