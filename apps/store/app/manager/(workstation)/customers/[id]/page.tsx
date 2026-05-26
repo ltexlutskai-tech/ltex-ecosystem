@@ -112,7 +112,13 @@ export default async function ClientDetailPage({
         }
         viber={<ClientViberTab client={client} />}
         presentationHistory={<ClientPresentationHistoryTab />}
-        social={<ClientSocialTab client={client} />}
+        social={
+          <ClientSocialTab
+            client={client}
+            canEdit={canEdit}
+            isForeign={isForeign}
+          />
+        }
       />
     </div>
   );

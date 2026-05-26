@@ -42,7 +42,7 @@ const TABS: TabDef[] = [
     label: "Іст. презентацій",
     foreignVisible: false,
   },
-  { id: "social", label: "Соц мережі", foreignVisible: false },
+  { id: "social", label: "Соцмережі та месенджери", foreignVisible: false },
 ];
 
 type TabId = TabDef["id"];
