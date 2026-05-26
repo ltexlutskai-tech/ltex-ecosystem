@@ -1211,23 +1211,79 @@ model MgrClientBankAccount {
 }
 
 // ─── Reminders (← 1С Catalog.Нагадування + own private extras) ─────────────
-model MgrReminder {
-  id             String    @id @default(cuid())
-  clientId       String    @map("client_id")
-  ownerUserId    String    @map("owner_user_id")
-  body           String    @db.Text
-  remindAt       DateTime  @map("remind_at")
-  completedAt    DateTime? @map("completed_at")
-  snoozedUntilAt DateTime? @map("snoozed_until_at")
-  createdAt      DateTime  @default(now()) @map("created_at")
-  updatedAt      DateTime  @updatedAt @map("updated_at")
+// Етап 1 (блок «Нагадування», M3.0): clientId став опційним (звичайне
+// нагадування може бути без клієнта), додано періодичність + прапорці + плоскі
+// скаляри lotId/productId для майбутніх авто-дій (без relations, як у Маршрутному
+// листі). Тип «Для товарів» (isProductReminder + items[]) — каркас на пізніший
+// етап; у Етапі 1 завжди false/порожній.
+enum MgrReminderPeriod {
+  none
+  daily
+  weekly
+  monthly
+  yearly
+  event
 
-  client MgrClient @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  owner  User      @relation("UserReminders", fields: [ownerUserId], references: [id], onDelete: Cascade)
+  @@map("mgr_reminder_period")
+}
+
+enum MgrReminderAction {
+  none
+  continue_bron
+  viber_video
+
+  @@map("mgr_reminder_action")
+}
+
+enum MgrReminderSource {
+  manual
+  auto_video
+  auto_bron
+
+  @@map("mgr_reminder_source")
+}
+
+model MgrReminder {
+  id                String            @id @default(cuid())
+  clientId          String?           @map("client_id")
+  ownerUserId       String            @map("owner_user_id")
+  body              String            @db.Text
+  remindAt          DateTime          @map("remind_at")
+  completedAt       DateTime?         @map("completed_at")
+  snoozedUntilAt    DateTime?         @map("snoozed_until_at")
+  periodicity       MgrReminderPeriod @default(none)
+  isProductReminder Boolean           @default(false) @map("is_product_reminder")
+  orderVideo        Boolean           @default(false) @map("order_video")
+  actionType        MgrReminderAction @default(none) @map("action_type")
+  source            MgrReminderSource @default(manual)
+  lotId             String?           @map("lot_id")
+  productId         String?           @map("product_id")
+  createdAt         DateTime          @default(now()) @map("created_at")
+  updatedAt         DateTime          @updatedAt @map("updated_at")
+
+  client MgrClient?        @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  owner  User              @relation("UserReminders", fields: [ownerUserId], references: [id], onDelete: Cascade)
+  items  MgrReminderItem[]
 
   @@index([clientId, remindAt])
   @@index([ownerUserId, completedAt, remindAt])
   @@map("mgr_reminders")
+}
+
+// ─── Reminder items (← 1С TabularSection.Товары; тип «Для товарів») ─────────
+// productId — плоский скаляр (без relation), як у дочірніх Маршрутного листа.
+model MgrReminderItem {
+  id         String   @id @default(cuid())
+  reminderId String   @map("reminder_id")
+  productId  String   @map("product_id")
+  quantity   Int      @default(1)
+  done       Boolean  @default(false)
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  reminder MgrReminder @relation(fields: [reminderId], references: [id], onDelete: Cascade)
+
+  @@index([reminderId])
+  @@map("mgr_reminder_items")
 }
 
 model MgrClientTimelineEntry {

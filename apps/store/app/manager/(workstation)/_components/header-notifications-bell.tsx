@@ -9,7 +9,7 @@ interface NotificationItem {
   body: string;
   remindAt: string;
   snoozedUntilAt: string | null;
-  client: { id: string; name: string };
+  client: { id: string; name: string } | null;
 }
 
 interface NotificationsResponse {
@@ -82,7 +82,12 @@ export function HeaderNotificationsBell() {
 
   function goTo(item: NotificationItem) {
     setOpen(false);
-    router.push(`/manager/customers/${item.client.id}#reminders`);
+    // Клієнтські → картка клієнта; standalone (без клієнта) → екран нагадувань.
+    router.push(
+      item.client
+        ? `/manager/customers/${item.client.id}#reminders`
+        : "/manager/reminders",
+    );
   }
 
   return (
@@ -130,7 +135,7 @@ export function HeaderNotificationsBell() {
                       {it.body}
                     </p>
                     <p className="mt-0.5 text-[11px] text-gray-500">
-                      {it.client.name} ·{" "}
+                      {it.client ? `${it.client.name} · ` : ""}
                       {fmtRelative(it.snoozedUntilAt ?? it.remindAt)}
                     </p>
                   </button>
