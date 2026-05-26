@@ -99,7 +99,13 @@ export default async function ClientDetailPage({
         assortment={<ClientAssortmentTab items={client.assortmentItems} />}
         presentations={<ClientPresentationsTab items={client.presentations} />}
         history={
-          <ClientHistoryTab clientId={client.id} timeline={client.timeline} />
+          <ClientHistoryTab
+            clientId={client.id}
+            timeline={client.timeline}
+            canEdit={canEdit}
+            currentUserId={user.id}
+            currentUserRole={user.role}
+          />
         }
         salesHistory={<ClientSalesHistoryTab />}
         orders={<ClientOrdersTab clientId={client.id} />}

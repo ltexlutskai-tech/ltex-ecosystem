@@ -1,22 +1,26 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-const { mockPrisma, getCurrentRateMock, enqueueOrderCreateMock } = vi.hoisted(
-  () => {
-    const tx = {
-      orderItem: { deleteMany: vi.fn() },
-      order: { update: vi.fn() },
-    };
-    return {
-      mockPrisma: {
-        order: { create: vi.fn(), update: tx.order.update },
-        orderItem: tx.orderItem,
-        $transaction: vi.fn(async (cb: (t: typeof tx) => unknown) => cb(tx)),
-      },
-      getCurrentRateMock: vi.fn(),
-      enqueueOrderCreateMock: vi.fn(),
-    };
-  },
-);
+const {
+  mockPrisma,
+  getCurrentRateMock,
+  enqueueOrderCreateMock,
+  recordClientEventSafeMock,
+} = vi.hoisted(() => {
+  const tx = {
+    orderItem: { deleteMany: vi.fn() },
+    order: { update: vi.fn() },
+  };
+  return {
+    mockPrisma: {
+      order: { create: vi.fn(), update: tx.order.update },
+      orderItem: tx.orderItem,
+      $transaction: vi.fn(async (cb: (t: typeof tx) => unknown) => cb(tx)),
+    },
+    getCurrentRateMock: vi.fn(),
+    enqueueOrderCreateMock: vi.fn(),
+    recordClientEventSafeMock: vi.fn(),
+  };
+});
 
 vi.mock("@ltex/db", () => ({ prisma: mockPrisma }));
 vi.mock("@/lib/exchange-rate", () => ({
@@ -25,6 +29,13 @@ vi.mock("@/lib/exchange-rate", () => ({
 vi.mock("@/lib/sync/enqueue", () => ({
   enqueueOrderCreate: enqueueOrderCreateMock,
 }));
+vi.mock("@/lib/manager/client-timeline", async () => {
+  const actual =
+    await vi.importActual<typeof import("./client-timeline")>(
+      "./client-timeline",
+    );
+  return { ...actual, recordClientEventSafe: recordClientEventSafeMock };
+});
 
 import {
   buildOrderTotals,
@@ -53,6 +64,7 @@ function fakeOrder(): unknown {
   return {
     id: "ord1",
     code1C: null,
+    customerId: "cust1",
     status: "draft",
     totalEur: 150,
     totalUah: 6450,
@@ -144,6 +156,20 @@ describe("createOrderWithItems", () => {
     const order = await createOrderWithItems(baseInput, baseCustomer, actor);
     expect(order).toBeDefined();
     expect((order as { id: string }).id).toBe("ord1");
+  });
+
+  it("пише авто-запис історії клієнта (kind=order) після create", async () => {
+    mockPrisma.order.create.mockResolvedValueOnce(fakeOrder());
+    await createOrderWithItems(baseInput, baseCustomer, actor);
+    expect(recordClientEventSafeMock).toHaveBeenCalledOnce();
+    const args = recordClientEventSafeMock.mock.calls[0]?.[0] as {
+      kind: string;
+      customerId: string;
+      authorUserId: string;
+    };
+    expect(args.kind).toBe("order");
+    expect(args.customerId).toBe("cust1");
+    expect(args.authorUserId).toBe("mgr-1");
   });
 
   it("дефолт assignedAgentUserId = поточний менеджер коли не передано", async () => {

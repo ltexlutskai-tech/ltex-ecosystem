@@ -1,6 +1,10 @@
 import { Prisma, prisma } from "@ltex/db";
 import { getCurrentRate } from "@/lib/exchange-rate";
 import { enqueueOrderCreate } from "@/lib/sync/enqueue";
+import {
+  buildOrderEventBody,
+  recordClientEventSafe,
+} from "@/lib/manager/client-timeline";
 import type {
   CreateOrderInputRaw,
   OrderItemInput,
@@ -105,6 +109,15 @@ export async function createOrderWithItems(
   });
 
   enqueueOrderSyncSafe(order);
+
+  // Авто-запис історії клієнта (Фаза 4) — fire-and-forget, не блокує відповідь.
+  recordClientEventSafe({
+    customerId: order.customerId,
+    kind: "order",
+    body: buildOrderEventBody(order.totalUah, order.items.length),
+    authorUserId: actor.userId,
+    metadata: { orderId: order.id },
+  });
 
   return order;
 }

@@ -5,9 +5,15 @@ import type { ClientTimelineEntry } from "./types";
 export function ClientHistoryTab({
   clientId,
   timeline,
+  canEdit,
+  currentUserId,
+  currentUserRole,
 }: {
   clientId: string;
   timeline: ClientTimelineEntry[];
+  canEdit: boolean;
+  currentUserId: string;
+  currentUserRole: string;
 }) {
   return (
     <div className="space-y-4 rounded-lg border bg-white p-5 shadow-sm">
@@ -19,7 +25,14 @@ export function ClientHistoryTab({
       ) : (
         <ul className="divide-y divide-gray-100">
           {timeline.map((entry) => (
-            <ClientTimelineItem key={entry.id} entry={entry} />
+            <ClientTimelineItem
+              key={entry.id}
+              clientId={clientId}
+              entry={entry}
+              canEdit={canEdit}
+              currentUserId={currentUserId}
+              currentUserRole={currentUserRole}
+            />
           ))}
         </ul>
       )}

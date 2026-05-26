@@ -1,6 +1,10 @@
 import { Prisma, prisma } from "@ltex/db";
 import { getCurrentRate } from "@/lib/exchange-rate";
 import { enqueueSaleCreate } from "@/lib/sync/enqueue";
+import {
+  buildSaleEventBody,
+  recordClientEventSafe,
+} from "@/lib/manager/client-timeline";
 import type {
   CreateSaleInputRaw,
   SaleItemInput,
@@ -110,7 +114,7 @@ function codAmountFor(
 export async function createSaleWithItems(
   input: CreateSaleInputRaw,
   customer: CreateSaleCustomer,
-  _actor: CreateSaleActor,
+  actor: CreateSaleActor,
 ) {
   const rateEur = input.exchangeRateEur ?? (await getCurrentRate());
   const rateUsd = input.exchangeRateUsd ?? 0;
@@ -143,6 +147,15 @@ export async function createSaleWithItems(
   });
 
   enqueueSaleSyncSafe(sale);
+
+  // Авто-запис історії клієнта (Фаза 4) — fire-and-forget, не блокує відповідь.
+  recordClientEventSafe({
+    customerId: sale.customerId,
+    kind: "sale",
+    body: buildSaleEventBody(sale.totalUah, sale.items.length),
+    authorUserId: actor.userId,
+    metadata: { saleId: sale.id },
+  });
 
   return sale;
 }
