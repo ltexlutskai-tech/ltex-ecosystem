@@ -9,6 +9,7 @@ import {
   Users,
   Wallet,
   Search,
+  Receipt,
 } from "lucide-react";
 import { Button, Textarea } from "@ltex/ui";
 import { ClientPicker } from "../../../orders/new/_components/client-picker";
@@ -26,6 +27,7 @@ import { bagWeightForQuantity } from "@/lib/manager/order-bag-weight";
 import {
   buildClientSaleMessage,
   buildGroupSaleMessage,
+  buildPaymentRequisitesText,
   type SaleMessageInput,
   type SaleMessageItem,
 } from "@/lib/manager/sale-message";
@@ -484,8 +486,7 @@ export function SaleForm({
       }));
     return {
       clientName: clientSummary?.name ?? "",
-      // ClientPickerItem не несе region — лишається опційним (необов'язкове поле).
-      region: null,
+      region: clientSummary?.region ?? null,
       city: clientSummary?.city ?? null,
       phone: clientSummary?.phone ?? null,
       deliveryMethod: deliveryMethod || null,
@@ -493,6 +494,7 @@ export function SaleForm({
       items: messageItems,
       totalEur,
       exchangeRateEur,
+      exchangeRateUsd,
       cashOnDelivery,
       codAmountUah: cashOnDelivery ? codAmountUah : null,
       notes: notes.trim() || null,
@@ -509,6 +511,13 @@ export function SaleForm({
   function openGroupMessage(): void {
     setShareTitle("Повідомлення у групу");
     setShareText(buildGroupSaleMessage(buildMessageInput()));
+    setShareOpen(true);
+  }
+
+  /** Реквізити оплати (ФОП) з підсумковою сумою грн — без позицій. */
+  function openRequisitesMessage(): void {
+    setShareTitle("Реквізити оплати");
+    setShareText(buildPaymentRequisitesText(totalEur * exchangeRateEur));
     setShareOpen(true);
   }
 
@@ -848,6 +857,15 @@ export function SaleForm({
             onClick={openGroupMessage}
           >
             <Users className="mr-1 h-4 w-4" />У групу
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={openRequisitesMessage}
+          >
+            <Receipt className="mr-1 h-4 w-4" />
+            Скинути реквізити
           </Button>
           {/* "У чат" (бот-вихідні) — TODO M1.8 */}
         </div>

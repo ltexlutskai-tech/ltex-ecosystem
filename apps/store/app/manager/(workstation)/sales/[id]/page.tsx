@@ -125,6 +125,7 @@ export default async function ManagerSaleDetailPage({
           select: {
             debt: true,
             phonePrimary: true,
+            region: true,
             street: true,
             house: true,
           },
@@ -157,6 +158,7 @@ export default async function ManagerSaleDetailPage({
     name: sale.customer.name,
     tradePointName: null,
     city: sale.customer.city,
+    region: mgr?.region ?? null,
     phone: sale.customer.phone ?? mgr?.phonePrimary ?? null,
     address: mgrAddress,
     debt: mgr?.debt?.toString() ?? "0",
