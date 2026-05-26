@@ -6,23 +6,26 @@
  * текст для відправки клієнту або у внутрішню групу. UI лише підставляє текст
  * у редаговане поле `ShareSheet` (копіювати / Viber / Telegram / WhatsApp).
  *
- * Без I/O — увесь стан (курс EUR, рядки, шапка) приходить ззовні як plain
+ * Без I/O — увесь стан (курс EUR/USD, рядки, шапка) приходить ззовні як plain
  * object, тому білдери легко будуються з form-state клієнтом і тестуються.
  *
  *  • `buildClientSaleMessage` — повідомлення клієнту: ім'я + регіон/місто/тел,
- *    рядок доставки, позиції `назва — к-ть × вага × ціна/кг = сума`, підсумки
- *    EUR+грн, післяплата (за наявності).
- *  • `buildGroupSaleMessage` — внутрішнє (у групу): ті самі позиції, але з
- *    артикулом та ШК (для Пошти), плюс коментар і дата.
+ *    рядок доставки, позиції `[назва] вагахціна = сума`, підсумки EUR+грн,
+ *    курси EUR/USD, післяплата (за наявності).
+ *  • `buildGroupSaleMessage` — внутрішнє (у групу): ті самі позиції, але з ШК
+ *    (для Пошти), плюс коментар і дата-час документа.
+ *  • `buildPaymentRequisitesText` — текст реквізитів оплати (ФОП) з сумою грн.
  */
+
+import { normalizePhone } from "@ltex/shared";
 
 /** Рядок позиції реалізації (plain — будується з form-state). */
 export interface SaleMessageItem {
-  /** Назва товара. */
+  /** Назва товара (повна — вже містить код у дужках). */
   productName: string;
-  /** Артикул (Product.articleCode) — для повідомлення у групу. */
+  /** Артикул (Product.articleCode) — більше не використовується у тексті. */
   articleCode?: string | null;
-  /** Штрихкод лота — для групи при доставці Поштою. */
+  /** Штрихкод лота — для групи (у дужках біля назви, за наявності). */
   barcode?: string | null;
   /** Кількість мішків (ціле ≥ 1). */
   quantity: number;
@@ -54,6 +57,8 @@ export interface SaleMessageInput {
   totalEur: number;
   /** Курс EUR→UAH (знімок документа). */
   exchangeRateEur: number;
+  /** Курс USD→UAH (знімок документа). */
+  exchangeRateUsd: number;
   /** Наложка (післяплата). */
   cashOnDelivery: boolean;
   /** Сума післяплати, грн (обчислена). */
@@ -64,22 +69,38 @@ export interface SaleMessageInput {
   date: Date | string;
 }
 
-/** Форматує число з 2 знаками після коми. */
-function n2(value: number): string {
-  return value.toFixed(2);
+/** Число з природними десятковими (uk-UA: кома + пробіл-роздільник тисяч). */
+function num(value: number): string {
+  return value.toLocaleString("uk-UA");
 }
 
-/** Сума в EUR: «12.50 €». */
-function eur(amount: number): string {
-  return `${n2(amount)} €`;
+/** Число з рівно 2 знаками після коми (uk-UA). */
+function money2(value: number): string {
+  return value.toLocaleString("uk-UA", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
 }
 
-/** Сума в грн: «1 234.00 грн» (без штучного округлення — 2 знаки). */
-function uah(amount: number): string {
-  return `${n2(amount)} грн`;
+/** Округлене ціле (uk-UA, пробіл-роздільник тисяч). */
+function num0(value: number): string {
+  return Math.round(value).toLocaleString("uk-UA");
 }
 
-/** Рядок доставки (1С-формат) для конкретного способу. */
+/** Телефон у локальний `0XXXXXXXXX` (з `+380…`); інакше — як є. */
+function localPhone(raw: string | null | undefined): string | null {
+  const phone = raw?.trim();
+  if (!phone) return null;
+  const normalized = normalizePhone(phone);
+  if (normalized && normalized.startsWith("+380")) {
+    return `0${normalized.slice(4)}`;
+  }
+  // Fallback: простий обмін провідного +380 на 0.
+  if (phone.startsWith("+380")) return `0${phone.slice(4)}`;
+  return phone;
+}
+
+/** Рядок доставки (заголовок) для конкретного способу, або null. */
 function deliveryLine(
   deliveryMethod: string | null | undefined,
   novaPoshtaBranch: string | null | undefined,
@@ -87,29 +108,71 @@ function deliveryLine(
   switch (deliveryMethod) {
     case "post": {
       const branch = novaPoshtaBranch?.trim();
-      return branch
-        ? `Доставка: Нова Пошта, відділення №${branch}`
-        : "Доставка: Нова Пошта";
+      return branch ? `Відділення пошти № ${branch}` : "Нова Пошта";
     }
     case "pickup":
-      return "Доставка: Самовивіз";
+      return "Самовивіз";
     case "delivery":
-      return "Доставка: Адресна доставка";
+      return "Адресна доставка";
     default:
       return null;
   }
 }
 
-/** Форматує дату документа у локальний формат (uk-UA, дд.мм.рррр). */
-function formatDate(date: Date | string): string {
+/** Дата-час документа у форматі `дд.мм.рррр гг:хх:сс` (24h, uk-UA). */
+function formatDateTime(date: Date | string): string {
   const d = typeof date === "string" ? new Date(date) : date;
   if (Number.isNaN(d.getTime())) return "";
-  return d.toLocaleDateString("uk-UA");
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const dd = pad(d.getDate());
+  const mm = pad(d.getMonth() + 1);
+  const yyyy = d.getFullYear();
+  const hh = pad(d.getHours());
+  const mi = pad(d.getMinutes());
+  const ss = pad(d.getSeconds());
+  return `${dd}.${mm}.${yyyy} ${hh}:${mi}:${ss}`;
 }
 
-/** Підсумок UAH = round(EUR × курс). */
-function totalUah(totalEur: number, rate: number): number {
-  return Math.round(totalEur * rate);
+/** Спільна шапка повідомлення (ім'я / регіон / місто / тел / доставка). */
+function headerLines(input: SaleMessageInput): string[] {
+  const lines: string[] = [];
+
+  const name = input.clientName.trim();
+  if (name) lines.push(name);
+
+  const region = input.region?.trim();
+  if (region) lines.push(region);
+
+  const city = input.city?.trim();
+  if (city) lines.push(city);
+
+  const phone = localPhone(input.phone);
+  if (phone) lines.push(phone);
+
+  const delivery = deliveryLine(input.deliveryMethod, input.novaPoshtaBranch);
+  if (delivery) lines.push(delivery);
+
+  return lines;
+}
+
+/** Підсумкові рядки (сума EUR/грн + наложка + курси). */
+function totalsLines(input: SaleMessageInput): string[] {
+  const lines: string[] = [];
+
+  lines.push(`Загальна сума: ${money2(input.totalEur)} €`);
+  lines.push(
+    `Загальна сума: *${money2(input.totalEur * input.exchangeRateEur)} грн*`,
+  );
+
+  if (input.cashOnDelivery && input.codAmountUah != null) {
+    lines.push(`Накладений платіж: ${money2(input.codAmountUah)} грн`);
+  }
+
+  lines.push("");
+  lines.push(`Курс EUR ${num(input.exchangeRateEur)}`);
+  lines.push(`Курс USD ${num(input.exchangeRateUsd)}`);
+
+  return lines;
 }
 
 /**
@@ -117,136 +180,112 @@ function totalUah(totalEur: number, rate: number): number {
  *
  * ```
  * <ім'я клієнта>
- * <регіон>, <місто>          ← рядки за наявності
- * <телефон>
- * Доставка: …                ← рядок доставки за способом
+ * <регіон>
+ * <місто>
+ * <телефон 0XXXXXXXXX>
+ * <рядок доставки>
  *
- * • <назва> — <к-ть> міш. × <вага> кг × <ціна/кг> €/кг = <сума> €
+ * [<назва>] <вага>х<ціна/кг> = <сума>
  * …
  *
- * Разом: <сумаEUR> € (<сумаUAH> грн)
+ * Загальна сума: <EUR> €
+ * Загальна сума: *<грн> грн*
  * Накладений платіж: <грн> грн   ← якщо Наложка
+ *
+ * Курс EUR <курс>
+ * Курс USD <курс>
  * ```
  */
 export function buildClientSaleMessage(input: SaleMessageInput): string {
-  const lines: string[] = [];
+  const lines: string[] = [...headerLines(input)];
 
-  // ── Контрагент ──
-  lines.push(input.clientName.trim());
-
-  const region = input.region?.trim();
-  const city = input.city?.trim();
-  const place = [region, city].filter(Boolean).join(", ");
-  if (place) lines.push(place);
-
-  const phone = input.phone?.trim();
-  if (phone) lines.push(phone);
-
-  const delivery = deliveryLine(input.deliveryMethod, input.novaPoshtaBranch);
-  if (delivery) lines.push(delivery);
-
-  // ── Позиції ──
   if (input.items.length > 0) {
     lines.push("");
     for (const it of input.items) {
+      const lineTotal = it.weight * it.pricePerKg;
       lines.push(
-        `• ${it.productName.trim()} — ${it.quantity} міш. × ${n2(
-          it.weight,
-        )} кг × ${n2(it.pricePerKg)} €/кг = ${eur(it.priceEur)}`,
+        `[${it.productName.trim()}] ${num(it.weight)}х${num(
+          it.pricePerKg,
+        )} = ${money2(lineTotal)}`,
       );
     }
   }
 
-  // ── Підсумки ──
   lines.push("");
-  lines.push(
-    `Разом: ${eur(input.totalEur)} (${uah(
-      totalUah(input.totalEur, input.exchangeRateEur),
-    )})`,
-  );
-
-  if (input.cashOnDelivery && input.codAmountUah != null) {
-    lines.push(`Накладений платіж: ${uah(input.codAmountUah)}`);
-  }
+  lines.push(...totalsLines(input));
 
   return lines.join("\n");
 }
 
 /**
- * Внутрішнє повідомлення (у групу): ті самі позиції, але з артикулом і ШК
- * (для доставки Поштою), плюс коментар і дата.
+ * Внутрішнє повідомлення (у групу): ті самі позиції, але з ШК (у дужках біля
+ * назви, за наявності), плюс коментар і дата-час документа в кінці.
  *
  * ```
- * <ім'я клієнта>
- * <регіон>, <місто>
- * Доставка: …
- * Дата: <дд.мм.рррр>
+ * <шапка як у клієнта>
  *
- * • [<артикул>] <назва> — <к-ть> міш. × <вага> кг × <ціна/кг> €/кг = <сума> €
- *   ШК <barcode>            ← окремим рядком, якщо доставка = post і ШК є
+ * [<назва>] (<ШК>) <вага>х<ціна/кг> = <сума>
  * …
  *
+ * Загальна сума: <EUR> €
+ * Загальна сума: *<грн> грн*
+ *
+ * Курс EUR <курс>
+ * Курс USD <курс>
  * Коментар: <notes>          ← якщо є
  *
- * Разом: <сумаEUR> € (<сумаUAH> грн)
- * Накладений платіж: <грн> грн   ← якщо Наложка
+ * <дд.мм.рррр гг:хх:сс>
  * ```
  */
 export function buildGroupSaleMessage(input: SaleMessageInput): string {
-  const lines: string[] = [];
+  const lines: string[] = [...headerLines(input)];
 
-  // ── Шапка ──
-  lines.push(input.clientName.trim());
-
-  const region = input.region?.trim();
-  const city = input.city?.trim();
-  const place = [region, city].filter(Boolean).join(", ");
-  if (place) lines.push(place);
-
-  const delivery = deliveryLine(input.deliveryMethod, input.novaPoshtaBranch);
-  if (delivery) lines.push(delivery);
-
-  const dateStr = formatDate(input.date);
-  if (dateStr) lines.push(`Дата: ${dateStr}`);
-
-  const isPost = input.deliveryMethod === "post";
-
-  // ── Позиції (з артикулом + ШК) ──
   if (input.items.length > 0) {
     lines.push("");
     for (const it of input.items) {
-      const article = it.articleCode?.trim();
-      const namePart = article
-        ? `[${article}] ${it.productName.trim()}`
-        : it.productName.trim();
-      lines.push(
-        `• ${namePart} — ${it.quantity} міш. × ${n2(it.weight)} кг × ${n2(
-          it.pricePerKg,
-        )} €/кг = ${eur(it.priceEur)}`,
-      );
+      const lineTotal = it.weight * it.pricePerKg;
       const barcode = it.barcode?.trim();
-      if (isPost && barcode) lines.push(`  ШК ${barcode}`);
+      const barcodePart = barcode ? `(${barcode}) ` : "";
+      lines.push(
+        `[${it.productName.trim()}] ${barcodePart}${num(it.weight)}х${num(
+          it.pricePerKg,
+        )} = ${money2(lineTotal)}`,
+      );
     }
   }
 
-  // ── Коментар ──
+  lines.push("");
+  lines.push(...totalsLines(input));
+
   const notes = input.notes?.trim();
   if (notes) {
-    lines.push("");
     lines.push(`Коментар: ${notes}`);
   }
 
-  // ── Підсумки ──
   lines.push("");
-  lines.push(
-    `Разом: ${eur(input.totalEur)} (${uah(
-      totalUah(input.totalEur, input.exchangeRateEur),
-    )})`,
-  );
-
-  if (input.cashOnDelivery && input.codAmountUah != null) {
-    lines.push(`Накладений платіж: ${uah(input.codAmountUah)}`);
-  }
+  lines.push(formatDateTime(input.date));
 
   return lines.join("\n");
+}
+
+/**
+ * Текст реквізитів оплати (ФОП КУЗЕНКО) з підсумковою сумою грн (округлено).
+ * Точний формат збережено навмисно (включно з пробілами після «:»).
+ */
+export function buildPaymentRequisitesText(totalUah: number): string {
+  return [
+    "Реквізити оплати : ",
+    "",
+    "Одержувач: ФОП КУЗЕНКО ТАРАС СТЕПАНОВИЧ",
+    'Банк: АТ КБ "ПРИВАТБАНК"',
+    "ЄДРПОУ одержувача: 3351808816",
+    "Розрахунковий рахунок:",
+    "UA603052990000026003010807538",
+    "Призначення платежу: Оплата товару",
+    "",
+    "Обов'язково скиньте скріншот, або фото чеку.",
+    "Дякуємо за замовлення!;)",
+    "",
+    `Сума : ${num0(totalUah)}грн`,
+  ].join("\n");
 }

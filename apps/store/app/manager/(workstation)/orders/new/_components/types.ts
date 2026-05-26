@@ -39,6 +39,8 @@ export interface ClientPickerItem {
   name: string;
   tradePointName: string | null;
   city: string | null;
+  /** Область/регіон клієнта — для шапки повідомлення реалізації. */
+  region?: string | null;
   /** Телефон клієнта — для блоку «Контактні дані» у формі. */
   phone?: string | null;
   /** Адреса клієнта — для блоку «Контактні дані» у формі. */
