@@ -100,11 +100,17 @@ export default async function NewSalePage({
     }
   }
 
-  const [priceTypeRows, exchangeRateEur, exchangeRateUsd] = await Promise.all([
-    prisma.mgrPriceType.findMany({ orderBy: { sortOrder: "asc" } }),
-    getCurrentRate(),
-    getUsdRate(),
-  ]);
+  const [priceTypeRows, exchangeRateEur, exchangeRateUsd, bankAccounts] =
+    await Promise.all([
+      prisma.mgrPriceType.findMany({ orderBy: { sortOrder: "asc" } }),
+      getCurrentRate(),
+      getUsdRate(),
+      prisma.mgrBankAccount.findMany({
+        where: { archived: false, hiddenInApp: false },
+        select: { id: true, name: true },
+        orderBy: { name: "asc" },
+      }),
+    ]);
 
   const priceTypes: PriceTypeOption[] = priceTypeRows.map((p) => ({
     id: p.id,
@@ -145,6 +151,7 @@ export default async function NewSalePage({
         currentUserName={user.fullName}
         routeSheetId={routeSheetId}
         returnHref={returnHref}
+        bankAccounts={bankAccounts}
       />
     </div>
   );

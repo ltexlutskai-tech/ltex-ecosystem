@@ -24,6 +24,12 @@ import {
 } from "./sale-lot-picker";
 import { unitPriceForType } from "@/lib/manager/order-pricing";
 import { bagWeightForQuantity } from "@/lib/manager/order-bag-weight";
+import { buildPaymentReceiptText } from "@/lib/manager/payment-message";
+import {
+  reduceToEur,
+  reduceChangeToEur,
+  computeBalanceEur,
+} from "@/lib/manager/cash-order";
 import {
   buildClientSaleMessage,
   buildGroupSaleMessage,
@@ -66,6 +72,8 @@ export interface SaleFormProps {
   routeSheetId?: string | null;
   /** Куди повертатись після створення (за замовч. список реалізацій). */
   returnHref?: string | null;
+  /** Активні банк. рахунки для блоку «Проект оплати» (безнал грн). */
+  bankAccounts?: { id: string; name: string }[];
 }
 
 /** Зіставляє код способу доставки клієнта з кодом доставки документа. */
@@ -123,6 +131,7 @@ export function SaleForm({
   currentUserName,
   routeSheetId,
   returnHref,
+  bankAccounts = [],
 }: SaleFormProps) {
   const router = useRouter();
   const isEdit = mode === "edit";
@@ -150,6 +159,19 @@ export function SaleForm({
   const [shareOpen, setShareOpen] = useState(false);
   const [shareTitle, setShareTitle] = useState("");
   const [shareText, setShareText] = useState("");
+
+  // ─── Проект оплати (preview, БЕЗ збереження в БД) ────────────────────────
+  const [showPaymentDraft, setShowPaymentDraft] = useState(false);
+  // Фактична оплата (готівка 3 валюти + безнал грн з рахунком).
+  const [payCashUah, setPayCashUah] = useState(0);
+  const [payCashlessUah, setPayCashlessUah] = useState(0);
+  const [payCashEur, setPayCashEur] = useState(0);
+  const [payCashUsd, setPayCashUsd] = useState(0);
+  const [payBankAccountId, setPayBankAccountId] = useState("");
+  // Решта (здача) — 3 валюти готівкою.
+  const [changeUah, setChangeUah] = useState(0);
+  const [changeEur, setChangeEur] = useState(0);
+  const [changeUsd, setChangeUsd] = useState(0);
 
   // ─── Менеджерські поля ──────────────────────────────────────────────────
   const [priceTypeId, setPriceTypeId] = useState<string>(
@@ -468,6 +490,26 @@ export function SaleForm({
     .reduce((s, i) => s + (i.priceEur || 0), 0);
   const codAmountUah = Math.round(totalEur * exchangeRateEur);
 
+  // ─── Проект оплати: live-зведення у EUR (порт 1С §B, без збереження) ──────
+  const draftPaidEur = reduceToEur(
+    {
+      uah: payCashUah,
+      eur: payCashEur,
+      usd: payCashUsd,
+      uahCashless: payCashlessUah,
+    },
+    { eur: exchangeRateEur, usd: exchangeRateUsd },
+  );
+  const draftChangeEur = reduceChangeToEur(
+    { uah: changeUah, eur: changeEur, usd: changeUsd },
+    { eur: exchangeRateEur, usd: exchangeRateUsd },
+  );
+  const paymentBalanceEur = computeBalanceEur({
+    sumToPayEur: totalEur,
+    paidEur: draftPaidEur,
+    changeEur: draftChangeEur,
+  });
+
   // Чи можна відправити повідомлення (мають бути позиції).
   const hasItems = items.some((i) => i.product);
 
@@ -518,6 +560,35 @@ export function SaleForm({
   function openRequisitesMessage(): void {
     setShareTitle("Реквізити оплати");
     setShareText(buildPaymentRequisitesText(totalEur * exchangeRateEur));
+    setShareOpen(true);
+  }
+
+  /**
+   * Проект оплати → текст-квитанція «Оплата» у ShareSheet. Нічого не зберігає
+   * в БД (preview-генератор); реальний запис оплати — окремий потік («Оплата»/
+   * «Історія оплат»).
+   */
+  function openPaymentDraftMessage(): void {
+    const acct =
+      bankAccounts.find((a) => a.id === payBankAccountId)?.name ?? null;
+    setShareTitle("Оплата (проект)");
+    setShareText(
+      buildPaymentReceiptText({
+        clientName: clientSummary?.name ?? "",
+        paid: {
+          uah: payCashUah,
+          eur: payCashEur,
+          usd: payCashUsd,
+          uahCashless: payCashlessUah,
+        },
+        change: { uah: changeUah, eur: changeEur, usd: changeUsd },
+        bankAccountName: acct,
+        rates: { eur: exchangeRateEur, usd: exchangeRateUsd },
+        sumToPayEur: totalEur,
+        cashOnDelivery,
+        codAmountUah: cashOnDelivery ? codAmountUah : null,
+      }),
+    );
     setShareOpen(true);
   }
 
@@ -867,12 +938,233 @@ export function SaleForm({
             <Receipt className="mr-1 h-4 w-4" />
             Скинути реквізити
           </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => setShowPaymentDraft((v) => !v)}
+          >
+            <Wallet className="mr-1 h-4 w-4" />
+            Проект оплати
+          </Button>
           {/* "У чат" (бот-вихідні) — TODO M1.8 */}
         </div>
         <p className="mt-2 text-xs text-gray-400">
           Згенерувати текст і поділитися (Viber / Telegram / WhatsApp /
           копіювати).
         </p>
+
+        {/* ─── Проект оплати (preview, нічого не зберігає) ─────────────────── */}
+        {showPaymentDraft && (
+          <div className="mt-4 rounded-lg border bg-gray-50 p-4 text-sm">
+            <div className="text-gray-700">
+              До сплати:{" "}
+              <span className="font-semibold text-gray-900">
+                {totalEur.toFixed(2)} €
+              </span>{" "}
+              <span className="text-gray-500">
+                ({(totalEur * exchangeRateEur).toFixed(2)} грн)
+              </span>
+            </div>
+
+            {/* Фактична оплата */}
+            <div className="mt-4">
+              <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">
+                Фактична оплата
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <label
+                    htmlFor="pay-cash-uah"
+                    className="mb-1 block text-xs text-gray-500"
+                  >
+                    Готівка грн
+                  </label>
+                  <input
+                    id="pay-cash-uah"
+                    type="number"
+                    min={0}
+                    step="0.01"
+                    value={payCashUah}
+                    onChange={(e) => setPayCashUah(Number(e.target.value) || 0)}
+                    className="h-9 w-full rounded-md border border-gray-300 bg-white px-3 text-sm focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500"
+                  />
+                </div>
+                <div>
+                  <label
+                    htmlFor="pay-cashless-uah"
+                    className="mb-1 block text-xs text-gray-500"
+                  >
+                    Безнал грн
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      id="pay-cashless-uah"
+                      type="number"
+                      min={0}
+                      step="0.01"
+                      value={payCashlessUah}
+                      onChange={(e) =>
+                        setPayCashlessUah(Number(e.target.value) || 0)
+                      }
+                      className="h-9 w-full rounded-md border border-gray-300 bg-white px-3 text-sm focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500"
+                    />
+                    <select
+                      aria-label="Банк. рахунок"
+                      value={payBankAccountId}
+                      onChange={(e) => setPayBankAccountId(e.target.value)}
+                      className="h-9 w-full rounded-md border border-gray-300 bg-white px-2 text-sm focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500"
+                    >
+                      <option value="">— рахунок —</option>
+                      {bankAccounts.map((a) => (
+                        <option key={a.id} value={a.id}>
+                          {a.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+                <div>
+                  <label
+                    htmlFor="pay-cash-eur"
+                    className="mb-1 block text-xs text-gray-500"
+                  >
+                    Готівка €
+                  </label>
+                  <input
+                    id="pay-cash-eur"
+                    type="number"
+                    min={0}
+                    step="0.01"
+                    value={payCashEur}
+                    onChange={(e) => setPayCashEur(Number(e.target.value) || 0)}
+                    className="h-9 w-full rounded-md border border-gray-300 bg-white px-3 text-sm focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500"
+                  />
+                </div>
+                <div>
+                  <label
+                    htmlFor="pay-cash-usd"
+                    className="mb-1 block text-xs text-gray-500"
+                  >
+                    Готівка $
+                  </label>
+                  <input
+                    id="pay-cash-usd"
+                    type="number"
+                    min={0}
+                    step="0.01"
+                    value={payCashUsd}
+                    onChange={(e) => setPayCashUsd(Number(e.target.value) || 0)}
+                    className="h-9 w-full rounded-md border border-gray-300 bg-white px-3 text-sm focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Решта */}
+            <div className="mt-4">
+              <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">
+                Решта
+              </div>
+              <div className="grid gap-3 sm:grid-cols-3">
+                <div>
+                  <label
+                    htmlFor="change-uah"
+                    className="mb-1 block text-xs text-gray-500"
+                  >
+                    грн
+                  </label>
+                  <input
+                    id="change-uah"
+                    type="number"
+                    min={0}
+                    step="0.01"
+                    value={changeUah}
+                    onChange={(e) => setChangeUah(Number(e.target.value) || 0)}
+                    className="h-9 w-full rounded-md border border-gray-300 bg-white px-3 text-sm focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500"
+                  />
+                </div>
+                <div>
+                  <label
+                    htmlFor="change-eur"
+                    className="mb-1 block text-xs text-gray-500"
+                  >
+                    €
+                  </label>
+                  <input
+                    id="change-eur"
+                    type="number"
+                    min={0}
+                    step="0.01"
+                    value={changeEur}
+                    onChange={(e) => setChangeEur(Number(e.target.value) || 0)}
+                    className="h-9 w-full rounded-md border border-gray-300 bg-white px-3 text-sm focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500"
+                  />
+                </div>
+                <div>
+                  <label
+                    htmlFor="change-usd"
+                    className="mb-1 block text-xs text-gray-500"
+                  >
+                    $
+                  </label>
+                  <input
+                    id="change-usd"
+                    type="number"
+                    min={0}
+                    step="0.01"
+                    value={changeUsd}
+                    onChange={(e) => setChangeUsd(Number(e.target.value) || 0)}
+                    className="h-9 w-full rounded-md border border-gray-300 bg-white px-3 text-sm focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Live-зведення */}
+            <div className="mt-4 space-y-1 border-t pt-3">
+              <div className="text-gray-700">
+                Оплачено:{" "}
+                <span className="font-semibold text-gray-900">
+                  {draftPaidEur.toFixed(2)} €
+                </span>
+              </div>
+              {draftChangeEur > 0 && (
+                <div className="text-gray-700">
+                  Решта:{" "}
+                  <span className="font-semibold text-gray-900">
+                    {draftChangeEur.toFixed(2)} €
+                  </span>
+                </div>
+              )}
+              {paymentBalanceEur > 0 ? (
+                <div className="font-semibold text-amber-700">
+                  Борг: {paymentBalanceEur.toFixed(2)} €
+                </div>
+              ) : paymentBalanceEur < 0 ? (
+                <div className="font-semibold text-green-700">
+                  Переплата: {(-paymentBalanceEur).toFixed(2)} €
+                </div>
+              ) : (
+                <div className="font-semibold text-green-700">
+                  Сплачено повністю
+                </div>
+              )}
+            </div>
+
+            <div className="mt-4">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={openPaymentDraftMessage}
+              >
+                <Receipt className="mr-1 h-4 w-4" />
+                Скинути оплату
+              </Button>
+            </div>
+          </div>
+        )}
       </section>
 
       {error && (
