@@ -6,6 +6,7 @@ import {
   lotCardInclude,
   serializeLotCard,
 } from "@/lib/manager/lot-card-serialize";
+import { buildBronEventBody } from "@/lib/manager/client-timeline";
 
 /**
  * Manager «Прайс» — Stage 4: POST /api/v1/manager/lots/[id]/book.
@@ -24,14 +25,6 @@ import {
  */
 
 const lotInclude = lotCardInclude;
-
-function formatDateUkr(d: Date): string {
-  return d.toLocaleDateString("uk-UA", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  });
-}
 
 export async function POST(
   req: NextRequest,
@@ -111,8 +104,8 @@ export async function POST(
     await tx.mgrClientTimelineEntry.create({
       data: {
         clientId: client.id,
-        kind: "lot_booking",
-        body: `Бронь лоту ${lot.barcode}, вага ${lot.weight} кг, до ${formatDateUkr(until)}.`,
+        kind: "bron",
+        body: buildBronEventBody(lot.barcode, until),
         occurredAt: now,
         authorUserId: user.id,
         metadata: {

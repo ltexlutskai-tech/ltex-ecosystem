@@ -1057,6 +1057,10 @@ model MgrClient {
   isViberLinked Boolean @default(false) @map("is_viber_linked")
   dialogStatus  String? @map("dialog_status")
 
+  // Картка клієнта — Фаза 3: ключові слова (теги через кому) для пошуку/фільтра
+  // у списку клієнтів. Вільний текст, керується вручну менеджером.
+  keywords String? @map("keywords")
+
   // ─── M1.3c additions (full 1С parity) ─────────────────────────────────────
   tradePointName   String?  @map("trade_point_name")
   tovDebt          Decimal? @map("tov_debt") @db.Decimal(12, 2)

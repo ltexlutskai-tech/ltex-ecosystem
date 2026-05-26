@@ -8,6 +8,10 @@ import {
   serializeReminder,
 } from "@/lib/manager/reminder-serialize";
 import { createReminderSchema } from "@/lib/validations/manager-reminder";
+import {
+  buildReminderEventBody,
+  recordClientEventSafe,
+} from "@/lib/manager/client-timeline";
 
 function clampInt(
   raw: string | null,
@@ -165,6 +169,16 @@ export async function POST(req: NextRequest) {
       include: REMINDER_INCLUDE,
     });
 
+    // Авто-запис історії клієнта (Фаза 4) — товарне нагадування завжди має
+    // клієнта. Fire-and-forget, не блокує відповідь.
+    recordClientEventSafe({
+      clientId,
+      kind: "reminder",
+      body: buildReminderEventBody(created.body),
+      authorUserId: user.id,
+      metadata: { reminderId: created.id },
+    });
+
     const productNames = await fetchProductNames([created]);
     return NextResponse.json(
       {
@@ -224,6 +238,18 @@ export async function POST(req: NextRequest) {
     },
     include: REMINDER_INCLUDE,
   });
+
+  // Авто-запис історії клієнта (Фаза 4) — лише коли нагадування прив'язане до
+  // клієнта (standalone-нагадування без клієнта пропускаємо). Fire-and-forget.
+  if (clientId) {
+    recordClientEventSafe({
+      clientId,
+      kind: "reminder",
+      body: buildReminderEventBody(created.body),
+      authorUserId: user.id,
+      metadata: { reminderId: created.id },
+    });
+  }
 
   const productNames = await fetchProductNames([created]);
   return NextResponse.json(

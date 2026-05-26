@@ -210,7 +210,7 @@ describe("POST /api/v1/manager/lots/[id]/book", () => {
     expect(txState.lotUpdateData?.reservedUntil).toBeInstanceOf(Date);
     expect(txState.timelineData).toMatchObject({
       clientId: "c1",
-      kind: "lot_booking",
+      kind: "bron",
       authorUserId: "u1",
     });
     expect(String(txState.timelineData?.body)).toContain("1234567890123");

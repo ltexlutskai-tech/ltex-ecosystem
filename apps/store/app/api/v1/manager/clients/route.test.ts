@@ -142,14 +142,15 @@ describe("GET /api/v1/manager/clients — base behaviour", () => {
     expect(ownershipClause).toBeDefined();
   });
 
-  it("search query uses OR across name/phone/city/phones[].phone", async () => {
+  it("search query uses OR across name/phone/city/phones[].phone/keywords", async () => {
     await GET(makeReq("search=Амер"));
     const callArgs = mockPrisma.mgrClient.findMany.mock.calls[0]?.[0];
     const where = callArgs.where as {
       AND?: Array<{ OR?: Array<Record<string, unknown>> }>;
     };
     const searchClause = (where.AND ?? []).find((c) => c.OR !== undefined);
-    expect(searchClause?.OR).toHaveLength(4);
+    expect(searchClause?.OR).toHaveLength(5);
+    expect(searchClause?.OR?.some((o) => "keywords" in o)).toBe(true);
   });
 
   it("respects pagination page=2 pageSize=10", async () => {

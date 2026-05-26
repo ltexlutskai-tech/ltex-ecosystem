@@ -15,6 +15,10 @@ import {
   serializeCashOrderRow,
 } from "@/lib/manager/cash-orders-list";
 import { enqueueCashOrderCreate } from "@/lib/sync/enqueue";
+import {
+  buildPaymentEventBody,
+  recordClientEventSafe,
+} from "@/lib/manager/client-timeline";
 
 const MAX_PAGE_SIZE = 100;
 const DEFAULT_PAGE_SIZE = 20;
@@ -220,6 +224,23 @@ export async function POST(req: NextRequest) {
     // наявності) у чергу `mgr_sync_jobs` (entityType `cash_order`). Не блокує
     // 201 і не змінює відповідь. Перевантажуємо з relations для payload-у §3.5.
     void enqueueOrdersForSync(income.id, change?.id ?? null);
+
+    // Авто-запис історії клієнта (Фаза 4) — лише прихідний ордер, fire-and-forget.
+    // Пропускається коли платник невідомий (customerId === null).
+    if (customerId) {
+      recordClientEventSafe({
+        customerId,
+        kind: "payment",
+        body: buildPaymentEventBody({
+          amountUah: income.amountUah,
+          amountEur: income.amountEur,
+          amountUsd: income.amountUsd,
+          type: income.type,
+        }),
+        authorUserId: user.id,
+        metadata: { cashOrderId: income.id, saleId },
+      });
+    }
 
     return NextResponse.json({ income, change }, { status: 201 });
   } catch (err) {

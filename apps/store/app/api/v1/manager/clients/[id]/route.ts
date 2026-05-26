@@ -22,7 +22,7 @@ const clientInclude = {
   phones: { orderBy: { sortOrder: "asc" } },
   messengers: true,
   warehouses: true,
-  routes: { include: { route: true } },
+  routes: { include: { route: true }, orderBy: { sortOrder: "asc" } },
   assortmentItems: { orderBy: { lastOrderedAt: "desc" } },
   presentations: { orderBy: { lastPresentedAt: "desc" } },
   bankAccounts: { orderBy: { accountNumber: "asc" } },
@@ -136,6 +136,10 @@ export async function PATCH(
     updateData.hasNewMessage = data.hasNewMessage;
   if (data.isViberLinked !== undefined)
     updateData.isViberLinked = data.isViberLinked;
+  if (data.keywords !== undefined) {
+    updateData.keywords =
+      data.keywords === null || data.keywords === "" ? null : data.keywords;
+  }
 
   if (data.websiteUrl !== undefined) {
     updateData.websiteUrl =
@@ -263,6 +267,7 @@ function serializeMgrClient(client: LoadedMgrClient) {
     hasNewMessage: client.hasNewMessage,
     isViberLinked: client.isViberLinked,
     dialogStatus: client.dialogStatus,
+    keywords: client.keywords,
     createdAt: client.createdAt,
     updatedAt: client.updatedAt,
     lastSyncedAt: client.lastSyncedAt,
