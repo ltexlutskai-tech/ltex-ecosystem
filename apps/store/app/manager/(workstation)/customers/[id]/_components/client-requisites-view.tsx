@@ -2,7 +2,8 @@ import { formatPhoneUkr, phoneToViberUrl } from "@ltex/shared";
 import { ClientStatusBadge } from "../../_components/client-status-badge";
 import { formatUah, parseDecimal } from "../../_components/format";
 import { ClientActionButtons } from "./client-action-buttons";
-import { ClientContactRow } from "./client-contact-row";
+import { ClientBankAccountRow } from "./client-bank-account-row";
+import { ClientPhonesSection } from "./client-phones-section";
 import {
   ClientAddressLink,
   ClientWebsiteLink,
@@ -72,51 +73,6 @@ function ViberContactValue({ contact }: { contact: string | null }) {
     <a href={url} className="text-purple-700 hover:underline">
       💬 {formatted}
     </a>
-  );
-}
-
-function PhonesBlock({
-  phones,
-  viberContact,
-  masked,
-}: {
-  phones: {
-    id: string;
-    phone: string;
-    label: string | null;
-    messenger: string | null;
-  }[];
-  viberContact: string | null;
-  masked?: boolean;
-}) {
-  if (phones.length === 0 && !viberContact) return null;
-  return (
-    <div className="rounded-lg border bg-white p-5 shadow-sm">
-      <div className="mb-2 flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-gray-700">
-          Номери телефонів
-        </h3>
-        {!masked && (
-          <span
-            title="Додавання нових телефонів — через 1С (sync у M1.5)"
-            className="cursor-not-allowed rounded border bg-gray-50 px-2 py-1 text-xs text-gray-400"
-          >
-            + Додати
-          </span>
-        )}
-      </div>
-      <div className="divide-y divide-gray-100">
-        {phones.map((p) => (
-          <ClientContactRow
-            key={p.id}
-            phone={p.phone}
-            label={p.label}
-            messenger={p.messenger}
-            masked={masked}
-          />
-        ))}
-      </div>
-    </div>
   );
 }
 
@@ -198,6 +154,8 @@ interface ViewProps {
   onEditClick?: () => void;
   editDisabledReason?: string;
   isForeign?: boolean;
+  /** `Customer.id` (дзеркало по code1C) для prefill Замовлення/Реалізації. */
+  customerId?: string | null;
 }
 
 export function ClientRequisitesView({
@@ -206,25 +164,20 @@ export function ClientRequisitesView({
   onEditClick,
   editDisabledReason,
   isForeign,
+  customerId,
 }: ViewProps) {
-  const phonesList = client.phonePrimary
-    ? [
-        {
-          id: "__primary",
-          phone: client.phonePrimary,
-          label: "основний",
-          messenger: null,
-        },
-        ...client.phones,
-      ]
-    : client.phones;
+  // Основний (видимий) розрахунковий рахунок — перший рядок без isHidden.
+  const primaryBankAccount =
+    client.bankAccounts.find((b) => !b.isHidden) ?? null;
 
   return (
     <div className="space-y-6">
-      <PhonesBlock
-        phones={phonesList}
-        viberContact={client.viberContact}
-        masked={isForeign}
+      <ClientPhonesSection
+        clientId={client.id}
+        phones={client.phones}
+        phonePrimary={client.phonePrimary}
+        isForeign={isForeign}
+        canEdit={canEdit}
       />
 
       <section className="rounded-lg border bg-white p-5 shadow-sm">
@@ -343,6 +296,19 @@ export function ClientRequisitesView({
               }
             />
           </div>
+
+          <div className="sm:col-span-2">
+            <Row
+              label="Розрахунковий рахунок"
+              value={
+                primaryBankAccount ? (
+                  <ClientBankAccountRow account={primaryBankAccount} />
+                ) : (
+                  <span className="text-gray-400">—</span>
+                )
+              }
+            />
+          </div>
         </dl>
       </section>
 
@@ -353,7 +319,7 @@ export function ClientRequisitesView({
 
       <FlagsBlock client={client} />
 
-      <ClientActionButtons clientId={client.id} />
+      <ClientActionButtons clientId={client.id} customerId={customerId} />
     </div>
   );
 }

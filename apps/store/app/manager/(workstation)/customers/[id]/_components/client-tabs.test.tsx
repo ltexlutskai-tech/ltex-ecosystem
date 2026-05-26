@@ -19,22 +19,21 @@ const PANELS = {
   orders: <div>orders-panel</div>,
   reminders: <div>reminders-panel</div>,
   viber: <div>viber-panel</div>,
-  banks: <div>banks-panel</div>,
   presentationHistory: <div>presentation-history-panel</div>,
   social: <div>social-panel</div>,
 };
 
 describe("ClientTabs — M1.3f foreign visibility filtering", () => {
-  it("mine view: рендерить усі 11 tabs", () => {
+  it("mine view: рендерить усі 10 tabs", () => {
     render(<ClientTabs {...PANELS} isForeign={false} />);
     const tabs = screen.getAllByRole("tab");
-    expect(tabs).toHaveLength(11);
+    expect(tabs).toHaveLength(10);
   });
 
-  it("admin view (default isForeign=false): рендерить усі 11 tabs", () => {
+  it("admin view (default isForeign=false): рендерить усі 10 tabs", () => {
     render(<ClientTabs {...PANELS} />);
     const tabs = screen.getAllByRole("tab");
-    expect(tabs).toHaveLength(11);
+    expect(tabs).toHaveLength(10);
   });
 
   it("foreign view: лише 4 tabs (Реквізити, Асортимент, Історія продаж, Замовлення)", () => {
@@ -50,7 +49,7 @@ describe("ClientTabs — M1.3f foreign visibility filtering", () => {
     ]);
   });
 
-  it("foreign view: hidden tabs не у DOM (Презентації / Історія / Нагадування / Viber / Банк. рахунки / Іст. презентацій / Соц мережі)", () => {
+  it("foreign view: hidden tabs не у DOM (Презентації / Історія / Нагадування / Viber / Іст. презентацій / Соц мережі)", () => {
     render(<ClientTabs {...PANELS} isForeign={true} />);
     const tabs = screen.getAllByRole("tab");
     const labels = new Set(tabs.map((b) => b.textContent?.trim() ?? ""));
@@ -58,7 +57,6 @@ describe("ClientTabs — M1.3f foreign visibility filtering", () => {
     expect(labels.has("Історія")).toBe(false);
     expect(labels.has("Нагадування")).toBe(false);
     expect(labels.has("Viber")).toBe(false);
-    expect(labels.has("Банк. рахунки")).toBe(false);
     expect(labels.has("Іст. презентацій")).toBe(false);
     expect(labels.has("Соц мережі")).toBe(false);
   });

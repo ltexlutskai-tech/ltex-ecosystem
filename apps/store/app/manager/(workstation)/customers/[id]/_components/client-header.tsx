@@ -1,6 +1,7 @@
 import { ClientStatusBadge } from "../../_components/client-status-badge";
 import { formatUah, parseDecimal } from "../../_components/format";
 import { ClientAssignDialog } from "./client-assign-dialog";
+import { ClientContactsStrip } from "./client-contacts-strip";
 import { ClientForeignBanner } from "./client-foreign-banner";
 import type { ClientDetail } from "./types";
 
@@ -42,6 +43,7 @@ export function ClientHeader({
                 {[client.region, client.city].filter(Boolean).join(" · ")}
               </p>
             )}
+            <ClientContactsStrip client={client} isForeign={isForeign} />
             <div className="flex flex-wrap items-center gap-4 pt-2 text-sm">
               <span className="text-gray-700">
                 Борг:{" "}

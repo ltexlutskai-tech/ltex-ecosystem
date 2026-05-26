@@ -1,10 +1,10 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
+import { prisma } from "@ltex/db";
 import { getCurrentUser } from "@/lib/auth/manager-auth";
 import { canEditClient } from "@/lib/permissions/mgr-client-edit";
 import { ClientAssortmentTab } from "./_components/client-assortment-tab";
-import { ClientBankAccountsTab } from "./_components/client-bank-accounts-tab";
 import { ClientHeader } from "./_components/client-header";
 import { ClientHistoryTab } from "./_components/client-history-tab";
 import { ClientOrdersTab } from "./_components/client-orders-tab";
@@ -59,6 +59,16 @@ export default async function ClientDetailPage({
       : "Тільки призначений менеджер або адмін може редагувати";
   const overdueCount = countOverdue(client.reminders);
 
+  // Дзеркало `Customer` (read-only лукап по code1C) для prefill сторінок
+  // Замовлення / Реалізація, які чекають `Customer.id` у `?clientId`. Якщо
+  // дзеркала ще нема — лишаємо null (форма відкриється з порожнім пікером).
+  const customerMirror = client.code1C
+    ? await prisma.customer.findUnique({
+        where: { code1C: client.code1C },
+        select: { id: true },
+      })
+    : null;
+
   return (
     <div className="mx-auto max-w-5xl space-y-4">
       <Link
@@ -82,6 +92,7 @@ export default async function ClientDetailPage({
             currentUserRole={user.role}
             editDisabledReason={editDisabledReason}
             isForeign={isForeign}
+            customerId={customerMirror?.id ?? null}
           />
         }
         assortment={<ClientAssortmentTab items={client.assortmentItems} />}
@@ -100,9 +111,14 @@ export default async function ClientDetailPage({
           />
         }
         viber={<ClientViberTab client={client} />}
-        banks={<ClientBankAccountsTab accounts={client.bankAccounts} />}
         presentationHistory={<ClientPresentationHistoryTab />}
-        social={<ClientSocialTab client={client} />}
+        social={
+          <ClientSocialTab
+            client={client}
+            canEdit={canEdit}
+            isForeign={isForeign}
+          />
+        }
       />
     </div>
   );

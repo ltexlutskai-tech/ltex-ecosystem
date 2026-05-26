@@ -46,6 +46,110 @@ export const mgrClientPatchSchema = z
 
 export type MgrClientPatchInput = z.infer<typeof mgrClientPatchSchema>;
 
+// ── Phones CRUD (Phase 2a) ──────────────────────────────────────────────
+// `MgrClientPhone.messenger` is a free `String?` у схемі (НЕ enum), тому
+// валідуємо як один з відомих месенджерів або null. Це не блокує майбутні
+// значення з 1С (read-only render через resolveBrandIconKind → link fallback),
+// але форма дає лише канонічний набір.
+export const MGR_PHONE_MESSENGERS = ["viber", "telegram", "whatsapp"] as const;
+export type MgrPhoneMessenger = (typeof MGR_PHONE_MESSENGERS)[number];
+
+const messengerField = z
+  .union([z.enum(MGR_PHONE_MESSENGERS), z.literal(""), z.null()])
+  .optional();
+
+export const mgrClientPhoneCreateSchema = z
+  .object({
+    phone: z.string().trim().min(1, "Номер не може бути порожнім").max(32),
+    messenger: messengerField,
+    label: z.string().trim().max(50).nullable().optional(),
+  })
+  .strict();
+
+export const mgrClientPhoneUpdateSchema = z
+  .object({
+    phone: z
+      .string()
+      .trim()
+      .min(1, "Номер не може бути порожнім")
+      .max(32)
+      .optional(),
+    messenger: messengerField,
+    label: z.string().trim().max(50).nullable().optional(),
+  })
+  .strict()
+  .refine((d) => Object.keys(d).length > 0, {
+    message: "Немає полів для оновлення",
+  });
+
+export type MgrClientPhoneCreateInput = z.infer<
+  typeof mgrClientPhoneCreateSchema
+>;
+export type MgrClientPhoneUpdateInput = z.infer<
+  typeof mgrClientPhoneUpdateSchema
+>;
+
+// ── Messengers / соцмережі CRUD (Phase 2b) ──────────────────────────────
+// `MgrClientMessenger.network` — free `String` у схемі (НЕ enum), тому
+// валідуємо проти канонічного набору social-network-ів. Render через
+// `resolveBrandIconKind(network)` → link fallback для невідомих значень
+// з 1С. Хоча б одне з handle/url має бути присутнім.
+export const MGR_MESSENGER_NETWORKS = [
+  "tiktok",
+  "instagram",
+  "facebook",
+  "telegram",
+  "viber",
+  "youtube",
+  "whatsapp",
+  "pinterest",
+  "other",
+] as const;
+export type MgrMessengerNetwork = (typeof MGR_MESSENGER_NETWORKS)[number];
+
+const messengerHandleField = z.string().trim().max(200).nullable().optional();
+const messengerUrlField = z.string().trim().max(500).nullable().optional();
+const messengerCommentField = z.string().trim().max(200).nullable().optional();
+
+function hasHandleOrUrl(d: {
+  handle?: string | null;
+  url?: string | null;
+}): boolean {
+  return Boolean(d.handle?.trim()) || Boolean(d.url?.trim());
+}
+
+export const mgrClientMessengerCreateSchema = z
+  .object({
+    network: z.enum(MGR_MESSENGER_NETWORKS),
+    handle: messengerHandleField,
+    url: messengerUrlField,
+    comment: messengerCommentField,
+  })
+  .strict()
+  .refine(hasHandleOrUrl, {
+    message: "Вкажіть посилання або ідентифікатор",
+    path: ["handle"],
+  });
+
+export const mgrClientMessengerUpdateSchema = z
+  .object({
+    network: z.enum(MGR_MESSENGER_NETWORKS).optional(),
+    handle: messengerHandleField,
+    url: messengerUrlField,
+    comment: messengerCommentField,
+  })
+  .strict()
+  .refine((d) => Object.keys(d).length > 0, {
+    message: "Немає полів для оновлення",
+  });
+
+export type MgrClientMessengerCreateInput = z.infer<
+  typeof mgrClientMessengerCreateSchema
+>;
+export type MgrClientMessengerUpdateInput = z.infer<
+  typeof mgrClientMessengerUpdateSchema
+>;
+
 export const MGR_CLIENT_ADMIN_ONLY_FIELDS = ["agentUserId"] as const;
 export type MgrClientAdminOnlyField =
   (typeof MGR_CLIENT_ADMIN_ONLY_FIELDS)[number];

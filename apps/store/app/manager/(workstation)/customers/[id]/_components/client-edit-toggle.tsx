@@ -13,6 +13,8 @@ interface Props {
   currentUserRole: "manager" | "senior_manager" | "admin";
   editDisabledReason?: string;
   isForeign?: boolean;
+  /** `Customer.id` (дзеркало по code1C) для prefill Замовлення/Реалізації. */
+  customerId?: string | null;
 }
 
 export function ClientEditToggle({
@@ -22,6 +24,7 @@ export function ClientEditToggle({
   currentUserRole,
   editDisabledReason,
   isForeign,
+  customerId,
 }: Props) {
   const [mode, setMode] = useState<"view" | "edit">("view");
 
@@ -33,6 +36,7 @@ export function ClientEditToggle({
         onEditClick={canEdit ? () => setMode("edit") : undefined}
         editDisabledReason={editDisabledReason}
         isForeign={isForeign}
+        customerId={customerId}
       />
     );
   }

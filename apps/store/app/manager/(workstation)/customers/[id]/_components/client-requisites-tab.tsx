@@ -9,6 +9,8 @@ interface Props {
   currentUserRole: "manager" | "senior_manager" | "admin";
   editDisabledReason?: string;
   isForeign?: boolean;
+  /** `Customer.id` (дзеркало по code1C) для prefill Замовлення/Реалізації. */
+  customerId?: string | null;
 }
 
 export function ClientRequisitesTab({
@@ -18,6 +20,7 @@ export function ClientRequisitesTab({
   currentUserRole,
   editDisabledReason,
   isForeign,
+  customerId,
 }: Props) {
   return (
     <ClientEditToggle
@@ -27,6 +30,7 @@ export function ClientRequisitesTab({
       currentUserRole={currentUserRole}
       editDisabledReason={editDisabledReason}
       isForeign={isForeign}
+      customerId={customerId}
     />
   );
 }
