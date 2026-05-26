@@ -9,6 +9,8 @@ interface NotificationItem {
   body: string;
   remindAt: string;
   snoozedUntilAt: string | null;
+  actionType: string;
+  source: string;
   client: { id: string; name: string } | null;
 }
 
@@ -90,6 +92,30 @@ export function HeaderNotificationsBell() {
     );
   }
 
+  /** Дія прямо з дзвіночка: «Виконано» / «Відкласти на годину». */
+  const act = useCallback(
+    async (id: string, action: "complete" | "snooze") => {
+      const payload =
+        action === "snooze"
+          ? {
+              action,
+              snoozedUntil: new Date(Date.now() + 3_600_000).toISOString(),
+            }
+          : { action };
+      try {
+        await fetch(`/api/v1/manager/reminders/${id}`, {
+          method: "PATCH",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+      } catch {
+        // best-effort
+      }
+      void refetch();
+    },
+    [refetch],
+  );
+
   return (
     <div ref={containerRef} className="relative">
       <button
@@ -125,11 +151,11 @@ export function HeaderNotificationsBell() {
           ) : (
             <ul className="max-h-80 divide-y divide-gray-100 overflow-y-auto">
               {data.items.map((it) => (
-                <li key={it.id}>
+                <li key={it.id} className="px-3 py-2 hover:bg-gray-50">
                   <button
                     type="button"
                     onClick={() => goTo(it)}
-                    className="block w-full px-3 py-2 text-left hover:bg-gray-50"
+                    className="block w-full text-left"
                   >
                     <p className="line-clamp-2 text-xs text-gray-800">
                       {it.body}
@@ -139,6 +165,22 @@ export function HeaderNotificationsBell() {
                       {fmtRelative(it.snoozedUntilAt ?? it.remindAt)}
                     </p>
                   </button>
+                  <div className="mt-1.5 flex gap-3">
+                    <button
+                      type="button"
+                      onClick={() => void act(it.id, "complete")}
+                      className="text-[11px] font-medium text-green-700 hover:underline"
+                    >
+                      Виконано
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void act(it.id, "snooze")}
+                      className="text-[11px] font-medium text-gray-500 hover:underline"
+                    >
+                      Відкласти на годину
+                    </button>
+                  </div>
                 </li>
               ))}
             </ul>

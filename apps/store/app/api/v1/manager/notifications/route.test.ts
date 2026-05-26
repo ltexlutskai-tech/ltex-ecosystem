@@ -80,4 +80,18 @@ describe("GET /api/v1/manager/notifications", () => {
       expect.objectContaining({ take: 10 }),
     );
   });
+
+  it("excludes event-type reminders (product checklists do not time-nag)", async () => {
+    mockPrisma.mgrReminder.count.mockResolvedValueOnce(0);
+    mockPrisma.mgrReminder.findMany.mockResolvedValueOnce([]);
+    await GET(req());
+    expect(mockPrisma.mgrReminder.count).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          periodicity: { not: "event" },
+          completedAt: null,
+        }),
+      }),
+    );
+  });
 });
