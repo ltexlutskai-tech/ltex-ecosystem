@@ -164,6 +164,7 @@ export function ProductCardView({
             <OrderVideoButton
               productName={product.name}
               articleCode={product.articleCode}
+              productId={product.id}
               sellerName={sellerName}
             />
           </div>

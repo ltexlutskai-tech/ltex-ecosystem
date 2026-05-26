@@ -521,6 +521,9 @@ export function LotCardModal({ lotId, onClose, rateUah, sellerName }: Props) {
                 <OrderVideoButton
                   productName={lot.product.name}
                   articleCode={lot.share.articleCode}
+                  productId={lot.product.id}
+                  lotId={lot.id}
+                  barcode={lot.barcode}
                   sellerName={sellerName}
                 />
               </div>

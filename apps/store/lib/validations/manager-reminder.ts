@@ -30,7 +30,14 @@ export const reminderItemSchema = z.object({
 
 export type ReminderItemInput = z.infer<typeof reminderItemSchema>;
 
-/** Тип «Звичайне» — body+remindAt обов'язкові, клієнт опційний. */
+/**
+ * Тип «Звичайне» — body+remindAt обов'язкові, клієнт опційний.
+ *
+ * Опційні `lotId`/`productId` несе лише сценарій «Замовити відео» (стеження
+ * за появою відео): cron `generate-reminders` дивиться на них, щоб «спрацювати»
+ * нагадування коли на лоті/товарі з'явилось відео. Для звичайного нагадування
+ * вони просто null.
+ */
 const regularReminderSchema = z.object({
   isProductReminder: z.literal(false).optional(),
   body: z.string().trim().min(1, "Текст не може бути порожнім").max(500),
@@ -38,6 +45,8 @@ const regularReminderSchema = z.object({
   periodicity: reminderPeriodSchema.default("none"),
   orderVideo: z.boolean().default(false),
   clientId: z.string().min(1).nullable().optional(),
+  lotId: z.string().min(1).nullable().optional(),
+  productId: z.string().min(1).nullable().optional(),
 });
 
 /** Тип «Для товарів» — клієнт обов'язковий, ≥1 товар, body опційний. */

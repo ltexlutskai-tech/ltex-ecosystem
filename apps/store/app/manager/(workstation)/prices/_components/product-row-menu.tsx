@@ -207,6 +207,7 @@ export function ProductRowMenu({
             onOpenChange={setVideoOpen}
             productName={activeTarget.name}
             articleCode={activeTarget.articleCode}
+            productId={activeTarget.id}
             sellerName={sellerName}
           />
         </>

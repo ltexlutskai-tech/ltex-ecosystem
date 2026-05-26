@@ -173,7 +173,15 @@ export async function POST(req: NextRequest) {
   }
 
   // ─── Тип «Звичайне» ───────────────────────────────────────────────────────
-  const { body, remindAt, periodicity, orderVideo, clientId } = parsed.data;
+  const {
+    body,
+    remindAt,
+    periodicity,
+    orderVideo,
+    clientId,
+    lotId,
+    productId,
+  } = parsed.data;
 
   // Якщо вказано клієнта — він має існувати і бути у scope (manager — лише свій).
   if (clientId) {
@@ -206,6 +214,10 @@ export async function POST(req: NextRequest) {
       orderVideo,
       isProductReminder: false,
       source: "manual",
+      // Несуть сценарій «стеження за відео» (cron `generate-reminders`); для
+      // звичайного нагадування лишаються null.
+      lotId: lotId ?? null,
+      productId: productId ?? null,
     },
     include: REMINDER_INCLUDE,
   });
