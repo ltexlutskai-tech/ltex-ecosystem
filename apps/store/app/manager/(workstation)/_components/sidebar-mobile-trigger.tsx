@@ -4,6 +4,7 @@ import { createElement, useState } from "react";
 import { Menu } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@ltex/ui";
 import type { ManagerRole } from "@/lib/auth/jwt";
+import { ChatUnreadBadge } from "./chat-unread-badge";
 import { SidebarNavLink } from "./sidebar-nav-link";
 import {
   ADMIN_USERS_LINK,
@@ -20,13 +21,7 @@ function iconFor(link: SidebarLink) {
   return createElement(link.icon, { className: "h-4 w-4" });
 }
 
-export function SidebarMobileTrigger({
-  role,
-  chatUnread = 0,
-}: {
-  role: ManagerRole;
-  chatUnread?: number;
-}) {
+export function SidebarMobileTrigger({ role }: { role: ManagerRole }) {
   const [open, setOpen] = useState(false);
   const close = () => setOpen(false);
 
@@ -55,7 +50,7 @@ export function SidebarMobileTrigger({
             href={CHAT_LINK.href}
             label={CHAT_LINK.label}
             icon={iconFor(CHAT_LINK)}
-            badge={chatUnread}
+            badgeSlot={<ChatUnreadBadge />}
             onNavigate={close}
           />
           <Separator />

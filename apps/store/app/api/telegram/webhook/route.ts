@@ -9,6 +9,7 @@ import {
   APP_NAME,
   CATEGORIES,
 } from "@ltex/shared";
+import { ingestInboundMessage } from "@/lib/chat/inbound";
 
 /**
  * Telegram Bot Webhook handler.
@@ -378,9 +379,50 @@ export async function POST(request: NextRequest) {
   try {
     // Route update to appropriate handler
     if (update.message) {
-      const msg = update.message as { chat: { id: number }; text?: string };
+      const msg = update.message as {
+        chat: { id: number };
+        from?: {
+          first_name?: string;
+          last_name?: string;
+          username?: string;
+        };
+        message_id?: number;
+        text?: string;
+        contact?: { phone_number?: string };
+      };
       const chatId = msg.chat.id;
       const text = msg.text?.trim() ?? "";
+      const contactPhone = msg.contact?.phone_number?.trim();
+
+      // ─── Manager inbox ingest (M1.8 Phase 1a) ──────────────────────────────
+      // Будь-який вільний текст (не команда) + contact-share ідуть у inbox.
+      // Жодних авто-відповідей: менеджер відповість через UI. Команди й
+      // callback_query — обходять inbox (це бот-функціонал, не діалог).
+      const isCommand = text.startsWith("/");
+      const isFreeFormText = text.length > 0 && !isCommand;
+      if (isFreeFormText || contactPhone) {
+        try {
+          const name =
+            [msg.from?.first_name, msg.from?.last_name]
+              .filter((v): v is string => Boolean(v))
+              .join(" ") ||
+            msg.from?.username ||
+            null;
+          await ingestInboundMessage({
+            platform: "telegram",
+            externalUserId: String(chatId),
+            externalUserName: name,
+            text: isFreeFormText ? text : "[поділився контактом]",
+            phone: contactPhone ?? null,
+            externalMessageId:
+              msg.message_id != null ? String(msg.message_id) : null,
+          });
+        } catch (error) {
+          console.warn("[L-TEX] Telegram inbox ingest failed", {
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+      }
 
       if (text.startsWith("/start")) await handleStart(chatId);
       else if (text.startsWith("/help"))

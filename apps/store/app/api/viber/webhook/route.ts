@@ -10,6 +10,7 @@ import {
   CATEGORIES,
 } from "@ltex/shared";
 import crypto from "crypto";
+import { ingestInboundMessage } from "@/lib/chat/inbound";
 
 /**
  * Viber Bot Webhook handler.
@@ -44,6 +45,34 @@ async function sendMessage(
       min_api_version: 7,
     }),
   });
+}
+
+/**
+ * Опційно дістає телефон користувача через `/pa/get_user_details`.
+ * Повертає `null` коли API недоступне / телефон не наданий.
+ * Не кидає винятків.
+ */
+async function fetchViberUserPhone(userId: string): Promise<string | null> {
+  if (!AUTH_TOKEN) return null;
+  try {
+    const res = await fetch("https://chatapi.viber.com/pa/get_user_details", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Viber-Auth-Token": AUTH_TOKEN,
+      },
+      body: JSON.stringify({ id: userId }),
+    });
+    if (!res.ok) return null;
+    const data = (await res.json().catch(() => ({}))) as {
+      status?: number;
+      user?: { primary_device_os?: string; phone_number?: string };
+    };
+    if (data.status !== 0) return null;
+    return data.user?.phone_number ?? null;
+  } catch {
+    return null;
+  }
 }
 
 function mainMenuKeyboard() {
@@ -409,7 +438,8 @@ export async function POST(request: NextRequest) {
     event: string;
     sender?: { id: string; name?: string };
     user?: { id: string; name?: string };
-    message?: { text?: string };
+    message?: { text?: string; type?: string };
+    message_token?: number | string;
   };
   try {
     event = JSON.parse(body);
@@ -434,6 +464,9 @@ export async function POST(request: NextRequest) {
         if (event.sender && event.message) {
           const userId = event.sender.id;
           const text = event.message.text?.trim() ?? "";
+          const messageType = event.message.type ?? "text";
+          const messageToken =
+            event.message_token != null ? String(event.message_token) : null;
 
           if (text === "menu:main" || text === "/start")
             await handleStart(userId, event.sender.name);
@@ -492,13 +525,38 @@ export async function POST(request: NextRequest) {
             } else if (pending === "order") {
               pendingInput.delete(userId);
               await handleOrder(userId, text);
-            } else if (text.length >= 2) await handleSearch(userId, text);
-            else
-              await sendMessage(
-                userId,
-                "Оберіть дію або напишіть назву товару 🔍",
-                mainMenuKeyboard(),
-              );
+            } else {
+              // ─── Manager inbox ingest (M1.8 Phase 1a) ────────────────────────
+              // Вільний текст без структури — це повідомлення менеджеру.
+              // Спершу пробуємо дістати телефон (best-effort, не блокуюче для
+              // самого ingest при невдачі).
+              if (messageType === "text" && text.length > 0) {
+                try {
+                  const phone = await fetchViberUserPhone(userId);
+                  await ingestInboundMessage({
+                    platform: "viber",
+                    externalUserId: userId,
+                    externalUserName: event.sender.name ?? null,
+                    text,
+                    phone,
+                    externalMessageId: messageToken,
+                  });
+                } catch (error) {
+                  console.warn("[L-TEX] Viber inbox ingest failed", {
+                    error:
+                      error instanceof Error ? error.message : String(error),
+                  });
+                }
+              }
+
+              if (text.length >= 2) await handleSearch(userId, text);
+              else
+                await sendMessage(
+                  userId,
+                  "Оберіть дію або напишіть назву товару 🔍",
+                  mainMenuKeyboard(),
+                );
+            }
           }
         }
         break;
