@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { ingestInboundMessage } from "@/lib/chat/inbound";
+import {
+  ingestInboundMessage,
+  recordOutboundSystemMessage,
+} from "@/lib/chat/inbound";
 
 /**
  * Telegram Bot Webhook handler.
@@ -97,6 +100,13 @@ export async function POST(request: NextRequest) {
 
         if (text === "/start") {
           await sendMessage(chatId, WELCOME_TEXT);
+          // Залогувати welcome у треді, щоб менеджер бачив, що бот уже відповів.
+          await recordOutboundSystemMessage({
+            platform: "telegram",
+            externalUserId: String(chatId),
+            externalUserName: name,
+            text: WELCOME_TEXT,
+          });
         }
       }
     }

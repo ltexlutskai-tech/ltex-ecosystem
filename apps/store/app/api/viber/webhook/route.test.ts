@@ -5,12 +5,14 @@ import crypto from "crypto";
 const VIBER_TOKEN = "test-viber-token";
 process.env.VIBER_AUTH_TOKEN = VIBER_TOKEN;
 
-const { ingestMock } = vi.hoisted(() => ({
+const { ingestMock, recordOutMock } = vi.hoisted(() => ({
   ingestMock: vi.fn(),
+  recordOutMock: vi.fn(),
 }));
 
 vi.mock("@/lib/chat/inbound", () => ({
   ingestInboundMessage: (...args: unknown[]) => ingestMock(...args),
+  recordOutboundSystemMessage: (...args: unknown[]) => recordOutMock(...args),
 }));
 
 import { POST } from "./route";
@@ -40,6 +42,7 @@ const fetchMock = vi.fn(
 beforeEach(() => {
   vi.clearAllMocks();
   ingestMock.mockResolvedValue({ conversationId: "c1" });
+  recordOutMock.mockResolvedValue(undefined);
   vi.stubGlobal("fetch", fetchMock);
 });
 
@@ -81,6 +84,17 @@ describe("POST /api/viber/webhook", () => {
     >;
     expect(body.receiver).toBe("viber-1");
     expect(String(body.text)).toContain("L-TEX");
+    // Welcome також записаний у тред — для conversation_started це і є точка
+    // створення розмови у /manager/chat.
+    expect(recordOutMock).toHaveBeenCalledTimes(1);
+    expect(recordOutMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        platform: "viber",
+        externalUserId: "viber-1",
+        externalUserName: "Olha",
+        text: expect.stringContaining("L-TEX"),
+      }),
+    );
   });
 
   it("ingests free-form text message", async () => {
@@ -119,7 +133,7 @@ describe("POST /api/viber/webhook", () => {
     );
   });
 
-  it("ingests /start and also sends welcome", async () => {
+  it("ingests /start and also sends welcome + records welcome у треді", async () => {
     fetchMock.mockResolvedValue(
       new Response(JSON.stringify({ status: 0 }), { status: 200 }),
     );
@@ -143,6 +157,36 @@ describe("POST /api/viber/webhook", () => {
       String(url).includes("send_message"),
     );
     expect(startCalls).toHaveLength(1);
+    // Welcome також записаний у тред.
+    expect(recordOutMock).toHaveBeenCalledTimes(1);
+    expect(recordOutMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        platform: "viber",
+        externalUserId: "viber-3",
+        externalUserName: "Maria",
+        text: expect.stringContaining("L-TEX"),
+      }),
+    );
+  });
+
+  it("does NOT record welcome для звичайного тексту (тільки /start)", async () => {
+    fetchMock.mockImplementation(async (url: unknown) => {
+      if (String(url).includes("get_user_details")) {
+        return new Response(JSON.stringify({ status: 0, user: {} }), {
+          status: 200,
+        });
+      }
+      return new Response(JSON.stringify({ status: 0 }), { status: 200 });
+    });
+    await POST(
+      makeRequest({
+        event: "message",
+        sender: { id: "viber-6", name: "Anna" },
+        message: { type: "text", text: "ціни?" },
+        message_token: 99,
+      }),
+    );
+    expect(recordOutMock).not.toHaveBeenCalled();
   });
 
   it("ignores non-text message types (picture, file)", async () => {

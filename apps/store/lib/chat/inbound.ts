@@ -15,6 +15,14 @@ export interface IngestInboundResult {
   conversationId: string;
 }
 
+export interface RecordOutboundSystemArgs {
+  platform: ChatPlatform;
+  externalUserId: string;
+  externalUserName?: string | null;
+  text: string;
+  externalMessageId?: string | null;
+}
+
 /**
  * Приймає вхідне повідомлення з вебхука платформи й кладе у inbox:
  *
@@ -102,4 +110,71 @@ export async function ingestInboundMessage(
   ]);
 
   return { conversationId: conversation.id };
+}
+
+/**
+ * Записує системне outbound-повідомлення (welcome від бота тощо) у тред,
+ * щоб менеджер бачив у `/manager/chat` що бот уже відповів клієнту.
+ *
+ *   1. Upsert `ChatConversation` за `(platform, externalUserId)` — create-якщо-нема
+ *      (наприклад Viber `conversation_started` приходить до будь-якого повідомлення
+ *      клієнта). При update — освіжаємо name якщо отримали його.
+ *   2. Створюємо `ChatInboxMessage` з direction=`out`, sender=`system`,
+ *      `authorUserId=null` (це не людина-менеджер).
+ *   3. Оновлюємо `lastMessageAt` (тримає conversation вгорі списку).
+ *      `unreadForManager` НЕ чіпаємо — це не повідомлення від клієнта.
+ *
+ * Best-effort: не кидає винятків — обгортка вебхука все одно нічого з ним не зробить.
+ */
+export async function recordOutboundSystemMessage(
+  args: RecordOutboundSystemArgs,
+): Promise<void> {
+  const {
+    platform,
+    externalUserId,
+    externalUserName,
+    text,
+    externalMessageId,
+  } = args;
+
+  try {
+    const conversation = await prisma.chatConversation.upsert({
+      where: {
+        platform_externalUserId: { platform, externalUserId },
+      },
+      create: {
+        platform,
+        externalUserId,
+        externalUserName: externalUserName ?? null,
+        unreadForManager: 0,
+        lastMessageAt: new Date(),
+      },
+      update: {
+        externalUserName: externalUserName ?? undefined,
+      },
+      select: { id: true },
+    });
+
+    await prisma.$transaction([
+      prisma.chatInboxMessage.create({
+        data: {
+          conversationId: conversation.id,
+          direction: "out",
+          sender: "system",
+          text,
+          authorUserId: null,
+          externalMessageId: externalMessageId ?? null,
+        },
+      }),
+      prisma.chatConversation.update({
+        where: { id: conversation.id },
+        data: { lastMessageAt: new Date() },
+      }),
+    ]);
+  } catch (error) {
+    console.warn("[L-TEX] recordOutboundSystemMessage failed", {
+      platform,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
 }

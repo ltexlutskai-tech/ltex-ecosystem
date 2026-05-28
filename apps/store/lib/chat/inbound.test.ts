@@ -18,7 +18,7 @@ vi.mock("./phone-match", () => ({
   matchClientByPhone: (...args: unknown[]) => matchClientByPhoneMock(...args),
 }));
 
-import { ingestInboundMessage } from "./inbound";
+import { ingestInboundMessage, recordOutboundSystemMessage } from "./inbound";
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -127,5 +127,91 @@ describe("ingestInboundMessage", () => {
     // Only the in-transaction counter bump (no auto-link update because match returned null).
     expect(mockPrisma.chatConversation.update).toHaveBeenCalledTimes(1);
     expect(mockPrisma.$transaction).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("recordOutboundSystemMessage", () => {
+  it("upserts conversation + creates out/system message with authorUserId=null", async () => {
+    mockPrisma.chatConversation.upsert.mockResolvedValueOnce({ id: "conv-x" });
+
+    await recordOutboundSystemMessage({
+      platform: "telegram",
+      externalUserId: "777",
+      externalUserName: "Bohdan",
+      text: "👋 Вітаємо",
+    });
+
+    // Upsert по (platform, externalUserId) — find-or-create.
+    expect(mockPrisma.chatConversation.upsert).toHaveBeenCalledTimes(1);
+    const upsertCall =
+      mockPrisma.chatConversation.upsert.mock.calls[0]?.[0] ?? null;
+    expect(upsertCall).not.toBeNull();
+    expect(upsertCall.where).toEqual({
+      platform_externalUserId: {
+        platform: "telegram",
+        externalUserId: "777",
+      },
+    });
+
+    // Транзакція: create message + bump lastMessageAt (без unreadForManager).
+    expect(mockPrisma.$transaction).toHaveBeenCalledTimes(1);
+    expect(mockPrisma.chatInboxMessage.create).toHaveBeenCalledTimes(1);
+    const createCall =
+      mockPrisma.chatInboxMessage.create.mock.calls[0]?.[0] ?? null;
+    expect(createCall).not.toBeNull();
+    expect(createCall.data).toMatchObject({
+      conversationId: "conv-x",
+      direction: "out",
+      sender: "system",
+      authorUserId: null,
+      text: "👋 Вітаємо",
+    });
+
+    // Conversation update — `lastMessageAt` тільки, БЕЗ unreadForManager.
+    expect(mockPrisma.chatConversation.update).toHaveBeenCalledTimes(1);
+    const updateCall =
+      mockPrisma.chatConversation.update.mock.calls[0]?.[0] ?? null;
+    expect(updateCall).not.toBeNull();
+    expect(updateCall.where).toEqual({ id: "conv-x" });
+    expect(updateCall.data).not.toHaveProperty("unreadForManager");
+    expect(updateCall.data.lastMessageAt).toBeInstanceOf(Date);
+  });
+
+  it("re-uses existing conversation (upsert returns same id, no duplicate create)", async () => {
+    mockPrisma.chatConversation.upsert.mockResolvedValueOnce({
+      id: "conv-existing",
+    });
+
+    await recordOutboundSystemMessage({
+      platform: "viber",
+      externalUserId: "viber-abc",
+      text: "Welcome",
+    });
+
+    // Upsert тільки 1 раз — Prisma сама find-or-create.
+    expect(mockPrisma.chatConversation.upsert).toHaveBeenCalledTimes(1);
+    expect(mockPrisma.chatInboxMessage.create).toHaveBeenCalledTimes(1);
+    expect(
+      mockPrisma.chatInboxMessage.create.mock.calls[0]?.[0]?.data
+        .conversationId,
+    ).toBe("conv-existing");
+  });
+
+  it("swallows errors (best-effort, never throws)", async () => {
+    mockPrisma.chatConversation.upsert.mockRejectedValueOnce(
+      new Error("db down"),
+    );
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    await expect(
+      recordOutboundSystemMessage({
+        platform: "telegram",
+        externalUserId: "999",
+        text: "hi",
+      }),
+    ).resolves.toBeUndefined();
+
+    expect(warnSpy).toHaveBeenCalled();
+    warnSpy.mockRestore();
   });
 });

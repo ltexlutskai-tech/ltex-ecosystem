@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
-import { ingestInboundMessage } from "@/lib/chat/inbound";
+import {
+  ingestInboundMessage,
+  recordOutboundSystemMessage,
+} from "@/lib/chat/inbound";
 
 /**
  * Viber Bot Webhook handler.
@@ -69,6 +72,15 @@ async function fetchViberUserPhone(userId: string): Promise<string | null> {
 async function handleStart(userId: string, userName?: string): Promise<void> {
   const text = userName ? `${userName}, ${WELCOME_TEXT}` : WELCOME_TEXT;
   await sendMessage(userId, text);
+  // Залогувати welcome у треді, щоб менеджер бачив, що бот уже відповів.
+  // Для `conversation_started` це теж створить розмову (upsert), щоб
+  // тред існував у /manager/chat від першого контакту.
+  await recordOutboundSystemMessage({
+    platform: "viber",
+    externalUserId: userId,
+    externalUserName: userName ?? null,
+    text,
+  });
 }
 
 // ─── Webhook POST handler ────────────────────────────────────────────────────
