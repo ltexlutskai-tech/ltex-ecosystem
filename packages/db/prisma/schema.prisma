@@ -101,21 +101,21 @@ model ProductImage {
 // ─── Lots / Bags (← 1С Серії + ТовариНаСкладах) ────────────────────────────
 
 model Lot {
-  id          String    @id @default(cuid())
-  productId   String    @map("product_id")
-  barcode     String    @unique
-  weight      Float
-  quantity    Int       @default(1)
-  status      String    @default("free")
-  priceEur    Float     @map("price_eur")
-  videoUrl    String?   @map("video_url")
-  isTarget    Boolean   @default(false) @map("is_target")
-  arrivalDate DateTime? @map("arrival_date")
-  sector      String?   @map("sector")
-  isOpen      Boolean   @default(false) @map("is_open")
-  comment     String?   @map("comment")
-  description String?   @map("description")
-  videoDate   DateTime? @map("video_date")
+  id                  String    @id @default(cuid())
+  productId           String    @map("product_id")
+  barcode             String    @unique
+  weight              Float
+  quantity            Int       @default(1)
+  status              String    @default("free")
+  priceEur            Float     @map("price_eur")
+  videoUrl            String?   @map("video_url")
+  isTarget            Boolean   @default(false) @map("is_target")
+  arrivalDate         DateTime? @map("arrival_date")
+  sector              String?   @map("sector")
+  isOpen              Boolean   @default(false) @map("is_open")
+  comment             String?   @map("comment")
+  description         String?   @map("description")
+  videoDate           DateTime? @map("video_date")
   // ── Бронь (Етап 4, денормалізована — як у 1С зберігається рядком; БЕЗ FK
   //    щоб уникнути cross-concern relations між магазином і менеджеркою) ──
   reservedForClientId String?   @map("reserved_for_client_id")
@@ -123,8 +123,8 @@ model Lot {
   reservedByUserId    String?   @map("reserved_by_user_id")
   reservedByName      String?   @map("reserved_by_name")
   reservedUntil       DateTime? @map("reserved_until")
-  createdAt   DateTime  @default(now()) @map("created_at")
-  updatedAt   DateTime  @updatedAt @map("updated_at")
+  createdAt           DateTime  @default(now()) @map("created_at")
+  updatedAt           DateTime  @updatedAt @map("updated_at")
 
   product    Product     @relation(fields: [productId], references: [id])
   barcodes   Barcode[]
@@ -200,30 +200,30 @@ model Customer {
 // ─── Orders (← 1С ЗаказПокупателя) ─────────────────────────────────────────
 
 model Order {
-  id           String   @id @default(cuid())
-  code1C       String?  @unique @map("code_1c")
-  customerId   String   @map("customer_id")
-  status       String   @default("draft")
-  totalEur     Float    @default(0) @map("total_eur")
-  totalUah     Float    @default(0) @map("total_uah")
-  exchangeRate Float    @default(0) @map("exchange_rate")
+  id           String  @id @default(cuid())
+  code1C       String? @unique @map("code_1c")
+  customerId   String  @map("customer_id")
+  status       String  @default("draft")
+  totalEur     Float   @default(0) @map("total_eur")
+  totalUah     Float   @default(0) @map("total_uah")
+  exchangeRate Float   @default(0) @map("exchange_rate")
   notes        String?
 
   // ─── Manager order fields (← 1С Document.Заказ, Етап 1) ──────────────────
   // Тип цін — id з довідника MgrPriceType (зберігаємо id, без жорсткого FK,
   // бо order — спільна з магазином модель). Доставка — delivery|post|pickup.
-  priceTypeId         String?  @map("price_type_id")
-  deliveryMethod      String?  @map("delivery_method")
-  cashOnDelivery      Boolean  @default(false) @map("cash_on_delivery")
-  assignedAgentUserId String?  @map("assigned_agent_user_id")
-  exportTo1C          Boolean  @default(true) @map("export_to_1c")
+  priceTypeId         String? @map("price_type_id")
+  deliveryMethod      String? @map("delivery_method")
+  cashOnDelivery      Boolean @default(false) @map("cash_on_delivery")
+  assignedAgentUserId String? @map("assigned_agent_user_id")
+  exportTo1C          Boolean @default(true) @map("export_to_1c")
   // Проведено в 1С (ставиться на етапі обмінів) + актуальність.
-  archived            Boolean  @default(false)
-  isActual            Boolean  @default(true) @map("is_actual")
-  routeSheetId        String?  @map("route_sheet_id") // зворотне посилання на МЛ (1С Заказ.МаршрутныйЛист)
+  archived            Boolean @default(false)
+  isActual            Boolean @default(true) @map("is_actual")
+  routeSheetId        String? @map("route_sheet_id") // зворотне посилання на МЛ (1С Заказ.МаршрутныйЛист)
 
-  createdAt    DateTime @default(now()) @map("created_at")
-  updatedAt    DateTime @updatedAt @map("updated_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   customer  Customer    @relation(fields: [customerId], references: [id])
   items     OrderItem[]
@@ -714,17 +714,18 @@ model User {
   failedLoginCount Int       @default(0) @map("failed_login_count")
   lockedUntil      DateTime? @map("locked_until")
 
-  refreshTokens    UserRefreshToken[]
-  passwordResets   PasswordResetToken[]
-  assignedClients  ClientAssignment[]
-  timelineComments MgrClientTimelineEntry[]
-  agentForClients  MgrClient[]              @relation("ClientAgent")
-  reminders        MgrReminder[]            @relation("UserReminders")
-  viewPrefs        MgrUserViewPrefs[]
-  routeSheetsExpedited RouteSheet[]         @relation("RouteSheetExpeditor")
-  routeSheetsCreated   RouteSheet[]         @relation("RouteSheetCreatedBy")
-  chatConversations    ChatConversation[]   @relation("ChatConversationAgent")
-  chatInboxMessages    ChatInboxMessage[]   @relation("ChatInboxMessageAuthor")
+  refreshTokens        UserRefreshToken[]
+  passwordResets       PasswordResetToken[]
+  assignedClients      ClientAssignment[]
+  timelineComments     MgrClientTimelineEntry[]
+  agentForClients      MgrClient[]              @relation("ClientAgent")
+  reminders            MgrReminder[]            @relation("UserReminders")
+  viewPrefs            MgrUserViewPrefs[]
+  routeSheetsExpedited RouteSheet[]             @relation("RouteSheetExpeditor")
+  routeSheetsCreated   RouteSheet[]             @relation("RouteSheetCreatedBy")
+  chatConversations    ChatConversation[]       @relation("ChatConversationAgent")
+  chatInboxMessages    ChatInboxMessage[]       @relation("ChatInboxMessageAuthor")
+  regionAgents         MgrRegionAgent[]         @relation("RegionAgentUser")
 
   @@map("users")
 }
@@ -1079,16 +1080,16 @@ model MgrClient {
   updatedAt    DateTime  @updatedAt @map("updated_at")
   lastSyncedAt DateTime? @map("last_synced_at")
 
-  phones          MgrClientPhone[]
-  warehouses      MgrClientWarehouse[]
-  routes          MgrClientRouteAssignment[]
-  messengers      MgrClientMessenger[]
-  assortmentItems MgrClientAssortmentItem[]
-  presentations   MgrClientPresentationItem[]
-  bankAccounts    MgrClientBankAccount[]
-  reminders       MgrReminder[]
-  timeline        MgrClientTimelineEntry[]
-  assignments     ClientAssignment[]
+  phones            MgrClientPhone[]
+  warehouses        MgrClientWarehouse[]
+  routes            MgrClientRouteAssignment[]
+  messengers        MgrClientMessenger[]
+  assortmentItems   MgrClientAssortmentItem[]
+  presentations     MgrClientPresentationItem[]
+  bankAccounts      MgrClientBankAccount[]
+  reminders         MgrReminder[]
+  timeline          MgrClientTimelineEntry[]
+  assignments       ClientAssignment[]
   chatConversations ChatConversation[]
 
   @@index([statusGeneralId])
@@ -1450,22 +1451,36 @@ enum ChatSender {
   @@map("chat_sender")
 }
 
-model ChatConversation {
-  id               String       @id @default(cuid())
-  platform         ChatPlatform
-  externalUserId   String       @map("external_user_id")
-  externalUserName String?      @map("external_user_name")
-  phone            String?
-  clientId         String?      @map("client_id")
-  agentUserId      String?      @map("agent_user_id")
-  status           String       @default("active")
-  unreadForManager Int          @default(0) @map("unread_for_manager")
-  lastMessageAt    DateTime     @default(now()) @map("last_message_at")
-  createdAt        DateTime     @default(now()) @map("created_at")
-  updatedAt        DateTime     @updatedAt @map("updated_at")
+// Phase 2 — стан реєстрації нового клієнта через бот.
+// NULL у `ChatConversation.registrationStep` = legacy розмова (Phase 1),
+// у такій реєстрація не запускається (handleRegistrationStep → noop).
+enum ChatRegistrationStep {
+  awaiting_phone
+  awaiting_region
+  completed
+  unassigned
 
-  client   MgrClient? @relation(fields: [clientId], references: [id], onDelete: SetNull)
-  agent    User?      @relation("ChatConversationAgent", fields: [agentUserId], references: [id], onDelete: SetNull)
+  @@map("chat_registration_step")
+}
+
+model ChatConversation {
+  id               String                @id @default(cuid())
+  platform         ChatPlatform
+  externalUserId   String                @map("external_user_id")
+  externalUserName String?               @map("external_user_name")
+  phone            String?
+  clientId         String?               @map("client_id")
+  agentUserId      String?               @map("agent_user_id")
+  status           String                @default("active")
+  unreadForManager Int                   @default(0) @map("unread_for_manager")
+  registrationStep ChatRegistrationStep? @map("registration_step")
+  pendingPhone     String?               @map("pending_phone")
+  lastMessageAt    DateTime              @default(now()) @map("last_message_at")
+  createdAt        DateTime              @default(now()) @map("created_at")
+  updatedAt        DateTime              @updatedAt @map("updated_at")
+
+  client   MgrClient?         @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  agent    User?              @relation("ChatConversationAgent", fields: [agentUserId], references: [id], onDelete: SetNull)
   messages ChatInboxMessage[]
 
   @@unique([platform, externalUserId])
@@ -1492,4 +1507,21 @@ model ChatInboxMessage {
 
   @@index([conversationId, createdAt])
   @@map("mgr_chat_inbox_messages")
+}
+
+// Phase 2 — мапа область→торговий (адмін-налаштовувана).
+// При реєстрації нового клієнта через бот: клієнт обирає область → шукаємо
+// агента → MgrClient.agentUserId. Якщо мапа не містить регіону → conversation
+// переходить у `unassigned`, admin розрулить вручну.
+model MgrRegionAgent {
+  id        String   @id @default(cuid())
+  region    String   @unique
+  userId    String   @map("user_id")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user User @relation("RegionAgentUser", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("mgr_region_agents")
 }
