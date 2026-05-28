@@ -1,0 +1,298 @@
+## Patch для `Central/WebServices/MobileExchange.xml`
+
+Додає 6 нових `<Operation>` секцій (по одній на JSON-wrapper) у кінець
+списку `<ChildObjects>` web-сервісу `MobileExchange`, ПЕРЕД закриваючим
+тегом `</ChildObjects>` (line 1234 у поточному файлі).
+
+**Як застосувати:**
+
+1. У 1С Конфігураторі: подвійний клік на `Web-сервиси → MobileExchange →
+   Операции`, потім «Додати» для кожної з 6 операцій нижче.
+2. Або (швидше) — закрити Конфігуратор, відкрити XML-файл у текстовому
+   редакторі, знайти рядок `</ChildObjects>` (наприкінці WebService-блоку,
+   line 1234), і вставити нижченаведений блок ПЕРЕД ним.
+3. Після вставки — згенерувати нові UUID для кожного `<Operation uuid="...">`
+   і `<Parameter uuid="...">` (8 нових UUID разом = 6 операцій × 1 + кожна
+   операція має 2 параметри = 18 UUID. Згенерувати через PowerShell:
+   `[guid]::NewGuid().ToString()`).
+4. Зберегти, оновити конфігурацію БД, перепублікувати веб-сервіс.
+
+⚠ **Структура кожного блоку — точна копія операції `ОтриматиДаніХарактеристики`**
+(line 1185-1233 поточного XML), яка має `XDTOReturningValueType=xs:string` +
+2 `xs:string` параметри. Це найближчий по контракту аналог.
+
+---
+
+### Блок для вставки (ПЕРЕД `</ChildObjects>` у line 1234)
+
+```xml
+<Operation uuid="REPLACE-WITH-GUID-01">
+    <Properties>
+        <Name>ОбновитиКлієнтаJSON</Name>
+        <Synonym>
+            <v8:item>
+                <v8:lang>uk</v8:lang>
+                <v8:content>Оновити клієнта JSON</v8:content>
+            </v8:item>
+        </Synonym>
+        <Comment/>
+        <XDTOReturningValueType>xs:string</XDTOReturningValueType>
+        <Nillable>false</Nillable>
+        <Transactioned>false</Transactioned>
+        <ProcedureName>ОбновитиКлієнтаJSON</ProcedureName>
+        <DataLockControlMode>Managed</DataLockControlMode>
+    </Properties>
+    <ChildObjects>
+        <Parameter uuid="REPLACE-WITH-GUID-01-P1">
+            <Properties>
+                <Name>ПарольВхода</Name>
+                <Synonym>
+                    <v8:item>
+                        <v8:lang>uk</v8:lang>
+                        <v8:content>Пароль входу</v8:content>
+                    </v8:item>
+                </Synonym>
+                <Comment/>
+                <XDTOValueType>xs:string</XDTOValueType>
+                <Nillable>false</Nillable>
+                <TransferDirection>In</TransferDirection>
+            </Properties>
+        </Parameter>
+        <Parameter uuid="REPLACE-WITH-GUID-01-P2">
+            <Properties>
+                <Name>JSONДані</Name>
+                <Synonym>
+                    <v8:item>
+                        <v8:lang>uk</v8:lang>
+                        <v8:content>JSON дані</v8:content>
+                    </v8:item>
+                </Synonym>
+                <Comment/>
+                <XDTOValueType>xs:string</XDTOValueType>
+                <Nillable>false</Nillable>
+                <TransferDirection>In</TransferDirection>
+            </Properties>
+        </Parameter>
+    </ChildObjects>
+</Operation>
+<Operation uuid="REPLACE-WITH-GUID-02">
+    <Properties>
+        <Name>СтворитиЗамовленняJSON</Name>
+        <Synonym>
+            <v8:item>
+                <v8:lang>uk</v8:lang>
+                <v8:content>Створити замовлення JSON</v8:content>
+            </v8:item>
+        </Synonym>
+        <Comment/>
+        <XDTOReturningValueType>xs:string</XDTOReturningValueType>
+        <Nillable>false</Nillable>
+        <Transactioned>false</Transactioned>
+        <ProcedureName>СтворитиЗамовленняJSON</ProcedureName>
+        <DataLockControlMode>Managed</DataLockControlMode>
+    </Properties>
+    <ChildObjects>
+        <Parameter uuid="REPLACE-WITH-GUID-02-P1">
+            <Properties>
+                <Name>ПарольВхода</Name>
+                <Synonym>
+                    <v8:item><v8:lang>uk</v8:lang><v8:content>Пароль входу</v8:content></v8:item>
+                </Synonym>
+                <Comment/>
+                <XDTOValueType>xs:string</XDTOValueType>
+                <Nillable>false</Nillable>
+                <TransferDirection>In</TransferDirection>
+            </Properties>
+        </Parameter>
+        <Parameter uuid="REPLACE-WITH-GUID-02-P2">
+            <Properties>
+                <Name>JSONДані</Name>
+                <Synonym>
+                    <v8:item><v8:lang>uk</v8:lang><v8:content>JSON дані</v8:content></v8:item>
+                </Synonym>
+                <Comment/>
+                <XDTOValueType>xs:string</XDTOValueType>
+                <Nillable>false</Nillable>
+                <TransferDirection>In</TransferDirection>
+            </Properties>
+        </Parameter>
+    </ChildObjects>
+</Operation>
+<Operation uuid="REPLACE-WITH-GUID-03">
+    <Properties>
+        <Name>СтворитиОплатуJSON</Name>
+        <Synonym>
+            <v8:item>
+                <v8:lang>uk</v8:lang>
+                <v8:content>Створити оплату JSON</v8:content>
+            </v8:item>
+        </Synonym>
+        <Comment/>
+        <XDTOReturningValueType>xs:string</XDTOReturningValueType>
+        <Nillable>false</Nillable>
+        <Transactioned>false</Transactioned>
+        <ProcedureName>СтворитиОплатуJSON</ProcedureName>
+        <DataLockControlMode>Managed</DataLockControlMode>
+    </Properties>
+    <ChildObjects>
+        <Parameter uuid="REPLACE-WITH-GUID-03-P1">
+            <Properties>
+                <Name>ПарольВхода</Name>
+                <Synonym><v8:item><v8:lang>uk</v8:lang><v8:content>Пароль входу</v8:content></v8:item></Synonym>
+                <Comment/>
+                <XDTOValueType>xs:string</XDTOValueType>
+                <Nillable>false</Nillable>
+                <TransferDirection>In</TransferDirection>
+            </Properties>
+        </Parameter>
+        <Parameter uuid="REPLACE-WITH-GUID-03-P2">
+            <Properties>
+                <Name>JSONДані</Name>
+                <Synonym><v8:item><v8:lang>uk</v8:lang><v8:content>JSON дані</v8:content></v8:item></Synonym>
+                <Comment/>
+                <XDTOValueType>xs:string</XDTOValueType>
+                <Nillable>false</Nillable>
+                <TransferDirection>In</TransferDirection>
+            </Properties>
+        </Parameter>
+    </ChildObjects>
+</Operation>
+<Operation uuid="REPLACE-WITH-GUID-04">
+    <Properties>
+        <Name>СтворитиКасовийОрдерJSON</Name>
+        <Synonym>
+            <v8:item>
+                <v8:lang>uk</v8:lang>
+                <v8:content>Створити касовий ордер JSON</v8:content>
+            </v8:item>
+        </Synonym>
+        <Comment/>
+        <XDTOReturningValueType>xs:string</XDTOReturningValueType>
+        <Nillable>false</Nillable>
+        <Transactioned>false</Transactioned>
+        <ProcedureName>СтворитиКасовийОрдерJSON</ProcedureName>
+        <DataLockControlMode>Managed</DataLockControlMode>
+    </Properties>
+    <ChildObjects>
+        <Parameter uuid="REPLACE-WITH-GUID-04-P1">
+            <Properties>
+                <Name>ПарольВхода</Name>
+                <Synonym><v8:item><v8:lang>uk</v8:lang><v8:content>Пароль входу</v8:content></v8:item></Synonym>
+                <Comment/>
+                <XDTOValueType>xs:string</XDTOValueType>
+                <Nillable>false</Nillable>
+                <TransferDirection>In</TransferDirection>
+            </Properties>
+        </Parameter>
+        <Parameter uuid="REPLACE-WITH-GUID-04-P2">
+            <Properties>
+                <Name>JSONДані</Name>
+                <Synonym><v8:item><v8:lang>uk</v8:lang><v8:content>JSON дані</v8:content></v8:item></Synonym>
+                <Comment/>
+                <XDTOValueType>xs:string</XDTOValueType>
+                <Nillable>false</Nillable>
+                <TransferDirection>In</TransferDirection>
+            </Properties>
+        </Parameter>
+    </ChildObjects>
+</Operation>
+<Operation uuid="REPLACE-WITH-GUID-05">
+    <Properties>
+        <Name>СтворитиРеалізаціюJSON</Name>
+        <Synonym>
+            <v8:item>
+                <v8:lang>uk</v8:lang>
+                <v8:content>Створити реалізацію JSON</v8:content>
+            </v8:item>
+        </Synonym>
+        <Comment/>
+        <XDTOReturningValueType>xs:string</XDTOReturningValueType>
+        <Nillable>false</Nillable>
+        <Transactioned>false</Transactioned>
+        <ProcedureName>СтворитиРеалізаціюJSON</ProcedureName>
+        <DataLockControlMode>Managed</DataLockControlMode>
+    </Properties>
+    <ChildObjects>
+        <Parameter uuid="REPLACE-WITH-GUID-05-P1">
+            <Properties>
+                <Name>ПарольВхода</Name>
+                <Synonym><v8:item><v8:lang>uk</v8:lang><v8:content>Пароль входу</v8:content></v8:item></Synonym>
+                <Comment/>
+                <XDTOValueType>xs:string</XDTOValueType>
+                <Nillable>false</Nillable>
+                <TransferDirection>In</TransferDirection>
+            </Properties>
+        </Parameter>
+        <Parameter uuid="REPLACE-WITH-GUID-05-P2">
+            <Properties>
+                <Name>JSONДані</Name>
+                <Synonym><v8:item><v8:lang>uk</v8:lang><v8:content>JSON дані</v8:content></v8:item></Synonym>
+                <Comment/>
+                <XDTOValueType>xs:string</XDTOValueType>
+                <Nillable>false</Nillable>
+                <TransferDirection>In</TransferDirection>
+            </Properties>
+        </Parameter>
+    </ChildObjects>
+</Operation>
+<Operation uuid="REPLACE-WITH-GUID-06">
+    <Properties>
+        <Name>СтворитиМаршрутнийЛистJSON</Name>
+        <Synonym>
+            <v8:item>
+                <v8:lang>uk</v8:lang>
+                <v8:content>Створити маршрутний лист JSON</v8:content>
+            </v8:item>
+        </Synonym>
+        <Comment/>
+        <XDTOReturningValueType>xs:string</XDTOReturningValueType>
+        <Nillable>false</Nillable>
+        <Transactioned>false</Transactioned>
+        <ProcedureName>СтворитиМаршрутнийЛистJSON</ProcedureName>
+        <DataLockControlMode>Managed</DataLockControlMode>
+    </Properties>
+    <ChildObjects>
+        <Parameter uuid="REPLACE-WITH-GUID-06-P1">
+            <Properties>
+                <Name>ПарольВхода</Name>
+                <Synonym><v8:item><v8:lang>uk</v8:lang><v8:content>Пароль входу</v8:content></v8:item></Synonym>
+                <Comment/>
+                <XDTOValueType>xs:string</XDTOValueType>
+                <Nillable>false</Nillable>
+                <TransferDirection>In</TransferDirection>
+            </Properties>
+        </Parameter>
+        <Parameter uuid="REPLACE-WITH-GUID-06-P2">
+            <Properties>
+                <Name>JSONДані</Name>
+                <Synonym><v8:item><v8:lang>uk</v8:lang><v8:content>JSON дані</v8:content></v8:item></Synonym>
+                <Comment/>
+                <XDTOValueType>xs:string</XDTOValueType>
+                <Nillable>false</Nillable>
+                <TransferDirection>In</TransferDirection>
+            </Properties>
+        </Parameter>
+    </ChildObjects>
+</Operation>
+```
+
+---
+
+## Альтернатива (рекомендовано): додати через 1С Конфігуратор GUI
+
+Якщо ручне редагування XML здається ризикованим, відкрити Конфігуратор:
+
+1. Web-сервіси → MobileExchange → Операції → подвійний клік
+2. Додати операцію → Ім'я: `ОбновитиКлієнтаJSON`
+3. Властивості: `Тип значення, що повертається` = `xs:string`,
+   `Транзакційно` = Ні, `Ім'я процедури` = `ОбновитиКлієнтаJSON`
+4. Додати 2 параметри: `ПарольВхода` (xs:string, In) і `JSONДані` (xs:string, In)
+5. Повторити для кожної з 6 операцій:
+   - `СтворитиЗамовленняJSON`
+   - `СтворитиОплатуJSON`
+   - `СтворитиКасовийОрдерJSON`
+   - `СтворитиРеалізаціюJSON`
+   - `СтворитиМаршрутнийЛистJSON`
+6. Зберегти конфігурацію → Адміністрування → Перепублікувати веб-сервіси.
+
+Це додасть UUID автоматично і нічого не зламає у решті XML-файлу.

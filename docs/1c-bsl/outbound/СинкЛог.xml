@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    Catalog.СинкЛог — реєстр виконаних обмінів для idempotency-захисту.
+    Зберігає 1 рядок на кожен успішний виклик `Створити*JSON` / `ОбновитиКлієнтаJSON`.
+
+    ⚠ Цей файл — СКЕЛЕТ. Це лише шапка catalog-метадати. Атрибути (Реквізити)
+    треба додати ВРУЧНУ у 1С Конфігураторі (3 хв роботи через GUI):
+
+    КРОКИ У КОНФІГУРАТОРІ:
+    1. Імпортувати цей XML як новий Catalog (Файл → Завантажити конфігурацію).
+       АБО створити вручну: Довідники → правий клік → Додати → Ім'я: `СинкЛог`.
+    2. Властивості довідника:
+       - Найменування: СинкЛог
+       - Синонім: «Сінк лог» (для відображення у списках)
+       - Ієрархічний: Ні
+       - Володарі: НЕМАЄ
+       - Довжина коду: 9 (стандарт)
+       - Довжина найменування: 64 (для UUID-формату)
+       - Тип коду: Строка
+       - Автонумерація: Так
+       - Дозволити видалення з вікна списку: Так
+    3. Додати 3 реквізити (Реквизиты → Додати):
+
+       а) Ім'я: `СтворенийДокумент`
+          Тип: складений (Composite):
+             - ДокументСсылка.ЗаказПокупателя
+             - ДокументСсылка.РеализацияТоваровУслуг
+             - ДокументСсылка.ПриходныйКассовыйОрдер
+             - ДокументСсылка.РасходныйКассовыйОрдер
+             - ДокументСсылка.ПоступлениеБезналичныхДенежныхСредств
+             - ДокументСсылка.МаршрутныйЛист
+             - СправочникСсылка.Контрагенты
+          Підказка: «Створений документ або контрагент (за результатом обміну)»
+
+       б) Ім'я: `ДатаСтворення`
+          Тип: Дата (Дата + Час)
+          Підказка: «Дата виконання обміну на стороні 1С»
+
+       в) Ім'я: `ТипОперації`
+          Тип: Строка, Довжина: 50
+          Підказка: «client_update / order_create / payment_create / cash_order_create / realization_create / route_sheet_create»
+
+    4. ⚠ Стандартний реквізит `Найменування` (= IdempotencyKey UUID, до 64 символів)
+       лишається. Заповнюється `СинкВхідний.ЗареєструватиСинк()`.
+    5. Зберегти + оновити конфігурацію БД (F7).
+
+    ПІДДЕРЖКА: TTL 7 днів через `ScheduledJob.ЧисткаСинкЛогу` →
+    `СинкВхідний.ВичиститиСтаріЗаписи()`. Див. `ЧисткаСинкЛогу.xml`.
+-->
+<MetaDataObject xmlns="http://v8.1c.ru/8.3/MDClasses"
+                xmlns:v8="http://v8.1c.ru/8.1/data/core"
+                xmlns:xr="http://v8.1c.ru/8.3/xcf/readable"
+                xmlns:xs="http://www.w3.org/2001/XMLSchema"
+                xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                version="2.8">
+    <Catalog uuid="GENERATE-NEW-GUID-HERE">
+        <Properties>
+            <Name>СинкЛог</Name>
+            <Synonym>
+                <v8:item>
+                    <v8:lang>uk</v8:lang>
+                    <v8:content>Сінк лог</v8:content>
+                </v8:item>
+            </Synonym>
+            <Comment>Idempotency registry для вхідної синхронізації з Node.js (Етап 2 1C_INTEGRATION_PLAN.md). TTL 7 днів через ChedulledJob.ЧисткаСинкЛогу.</Comment>
+            <Hierarchical>false</Hierarchical>
+            <Owners/>
+            <CodeLength>9</CodeLength>
+            <DescriptionLength>64</DescriptionLength>
+            <CodeType>String</CodeType>
+            <CodeAllowedLength>Variable</CodeAllowedLength>
+            <CodeSeries>WholeCatalog</CodeSeries>
+            <CheckUnique>true</CheckUnique>
+            <Autonumbering>true</Autonumbering>
+            <DefaultPresentation>AsDescription</DefaultPresentation>
+            <PredefinedDataUpdate>Auto</PredefinedDataUpdate>
+            <EditType>InDialog</EditType>
+            <DataLockControlMode>Managed</DataLockControlMode>
+            <FullTextSearch>DontUse</FullTextSearch>
+            <CreateOnInput>DontUse</CreateOnInput>
+            <ChoiceHistoryOnInput>Auto</ChoiceHistoryOnInput>
+            <DataHistory>DontUse</DataHistory>
+        </Properties>
+        <ChildObjects>
+            <!-- ⚠ Реквізити СтворенийДокумент / ДатаСтворення / ТипОперації
+                 додаються вручну через Конфігуратор (див. інструкції вище у коментарі) -->
+        </ChildObjects>
+    </Catalog>
+</MetaDataObject>
