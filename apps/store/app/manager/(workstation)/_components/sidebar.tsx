@@ -2,6 +2,7 @@ import type { ManagerRole } from "@/lib/auth/jwt";
 import { ChatUnreadBadge } from "./chat-unread-badge";
 import { SidebarNavLink } from "./sidebar-nav-link";
 import {
+  ADMIN_REGION_AGENTS_LINK,
   ADMIN_USERS_LINK,
   CHAT_LINK,
   PRIMARY_LINKS,
@@ -26,11 +27,18 @@ export function ManagerSidebar({ role }: { role: ManagerRole }) {
       />
       <Separator />
       {role === "admin" && (
-        <SidebarNavLink
-          href={ADMIN_USERS_LINK.href}
-          label={ADMIN_USERS_LINK.label}
-          icon={renderLinkIcon(ADMIN_USERS_LINK)}
-        />
+        <>
+          <SidebarNavLink
+            href={ADMIN_USERS_LINK.href}
+            label={ADMIN_USERS_LINK.label}
+            icon={renderLinkIcon(ADMIN_USERS_LINK)}
+          />
+          <SidebarNavLink
+            href={ADMIN_REGION_AGENTS_LINK.href}
+            label={ADMIN_REGION_AGENTS_LINK.label}
+            icon={renderLinkIcon(ADMIN_REGION_AGENTS_LINK)}
+          />
+        </>
       )}
       <SidebarNavLink
         href={SETTINGS_LINK.href}

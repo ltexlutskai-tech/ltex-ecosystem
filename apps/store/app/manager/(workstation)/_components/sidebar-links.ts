@@ -8,6 +8,7 @@ import {
   Gift,
   Home,
   Map,
+  MapPin,
   MessageCircle,
   Settings,
   Truck,
@@ -61,6 +62,12 @@ export const ADMIN_USERS_LINK: SidebarLink = {
   href: "/manager/admin/users",
   label: "Користувачі",
   icon: UserCog,
+};
+
+export const ADMIN_REGION_AGENTS_LINK: SidebarLink = {
+  href: "/manager/admin/region-agents",
+  label: "Регіони менеджерів",
+  icon: MapPin,
 };
 
 export const SETTINGS_LINK: SidebarLink = {
