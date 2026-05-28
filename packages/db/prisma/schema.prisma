@@ -723,6 +723,8 @@ model User {
   viewPrefs        MgrUserViewPrefs[]
   routeSheetsExpedited RouteSheet[]         @relation("RouteSheetExpeditor")
   routeSheetsCreated   RouteSheet[]         @relation("RouteSheetCreatedBy")
+  chatConversations    ChatConversation[]   @relation("ChatConversationAgent")
+  chatInboxMessages    ChatInboxMessage[]   @relation("ChatInboxMessageAuthor")
 
   @@map("users")
 }
@@ -1087,6 +1089,7 @@ model MgrClient {
   reminders       MgrReminder[]
   timeline        MgrClientTimelineEntry[]
   assignments     ClientAssignment[]
+  chatConversations ChatConversation[]
 
   @@index([statusGeneralId])
   @@index([searchChannelId])
@@ -1416,4 +1419,77 @@ model MgrMessageTemplate {
 
   @@index([createdAt])
   @@map("mgr_message_templates")
+}
+
+// ─── Chat inbox (M1.8 Phase 1a) ────────────────────────────────────────────
+// Об'єднаний чат-inbox для менеджерів: Telegram + Viber (далі WhatsApp/Instagram).
+// Окремо від наявного `ChatMessage` (внутрішній чат магазину). Підстава —
+// docs/CHAT_INBOX_PLAN.md.
+
+enum ChatPlatform {
+  telegram
+  viber
+  whatsapp
+  instagram
+
+  @@map("chat_platform")
+}
+
+enum ChatDirection {
+  in
+  out
+
+  @@map("chat_direction")
+}
+
+enum ChatSender {
+  client
+  manager
+  system
+
+  @@map("chat_sender")
+}
+
+model ChatConversation {
+  id               String       @id @default(cuid())
+  platform         ChatPlatform
+  externalUserId   String       @map("external_user_id")
+  externalUserName String?      @map("external_user_name")
+  phone            String?
+  clientId         String?      @map("client_id")
+  agentUserId      String?      @map("agent_user_id")
+  status           String       @default("active")
+  unreadForManager Int          @default(0) @map("unread_for_manager")
+  lastMessageAt    DateTime     @default(now()) @map("last_message_at")
+  createdAt        DateTime     @default(now()) @map("created_at")
+  updatedAt        DateTime     @updatedAt @map("updated_at")
+
+  client   MgrClient? @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  agent    User?      @relation("ChatConversationAgent", fields: [agentUserId], references: [id], onDelete: SetNull)
+  messages ChatInboxMessage[]
+
+  @@unique([platform, externalUserId])
+  @@index([agentUserId, lastMessageAt(sort: Desc)])
+  @@index([clientId])
+  @@index([status, lastMessageAt(sort: Desc)])
+  @@map("mgr_chat_conversations")
+}
+
+model ChatInboxMessage {
+  id                String        @id @default(cuid())
+  conversationId    String        @map("conversation_id")
+  direction         ChatDirection
+  sender            ChatSender
+  text              String
+  mediaUrl          String?       @map("media_url")
+  externalMessageId String?       @map("external_message_id")
+  authorUserId      String?       @map("author_user_id")
+  isRead            Boolean       @default(false) @map("is_read")
+  createdAt         DateTime      @default(now()) @map("created_at")
+
+  conversation ChatConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  author       User?            @relation("ChatInboxMessageAuthor", fields: [authorUserId], references: [id], onDelete: SetNull)
+
+  @@index([conversationId, createdAt])
+  @@map("mgr_chat_inbox_messages")
 }
