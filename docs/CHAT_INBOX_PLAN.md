@@ -44,8 +44,16 @@
 
 ## Фази
 
-- **Фаза 1 (inbound+reply, TG+Viber):** вебхуки → `ChatConversation`/`ChatInboxMessage`, звірка за номером → прив'язка до клієнта; UI inbox (список розмов + тред + SSE + unread); відповідь менеджера → бот шле клієнту. **Код+тести будуються без живих токенів** (платформенний send — за інтерфейсом, мок у тестах); жива конекція — коли будуть токени.
-- **Фаза 2 (реєстрація нового):** номер не знайдено → бот питає область (+ім'я) → створюємо `MgrClient`(+`Customer`) → призначаємо торгового (за обраним правилом).
+- **Фаза 1 (inbound+reply, TG+Viber):** ✅ DONE. Вебхуки → `ChatConversation`/`ChatInboxMessage`, звірка за номером → прив'язка до клієнта; UI inbox (список розмов + тред + SSE + unread); відповідь менеджера → бот шле клієнту.
+- **Фаза 2 (реєстрація нового):** ✅ DONE. Бот сам веде діалог:
+  1. Нова розмова → welcome + кнопка contact-share (Telegram `request_contact` / Viber `share-phone`).
+  2. Phone отриманий → `matchClientByPhone`. Знайдено → link + welcome-back з ім'ям менеджера.
+  3. Не знайдено → бот шле 24-кнопкову клавіатуру областей (Telegram inline 2-в-ряд / Viber reply 2-в-ряд через `Columns:3`). Phone тимчасово зберігається у `ChatConversation.pendingPhone`.
+  4. Користувач обрав область → шукаємо у мапі `MgrRegionAgent`. Знайдено → створюємо `MgrClient` з `agentUserId` + completed; не знайдено → unassigned (admin розрулить вручну через `/manager/admin/region-agents`).
+  - **State machine** у `apps/store/lib/chat/registration.ts` (enum `chat_registration_step`: awaiting_phone / awaiting_region / completed / unassigned).
+  - **Список областей:** 24 (без окремого м. Київ — Київська область включає Київ). Slug→label мапа у `apps/store/lib/constants/regions.ts`.
+  - **Phone input** ТІЛЬКИ через contact-share кнопку (без ручного вводу); якщо клієнт пише вільний текст замість тапу — бот нагадує про кнопку.
+  - **Admin UI:** `/manager/admin/region-agents` (тільки admin) для CRUD мапи.
 - **Фаза 3 (V2):** WhatsApp + Instagram (Meta).
 - **TikTok:** лише кнопка-діплінк.
 

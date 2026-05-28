@@ -1,5 +1,5 @@
 import { prisma } from "@ltex/db";
-import type { ChatPlatform } from "@ltex/db";
+import type { ChatConversation, ChatPlatform } from "@ltex/db";
 import { matchClientByPhone } from "./phone-match";
 
 export interface IngestInboundArgs {
@@ -13,6 +13,50 @@ export interface IngestInboundArgs {
 
 export interface IngestInboundResult {
   conversationId: string;
+}
+
+export interface UpsertConversationArgs {
+  platform: ChatPlatform;
+  externalUserId: string;
+  externalUserName?: string | null;
+}
+
+/**
+ * Phase 2 — find-or-create розмови БЕЗ створення повідомлення. Потрібно для
+ * webhook handler-а, який спочатку має отримати conversation (зі стейтом
+ * реєстрації / pendingPhone / etc.) щоб викликати `handleRegistrationStep`
+ * до прийняття рішення про ingest. Старий `ingestInboundMessage` теж робить
+ * upsert (для backwards-compat не міняємо його сигнатуру).
+ */
+export async function upsertConversation(
+  args: UpsertConversationArgs,
+): Promise<
+  Pick<
+    ChatConversation,
+    "id" | "clientId" | "registrationStep" | "pendingPhone" | "externalUserName"
+  >
+> {
+  const { platform, externalUserId, externalUserName } = args;
+  return prisma.chatConversation.upsert({
+    where: { platform_externalUserId: { platform, externalUserId } },
+    create: {
+      platform,
+      externalUserId,
+      externalUserName: externalUserName ?? null,
+      unreadForManager: 0,
+      lastMessageAt: new Date(),
+    },
+    update: {
+      externalUserName: externalUserName ?? undefined,
+    },
+    select: {
+      id: true,
+      clientId: true,
+      registrationStep: true,
+      pendingPhone: true,
+      externalUserName: true,
+    },
+  });
 }
 
 export interface RecordOutboundSystemArgs {

@@ -3,25 +3,54 @@ import crypto from "crypto";
 import {
   ingestInboundMessage,
   recordOutboundSystemMessage,
+  upsertConversation,
 } from "@/lib/chat/inbound";
+import {
+  handleRegistrationStep,
+  type IncomingMessage,
+  type RegistrationOutcome,
+} from "@/lib/chat/registration";
+import { UA_REGIONS } from "@/lib/constants/regions";
 
 /**
  * Viber Bot Webhook handler.
  *
  * Бот працює виключно як канал переписки з менеджером (chat-inbox).
- * Self-service (меню / пошук / лоти / замовлення / категорії) видалений:
- * будь-який вільний текст іде в `ingestInboundMessage` → `/manager/chat`.
- * `conversation_started`/`subscribed`/`/start` → коротке welcome БЕЗ keyboard.
- * Події `delivered`/`seen`/`failed`/`unsubscribed`/`webhook` — no-op 200.
+ * Self-service видалений: будь-який вільний текст іде в `ingestInboundMessage`
+ * → `/manager/chat`. Phase 2: state machine реєстрації нового клієнта.
  *
- * Env vars:
- *   VIBER_AUTH_TOKEN — bot auth token
+ * Env vars: VIBER_AUTH_TOKEN
  */
 
 const WELCOME_TEXT =
   "👋 Вітаємо в L-TEX! Напишіть ваше повідомлення — менеджер відповість якнайшвидше.";
 
-async function sendMessage(receiverId: string, text: string): Promise<void> {
+// ─── Viber keyboard types ───────────────────────────────────────────────────
+
+interface ViberKeyboardButton {
+  Columns: number;
+  Rows: number;
+  ActionType: "reply" | "share-phone" | "open-url" | "none";
+  ActionBody: string;
+  Text: string;
+  TextSize?: "small" | "regular" | "large";
+  TextHAlign?: "left" | "center" | "right";
+  TextVAlign?: "top" | "middle" | "bottom";
+  BgColor?: string;
+  TextColor?: string;
+}
+
+interface ViberKeyboard {
+  Type: "keyboard";
+  Buttons: ViberKeyboardButton[];
+  DefaultHeight?: boolean;
+}
+
+async function sendMessage(
+  receiverId: string,
+  text: string,
+  keyboard?: ViberKeyboard,
+): Promise<void> {
   const token = process.env.VIBER_AUTH_TOKEN ?? "";
   await fetch("https://chatapi.viber.com/pa/send_message", {
     method: "POST",
@@ -34,14 +63,59 @@ async function sendMessage(receiverId: string, text: string): Promise<void> {
       type: "text",
       text,
       min_api_version: 7,
+      ...(keyboard ? { keyboard } : {}),
     }),
   });
+}
+
+function contactKeyboard(): ViberKeyboard {
+  return {
+    Type: "keyboard",
+    DefaultHeight: true,
+    Buttons: [
+      {
+        Columns: 6,
+        Rows: 1,
+        ActionType: "share-phone",
+        ActionBody: "+38",
+        Text: "📞 Поділитись номером",
+        TextSize: "regular",
+        TextHAlign: "center",
+        TextVAlign: "middle",
+        BgColor: "#22c55e",
+        TextColor: "#ffffff",
+      },
+    ],
+  };
+}
+
+/**
+ * Viber-клавіатура з 24 областями — 2 кнопки в ряд → кожна `Columns: 3`
+ * (Viber керує grid через 6-колонкову сітку). ActionType=reply, ActionBody=
+ * `region:<slug>` — детектується далі у обробці тексту.
+ */
+function regionKeyboard(): ViberKeyboard {
+  return {
+    Type: "keyboard",
+    DefaultHeight: true,
+    Buttons: UA_REGIONS.map((r) => ({
+      Columns: 3,
+      Rows: 1,
+      ActionType: "reply",
+      ActionBody: `region:${r.slug}`,
+      Text: r.label,
+      TextSize: "regular",
+      TextHAlign: "center",
+      TextVAlign: "middle",
+      BgColor: "#f1f5f9",
+      TextColor: "#0f172a",
+    })),
+  };
 }
 
 /**
  * Опційно дістає телефон користувача через `/pa/get_user_details`.
  * Повертає `null` коли API недоступне / телефон не наданий.
- * Не кидає винятків.
  */
 async function fetchViberUserPhone(userId: string): Promise<string | null> {
   const token = process.env.VIBER_AUTH_TOKEN ?? "";
@@ -67,18 +141,41 @@ async function fetchViberUserPhone(userId: string): Promise<string | null> {
   }
 }
 
-// ─── Welcome ────────────────────────────────────────────────────────────────
+/**
+ * Відповідь бота клієнту з urахуванням outcome state-machine.
+ */
+async function applyOutcome(
+  userId: string,
+  userName: string | null,
+  outcome: RegistrationOutcome,
+): Promise<void> {
+  if (outcome.kind === "noop") return;
 
-async function handleStart(userId: string, userName?: string): Promise<void> {
-  const text = userName ? `${userName}, ${WELCOME_TEXT}` : WELCOME_TEXT;
-  await sendMessage(userId, text);
-  // Залогувати welcome у треді, щоб менеджер бачив, що бот уже відповів.
-  // Для `conversation_started` це теж створить розмову (upsert), щоб
-  // тред існував у /manager/chat від першого контакту.
+  let text: string;
+  let keyboard: ViberKeyboard | undefined;
+
+  switch (outcome.kind) {
+    case "ask_phone":
+      text = outcome.promptText;
+      keyboard = contactKeyboard();
+      break;
+    case "ask_region":
+      text = outcome.promptText;
+      keyboard = regionKeyboard();
+      break;
+    case "linked":
+    case "registered":
+    case "unassigned":
+      text = outcome.greeting;
+      keyboard = undefined; // прибрати keyboard після завершення
+      break;
+  }
+
+  await sendMessage(userId, text, keyboard);
   await recordOutboundSystemMessage({
     platform: "viber",
     externalUserId: userId,
-    externalUserName: userName ?? null,
+    externalUserName: userName,
     text,
   });
 }
@@ -91,8 +188,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Bot not configured" }, { status: 503 });
   }
 
-  // Viber always signs callbacks with the bot auth token. Reject any request
-  // that lacks a valid HMAC-SHA256 signature — unsigned callbacks are never OK.
+  // Viber always signs callbacks with the bot auth token.
   const signature = request.headers.get("x-viber-content-signature");
   if (!signature) {
     return NextResponse.json({ error: "Missing signature" }, { status: 403 });
@@ -116,7 +212,11 @@ export async function POST(request: NextRequest) {
     event: string;
     sender?: { id: string; name?: string };
     user?: { id: string; name?: string };
-    message?: { text?: string; type?: string };
+    message?: {
+      text?: string;
+      type?: string;
+      contact?: { phone_number?: string };
+    };
     message_token?: number | string;
   };
   try {
@@ -132,31 +232,96 @@ export async function POST(request: NextRequest) {
         break;
 
       case "conversation_started":
-        // Перший контакт: коротке welcome. НЕ ingest-имо: у Viber подія
-        // `conversation_started` спрацьовує при відкритті чату й до
-        // реального повідомлення (без `message`).
+        // Перший контакт (відкриття чату ДО першого повідомлення). Phase 2:
+        // запустити state-machine, щоб бот сам надіслав welcome+contact-keyboard.
         if (event.user) {
-          await handleStart(event.user.id, event.user.name);
+          const conv = await upsertConversation({
+            platform: "viber",
+            externalUserId: event.user.id,
+            externalUserName: event.user.name ?? null,
+          });
+          const outcome = await handleRegistrationStep({
+            conversation: conv,
+            // Trigger entry-state без явного повідомлення — викидаємо порожній
+            // text, він не вплине на flow (registrationStep===null → ask_phone
+            // незалежно від message).
+            message: { type: "text", text: "" },
+          });
+          if (outcome.kind !== "noop") {
+            await applyOutcome(event.user.id, event.user.name ?? null, outcome);
+          } else {
+            // Для legacy completed-розмов — просто welcome.
+            const name = event.user.name;
+            const text = name ? `${name}, ${WELCOME_TEXT}` : WELCOME_TEXT;
+            await sendMessage(event.user.id, text);
+            await recordOutboundSystemMessage({
+              platform: "viber",
+              externalUserId: event.user.id,
+              externalUserName: name ?? null,
+              text,
+            });
+          }
         }
         break;
 
       case "message":
         if (event.sender && event.message) {
           const userId = event.sender.id;
+          const userName = event.sender.name ?? null;
           const text = event.message.text?.trim() ?? "";
           const messageType = event.message.type ?? "text";
           const messageToken =
             event.message_token != null ? String(event.message_token) : null;
+          const contactPhone = event.message.contact?.phone_number ?? null;
 
+          // Phase 2: contact share від клієнта приходить як type:"contact"
+          // з вкладеним contact.phone_number.
+          if (messageType === "contact" && contactPhone) {
+            const conv = await upsertConversation({
+              platform: "viber",
+              externalUserId: userId,
+              externalUserName: userName,
+            });
+            const outcome = await handleRegistrationStep({
+              conversation: conv,
+              message: { type: "contact", phone: contactPhone },
+            });
+            await applyOutcome(userId, userName, outcome);
+            break;
+          }
+
+          // Нормальний текст (вільний або вибір регіону через reply-кнопку).
           if (messageType === "text" && text.length > 0) {
-            // Будь-який вільний текст — у inbox. /start теж: менеджер
-            // побачить, що клієнт зайшов уперше.
+            const conv = await upsertConversation({
+              platform: "viber",
+              externalUserId: userId,
+              externalUserName: userName,
+            });
+
+            const incoming: IncomingMessage = text.startsWith("region:")
+              ? {
+                  type: "region_select",
+                  regionSlug: text.slice("region:".length),
+                }
+              : { type: "text", text };
+
+            const outcome = await handleRegistrationStep({
+              conversation: conv,
+              message: incoming,
+            });
+
+            if (outcome.kind !== "noop") {
+              await applyOutcome(userId, userName, outcome);
+              break;
+            }
+
+            // Noop = звичайний ingest.
             try {
               const phone = await fetchViberUserPhone(userId);
               await ingestInboundMessage({
                 platform: "viber",
                 externalUserId: userId,
-                externalUserName: event.sender.name ?? null,
+                externalUserName: userName,
                 text,
                 phone,
                 externalMessageId: messageToken,
@@ -167,12 +332,21 @@ export async function POST(request: NextRequest) {
               });
             }
 
+            // Legacy /start — повторити welcome.
             if (text === "/start") {
-              await handleStart(userId, event.sender.name);
+              const wtext = userName
+                ? `${userName}, ${WELCOME_TEXT}`
+                : WELCOME_TEXT;
+              await sendMessage(userId, wtext);
+              await recordOutboundSystemMessage({
+                platform: "viber",
+                externalUserId: userId,
+                externalUserName: userName,
+                text: wtext,
+              });
             }
           }
-          // Non-text повідомлення (picture, video, file, location, contact,
-          // sticker, url) — silent ignore у Phase 1.
+          // picture, video, file, location, sticker, url — silent у Phase 1+2.
         }
         break;
 
