@@ -10,6 +10,8 @@ export interface SidebarNavLinkProps {
   label: string;
   icon: ReactNode;
   badge?: number;
+  /** Опціональний живий бейдж (client-side polling) — має пріоритет над `badge`. */
+  badgeSlot?: ReactNode;
   onNavigate?: () => void;
 }
 
@@ -18,6 +20,7 @@ export function SidebarNavLink({
   label,
   icon,
   badge,
+  badgeSlot,
   onNavigate,
 }: SidebarNavLinkProps) {
   const pathname = usePathname();
@@ -39,11 +42,14 @@ export function SidebarNavLink({
     >
       {icon}
       <span className="flex-1">{label}</span>
-      {badge !== undefined && badge > 0 && (
-        <span className="rounded-full bg-red-500 px-2 py-0.5 text-xs font-medium text-white">
-          {badge > 9 ? "9+" : badge}
-        </span>
-      )}
+      {badgeSlot !== undefined
+        ? badgeSlot
+        : badge !== undefined &&
+          badge > 0 && (
+            <span className="rounded-full bg-red-500 px-2 py-0.5 text-xs font-medium text-white">
+              {badge > 9 ? "9+" : badge}
+            </span>
+          )}
     </Link>
   );
 }

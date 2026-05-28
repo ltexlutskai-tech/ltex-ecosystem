@@ -10,17 +10,15 @@ import { SidebarMobileTrigger } from "./sidebar-mobile-trigger";
 export function ManagerHeader({
   fullName,
   role,
-  chatUnread = 0,
   lastSyncAt,
 }: {
   fullName: string;
   role: ManagerRole;
-  chatUnread?: number;
   lastSyncAt: string | null;
 }) {
   return (
     <header className="flex h-14 shrink-0 items-center gap-3 border-b bg-white px-3 lg:px-6">
-      <SidebarMobileTrigger role={role} chatUnread={chatUnread} />
+      <SidebarMobileTrigger role={role} />
       <Link
         href="/manager"
         className="text-lg font-bold text-green-700 whitespace-nowrap"

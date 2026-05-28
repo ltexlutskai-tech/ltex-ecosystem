@@ -17,18 +17,16 @@ export default async function WorkstationLayout({
   if (!user) redirect("/manager/login");
 
   const lastSyncAt = new Date().toISOString();
-  const chatUnread = 0;
 
   return (
     <div className="flex h-screen flex-col bg-gray-50">
       <ManagerHeader
         fullName={user.fullName}
         role={user.role}
-        chatUnread={chatUnread}
         lastSyncAt={lastSyncAt}
       />
       <div className="flex flex-1 overflow-hidden">
-        <ManagerSidebar role={user.role} chatUnread={chatUnread} />
+        <ManagerSidebar role={user.role} />
         <main className="flex-1 overflow-y-auto p-4 md:p-6">{children}</main>
       </div>
       <Toaster />
