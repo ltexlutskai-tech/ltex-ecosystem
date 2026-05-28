@@ -37,7 +37,9 @@ export async function notifyNewOrder(order: OrderNotification): Promise<void> {
 async function sendTelegramNotification(
   order: OrderNotification,
 ): Promise<void> {
-  const botToken = process.env.TELEGRAM_BOT_TOKEN;
+  const botToken =
+    process.env.TELEGRAM_NOTIFICATIONS_BOT_TOKEN ??
+    process.env.TELEGRAM_BOT_TOKEN;
   const chatId = process.env.TELEGRAM_CHAT_ID;
 
   if (!botToken || !chatId) return;
@@ -151,7 +153,9 @@ function escapeMarkdownCode(text: string): string {
 export async function notifyNewLead(
   params: NewLeadNotification,
 ): Promise<void> {
-  const botToken = process.env.TELEGRAM_BOT_TOKEN;
+  const botToken =
+    process.env.TELEGRAM_NOTIFICATIONS_BOT_TOKEN ??
+    process.env.TELEGRAM_BOT_TOKEN;
   const chatId = process.env.NEWSLETTER_TELEGRAM_CHAT_ID;
 
   if (!botToken || !chatId) {
@@ -209,7 +213,9 @@ export async function notifyNewLead(
 export async function notifyNewsletterSubscribe(
   payload: NewsletterNotification,
 ): Promise<void> {
-  const botToken = process.env.TELEGRAM_BOT_TOKEN;
+  const botToken =
+    process.env.TELEGRAM_NOTIFICATIONS_BOT_TOKEN ??
+    process.env.TELEGRAM_BOT_TOKEN;
   const chatId = process.env.NEWSLETTER_TELEGRAM_CHAT_ID;
 
   if (!botToken || !chatId) {

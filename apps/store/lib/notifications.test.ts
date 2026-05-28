@@ -397,3 +397,90 @@ describe("notifyNewLead", () => {
     expect(text).not.toContain("Область");
   });
 });
+
+describe("TELEGRAM_NOTIFICATIONS_BOT_TOKEN takes precedence over TELEGRAM_BOT_TOKEN", () => {
+  let fetchSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    fetchSpy = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValue(
+        new Response(JSON.stringify({ ok: true }), { status: 200 }),
+      );
+    vi.spyOn(console, "info").mockImplementation(() => {});
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllEnvs();
+  });
+
+  it("notifyNewOrder uses notifications bot token when both are set", async () => {
+    vi.stubEnv("TELEGRAM_BOT_TOKEN", "inbox-token");
+    vi.stubEnv("TELEGRAM_NOTIFICATIONS_BOT_TOKEN", "notifications-token");
+    vi.stubEnv("TELEGRAM_CHAT_ID", "test-chat-id");
+    vi.stubEnv("VIBER_AUTH_TOKEN", "");
+    vi.stubEnv("VIBER_ADMIN_USER_ID", "");
+
+    await notifyNewOrder(mockOrder);
+
+    const telegramCall = fetchSpy.mock.calls.find((c: unknown[]) =>
+      (c[0] as string).includes("api.telegram.org"),
+    );
+    expect(telegramCall).toBeDefined();
+    expect(telegramCall![0] as string).toContain("/botnotifications-token/");
+    expect(telegramCall![0] as string).not.toContain("/botinbox-token/");
+  });
+
+  it("notifyNewsletterSubscribe uses notifications bot token when both are set", async () => {
+    vi.stubEnv("TELEGRAM_BOT_TOKEN", "inbox-token");
+    vi.stubEnv("TELEGRAM_NOTIFICATIONS_BOT_TOKEN", "notifications-token");
+    vi.stubEnv("NEWSLETTER_TELEGRAM_CHAT_ID", "newsletter-chat-id");
+
+    await notifyNewsletterSubscribe({
+      email: "user@example.com",
+      source: "footer",
+      subscribedAt: new Date("2026-04-25T12:00:00Z"),
+    });
+
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    expect(fetchSpy.mock.calls[0]![0] as string).toBe(
+      "https://api.telegram.org/botnotifications-token/sendMessage",
+    );
+  });
+
+  it("notifyNewLead uses notifications bot token when both are set, with fallback when only TELEGRAM_BOT_TOKEN set", async () => {
+    // Case A: both set → notifications wins
+    vi.stubEnv("TELEGRAM_BOT_TOKEN", "inbox-token");
+    vi.stubEnv("TELEGRAM_NOTIFICATIONS_BOT_TOKEN", "notifications-token");
+    vi.stubEnv("NEWSLETTER_TELEGRAM_CHAT_ID", "newsletter-chat-id");
+
+    await notifyNewLead({
+      customerId: "cust-123",
+      phone: "+380671234567",
+      name: "Іван",
+      source: "web",
+    });
+
+    expect(fetchSpy.mock.calls[0]![0] as string).toBe(
+      "https://api.telegram.org/botnotifications-token/sendMessage",
+    );
+
+    // Case B: only TELEGRAM_BOT_TOKEN set (notifications token unset) →
+    // fallback to inbox token (backward compat for single-bot deployments).
+    fetchSpy.mockClear();
+    vi.stubEnv("TELEGRAM_NOTIFICATIONS_BOT_TOKEN", undefined);
+
+    await notifyNewLead({
+      customerId: "cust-456",
+      phone: "+380501112233",
+      name: "Петро",
+      source: "web",
+    });
+
+    expect(fetchSpy.mock.calls[0]![0] as string).toBe(
+      "https://api.telegram.org/botinbox-token/sendMessage",
+    );
+  });
+});
