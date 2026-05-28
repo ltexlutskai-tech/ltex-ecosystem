@@ -4,12 +4,14 @@ import { NextRequest } from "next/server";
 process.env.TELEGRAM_BOT_TOKEN = "test-bot-token";
 process.env.TELEGRAM_WEBHOOK_SECRET = "test-webhook-secret";
 
-const { ingestMock } = vi.hoisted(() => ({
+const { ingestMock, recordOutMock } = vi.hoisted(() => ({
   ingestMock: vi.fn(),
+  recordOutMock: vi.fn(),
 }));
 
 vi.mock("@/lib/chat/inbound", () => ({
   ingestInboundMessage: (...args: unknown[]) => ingestMock(...args),
+  recordOutboundSystemMessage: (...args: unknown[]) => recordOutMock(...args),
 }));
 
 import { POST } from "./route";
@@ -34,6 +36,7 @@ const fetchMock = vi.fn(
 beforeEach(() => {
   vi.clearAllMocks();
   ingestMock.mockResolvedValue({ conversationId: "c1" });
+  recordOutMock.mockResolvedValue(undefined);
   vi.stubGlobal("fetch", fetchMock);
 });
 
@@ -108,6 +111,30 @@ describe("POST /api/telegram/webhook", () => {
     >;
     expect(sentBody.chat_id).toBe(999);
     expect(String(sentBody.text)).toContain("L-TEX");
+    // Welcome також записаний у тред (out/system).
+    expect(recordOutMock).toHaveBeenCalledTimes(1);
+    expect(recordOutMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        platform: "telegram",
+        externalUserId: "999",
+        externalUserName: "vasya",
+        text: expect.stringContaining("L-TEX"),
+      }),
+    );
+  });
+
+  it("does NOT record welcome для звичайного тексту (тільки /start)", async () => {
+    await POST(
+      makeRequest({
+        message: {
+          chat: { id: 444 },
+          from: { first_name: "Olya" },
+          message_id: 11,
+          text: "Шукаю куртки",
+        },
+      }),
+    );
+    expect(recordOutMock).not.toHaveBeenCalled();
   });
 
   it("ignores non-text payloads (sticker/photo)", async () => {
