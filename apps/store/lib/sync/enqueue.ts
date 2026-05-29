@@ -3,7 +3,7 @@ import { Prisma, prisma } from "@ltex/db";
 import type { ClientUpdatePayload } from "@/lib/validations/sync-job";
 
 /**
- * Збирає payload для 1С `ОбновитиКлієнта` з MgrClient row + relations
+ * Збирає payload для 1С `ОбновитиКлієнтаJSON` з MgrClient row + relations
  * і створює row у `mgr_sync_jobs` черзі.
  *
  * Cron-worker (`/api/cron/process-sync-queue`) поступово дренує чергу.
@@ -14,6 +14,53 @@ import type { ClientUpdatePayload } from "@/lib/validations/sync-job";
  *
  * **DO NOT** робити цей call синхронно у HTTP-handler-i; завжди обертай
  * у try/catch і не fail-и сам PATCH якщо enqueue впав (sync — best-effort).
+ *
+ * ─── Розбіжності з BSL (Етап 2.5 align, TODO для наступного раунду) ──────
+ *
+ * Поля payload-ів, які BSL у `docs/1c-bsl/outbound/Module.bsl.append`
+ * **ігнорує** (не присвоює у реквізити документа/довідника):
+ *
+ *   • Client:
+ *       — `primaryAssortmentCode` — у BSL TODO (немає очевидного 1С-довідника).
+ *
+ *   • Order:
+ *       — `status` (наш draft/sent/posted) — у BSL немає mapping.
+ *       — `totalUah` — BSL пише лише `СуммаДокумента` з `totalEur`.
+ *       — `code1C` (повторно) — BSL не оновлює існуючі замовлення, лише створює.
+ *       — `items[].productId` / `items[].lotId` (наші внутрішні UUID) — ігнорується;
+ *         BSL використовує тільки `productCode1C` / `lotBarcode`.
+ *
+ *   • Payment:
+ *       — `currency` (наш "UAH"/"EUR") — BSL пише завжди в УГА (валюта документа).
+ *       — `orderInternalId` (наш UUID) — BSL знаходить замовлення за `orderCode1C`.
+ *
+ *   • CashOrder (НАЙБІЛЬШЕ розбіжностей — BSL покриває лише ПКО UAH):
+ *       — `amountEur`, `amountUsd`, `amountUahCashless` — ігнорується;
+ *         multi-currency сценарій (3 ордери + безнал) — TODO BSL (README §5.2).
+ *       — `debtCorrection`, `correctionUid` — корекція боргу не реалізована.
+ *       — `uidUah`, `uidEur`, `uidUsd` — мультивалютні UUID-ключі не використовуються.
+ *       — `docNumber`, `code1C` — BSL не оновлює існуючі касові ордери.
+ *
+ *   • Sale (Realization):
+ *       — `customerName` — BSL читає з resolved посилання на Контрагента.
+ *       — `priceTypeId` (наш UUID) — BSL потребує `code` довідника; treba замінити
+ *         на `priceTypeCode` як у Client.
+ *       — `assignedAgentUserId` (наш Next-user UUID) — НЕ резолвиться у Catalog.
+ *         ТорговыйАгент; треба передавати `assignedAgentCode1C`.
+ *       — `onTradeAgent` (bool) — у BSL немає mapping.
+ *       — `docNumber`, `code1C` — BSL не оновлює існуючі реалізації.
+ *       — `items[].productId`/`items[].lotId` — ігнорується (як в Order).
+ *
+ *   • RouteSheet:
+ *       — `payments[]` — ігнорується; 1С відновлює оплати з пов'язаних ПКО/РКО
+ *         (аудит §H, дискримінатор `ТабЧасть`).
+ *       — `date`, `code1C`, `docNumber` — BSL виставляє `Дата = ТекущаяДата()`.
+ *       — `items[].unit`, `loading[].unit` — BSL не використовує (одиниці резолвить
+ *         з номенклатури).
+ *
+ * Жодна розбіжність НЕ блокує fire-and-forget enqueue — BSL обертає кожне
+ * присвоєння у `Попытка...Исключение КонецПопытки` і просто пропускає невідомий
+ * реквізит. Усе вище — питання повноти даних на стороні 1С, а не runtime-помилка.
  */
 
 export interface ClientForEnqueue {
@@ -103,7 +150,8 @@ export async function enqueueClientUpdate(
 
 /**
  * Shape для `enqueueOrderCreate` — мінімум полів з Order + items для
- * payload-у `СтворитиЗамовлення` SOAP-operation (див. docs/1C_SYNC_MODULES_SPEC.md §3.2).
+ * payload-у `СтворитиЗамовленняJSON` SOAP-operation (див. docs/1C_SYNC_MODULES_SPEC.md §3.2
+ * + `docs/1c-bsl/outbound/Module.bsl.append`).
  *
  * Усі numeric поля передаються як string з `.` decimal separator щоб уникнути
  * floating-point issues (1С парсить через Число()).
@@ -188,7 +236,7 @@ export async function enqueueOrderCreate(order: OrderForEnqueue) {
 
 /**
  * Shape для `enqueuePaymentCreate` — мінімум полів з Payment + parent
- * order.code1C для payload-у `СтворитиОплату`.
+ * order.code1C для payload-у `СтворитиОплатуJSON`.
  */
 export interface PaymentForEnqueue {
   id: string;
@@ -245,7 +293,8 @@ export async function enqueuePaymentCreate(payment: PaymentForEnqueue) {
 
 /**
  * Shape для `enqueueSaleCreate` — мінімум полів з Sale + items для payload-у
- * `СтворитиРеалізацію` SOAP-operation (див. docs/1C_SYNC_MODULES_SPEC.md §3.4).
+ * `СтворитиРеалізаціюJSON` SOAP-operation (див. docs/1C_SYNC_MODULES_SPEC.md §3.4
+ * + `docs/1c-bsl/outbound/Module.bsl.append`).
  *
  * Mirror-ить `OrderForEnqueue`, але реалізація несе додаткові менеджерські
  * поля (курс EUR+USD, наложка/сума COD, призначений агент, ТТН) і кожен рядок
@@ -366,9 +415,12 @@ export async function enqueueSaleCreate(sale: SaleForEnqueue) {
 
 /**
  * Shape для `enqueueCashOrderCreate` — мінімум полів з MgrCashOrder + relations
- * для payload-у `СоздатьПКО` SOAP-operation (див. docs/1C_SYNC_MODULES_SPEC.md
- * §3.5). Один мобільний касовий ордер → до 3 ПКО/РКО у central 1С (по одному на
- * валюту з ненульовою сумою) + безнал як платіжне доручення (контракт §H аудиту).
+ * для payload-у `СтворитиКасовийОрдерJSON` SOAP-operation (див. docs/1C_SYNC_MODULES_SPEC.md
+ * §3.5 + `docs/1c-bsl/outbound/Module.bsl.append`). Один мобільний касовий
+ * ордер → до 3 ПКО/РКО у central 1С (по одному на валюту з ненульовою сумою)
+ * + безнал як платіжне доручення (контракт §H аудиту).
+ * ⚠ BSL поки реалізує ЛИШЕ сценарій ПКО UAH (README §5.2 outbound); решта валют
+ * + безнал + здача — TODO для наступного раунду.
  *
  * Усі numeric поля передаються як string з `.` decimal separator (1С парсить
  * через Число()). Курси — 4 знаки. `customer`/`sale` несуть code1C як 1С-ключі;
@@ -474,8 +526,9 @@ export async function enqueueCashOrderCreate(order: CashOrderForEnqueue) {
 // ─── M1.9 (Маршрутний лист, Етап 5) — Route sheet enqueue ───────────────────
 
 /**
- * Збирає payload для 1С `СтворитиМаршрутнийЛист` (двофазний контракт,
- * `docs/1C_SYNC_MODULES_SPEC.md` §3.6) і ставить row у `mgr_sync_jobs` чергу.
+ * Збирає payload для 1С `СтворитиМаршрутнийЛистJSON` (двофазний контракт,
+ * `docs/1C_SYNC_MODULES_SPEC.md` §3.6 + `docs/1c-bsl/outbound/Module.bsl.append`)
+ * і ставить row у `mgr_sync_jobs` чергу.
  *
  * Маршрутний лист — документ-агрегатор дня виїзду: він не несе власних товарних
  * полів, а **оркеструє** дочірні таб. частини (`Заказы`/`ТоварыЗаказов`/
