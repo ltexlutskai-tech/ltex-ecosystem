@@ -302,3 +302,57 @@ production до моменту узгодження. Тоді `services/manager-
    чи краще додати UID-поле на нашій стороні? Наше payload не несе
    `cityCode1C` зараз — додавати?
 6. **Ім'я операції** — фінальне рішення `JSON`-суфікс vs без (див. §4)?
+
+
+---
+
+## 8. Доповнення Етапу 4 (Closures блок, M3.4)
+
+`Module.bsl.append` додатково містить 2 функції для блоку «Закриття старих
+замовлень» (наш Node `/api/v1/manager/closures/[clientId]`):
+
+- **`ОтриматиДаніЗакриттяЗамовленьJSON(ПарольВхода, JSONДані)`** — повертає
+  список незакритих замовлень контрагента (з `Документ.ЗакрытиеЗаказовПокупателей`
+  + регістру `ЗаказыПокупателей.Остатки`). Тонкий wrapper над
+  `ОбменАРМ.ПолучитьДанныеНезакрытыхЗаказов_v1` — декодує `ТаблицаЗначений`
+  у JSON-масив.
+- **`ЗакритиСтаріЗамовленняJSON(ПарольВхода, JSONДані)`** — закриває обрані
+  замовлення + опційно створює нове замовлення для позицій з
+  `addToNewOrder: true`. Wrapper над `ОбменАРМ.ЗакрытьСтарыеЗаказы_v1`.
+
+Декларації — у `MobileExchange.xml.diff` §Доповнення (після 6 операцій Етапу 2).
+
+### Smoke-тест 5: ОтриматиДаніЗакриттяЗамовленьJSON
+
+```bash
+PASSWORD='<значення-з-Константа.СинкСистемнийПароль>'
+URL='https://<1c-host>/<base>/ws/MobileExchange.1cws'
+PAYLOAD='{"idempotencyKey":"smoke-closures-get-001","data":{"clientCode1C":"000001"}}'
+# ...надсилаємо SOAP-запит з body $PAYLOAD у параметрі ms:JSONДані
+```
+
+Очікувано: `{"ok":true, "code1C":null, "alreadyProcessed":false,
+"data":{"items":[{"orderUid":"...", "orderNumber":"L-2026-...", "orderDate":"...",
+"productUid":"...", "productName":"...", "quantity":<n>, "sum":<n>, "sold":<n>,
+"status":"Новий"}]}, "error":null}`.
+
+Якщо у контрагента немає незакритих замовлень — `items: []`.
+
+### Smoke-тест 6: ЗакритиСтаріЗамовленняJSON
+
+Закриваємо 1 замовлення + переносимо 1 позицію у нове замовлення.
+**УВАГА:** ця операція РЕАЛЬНО створює документи в 1С — спершу прогнати
+на тестовій базі. `productUid`/`orderUid` беремо з відповіді
+Smoke-теста 5 вище.
+
+```bash
+PAYLOAD='{"idempotencyKey":"smoke-closures-write-001","data":{"clientCode1C":"000001","items":[{"orderUid":"abcd1234-...","productUid":"efgh5678-...","quantity":75,"price":50,"addToNewOrder":true}]}}'
+# ...надсилаємо SOAP-запит з body $PAYLOAD у параметрі ms:JSONДані
+```
+
+Очікувано: `{"ok":true, "code1C":"L-2026-00567", "alreadyProcessed":false,
+"data":{"newOrderUid":"...", "newOrderNumber":"L-2026-00567",
+"closedCount":1}, "error":null}`.
+
+Повторний виклик з тим же `idempotencyKey` → `alreadyProcessed: true`,
+жодного нового документа.
