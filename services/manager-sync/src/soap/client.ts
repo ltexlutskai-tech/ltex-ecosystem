@@ -19,13 +19,24 @@ import type {
   RouteSheetCreateResult,
 } from "./types";
 
+// ─── Імена SOAP-операцій узгоджені з BSL (Етап 2.5, Опція А) ────────────────
+// Див. `docs/1c-bsl/outbound/Module.bsl.append` — усі 6 функцій з суфіксом
+// `JSON`, приймають 2 string-параметри (`ПарольВхода` + `JSONДані`).
+
+const OP_CLIENT_UPDATE = "ОбновитиКлієнтаJSON";
+const OP_ORDER_CREATE = "СтворитиЗамовленняJSON";
+const OP_PAYMENT_CREATE = "СтворитиОплатуJSON";
+const OP_REALIZATION_CREATE = "СтворитиРеалізаціюJSON";
+const OP_CASH_ORDER_CREATE = "СтворитиКасовийОрдерJSON";
+const OP_ROUTE_SHEET_CREATE = "СтворитиМаршрутнийЛистJSON";
+
 /**
- * Викликає 1С SOAP operation `ОбновитиКлієнта`.
+ * Викликає 1С SOAP operation `ОбновитиКлієнтаJSON`.
  *
  * **NOT EXERCISED IN CI** — викликається тільки коли SYNC_MOCK_MODE=false.
  * Тести covering only envelope construction + response parsing (детерміністично);
  * real handshake — separate manual smoke test після того як 1С-розробник
- * реалізує BSL-модулі за `docs/1C_SYNC_MODULES_SPEC.md`.
+ * розгорне BSL-модулі з `docs/1c-bsl/outbound/`.
  */
 export async function updateClientViaSoap(
   req: ClientUpdateRequest,
@@ -38,12 +49,11 @@ export async function updateClientViaSoap(
     );
   }
 
-  const payloadJson = JSON.stringify(req.payload);
   const envelope = buildSoapEnvelope({
-    operation: "ОбновитиКлієнта",
+    operation: OP_CLIENT_UPDATE,
     password: config.onecPassword,
     idempotencyKey: req.idempotencyKey,
-    payloadJson,
+    payload: req.payload,
   });
 
   const controller = new AbortController();
@@ -55,7 +65,7 @@ export async function updateClientViaSoap(
       method: "POST",
       headers: {
         "Content-Type": "text/xml; charset=utf-8",
-        SOAPAction: buildSoapAction("ОбновитиКлієнта"),
+        SOAPAction: buildSoapAction(OP_CLIENT_UPDATE),
       },
       body: envelope,
       signal: controller.signal,
@@ -82,7 +92,7 @@ export async function updateClientViaSoap(
     );
   }
 
-  return normalizeResult(parsed);
+  return normalizeClientResult(parsed);
 }
 
 async function safeReadText(res: Response): Promise<string> {
@@ -93,7 +103,41 @@ async function safeReadText(res: Response): Promise<string> {
   }
 }
 
-function normalizeResult(parsed: unknown): ClientUpdateResult {
+/**
+ * Витягує (errorCode, errorMessage) з BSL-відповіді АБО з legacy/mock-формату.
+ *
+ * BSL формат (`docs/1c-bsl/outbound/Module.bsl.append`):
+ *   { ok:false, code1C:null, alreadyProcessed:false,
+ *     error: { code: "auth_failed", message: "..." } }
+ *
+ * Legacy/mock формат (досі генерує наш mock.ts):
+ *   { ok:false, errorCode: 4, errorMessage: "..." }
+ *
+ * Підтримуємо обидва, поки не оновимо mock.ts на нову схему окремим раундом.
+ */
+function extractErrorFields(obj: Record<string, unknown>): {
+  errorCode: number;
+  errorMessage: string;
+} {
+  // BSL: error: { code, message }
+  if (obj.error && typeof obj.error === "object") {
+    const err = obj.error as Record<string, unknown>;
+    return {
+      // BSL код — рядок (e.g. "auth_failed"); хешуємо у number-slot,
+      // лишаємо 4 (generic) як sentinel — caller дивиться на message.
+      errorCode: typeof err.code === "string" ? 4 : 4,
+      errorMessage:
+        typeof err.message === "string" ? err.message : "Unknown error",
+    };
+  }
+  return {
+    errorCode: typeof obj.errorCode === "number" ? obj.errorCode : 4,
+    errorMessage:
+      typeof obj.errorMessage === "string" ? obj.errorMessage : "Unknown error",
+  };
+}
+
+function normalizeClientResult(parsed: unknown): ClientUpdateResult {
   if (!parsed || typeof parsed !== "object") {
     throw new Error("SOAP response: <return> JSON is not an object");
   }
@@ -107,18 +151,13 @@ function normalizeResult(parsed: unknown): ClientUpdateResult {
         : [],
     };
   }
-  return {
-    ok: false,
-    errorCode: typeof obj.errorCode === "number" ? obj.errorCode : 4,
-    errorMessage:
-      typeof obj.errorMessage === "string" ? obj.errorMessage : "Unknown error",
-  };
+  return { ok: false, ...extractErrorFields(obj) };
 }
 
 // ─── M1.5b: order + payment SOAP wrappers ───────────────────────────────────
 
 /**
- * Викликає 1С SOAP operation `СтворитиЗамовлення`.
+ * Викликає 1С SOAP operation `СтворитиЗамовленняJSON`.
  * Mirror-ить `updateClientViaSoap` pattern — fetch + XML envelope + extract <return>.
  *
  * **NOT EXERCISED IN CI** — викликається тільки коли SYNC_MOCK_MODE=false.
@@ -134,12 +173,11 @@ export async function createOrderViaSoap(
     );
   }
 
-  const payloadJson = JSON.stringify(req.payload);
   const envelope = buildSoapEnvelope({
-    operation: "СтворитиЗамовлення",
+    operation: OP_ORDER_CREATE,
     password: config.onecPassword,
     idempotencyKey: req.idempotencyKey,
-    payloadJson,
+    payload: req.payload,
   });
 
   const controller = new AbortController();
@@ -151,7 +189,7 @@ export async function createOrderViaSoap(
       method: "POST",
       headers: {
         "Content-Type": "text/xml; charset=utf-8",
-        SOAPAction: buildSoapAction("СтворитиЗамовлення"),
+        SOAPAction: buildSoapAction(OP_ORDER_CREATE),
       },
       body: envelope,
       signal: controller.signal,
@@ -186,9 +224,17 @@ function normalizeOrderResult(parsed: unknown): OrderCreateResult {
   }
   const obj = parsed as Record<string, unknown>;
   if (obj.ok === true) {
+    // BSL шле uniform `code1C` (= Документ.Номер для документів); legacy/mock
+    // шле entity-specific `orderCode1C`. Підтримуємо обидва: спочатку BSL, потім fallback.
+    const code =
+      typeof obj.code1C === "string"
+        ? obj.code1C
+        : typeof obj.orderCode1C === "string"
+          ? obj.orderCode1C
+          : "";
     return {
       ok: true,
-      orderCode1C: typeof obj.orderCode1C === "string" ? obj.orderCode1C : "",
+      orderCode1C: code,
       orderNumber:
         typeof obj.orderNumber === "string" ? obj.orderNumber : undefined,
       errors: Array.isArray(obj.errors)
@@ -196,16 +242,11 @@ function normalizeOrderResult(parsed: unknown): OrderCreateResult {
         : [],
     };
   }
-  return {
-    ok: false,
-    errorCode: typeof obj.errorCode === "number" ? obj.errorCode : 4,
-    errorMessage:
-      typeof obj.errorMessage === "string" ? obj.errorMessage : "Unknown error",
-  };
+  return { ok: false, ...extractErrorFields(obj) };
 }
 
 /**
- * Викликає 1С SOAP operation `СтворитиОплату`.
+ * Викликає 1С SOAP operation `СтворитиОплатуJSON`.
  */
 export async function createPaymentViaSoap(
   req: PaymentCreateRequest,
@@ -218,12 +259,11 @@ export async function createPaymentViaSoap(
     );
   }
 
-  const payloadJson = JSON.stringify(req.payload);
   const envelope = buildSoapEnvelope({
-    operation: "СтворитиОплату",
+    operation: OP_PAYMENT_CREATE,
     password: config.onecPassword,
     idempotencyKey: req.idempotencyKey,
-    payloadJson,
+    payload: req.payload,
   });
 
   const controller = new AbortController();
@@ -235,7 +275,7 @@ export async function createPaymentViaSoap(
       method: "POST",
       headers: {
         "Content-Type": "text/xml; charset=utf-8",
-        SOAPAction: buildSoapAction("СтворитиОплату"),
+        SOAPAction: buildSoapAction(OP_PAYMENT_CREATE),
       },
       body: envelope,
       signal: controller.signal,
@@ -270,27 +310,27 @@ function normalizePaymentResult(parsed: unknown): PaymentCreateResult {
   }
   const obj = parsed as Record<string, unknown>;
   if (obj.ok === true) {
+    const code =
+      typeof obj.code1C === "string"
+        ? obj.code1C
+        : typeof obj.paymentCode1C === "string"
+          ? obj.paymentCode1C
+          : "";
     return {
       ok: true,
-      paymentCode1C:
-        typeof obj.paymentCode1C === "string" ? obj.paymentCode1C : "",
+      paymentCode1C: code,
       errors: Array.isArray(obj.errors)
         ? obj.errors.filter((e): e is string => typeof e === "string")
         : [],
     };
   }
-  return {
-    ok: false,
-    errorCode: typeof obj.errorCode === "number" ? obj.errorCode : 4,
-    errorMessage:
-      typeof obj.errorMessage === "string" ? obj.errorMessage : "Unknown error",
-  };
+  return { ok: false, ...extractErrorFields(obj) };
 }
 
 // ─── M1.6 (Реалізація, Етап 5): realization SOAP wrapper ────────────────────
 
 /**
- * Викликає 1С SOAP operation `СтворитиРеалізацію`.
+ * Викликає 1С SOAP operation `СтворитиРеалізаціюJSON`.
  * Mirror-ить `createOrderViaSoap` pattern — fetch + XML envelope + extract <return>.
  *
  * **NOT EXERCISED IN CI** — викликається тільки коли SYNC_MOCK_MODE=false.
@@ -306,12 +346,11 @@ export async function createRealizationViaSoap(
     );
   }
 
-  const payloadJson = JSON.stringify(req.payload);
   const envelope = buildSoapEnvelope({
-    operation: "СтворитиРеалізацію",
+    operation: OP_REALIZATION_CREATE,
     password: config.onecPassword,
     idempotencyKey: req.idempotencyKey,
-    payloadJson,
+    payload: req.payload,
   });
 
   const controller = new AbortController();
@@ -323,7 +362,7 @@ export async function createRealizationViaSoap(
       method: "POST",
       headers: {
         "Content-Type": "text/xml; charset=utf-8",
-        SOAPAction: buildSoapAction("СтворитиРеалізацію"),
+        SOAPAction: buildSoapAction(OP_REALIZATION_CREATE),
       },
       body: envelope,
       signal: controller.signal,
@@ -358,10 +397,15 @@ function normalizeRealizationResult(parsed: unknown): RealizationCreateResult {
   }
   const obj = parsed as Record<string, unknown>;
   if (obj.ok === true) {
+    const code =
+      typeof obj.code1C === "string"
+        ? obj.code1C
+        : typeof obj.realizationCode1C === "string"
+          ? obj.realizationCode1C
+          : "";
     return {
       ok: true,
-      realizationCode1C:
-        typeof obj.realizationCode1C === "string" ? obj.realizationCode1C : "",
+      realizationCode1C: code,
       realizationNumber:
         typeof obj.realizationNumber === "string"
           ? obj.realizationNumber
@@ -371,23 +415,19 @@ function normalizeRealizationResult(parsed: unknown): RealizationCreateResult {
         : [],
     };
   }
-  return {
-    ok: false,
-    errorCode: typeof obj.errorCode === "number" ? obj.errorCode : 4,
-    errorMessage:
-      typeof obj.errorMessage === "string" ? obj.errorMessage : "Unknown error",
-  };
+  return { ok: false, ...extractErrorFields(obj) };
 }
 
 // ─── Оплати / Каса (Етап 3): cash order SOAP wrapper ────────────────────────
 
 /**
- * Викликає 1С SOAP operation `СоздатьПКО` (касовий ордер).
+ * Викликає 1С SOAP operation `СтворитиКасовийОрдерJSON` (касовий ордер).
  * Mirror-ить `createRealizationViaSoap` pattern — fetch + XML envelope +
  * extract <return>.
  *
  * **NOT EXERCISED IN CI** — викликається тільки коли SYNC_MOCK_MODE=false.
- * Реальний BSL пишеться на загальному етапі обмінів (`docs/1C_SYNC_MODULES_SPEC.md` §3.5).
+ * BSL реалізує лише ПКО UAH (см. README §5.2). Мульти-валютний сценарій
+ * (3 ордери + здача) — TODO для наступного раунду.
  */
 export async function createCashOrderViaSoap(
   req: CashOrderCreateRequest,
@@ -400,12 +440,11 @@ export async function createCashOrderViaSoap(
     );
   }
 
-  const payloadJson = JSON.stringify(req.payload);
   const envelope = buildSoapEnvelope({
-    operation: "СоздатьПКО",
+    operation: OP_CASH_ORDER_CREATE,
     password: config.onecPassword,
     idempotencyKey: req.idempotencyKey,
-    payloadJson,
+    payload: req.payload,
   });
 
   const controller = new AbortController();
@@ -417,7 +456,7 @@ export async function createCashOrderViaSoap(
       method: "POST",
       headers: {
         "Content-Type": "text/xml; charset=utf-8",
-        SOAPAction: buildSoapAction("СоздатьПКО"),
+        SOAPAction: buildSoapAction(OP_CASH_ORDER_CREATE),
       },
       body: envelope,
       signal: controller.signal,
@@ -452,32 +491,31 @@ function normalizeCashOrderResult(parsed: unknown): CashOrderCreateResult {
   }
   const obj = parsed as Record<string, unknown>;
   if (obj.ok === true) {
+    const code =
+      typeof obj.code1C === "string"
+        ? obj.code1C
+        : typeof obj.cashOrderCode1C === "string"
+          ? obj.cashOrderCode1C
+          : "";
     return {
       ok: true,
-      cashOrderCode1C:
-        typeof obj.cashOrderCode1C === "string" ? obj.cashOrderCode1C : "",
+      cashOrderCode1C: code,
       errors: Array.isArray(obj.errors)
         ? obj.errors.filter((e): e is string => typeof e === "string")
         : [],
     };
   }
-  return {
-    ok: false,
-    errorCode: typeof obj.errorCode === "number" ? obj.errorCode : 4,
-    errorMessage:
-      typeof obj.errorMessage === "string" ? obj.errorMessage : "Unknown error",
-  };
+  return { ok: false, ...extractErrorFields(obj) };
 }
 
 // ─── Маршрутний лист (M1.9, Етап 5): route sheet SOAP wrapper ───────────────
 
 /**
- * Викликає 1С SOAP operation `СтворитиМаршрутнийЛист` (двофазний контракт,
+ * Викликає 1С SOAP operation `СтворитиМаршрутнийЛистJSON` (двофазний контракт,
  * `docs/1C_SYNC_MODULES_SPEC.md` §3.6). Mirror-ить `createCashOrderViaSoap`
  * pattern — fetch + XML envelope + extract <return>.
  *
  * **NOT EXERCISED IN CI** — викликається тільки коли SYNC_MOCK_MODE=false.
- * Реальний BSL пишеться на загальному етапі обмінів (`docs/1C_SYNC_MODULES_SPEC.md` §3.6).
  */
 export async function createRouteSheetViaSoap(
   req: RouteSheetCreateRequest,
@@ -490,12 +528,11 @@ export async function createRouteSheetViaSoap(
     );
   }
 
-  const payloadJson = JSON.stringify(req.payload);
   const envelope = buildSoapEnvelope({
-    operation: "СтворитиМаршрутнийЛист",
+    operation: OP_ROUTE_SHEET_CREATE,
     password: config.onecPassword,
     idempotencyKey: req.idempotencyKey,
-    payloadJson,
+    payload: req.payload,
   });
 
   const controller = new AbortController();
@@ -507,7 +544,7 @@ export async function createRouteSheetViaSoap(
       method: "POST",
       headers: {
         "Content-Type": "text/xml; charset=utf-8",
-        SOAPAction: buildSoapAction("СтворитиМаршрутнийЛист"),
+        SOAPAction: buildSoapAction(OP_ROUTE_SHEET_CREATE),
       },
       body: envelope,
       signal: controller.signal,
@@ -542,10 +579,15 @@ function normalizeRouteSheetResult(parsed: unknown): RouteSheetCreateResult {
   }
   const obj = parsed as Record<string, unknown>;
   if (obj.ok === true) {
+    const code =
+      typeof obj.code1C === "string"
+        ? obj.code1C
+        : typeof obj.routeSheetCode1C === "string"
+          ? obj.routeSheetCode1C
+          : "";
     return {
       ok: true,
-      routeSheetCode1C:
-        typeof obj.routeSheetCode1C === "string" ? obj.routeSheetCode1C : "",
+      routeSheetCode1C: code,
       routeSheetNumber:
         typeof obj.routeSheetNumber === "string"
           ? obj.routeSheetNumber
@@ -555,10 +597,5 @@ function normalizeRouteSheetResult(parsed: unknown): RouteSheetCreateResult {
         : [],
     };
   }
-  return {
-    ok: false,
-    errorCode: typeof obj.errorCode === "number" ? obj.errorCode : 4,
-    errorMessage:
-      typeof obj.errorMessage === "string" ? obj.errorMessage : "Unknown error",
-  };
+  return { ok: false, ...extractErrorFields(obj) };
 }
