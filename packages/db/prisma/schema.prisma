@@ -1404,6 +1404,20 @@ model MgrSyncJob {
   @@map("mgr_sync_jobs")
 }
 
+// ─── Manager sync state (M3.3 — INBOUND polling) ────────────────────────────
+// Простий key/value store для збереження курсорів синхронізації pull-mode
+// (cron `/api/cron/pull-from-1c`). На сьогодні єдиний ключ —
+// `last_sync_cursor` (ISO-timestamp останнього успішного pull-у з 1С).
+// Cursor зсувається тільки коли всі inbound endpoints успішно прийняли дані.
+
+model MgrSyncState {
+  key       String   @id
+  value     String
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@map("mgr_sync_state")
+}
+
 // ─── Manager message templates (M1.7 / Прайс Stage 5b) ──────────────────────
 // Простий довідник готових фраз {назва, текст} — відтворює 1С
 // Catalog.ШаблоныСообщений. Спільний для всіх менеджерів (як довідник 1С):
