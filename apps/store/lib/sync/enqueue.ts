@@ -61,6 +61,22 @@ import type { ClientUpdatePayload } from "@/lib/validations/sync-job";
  * Жодна розбіжність НЕ блокує fire-and-forget enqueue — BSL обертає кожне
  * присвоєння у `Попытка...Исключение КонецПопытки` і просто пропускає невідомий
  * реквізит. Усе вище — питання повноти даних на стороні 1С, а не runtime-помилка.
+ *
+ * ─── Rework під Molenari OU (Етап 2 переробка) ────────────────────────────
+ *
+ *   • Postachalnyk `Molenari OU` блокує нові кореневі об'єкти конфігурації
+ *     (`Catalog.СинкЛог`, `Constant.СинкСистемнийПароль`, `CommonModule.СинкВхідний`,
+ *     `ScheduledJob.ЧисткаСинкЛогу`). Тому:
+ *   • Idempotency повністю на Node-стороні — `queue-processor.ts` фільтрує
+ *     `status IN ('pending','retrying')` (sent/failed НЕ ретраяться). На
+ *     1С-стороні `alreadyProcessed` завжди = false; повторний виклик з
+ *     ідентичним idempotencyKey СТВОРИТЬ другий документ-чернетку (рідкісне race).
+ *   • `password` тепер передається з `services/manager-sync/.env::ONEC_SOAP_PASSWORD`
+ *     і інжектиться у JSONДані (`buildSoapEnvelope` додає поле `password`).
+ *     Зовнішній SOAP-параметр `<ms:ПарольВхода>` лишається порожнім; auth
+ *     перевіряється у BSL `_LTEX_ПеревіритиПароль` через hardcoded string
+ *     порівняння з `LTEX_SYNC_PASSWORD_PLACEHOLDER` (заміняється вручну при
+ *     вставці у Конфігуратор). Деталі — `docs/1c-bsl/outbound/README.md` §3.
  */
 
 export interface ClientForEnqueue {
