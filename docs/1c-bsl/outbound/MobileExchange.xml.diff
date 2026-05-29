@@ -296,3 +296,104 @@
 6. Зберегти конфігурацію → Адміністрування → Перепублікувати веб-сервіси.
 
 Це додасть UUID автоматично і нічого не зламає у решті XML-файлу.
+
+
+---
+
+## Доповнення Етапу 4 (Closures блок, M3.4)
+
+Додає ще 2 операції до списку вище:
+
+- `ОтриматиДаніЗакриттяЗамовленьJSON` — READ список незакритих замовлень
+  контрагента (wrapper навколо `ОбменАРМ.ПолучитьДанныеНезакрытыхЗаказов_v1`).
+- `ЗакритиСтаріЗамовленняJSON` — WRITE закриває обрані замовлення +
+  опційно створює нове замовлення (wrapper навколо
+  `ОбменАРМ.ЗакрытьСтарыеЗаказы_v1`).
+
+Декларації вставити ПЕРЕД `</ChildObjects>` за тим самим патерном що 6
+операцій вище:
+
+```xml
+<Operation uuid="REPLACE-WITH-GUID-07">
+    <Properties>
+        <Name>ОтриматиДаніЗакриттяЗамовленьJSON</Name>
+        <Synonym>
+            <v8:item>
+                <v8:lang>uk</v8:lang>
+                <v8:content>Отримати дані закриття замовлень JSON</v8:content>
+            </v8:item>
+        </Synonym>
+        <Comment/>
+        <XDTOReturningValueType>xs:string</XDTOReturningValueType>
+        <Nillable>false</Nillable>
+        <Transactioned>false</Transactioned>
+        <ProcedureName>ОтриматиДаніЗакриттяЗамовленьJSON</ProcedureName>
+        <DataLockControlMode>Managed</DataLockControlMode>
+    </Properties>
+    <ChildObjects>
+        <Parameter uuid="REPLACE-WITH-GUID-07-P1">
+            <Properties>
+                <Name>ПарольВхода</Name>
+                <Synonym><v8:item><v8:lang>uk</v8:lang><v8:content>Пароль входу</v8:content></v8:item></Synonym>
+                <Comment/>
+                <XDTOValueType>xs:string</XDTOValueType>
+                <Nillable>false</Nillable>
+                <TransferDirection>In</TransferDirection>
+            </Properties>
+        </Parameter>
+        <Parameter uuid="REPLACE-WITH-GUID-07-P2">
+            <Properties>
+                <Name>JSONДані</Name>
+                <Synonym><v8:item><v8:lang>uk</v8:lang><v8:content>JSON дані</v8:content></v8:item></Synonym>
+                <Comment/>
+                <XDTOValueType>xs:string</XDTOValueType>
+                <Nillable>false</Nillable>
+                <TransferDirection>In</TransferDirection>
+            </Properties>
+        </Parameter>
+    </ChildObjects>
+</Operation>
+<Operation uuid="REPLACE-WITH-GUID-08">
+    <Properties>
+        <Name>ЗакритиСтаріЗамовленняJSON</Name>
+        <Synonym>
+            <v8:item>
+                <v8:lang>uk</v8:lang>
+                <v8:content>Закрити старі замовлення JSON</v8:content>
+            </v8:item>
+        </Synonym>
+        <Comment/>
+        <XDTOReturningValueType>xs:string</XDTOReturningValueType>
+        <Nillable>false</Nillable>
+        <Transactioned>false</Transactioned>
+        <ProcedureName>ЗакритиСтаріЗамовленняJSON</ProcedureName>
+        <DataLockControlMode>Managed</DataLockControlMode>
+    </Properties>
+    <ChildObjects>
+        <Parameter uuid="REPLACE-WITH-GUID-08-P1">
+            <Properties>
+                <Name>ПарольВхода</Name>
+                <Synonym><v8:item><v8:lang>uk</v8:lang><v8:content>Пароль входу</v8:content></v8:item></Synonym>
+                <Comment/>
+                <XDTOValueType>xs:string</XDTOValueType>
+                <Nillable>false</Nillable>
+                <TransferDirection>In</TransferDirection>
+            </Properties>
+        </Parameter>
+        <Parameter uuid="REPLACE-WITH-GUID-08-P2">
+            <Properties>
+                <Name>JSONДані</Name>
+                <Synonym><v8:item><v8:lang>uk</v8:lang><v8:content>JSON дані</v8:content></v8:item></Synonym>
+                <Comment/>
+                <XDTOValueType>xs:string</XDTOValueType>
+                <Nillable>false</Nillable>
+                <TransferDirection>In</TransferDirection>
+            </Properties>
+        </Parameter>
+    </ChildObjects>
+</Operation>
+```
+
+(Через 1С Конфігуратор: WebServices → MobileExchange → Операції → Додати
+для двох операцій — обидві приймають 2 string-параметри
+`ПарольВхода` + `JSONДані`, повертають xs:string).

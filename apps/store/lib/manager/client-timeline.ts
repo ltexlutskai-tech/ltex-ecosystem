@@ -26,7 +26,8 @@ export type ClientEventKind =
   | "payment"
   | "bron"
   | "reminder"
-  | "comment";
+  | "comment"
+  | "close_orders";
 
 export interface RecordClientEventArgs {
   /** MgrClient.id — прямий шлях (напр. бронь, нагадування). */
