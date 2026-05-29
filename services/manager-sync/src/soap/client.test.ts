@@ -37,38 +37,44 @@ function buildOkResponse(returnJson: string): Response {
 }
 
 describe("buildJsonDataEnvelope", () => {
-  it("серіалізує {idempotencyKey, data} як очікує BSL", () => {
-    const json = buildJsonDataEnvelope("key-1", { name: "L-TEX", code1C: "X" });
+  it("серіалізує {idempotencyKey, password, data} як очікує BSL (Molenari OU rework)", () => {
+    const json = buildJsonDataEnvelope("key-1", "secret-pwd", {
+      name: "L-TEX",
+      code1C: "X",
+    });
     expect(JSON.parse(json)).toEqual({
       idempotencyKey: "key-1",
+      password: "secret-pwd",
       data: { name: "L-TEX", code1C: "X" },
     });
   });
 });
 
 describe("buildSoapEnvelope", () => {
-  it("XML-escapes special chars у password і payload", () => {
+  it("XML-escapes special chars у JSONДані (пароль тепер всередині JSON)", () => {
     const env = buildSoapEnvelope({
       operation: "ОбновитиКлієнтаJSON",
       password: 'p"ass<>&',
       idempotencyKey: "550e8400-e29b-41d4-a716-446655440000",
       payload: { name: "A & B" },
     });
-    expect(env).toContain(
-      "<ms:ПарольВхода>p&quot;ass&lt;&gt;&amp;</ms:ПарольВхода>",
-    );
-    // JSONДані містить escape-ний JSON з ім'ям всередині.
+    // <ms:ПарольВхода> завжди порожній (BSL читає з JSON).
+    expect(env).toContain("<ms:ПарольВхода></ms:ПарольВхода>");
+    // JSONДані містить escape-ний JSON з паролем і payload-ом всередині.
     expect(env).toContain("&quot;A &amp; B&quot;");
+    // пароль зі спецсимволами теж escape-ється у JSON-стрічці.
+    expect(env).toContain("p\\&quot;ass&lt;&gt;&amp;");
   });
 
-  it("використовує 2-параметровий BSL-контракт (ПарольВхода + JSONДані)", () => {
+  it("використовує 2-параметровий BSL-контракт (ПарольВхода порожній + JSONДані)", () => {
     const env = buildSoapEnvelope({
       operation: "ОбновитиКлієнтаJSON",
       password: "secret",
       idempotencyKey: "key-42",
       payload: { code1C: "000001" },
     });
-    expect(env).toContain("<ms:ПарольВхода>secret</ms:ПарольВхода>");
+    // ПарольВхода завжди порожній — пароль міграно у JSON-поле.
+    expect(env).toContain("<ms:ПарольВхода></ms:ПарольВхода>");
     expect(env).toContain("<ms:JSONДані>");
     expect(env).toContain("</ms:JSONДані>");
     // Старий 3-параметровий контракт прибрано.
@@ -76,20 +82,21 @@ describe("buildSoapEnvelope", () => {
     expect(env).not.toContain("<ms:ПакетДанних>");
   });
 
-  it("кладе idempotencyKey ВСЕРЕДИНУ JSONДані payload-у", () => {
+  it("кладе idempotencyKey + password ВСЕРЕДИНУ JSONДані payload-у", () => {
     const env = buildSoapEnvelope({
       operation: "СтворитиЗамовленняJSON",
-      password: "p",
+      password: "shared-secret",
       idempotencyKey: "uniq-123",
       payload: { customerCode1C: "000001" },
     });
-    // після unescape JSONДані має містити обидва ключі
+    // після unescape JSONДані має містити усі три ключі
     const unescaped = env
       .replace(/&quot;/g, '"')
       .replace(/&amp;/g, "&")
       .replace(/&lt;/g, "<")
       .replace(/&gt;/g, ">");
     expect(unescaped).toContain('"idempotencyKey":"uniq-123"');
+    expect(unescaped).toContain('"password":"shared-secret"');
     expect(unescaped).toContain('"data":{"customerCode1C":"000001"}');
   });
 
@@ -156,6 +163,15 @@ describe("updateClientViaSoap", () => {
     expect(body).toContain("550e8400-e29b-41d4-a716-446655440000");
     expect(body).toContain("<ms:JSONДані>");
     expect(body).not.toContain("<ms:IdempotencyKey>");
+    // ПарольВхода завжди порожній — пароль міграно у JSON.
+    expect(body).toContain("<ms:ПарольВхода></ms:ПарольВхода>");
+    // Пароль (з config.onecPassword) сидить у JSON-полі.
+    const unescaped = body
+      .replace(/&quot;/g, '"')
+      .replace(/&amp;/g, "&")
+      .replace(/&lt;/g, "<")
+      .replace(/&gt;/g, ">");
+    expect(unescaped).toContain('"password":"shared-secret"');
     // SOAPAction теж з JSON-суфіксом.
     const headers = init.headers as Record<string, string>;
     expect(headers.SOAPAction).toBe(
