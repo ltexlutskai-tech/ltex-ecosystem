@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { prisma } from "@ltex/db";
 import { getCurrentUser } from "@/lib/auth/manager-auth";
@@ -87,6 +88,12 @@ export default async function CustomersPage({
             Усього: {list.total} · сторінка {list.page} з {list.totalPages}
           </p>
         </div>
+        <Link
+          href="/manager/customers/new"
+          className="rounded-md bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700"
+        >
+          + Створити клієнта
+        </Link>
       </header>
       <ClientListToolbar
         dictionaries={dictionaries}

@@ -2,7 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { Prisma, prisma } from "@ltex/db";
 import { getCurrentUser } from "@/lib/auth/manager-auth";
 import { ownershipWhere } from "@/lib/manager/client-visibility";
+import { enqueueClientUpdate } from "@/lib/sync/enqueue";
 import { listQuerySchema } from "@/lib/validations/manager-clients";
+import { mgrClientCreateSchema } from "@/lib/validations/mgr-client";
 
 // Префікси імен сміттєвих контрагентів з 1С — "1111111 ()", "777777 ()" тощо.
 // Prisma не підтримує regex matches, тому вирізаємо найчастіші numeric-only префікси.
@@ -256,4 +258,94 @@ export async function GET(req: NextRequest) {
     total,
     totalPages: Math.max(1, Math.ceil(total / q.pageSize)),
   });
+}
+
+export async function POST(req: NextRequest) {
+  const user = await getCurrentUser(req);
+  if (!user) {
+    return NextResponse.json({ error: "Не авторизовано" }, { status: 401 });
+  }
+
+  const body = await req.json().catch(() => null);
+  const parsed = mgrClientCreateSchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json(
+      {
+        error: parsed.error.issues[0]?.message ?? "Невірні дані",
+        details: parsed.error.issues.slice(0, 5),
+      },
+      { status: 400 },
+    );
+  }
+  const data = parsed.data;
+
+  if (data.agentUserId && user.role !== "admin") {
+    return NextResponse.json(
+      { error: "Тільки адміністратор може призначати торгового агента" },
+      { status: 403 },
+    );
+  }
+
+  const createData: Prisma.MgrClientCreateInput = {
+    name: data.name,
+    code1C: data.code1C || null,
+    phonePrimary: data.phonePrimary || null,
+    tradePointName: data.tradePointName || null,
+    region: data.region || null,
+    city: data.city || null,
+  };
+
+  if (data.priceTypeId) {
+    createData.priceType = { connect: { id: data.priceTypeId } };
+  }
+  // Якщо admin не призначив агента — за замовчуванням сам non-admin creator стає
+  // власником клієнта (інакше manager не побачить власного нового клієнта).
+  const agentId =
+    data.agentUserId ?? (user.role !== "admin" ? user.id : undefined);
+  if (agentId) {
+    createData.agent = { connect: { id: agentId } };
+  }
+
+  try {
+    const created = await prisma.mgrClient.create({
+      data: createData,
+      include: {
+        statusGeneral: true,
+        statusOperational: true,
+        categoryTT: true,
+        searchChannel: true,
+        deliveryMethod: true,
+        priceType: true,
+        primaryAssortment: true,
+        primaryRoute: true,
+        agent: true,
+      },
+    });
+
+    // М3.5 — best-effort sync до 1С (mock або real залежно від SYNC_MOCK_MODE).
+    enqueueClientUpdate(created, "create").catch((e: unknown) => {
+      console.warn("[L-TEX] Failed to enqueue new-client sync", {
+        clientId: created.id,
+        error: e instanceof Error ? e.message : String(e),
+      });
+    });
+
+    return NextResponse.json({ id: created.id }, { status: 201 });
+  } catch (err) {
+    if (err instanceof Prisma.PrismaClientKnownRequestError) {
+      if (err.code === "P2002") {
+        return NextResponse.json(
+          { error: "Клієнт з таким code1C вже існує" },
+          { status: 409 },
+        );
+      }
+      if (err.code === "P2003" || err.code === "P2025") {
+        return NextResponse.json(
+          { error: "Невірне значення довідника" },
+          { status: 400 },
+        );
+      }
+    }
+    throw err;
+  }
 }

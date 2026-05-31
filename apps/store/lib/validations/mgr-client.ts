@@ -48,6 +48,23 @@ export const mgrClientPatchSchema = z
 
 export type MgrClientPatchInput = z.infer<typeof mgrClientPatchSchema>;
 
+// Створення нового клієнта (M3.6 — UI manual entry). Мінімум — `name`;
+// інші поля можна заповнити пізніше через PATCH після відкриття картки.
+export const mgrClientCreateSchema = z
+  .object({
+    name: z.string().trim().min(1, "Введіть назву").max(255),
+    code1C: z.string().trim().max(50).optional(),
+    phonePrimary: z.string().trim().max(50).optional(),
+    tradePointName: z.string().trim().max(255).optional(),
+    region: z.string().trim().max(100).optional(),
+    city: z.string().trim().max(100).optional(),
+    priceTypeId: z.string().min(1).max(50).optional(),
+    agentUserId: z.string().min(1).max(50).optional(),
+  })
+  .strict();
+
+export type MgrClientCreateInput = z.infer<typeof mgrClientCreateSchema>;
+
 // ── Phones CRUD (Phase 2a) ──────────────────────────────────────────────
 // `MgrClientPhone.messenger` is a free `String?` у схемі (НЕ enum), тому
 // валідуємо як один з відомих месенджерів або null. Це не блокує майбутні
