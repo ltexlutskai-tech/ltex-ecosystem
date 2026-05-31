@@ -95,8 +95,13 @@ export function buildSoapEnvelope(params: BuildEnvelopeParams): string {
   );
 }
 
-export function buildSoapAction(operation: string): string {
-  return `"${ARM_NS}#MobileExchange:${operation}"`;
+export function buildSoapAction(_operation: string): string {
+  // 1С приймає порожній SOAPAction (smoke-test через curl підтвердив).
+  // Не можемо вкласти operation name бо у назві Cyrillic (`ОбновитиКлиентаJSON`
+  // тощо), а HTTP headers — ByteString (Latin-1). URL-encoding не варто
+  // ускладнювати — 1С не вимагає SOAPAction щоб маршрутизувати запит
+  // (це робиться через element name у SOAP body).
+  return `""`;
 }
 
 /**

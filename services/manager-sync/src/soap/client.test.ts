@@ -100,10 +100,8 @@ describe("buildSoapEnvelope", () => {
     expect(unescaped).toContain('"data":{"customerCode1C":"000001"}');
   });
 
-  it("збирає валідний SOAP action header з JSON-суфіксом", () => {
-    expect(buildSoapAction("ОбновитиКлиентаJSON")).toBe(
-      '"http://arm_mobile#MobileExchange:ОбновитиКлиентаJSON"',
-    );
+  it("повертає порожній SOAPAction (HTTP header не приймає Cyrillic)", () => {
+    expect(buildSoapAction("ОбновитиКлиентаJSON")).toBe('""');
   });
 });
 
@@ -172,11 +170,9 @@ describe("updateClientViaSoap", () => {
       .replace(/&lt;/g, "<")
       .replace(/&gt;/g, ">");
     expect(unescaped).toContain('"password":"shared-secret"');
-    // SOAPAction теж з JSON-суфіксом.
+    // SOAPAction порожній — HTTP header не приймає Cyrillic у operation name.
     const headers = init.headers as Record<string, string>;
-    expect(headers.SOAPAction).toBe(
-      '"http://arm_mobile#MobileExchange:ОбновитиКлиентаJSON"',
-    );
+    expect(headers.SOAPAction).toBe('""');
   });
 
   it("повертає ok=false коли BSL повернув error.message", async () => {
