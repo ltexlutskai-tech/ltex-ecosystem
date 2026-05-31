@@ -93,7 +93,7 @@ interface BuildPullEnvelopeParams {
 
 /**
  * Окремий envelope-builder для pull-mode — інакша signature ніж outbound
- * (2 параметри замість 3, без `JSONДані`). Експортовано для тестів.
+ * (2 параметри замість 3, без `JSONДани`). Експортовано для тестів.
  */
 export function buildPullEnvelope(params: BuildPullEnvelopeParams): string {
   const { password, cursor } = params;

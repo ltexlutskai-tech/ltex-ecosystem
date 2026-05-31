@@ -32,6 +32,7 @@
 Без `<Content>` у плані registry-логіка змодельована через 3 EventSubscriptions які диктують **які записи продукуються у `РегистрСведений.РегистрацияОбмена`** (це класичний 1С Site sync registry):
 
 **`ПриЗаписиСправочникаОбменССайтом`** (`docs/1c-export-full/EventSubscriptions/ПриЗаписиСправочникаОбменССайтом.xml:13-19`):
+
 ```xml
 <Source>
   <v8:Type>cfg:CatalogObject.ХранилищеДополнительнойИнформации</v8:Type>
@@ -43,6 +44,7 @@
 ```
 
 **`ПриЗаписиРегистраНакопленияОбменССайтом`** (`docs/1c-export-full/EventSubscriptions/ПриЗаписиРегистраНакопленияОбменССайтом.xml:13-19`):
+
 ```xml
 <Source>
   <v8:Type>cfg:AccumulationRegisterRecordSet.ВзаиморасчетыСКонтрагентами</v8:Type>
@@ -52,6 +54,7 @@
 ```
 
 **`ПриЗаписиРегистраСведенийОбменССайтом`** (`docs/1c-export-full/EventSubscriptions/ПриЗаписиРегистраСведенийОбменССайтом.xml:13-19`):
+
 ```xml
 <Source>
   <v8:Type>cfg:InformationRegisterRecordSet.Штрихкоды</v8:Type>
@@ -61,6 +64,7 @@
 ```
 
 **Що це означає:** при будь-якому write у одного з цих **8 типів об'єктів** на стороні 1С — handler у `CommonModule.ПроцедурыОбменаССайтом` фіксує зміну (логічно) у одному з двох планів. Список зареєстрованих типів:
+
 - Catalog: `ХранилищеДополнительнойИнформации` (фото товарів), `ЕдиницыИзмерения`, `ХарактеристикиНоменклатуры` (атрибути)
 - AccumRegister: `ВзаиморасчетыСКонтрагентами` (борги клієнтів!), `ТоварыНаСкладах` (залишки), `ЗаказыПокупателей` (статус замовлень)
 - InfoRegister: `Штрихкоды`, `ЦеныНоменклатуры` (ціни — той що ми вже sync-имо!), `ЗначенияСвойствОбъектов` (атрибути)
@@ -70,6 +74,7 @@
 ### 1.4 ScheduledJob `ЗаданиеОбменССайтом`
 
 `docs/1c-export-full/ScheduledJobs/ЗаданиеОбменССайтом.xml:13-19`:
+
 ```xml
 <MethodName>CommonModule.ПроцедурыОбменаССайтом.ЗаданиеОбменССайтом</MethodName>
 <Use>true</Use>
@@ -83,31 +88,31 @@
 
 `docs/1c-export-full/WebServices/MobileExchange.xml:1-1236`, namespace `http://arm_mobile`, file `MobileExchange.1cws`. Усі operations повертають `xs:string` або `v8:ValueStorage`.
 
-| # | Operation                          | Params                                     | Returns          | Призначення                                   |
-| - | ---------------------------------- | ------------------------------------------ | ---------------- | --------------------------------------------- |
-| 1 | `НачатьОбмен`                      | Версия, ИдентификаторКлиента, Пароль, ЭтоНеПервыйОбмен | xs:string        | Handshake initialization                      |
-| 2 | `СформироватьПакетДанных`          | ИдентифікаторКлієнта, Пароль               | ValueStorage     | Build outbound bundle (товари+клієнти+документи) |
-| 3 | `ВивантажитиТовари`                | ИдентифікаторКлієнта, Пароль               | ValueStorage     | Outbound: тільки товари (subset of #2)        |
-| 4 | `ВивантажитиКонтрагентів`          | ИдентифікаторКлієнта, Пароль               | ValueStorage     | Outbound: тільки клієнти                      |
-| 5 | `ВивантажитиДокументи`             | ИдентифікаторКлієнта, Пароль               | ValueStorage     | Outbound: тільки документи                    |
-| 6 | `ОбработатьПакетДанных`            | Пароль, **Данные** (ValueStorage)          | ValueStorage     | **Inbound: обробити пакет (контрагенти+заказы+маршрути+реалізації+презентації+ПКО+нагадування)** |
-| 7 | `УдалитьРегистрацию`               | МассивИД, Пароль                           | ValueStorage     | Mark received items as processed              |
-| 8 | `ВключитьЧастичныйОбмен`           | Пароль                                     | xs:string        | Switch mode                                   |
-| 9 | `ПолучитьДолгПартнера`             | Пароль                                     | xs:double        | Get partner debt                              |
-| 10| `ОтриматиЗалишкиХарактеристик`     | Пароль, Номенклатура                       | ValueStorage     | Lot stock balances                            |
-| 11| `ОновитьОстаткиТаЦены`             | Пароль                                     | ValueStorage     | Refresh stock + prices (full)                 |
-| 12| `ОновитьОстаткиТаЦеныЧастково`     | Пароль                                     | ValueStorage     | Refresh stock + prices (delta)                |
-| 13| `ПолучитьДанныеНезакрытыхЗаказов`  | Пароль, Контрагент_уид                     | ValueStorage     | Open orders per client                        |
-| 14| `ЗакрытьСтарыеЗаказы`              | Пароль, Товары, Контрагент_уид             | xs:string        | Close stale orders                            |
-| 15| `ПолучитьКурсЕвроНаДату`           | Пароль, Дата                               | ValueStorage     | EUR rate at date                              |
-| 16| `ОновитиКурси`                     | Пароль                                     | ValueStorage     | Refresh all currency rates                    |
-| 17| `ЗаписатиКурсВалют`                | Пароль, Данные                             | ValueStorage     | Write currency rates (inbound)                |
-| 18| `ОновитьЧат`                       | Пароль, НовыеСообщения, УИД_Клиента        | ValueStorage     | Chat sync                                     |
-| 19| `ЗабронюватиНоменклатуру`          | Пароль, Данные                             | ValueStorage     | Reserve lot                                   |
-| 20| **`ОбновитьКлиента`**              | Пароль, Данные                             | ValueStorage     | **Update client** ← target нашого ОбновитиКлієнта |
-| 21| `ВыполнитьКоманду`                 | Пароль, Данные                             | ValueStorage     | Generic command (бек-двір)                    |
-| 22| **`ЗаписатиЗміниКонтрагента`**     | Пароль, Данные                             | ValueStorage     | **Persist client changes** (alternative до #20) |
-| 23| `ОтриматиДаніХарактеристики`       | Данные, Сектор                             | xs:string        | Get characteristic by UUID                    |
+| #   | Operation                         | Params                                                 | Returns      | Призначення                                                                                      |
+| --- | --------------------------------- | ------------------------------------------------------ | ------------ | ------------------------------------------------------------------------------------------------ |
+| 1   | `НачатьОбмен`                     | Версия, ИдентификаторКлиента, Пароль, ЭтоНеПервыйОбмен | xs:string    | Handshake initialization                                                                         |
+| 2   | `СформироватьПакетДанных`         | ИдентифікаторКлієнта, Пароль                           | ValueStorage | Build outbound bundle (товари+клієнти+документи)                                                 |
+| 3   | `ВивантажитиТовари`               | ИдентифікаторКлієнта, Пароль                           | ValueStorage | Outbound: тільки товари (subset of #2)                                                           |
+| 4   | `ВивантажитиКонтрагентів`         | ИдентифікаторКлієнта, Пароль                           | ValueStorage | Outbound: тільки клієнти                                                                         |
+| 5   | `ВивантажитиДокументи`            | ИдентифікаторКлієнта, Пароль                           | ValueStorage | Outbound: тільки документи                                                                       |
+| 6   | `ОбработатьПакетДанных`           | Пароль, **Данные** (ValueStorage)                      | ValueStorage | **Inbound: обробити пакет (контрагенти+заказы+маршрути+реалізації+презентації+ПКО+нагадування)** |
+| 7   | `УдалитьРегистрацию`              | МассивИД, Пароль                                       | ValueStorage | Mark received items as processed                                                                 |
+| 8   | `ВключитьЧастичныйОбмен`          | Пароль                                                 | xs:string    | Switch mode                                                                                      |
+| 9   | `ПолучитьДолгПартнера`            | Пароль                                                 | xs:double    | Get partner debt                                                                                 |
+| 10  | `ОтриматиЗалишкиХарактеристик`    | Пароль, Номенклатура                                   | ValueStorage | Lot stock balances                                                                               |
+| 11  | `ОновитьОстаткиТаЦены`            | Пароль                                                 | ValueStorage | Refresh stock + prices (full)                                                                    |
+| 12  | `ОновитьОстаткиТаЦеныЧастково`    | Пароль                                                 | ValueStorage | Refresh stock + prices (delta)                                                                   |
+| 13  | `ПолучитьДанныеНезакрытыхЗаказов` | Пароль, Контрагент_уид                                 | ValueStorage | Open orders per client                                                                           |
+| 14  | `ЗакрытьСтарыеЗаказы`             | Пароль, Товары, Контрагент_уид                         | xs:string    | Close stale orders                                                                               |
+| 15  | `ПолучитьКурсЕвроНаДату`          | Пароль, Дата                                           | ValueStorage | EUR rate at date                                                                                 |
+| 16  | `ОновитиКурси`                    | Пароль                                                 | ValueStorage | Refresh all currency rates                                                                       |
+| 17  | `ЗаписатиКурсВалют`               | Пароль, Данные                                         | ValueStorage | Write currency rates (inbound)                                                                   |
+| 18  | `ОновитьЧат`                      | Пароль, НовыеСообщения, УИД_Клиента                    | ValueStorage | Chat sync                                                                                        |
+| 19  | `ЗабронюватиНоменклатуру`         | Пароль, Данные                                         | ValueStorage | Reserve lot                                                                                      |
+| 20  | **`ОбновитьКлиента`**             | Пароль, Данные                                         | ValueStorage | **Update client** ← target нашого ОбновитиКлієнта                                                |
+| 21  | `ВыполнитьКоманду`                | Пароль, Данные                                         | ValueStorage | Generic command (бек-двір)                                                                       |
+| 22  | **`ЗаписатиЗміниКонтрагента`**    | Пароль, Данные                                         | ValueStorage | **Persist client changes** (alternative до #20)                                                  |
+| 23  | `ОтриматиДаніХарактеристики`      | Данные, Сектор                                         | xs:string    | Get characteristic by UUID                                                                       |
 
 **Critical insight #1:** namespace `http://arm_mobile` той самий що і в моїй M1.5 spec (`docs/1C_SYNC_MODULES_SPEC.md:521`). У моїй spec я навіть посилаюсь на `MobileExchange.1cws` як target. **Це не нова створювана служба — це існуюча.**
 
@@ -117,12 +122,12 @@
 
 `docs/1c-export-full/HTTPServices/Боты.xml:1-136`, RootURL `bots`. 4 REST endpoints:
 
-| Method | URL Template | Handler                  | Призначення (підозра)        |
-| ------ | ------------ | ------------------------ | ---------------------------- |
-| GET    | `/ping`      | `pingGETping`            | Healthcheck                  |
-| POST   | `/send`      | `SendPOSTSend`           | Send message bot #1 (Viber?) |
-| POST   | `/sendsecond`| `SendSecondPOSTSend`     | Send message bot #2 (Telegram?) |
-| POST   | `/exchange`  | `exchangePOSTSendExchange` | Generic bot exchange       |
+| Method | URL Template  | Handler                    | Призначення (підозра)           |
+| ------ | ------------- | -------------------------- | ------------------------------- |
+| GET    | `/ping`       | `pingGETping`              | Healthcheck                     |
+| POST   | `/send`       | `SendPOSTSend`             | Send message bot #1 (Viber?)    |
+| POST   | `/sendsecond` | `SendSecondPOSTSend`       | Send message bot #2 (Telegram?) |
+| POST   | `/exchange`   | `exchangePOSTSendExchange` | Generic bot exchange            |
 
 Без BSL handlers і без UrlPath details не можна сказати точно але назви + існування `Catalog/ViberОбмен.xml` + `МодульУправленияViber.xml` + згадки в Module.bsl процедур `ВыполнитьКоманду`/`ОновитьЧат` показують: це **Telegram/Viber webhook layer для inbound messages у 1С**. Наш сайт зараз має `app/api/telegram/webhook` + `app/api/viber/webhook` що приймають bot-updates і фіксують у нашу DB; 1С має паралельний канал для тих самих bots напряму. Це НЕ конфлікт з M1.5 sync — це для M1.8 chat-bots epic.
 
@@ -145,6 +150,7 @@
 ### 1.8 Об'єкти даних — confirmed structures
 
 **`Catalog.Контрагенты`** (`docs/1c-export-full/Catalogs/Контрагенты.xml`) — extended атрибути збігаються з 1:1 з моєю M1.5 spec для `ОбновитиКлієнта`:
+
 - `НаименованиеТТ` ↔ `tradePointName`
 - `Геолокация` ↔ `geolocation`
 - `ОбъмЗаМесяц` ↔ `monthlyVolume`
@@ -155,6 +161,7 @@
 - `КоличествоДнейОтПоследнейПокупки`, `ДатаПоследнейПокупки`, `ДатаСоздания`
 
 **`Document.ЗаказПокупателя`** (`docs/1c-export-full/Documents/ЗаказПокупателя.xml`) — атрибути:
+
 - `Контрагент`, `Организация`, `ДоговорКонтрагента`, `ВалютаДокумента`, `СуммаДокумента`
 - `СкладГруппа`, `ТипЦен`, `СтатусЗамовлення`, `СтатусДоставки`, `Наложка`, `Доставка`
 - TabularSection `Товары` з полями: `Номенклатура`, `Количество`, `Цена`, `Сумма`, `СерияНоменклатуры` (= наш `barcode`!), `ХарактеристикаНоменклатуры`, `Размещение`
@@ -168,13 +175,13 @@
 
 ### 2.1 Операції що дублюються
 
-| M1.5 spec operation | Існуюча 1С operation | Точність матчу | Notes |
-|---------------------|---------------------|---------------|-------|
-| `ОбновитиКлієнта` | `MobileExchange.ОбновитьКлиента` (line 1030-1082) | **100% — точна назва** | Намірений match у моїй spec |
-| `ОбновитиКлієнта` (alt) | `MobileExchange.ЗаписатиЗміниКонтрагента` (line 1136-1184) | 95% | Stub у mobile-export (`Возврат Сериализовать(Истина);`) — но прив'язаний до `ОбновитьКонтрагентов` через коментарі |
-| `СтворитиЗамовлення` | `MobileExchange.ОбработатьПакетДанных` (line 162-214) | **80% — generic bundle, не dedicated** | Один endpoint приймає `Контрагенты + Заказы + МаршрутныеЛисты + Реализации + Презентации + ПКО + Напоминания` в одному виклику. `СоздатьВнутренниеЗаказы` (line 3388) — внутрішня процедура що обробляє `Заказы` array |
-| `СтворитиОплату` | `MobileExchange.ОбработатьПакетДанных` (sub-key `ПКО`) | 80% | Той самий entry, sub-key `ПКО` → `СоздатьПКО` (line 4629) |
-| `ОтриматиСнапшот` (M1.6 future) | `MobileExchange.СформироватьПакетДанных` + `ВивантажитиКонтрагентів` + `ВивантажитиТовари` + `ВивантажитиДокументи` | 100% — три dedicated outbound endpoints | Уже існують з повним 1С BSL |
+| M1.5 spec operation             | Існуюча 1С operation                                                                                                | Точність матчу                          | Notes                                                                                                                                                                                                                  |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------------- | --------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ОбновитиКлієнта`               | `MobileExchange.ОбновитьКлиента` (line 1030-1082)                                                                   | **100% — точна назва**                  | Намірений match у моїй spec                                                                                                                                                                                            |
+| `ОбновитиКлієнта` (alt)         | `MobileExchange.ЗаписатиЗміниКонтрагента` (line 1136-1184)                                                          | 95%                                     | Stub у mobile-export (`Возврат Сериализовать(Истина);`) — но прив'язаний до `ОбновитьКонтрагентов` через коментарі                                                                                                     |
+| `СтворитиЗамовлення`            | `MobileExchange.ОбработатьПакетДанных` (line 162-214)                                                               | **80% — generic bundle, не dedicated**  | Один endpoint приймає `Контрагенты + Заказы + МаршрутныеЛисты + Реализации + Презентации + ПКО + Напоминания` в одному виклику. `СоздатьВнутренниеЗаказы` (line 3388) — внутрішня процедура що обробляє `Заказы` array |
+| `СтворитиОплату`                | `MobileExchange.ОбработатьПакетДанных` (sub-key `ПКО`)                                                              | 80%                                     | Той самий entry, sub-key `ПКО` → `СоздатьПКО` (line 4629)                                                                                                                                                              |
+| `ОтриматиСнапшот` (M1.6 future) | `MobileExchange.СформироватьПакетДанных` + `ВивантажитиКонтрагентів` + `ВивантажитиТовари` + `ВивантажитиДокументи` | 100% — три dedicated outbound endpoints | Уже існують з повним 1С BSL                                                                                                                                                                                            |
 
 **Висновок:** усі мої запропоновані operations **вже існують** у `MobileExchange.1cws`. Я фактично робив paper-design `MobileExchange v2` навіть не знаючи що v1 існує.
 
@@ -187,11 +194,13 @@
 **Idempotency** — не реалізована у існуючому каналі. Мобільний агент покладається на client-side dedup через `УдалитьРегистрацию(МассивИД)` (line 4608) що отримує processed IDs з sequence number. Це **mobile-specific** flow і не годиться для нашого queue-with-retry pattern.
 
 **Error reporting** — існуюче поведення (line 3268-3270):
+
 ```bsl
 Исключение
     Возврат Сериализовать(ОписаниеОшибки());
 КонецПопытки;
 ```
+
 Просто string у ValueStorage. Без error codes, без structured `{ ok, errorCode, errorMessage }`. Моя spec пропонує **кращий contract** але треба домовитися з 1С-розробником.
 
 ---
@@ -200,31 +209,31 @@
 
 ### 3.1 Є у M1.5 spec, але немає у 1С (наш гап — ми будували те що зайве)
 
-| Item | Status | Impact |
-|------|--------|--------|
-| Окремий dedicated `СтворитиЗамовлення` endpoint | Не існує (треба запушити через `ОбработатьПакетДанных` з ключем `Заказы`) | M1.5 spec §3.2 BSL draft — wasted; реальний BSL приклад уже існує у `СоздатьВнутренниеЗаказы` line 3388 |
-| Окремий dedicated `СтворитиОплату` endpoint | Не існує (треба через `ОбработатьПакетДанных` з ключем `ПКО`) | Те саме |
-| JSON serialization (`text/json`) у payload | Не існує — 1С використовує `ValueStorage(структура, СжатиеДанных(9))` | **Severe blocker** — наш Node-SOAP client не вміє читати/писати ValueStorage |
-| Catalog `СинкЛог` з idempotency keys | Не існує | Треба написати з нуля — це M1.5 contribution |
-| Structured `{ ok, errorCode, errorMessage }` response contract | Не існує — повертається serialized error string | Треба domain-узгодити з 1С-розробником |
-| `ВнішнійID` реквізит на документах | Частково — `НомерВходящегоДокументаЭлектронногоОбмена` уже існує | **Reuse existing, don't add new** |
+| Item                                                           | Status                                                                    | Impact                                                                                                  |
+| -------------------------------------------------------------- | ------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| Окремий dedicated `СтворитиЗамовлення` endpoint                | Не існує (треба запушити через `ОбработатьПакетДанных` з ключем `Заказы`) | M1.5 spec §3.2 BSL draft — wasted; реальний BSL приклад уже існує у `СоздатьВнутренниеЗаказы` line 3388 |
+| Окремий dedicated `СтворитиОплату` endpoint                    | Не існує (треба через `ОбработатьПакетДанных` з ключем `ПКО`)             | Те саме                                                                                                 |
+| JSON serialization (`text/json`) у payload                     | Не існує — 1С використовує `ValueStorage(структура, СжатиеДанных(9))`     | **Severe blocker** — наш Node-SOAP client не вміє читати/писати ValueStorage                            |
+| Catalog `СинкЛог` з idempotency keys                           | Не існує                                                                  | Треба написати з нуля — це M1.5 contribution                                                            |
+| Structured `{ ok, errorCode, errorMessage }` response contract | Не існує — повертається serialized error string                           | Треба domain-узгодити з 1С-розробником                                                                  |
+| `ВнішнійID` реквізит на документах                             | Частково — `НомерВходящегоДокументаЭлектронногоОбмена` уже існує          | **Reuse existing, don't add new**                                                                       |
 
 ### 3.2 Є у 1С, але я не покривав (gaps у моєму баченні)
 
-| Operation | Покриття у M1.5 client | Impact |
-|-----------|------------------------|--------|
-| `НачатьОбмен` handshake з версією | Відсутнє | Можливо OK skip — це для session establishment, наш queue stateless |
-| `ВивантажитиТовари` / `ВивантажитиКонтрагентів` / `ВивантажитиДокументи` (outbound 1C→client) | Відсутнє | **Це full inbound polling — закриває M1.6 SnapshotFetch**, нам не треба будувати свій |
-| `СформироватьПакетДанных` (combined outbound) | Відсутнє | Спрощує initial sync (full dump) |
-| `УдалитьРегистрацию` (mark-processed) | Відсутнє | **Критично** — без виклику цієї функції 1С буде шити ті самі ID знову і знову у `РегистрацияОбмена` |
-| `ПолучитьДолгПартнера` / `ПолучитьДанныеНезакрытыхЗаказов` | Відсутнє | Перепокривається через S66 GET endpoints або потенційно через outbound polling |
-| `ОновитьОстаткиТаЦены[Частково]` / `ОтриматиЗалишкиХарактеристик` | Відсутнє | Це уже purpose S66 sync API endpoints — overlap з нашим pull-from-1C |
-| `ОновитиКурси` / `ЗаписатиКурсВалют` / `ПолучитьКурсЕвроНаДату` | Відсутнє | Покривається S66 `/api/sync/rates` push + наш `getCurrentRate()` reader |
-| `ОновитьЧат` + `ЗабронюватиНоменклатуру` | Відсутнє | M1.8 chat-bot + M1.7 reservation epics — non-blocking |
-| `ВыполнитьКоманду` generic command | Відсутнє | Generic escape-hatch — non-blocking |
-| `ОтриматиДаніХарактеристики` | Відсутнє | Detail-level lookup — non-blocking |
-| HTTPService `Боты` `/ping|/send|/sendsecond|/exchange` | Відсутнє з M1.5 angle | Окремий канал для bot-relay — це M1.8 epic |
-| `EventSubscription` + `ЗаданиеОбменССайтом` outbound push | Відсутнє з боку M1.5 SOAP | Це механізм через який S66 `/api/sync/*` отримує payload з 1С — **active channel, відрізняється від M1.5** |
+| Operation                                                                                     | Покриття у M1.5 client    | Impact                                                                                                     |
+| --------------------------------------------------------------------------------------------- | ------------------------- | ---------------------------------------------------------------------------------------------------------- | ---------- | --------------------- | ------------------------------------------ |
+| `НачатьОбмен` handshake з версією                                                             | Відсутнє                  | Можливо OK skip — це для session establishment, наш queue stateless                                        |
+| `ВивантажитиТовари` / `ВивантажитиКонтрагентів` / `ВивантажитиДокументи` (outbound 1C→client) | Відсутнє                  | **Це full inbound polling — закриває M1.6 SnapshotFetch**, нам не треба будувати свій                      |
+| `СформироватьПакетДанных` (combined outbound)                                                 | Відсутнє                  | Спрощує initial sync (full dump)                                                                           |
+| `УдалитьРегистрацию` (mark-processed)                                                         | Відсутнє                  | **Критично** — без виклику цієї функції 1С буде шити ті самі ID знову і знову у `РегистрацияОбмена`        |
+| `ПолучитьДолгПартнера` / `ПолучитьДанныеНезакрытыхЗаказов`                                    | Відсутнє                  | Перепокривається через S66 GET endpoints або потенційно через outbound polling                             |
+| `ОновитьОстаткиТаЦены[Частково]` / `ОтриматиЗалишкиХарактеристик`                             | Відсутнє                  | Це уже purpose S66 sync API endpoints — overlap з нашим pull-from-1C                                       |
+| `ОновитиКурси` / `ЗаписатиКурсВалют` / `ПолучитьКурсЕвроНаДату`                               | Відсутнє                  | Покривається S66 `/api/sync/rates` push + наш `getCurrentRate()` reader                                    |
+| `ОновитьЧат` + `ЗабронюватиНоменклатуру`                                                      | Відсутнє                  | M1.8 chat-bot + M1.7 reservation epics — non-blocking                                                      |
+| `ВыполнитьКоманду` generic command                                                            | Відсутнє                  | Generic escape-hatch — non-blocking                                                                        |
+| `ОтриматиДаніХарактеристики`                                                                  | Відсутнє                  | Detail-level lookup — non-blocking                                                                         |
+| HTTPService `Боты` `/ping                                                                     | /send                     | /sendsecond                                                                                                | /exchange` | Відсутнє з M1.5 angle | Окремий канал для bot-relay — це M1.8 epic |
+| `EventSubscription` + `ЗаданиеОбменССайтом` outbound push                                     | Відсутнє з боку M1.5 SOAP | Це механізм через який S66 `/api/sync/*` отримує payload з 1С — **active channel, відрізняється від M1.5** |
 
 **Найбільший gap:** ми писали M1.5 client як **push** з нашого боку у 1С (queue → SOAP → 1С update). А наявна 1С-архітектура **inverted**: 1С push-ить через ScheduledJob → REST до нашого S66 layer. Outbound from 1С — handled. M1.5 — це справді net-new для **inbound to 1С** (write-back) — ця частина дійсно не існує і будуватись потрібно.
 
@@ -235,6 +244,7 @@
 ### 4.1 Option A — Reuse existing ExchangePlans + WebService
 
 **Що це означає:**
+
 - Map M1.5 queue operations на existing `MobileExchange.1cws` operations:
   - `ОбновитиКлієнта` → виклик `MobileExchange.ОбновитьКлиента(пароль, данные)` напряму
   - `СтворитиЗамовлення` + `СтворитиОплату` → один виклик `MobileExchange.ОбработатьПакетДанных(пароль, structure{Заказы, ПКО})`
@@ -242,12 +252,14 @@
 - BSL не пишеться — все вже є
 
 **Pros:**
+
 - Найменше BSL роботи (0 рядків нового коду у 1С — окрім constants/секрету)
 - Знайомий патерн для 1С-розробника, який вже підтримує MobileExchange для мобільного агента
 - Намагаємось не зламати mobile-agent flow — `MobileExchange` лишається одна служба
 - Outbound (1С → site) **уже активний** — наш сайт уже мав working endpoints S66
 
 **Cons:**
+
 - **CRITICAL: payload encoding ≠ JSON.** Усі operations повертають/приймають `ValueStorage` з `СжатиеДанных(9)`. Це 1С-native binary blob, недоступний без 1С COM-bridge або шлюз-сервіса який вміє читати V8 internal format. Наш Node-SOAP-client цього робити **НЕ ВМІЄ.**
   - Workaround: попросити 1С-розробника додати JSON-paired операції (`ОбновитьКлиентаJSON`, `ОбработатьПакетДанныхJSON`) — це by-design parallel API. Це означає 100-300 рядків BSL — все одно треба code-change.
 - Idempotency не існує — треба все одно додати `Catalog.СинкЛог` + check у кожному handler
@@ -259,12 +271,14 @@
 ### 4.2 Option B — Parallel M1.5 channel (мій оригінальний план)
 
 **Що це означає:**
+
 - Створити **новий** WebService `ManagerSync.1cws` namespace `http://ltex_manager` з JSON-only operations `ОбновитиКлієнта`/`СтворитиЗамовлення`/`СтворитиОплату`
 - Створити **новий** CommonModule `СинкВхідний` з повним BSL логікою (вже draft у M1.5 spec)
 - Не торкатися MobileExchange/ОбменАРМ/ПроцедурыОбменаССайтом — це independent track для site sync
 - S66 outbound layer лишається
 
 **Pros:**
+
 - Чіткий boundary — `MobileExchange` тільки для mobile agents (legacy), `ManagerSync` тільки для site managers (new)
 - Незалежна еволюція — можна додавати operations без боязні зламати mobile agent v1.15.3
 - JSON-first contract — наш Node SOAP client уже працює (S65 shipped) і test (24 manager-sync tests pass)
@@ -272,6 +286,7 @@
 - Idempotency, error contract, retries — все на власних рейках
 
 **Cons:**
+
 - **Duplication of intent:** і `MobileExchange.ОбновитьКлиента` і `ManagerSync.ОбновитиКлієнта` будуть мати overlap. 1С-розробник може запитати "а чого не reuse?" — і він буде формально правий
 - Confusion у 1С codebase: 2 канали з картками клієнтів, можуть divergent з часом
 - **Реальний blocker** для 1С-розробника — він мусить розібратися як писати дві паралельні версії того ж data write. Patterns відрізняються (ValueStorage vs JSON)
@@ -279,6 +294,7 @@
 ### 4.3 Option C — Hybrid (рекомендована)
 
 **Що це означає:**
+
 1. **Outbound (1С → site)** — лишити як є. S66 `/api/sync/*` REST endpoints приймають JSON push з 1С scheduled job `ЗаданиеОбменССайтом`. Не чіпати. Це **активний робочий канал** (хоча конкретний BSL ще треба пере-валідувати).
 
 2. **Inbound write-back (site → 1С)** — реалізувати через **новий WebService**, але з мінімальною площею і **NOT** копіювати MobileExchange:
@@ -296,6 +312,7 @@
 5. **`Catalog.СинкЛог`** — додаємо. 1 новий catalog. ~30 рядків BSL для read/write. Підтримує idempotency для site-direction inbound (mobile-agent уже має свій механізм через `УдалитьРегистрацию` + `РегистрСведений.РегистрацияОбмена` — ми **не торкаємось**).
 
 **Pros:**
+
 - Найменше нового BSL — 1 WebService з 2 operations + 1 catalog + 1 wrapper module (~200 рядків BSL total)
 - Reuse working business logic з `ОбменАРМ` (4181, 3388) — це битий мобільним агентом код, працює
 - Чіткий separation з MobileExchange/legacy
@@ -303,11 +320,13 @@
 - JSON contract на нашому end → наш Node client unchanged
 
 **Cons:**
+
 - 1С-розробник усе одно мусить написати CommonModule `СинкВхідний` + WebService + catalog + parsing helpers. Не zero-work.
 - `ОбменАРМ.СоздатьВнутренниеЗаказы` працює з `ТаблицаЗначений` (1С datatype), не з JSON arrays — wrapper мусить translate. Це teach-friction.
 - Якщо 1С-розробник захоче проste підставити existing `ОбработатьПакетДанных` — ми втратимо JSON contract і скочимось у Option A. Треба чітко комунікувати.
 
 **Cons mitigations:**
+
 - M1.5 spec вже містить BSL draft (line 167-253) — даємо як стартовий код, 1С-розробник адаптує
 - Заплановано "Phase 5" follow-up — після того як 1С-розробник реалізує BSL, перемикаємо `SYNC_MOCK_MODE=false` і виставляємо `ONEC_SOAP_URL`
 
@@ -322,12 +341,14 @@
 3. **Acknowledge у docs:** S66 outbound layer (`/api/sync/products|prices|lots|categories|rates|orders/import|orders/export`) **уже є target для existing 1С `ЗаданиеОбменССайтом` scheduled job**. M1.6 "inbound polling" з мого backlog — **не потрібен як new feature**. Можливо потрібен як re-validation того що 1С scheduled job дійсно шле дані (треба BSL audit `ПроцедурыОбменаССайтом.bsl`).
 
 **Не roll back:**
+
 - `services/manager-sync` Fastify proxy — лишається. Useful as SOAP client + idempotency cache + mock-mode для CI.
 - `MgrSyncJob` queue + cron — лишається. Useful as DLQ + retries.
 - `lib/sync/enqueue.ts` + `proxy-client.ts` — лишаються. JSON payload shapes — лишаються.
 - Усі 1050 tests — лишаються.
 
 **Що змінюється:**
+
 - `docs/1C_SYNC_MODULES_SPEC.md` — переписати §3 (consolidate 3 ops → 2 ops), оновити §5 checklist
 - `services/manager-sync/src/soap/client.ts::updateClientViaSoap` / `updateOrderViaSoap` / `updatePaymentViaSoap` — порефакторити на один `executeTransactionViaSoap(packetType, payload)`
 - `apps/store/lib/sync/proxy-client.ts` — мінімальна зміна switch
@@ -344,17 +365,17 @@
 
 ### 5.1 Список top-9 файлів (priority order)
 
-| # | Файл | Чому критично | Min lines очікувано |
-|---|------|---------------|----------------------|
-| 1 | `CommonModules/ПроцедурыОбменаССайтом/Ext/Module.bsl` | **Сердце outbound 1С → site channel.** Підтверджує format payload що шле scheduled job. Без цього файлу ми не знаємо чи S66 endpoints дійсно target цього job. Можливо payload — не той що очікуємо. | 500-2000 |
-| 2 | `WebServices/MobileExchange/Ext/Module.bsl` | Підтверджує signature кожної з 23 operations. Конкретно: чи `ОбновитьКлиента` (1030-1082) реально `ОбновитьИдентификаторКлиента` (як у mobile-export 5%) чи повний картка-update. Diff vs mobile-export. | 200-500 |
-| 3 | `CommonModules/УправлениеКонтрагентами/Ext/Module.bsl` | API через який ми (Option C) можемо викликати `СоздатьКонтрагента`/`ОбновитьКонтрагента` reuse. Mobile-export Module.bsl line 4181 робить це inline — можливо вже extracted у цей модуль. | 300-1000 |
-| 4 | `CommonModules/УправлениеЗаказами/Ext/Module.bsl` | Те саме для `СоздатьЗаказ` reuse. У mobile line 3388 inline — можливо також refactored. | 300-1000 |
-| 5 | `CommonModules/УправлениеТоварами/Ext/Module.bsl` | Confirm shape data при outbound товар-push (для S66 audit). | 300-1000 |
-| 6 | `Catalogs/Контрагенты/Ext/ManagerModule.bsl` (або `ObjectModule.bsl`) | Hook-логіка при write контрагента — звідси triggers OnWrite EventSubscription. Підтверджує які scenario тригерять site sync. | 100-500 |
-| 7 | `HTTPServices/Боты/Ext/Module.bsl` | URL handlers `pingGETping`/`SendPOSTSend`/etc. Релевантно для M1.8 chat-bots (не M1.5), але важко для audit (вже active) | 50-300 |
-| 8 | `CommonModules/ОбменАндроид/Ext/Module.bsl` (CENTRAL, не mobile!) | Auth function `ПолучитьПродавцаПоКодуПартнера` що використовується у MobileExchange. Підтверджує password-vs-agent mapping що теж нам потрібний для Option C. | 200-500 |
-| 9 | `Catalogs/СерииНоменклатуры/Ext/ManagerModule.bsl` | Hooks для lots — підтверджує що `НомерВходящегоДокументаЭлектронногоОбмена` працює як ми очікуємо. (low priority — можна skip якщо timeline tight) | 50-200 |
+| #   | Файл                                                                  | Чому критично                                                                                                                                                                                            | Min lines очікувано |
+| --- | --------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------- |
+| 1   | `CommonModules/ПроцедурыОбменаССайтом/Ext/Module.bsl`                 | **Сердце outbound 1С → site channel.** Підтверджує format payload що шле scheduled job. Без цього файлу ми не знаємо чи S66 endpoints дійсно target цього job. Можливо payload — не той що очікуємо.     | 500-2000            |
+| 2   | `WebServices/MobileExchange/Ext/Module.bsl`                           | Підтверджує signature кожної з 23 operations. Конкретно: чи `ОбновитьКлиента` (1030-1082) реально `ОбновитьИдентификаторКлиента` (як у mobile-export 5%) чи повний картка-update. Diff vs mobile-export. | 200-500             |
+| 3   | `CommonModules/УправлениеКонтрагентами/Ext/Module.bsl`                | API через який ми (Option C) можемо викликати `СоздатьКонтрагента`/`ОбновитьКонтрагента` reuse. Mobile-export Module.bsl line 4181 робить це inline — можливо вже extracted у цей модуль.                | 300-1000            |
+| 4   | `CommonModules/УправлениеЗаказами/Ext/Module.bsl`                     | Те саме для `СоздатьЗаказ` reuse. У mobile line 3388 inline — можливо також refactored.                                                                                                                  | 300-1000            |
+| 5   | `CommonModules/УправлениеТоварами/Ext/Module.bsl`                     | Confirm shape data при outbound товар-push (для S66 audit).                                                                                                                                              | 300-1000            |
+| 6   | `Catalogs/Контрагенты/Ext/ManagerModule.bsl` (або `ObjectModule.bsl`) | Hook-логіка при write контрагента — звідси triggers OnWrite EventSubscription. Підтверджує які scenario тригерять site sync.                                                                             | 100-500             |
+| 7   | `HTTPServices/Боты/Ext/Module.bsl`                                    | URL handlers `pingGETping`/`SendPOSTSend`/etc. Релевантно для M1.8 chat-bots (не M1.5), але важко для audit (вже active)                                                                                 | 50-300              |
+| 8   | `CommonModules/ОбменАндроид/Ext/Module.bsl` (CENTRAL, не mobile!)     | Auth function `ПолучитьПродавцаПоКодуПартнера` що використовується у MobileExchange. Підтверджує password-vs-agent mapping що теж нам потрібний для Option C.                                            | 200-500             |
+| 9   | `Catalogs/СерииНоменклатуры/Ext/ManagerModule.bsl`                    | Hooks для lots — підтверджує що `НомерВходящегоДокументаЭлектронногоОбмена` працює як ми очікуємо. (low priority — можна skip якщо timeline tight)                                                       | 50-200              |
 
 ### 5.2 Robocopy команда для дотягування
 

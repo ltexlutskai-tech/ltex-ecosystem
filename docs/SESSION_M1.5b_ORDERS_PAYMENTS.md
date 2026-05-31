@@ -7,6 +7,7 @@
 **Parent spec:** `docs/SESSION_M1.5_SYNC_BACKBONE.md` (backbone). **Builds on:** M1.4 (orders list read-only), M1.5 (sync infrastructure).
 
 **User decisions (locked 2026-05-15):**
+
 - M1.5b закриває stub "+ Створити" з M1.4
 - Платежі — тільки create (список оплат уже з 1С snapshot, не редагуємо існуючі)
 - Order create — без shipment-логіки (це окремо у M1.7+ якщо буде)
@@ -77,6 +78,7 @@
 ### Order item — lot-bound vs general
 
 З S59 — `OrderItem.lotId` nullable (Migration `20260502_product_attrs_lot_optional`). Тобто item може бути:
+
 - **Bound to lot:** конкретний bag/lot, барcode known, weight fixed → `priceEur = lot.priceEur` (total)
 - **General:** менеджер обере вільний лот пізніше → `priceEur = product.price * estWeight`
 
@@ -91,6 +93,7 @@ UI form має дозволити обидва шляхи (radio / toggle per ro
 ### Admin sync-jobs UI
 
 `/admin/sync-jobs` (admin Supabase Auth layer):
+
 - Таблиця: id / entityType / entityId / status / attempts / lastError / createdAt
 - Filter: status (multi-select)
 - Action per row для status='failed': "Retry" button → `POST /api/admin/sync-jobs/[id]/retry` → reset `status='pending'`, `attempts=0`, `nextAttemptAt=now`, `lastError=null`
@@ -190,12 +193,13 @@ docs/M1.5_SYNC_ARCHITECTURE.md                                         ← edit:
 ### Task 1 — Zod schemas
 
 `lib/validations/manager-order.ts`:
+
 ```typescript
 import { z } from "zod";
 
 export const orderItemInputSchema = z.object({
   productId: z.string().min(1),
-  lotId: z.string().nullable().optional(),  // null = general (1С обере лот пізніше)
+  lotId: z.string().nullable().optional(), // null = general (1С обере лот пізніше)
   weight: z.number().positive().max(10_000),
   quantity: z.number().int().positive().max(10_000).default(1),
   priceEur: z.number().nonnegative().max(100_000),
@@ -204,7 +208,7 @@ export const orderItemInputSchema = z.object({
 export const createOrderSchema = z.object({
   customerId: z.string().min(1),
   notes: z.string().max(2000).optional(),
-  exchangeRate: z.number().positive().max(1000).optional(),  // якщо не передано — взяти getCurrentRate()
+  exchangeRate: z.number().positive().max(1000).optional(), // якщо не передано — взяти getCurrentRate()
   items: z.array(orderItemInputSchema).min(1).max(200),
 });
 
@@ -213,6 +217,7 @@ export type OrderItemInput = z.infer<typeof orderItemInputSchema>;
 ```
 
 `lib/validations/manager-payment.ts`:
+
 ```typescript
 import { z } from "zod";
 
@@ -235,7 +240,8 @@ export const createPaymentSchema = z.object({
 ```typescript
 export async function POST(req: NextRequest) {
   const user = await getCurrentUser(req);
-  if (!user) return NextResponse.json({ error: "Не авторизовано" }, { status: 401 });
+  if (!user)
+    return NextResponse.json({ error: "Не авторизовано" }, { status: 401 });
 
   const body = await req.json().catch(() => null);
   const parsed = createOrderSchema.safeParse(body);
@@ -304,7 +310,10 @@ export async function createOrderWithItems(
           })),
         },
       },
-      include: { items: true, customer: { select: { id: true, code1C: true, name: true } } },
+      include: {
+        items: true,
+        customer: { select: { id: true, code1C: true, name: true } },
+      },
     });
 
     return o;
@@ -325,12 +334,16 @@ export async function createOrderWithItems(
 ### Task 4 — POST /payments
 
 `/api/v1/manager/payments/route.ts`:
+
 ```typescript
 export async function POST(req: NextRequest) {
   const user = await getCurrentUser(req);
-  if (!user) return NextResponse.json({ error: "Не авторизовано" }, { status: 401 });
+  if (!user)
+    return NextResponse.json({ error: "Не авторизовано" }, { status: 401 });
 
-  const parsed = createPaymentSchema.safeParse(await req.json().catch(() => null));
+  const parsed = createPaymentSchema.safeParse(
+    await req.json().catch(() => null),
+  );
   if (!parsed.success) {
     return NextResponse.json(
       { error: "Невірні дані", details: parsed.error.issues.slice(0, 5) },
@@ -344,7 +357,10 @@ export async function POST(req: NextRequest) {
     include: { customer: { select: { code1C: true } } },
   });
   if (!order) {
-    return NextResponse.json({ error: "Замовлення не знайдено" }, { status: 404 });
+    return NextResponse.json(
+      { error: "Замовлення не знайдено" },
+      { status: 404 },
+    );
   }
 
   // Ownership
@@ -381,8 +397,11 @@ export async function POST(req: NextRequest) {
 ### Task 5 — enqueue extensions
 
 `lib/sync/enqueue.ts` — add:
+
 ```typescript
-export async function enqueueOrderCreate(order: Order & { items: OrderItem[]; customer: { code1C: string | null } }) {
+export async function enqueueOrderCreate(
+  order: Order & { items: OrderItem[]; customer: { code1C: string | null } },
+) {
   return prisma.mgrSyncJob.create({
     data: {
       entityType: "order",
@@ -394,7 +413,7 @@ export async function enqueueOrderCreate(order: Order & { items: OrderItem[]; cu
         totalEur: order.totalEur,
         totalUah: order.totalUah,
         exchangeRate: order.exchangeRate,
-        items: order.items.map(i => ({
+        items: order.items.map((i) => ({
           productId: i.productId,
           lotId: i.lotId,
           priceEur: i.priceEur,
@@ -431,6 +450,7 @@ export async function enqueuePaymentCreate(payment: Payment) {
 ### Task 6 — proxy-client routing
 
 `lib/sync/proxy-client.ts` — extend switch:
+
 ```typescript
 switch (job.entityType) {
   case "client":
@@ -452,12 +472,13 @@ switch (job.entityType) {
 Mirror `sync-clients.ts` pattern:
 
 `services/manager-sync/src/routes/sync-orders.ts`:
+
 ```typescript
 import { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { config } from "../config";
 import { mockUpdateOrder } from "../soap/mock";
-import { updateOrderViaSoap } from "../soap/client";  // якщо є; інакше throw
+import { updateOrderViaSoap } from "../soap/client"; // якщо є; інакше throw
 import { checkAndStoreIdempotencyKey } from "../idempotency";
 
 const bodySchema = z.object({
@@ -490,13 +511,20 @@ export async function syncOrdersRoute(app: FastifyInstance) {
 Equivalent для payments — `sync-payments.ts`.
 
 `services/manager-sync/src/soap/mock.ts` — add:
+
 ```typescript
-export async function mockUpdateOrder(payload: { idempotencyKey: string; data: unknown }) {
+export async function mockUpdateOrder(payload: {
+  idempotencyKey: string;
+  data: unknown;
+}) {
   await delay();
   return { ok: true, orderCode1C: `MOCK-ORD-${Date.now()}`, mockMode: true };
 }
 
-export async function mockUpdatePayment(payload: { idempotencyKey: string; data: unknown }) {
+export async function mockUpdatePayment(payload: {
+  idempotencyKey: string;
+  data: unknown;
+}) {
   await delay();
   return { ok: true, paymentCode1C: `MOCK-PMT-${Date.now()}`, mockMode: true };
 }
@@ -505,6 +533,7 @@ export async function mockUpdatePayment(payload: { idempotencyKey: string; data:
 `services/manager-sync/src/soap/client.ts` — real SOAP wrappers (mirror updateClientViaSoap pattern, operation names `ОбновитиЗамовлення` + `ОбновитиОплату`).
 
 `services/manager-sync/src/index.ts` — register:
+
 ```typescript
 app.register(syncClientsRoute, { prefix: "/sync" });
 app.register(syncOrdersRoute, { prefix: "/sync" });
@@ -514,16 +543,21 @@ app.register(syncPaymentsRoute, { prefix: "/sync" });
 ### Task 8 — UI form `/manager/orders/new`
 
 `page.tsx` (server):
+
 ```tsx
 import { getCurrentUser } from "@/lib/auth/manager-auth";
 import { redirect } from "next/navigation";
 import { OrderForm } from "./_components/order-form";
 
-export default async function NewOrderPage({ searchParams }: { searchParams: Promise<{ clientId?: string }> }) {
+export default async function NewOrderPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ clientId?: string }>;
+}) {
   const sp = await searchParams;
   const user = await getCurrentUser();
   if (!user) redirect("/manager/login");
-  
+
   return (
     <div className="container mx-auto p-6">
       <h1 className="mb-6 text-2xl font-bold">Створити замовлення</h1>
@@ -534,6 +568,7 @@ export default async function NewOrderPage({ searchParams }: { searchParams: Pro
 ```
 
 `_components/order-form.tsx` (client) — state + submit:
+
 ```typescript
 "use client";
 import { useState } from "react";
@@ -590,6 +625,7 @@ export function OrderForm({ initialClientId }: { initialClientId?: string }) {
 `_components/items-editor.tsx` — список `ItemRow` + add/remove buttons.
 
 `_components/item-row.tsx`:
+
 - Product autocomplete (через `/api/v1/manager/products/search?q=`)
 - Lot toggle (radio: "Конкретний лот" vs "Загальна позиція")
 - Якщо "Конкретний лот" → `LotPicker` показує вільні лоти для chosen product
@@ -602,10 +638,12 @@ export function OrderForm({ initialClientId }: { initialClientId?: string }) {
 ### Task 9 — Product search endpoint
 
 `/api/v1/manager/products/search/route.ts`:
+
 ```typescript
 export async function GET(req: NextRequest) {
   const user = await getCurrentUser(req);
-  if (!user) return NextResponse.json({ error: "Не авторизовано" }, { status: 401 });
+  if (!user)
+    return NextResponse.json({ error: "Не авторизовано" }, { status: 401 });
 
   const url = new URL(req.url);
   const q = (url.searchParams.get("q") ?? "").trim();
@@ -620,8 +658,11 @@ export async function GET(req: NextRequest) {
       isActive: true,
     },
     select: {
-      id: true, name: true, sku: true,
-      basePrice: true, weight: true,
+      id: true,
+      name: true,
+      sku: true,
+      basePrice: true,
+      weight: true,
     },
     take: 20,
   });
@@ -630,15 +671,26 @@ export async function GET(req: NextRequest) {
 ```
 
 `/api/v1/manager/products/[id]/lots/route.ts`:
+
 ```typescript
-export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function GET(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+) {
   const user = await getCurrentUser(req);
-  if (!user) return NextResponse.json({ error: "Не авторизовано" }, { status: 401 });
+  if (!user)
+    return NextResponse.json({ error: "Не авторизовано" }, { status: 401 });
   const { id } = await params;
 
   const lots = await prisma.lot.findMany({
     where: { productId: id, status: "free", inStock: true },
-    select: { id: true, barcode: true, weight: true, quantity: true, priceEur: true },
+    select: {
+      id: true,
+      barcode: true,
+      weight: true,
+      quantity: true,
+      priceEur: true,
+    },
     orderBy: { createdAt: "desc" },
     take: 50,
   });
@@ -649,24 +701,30 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 ### Task 10 — Replace M1.4 stubs
 
 `apps/store/app/manager/(workstation)/orders/_components/order-actions.tsx`:
+
 - Видалити toast `"M1.5"` — замінити `<Link href="/manager/orders/new">+ Створити</Link>`
 
 `apps/store/app/manager/(workstation)/customers/[id]/_components/client-orders-tab.tsx`:
+
 - Знайти "+ Створити" stub та замінити на `<Link href={\`/manager/orders/new?clientId=${clientId}\`}>+ Створити</Link>`
 
 ### Task 11 — Admin sync-jobs page
 
 `/admin/sync-jobs/page.tsx` (server, Supabase admin auth check):
+
 ```tsx
 import { SyncJobsTable } from "./_components/sync-jobs-table";
 import { prisma } from "@ltex/db";
 
-export default async function SyncJobsPage({ searchParams }: { searchParams: Promise<{ status?: string }> }) {
+export default async function SyncJobsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ status?: string }>;
+}) {
   const sp = await searchParams;
   const statusFilter = sp.status?.split(",").filter(Boolean) ?? [];
-  const where = statusFilter.length > 0
-    ? { status: { in: statusFilter as any } }
-    : {};
+  const where =
+    statusFilter.length > 0 ? { status: { in: statusFilter as any } } : {};
 
   const jobs = await prisma.mgrSyncJob.findMany({
     where,
@@ -683,24 +741,38 @@ export default async function SyncJobsPage({ searchParams }: { searchParams: Pro
 ```
 
 `_components/sync-jobs-table.tsx` — client component:
+
 - Multi-select status filter (URL `?status=pending,failed`)
 - Table: id (short) / entityType / entityId / status / attempts / lastError (truncated) / createdAt
 - Per-row, status='failed': "Retry" button → `POST /api/admin/sync-jobs/[id]/retry`
 
 `/api/admin/sync-jobs/[id]/retry/route.ts`:
+
 ```typescript
-export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function POST(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+) {
   // Supabase admin auth check (як інші admin endpoints — використати existing helper)
   const { id } = await params;
   const job = await prisma.mgrSyncJob.findUnique({ where: { id } });
-  if (!job) return NextResponse.json({ error: "Job not found" }, { status: 404 });
+  if (!job)
+    return NextResponse.json({ error: "Job not found" }, { status: 404 });
   if (job.status !== "failed") {
-    return NextResponse.json({ error: "Only failed jobs can be retried" }, { status: 400 });
+    return NextResponse.json(
+      { error: "Only failed jobs can be retried" },
+      { status: 400 },
+    );
   }
 
   await prisma.mgrSyncJob.update({
     where: { id },
-    data: { status: "pending", attempts: 0, nextAttemptAt: new Date(), lastError: null },
+    data: {
+      status: "pending",
+      attempts: 0,
+      nextAttemptAt: new Date(),
+      lastError: null,
+    },
   });
   return NextResponse.json({ ok: true });
 }
@@ -709,6 +781,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 ### Task 12 — 1С BSL spec extension
 
 `docs/1C_SYNC_MODULES_SPEC.md` — додати:
+
 - §3.2 `ОбновитиЗамовлення(ПарольВхода, IdempotencyKey, ПакетДанних)` з ПакетДанних JSON структура (customerCode1C, notes, totals, items[] з productCode1C/lotBarcode/priceEur/weight/quantity)
 - §3.3 `ОбновитиОплату(ПарольВхода, IdempotencyKey, ПакетДанних)` з orderCode1C, method, amount, currency, paidAt
 - §4.2/4.3 — XML examples request/response
@@ -717,6 +790,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 ### Task 13 — Tests final count
 
 Total нових ≥ 50:
+
 - Validations (8): manager-order (5) + manager-payment (3)
 - POST /orders (6) + helper (4) + POST /payments (5) = 15
 - Enqueue extensions (4) + proxy routing (2) = 6

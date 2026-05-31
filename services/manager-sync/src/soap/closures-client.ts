@@ -2,15 +2,15 @@
  * M3.4 Closures — real SOAP client (used коли SYNC_MOCK_MODE=false).
  *
  * Викликає 1С через `MobileExchange.1cws`:
- *  - `ОтриматиДаніЗакриттяЗамовленьJSON(ПарольВхода, JSONДані)`
- *  - `ЗакритиСтаріЗамовленняJSON(ПарольВхода, JSONДані)`
+ *  - `ОтриматиДаниЗакриттяЗамовленьJSON(ПарольВхода, JSONДани)`
+ *  - `ЗакритиСтариЗамовленняJSON(ПарольВхода, JSONДани)`
  *
  * **NOT EXERCISED IN CI** — викликається тільки після того як 1С-розробник
  * розгорне BSL з `docs/1c-bsl/outbound/Module.bsl.append` §7-8. До того
  * `SYNC_MOCK_MODE=true` (default) маршрутить у `closures-mock.ts`.
  *
  * Контракт SOAP-envelope узгоджено з BSL Етап 2.5 (Опція А): 2 string-параметри
- * `<ms:ПарольВхода>` + `<ms:JSONДані>`, де JSONДані = JSON.stringify({
+ * `<ms:ПарольВхода>` + `<ms:JSONДани>`, де JSONДани = JSON.stringify({
  *   idempotencyKey, data: payload}).
  *
  * Через те що `services/manager-sync/src/soap/envelope.ts` зараз ще може бути
@@ -50,7 +50,7 @@ function buildClosuresEnvelope(
     `<soap:Body>` +
     `<ms:${operation} xmlns:ms="${ARM_NS}">` +
     `<ms:ПарольВхода>${escapeXml(password)}</ms:ПарольВхода>` +
-    `<ms:JSONДані>${escapeXml(jsonData)}</ms:JSONДані>` +
+    `<ms:JSONДани>${escapeXml(jsonData)}</ms:JSONДани>` +
     `</ms:${operation}>` +
     `</soap:Body>` +
     `</soap:Envelope>`
@@ -158,7 +158,7 @@ export async function getClosuresViaSoap(
     data: { clientCode1C: req.clientCode1C },
   });
   const parsed = await callJsonOperation(
-    "ОтриматиДаніЗакриттяЗамовленьJSON",
+    "ОтриматиДаниЗакриттяЗамовленьJSON",
     jsonData,
     config,
     fetchImpl,
@@ -205,7 +205,7 @@ export async function closeClosuresViaSoap(
     },
   });
   const parsed = await callJsonOperation(
-    "ЗакритиСтаріЗамовленняJSON",
+    "ЗакритиСтариЗамовленняJSON",
     jsonData,
     config,
     fetchImpl,

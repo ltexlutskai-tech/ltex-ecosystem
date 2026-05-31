@@ -7,6 +7,7 @@
 **Parent spec:** [`docs/MANAGER_APP_STRATEGY.md`](MANAGER_APP_STRATEGY.md) §6. **Builds on:** M1.3a (list + ownership), M1.3c (full schema), M1.3d (canEditClient), M1.3e (filters), M1.4 (orders).
 
 **User decisions (locked 2026-05-14):**
+
 - Tab Клієнти = **тільки свої** для менеджера (server-enforced, не bypass-абельне)
 - Adminstrator бачить усіх
 - Foreign-clieнт детальний view = masked phones (last 3 digits) + hidden tabs
@@ -38,56 +39,57 @@
 
 ### Концепція visibility scope
 
-| Scenario | Manager scope | Admin scope |
-|---|---|---|
-| List `/manager/customers` | Тільки свої (forced) | Усі |
-| Detail `/manager/customers/[id]` свого | Full + edit | Full + edit |
-| Detail `/manager/customers/[id]` чужого | Masked view, no edit | Full + edit |
+| Scenario                                            | Manager scope             | Admin scope     |
+| --------------------------------------------------- | ------------------------- | --------------- |
+| List `/manager/customers`                           | Тільки свої (forced)      | Усі             |
+| Detail `/manager/customers/[id]` свого              | Full + edit               | Full + edit     |
+| Detail `/manager/customers/[id]` чужого             | Masked view, no edit      | Full + edit     |
 | Picker `/api/v1/manager/clients/search-all` (M1.5+) | Усі з masked для не-своїх | Усі без masking |
 
 ### Що масковано у "foreign" view (для менеджера)
 
-| Поле / Tab | Свій | Чужий |
-|---|---|---|
-| `name` | Видно | Видно |
-| `tradePointName` | Видно | Видно |
-| Адреса (region/city/street/house/novaPoshtaBranch) | Видно | Видно |
-| `phonePrimary` | `+380 50 123 45 67` | `*** *** ** 67` |
-| `phones[].phone` | повний | masked |
-| `viberContact` | Видно | `null` |
-| `websiteUrl` | Видно | `null` |
-| `geolocation` | Видно | `null` |
-| `messengers[]` | повний | `[]` (empty array) |
-| Статуси / категорія / тип цін / асортимент / доставка | Видно | Видно |
-| Борг, обєм/міс, sessionRemainder | Видно | Видно |
-| `agent` (хто менеджер) | Видно | **Видно** (для banner "Призначений X") |
-| `bankAccounts[]` | Видно | `[]` |
-| `reminders[]` | Видно (тільки свої — owner check) | `[]` |
-| `presentations[]` | Видно | `[]` |
-| `timeline[]` (Історія) | Видно | `[]` |
-| Замовлення / Реалізації | Видно | Видно |
+| Поле / Tab                                            | Свій                              | Чужий                                  |
+| ----------------------------------------------------- | --------------------------------- | -------------------------------------- |
+| `name`                                                | Видно                             | Видно                                  |
+| `tradePointName`                                      | Видно                             | Видно                                  |
+| Адреса (region/city/street/house/novaPoshtaBranch)    | Видно                             | Видно                                  |
+| `phonePrimary`                                        | `+380 50 123 45 67`               | `*** *** ** 67`                        |
+| `phones[].phone`                                      | повний                            | masked                                 |
+| `viberContact`                                        | Видно                             | `null`                                 |
+| `websiteUrl`                                          | Видно                             | `null`                                 |
+| `geolocation`                                         | Видно                             | `null`                                 |
+| `messengers[]`                                        | повний                            | `[]` (empty array)                     |
+| Статуси / категорія / тип цін / асортимент / доставка | Видно                             | Видно                                  |
+| Борг, обєм/міс, sessionRemainder                      | Видно                             | Видно                                  |
+| `agent` (хто менеджер)                                | Видно                             | **Видно** (для banner "Призначений X") |
+| `bankAccounts[]`                                      | Видно                             | `[]`                                   |
+| `reminders[]`                                         | Видно (тільки свої — owner check) | `[]`                                   |
+| `presentations[]`                                     | Видно                             | `[]`                                   |
+| `timeline[]` (Історія)                                | Видно                             | `[]`                                   |
+| Замовлення / Реалізації                               | Видно                             | Видно                                  |
 
 ### Tabs у foreign view
 
-| Tab | Свій | Чужий |
-|---|---|---|
-| Реквізити | ✓ | ✓ (з masked + banner) |
-| Асортимент | ✓ | ✓ |
-| Презентації | ✓ | **HIDDEN** |
-| Історія | ✓ | **HIDDEN** |
-| Історія продаж | ✓ | ✓ |
-| Замовлення | ✓ | ✓ |
-| Нагадування | ✓ | **HIDDEN** |
-| Viber | ✓ | **HIDDEN** |
-| Банк. рахунки | ✓ | **HIDDEN** |
-| Іст. презентацій | ✓ | **HIDDEN** |
-| Соц мережі | ✓ | **HIDDEN** |
+| Tab              | Свій | Чужий                 |
+| ---------------- | ---- | --------------------- |
+| Реквізити        | ✓    | ✓ (з masked + banner) |
+| Асортимент       | ✓    | ✓                     |
+| Презентації      | ✓    | **HIDDEN**            |
+| Історія          | ✓    | **HIDDEN**            |
+| Історія продаж   | ✓    | ✓                     |
+| Замовлення       | ✓    | ✓                     |
+| Нагадування      | ✓    | **HIDDEN**            |
+| Viber            | ✓    | **HIDDEN**            |
+| Банк. рахунки    | ✓    | **HIDDEN**            |
+| Іст. презентацій | ✓    | **HIDDEN**            |
+| Соц мережі       | ✓    | **HIDDEN**            |
 
 Visible 4 / 11 для чужого.
 
 ### UX
 
 **Banner для foreign view:**
+
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │ ⚠ Чужий клієнт. Призначений менеджер: Олена Петренко         │
@@ -98,6 +100,7 @@ Visible 4 / 11 для чужого.
 **Кнопка "Редагувати"** — disabled з tooltip "Тільки призначений менеджер".
 
 **Phone display:**
+
 ```
 *** *** ** 67   (lock icon, no action buttons)
 ```
@@ -107,6 +110,7 @@ Visible 4 / 11 для чужого.
 ### List endpoint поведінка
 
 `/api/v1/manager/clients`:
+
 - `getCurrentUser()` → role
 - Admin: повертає усіх з усіма параметрами без modify
 - Manager: **forced** `where = { ...userInput, OR: [{ agentUserId: me }, { assignments: { some: { userId: me } } }] }`
@@ -116,6 +120,7 @@ Visible 4 / 11 для чужого.
 ### Search-all endpoint (NEW)
 
 `/api/v1/manager/clients/search-all?q=...&page=...&pageSize=...`:
+
 - Auth required
 - Returns minimal fields для picker: `{ id, name, code1C, city, debt, agentName, isOwned: boolean }`
 - Manager: бачить **усіх**, isOwned per item
@@ -211,7 +216,7 @@ export async function getViewerOwnership(
       assignments: { where: { userId: user.id }, select: { id: true } },
     },
   });
-  if (!client) return "foreign";  // 404 logic окремо; helper returns conservative
+  if (!client) return "foreign"; // 404 logic окремо; helper returns conservative
   if (client.agentUserId === user.id) return "mine";
   if (client.assignments.length > 0) return "mine";
   return "foreign";
@@ -235,7 +240,7 @@ export async function getOwnedClientIds(
     },
     select: { id: true },
   });
-  return new Set(clients.map(c => c.id));
+  return new Set(clients.map((c) => c.id));
 }
 
 /**
@@ -260,7 +265,8 @@ export function maskClientForForeign<T extends ClientShape>(client: T): T {
   return {
     ...client,
     phonePrimary: client.phonePrimary ? maskPhone(client.phonePrimary) : null,
-    phones: client.phones?.map(p => ({ ...p, phone: maskPhone(p.phone) })) ?? [],
+    phones:
+      client.phones?.map((p) => ({ ...p, phone: maskPhone(p.phone) })) ?? [],
     viberContact: null,
     websiteUrl: null,
     geolocation: null,
@@ -274,6 +280,7 @@ export function maskClientForForeign<T extends ClientShape>(client: T): T {
 ```
 
 Tests ≥ 10:
+
 - admin getViewerOwnership → "admin"
 - manager + agentUserId match → "mine"
 - manager + assignment match → "mine"
@@ -300,9 +307,9 @@ Tests ≥ 10:
 export function maskPhone(raw: string | null | undefined): string | null {
   if (!raw) return null;
   const e164 = normalizePhone(raw);
-  if (!e164) return null;  // invalid → null
+  if (!e164) return null; // invalid → null
 
-  const last3 = e164.slice(-2);  // last 2 digits (3rd як space-separated)
+  const last3 = e164.slice(-2); // last 2 digits (3rd як space-separated)
   // Format: +380 50 123 45 67 → mask all but last 2 digits
   // "*** *** ** XX"
   return `*** *** ** ${last3}`;
@@ -320,7 +327,7 @@ export function maskPhone(raw: string | null | undefined): string | null {
   if (!raw) return null;
   const e164 = normalizePhone(raw);
   if (!e164) return null;
-  const digits = e164.slice(1);  // drop "+"
+  const digits = e164.slice(1); // drop "+"
   if (digits.length < 3) return null;
   const last3 = digits.slice(-3);
   // Format as +XXX XX XXX XX XX with masking
@@ -339,7 +346,9 @@ Tests ≥ 3: valid → masked / invalid → null / empty → null.
 const user = await getCurrentUser();
 // ... existing filter parsing
 
-const where: Prisma.MgrClientWhereInput = { /* ... */ };
+const where: Prisma.MgrClientWhereInput = {
+  /* ... */
+};
 
 // Apply ownership гарантовано (manager — only own, ignore mineOnly URL override)
 const ownership = ownershipWhere(user);
@@ -364,6 +373,7 @@ if (user.role === "admin" && url.searchParams.get("mineOnly") === "true") {
 ```
 
 Tests ≥ 3:
+
 - manager — only own returned
 - manager + mineOnly=false URL — STILL only own (ignored)
 - admin — all returned
@@ -381,7 +391,9 @@ export async function GET(_req, { params }) {
 
   const client = await prisma.mgrClient.findUnique({
     where: { id },
-    include: { /* ... all relations як раніше */ },
+    include: {
+      /* ... all relations як раніше */
+    },
   });
   if (!client) return 404;
 
@@ -396,6 +408,7 @@ export async function GET(_req, { params }) {
 ```
 
 Tests ≥ 4:
+
 - admin → full
 - manager own → full
 - manager foreign → masked (phones / messengers empty / etc.)
@@ -452,6 +465,7 @@ export async function GET(req: NextRequest) {
 ```
 
 Tests ≥ 4:
+
 - admin sees all з isOwned=true
 - manager sees all з isOwned mixed
 - search by name працює
@@ -462,12 +476,18 @@ Tests ≥ 4:
 `client-foreign-banner.tsx`:
 
 ```tsx
-export function ClientForeignBanner({ agentName }: { agentName: string | null }) {
+export function ClientForeignBanner({
+  agentName,
+}: {
+  agentName: string | null;
+}) {
   return (
     <div className="rounded-lg border-l-4 border-amber-500 bg-amber-50 p-4 text-sm">
       <strong className="text-amber-900">⚠ Чужий клієнт.</strong>{" "}
       <span className="text-amber-800">
-        {agentName ? `Призначений менеджер: ${agentName}. ` : "Призначеного менеджера немає. "}
+        {agentName
+          ? `Призначений менеджер: ${agentName}. `
+          : "Призначеного менеджера немає. "}
         Контакти приховано. Ви можете створювати документи.
       </span>
     </div>
@@ -483,25 +503,30 @@ export function ClientForeignBanner({ agentName }: { agentName: string | null })
 
 ```typescript
 const ALL_TABS = [
-  { value: "requisites",          label: "Реквізити",       foreignVisible: true },
-  { value: "assortment",          label: "Асортимент",      foreignVisible: true },
-  { value: "presentations",       label: "Презентації",     foreignVisible: false },
-  { value: "history",             label: "Історія",         foreignVisible: false },
-  { value: "sales-history",       label: "Історія продаж",  foreignVisible: true },
-  { value: "orders",              label: "Замовлення",      foreignVisible: true },
-  { value: "reminders",           label: "Нагадування",     foreignVisible: false },
-  { value: "viber",               label: "Viber",           foreignVisible: false },
-  { value: "banks",               label: "Банк. рахунки",   foreignVisible: false },
-  { value: "presentation-history", label: "Іст. презентацій", foreignVisible: false },
-  { value: "social",              label: "Соц мережі",      foreignVisible: false },
+  { value: "requisites", label: "Реквізити", foreignVisible: true },
+  { value: "assortment", label: "Асортимент", foreignVisible: true },
+  { value: "presentations", label: "Презентації", foreignVisible: false },
+  { value: "history", label: "Історія", foreignVisible: false },
+  { value: "sales-history", label: "Історія продаж", foreignVisible: true },
+  { value: "orders", label: "Замовлення", foreignVisible: true },
+  { value: "reminders", label: "Нагадування", foreignVisible: false },
+  { value: "viber", label: "Viber", foreignVisible: false },
+  { value: "banks", label: "Банк. рахунки", foreignVisible: false },
+  {
+    value: "presentation-history",
+    label: "Іст. презентацій",
+    foreignVisible: false,
+  },
+  { value: "social", label: "Соц мережі", foreignVisible: false },
 ];
 
-const tabs = isForeign ? ALL_TABS.filter(t => t.foreignVisible) : ALL_TABS;
+const tabs = isForeign ? ALL_TABS.filter((t) => t.foreignVisible) : ALL_TABS;
 ```
 
 Якщо user пробує deeplink `#viber` на чужого → fallback на `#requisites`.
 
 Tests ≥ 3:
+
 - mine → 11 tabs
 - foreign → 4 tabs
 - admin → 11 tabs
@@ -519,7 +544,9 @@ export function ContactRow({ phone, messenger, masked }: Props) {
 
   return (
     <div className="flex items-center gap-2">
-      <span className={masked ? "font-mono text-gray-500" : "font-medium"}>{formatted}</span>
+      <span className={masked ? "font-mono text-gray-500" : "font-medium"}>
+        {formatted}
+      </span>
       {tel && <a href={tel}>📞</a>}
       {viber && <a href={viber}>💬</a>}
       {/* etc. */}
@@ -562,6 +589,7 @@ Adjust shape — masked-versions полів: `phonePrimary: string | null` (ст
 ### Task 11 — Tests final
 
 Total ≥ 24:
+
 - client-visibility helpers (≥ 10)
 - maskPhone (≥ 3)
 - /clients route enforcement (≥ 3)
@@ -630,8 +658,7 @@ git pull origin main
 10. **`/clients/[id]/orders` endpoint (з M1.4)** — лишити без змін: orders уже permission-checked через `getMyClientCodes1C`. Якщо foreign manager відкриє чужого і клікне Tab Замовлення — endpoint поверне порожній список (тому що customer.code1C НЕ in myCodes). Це OK поведінка — у наступному M1.5 розширимо щоб foreign manager бачив orders для doc context.
 
     ⚠️ Wait — це conflict з acceptance "Замовлення visible у foreign". Перевір: foreign manager у Tab Замовлення має бачити ці замовлення (для context). Це потребує relaxing `/clients/[id]/orders` для будь-якого authed manager (not тільки owner). Update endpoint:
-    
     - Для foreign client: дозволити перегляд `/clients/[id]/orders` АЛЕ без contact-related data. Orders самі по собі — не secret.
     - Або simpler: видалити ownership check з `/clients/[id]/orders` (всі authed bachat). Перевір що це не leak-ить sensitive data — Order має тільки code1C, status, total, items. Це OK для cross-manager.
-    
+
     **Decision (locked):** Relax `/clients/[id]/orders` — дозволити foreign manager відкрити. Все одно у Tab Замовлення показано тільки orders (status/total) — не контакти.

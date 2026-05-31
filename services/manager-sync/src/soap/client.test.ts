@@ -21,13 +21,13 @@ function buildOkResponse(returnJson: string): Response {
   const body = `<?xml version="1.0" encoding="utf-8"?>
 <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
   <soap:Body>
-    <ms:ОбновитиКлієнтаJSONResponse xmlns:ms="http://arm_mobile">
+    <ms:ОбновитиКлиентаJSONResponse xmlns:ms="http://arm_mobile">
       <ms:return>${returnJson
         .replace(/&/g, "&amp;")
         .replace(/</g, "&lt;")
         .replace(/>/g, "&gt;")
         .replace(/"/g, "&quot;")}</ms:return>
-    </ms:ОбновитиКлієнтаJSONResponse>
+    </ms:ОбновитиКлиентаJSONResponse>
   </soap:Body>
 </soap:Envelope>`;
   return new Response(body, {
@@ -51,45 +51,45 @@ describe("buildJsonDataEnvelope", () => {
 });
 
 describe("buildSoapEnvelope", () => {
-  it("XML-escapes special chars у JSONДані (пароль тепер всередині JSON)", () => {
+  it("XML-escapes special chars у JSONДани (пароль тепер всередині JSON)", () => {
     const env = buildSoapEnvelope({
-      operation: "ОбновитиКлієнтаJSON",
+      operation: "ОбновитиКлиентаJSON",
       password: 'p"ass<>&',
       idempotencyKey: "550e8400-e29b-41d4-a716-446655440000",
       payload: { name: "A & B" },
     });
     // <ms:ПарольВхода> завжди порожній (BSL читає з JSON).
     expect(env).toContain("<ms:ПарольВхода></ms:ПарольВхода>");
-    // JSONДані містить escape-ний JSON з паролем і payload-ом всередині.
+    // JSONДани містить escape-ний JSON з паролем і payload-ом всередині.
     expect(env).toContain("&quot;A &amp; B&quot;");
     // пароль зі спецсимволами теж escape-ється у JSON-стрічці.
     expect(env).toContain("p\\&quot;ass&lt;&gt;&amp;");
   });
 
-  it("використовує 2-параметровий BSL-контракт (ПарольВхода порожній + JSONДані)", () => {
+  it("використовує 2-параметровий BSL-контракт (ПарольВхода порожній + JSONДани)", () => {
     const env = buildSoapEnvelope({
-      operation: "ОбновитиКлієнтаJSON",
+      operation: "ОбновитиКлиентаJSON",
       password: "secret",
       idempotencyKey: "key-42",
       payload: { code1C: "000001" },
     });
     // ПарольВхода завжди порожній — пароль міграно у JSON-поле.
     expect(env).toContain("<ms:ПарольВхода></ms:ПарольВхода>");
-    expect(env).toContain("<ms:JSONДані>");
-    expect(env).toContain("</ms:JSONДані>");
+    expect(env).toContain("<ms:JSONДани>");
+    expect(env).toContain("</ms:JSONДани>");
     // Старий 3-параметровий контракт прибрано.
     expect(env).not.toContain("<ms:IdempotencyKey>");
     expect(env).not.toContain("<ms:ПакетДанних>");
   });
 
-  it("кладе idempotencyKey + password ВСЕРЕДИНУ JSONДані payload-у", () => {
+  it("кладе idempotencyKey + password ВСЕРЕДИНУ JSONДани payload-у", () => {
     const env = buildSoapEnvelope({
       operation: "СтворитиЗамовленняJSON",
       password: "shared-secret",
       idempotencyKey: "uniq-123",
       payload: { customerCode1C: "000001" },
     });
-    // після unescape JSONДані має містити усі три ключі
+    // після unescape JSONДани має містити усі три ключі
     const unescaped = env
       .replace(/&quot;/g, '"')
       .replace(/&amp;/g, "&")
@@ -101,8 +101,8 @@ describe("buildSoapEnvelope", () => {
   });
 
   it("збирає валідний SOAP action header з JSON-суфіксом", () => {
-    expect(buildSoapAction("ОбновитиКлієнтаJSON")).toBe(
-      '"http://arm_mobile#MobileExchange:ОбновитиКлієнтаJSON"',
+    expect(buildSoapAction("ОбновитиКлиентаJSON")).toBe(
+      '"http://arm_mobile#MobileExchange:ОбновитиКлиентаJSON"',
     );
   });
 });
@@ -158,10 +158,10 @@ describe("updateClientViaSoap", () => {
     const init = fetchArgs?.[1] as RequestInit;
     const body = init.body as string;
     // Operation name з JSON-суфіксом.
-    expect(body).toContain("ОбновитиКлієнтаJSON");
-    // idempotencyKey тепер всередині JSONДані payload-у, не окремим елементом.
+    expect(body).toContain("ОбновитиКлиентаJSON");
+    // idempotencyKey тепер всередині JSONДани payload-у, не окремим елементом.
     expect(body).toContain("550e8400-e29b-41d4-a716-446655440000");
-    expect(body).toContain("<ms:JSONДані>");
+    expect(body).toContain("<ms:JSONДани>");
     expect(body).not.toContain("<ms:IdempotencyKey>");
     // ПарольВхода завжди порожній — пароль міграно у JSON.
     expect(body).toContain("<ms:ПарольВхода></ms:ПарольВхода>");
@@ -175,7 +175,7 @@ describe("updateClientViaSoap", () => {
     // SOAPAction теж з JSON-суфіксом.
     const headers = init.headers as Record<string, string>;
     expect(headers.SOAPAction).toBe(
-      '"http://arm_mobile#MobileExchange:ОбновитиКлієнтаJSON"',
+      '"http://arm_mobile#MobileExchange:ОбновитиКлиентаJSON"',
     );
   });
 

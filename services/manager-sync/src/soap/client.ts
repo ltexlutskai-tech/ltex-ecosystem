@@ -19,19 +19,21 @@ import type {
   RouteSheetCreateResult,
 } from "./types";
 
-// ─── Імена SOAP-операцій узгоджені з BSL (Етап 2.5, Опція А) ────────────────
-// Див. `docs/1c-bsl/outbound/Module.bsl.append` — усі 6 функцій з суфіксом
-// `JSON`, приймають 2 string-параметри (`ПарольВхода` + `JSONДані`).
+// ─── Імена SOAP-операцій узгоджені з BSL (М3.5 — після Russification) ──────
+// Див. `docs/1c-bsl/outbound/Module.bsl.full` — усі 8 EXPORT-функцій з суфіксом
+// `JSON`, приймають 2 string-параметри (`ПарольВхода` + `JSONДани`).
+// Після фіксу 8.2.13 compat mode (commit d9ac790) усі ідентифікатори лише
+// з російською кирилицею — без української `і/ї/є/І`.
 
-const OP_CLIENT_UPDATE = "ОбновитиКлієнтаJSON";
+const OP_CLIENT_UPDATE = "ОбновитиКлиентаJSON";
 const OP_ORDER_CREATE = "СтворитиЗамовленняJSON";
 const OP_PAYMENT_CREATE = "СтворитиОплатуJSON";
-const OP_REALIZATION_CREATE = "СтворитиРеалізаціюJSON";
+const OP_REALIZATION_CREATE = "СтворитиРеализациюJSON";
 const OP_CASH_ORDER_CREATE = "СтворитиКасовийОрдерJSON";
 const OP_ROUTE_SHEET_CREATE = "СтворитиМаршрутнийЛистJSON";
 
 /**
- * Викликає 1С SOAP operation `ОбновитиКлієнтаJSON`.
+ * Викликає 1С SOAP operation `ОбновитиКлиентаJSON`.
  *
  * **NOT EXERCISED IN CI** — викликається тільки коли SYNC_MOCK_MODE=false.
  * Тести covering only envelope construction + response parsing (детерміністично);
@@ -330,7 +332,7 @@ function normalizePaymentResult(parsed: unknown): PaymentCreateResult {
 // ─── M1.6 (Реалізація, Етап 5): realization SOAP wrapper ────────────────────
 
 /**
- * Викликає 1С SOAP operation `СтворитиРеалізаціюJSON`.
+ * Викликає 1С SOAP operation `СтворитиРеализациюJSON`.
  * Mirror-ить `createOrderViaSoap` pattern — fetch + XML envelope + extract <return>.
  *
  * **NOT EXERCISED IN CI** — викликається тільки коли SYNC_MOCK_MODE=false.

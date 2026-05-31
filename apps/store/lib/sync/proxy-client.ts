@@ -7,7 +7,7 @@ import type { MgrSyncJob } from "@ltex/db";
  * стороні). Body: `{ idempotencyKey, payload }`.
  *
  * Шлях `payload` → 1С: proxy кладе `{idempotencyKey, data: payload}` у єдиний
- * SOAP-параметр `<ms:JSONДані>` (узгоджено з BSL `Module.bsl.append`, Етап 2.5).
+ * SOAP-параметр `<ms:JSONДани>` (узгоджено з BSL `Module.bsl.append`, Етап 2.5).
  * Тобто сам `payload` тут — це майбутнє `data` у BSL-парсингу. Поле-розбіжності
  * між нашими `build*Payload` і BSL-очікуваннями задокументовано у заголовку
  * `enqueue.ts` (TODO для наступного раунду).

@@ -3,7 +3,7 @@ import { Prisma, prisma } from "@ltex/db";
 import type { ClientUpdatePayload } from "@/lib/validations/sync-job";
 
 /**
- * Збирає payload для 1С `ОбновитиКлієнтаJSON` з MgrClient row + relations
+ * Збирає payload для 1С `ОбновитиКлиентаJSON` з MgrClient row + relations
  * і створює row у `mgr_sync_jobs` черзі.
  *
  * Cron-worker (`/api/cron/process-sync-queue`) поступово дренує чергу.
@@ -72,9 +72,9 @@ import type { ClientUpdatePayload } from "@/lib/validations/sync-job";
  *     1С-стороні `alreadyProcessed` завжди = false; повторний виклик з
  *     ідентичним idempotencyKey СТВОРИТЬ другий документ-чернетку (рідкісне race).
  *   • `password` тепер передається з `services/manager-sync/.env::ONEC_SOAP_PASSWORD`
- *     і інжектиться у JSONДані (`buildSoapEnvelope` додає поле `password`).
+ *     і інжектиться у JSONДани (`buildSoapEnvelope` додає поле `password`).
  *     Зовнішній SOAP-параметр `<ms:ПарольВхода>` лишається порожнім; auth
- *     перевіряється у BSL `_LTEX_ПеревіритиПароль` через hardcoded string
+ *     перевіряється у BSL `_LTEX_ПеревиритиПароль` через hardcoded string
  *     порівняння з `LTEX_SYNC_PASSWORD_PLACEHOLDER` (заміняється вручну при
  *     вставці у Конфігуратор). Деталі — `docs/1c-bsl/outbound/README.md` §3.
  */
@@ -309,7 +309,7 @@ export async function enqueuePaymentCreate(payment: PaymentForEnqueue) {
 
 /**
  * Shape для `enqueueSaleCreate` — мінімум полів з Sale + items для payload-у
- * `СтворитиРеалізаціюJSON` SOAP-operation (див. docs/1C_SYNC_MODULES_SPEC.md §3.4
+ * `СтворитиРеализациюJSON` SOAP-operation (див. docs/1C_SYNC_MODULES_SPEC.md §3.4
  * + `docs/1c-bsl/outbound/Module.bsl.append`).
  *
  * Mirror-ить `OrderForEnqueue`, але реалізація несе додаткові менеджерські

@@ -7,6 +7,7 @@
 **Parent spec:** [`docs/MANAGER_APP_STRATEGY.md`](MANAGER_APP_STRATEGY.md) §6. **Builds on:** M1.3a (clients list + GET filter params), M1.3c (full schema), M1.3d (editing).
 
 **User decision (locked 2026-05-14):**
+
 - "Фільтри клієнтів повинні містити всі поля крім контактів"
 - "Налаштовувати колонки на сторінці та у фільтрах — переставляти місцями, відображати/невідображати"
 
@@ -36,32 +37,33 @@
 
 **Додати (17 нових):**
 
-| Param | Type | Behavior |
-|---|---|---|
-| `statusOperationalId` | csv string[] | multi-select |
-| `categoryTTId` | csv string[] | multi-select |
-| `priceTypeId` | csv string[] | multi-select |
-| `primaryAssortmentId` | csv string[] | multi-select |
-| `primaryRouteId` | csv string[] | multi-select |
-| `agentUserId` | csv string[] | multi-select з User WHERE role IN ('manager','admin') |
-| `region` | string | LIKE %query% |
-| `city` | string | LIKE %query% |
-| `dialogStatus` | string | exact match (поки text) |
-| `debtMin` | number | `debt >= n` |
-| `debtMax` | number | `debt <= n` |
-| `overdueDebtMin` | number | `overdueDebt >= n` |
-| `overdueDebtMax` | number | `overdueDebt <= n` |
-| `monthlyVolumeMin` | number | `monthlyVolume >= n` |
-| `monthlyVolumeMax` | number | `monthlyVolume <= n` |
-| `daysSinceMin` | number | range по `daysSinceLastPurchase` |
-| `daysSinceMax` | number | range |
-| `licenseExpiresBefore` | ISO date | `licenseExpiresAt <= date` |
-| `hasNewMessage` | boolean | exact match |
-| `isViberLinked` | boolean | exact match |
-| `createdFrom` | ISO date | `createdAt >= date` |
-| `createdTo` | ISO date | `createdAt <= date` |
+| Param                  | Type         | Behavior                                              |
+| ---------------------- | ------------ | ----------------------------------------------------- |
+| `statusOperationalId`  | csv string[] | multi-select                                          |
+| `categoryTTId`         | csv string[] | multi-select                                          |
+| `priceTypeId`          | csv string[] | multi-select                                          |
+| `primaryAssortmentId`  | csv string[] | multi-select                                          |
+| `primaryRouteId`       | csv string[] | multi-select                                          |
+| `agentUserId`          | csv string[] | multi-select з User WHERE role IN ('manager','admin') |
+| `region`               | string       | LIKE %query%                                          |
+| `city`                 | string       | LIKE %query%                                          |
+| `dialogStatus`         | string       | exact match (поки text)                               |
+| `debtMin`              | number       | `debt >= n`                                           |
+| `debtMax`              | number       | `debt <= n`                                           |
+| `overdueDebtMin`       | number       | `overdueDebt >= n`                                    |
+| `overdueDebtMax`       | number       | `overdueDebt <= n`                                    |
+| `monthlyVolumeMin`     | number       | `monthlyVolume >= n`                                  |
+| `monthlyVolumeMax`     | number       | `monthlyVolume <= n`                                  |
+| `daysSinceMin`         | number       | range по `daysSinceLastPurchase`                      |
+| `daysSinceMax`         | number       | range                                                 |
+| `licenseExpiresBefore` | ISO date     | `licenseExpiresAt <= date`                            |
+| `hasNewMessage`        | boolean      | exact match                                           |
+| `isViberLinked`        | boolean      | exact match                                           |
+| `createdFrom`          | ISO date     | `createdAt >= date`                                   |
+| `createdTo`            | ISO date     | `createdAt <= date`                                   |
 
 **URL encoding rules:**
+
 - single: `?statusId=abc`
 - multi: `?statusId=abc,def,ghi` (comma-separated — backend split on `,` + filter empties)
 - range: `?debtMin=100&debtMax=5000`
@@ -75,10 +77,12 @@
 ### Part B — User view prefs
 
 **Concept:** Окрема DB таблиця `mgr_user_view_prefs` зберігає JSON-конфіг для кожної комбінації (userId, viewKey). Два initial views:
+
 - `clients_table` — конфіг колонок таблиці
 - `clients_filters` — конфіг панелі фільтрів
 
 **Schema:**
+
 ```prisma
 model MgrUserViewPrefs {
   id        String   @id @default(cuid())
@@ -93,33 +97,36 @@ model MgrUserViewPrefs {
 ```
 
 **Config shape `clients_table`:**
+
 ```json
 {
   "version": 1,
   "items": [
-    { "key": "name",            "visible": true,  "order": 1 },
-    { "key": "debt",            "visible": true,  "order": 2 },
-    { "key": "statusGeneral",   "visible": true,  "order": 3 },
-    { "key": "searchChannel",   "visible": false, "order": 4 },
-    { "key": "daysSinceLast",   "visible": true,  "order": 5 },
-    { "key": "agent",           "visible": false, "order": 6 }
+    { "key": "name", "visible": true, "order": 1 },
+    { "key": "debt", "visible": true, "order": 2 },
+    { "key": "statusGeneral", "visible": true, "order": 3 },
+    { "key": "searchChannel", "visible": false, "order": 4 },
+    { "key": "daysSinceLast", "visible": true, "order": 5 },
+    { "key": "agent", "visible": false, "order": 6 }
   ]
 }
 ```
 
 **Config shape `clients_filters`:**
+
 ```json
 {
   "version": 1,
   "items": [
-    { "key": "search",          "visible": true,  "order": 1 },
-    { "key": "statusGeneralId", "visible": true,  "order": 2 },
-    { "key": "agentUserId",     "visible": false, "order": 3 }
+    { "key": "search", "visible": true, "order": 1 },
+    { "key": "statusGeneralId", "visible": true, "order": 2 },
+    { "key": "agentUserId", "visible": false, "order": 3 }
   ]
 }
 ```
 
 **Available column keys** (всього 19):
+
 - `name` / `tradePointName` / `code1C`
 - `phonePrimary` (тільки display, **не filter**)
 - `statusGeneral` / `statusOperational`
@@ -134,6 +141,7 @@ model MgrUserViewPrefs {
 **Default visible columns (7, як M1.3a):** `name`, `phonePrimary`, `debt`, `statusGeneral`, `searchChannel`, `daysSinceLast`, `agent`.
 
 **Available filter keys** (всього 25):
+
 - `search`
 - `statusGeneralId` / `statusOperationalId`
 - `searchChannelId` / `deliveryMethodId` / `categoryTTId` / `priceTypeId` / `primaryAssortmentId` / `primaryRouteId`
@@ -152,6 +160,7 @@ model MgrUserViewPrefs {
 ### API
 
 **GET `/api/v1/manager/me/view-prefs/[viewKey]`** — read:
+
 - Auth required
 - viewKey ∈ {"clients_table", "clients_filters"}
 - Якщо немає у DB → return default (з `lib/manager/view-defaults.ts`)
@@ -159,6 +168,7 @@ model MgrUserViewPrefs {
 - Response: `{ items: ConfigItem[] }`
 
 **PUT `/api/v1/manager/me/view-prefs/[viewKey]`** — write:
+
 - Auth required
 - Body: `{ items: ConfigItem[] }`, Zod validate (всі keys мають бути з whitelisted set)
 - Upsert (`@@unique([userId, viewKey])`)
@@ -183,6 +193,7 @@ model MgrUserViewPrefs {
 - "⚙️ Налаштування" — opens prefs sheet (3 sections: Columns / Filters / Reset)
 
 **Filter sheet:**
+
 ```
 Sheet (right side, w-96)
 ┌─────────────────────────────┐
@@ -215,6 +226,7 @@ Sheet (right side, w-96)
 Фільтри відображаються у порядку з `clients_filters` prefs (`order` ASC, `visible: false` приховані). Multi-select — chip-style з зачитуванням з `dictionaries` API.
 
 **Налаштування sheet (Sheet right side):**
+
 ```
 ┌──────────────────────────────────┐
 │ Налаштування таблиці          ✕  │
@@ -339,50 +351,85 @@ EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 ```typescript
 export const CLIENTS_TABLE_KEYS = [
-  "name", "tradePointName", "code1C", "phonePrimary",
-  "statusGeneral", "statusOperational",
-  "searchChannel", "deliveryMethod", "categoryTT", "priceType", "primaryAssortment", "primaryRoute",
-  "agent", "region", "city",
-  "debt", "overdueDebt", "monthlyVolume",
-  "daysSinceLast", "licenseExpiresAt", "lastSyncedAt", "createdAt",
+  "name",
+  "tradePointName",
+  "code1C",
+  "phonePrimary",
+  "statusGeneral",
+  "statusOperational",
+  "searchChannel",
+  "deliveryMethod",
+  "categoryTT",
+  "priceType",
+  "primaryAssortment",
+  "primaryRoute",
+  "agent",
+  "region",
+  "city",
+  "debt",
+  "overdueDebt",
+  "monthlyVolume",
+  "daysSinceLast",
+  "licenseExpiresAt",
+  "lastSyncedAt",
+  "createdAt",
 ] as const;
 
 export const CLIENTS_TABLE_DEFAULT: ConfigItem[] = [
-  { key: "name",          visible: true,  order: 1 },
-  { key: "phonePrimary",  visible: true,  order: 2 },
-  { key: "debt",          visible: true,  order: 3 },
-  { key: "statusGeneral", visible: true,  order: 4 },
-  { key: "searchChannel", visible: true,  order: 5 },
-  { key: "daysSinceLast", visible: true,  order: 6 },
-  { key: "agent",         visible: true,  order: 7 },
+  { key: "name", visible: true, order: 1 },
+  { key: "phonePrimary", visible: true, order: 2 },
+  { key: "debt", visible: true, order: 3 },
+  { key: "statusGeneral", visible: true, order: 4 },
+  { key: "searchChannel", visible: true, order: 5 },
+  { key: "daysSinceLast", visible: true, order: 6 },
+  { key: "agent", visible: true, order: 7 },
   // решта append як invisible
 ];
 
 export const CLIENTS_FILTERS_KEYS = [
   "search",
-  "statusGeneralId", "statusOperationalId",
-  "searchChannelId", "deliveryMethodId", "categoryTTId", "priceTypeId", "primaryAssortmentId", "primaryRouteId",
+  "statusGeneralId",
+  "statusOperationalId",
+  "searchChannelId",
+  "deliveryMethodId",
+  "categoryTTId",
+  "priceTypeId",
+  "primaryAssortmentId",
+  "primaryRouteId",
   "agentUserId",
-  "region", "city", "dialogStatus",
-  "debtRange", "overdueDebtRange", "monthlyVolumeRange", "daysSinceRange",
-  "licenseExpiresBefore", "createdRange",
-  "hasNewMessage", "isViberLinked",
-  "hasDebt", "hasOverpayment",
-  "onlyMine", "hideTrash",
+  "region",
+  "city",
+  "dialogStatus",
+  "debtRange",
+  "overdueDebtRange",
+  "monthlyVolumeRange",
+  "daysSinceRange",
+  "licenseExpiresBefore",
+  "createdRange",
+  "hasNewMessage",
+  "isViberLinked",
+  "hasDebt",
+  "hasOverpayment",
+  "onlyMine",
+  "hideTrash",
 ] as const;
 
 export const CLIENTS_FILTERS_DEFAULT: ConfigItem[] = [
-  { key: "search",           visible: true, order: 1 },
-  { key: "statusGeneralId",  visible: true, order: 2 },
-  { key: "searchChannelId",  visible: true, order: 3 },
+  { key: "search", visible: true, order: 1 },
+  { key: "statusGeneralId", visible: true, order: 2 },
+  { key: "searchChannelId", visible: true, order: 3 },
   { key: "deliveryMethodId", visible: true, order: 4 },
-  { key: "hasDebt",          visible: true, order: 5 },
-  { key: "hasOverpayment",   visible: true, order: 6 },
-  { key: "onlyMine",         visible: true, order: 7 },
-  { key: "hideTrash",        visible: true, order: 8 },
+  { key: "hasDebt", visible: true, order: 5 },
+  { key: "hasOverpayment", visible: true, order: 6 },
+  { key: "onlyMine", visible: true, order: 7 },
+  { key: "hideTrash", visible: true, order: 8 },
 ];
 
-export function mergePrefs(saved: ConfigItem[] | null, defaults: ConfigItem[], allKeys: readonly string[]): ConfigItem[] {
+export function mergePrefs(
+  saved: ConfigItem[] | null,
+  defaults: ConfigItem[],
+  allKeys: readonly string[],
+): ConfigItem[] {
   // 1. Validate: drop saved items where key ∉ allKeys
   // 2. Auto-append missing keys (from allKeys but not у saved) з visible: false (continue order)
   // 3. Return ordered list
@@ -427,13 +474,16 @@ Tests ≥ 6: GET default / GET saved / GET with new key auto-appended / PUT vali
 ### Task 4 — Extended clients GET filters
 
 `apps/store/app/api/v1/manager/clients/route.ts`:
+
 1. Parse comma-separated arrays для FK params (split + filter empty + validate cuid).
 2. Build Prisma `where` clause:
+
    ```typescript
    const where: Prisma.MgrClientWhereInput = { ...existing };
 
    // Multi-select FK
-   if (statusOperationalIds?.length) where.statusOperationalId = { in: statusOperationalIds };
+   if (statusOperationalIds?.length)
+     where.statusOperationalId = { in: statusOperationalIds };
    if (categoryTTIds?.length) where.categoryTTId = { in: categoryTTIds };
    // ...
 
@@ -470,7 +520,11 @@ Tests ≥ 8 (нових): multi-select по category / debt range / region LIKE 
 
 ```tsx
 "use client";
-export function ViewCustomizerSheet({ open, onClose, currentTab = "columns" }: Props) {
+export function ViewCustomizerSheet({
+  open,
+  onClose,
+  currentTab = "columns",
+}: Props) {
   const [tab, setTab] = useState<"columns" | "filters">(currentTab);
   const columnsPrefs = useViewPrefs("clients_table");
   const filtersPrefs = useViewPrefs("clients_filters");
@@ -479,17 +533,36 @@ export function ViewCustomizerSheet({ open, onClose, currentTab = "columns" }: P
     <Sheet open={open} onClose={onClose}>
       <header>
         <h2>Налаштування таблиці</h2>
-        <TabSwitcher tabs={[{ key: "columns", label: "Колонки" }, { key: "filters", label: "Фільтри" }]} value={tab} onChange={setTab} />
+        <TabSwitcher
+          tabs={[
+            { key: "columns", label: "Колонки" },
+            { key: "filters", label: "Фільтри" },
+          ]}
+          value={tab}
+          onChange={setTab}
+        />
       </header>
       <div className="p-4">
-        {tab === "columns" && <ViewCustomizerList prefs={columnsPrefs} labels={COLUMN_LABELS} />}
-        {tab === "filters" && <ViewCustomizerList prefs={filtersPrefs} labels={FILTER_LABELS} />}
+        {tab === "columns" && (
+          <ViewCustomizerList prefs={columnsPrefs} labels={COLUMN_LABELS} />
+        )}
+        {tab === "filters" && (
+          <ViewCustomizerList prefs={filtersPrefs} labels={FILTER_LABELS} />
+        )}
       </div>
       <footer>
-        <button onClick={() => (tab === "columns" ? columnsPrefs.reset() : filtersPrefs.reset())}>
+        <button
+          onClick={() =>
+            tab === "columns" ? columnsPrefs.reset() : filtersPrefs.reset()
+          }
+        >
           Скинути до дефолту
         </button>
-        <button onClick={() => (tab === "columns" ? columnsPrefs.save() : filtersPrefs.save())}>
+        <button
+          onClick={() =>
+            tab === "columns" ? columnsPrefs.save() : filtersPrefs.save()
+          }
+        >
           Зберегти
         </button>
       </footer>
@@ -499,19 +572,26 @@ export function ViewCustomizerSheet({ open, onClose, currentTab = "columns" }: P
 ```
 
 `view-customizer-list.tsx` — uses local state, items as `ConfigItem[]`:
+
 ```tsx
-{items.map((item, i) => (
-  <div key={item.key} className="flex items-center gap-2 py-1">
-    <button onClick={() => moveUp(i)} disabled={i === 0}>▲</button>
-    <button onClick={() => moveDown(i)} disabled={i === items.length - 1}>▼</button>
-    <input
-      type="checkbox"
-      checked={item.visible}
-      onChange={(e) => toggleVisible(i, e.target.checked)}
-    />
-    <span className="flex-1">{labels[item.key]}</span>
-  </div>
-))}
+{
+  items.map((item, i) => (
+    <div key={item.key} className="flex items-center gap-2 py-1">
+      <button onClick={() => moveUp(i)} disabled={i === 0}>
+        ▲
+      </button>
+      <button onClick={() => moveDown(i)} disabled={i === items.length - 1}>
+        ▼
+      </button>
+      <input
+        type="checkbox"
+        checked={item.visible}
+        onChange={(e) => toggleVisible(i, e.target.checked)}
+      />
+      <span className="flex-1">{labels[item.key]}</span>
+    </div>
+  ));
+}
 ```
 
 ### Task 6 — use-view-prefs hook
@@ -524,8 +604,8 @@ export function useViewPrefs(viewKey: "clients_table" | "clients_filters") {
 
   useEffect(() => {
     fetch(`/api/v1/manager/me/view-prefs/${viewKey}`)
-      .then(r => r.json())
-      .then(data => setItems(data.items));
+      .then((r) => r.json())
+      .then((data) => setItems(data.items));
   }, [viewKey]);
 
   const update = (newItems: ConfigItem[]) => {
@@ -541,7 +621,7 @@ export function useViewPrefs(viewKey: "clients_table" | "clients_filters") {
     });
     setDirty(false);
     setSaving(false);
-    router.refresh();  // re-render таблицю з new prefs
+    router.refresh(); // re-render таблицю з new prefs
   };
 
   const reset = async () => {
@@ -555,6 +635,7 @@ export function useViewPrefs(viewKey: "clients_table" | "clients_filters") {
 ### Task 7 — Apply prefs у таблицю
 
 `clients-table.tsx`:
+
 - Receive `columnsPrefs: ConfigItem[]` as prop (server-side load + pass через page → table)
 - Filter `visible: true`, sort by `order`
 - Render thead/tbody dynamically:
@@ -577,6 +658,7 @@ const visibleCols = columnsPrefs.filter(c => c.visible).sort((a, b) => a.order -
 ```
 
 `column-render.ts`:
+
 ```typescript
 export function renderCell(key: string, client: ClientListItem): React.ReactNode {
   switch (key) {
@@ -594,11 +676,13 @@ export function renderCell(key: string, client: ClientListItem): React.ReactNode
 ### Task 8 — Apply prefs у filter sheet
 
 `clients-filter-sheet.tsx`:
+
 - Receive `filtersPrefs: ConfigItem[]` як prop
 - Filter `visible: true`, sort by order
 - Render per-filter control via switch on key
 
 `filter-key → control type` mapping:
+
 ```typescript
 const FILTER_CONFIG: Record<string, { type: "multi" | "range" | "text" | "bool" | "search"; ...}> = {
   search: { type: "search", label: "Пошук" },
@@ -633,7 +717,8 @@ export function urlToState(searchParams: URLSearchParams): FilterState {
 export function stateToUrl(state: FilterState): URLSearchParams {
   const params = new URLSearchParams();
   if (state.search) params.set("search", state.search);
-  if (state.statusGeneralIds?.length) params.set("statusId", state.statusGeneralIds.join(","));
+  if (state.statusGeneralIds?.length)
+    params.set("statusId", state.statusGeneralIds.join(","));
   // ...
   return params;
 }
@@ -663,6 +748,7 @@ Tests ≥ 6: roundtrip / empty / unknown param ignored / multi-csv parsed / rang
 ### Task 11 — Tests final
 
 Total ≥ 28:
+
 - view-defaults merge (≥ 4)
 - view-prefs route (≥ 6)
 - extended clients filters (≥ 8)

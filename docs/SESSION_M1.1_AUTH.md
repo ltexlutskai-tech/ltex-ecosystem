@@ -284,7 +284,10 @@ export async function hashPassword(plain: string): Promise<string> {
   return bcrypt.hash(plain, BCRYPT_COST);
 }
 
-export async function verifyPassword(plain: string, hash: string): Promise<boolean> {
+export async function verifyPassword(
+  plain: string,
+  hash: string,
+): Promise<boolean> {
   return bcrypt.compare(plain, hash);
 }
 
@@ -293,10 +296,14 @@ export function generateRandomPassword(length = 16): string {
   return randomBytes(length).toString("base64url").slice(0, length);
 }
 
-export function validatePasswordStrength(plain: string): { ok: boolean; reason?: string } {
+export function validatePasswordStrength(plain: string): {
+  ok: boolean;
+  reason?: string;
+} {
   if (plain.length < 12) return { ok: false, reason: "Мінімум 12 символів" };
   if (!/[0-9]/.test(plain)) return { ok: false, reason: "Хоча б одна цифра" };
-  if (!/[A-Za-zА-Яа-яҐІЇЄ]/.test(plain)) return { ok: false, reason: "Хоча б одна буква" };
+  if (!/[A-Za-zА-Яа-яҐІЇЄ]/.test(plain))
+    return { ok: false, reason: "Хоча б одна буква" };
   return { ok: true };
 }
 ```
@@ -307,11 +314,11 @@ export function validatePasswordStrength(plain: string): { ok: boolean; reason?:
 import { createHmac, randomBytes, createHash } from "crypto";
 
 const ALG = "HS256";
-const ACCESS_TTL_SEC = 15 * 60;          // 15 хв
+const ACCESS_TTL_SEC = 15 * 60; // 15 хв
 const REFRESH_TTL_SEC = 30 * 24 * 60 * 60; // 30 днів
 
 export interface AccessTokenPayload {
-  sub: string;       // userId
+  sub: string; // userId
   role: "manager" | "senior_manager" | "admin";
   iat: number;
   exp: number;
@@ -319,7 +326,8 @@ export interface AccessTokenPayload {
 
 function getSecret(): string {
   const s = process.env.MANAGER_JWT_SECRET;
-  if (!s || s.length < 32) throw new Error("MANAGER_JWT_SECRET must be at least 32 chars");
+  if (!s || s.length < 32)
+    throw new Error("MANAGER_JWT_SECRET must be at least 32 chars");
   return s;
 }
 
@@ -330,10 +338,18 @@ function fromB64url(s: string): Buffer {
   return Buffer.from(s, "base64url");
 }
 
-export function signAccessToken(userId: string, role: AccessTokenPayload["role"]): string {
+export function signAccessToken(
+  userId: string,
+  role: AccessTokenPayload["role"],
+): string {
   const now = Math.floor(Date.now() / 1000);
   const header = { alg: ALG, typ: "JWT" };
-  const payload: AccessTokenPayload = { sub: userId, role, iat: now, exp: now + ACCESS_TTL_SEC };
+  const payload: AccessTokenPayload = {
+    sub: userId,
+    role,
+    iat: now,
+    exp: now + ACCESS_TTL_SEC,
+  };
   const h = b64url(JSON.stringify(header));
   const p = b64url(JSON.stringify(payload));
   const sig = createHmac("sha256", getSecret()).update(`${h}.${p}`).digest();
@@ -344,10 +360,14 @@ export function verifyAccessToken(token: string): AccessTokenPayload | null {
   const parts = token.split(".");
   if (parts.length !== 3) return null;
   const [h, p, s] = parts;
-  const expected = createHmac("sha256", getSecret()).update(`${h}.${p}`).digest();
+  const expected = createHmac("sha256", getSecret())
+    .update(`${h}.${p}`)
+    .digest();
   if (!timingSafeEqual(fromB64url(s), expected)) return null;
   try {
-    const payload = JSON.parse(fromB64url(p).toString("utf8")) as AccessTokenPayload;
+    const payload = JSON.parse(
+      fromB64url(p).toString("utf8"),
+    ) as AccessTokenPayload;
     if (payload.exp * 1000 < Date.now()) return null;
     return payload;
   } catch {
@@ -355,7 +375,11 @@ export function verifyAccessToken(token: string): AccessTokenPayload | null {
   }
 }
 
-export function generateRefreshToken(): { plain: string; hash: string; expiresAt: Date } {
+export function generateRefreshToken(): {
+  plain: string;
+  hash: string;
+  expiresAt: Date;
+} {
   const plain = randomBytes(32).toString("base64url");
   const hash = sha256(plain);
   const expiresAt = new Date(Date.now() + REFRESH_TTL_SEC * 1000);
@@ -428,8 +452,15 @@ export async function getCurrentUser(req?: NextRequest) {
   const user = await prisma.user.findUnique({
     where: { id: payload.sub },
     select: {
-      id: true, email: true, fullName: true, role: true, isActive: true,
-      code1C: true, telegramChatId: true, notifyChannels: true, lastSeenAt: true,
+      id: true,
+      email: true,
+      fullName: true,
+      role: true,
+      isActive: true,
+      code1C: true,
+      telegramChatId: true,
+      notifyChannels: true,
+      lastSeenAt: true,
     },
   });
   if (!user || !user.isActive) return null;
@@ -448,7 +479,9 @@ async function readToken(req?: NextRequest): Promise<string | null> {
   return c?.value ?? null;
 }
 
-export async function requireRole(roles: ("manager" | "senior_manager" | "admin")[]) {
+export async function requireRole(
+  roles: ("manager" | "senior_manager" | "admin")[],
+) {
   const user = await getCurrentUser();
   if (!user) return null;
   if (!roles.includes(user.role)) return null;
@@ -472,7 +505,8 @@ export const passwordResetRequestSchema = z.object({
 
 export const passwordResetConfirmSchema = z.object({
   token: z.string().min(20).max(120),
-  newPassword: z.string()
+  newPassword: z
+    .string()
     .min(12, "Мінімум 12 символів")
     .max(200)
     .refine((v) => /[0-9]/.test(v), "Хоча б одна цифра")
@@ -493,7 +527,7 @@ export const updateUserSchema = z.object({
   isActive: z.boolean().optional(),
   role: z.enum(["manager", "senior_manager", "admin"]).optional(),
   fullName: z.string().min(2).max(120).optional(),
-  forcePasswordReset: z.boolean().optional(),  // якщо true → revoke all refresh + email link
+  forcePasswordReset: z.boolean().optional(), // якщо true → revoke all refresh + email link
 });
 ```
 
@@ -506,42 +540,72 @@ import { prisma } from "@ltex/db";
 import { loginSchema } from "@/lib/validations/manager-auth";
 import { verifyPassword } from "@/lib/auth/password";
 import { signAccessToken, generateRefreshToken } from "@/lib/auth/jwt";
-import { isLocked, recordFailedLogin, clearFailedLogins } from "@/lib/auth/lockout";
+import {
+  isLocked,
+  recordFailedLogin,
+  clearFailedLogins,
+} from "@/lib/auth/lockout";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 
 export async function POST(req: NextRequest) {
   const ip = getClientIp(req);
-  const rl = await checkRateLimit(`mgr-login:${ip}`, { window: 60_000, max: 10 });
+  const rl = await checkRateLimit(`mgr-login:${ip}`, {
+    window: 60_000,
+    max: 10,
+  });
   if (!rl.ok) {
-    return NextResponse.json({ error: "Забагато спроб. Спробуйте за хвилину." }, { status: 429 });
+    return NextResponse.json(
+      { error: "Забагато спроб. Спробуйте за хвилину." },
+      { status: 429 },
+    );
   }
 
   const body = await req.json().catch(() => null);
   const parsed = loginSchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json({ error: "Невірні дані", details: parsed.error.issues.slice(0, 3) }, { status: 400 });
+    return NextResponse.json(
+      { error: "Невірні дані", details: parsed.error.issues.slice(0, 3) },
+      { status: 400 },
+    );
   }
 
   const { email, password } = parsed.data;
-  const user = await prisma.user.findUnique({ where: { email: email.toLowerCase() } });
+  const user = await prisma.user.findUnique({
+    where: { email: email.toLowerCase() },
+  });
 
   // Anti-enumeration — same response for "no user" + "wrong password"
   if (!user) {
-    return NextResponse.json({ error: "Невірний email або пароль" }, { status: 401 });
+    return NextResponse.json(
+      { error: "Невірний email або пароль" },
+      { status: 401 },
+    );
   }
 
   if (!user.isActive) {
-    return NextResponse.json({ error: "Обліковий запис вимкнено" }, { status: 403 });
+    return NextResponse.json(
+      { error: "Обліковий запис вимкнено" },
+      { status: 403 },
+    );
   }
 
   if (await isLocked(user.id)) {
-    return NextResponse.json({ error: "Обліковий запис тимчасово заблоковано. Спробуйте через 15 хвилин." }, { status: 423 });
+    return NextResponse.json(
+      {
+        error:
+          "Обліковий запис тимчасово заблоковано. Спробуйте через 15 хвилин.",
+      },
+      { status: 423 },
+    );
   }
 
   const ok = await verifyPassword(password, user.passwordHash);
   if (!ok) {
     await recordFailedLogin(user.id);
-    return NextResponse.json({ error: "Невірний email або пароль" }, { status: 401 });
+    return NextResponse.json(
+      { error: "Невірний email або пароль" },
+      { status: 401 },
+    );
   }
 
   // success
@@ -576,10 +640,18 @@ export async function POST(req: NextRequest) {
   });
   // Mirror у cookies для SSR-страніц
   res.cookies.set("ltex_mgr_access", accessToken, {
-    httpOnly: true, sameSite: "lax", secure: true, maxAge: 15 * 60, path: "/manager",
+    httpOnly: true,
+    sameSite: "lax",
+    secure: true,
+    maxAge: 15 * 60,
+    path: "/manager",
   });
   res.cookies.set("ltex_mgr_refresh", refresh.plain, {
-    httpOnly: true, sameSite: "lax", secure: true, maxAge: 30 * 24 * 60 * 60, path: "/api/v1/manager/auth",
+    httpOnly: true,
+    sameSite: "lax",
+    secure: true,
+    maxAge: 30 * 24 * 60 * 60,
+    path: "/api/v1/manager/auth",
   });
   return res;
 }
@@ -590,6 +662,7 @@ export async function POST(req: NextRequest) {
 (Аналогічна структура. Refresh: lookup tokenHash, revoke old, issue new. Logout: revoke single (з `?everywhere=true` — revoke all для user). Me: повертає user shape.)
 
 Окремо для **refresh**:
+
 - Body `{ refreshToken }` АБО з cookie `ltex_mgr_refresh`
 - Знайти `UserRefreshToken` by `tokenHash = sha256(refreshToken)`, `revokedAt IS NULL`, `expiresAt > now`
 - Mark old revoked + create new + issue new access
@@ -597,13 +670,15 @@ export async function POST(req: NextRequest) {
 
 ### Task 9 — password-reset endpoints
 
-**`/request`:** 
+**`/request`:**
+
 - Завжди return 202 (anti-enumeration)
 - Якщо user знайдено + isActive — згенерувати `randomBytes(32)`, store sha256 з `expiresAt = now + 1h`, `isInvite=false`
 - Запустити `enqueueEmail()` з template `manager-password-reset.ts`
 - Rate limit 3/hour/email
 
 **`/confirm`:**
+
 - Знайти `PasswordResetToken` by `tokenHash`, validate `usedAt IS NULL`, `expiresAt > now`
 - bcrypt-hash newPassword → save у User.passwordHash
 - Revoke ALL `UserRefreshToken` для user-а
@@ -613,6 +688,7 @@ export async function POST(req: NextRequest) {
 ### Task 10 — admin invite endpoints
 
 **POST `/api/v1/manager/admin/users`:**
+
 - Auth required, role === "admin"
 - Body `{ email, fullName, role }` (Zod)
 - Check email unique
@@ -622,9 +698,11 @@ export async function POST(req: NextRequest) {
 - Return `{ id, email, fullName, role, inviteSent: true }`
 
 **GET `/api/v1/manager/admin/users`:**
+
 - Admin only, list з pagination
 
 **PATCH `/api/v1/manager/admin/users/{id}`:**
+
 - Admin only, Body `{ isActive?, role?, fullName?, forcePasswordReset? }`
 - If `forcePasswordReset=true` → revoke all refresh + create PasswordResetToken (isInvite=false) + send email
 
@@ -633,7 +711,13 @@ export async function POST(req: NextRequest) {
 **`lib/email/templates/manager-invite.ts`:**
 
 ```typescript
-export function buildManagerInviteEmail({ fullName, resetUrl }: { fullName: string; resetUrl: string }) {
+export function buildManagerInviteEmail({
+  fullName,
+  resetUrl,
+}: {
+  fullName: string;
+  resetUrl: string;
+}) {
   return {
     subject: "Вас запросили в L-TEX Manager",
     html: `
@@ -653,7 +737,13 @@ export function buildManagerInviteEmail({ fullName, resetUrl }: { fullName: stri
   };
 }
 function escapeHtml(s: string) {
-  return s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!));
+  return s.replace(
+    /[&<>"']/g,
+    (c) =>
+      ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[
+        c
+      ]!,
+  );
 }
 ```
 
@@ -664,10 +754,12 @@ function escapeHtml(s: string) {
 ### Task 12 — UI pages
 
 **`/manager/(auth)/login/page.tsx`:**
+
 - Server component, redirect on `/manager` якщо вже залогінений (через `getCurrentUser()`)
 - Render `<LoginForm />` client component
 
 **`<LoginForm />` (client):**
+
 - Fields: email, password, "Забули пароль?" link
 - POST `/api/v1/manager/auth/login`
 - On 200 → `router.push("/manager")`
@@ -677,10 +769,12 @@ function escapeHtml(s: string) {
 - Loading state на submit
 
 **`/manager/(auth)/forgot/page.tsx` + `<ForgotForm />`:**
+
 - Email field, POST `/password-reset/request`
 - On 202 → success screen "Перевірте пошту"
 
 **`/manager/(auth)/reset/page.tsx` + `<ResetForm />`:**
+
 - Read `?token=XXX&invite=true|false` (через `useSearchParams`)
 - Якщо `invite=true` — show "Ласкаво просимо! Задайте свій пароль", інакше "Скидання пароля"
 - 2 password fields (new + confirm), validate strength inline
@@ -690,16 +784,19 @@ function escapeHtml(s: string) {
 ### Task 13 — Admin users page
 
 **`/manager/admin/users/page.tsx`** (server):
+
 - `requireRole(["admin"])` → 404 if not admin
 - Fetch users list
 - Render `<UsersTable users={...} />` + `<InviteModal />` (trigger button)
 
 **`<InviteModal />`** (client, shadcn Dialog):
+
 - Form: email + fullName + role select
 - POST `/api/v1/manager/admin/users`
 - On 200 → toast "Запрошення відправлено на email", close modal, revalidate list
 
 **`<UsersTable />`:**
+
 - Columns: ПІБ / Email / Роль / Статус (Active toggle) / Last seen / Actions
 - Action: dropdown з "Змінити роль", "Скинути пароль", "Вимкнути"
 - Кожна дія → PATCH `/api/v1/manager/admin/users/{id}`
@@ -709,8 +806,8 @@ function escapeHtml(s: string) {
 Розширити `apps/store/middleware.ts`:
 
 ```typescript
-import { updateSession } from "@/lib/supabase/middleware";       // existing (admin only)
-import { managerGuard } from "@/middleware-manager";              // new
+import { updateSession } from "@/lib/supabase/middleware"; // existing (admin only)
+import { managerGuard } from "@/middleware-manager"; // new
 import type { NextRequest } from "next/server";
 
 export async function middleware(request: NextRequest) {
@@ -730,6 +827,7 @@ export const config = {
 ```
 
 `middleware-manager.ts`:
+
 ```typescript
 import { NextRequest, NextResponse } from "next/server";
 import { verifyAccessToken } from "@/lib/auth/jwt";
@@ -805,7 +903,10 @@ async function main() {
 }
 
 main()
-  .catch((e) => { console.error(e); process.exit(1); })
+  .catch((e) => {
+    console.error(e);
+    process.exit(1);
+  })
   .finally(() => prisma.$disconnect());
 ```
 
@@ -829,7 +930,10 @@ MOBILE_EXCHANGE_SOAP_PASSWORD=      # TBD у M1.5
 Update `apps/store/instrumentation.ts::validateProductionSecrets()`:
 
 ```typescript
-if (!process.env.MANAGER_JWT_SECRET || process.env.MANAGER_JWT_SECRET.length < 32) {
+if (
+  !process.env.MANAGER_JWT_SECRET ||
+  process.env.MANAGER_JWT_SECRET.length < 32
+) {
   throw new Error("MANAGER_JWT_SECRET must be at least 32 characters");
 }
 ```
@@ -839,23 +943,27 @@ if (!process.env.MANAGER_JWT_SECRET || process.env.MANAGER_JWT_SECRET.length < 3
 Кожен test-файл живе поряд з кодом (`*.test.ts`).
 
 **`password.test.ts`:**
+
 - `hashPassword + verifyPassword` round-trip
 - Wrong password → false
 - `generateRandomPassword(16)` length === 16, base64url chars only
 - `validatePasswordStrength` happy + each rule
 
 **`jwt.test.ts`:**
+
 - `signAccessToken` → `verifyAccessToken` round-trip
 - Tampered signature → null
 - Expired (mock Date.now) → null
 - Missing secret throws
 
 **`lockout.test.ts`** (with prisma mock or real test DB):
+
 - 5 fails → locked
 - After window passes → unlocked
 - Clear resets counter
 
 **`login/route.test.ts`** (≥5):
+
 - Happy login → 200 + accessToken
 - Wrong password → 401 + counter++
 - Non-existent email → 401 (same response — anti-enum)
@@ -864,26 +972,31 @@ if (!process.env.MANAGER_JWT_SECRET || process.env.MANAGER_JWT_SECRET.length < 3
 - Rate-limit 11/min → 429
 
 **`refresh/route.test.ts`** (≥3):
+
 - Happy rotate → 200, old revoked
 - Already revoked → 401
 - Expired → 401
 
 **`password-reset/request/route.test.ts`** (≥2):
+
 - Happy → 202, EmailJob enqueued
 - Non-existent email → 202 (no job enqueued)
 - Rate-limit 4/hour → 429
 
 **`password-reset/confirm/route.test.ts`** (≥3):
+
 - Happy → 200, password changed, all refresh revoked
 - Expired token → 401
 - Already used → 401
 
 **`admin/users/route.test.ts`** (≥3):
+
 - POST happy → user created + invite email queued
 - POST non-admin → 403
 - POST duplicate email → 409
 
 **`manager-auth.test.ts`** (≥2):
+
 - `getCurrentUser` happy via Bearer
 - Inactive user → null
 - Invalid token → null
@@ -905,21 +1018,26 @@ if (!process.env.MANAGER_JWT_SECRET || process.env.MANAGER_JWT_SECRET.length < 3
 ## User-action post-merge
 
 1. **Згенерувати JWT-секрет** на Windows-сервері:
+
    ```powershell
    openssl rand -base64 48
    ```
+
    Скопіюй output → додай в `E:\ltex-ecosystem\apps\store\.env`:
+
    ```
    MANAGER_JWT_SECRET=<вставлений output>
    ```
 
 2. **Запустити міграцію DB:**
+
    ```powershell
    cd E:\ltex-ecosystem
    pnpm --filter @ltex/db exec prisma migrate deploy
    ```
 
 3. **Seed першого admin** (одноразово):
+
    ```powershell
    $env:SEED_ADMIN_EMAIL = "ltex.lutsk.ai@gmail.com"
    $env:SEED_ADMIN_PASSWORD = "<придумай 12+ chars>"
@@ -927,6 +1045,7 @@ if (!process.env.MANAGER_JWT_SECRET || process.env.MANAGER_JWT_SECRET.length < 3
    cd E:\ltex-ecosystem
    pnpm --filter @ltex/store exec tsx scripts/seed-admin-user.ts
    ```
+
    Після успіху — видали ці env vars з PowerShell (`Remove-Item Env:SEED_ADMIN_*`).
 
 4. **Рестарт PM2:** `pm2 restart ltex-store --update-env`.

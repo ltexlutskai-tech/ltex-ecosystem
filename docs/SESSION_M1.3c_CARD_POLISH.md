@@ -5,6 +5,7 @@
 **Goal:** Доробити картку клієнта до **повної відповідності** 1С-формі `Catalog.Контрагенты.ФормаЭлемента` (видно на user-скрінах). M1.3a пропустив 7 полів MgrClient, 5 tabs і 3 окремі таблиці — закриваємо це. Робимо clickable contacts (tel:/viber/wa/maps), додаємо новий tab "Нагадування" (наша private model), bell у sidebar з real overdue count, всі інші tabs з 1С форми — placeholders або real read-only display.
 
 **User скріни (2026-05-13):**
+
 - Tab "Дані" має 25 полів + блок "Номери телефонів" + таблична частина "Маршрути" + кнопка "Повідомити про борг"
 - Tabs повний набір: Дані / Асортимент / **Асортимент презентацій** / Історія / **Історія продаж** / Замовлення / Нагадування / **Viber** / **Банківські рахунки** / **Історія презентацій** / **Соц мережі** (жирним — те що пропустили у M1.3a)
 - Header tabs: Головне / КатегорииОбъектов / Работа с клиентом / РегистрацияОбмена (це інший level — секції форми, не tabs)
@@ -12,6 +13,7 @@
 **User decision (locked 2026-05-13):** "Додати всі поля з 1С + усі вкладки навіть як заглушки. У майбутньому — Viber/Telegram/Instagram чат-боти, переписку писати у timeline. Кнопки переходу у месенджери. Перечитай всю конфігурацію."
 
 **Конфігурація 1С — MUST-READ перед першим commit:**
+
 - `docs/1c-export-mobile/MobileAgent/Catalogs/Контрагенты.xml` — повний список полів + tabular sections (40+ полів, 6 tabular: Телефоны / Маршруты / Асортимент / БанковскиеСчета / АсортиментПрезентацій / СоцМережі)
 - `docs/1c-export-mobile/MobileAgent/Catalogs/Контрагенты/Forms/ФормаЭлемента/Ext/Form.xml` — UI form з усіма tabs + control names (СторінкаІсторія, ГруппаВайбер, НагадуванняГруппа, ОтчетПоПродажамДерево, ОтчетПоПрезентациямДерево, БанковскиеСчета, СоцМережі)
 - `docs/1c-export-mobile/MobileAgent/Catalogs/Контрагенты/Forms/ФормаЭлемента/Ext/Form/Module.bsl` — server logic (SQL для timeline, для зведений Звіт по Продажах per клієнт)
@@ -63,6 +65,7 @@
 | `MgrClientMessenger` | `comment` (вже є?) | text | `Коментар` |
 
 **New private model (наша):**
+
 - `MgrReminder` — нагадування про клієнта (id, clientId, ownerUserId, body, remindAt, completedAt, snoozedUntilAt)
 
 ### Tabs гap analysis
@@ -85,6 +88,7 @@ Tabs у 1С формі (з порядку рендеру на скріні):
 ### Contact actions
 
 **Phones** — кожен номер як `<ContactRow>` з:
+
 - Formatted `+380 50 123 45 67`
 - 📞 dial (tel:)
 - 💬 Viber (viber://chat?number=...)
@@ -103,6 +107,7 @@ Tabs у 1С формі (з порядку рендеру на скріні):
 **Контакт Viber** (новий поле) — viber:// deeplink
 
 **Соц мережі** — кожен `<MessengerLink>` per network:
+
 - `tiktok` → `https://tiktok.com/@{handle}`
 - `instagram` → `https://instagram.com/{handle}`
 - `facebook` → handle або URL якщо містить URL
@@ -404,25 +409,42 @@ CREATE INDEX IF NOT EXISTS "mgr_reminders_owner_status_idx"
 ### Task 3 — Phone utils
 
 `packages/shared/src/utils/phone.ts` — як у попередньому spec версії:
+
 - `normalizePhone(raw)` — to E.164 `+380...`
 - `formatPhoneUkr(raw)` — display `+380 50 123 45 67`
 - `phoneToTelUrl(raw)`, `phoneToViberUrl(raw)`, `phoneToWhatsAppUrl(raw)`
 
 `packages/shared/src/utils/social-links.ts`:
-```typescript
-export type SocialNetwork = "tiktok" | "instagram" | "facebook" | "telegram" | "viber" | "youtube" | "whatsapp" | "other";
 
-export function buildSocialUrl(network: string, handle: string | null, browserUrl?: string | null): string | null {
-  if (browserUrl) return browserUrl;  // explicit override з 1С
+```typescript
+export type SocialNetwork =
+  | "tiktok"
+  | "instagram"
+  | "facebook"
+  | "telegram"
+  | "viber"
+  | "youtube"
+  | "whatsapp"
+  | "other";
+
+export function buildSocialUrl(
+  network: string,
+  handle: string | null,
+  browserUrl?: string | null,
+): string | null {
+  if (browserUrl) return browserUrl; // explicit override з 1С
   if (!handle) return null;
   const clean = handle.replace(/^@/, "").trim();
   switch (network.toLowerCase()) {
-    case "tiktok": return `https://www.tiktok.com/@${clean}`;
-    case "instagram": return `https://www.instagram.com/${clean}`;
+    case "tiktok":
+      return `https://www.tiktok.com/@${clean}`;
+    case "instagram":
+      return `https://www.instagram.com/${clean}`;
     case "facebook":
       if (clean.startsWith("http")) return clean;
       return `https://www.facebook.com/${clean}`;
-    case "telegram": return `https://t.me/${clean}`;
+    case "telegram":
+      return `https://t.me/${clean}`;
     case "viber": {
       const phone = clean.replace(/[\s+()-]/g, "");
       return `viber://chat?number=%2B${phone}`;
@@ -434,21 +456,30 @@ export function buildSocialUrl(network: string, handle: string | null, browserUr
       const phone = clean.replace(/[\s+()-]/g, "");
       return `https://wa.me/${phone}`;
     }
-    default: return null;
+    default:
+      return null;
   }
 }
 
 export function socialNetworkIcon(network: string): string {
   // emoji fallback — replace з proper icons коли є time
   switch (network.toLowerCase()) {
-    case "tiktok": return "🎵";
-    case "instagram": return "📷";
-    case "facebook": return "📘";
-    case "telegram": return "✈️";
-    case "viber": return "💬";
-    case "youtube": return "🎥";
-    case "whatsapp": return "✉️";
-    default: return "🔗";
+    case "tiktok":
+      return "🎵";
+    case "instagram":
+      return "📷";
+    case "facebook":
+      return "📘";
+    case "telegram":
+      return "✈️";
+    case "viber":
+      return "💬";
+    case "youtube":
+      return "🎥";
+    case "whatsapp":
+      return "✉️";
+    default:
+      return "🔗";
   }
 }
 ```
@@ -536,7 +567,10 @@ const tabs = [
   { value: "history", label: "Історія" },
   { value: "sales-history", label: "Історія продаж" },
   { value: "orders", label: "Замовлення" },
-  { value: "reminders", label: <>Нагадування{overdueCount > 0 && <Badge>{overdueCount}</Badge>}</> },
+  {
+    value: "reminders",
+    label: <>Нагадування{overdueCount > 0 && <Badge>{overdueCount}</Badge>}</>,
+  },
   { value: "viber", label: "Viber" },
   { value: "banks", label: "Банк. рахунки" },
   { value: "presentation-history", label: "Іст. презентацій" },
@@ -549,12 +583,14 @@ Default tab = `requisites`. URL anchor `#tabname` — initial selection.
 ### Task 6 — New tabs implementations
 
 **Tab Презентації** (`client-presentations-tab.tsx`) — server component:
+
 - Load `client.presentations` через prisma include
 - Render table: артикул / назва / остання презентація / "Не ручний запис" chip
 - Empty state: "Презентацій ще не було"
 - Read-only
 
 **Tab Історія продаж** (`client-sales-history-tab.tsx`) — stub:
+
 ```tsx
 <UnderConstruction
   session="M1.4"
@@ -565,11 +601,13 @@ Default tab = `requisites`. URL anchor `#tabname` — initial selection.
 **Tab Замовлення** (`client-orders-tab.tsx`) — keep existing M1.3a stub.
 
 **Tab Нагадування** (`client-reminders-tab.tsx`) — server, fetch + group:
+
 - 4 sections: Прострочено / Сьогодні / Заплановано / Виконано
 - Header: title + "+ Створити" button (відкриває modal)
 - Each item — `<ReminderItem>` з actions
 
 **Tab Viber** (`client-viber-tab.tsx`) — stub з real buttons:
+
 ```tsx
 <div className="rounded-lg border bg-white p-6">
   <h3 className="text-lg font-semibold">Viber-чат</h3>
@@ -596,6 +634,7 @@ Default tab = `requisites`. URL anchor `#tabname` — initial selection.
 ```
 
 **Tab Банк. рахунки** (`client-bank-accounts-tab.tsx`) — server, list:
+
 - Render `client.bankAccounts.filter(b => !b.isHidden)` — кожен рядок: account_number monospace + bank + mfo + comment
 - Кнопка "Копіювати IBAN" на кожному рядку (client-side)
 - Empty state: "Рахунків не вказано"
@@ -603,6 +642,7 @@ Default tab = `requisites`. URL anchor `#tabname` — initial selection.
 **Tab Іст. презентацій** — stub UnderConstruction M1.6.
 
 **Tab Соц мережі** (`client-social-tab.tsx`) — server, grid:
+
 - `client.messengers.map(m => <MessengerLink ... />)`
 - `<MessengerLink>` — icon + network label + handle + opens URL з `buildSocialUrl(m.network, m.handle, m.browserUrl)`
 - Окремий блок: "Сайт клієнта" якщо `client.websiteUrl`
@@ -611,11 +651,13 @@ Default tab = `requisites`. URL anchor `#tabname` — initial selection.
 ### Task 7 — Reminders CRUD (як у попередній версії spec)
 
 GET+POST `/api/v1/manager/clients/[id]/reminders`:
+
 - Auth required
 - POST Zod: `{ body: 1-500, remindAt: ISO }`
 - Save with `ownerUserId = currentUser.id`
 
 PATCH+DELETE `/api/v1/manager/clients/[id]/reminders/[rid]`:
+
 - Permission: owner OR admin (403 otherwise)
 - PATCH actions: `complete` / `uncomplete` / `snooze` (з `snoozedUntil`)
 - DELETE: hard delete
@@ -623,6 +665,7 @@ PATCH+DELETE `/api/v1/manager/clients/[id]/reminders/[rid]`:
 ### Task 8 — Bell endpoint
 
 GET `/api/v1/manager/notifications`:
+
 - Returns `{ overdueCount: int, items: [...] }` для current user
 - `items`: max 10, ordered by `remindAt ASC`
 - Query: `WHERE ownerUserId = me AND completedAt IS NULL AND (snoozedUntilAt IS NULL OR snoozedUntilAt <= NOW()) AND remindAt <= NOW()`
@@ -630,6 +673,7 @@ GET `/api/v1/manager/notifications`:
 ### Task 9 — Bell UI
 
 `manager-header-bell.tsx`:
+
 - Client component (use shadcn `Popover`)
 - Polling: useEffect з 60s interval (clear on unmount)
 - Badge cap "9+"
@@ -639,6 +683,7 @@ GET `/api/v1/manager/notifications`:
 ### Task 10 — Seed update
 
 `scripts/seed-mgr-test-data.ts` — extend:
+
 - Додати MgrPriceType (3-4 типи: wholesale / small_wholesale / retail)
 - На 3 з 10 клієнтів — set `priceTypeId`, `tradePointName`, `tovDebt`, `agentUserId = admin`, `viberContact`, `sessionRemainder`
 - Додати на 2 клієнти приклади банк рахунків (IBAN UA + bank + comment)

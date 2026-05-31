@@ -9,6 +9,7 @@
 **Конфігурація 1С для reference:** `docs/1c-export-mobile/MobileAgent/Catalogs/Контрагенты/` + `Central/Catalogs/Контрагенты/` + `Central/CommonModules/ОбменАРМ/`. Тут визначені реальні поля, типи і ім'я полів які треба мапити у Postgres-schema.
 
 **User decisions (locked 2026-05-13):**
+
 - 7 базових колонок: Клієнт / Борг / Статус / Канал / Днів від останнього / Останній запис / Менеджер
 - Статус = автоматично з 1С (Активний/Малоактивний/Неактивний/Потенційний/Новий — формула на сервері 1С, не реалізуємо)
 - ОПСтатус = окреме поле, теж приходить з 1С (за поточний місяць замість попереднього)
@@ -16,6 +17,7 @@
 - Сміттєві контрагенти (порожні поля, name = "1111111" / "777777") — приховуємо у нашому UI через фільтр `name regex not all-digits AND hasValidContact`
 
 **Out of scope (відкладено):**
+
 - Toggle 7↔20 колонок + звіт "Аналіз клієнтської бази" → **M1.3b**
 - Створення / редагування клієнта → V2
 - Закриття старих замовлень → M2.1
@@ -446,14 +448,31 @@ async function seedDictionaries() {
   // 5 statuses, 6 channels, 3 categories, 3 deliveries, 5 assortment codes, 3 routes
   const statuses = [
     { code: "active", label: "Активний", colorHex: "#16a34a", sortOrder: 1 },
-    { code: "low_active", label: "Малоактивний", colorHex: "#eab308", sortOrder: 2 },
-    { code: "inactive", label: "Неактивний", colorHex: "#dc2626", sortOrder: 3 },
-    { code: "potential", label: "Потенційний", colorHex: "#3b82f6", sortOrder: 4 },
+    {
+      code: "low_active",
+      label: "Малоактивний",
+      colorHex: "#eab308",
+      sortOrder: 2,
+    },
+    {
+      code: "inactive",
+      label: "Неактивний",
+      colorHex: "#dc2626",
+      sortOrder: 3,
+    },
+    {
+      code: "potential",
+      label: "Потенційний",
+      colorHex: "#3b82f6",
+      sortOrder: 4,
+    },
     { code: "new", label: "Новий", colorHex: "#a855f7", sortOrder: 5 },
   ];
   for (const s of statuses) {
     await prisma.mgrClientStatus.upsert({
-      where: { code: s.code }, create: s, update: s,
+      where: { code: s.code },
+      create: s,
+      update: s,
     });
   }
   // similar для других довідників
@@ -478,7 +497,10 @@ async function main() {
 }
 
 main()
-  .catch((e) => { console.error(e); process.exit(1); })
+  .catch((e) => {
+    console.error(e);
+    process.exit(1);
+  })
   .finally(() => prisma.$disconnect());
 ```
 
@@ -492,7 +514,7 @@ import { z } from "zod";
 
 export const listQuerySchema = z.object({
   search: z.string().max(100).optional(),
-  status: z.string().optional(),           // mgr_client_statuses.code
+  status: z.string().optional(), // mgr_client_statuses.code
   channel: z.string().optional(),
   deliveryMethod: z.string().optional(),
   hasDebt: z.coerce.boolean().optional(),
@@ -500,7 +522,7 @@ export const listQuerySchema = z.object({
   onlyMine: z.coerce.boolean().optional(),
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(10).max(100).default(50),
-  hideTrash: z.coerce.boolean().default(true),   // приховати "1111111 ()" sміттєвки
+  hideTrash: z.coerce.boolean().default(true), // приховати "1111111 ()" sміттєвки
 });
 
 export const timelineCommentSchema = z.object({
@@ -508,7 +530,7 @@ export const timelineCommentSchema = z.object({
 });
 
 export const assignSchema = z.object({
-  userId: z.string().cuid().nullable(),    // null = unassign
+  userId: z.string().cuid().nullable(), // null = unassign
 });
 ```
 
@@ -522,12 +544,18 @@ import { listQuerySchema } from "@/lib/validations/manager-clients";
 
 export async function GET(req: NextRequest) {
   const user = await getCurrentUser(req);
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!user)
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const url = new URL(req.url);
-  const parsed = listQuerySchema.safeParse(Object.fromEntries(url.searchParams));
+  const parsed = listQuerySchema.safeParse(
+    Object.fromEntries(url.searchParams),
+  );
   if (!parsed.success) {
-    return NextResponse.json({ error: "Bad query", details: parsed.error.issues.slice(0,3) }, { status: 400 });
+    return NextResponse.json(
+      { error: "Bad query", details: parsed.error.issues.slice(0, 3) },
+      { status: 400 },
+    );
   }
   const q = parsed.data;
 
@@ -550,11 +578,7 @@ export async function GET(req: NextRequest) {
     // Виключити "1111111 ()", "777777 ()", "8888888 ()" тощо — імена з цифр-онлі + порожні phonePrimary
     where.AND = [
       { name: { not: { matches: "^\\s*\\d+\\s*\\(\\)?\\s*$" } } },
-      { OR: [
-          { phonePrimary: { not: null } },
-          { city: { not: null } },
-        ]
-      },
+      { OR: [{ phonePrimary: { not: null } }, { city: { not: null } }] },
     ];
   }
 
@@ -574,7 +598,9 @@ export async function GET(req: NextRequest) {
         statusGeneral: true,
         searchChannel: true,
         deliveryMethod: true,
-        assignments: { include: { user: { select: { id: true, fullName: true } } } },
+        assignments: {
+          include: { user: { select: { id: true, fullName: true } } },
+        },
       },
     }),
   ]);
@@ -589,9 +615,22 @@ export async function GET(req: NextRequest) {
       region: c.region,
       debt: c.debt.toString(),
       daysSinceLastPurchase: c.daysSinceLastPurchase,
-      statusGeneral: c.statusGeneral ? { code: c.statusGeneral.code, label: c.statusGeneral.label, colorHex: c.statusGeneral.colorHex } : null,
-      searchChannel: c.searchChannel ? { code: c.searchChannel.code, label: c.searchChannel.label } : null,
-      assignedManager: c.assignments[0]?.user ? { id: c.assignments[0].user.id, fullName: c.assignments[0].user.fullName } : null,
+      statusGeneral: c.statusGeneral
+        ? {
+            code: c.statusGeneral.code,
+            label: c.statusGeneral.label,
+            colorHex: c.statusGeneral.colorHex,
+          }
+        : null,
+      searchChannel: c.searchChannel
+        ? { code: c.searchChannel.code, label: c.searchChannel.label }
+        : null,
+      assignedManager: c.assignments[0]?.user
+        ? {
+            id: c.assignments[0].user.id,
+            fullName: c.assignments[0].user.fullName,
+          }
+        : null,
       lastTimelineSnippet: null, // буде в next iteration
     })),
     page: q.page,
@@ -668,6 +707,7 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
 Header — `<ClientHeader client={...} canAssign={user.role === "admin"} />`.
 
 Tabs — `<ClientTabs>` (shadcn Tabs from `@ltex/ui`). Кожен tab — окремий компонент:
+
 - `client-requisites-tab.tsx`
 - `client-history-tab.tsx`
 - `client-routes-tab.tsx`
@@ -683,7 +723,13 @@ Tabs — `<ClientTabs>` (shadcn Tabs from `@ltex/ui`). Кожен tab — окр
 import { useState } from "react";
 import { Button, Textarea, useToast } from "@ltex/ui";
 
-export function ClientHistoryCommentForm({ clientId, onPosted }: { clientId: string; onPosted?: () => void }) {
+export function ClientHistoryCommentForm({
+  clientId,
+  onPosted,
+}: {
+  clientId: string;
+  onPosted?: () => void;
+}) {
   const [body, setBody] = useState("");
   const [busy, setBusy] = useState(false);
   const { toast } = useToast();
@@ -691,7 +737,9 @@ export function ClientHistoryCommentForm({ clientId, onPosted }: { clientId: str
     if (!body.trim()) return;
     setBusy(true);
     const res = await fetch(`/api/v1/manager/clients/${clientId}/timeline`, {
-      method: "POST", body: JSON.stringify({ body }), headers: { "Content-Type": "application/json" },
+      method: "POST",
+      body: JSON.stringify({ body }),
+      headers: { "Content-Type": "application/json" },
     });
     setBusy(false);
     if (res.ok) {
@@ -704,8 +752,17 @@ export function ClientHistoryCommentForm({ clientId, onPosted }: { clientId: str
   };
   return (
     <div className="flex flex-col gap-2 border-t pt-4">
-      <Textarea value={body} onChange={(e) => setBody(e.target.value)} placeholder="Додати коментар про клієнта…" rows={3} />
-      <Button onClick={submit} disabled={busy || !body.trim()} className="self-end">
+      <Textarea
+        value={body}
+        onChange={(e) => setBody(e.target.value)}
+        placeholder="Додати коментар про клієнта…"
+        rows={3}
+      />
+      <Button
+        onClick={submit}
+        disabled={busy || !body.trim()}
+        className="self-end"
+      >
         {busy ? "Записую…" : "Записати"}
       </Button>
     </div>
@@ -718,6 +775,7 @@ export function ClientHistoryCommentForm({ clientId, onPosted }: { clientId: str
 ### Task 14 — Admin assign dialog
 
 `client-assign-dialog.tsx` (client, shadcn Dialog):
+
 - Trigger: button "+ Прив'язати менеджера" (видно тільки admin role)
 - Fetches list of users `role IN (manager, senior_manager, admin)` через `fetch('/api/v1/manager/admin/users')` (вже existing з M1.1)
 - Select з ними + "Зняти прив'язку"
@@ -726,6 +784,7 @@ export function ClientHistoryCommentForm({ clientId, onPosted }: { clientId: str
 ### Task 15 — Action buttons (stubs)
 
 `client-action-buttons.tsx`:
+
 - "Створити замовлення" → toast `"Створення замовлення буде у M1.5"`
 - "Відправити повідомлення про борг" → toast `"Виber-повідомлення буде у M1.8"`
 
@@ -740,8 +799,11 @@ export function ClientHistoryCommentForm({ clientId, onPosted }: { clientId: str
 ### Task 17 — Dashboard tile counts update
 
 У `apps/store/app/api/v1/manager/dashboard/stats/route.ts` додати real counts:
+
 ```typescript
-const clientCount = await prisma.clientAssignment.count({ where: { userId: user.id } });
+const clientCount = await prisma.clientAssignment.count({
+  where: { userId: user.id },
+});
 const totalDebt = await prisma.mgrClient.aggregate({
   where: { assignments: { some: { userId: user.id } } },
   _sum: { debt: true },

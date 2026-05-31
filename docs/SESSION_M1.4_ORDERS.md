@@ -7,6 +7,7 @@
 **Parent spec:** [`docs/MANAGER_APP_STRATEGY.md`](MANAGER_APP_STRATEGY.md) §6. **Builds on:** M1.3a (MgrClient + assignments), M1.3e (view prefs можна reuse), S67 (1С order import).
 
 **User decision (locked 2026-05-14):**
+
 - Спочатку M1.4 (read замовлень), потім M1.3f (visibility/masking)
 - M1.4 обмежується **своїми клієнтами** для менеджера. Cross-manager picker — після M1.3f.
 
@@ -30,6 +31,7 @@
 ## Big picture
 
 ### Часті scenarios:
+
 1. **Менеджер заходить у картку свого клієнта → Tab Замовлення** → бачить усі замовлення цього клієнта (свого).
 2. **Менеджер у sidebar клікає "Замовлення"** → `/manager/orders` → бачить замовлення усіх своїх клієнтів (зведений список через всі ClientAssignment + agentUserId).
 3. **Адмін у sidebar "Замовлення"** → бачить ВСІ замовлення системи.
@@ -39,14 +41,14 @@
 
 Order.status з 1С — рядки `"draft" | "pending" | "approved" | "shipped" | "delivered" | "cancelled"` (вже у use). Map на UI:
 
-| status | Badge label | Color |
-|---|---|---|
-| `draft` | Чернетка | grey |
-| `pending` | Очікує підтвердження | yellow |
-| `approved` | Підтверджено | blue |
-| `shipped` | Відправлено | indigo |
-| `delivered` | Доставлено | green |
-| `cancelled` | Скасовано | red |
+| status      | Badge label          | Color  |
+| ----------- | -------------------- | ------ |
+| `draft`     | Чернетка             | grey   |
+| `pending`   | Очікує підтвердження | yellow |
+| `approved`  | Підтверджено         | blue   |
+| `shipped`   | Відправлено          | indigo |
+| `delivered` | Доставлено           | green  |
+| `cancelled` | Скасовано            | red    |
 
 ### Display fields на сторінці клієнта
 
@@ -81,6 +83,7 @@ Pagination: 20/page
 ```
 
 Filter params:
+
 - `search` — LIKE на code1C OR customer.name
 - `status` — single select
 - `from` / `to` — ISO date range на createdAt
@@ -116,7 +119,7 @@ const myClients = await prisma.mgrClient.findMany({
   select: { code1C: true },
 });
 
-const myCode1Cs = myClients.map(c => c.code1C!);
+const myCode1Cs = myClients.map((c) => c.code1C!);
 
 const orders = await prisma.order.findMany({
   where: {
@@ -129,14 +132,20 @@ const orders = await prisma.order.findMany({
 ⚠️ Якщо у користувача 0 призначених клієнтів → return empty list БЕЗ виконання query з `{ in: [] }` (це Prisma OK для empty array, але optimization).
 
 **3. Permission на одну замовлення (GET single):**
+
 - Admin — завжди ОК
 - Manager — ОК тільки якщо `Order.customer.code1C` належить його клієнтам
 
 ### Створити замовлення кнопка
 
 Stub:
+
 ```tsx
-<button onClick={() => toast.info("Створення замовлення зробимо у M1.5 (з SOAP write-back у 1С)")}>
+<button
+  onClick={() =>
+    toast.info("Створення замовлення зробимо у M1.5 (з SOAP write-back у 1С)")
+  }
+>
   + Створити замовлення
 </button>
 ```
@@ -215,7 +224,9 @@ import type { CurrentManager } from "@/lib/auth/manager-auth";
  * Admin → null (means "no restriction").
  * Manager → array of code1Cs (можливо empty array → 0 orders видно).
  */
-export async function getMyClientCodes1C(user: Pick<CurrentManager, "id" | "role">): Promise<string[] | null> {
+export async function getMyClientCodes1C(
+  user: Pick<CurrentManager, "id" | "role">,
+): Promise<string[] | null> {
   if (user.role === "admin") return null;
 
   const clients = await prisma.mgrClient.findMany({
@@ -229,13 +240,16 @@ export async function getMyClientCodes1C(user: Pick<CurrentManager, "id" | "role
     select: { code1C: true },
   });
 
-  return clients.map(c => c.code1C!).filter(Boolean);
+  return clients.map((c) => c.code1C!).filter(Boolean);
 }
 
 /**
  * Check: чи user має право бачити цей конкретний order?
  */
-export async function canViewOrder(user: CurrentManager, orderId: string): Promise<boolean> {
+export async function canViewOrder(
+  user: CurrentManager,
+  orderId: string,
+): Promise<boolean> {
   if (user.role === "admin") return true;
 
   const order = await prisma.order.findUnique({
@@ -258,25 +272,30 @@ Tests ≥ 4: admin always true / manager owns / manager not owns / manager with 
 
 ```typescript
 export const ORDER_STATUS_META = {
-  draft:     { label: "Чернетка",            color: "gray" },
-  pending:   { label: "Очікує підтвердження", color: "yellow" },
-  approved:  { label: "Підтверджено",         color: "blue" },
-  shipped:   { label: "Відправлено",          color: "indigo" },
-  delivered: { label: "Доставлено",           color: "green" },
-  cancelled: { label: "Скасовано",            color: "red" },
+  draft: { label: "Чернетка", color: "gray" },
+  pending: { label: "Очікує підтвердження", color: "yellow" },
+  approved: { label: "Підтверджено", color: "blue" },
+  shipped: { label: "Відправлено", color: "indigo" },
+  delivered: { label: "Доставлено", color: "green" },
+  cancelled: { label: "Скасовано", color: "red" },
 } as const;
 
 export type OrderStatus = keyof typeof ORDER_STATUS_META;
 
 export function getOrderStatusMeta(status: string) {
-  return ORDER_STATUS_META[status as OrderStatus] ?? { label: status, color: "gray" };
+  return (
+    ORDER_STATUS_META[status as OrderStatus] ?? { label: status, color: "gray" }
+  );
 }
 ```
 
 ### Task 3 — GET `/clients/[id]/orders`
 
 ```typescript
-export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function GET(
+  _req: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+) {
   const user = await getCurrentUser();
   if (!user) return 401;
 
@@ -285,14 +304,20 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   // Verify client exists + visibility
   const client = await prisma.mgrClient.findUnique({
     where: { id },
-    select: { id: true, code1C: true, agentUserId: true, assignments: { where: { userId: user.id }, select: { id: true } } },
+    select: {
+      id: true,
+      code1C: true,
+      agentUserId: true,
+      assignments: { where: { userId: user.id }, select: { id: true } },
+    },
   });
   if (!client) return 404;
 
   // Manager: тільки свої клієнти
   if (user.role !== "admin") {
-    const isMine = client.agentUserId === user.id || client.assignments.length > 0;
-    if (!isMine) return 403;  // M1.3f розширить це на masked-read
+    const isMine =
+      client.agentUserId === user.id || client.assignments.length > 0;
+    if (!isMine) return 403; // M1.3f розширить це на masked-read
   }
 
   if (!client.code1C) return NextResponse.json({ items: [], total: 0 });
@@ -331,7 +356,10 @@ export async function GET(req: NextRequest) {
   const from = url.searchParams.get("from");
   const to = url.searchParams.get("to");
   const page = Math.max(1, parseInt(url.searchParams.get("page") ?? "1"));
-  const pageSize = Math.min(100, Math.max(10, parseInt(url.searchParams.get("pageSize") ?? "20")));
+  const pageSize = Math.min(
+    100,
+    Math.max(10, parseInt(url.searchParams.get("pageSize") ?? "20")),
+  );
 
   const where: Prisma.OrderWhereInput = {};
 
@@ -384,7 +412,10 @@ export async function GET(req: NextRequest) {
 ### Task 5 — GET `/orders/[id]` single
 
 ```typescript
-export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function GET(
+  _req: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+) {
   const user = await getCurrentUser();
   if (!user) return 401;
 
@@ -425,14 +456,16 @@ export async function ClientOrdersTab({ clientId, currentUser }: Props) {
   });
 
   if (!client?.code1C) {
-    return <EmptyState message="Клієнт ще не sync-ався з 1С — замовлень нема." />;
+    return (
+      <EmptyState message="Клієнт ще не sync-ався з 1С — замовлень нема." />
+    );
   }
 
   const [orders, total] = await Promise.all([
     prisma.order.findMany({
       where: { customer: { code1C: client.code1C } },
       orderBy: { createdAt: "desc" },
-      take: 10,  // лише останні — повний список на /manager/orders?clientCode1C=
+      take: 10, // лише останні — повний список на /manager/orders?clientCode1C=
       include: { _count: { select: { items: true } } },
     }),
     prisma.order.count({ where: { customer: { code1C: client.code1C } } }),
@@ -468,7 +501,14 @@ export default async function ManagerOrdersPage({ searchParams }: Props) {
   // ... parse інших
 
   // Fetch list через service helpers (DRY з API endpoint)
-  const { items, total } = await fetchOrdersForUser(user, { search, status, from, to, page, pageSize });
+  const { items, total } = await fetchOrdersForUser(user, {
+    search,
+    status,
+    from,
+    to,
+    page,
+    pageSize,
+  });
 
   return (
     <div className="space-y-4">
@@ -492,11 +532,16 @@ export default async function ManagerOrderDetailPage({ params }: Props) {
   const user = await requireManagerOrAdmin();
   const { id } = await params;
   const ok = await canViewOrder(user, id);
-  if (!ok) notFound();  // 404 для security (без leak)
+  if (!ok) notFound(); // 404 для security (без leak)
 
   const order = await prisma.order.findUnique({
     where: { id },
-    include: { customer: true, items: { include: { product: true, lot: true } }, shipments: true, payments: true },
+    include: {
+      customer: true,
+      items: { include: { product: true, lot: true } },
+      shipments: true,
+      payments: true,
+    },
   });
   if (!order) notFound();
 
@@ -517,10 +562,15 @@ export default async function ManagerOrderDetailPage({ params }: Props) {
         <table>
           {/* product name / lot barcode / weight / qty / priceEur */}
         </table>
-        <p>Сума: {order.totalUah} ₴ ({order.totalEur} €)</p>
+        <p>
+          Сума: {order.totalUah} ₴ ({order.totalEur} €)
+        </p>
       </section>
 
-      <UnderConstruction session="M1.5" description="Редагування замовлення + SOAP write-back у 1С — М1.5." />
+      <UnderConstruction
+        session="M1.5"
+        description="Редагування замовлення + SOAP write-back у 1С — М1.5."
+      />
     </div>
   );
 }
@@ -544,6 +594,7 @@ Replace `ordersToday: 0` placeholder на real number.
 ### Task 10 — Tests final
 
 Total ≥ 22:
+
 - order-ownership (≥ 4)
 - order-status (≥ 2: known status / unknown fallback)
 - clients/[id]/orders route (≥ 4)

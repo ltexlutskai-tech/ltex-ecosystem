@@ -16,21 +16,22 @@
  * Узгоджено з `docs/1c-bsl/outbound/Module.bsl.append` (Етап 2, rework під
  * Molenari OU constraint):
  *
- *   - Усі 8 операцій (ОбновитиКлієнтаJSON / СтворитиЗамовленняJSON /
- *     СтворитиОплатуJSON / СтворитиКасовийОрдерJSON / СтворитиРеалізаціюJSON /
- *     СтворитиМаршрутнийЛистJSON / ОтриматиДаніЗакриттяЗамовленьJSON /
- *     ЗакритиСтаріЗамовленняJSON) приймають **2 string-параметри**:
+ *   - Усі 8 операцій (ОбновитиКлиентаJSON / СтворитиЗамовленняJSON /
+ *     СтворитиОплатуJSON / СтворитиКасовийОрдерJSON / СтворитиРеализациюJSON /
+ *     СтворитиМаршрутнийЛистJSON / ОтриматиДаниЗакриттяЗамовленьJSON /
+ *     ЗакритиСтариЗамовленняJSON) приймають **2 string-параметри**:
  *       <ms:ПарольВхода>...</ms:ПарольВхода>           ← лишений порожнім
  *                                                          для backward compat
- *       <ms:JSONДані>{"idempotencyKey":"...",
+ *       <ms:JSONДани>{"idempotencyKey":"...",
  *                    "password":"...",                 ← auth ВСЕРЕДИНІ JSON
- *                    "data":{...}}</ms:JSONДані>
+ *                    "data":{...}}</ms:JSONДани>
  *   - Назва operation у XML обов'язково з суфіксом `JSON`.
- *   - Назва другого параметра — `JSONДані` (з українською «і», як у BSL).
+ *   - Назва другого параметра — `JSONДани` (з російською «и», як у BSL після
+ *     Russification commit d9ac790 для 8.2.13 compat).
  *   - Пароль читається з `services/manager-sync/.env::ONEC_SOAP_PASSWORD`
  *     (інжектиться у `buildSoapEnvelope` через `params.password`) — постачальник
  *     1С (Molenari OU) блокує `Константа.СинкСистемнийПароль`, тому пароль
- *     зашитий у BSL `_LTEX_ПеревіритиПароль` як локальний рядок.
+ *     зашитий у BSL `_LTEX_ПеревиритиПароль` як локальний рядок.
  */
 
 const SOAP_NS = "http://schemas.xmlsoap.org/soap/envelope/";
@@ -46,15 +47,15 @@ function escapeXml(value: string): string {
 }
 
 export interface BuildEnvelopeParams {
-  /** Назва SOAP-операції з суфіксом `JSON`, напр. `ОбновитиКлієнтаJSON`. */
+  /** Назва SOAP-операції з суфіксом `JSON`, напр. `ОбновитиКлиентаJSON`. */
   operation: string;
   /**
-   * Пароль з `ONEC_SOAP_PASSWORD` (.env). Йде ВСЕРЕДИНУ JSONДані як поле
+   * Пароль з `ONEC_SOAP_PASSWORD` (.env). Йде ВСЕРЕДИНУ JSONДани як поле
    * `password` (зовнішній XML-параметр `<ms:ПарольВхода>` лишається порожнім —
    * BSL після rework Molenari OU читає auth тільки з JSON).
    */
   password: string;
-  /** Унікальний ключ ідемпотентності (UUID v4). Уходить ВСЕРЕДИНУ JSONДані. */
+  /** Унікальний ключ ідемпотентності (UUID v4). Уходить ВСЕРЕДИНУ JSONДани. */
   idempotencyKey: string;
   /** Payload-об'єкт; буде serialize-ний як `{"idempotencyKey","password","data":payload}`. */
   payload: Record<string, unknown>;
@@ -87,7 +88,7 @@ export function buildSoapEnvelope(params: BuildEnvelopeParams): string {
     `<soap:Body>` +
     `<ms:${operation} xmlns:ms="${ARM_NS}">` +
     `<ms:ПарольВхода></ms:ПарольВхода>` +
-    `<ms:JSONДані>${escapeXml(jsonData)}</ms:JSONДані>` +
+    `<ms:JSONДани>${escapeXml(jsonData)}</ms:JSONДани>` +
     `</ms:${operation}>` +
     `</soap:Body>` +
     `</soap:Envelope>`

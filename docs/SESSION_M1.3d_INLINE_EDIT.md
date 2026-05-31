@@ -7,6 +7,7 @@
 **Parent spec:** [`docs/MANAGER_APP_STRATEGY.md`](MANAGER_APP_STRATEGY.md) §6. **Builds on:** M1.3a (clients schema), M1.3c (full field parity).
 
 **User decision (locked 2026-05-14):**
+
 - **Conflict policy:** Менеджер і 1С обидва редагують усі поля. Last-write-wins. Жодного field-level tracking — sync logic (M1.5) сам розбереться як merge-ити. У M1.3d просто save → DB.
 - **Tabular CRUD (phones/messengers/bank accounts/etc.):** OUT OF SCOPE M1.3d. Це окрема follow-up сесія якщо знадобиться. Зараз тільки **scalar** поля.
 
@@ -34,42 +35,42 @@
 
 ### Editable / read-only fields
 
-| Поле | Editable? | Type у формі |
-|---|---|---|
-| `name` | ✓ | text input |
-| `tradePointName` | ✓ | text input |
-| `region` | ✓ | text input (або select з distinct у M1.3e) |
-| `city` | ✓ | text input |
-| `street` | ✓ | text input |
-| `house` | ✓ | text input |
-| `novaPoshtaBranch` | ✓ | text input |
-| `websiteUrl` | ✓ | url input |
-| `geolocation` | ✓ | text input ("lat,lng" format) |
-| `viberContact` | ✓ | tel input |
-| `monthlyVolume` | ✓ | number input (kg) |
-| `licenseExpiresAt` | ✓ | date input |
-| `hasNewMessage` | ✓ | checkbox |
-| `isViberLinked` | ✓ | checkbox |
-| `dialogStatus` | ✓ | text input (поки text — у V2 буде enum) |
-| `statusGeneralId` | ✓ | select dropdown з `mgr_client_statuses` |
-| `statusOperationalId` | ✓ | select dropdown |
-| `categoryTTId` | ✓ | select dropdown з `mgr_categories_tt` |
-| `priceTypeId` | ✓ | select dropdown з `mgr_price_types` |
-| `primaryAssortmentId` | ✓ | select з `mgr_assortment_codes` |
-| `deliveryMethodId` | ✓ | select з `mgr_delivery_methods` |
-| `searchChannelId` | ✓ | select з `mgr_search_channels` |
-| `primaryRouteId` | ✓ | select з `mgr_routes` |
-| `agentUserId` | ✓ | select з `users WHERE role IN ('manager','admin')` |
-| `code1C` | ✗ | read-only (system) |
-| `createdAt` | ✗ | read-only |
-| `updatedAt` | ✗ | read-only |
-| `lastSyncedAt` | ✗ | read-only |
-| `debt` | ✗ | read-only (aggregate з документів) |
-| `overdueDebt` | ✗ | read-only |
-| `tovDebt` | ✗ | read-only |
-| `tovOverdueDebt` | ✗ | read-only |
-| `sessionRemainder` | ✗ | read-only |
-| `daysSinceLastPurchase` | ✗ | read-only (computed) |
+| Поле                    | Editable? | Type у формі                                       |
+| ----------------------- | --------- | -------------------------------------------------- |
+| `name`                  | ✓         | text input                                         |
+| `tradePointName`        | ✓         | text input                                         |
+| `region`                | ✓         | text input (або select з distinct у M1.3e)         |
+| `city`                  | ✓         | text input                                         |
+| `street`                | ✓         | text input                                         |
+| `house`                 | ✓         | text input                                         |
+| `novaPoshtaBranch`      | ✓         | text input                                         |
+| `websiteUrl`            | ✓         | url input                                          |
+| `geolocation`           | ✓         | text input ("lat,lng" format)                      |
+| `viberContact`          | ✓         | tel input                                          |
+| `monthlyVolume`         | ✓         | number input (kg)                                  |
+| `licenseExpiresAt`      | ✓         | date input                                         |
+| `hasNewMessage`         | ✓         | checkbox                                           |
+| `isViberLinked`         | ✓         | checkbox                                           |
+| `dialogStatus`          | ✓         | text input (поки text — у V2 буде enum)            |
+| `statusGeneralId`       | ✓         | select dropdown з `mgr_client_statuses`            |
+| `statusOperationalId`   | ✓         | select dropdown                                    |
+| `categoryTTId`          | ✓         | select dropdown з `mgr_categories_tt`              |
+| `priceTypeId`           | ✓         | select dropdown з `mgr_price_types`                |
+| `primaryAssortmentId`   | ✓         | select з `mgr_assortment_codes`                    |
+| `deliveryMethodId`      | ✓         | select з `mgr_delivery_methods`                    |
+| `searchChannelId`       | ✓         | select з `mgr_search_channels`                     |
+| `primaryRouteId`        | ✓         | select з `mgr_routes`                              |
+| `agentUserId`           | ✓         | select з `users WHERE role IN ('manager','admin')` |
+| `code1C`                | ✗         | read-only (system)                                 |
+| `createdAt`             | ✗         | read-only                                          |
+| `updatedAt`             | ✗         | read-only                                          |
+| `lastSyncedAt`          | ✗         | read-only                                          |
+| `debt`                  | ✗         | read-only (aggregate з документів)                 |
+| `overdueDebt`           | ✗         | read-only                                          |
+| `tovDebt`               | ✗         | read-only                                          |
+| `tovOverdueDebt`        | ✗         | read-only                                          |
+| `sessionRemainder`      | ✗         | read-only                                          |
+| `daysSinceLastPurchase` | ✗         | read-only (computed)                               |
 
 **25 editable + 9 read-only = 34 total scalar fields.**
 
@@ -227,7 +228,10 @@ Tests ≥ 6: valid full payload / empty payload / invalid url / invalid date / u
 import type { User } from "@prisma/client";
 import { prisma } from "@ltex/db";
 
-export async function canEditClient(user: User, clientId: string): Promise<boolean> {
+export async function canEditClient(
+  user: User,
+  clientId: string,
+): Promise<boolean> {
   if (user.role === "admin") return true;
 
   // Manager — only if assigned OR is agent
@@ -252,19 +256,27 @@ Tests ≥ 4: admin always true / agent true / assigned manager true / unrelated 
 `apps/store/app/api/v1/manager/clients/[id]/route.ts` — додати:
 
 ```typescript
-export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function PATCH(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+) {
   const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!user)
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { id } = await params;
 
   const allowed = await canEditClient(user, id);
-  if (!allowed) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (!allowed)
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const body = await req.json();
   const parsed = mgrClientPatchSchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json({ error: "Validation failed", details: parsed.error.flatten() }, { status: 400 });
+    return NextResponse.json(
+      { error: "Validation failed", details: parsed.error.flatten() },
+      { status: 400 },
+    );
   }
 
   const data = parsed.data;
@@ -276,10 +288,17 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     where: { id },
     data: {
       ...data,
-      licenseExpiresAt: data.licenseExpiresAt === undefined ? undefined : data.licenseExpiresAt ? new Date(data.licenseExpiresAt) : null,
+      licenseExpiresAt:
+        data.licenseExpiresAt === undefined
+          ? undefined
+          : data.licenseExpiresAt
+            ? new Date(data.licenseExpiresAt)
+            : null,
       websiteUrl: data.websiteUrl === "" ? null : data.websiteUrl,
     },
-    include: { /* same as GET */ },
+    include: {
+      /* same as GET */
+    },
   });
 
   return NextResponse.json(updated);
@@ -287,6 +306,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 ```
 
 Tests ≥ 6:
+
 - happy update text field as admin
 - happy update FK field as agent
 - 403 unrelated manager
@@ -300,11 +320,21 @@ Tests ≥ 6:
 
 ```tsx
 "use client";
-export function ClientEditToggle({ client, dictionaries, currentUserRole, canEdit }: Props) {
+export function ClientEditToggle({
+  client,
+  dictionaries,
+  currentUserRole,
+  canEdit,
+}: Props) {
   const [mode, setMode] = useState<"view" | "edit">("view");
 
   if (mode === "view") {
-    return <ClientRequisitesView client={client} onEditClick={canEdit ? () => setMode("edit") : undefined} />;
+    return (
+      <ClientRequisitesView
+        client={client}
+        onEditClick={canEdit ? () => setMode("edit") : undefined}
+      />
+    );
   }
   return (
     <ClientRequisitesEdit
@@ -323,7 +353,12 @@ export function ClientEditToggle({ client, dictionaries, currentUserRole, canEdi
 
 ```tsx
 "use client";
-export function ClientRequisitesEdit({ client, dictionaries, onCancel, onSaved }: Props) {
+export function ClientRequisitesEdit({
+  client,
+  dictionaries,
+  onCancel,
+  onSaved,
+}: Props) {
   const { values, isDirty, dirtyKeys, setField, reset } = useClientEdit(client);
   const [saving, setSaving] = useState(false);
   const router = useRouter();
@@ -357,7 +392,12 @@ export function ClientRequisitesEdit({ client, dictionaries, onCancel, onSaved }
   }
 
   return (
-    <form onSubmit={(e) => { e.preventDefault(); handleSave(); }}>
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        handleSave();
+      }}
+    >
       <div className="flex items-center justify-end gap-2 mb-4">
         <button type="button" onClick={handleCancel} disabled={saving}>
           {isDirty ? "Скасувати правки" : "Скасувати"}
@@ -372,43 +412,162 @@ export function ClientRequisitesEdit({ client, dictionaries, onCancel, onSaved }
         <ReadonlyRow label="Код" value={client.code1C} />
         <ReadonlyRow label="Створений" value={formatDate(client.createdAt)} />
 
-        <EditTextRow label="Найменування" value={values.name} onChange={v => setField("name", v)} required />
-        <EditTextRow label="Торгова точка" value={values.tradePointName} onChange={v => setField("tradePointName", v)} />
+        <EditTextRow
+          label="Найменування"
+          value={values.name}
+          onChange={(v) => setField("name", v)}
+          required
+        />
+        <EditTextRow
+          label="Торгова точка"
+          value={values.tradePointName}
+          onChange={(v) => setField("tradePointName", v)}
+        />
 
         <ReadonlyRow label="Борг" value={<DebtValue value={client.debt} />} />
-        <ReadonlyRow label="Протерміновано" value={<DebtValue value={client.overdueDebt} />} />
+        <ReadonlyRow
+          label="Протерміновано"
+          value={<DebtValue value={client.overdueDebt} />}
+        />
 
-        <EditSelectRow label="Статус" value={values.statusGeneralId} onChange={v => setField("statusGeneralId", v)} options={dictionaries.statuses} />
-        <EditSelectRow label="Оперативний статус" value={values.statusOperationalId} onChange={v => setField("statusOperationalId", v)} options={dictionaries.statuses} />
+        <EditSelectRow
+          label="Статус"
+          value={values.statusGeneralId}
+          onChange={(v) => setField("statusGeneralId", v)}
+          options={dictionaries.statuses}
+        />
+        <EditSelectRow
+          label="Оперативний статус"
+          value={values.statusOperationalId}
+          onChange={(v) => setField("statusOperationalId", v)}
+          options={dictionaries.statuses}
+        />
 
-        <EditSelectRow label="Тип цін" value={values.priceTypeId} onChange={v => setField("priceTypeId", v)} options={dictionaries.priceTypes} />
-        <EditSelectRow label="Асортимент" value={values.primaryAssortmentId} onChange={v => setField("primaryAssortmentId", v)} options={dictionaries.assortments} />
-        <EditSelectRow label="Спосіб доставки" value={values.deliveryMethodId} onChange={v => setField("deliveryMethodId", v)} options={dictionaries.deliveryMethods} />
-        <EditSelectRow label="Категорія ТТ" value={values.categoryTTId} onChange={v => setField("categoryTTId", v)} options={dictionaries.categoriesTT} />
+        <EditSelectRow
+          label="Тип цін"
+          value={values.priceTypeId}
+          onChange={(v) => setField("priceTypeId", v)}
+          options={dictionaries.priceTypes}
+        />
+        <EditSelectRow
+          label="Асортимент"
+          value={values.primaryAssortmentId}
+          onChange={(v) => setField("primaryAssortmentId", v)}
+          options={dictionaries.assortments}
+        />
+        <EditSelectRow
+          label="Спосіб доставки"
+          value={values.deliveryMethodId}
+          onChange={(v) => setField("deliveryMethodId", v)}
+          options={dictionaries.deliveryMethods}
+        />
+        <EditSelectRow
+          label="Категорія ТТ"
+          value={values.categoryTTId}
+          onChange={(v) => setField("categoryTTId", v)}
+          options={dictionaries.categoriesTT}
+        />
 
-        <EditTextRow label="Область" value={values.region} onChange={v => setField("region", v)} />
-        <EditTextRow label="Місто" value={values.city} onChange={v => setField("city", v)} />
-        <EditTextRow label="Вулиця" value={values.street} onChange={v => setField("street", v)} />
-        <EditTextRow label="Будинок" value={values.house} onChange={v => setField("house", v)} />
+        <EditTextRow
+          label="Область"
+          value={values.region}
+          onChange={(v) => setField("region", v)}
+        />
+        <EditTextRow
+          label="Місто"
+          value={values.city}
+          onChange={(v) => setField("city", v)}
+        />
+        <EditTextRow
+          label="Вулиця"
+          value={values.street}
+          onChange={(v) => setField("street", v)}
+        />
+        <EditTextRow
+          label="Будинок"
+          value={values.house}
+          onChange={(v) => setField("house", v)}
+        />
 
-        <EditTextRow label="Відділення НП" value={values.novaPoshtaBranch} onChange={v => setField("novaPoshtaBranch", v)} />
-        <EditTextRow label="Сайт" value={values.websiteUrl} onChange={v => setField("websiteUrl", v)} type="url" />
-        <EditTextRow label="Геолокація" value={values.geolocation} onChange={v => setField("geolocation", v)} placeholder="50.7472,25.3254" />
-        <EditNumberRow label="Обєм за місяць (кг)" value={values.monthlyVolume} onChange={v => setField("monthlyVolume", v)} />
+        <EditTextRow
+          label="Відділення НП"
+          value={values.novaPoshtaBranch}
+          onChange={(v) => setField("novaPoshtaBranch", v)}
+        />
+        <EditTextRow
+          label="Сайт"
+          value={values.websiteUrl}
+          onChange={(v) => setField("websiteUrl", v)}
+          type="url"
+        />
+        <EditTextRow
+          label="Геолокація"
+          value={values.geolocation}
+          onChange={(v) => setField("geolocation", v)}
+          placeholder="50.7472,25.3254"
+        />
+        <EditNumberRow
+          label="Обєм за місяць (кг)"
+          value={values.monthlyVolume}
+          onChange={(v) => setField("monthlyVolume", v)}
+        />
 
-        <EditSelectRow label="Канал пошуку" value={values.searchChannelId} onChange={v => setField("searchChannelId", v)} options={dictionaries.searchChannels} />
-        <EditTextRow label="Контакт Viber" value={values.viberContact} onChange={v => setField("viberContact", v)} type="tel" />
-        <EditUserSelectRow label="Торговий агент" value={values.agentUserId} onChange={v => setField("agentUserId", v)} />
-        <EditDateRow label="Ліцензія дійсна до" value={values.licenseExpiresAt} onChange={v => setField("licenseExpiresAt", v)} />
+        <EditSelectRow
+          label="Канал пошуку"
+          value={values.searchChannelId}
+          onChange={(v) => setField("searchChannelId", v)}
+          options={dictionaries.searchChannels}
+        />
+        <EditTextRow
+          label="Контакт Viber"
+          value={values.viberContact}
+          onChange={(v) => setField("viberContact", v)}
+          type="tel"
+        />
+        <EditUserSelectRow
+          label="Торговий агент"
+          value={values.agentUserId}
+          onChange={(v) => setField("agentUserId", v)}
+        />
+        <EditDateRow
+          label="Ліцензія дійсна до"
+          value={values.licenseExpiresAt}
+          onChange={(v) => setField("licenseExpiresAt", v)}
+        />
 
-        <ReadonlyRow label="Залишок сесії" value={formatMoney(client.sessionRemainder)} />
-        <ReadonlyRow label="Оновлено з 1С" value={client.lastSyncedAt ? formatDateTime(client.lastSyncedAt) : "—"} />
+        <ReadonlyRow
+          label="Залишок сесії"
+          value={formatMoney(client.sessionRemainder)}
+        />
+        <ReadonlyRow
+          label="Оновлено з 1С"
+          value={
+            client.lastSyncedAt ? formatDateTime(client.lastSyncedAt) : "—"
+          }
+        />
 
-        <EditSelectRow label="Основний маршрут" value={values.primaryRouteId} onChange={v => setField("primaryRouteId", v)} options={dictionaries.routes} />
-        <EditTextRow label="Статус діалогу" value={values.dialogStatus} onChange={v => setField("dialogStatus", v)} />
+        <EditSelectRow
+          label="Основний маршрут"
+          value={values.primaryRouteId}
+          onChange={(v) => setField("primaryRouteId", v)}
+          options={dictionaries.routes}
+        />
+        <EditTextRow
+          label="Статус діалогу"
+          value={values.dialogStatus}
+          onChange={(v) => setField("dialogStatus", v)}
+        />
 
-        <EditBoolRow label="Нове повідомлення" value={values.hasNewMessage} onChange={v => setField("hasNewMessage", v)} />
-        <EditBoolRow label="Підписаний у Viber" value={values.isViberLinked} onChange={v => setField("isViberLinked", v)} />
+        <EditBoolRow
+          label="Нове повідомлення"
+          value={values.hasNewMessage}
+          onChange={(v) => setField("hasNewMessage", v)}
+        />
+        <EditBoolRow
+          label="Підписаний у Viber"
+          value={values.isViberLinked}
+          onChange={(v) => setField("isViberLinked", v)}
+        />
       </dl>
     </form>
   );
@@ -421,15 +580,25 @@ export function ClientRequisitesEdit({ client, dictionaries, onCancel, onSaved }
 
 ```tsx
 // edit-text-row.tsx
-export function EditTextRow({ label, value, onChange, required, type = "text", placeholder }: Props) {
+export function EditTextRow({
+  label,
+  value,
+  onChange,
+  required,
+  type = "text",
+  placeholder,
+}: Props) {
   return (
     <div className="flex items-start gap-2 text-sm">
-      <dt className="w-44 shrink-0 text-gray-500">{label}{required && <span className="text-red-500">*</span>}:</dt>
+      <dt className="w-44 shrink-0 text-gray-500">
+        {label}
+        {required && <span className="text-red-500">*</span>}:
+      </dt>
       <dd className="flex-1">
         <input
           type={type}
           value={value ?? ""}
-          onChange={e => onChange(e.target.value || null)}
+          onChange={(e) => onChange(e.target.value || null)}
           required={required}
           placeholder={placeholder}
           className="w-full rounded border border-gray-300 px-2 py-1 text-sm focus:border-blue-500 focus:outline-none"
@@ -461,9 +630,12 @@ export function useClientEdit(client: ClientDetail) {
 
   const isDirty = dirtyKeys.length > 0;
 
-  const setField = useCallback(<K extends keyof typeof values>(key: K, value: typeof values[K]) => {
-    setValues(prev => ({ ...prev, [key]: value }));
-  }, []);
+  const setField = useCallback(
+    <K extends keyof typeof values>(key: K, value: (typeof values)[K]) => {
+      setValues((prev) => ({ ...prev, [key]: value }));
+    },
+    [],
+  );
 
   const reset = useCallback(() => setValues(initial), [initial]);
 
@@ -496,6 +668,7 @@ Tests ≥ 1 (hook registers/unregisters).
 ### Task 9 — Page wiring
 
 `apps/store/app/manager/(workstation)/customers/[id]/page.tsx` — додати:
+
 1. Load dictionaries (reuse existing GET /api/v1/manager/dictionaries — теж приймає `priceTypes`?)
 2. Compute `canEdit = await canEditClient(user, id)` server-side
 3. Pass `dictionaries` + `canEdit` через props у `<ClientEditToggle>`
@@ -507,6 +680,7 @@ Tests ≥ 1 (hook registers/unregisters).
 ### Task 11 — Tests final
 
 Total ≥ 18:
+
 - Zod schema (6)
 - Permission helper (4)
 - PATCH endpoint (6)

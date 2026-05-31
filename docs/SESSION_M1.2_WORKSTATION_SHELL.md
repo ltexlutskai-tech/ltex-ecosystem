@@ -7,6 +7,7 @@
 **Parent spec:** [`docs/MANAGER_APP_STRATEGY.md`](MANAGER_APP_STRATEGY.md). **Backlog ref:** [`docs/M1_BACKLOG.md`](M1_BACKLOG.md) → M1.2.
 
 **User decisions (2026-05-13, locked):**
+
 - Sidebar = лівий вертикальний (modern Gmail/Notion style).
 - 4 базові плитки на dashboard: Замовлення / Реалізація / Оплати / Маршрут (НЕ Мішок, НЕ Месенджер).
 - Sync-блок з 1С прибрано — тільки маленький індикатор "Синхронізовано N хв тому" + кнопка-іконка "Оновити".
@@ -349,7 +350,7 @@ export default async function WorkstationDashboard() {
   ```
   Якщо `canEdit` — клік ✏️ відкриває `<DashboardCurrencyEditModal>`.
   Якщо обидва null — "Курси не завантажені з 1С."
-- **`dashboard-currency-edit-modal.tsx`** (admin only): Dialog з 2 inputs (EUR, USD), default values від current rates. Submit → POST `/api/v1/manager/admin/rates` з body `{ EUR: number, USD: number }`. На success — `toast` + close + revalidate. 
+- **`dashboard-currency-edit-modal.tsx`** (admin only): Dialog з 2 inputs (EUR, USD), default values від current rates. Submit → POST `/api/v1/manager/admin/rates` з body `{ EUR: number, USD: number }`. На success — `toast` + close + revalidate.
 - **`dashboard-tiles.tsx`**: 4-column grid (`grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4`). Кожна `<DashboardTile>`.
 - **`dashboard-tile.tsx`**: `<Link href={href}>` з Card, icon великий, title, count line. Hover-стан з shadow.
 
@@ -410,6 +411,7 @@ export default function OrdersPage() {
 ```
 
 Описи для кожного:
+
 - orders: "Створення та керування замовленнями." (M1.5)
 - sales: "Реалізації, проведення документів, статуси доставки." (M1.6)
 - payments: "Каса, прийом готівки, розрахунок здачі." (M1.6)
@@ -458,41 +460,49 @@ export default async function SettingsPage() {
 ```
 
 **ProfileSection** (client):
+
 - Read-only email (display only)
 - Editable fullName з save-on-blur через PATCH `/api/v1/manager/me`
 - "Змінити пароль" — кнопка відкриває `<ChangePasswordModal>`
 
 **ChangePasswordModal** (client, Dialog):
+
 - 3 fields: current password, new password, confirm new
 - Frontend validate: new ≥12 chars, ≥1 digit, ≥1 letter, confirm matches
 - POST `/api/v1/manager/me/change-password` `{ currentPassword, newPassword }`
 - On success — toast + close
 
 **TelegramSection** (client):
+
 - Show status: "🟢 Прив'язано до @username" АБО "⚪ Не прив'язано"
 - Кнопка "Прив'язати" — поки toast "Telegram pairing буде у M1.10" (placeholder)
 - Якщо прив'язано — кнопка "Відв'язати" (поки toast "Скоро")
 
 **NotifyChannelsSection** (client):
+
 - 2 toggle switches: "OS push (у браузері/додатку)" + "Telegram DM"
 - Save-on-toggle через PATCH `/api/v1/manager/me` `{ notifyChannels: ["push"], ... }`
 
 **SessionsSection** (server, бо сесії — read-only список):
+
 - Table з columns: Пристрій (parsed з User-Agent) · IP · Активна з · [Завершити]
 - Click "Завершити" — client wrapper → DELETE `/api/v1/manager/me/sessions/{id}`
 - Внизу — кнопка "Завершити всі сесії, окрім поточної" (POST `/api/v1/manager/auth/logout?everywhere=true` → redirect /manager/login)
 
 **LogoutButton** (client):
+
 - Простий button → POST `/api/v1/manager/auth/logout` → `router.push("/manager/login")`
 
 ### Task 6 — API endpoints
 
 **`PATCH /api/v1/manager/me`:**
+
 - Auth required (manager-auth)
 - Zod schema `updateMeSchema`: `{ fullName?: string (min 2, max 120), notifyChannels?: string[] (subset of ["push","telegram"]) }`
 - Returns updated user shape
 
 **`POST /api/v1/manager/me/change-password`:**
+
 - Auth required
 - Zod: `{ currentPassword: string, newPassword: string з validatePasswordStrength }`
 - `verifyPassword(currentPassword, user.passwordHash)` → 401 if wrong
@@ -501,22 +511,26 @@ export default async function SettingsPage() {
 - Return 204
 
 **`GET /api/v1/manager/me/sessions`:**
+
 - Auth required
 - Returns array of active refresh tokens (id, userAgent, ipAddress, createdAt, expiresAt)
 
 **`DELETE /api/v1/manager/me/sessions/[id]`:**
+
 - Auth required
 - Revoke single token. Якщо `id === currentTokenId` — повертає 200 + cookie clear (logout this device).
 - Return 204
 
 **`GET /api/v1/manager/dashboard/stats`:**
+
 - Auth required
 - Returns: `{ clientCount, totalDebt, eur, usd, syncStatus: { lastSyncAt }, sessionCounts: { orders, sales, payments, routes } }`
-- Поки sessionCounts hardcode `{ orders: 0, sales: 0, payments: 0, routes: 0 }` бо немає mgr_* snapshot.
+- Поки sessionCounts hardcode `{ orders: 0, sales: 0, payments: 0, routes: 0 }` бо немає mgr\_\* snapshot.
 - `syncStatus.lastSyncAt` поки `new Date()` (буде real value у M1.3 коли sync worker з'явиться).
 - 30-секундний `revalidateTag("dashboard-stats")` cache.
 
 **`POST /api/v1/manager/admin/rates`:**
+
 - Auth required, **role=admin only** (`requireRole(["admin"])` → 403 if not)
 - Zod schema `updateRatesSchema`: `{ EUR: number().positive(), USD: number().positive() }`
 - Upsert `ExchangeRate { currencyFrom: "EUR"/"USD", currencyTo: "UAH", rate, source: "manual" }` для today's date
@@ -537,7 +551,8 @@ export const updateMeSchema = z.object({
 
 export const changePasswordSchema = z.object({
   currentPassword: z.string().min(1).max(200),
-  newPassword: z.string()
+  newPassword: z
+    .string()
     .min(12, "Мінімум 12 символів")
     .max(200)
     .refine((v) => /[0-9]/.test(v), "Хоча б одна цифра")
@@ -559,21 +574,25 @@ export const updateRatesSchema = z.object({
 ### Task 8 — Tests
 
 **`/api/v1/manager/me/route.test.ts`** (≥4):
+
 - PATCH happy (fullName) → 200 + user updated
 - PATCH no auth → 401
 - PATCH invalid fullName (too short) → 400
 - PATCH notifyChannels with invalid value → 400
 
 **`/api/v1/manager/me/change-password/route.test.ts`** (≥3):
+
 - Happy → 204, password changed, all refresh tokens revoked
 - Wrong current → 401
 - Weak new password → 400
 
 **`/api/v1/manager/dashboard/stats/route.test.ts`** (≥2):
+
 - Happy returns shape з expected fields
 - No auth → 401
 
 **`/api/v1/manager/admin/rates/route.test.ts`** (≥3):
+
 - Admin user → 200, ExchangeRate upserted
 - Non-admin user (role=manager) → 403
 - Invalid body (negative number) → 400
@@ -619,6 +638,7 @@ git merge --ff-only origin/claude/m1-orch-merge
 Після deploy відкрий `https://new.ltex.com.ua/manager` — має одразу побачити повний робочий стіл з 4 tiles, sidebar, header. Логін зробити НЕ потрібен (cookie ще активний від M1.1).
 
 Перевір:
+
 - 4 плитки клікаються — кожна веде на заглушку "Цей розділ ще будується"
 - Sidebar має 13 пунктів (10 базових + Чат + Користувачі + Налаштування). "Користувачі" + ✏️ біля курсів видно бо ти admin.
 - Налаштування → "Змінити пароль" → задай нормальний пароль замість тимчасового `Test123456!@`

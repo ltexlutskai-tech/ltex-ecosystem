@@ -29,15 +29,18 @@ V2: M2.1 returns, M2.2 presentations+viber, M2.3 reports, M2.4 reservations
 ## Sessions
 
 ### M1.0 — Strategy + backlog ✓
+
 **Status:** done (this session).
 **Artefacts:** `docs/MANAGER_APP_STRATEGY.md`, `docs/M1_BACKLOG.md`.
 
 ---
 
 ### M1.1 — Self-hosted auth (users + bcrypt + JWT) + login + password reset + admin invite
+
 **Goal:** Власна auth-система **без Supabase**: таблиця `User`, bcrypt пароль, HMAC JWT, email password-reset через Resend, admin invite flow.
 **Pre-reqs:** Жодних — design зафіксований у `MANAGER_APP_STRATEGY.md §4`.
 **Acceptance:**
+
 - [ ] Migration `2026MMDD_users_auth`: `users`, `user_refresh_tokens`, `password_reset_tokens`, `client_assignments`, enum `UserRole(manager|senior_manager|admin)`. Усі через `@@map`.
 - [ ] `bcryptjs` додано у `apps/store/package.json` (dependency)
 - [ ] `MANAGER_JWT_SECRET` додано у `.env.example` (≥32 байти, validated у `instrumentation.ts`)
@@ -69,15 +72,17 @@ V2: M2.1 returns, M2.2 presentations+viber, M2.3 reports, M2.4 reservations
   - login route: happy + bad-password + locked + inactive + rate-limited (5)
   - refresh: rotate + revoked + expired (3)
   - reset: request anti-enumeration + confirm happy + expired + used twice (4)
-**Out of scope:** UI inside `/manager/*` крім auth pages (M1.2). Existing `/admin/login` (Supabase) — НЕ ламаємо. Customer auth `/api/mobile/*` — НЕ торкаємо.
-**User-action post-deploy:** запустити `pnpm tsx scripts/seed-admin-user.ts` один раз з env vars; залогінитись як admin; з UI запросити менеджерів.
+    **Out of scope:** UI inside `/manager/*` крім auth pages (M1.2). Existing `/admin/login` (Supabase) — НЕ ламаємо. Customer auth `/api/mobile/*` — НЕ торкаємо.
+    **User-action post-deploy:** запустити `pnpm tsx scripts/seed-admin-user.ts` один раз з env vars; залогінитись як admin; з UI запросити менеджерів.
 
 ---
 
 ### M1.2 — Workstation shell + dashboard + minimal settings
+
 **Goal:** Layout `/manager/*` із sidebar, header (user name + logout + connection-status), Dashboard з реальними cards, і Settings page **мінімальна** (replaces 1С `ФормаВводаПароля` — усі 7 toggles викинуті, бо менеджери ними не користуються).
 **Pre-reqs:** Скрін поточного `Catalog.РабочийСтол.ФормаСписка` (`§5.1.2`) — user вкаже які 4-6 плиток найважливіші.
 **Acceptance:**
+
 - [ ] `apps/store/app/manager/(workstation)/layout.tsx` — двоколонковий desktop layout, mobile fallback Sheet
 - [ ] Sidebar nav: Dashboard, Клієнти, Товари, Замовлення, Реалізації, Каса, Маршрути, Чат, Нагадування, Налаштування. Items з permission gating (наприклад "Користувачі" — admin-only)
 - [ ] Header: user fullName, connection indicator (online/syncing/offline), notification bell (count), logout
@@ -98,9 +103,11 @@ V2: M2.1 returns, M2.2 presentations+viber, M2.3 reports, M2.4 reservations
 ---
 
 ### M1.3 — Clients (read-only) + детальна картка
+
 **Goal:** List+search+detail клієнтів з snapshot.
 **Pre-reqs:** Скріни `Catalog.Контрагенты.ФормаСписка` + `ФормаЭлемента` (борг, склади, асортимент, історія).
 **Acceptance:**
+
 - [ ] Migration `2026MMDD_mgr_clients_snapshot`: `mgr_clients`, `mgr_client_warehouses`, `mgr_client_assortment`, `mgr_client_timeline` (read-only mirror)
 - [ ] `services/manager-sync/__mocks__/clients-fixture.json` — 50 mock clients для dev (доки немає live SOAP)
 - [ ] `services/manager-sync/src/sync-clients.ts` — pure function-pulls дельт + writes snapshot
@@ -114,9 +121,11 @@ V2: M2.1 returns, M2.2 presentations+viber, M2.3 reports, M2.4 reservations
 ---
 
 ### M1.4 — Products + lots + ШК-сканер
+
 **Goal:** Список товарів, картка з характеристиками, пошук по name/article/barcode.
 **Pre-reqs:** Скріни `ФормаПодбораНоменклатуры` (`§5.4.2`) + `ХарактеристикиНоменклатуры.ФормаЭлемента` (`§5.11`).
 **Acceptance:**
+
 - [ ] Migration `2026MMDD_mgr_products_snapshot`: `mgr_products`, `mgr_lots`, `mgr_prices`, `mgr_balances`, `mgr_barcodes`
 - [ ] `services/manager-sync/src/sync-products.ts` (similar pattern як sync-clients)
 - [ ] `GET /api/v1/manager/products?search=&category=&barcode=&priceTypeId=`
@@ -130,9 +139,11 @@ V2: M2.1 returns, M2.2 presentations+viber, M2.3 reports, M2.4 reservations
 ---
 
 ### M1.5 — Order create + submit
+
 **Goal:** Document `Заказ` створення (full life-cycle: draft → submit → 1С-sync).
 **Pre-reqs:** Скрін `Document.Заказ.ФормаДокумента` + `§5.6 Workflow #1`.
 **Acceptance:**
+
 - [ ] Migration `2026MMDD_mgr_orders_outbox`: `mgr_orders`, `mgr_order_items`, `mgr_orders_outbox` (status pending/syncing/synced/failed)
 - [ ] Zod schema `mgrOrderCreateSchema` (clientId, items[], priceTypeId, comment, deliveryStatus, paymentStatus, cashOnDelivery, locationLat/Lng, otherSuppliers[])
 - [ ] `POST /api/v1/manager/orders` (idempotency-key header required, returns `{id, status: "pending"}`)
@@ -149,9 +160,11 @@ V2: M2.1 returns, M2.2 presentations+viber, M2.3 reports, M2.4 reservations
 ---
 
 ### M1.6 — Sales (РТУ) + payments
+
 **Goal:** Реалізація на базі Order + DataProcessor.Оплата + КассовыйОрдер.
 **Pre-reqs:** Скріни `Document.РеализацияТоваровУслуг`, `DataProcessor.Оплата` (`§5.5.1`), `Document.КассовыйОрдер`.
 **Acceptance:**
+
 - [ ] Migration `2026MMDD_mgr_sales_cash`: `mgr_sales`, `mgr_sale_items`, `mgr_cash_orders`
 - [ ] `POST /api/v1/manager/sales` (з optional orderId, items[], paymentStatus, courseEUR/USD)
 - [ ] `POST /api/v1/manager/sales/{id}/post` (проведення = SOAP)
@@ -164,9 +177,11 @@ V2: M2.1 returns, M2.2 presentations+viber, M2.3 reports, M2.4 reservations
 ---
 
 ### M1.7 — Routes (маршрутні листи) + кілометраж
+
 **Goal:** Document `МаршрутныйЛист` з orders-binding + start/end mileage.
 **Pre-reqs:** Скріни `Document.МаршрутныйЛист`, `ФормаВводаКілометражу` (`§5.4.4`), `§5.9 Workflow #4`.
 **Acceptance:**
+
 - [ ] Migration `2026MMDD_mgr_routes`: `mgr_routes`, `mgr_route_orders`, `mgr_mileage_log`
 - [ ] `POST /api/v1/manager/routes` (date, orderIds[])
 - [ ] `PATCH /api/v1/manager/routes/{id}/start` (записує mileage_start + GPS lat/lng)
@@ -179,9 +194,11 @@ V2: M2.1 returns, M2.2 presentations+viber, M2.3 reports, M2.4 reservations
 ---
 
 ### M1.8 — Internal chat (groups + DM)
+
 **Goal:** Менеджер-менеджер чат через SSE.
 **Pre-reqs:** Скрін `DataProcessor.Чат1с` (`§5.5.2`).
 **Acceptance:**
+
 - [ ] Migration `2026MMDD_mgr_chat`: `mgr_chat_groups`, `mgr_chat_group_members`, `mgr_chat_messages`, `mgr_chat_read_state`
 - [ ] `GET /api/v1/manager/chat/groups` (list + unread per group)
 - [ ] `GET /api/v1/manager/chat/groups/{id}/messages?since=&limit=`
@@ -196,9 +213,11 @@ V2: M2.1 returns, M2.2 presentations+viber, M2.3 reports, M2.4 reservations
 ---
 
 ### M1.9 — Reminders + geo logging
+
 **Goal:** Заплановані нагадування + фон GPS track.
 **Pre-reqs:** Скріни `DataProcessor.Нагадування` (`§5.5.3`), `Геопозиціювання` (`§5.13`).
 **Acceptance:**
+
 - [ ] Migration `2026MMDD_mgr_reminders_geo`: `mgr_reminders`, `mgr_geo_log`
 - [ ] `POST /api/v1/manager/reminders` (text, scheduledAt, recurrence, productId?, clientId?)
 - [ ] `PATCH /api/v1/manager/reminders/{id}` + `POST /done`
@@ -211,9 +230,11 @@ V2: M2.1 returns, M2.2 presentations+viber, M2.3 reports, M2.4 reservations
 ---
 
 ### M1.10 — Telegram bot extension (per-manager DM + commands)
+
 **Goal:** Розширити `services/telegram-bot` щоб надсилати DM конкретним менеджерам + accept commands.
 **Pre-reqs:** Поточний bot вже шле у спільний `TELEGRAM_CHAT_ID`. Цей session переключає його на per-manager DM при наявності `Manager.telegramChatId`.
 **Acceptance:**
+
 - [ ] Handler `/start_manager <token>` — exchange one-time token (із `Manager.telegramLinkToken`) на `chat_id` binding
 - [ ] Handler `/today` — list orders responsible_manager=me, today's
 - [ ] Handler `/debt <code>` — current debt for client
@@ -226,9 +247,11 @@ V2: M2.1 returns, M2.2 presentations+viber, M2.3 reports, M2.4 reservations
 ---
 
 ### M1.11 — Tauri 2 wrap для Windows + macOS
+
 **Goal:** Native installer що hosts our `/manager` web-app.
 **Pre-reqs:** M1.10 done (notification stack stable).
 **Acceptance:**
+
 - [ ] `apps/manager-desktop/` Tauri project (Rust ≥1.77, Tauri 2.x)
 - [ ] `tauri.conf.json` пакує static export `/manager/*` АБО embed-ить production URL через `tauri-plugin-shell`
 - [ ] Native menubar (File / Edit / View / Help, з shortcut keys)
@@ -245,9 +268,11 @@ V2: M2.1 returns, M2.2 presentations+viber, M2.3 reports, M2.4 reservations
 ---
 
 ### M1.12 — Offline mutation queue
+
 **Goal:** Якщо connectivity drops, мутації стають у чергу у IndexedDB і re-tryяться при відновленні.
 **Pre-reqs:** M1.5 (orders write-path).
 **Acceptance:**
+
 - [ ] `lib/offline-queue.ts` — IndexedDB store (idb wrapper), schema `{id, method, url, body, headers, attempts, createdAt, lastError}`
 - [ ] TanStack Query global `mutationFn` wrapper — на network-error → enqueue, на success → drain
 - [ ] `<OfflineQueueIndicator>` у header (badge з count + click → drawer з list/retry-all/discard)
@@ -259,15 +284,15 @@ V2: M2.1 returns, M2.2 presentations+viber, M2.3 reports, M2.4 reservations
 
 ### V2 (M2.x) — Out-of-scope для v1 launch
 
-| Session | Topic | Notes |
-|---|---|---|
-| M2.1 | Returns flow | `Возврат` + `ВозвратОтПокупателя` per §5.8 |
-| M2.2 | Presentations + Viber share | Шарінг товару у Viber per §5.10 + bot integration |
-| M2.3 | Reports (СКД-like) | Звіт продажів + наявності per §5.4.8 |
-| M2.4 | Reservation race-detection | Pessimistic lock на `mgr_lots` + UI conflict resolution |
-| M2.5 | iOS Tauri (if Apple Developer обзаведений) | Окрема target у CI matrix |
-| M2.6 | Bluetooth check-printer | Web Bluetooth API → ESC/POS protocol |
-| M2.7 | Multi-org support | Якщо L-TEX розширюється на додаткові регіони/компанії |
+| Session | Topic                                      | Notes                                                   |
+| ------- | ------------------------------------------ | ------------------------------------------------------- |
+| M2.1    | Returns flow                               | `Возврат` + `ВозвратОтПокупателя` per §5.8              |
+| M2.2    | Presentations + Viber share                | Шарінг товару у Viber per §5.10 + bot integration       |
+| M2.3    | Reports (СКД-like)                         | Звіт продажів + наявності per §5.4.8                    |
+| M2.4    | Reservation race-detection                 | Pessimistic lock на `mgr_lots` + UI conflict resolution |
+| M2.5    | iOS Tauri (if Apple Developer обзаведений) | Окрема target у CI matrix                               |
+| M2.6    | Bluetooth check-printer                    | Web Bluetooth API → ESC/POS protocol                    |
+| M2.7    | Multi-org support                          | Якщо L-TEX розширюється на додаткові регіони/компанії   |
 
 ---
 

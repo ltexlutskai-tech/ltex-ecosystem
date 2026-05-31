@@ -50,7 +50,12 @@ import sharp from "sharp";
 const buf = Buffer.from(await file.arrayBuffer());
 const optimized = await sharp(buf)
   .rotate() // honor EXIF orientation
-  .resize({ width: 1920, height: 1920, fit: "inside", withoutEnlargement: true })
+  .resize({
+    width: 1920,
+    height: 1920,
+    fit: "inside",
+    withoutEnlargement: true,
+  })
   .webp({ quality: 82 })
   .toBuffer();
 
