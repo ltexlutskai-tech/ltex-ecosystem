@@ -1,5 +1,9 @@
 import type { SyncConfig } from "../config";
-import { buildSoapAction, extractSoapReturn } from "./envelope";
+import {
+  buildBasicAuthHeader,
+  buildSoapAction,
+  extractSoapReturn,
+} from "./envelope";
 import type { PullSnapshotRequest, PullSnapshotResult } from "./pull-types";
 
 /**
@@ -43,6 +47,7 @@ export async function pullSnapshotViaSoap(
       headers: {
         "Content-Type": "text/xml; charset=utf-8",
         SOAPAction: buildSoapAction("СформуватиПакетДаннихJSON"),
+        ...buildBasicAuthHeader(config.onecHttpUser, config.onecHttpPassword),
       },
       body: envelope,
       signal: controller.signal,

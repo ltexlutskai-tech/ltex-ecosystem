@@ -14,6 +14,8 @@ const liveConfig: SyncConfig = {
   mockMode: false,
   onecUrl: "https://1c-test.local/ltex/ws/MobileExchange.1cws",
   onecPassword: "shared-secret",
+  onecHttpUser: undefined,
+  onecHttpPassword: undefined,
   onecTimeoutMs: 5000,
 };
 

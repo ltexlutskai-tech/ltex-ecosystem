@@ -1,5 +1,6 @@
 import type { SyncConfig } from "../config";
 import {
+  buildBasicAuthHeader,
   buildSoapAction,
   buildSoapEnvelope,
   extractSoapReturn,
@@ -68,6 +69,7 @@ export async function updateClientViaSoap(
       headers: {
         "Content-Type": "text/xml; charset=utf-8",
         SOAPAction: buildSoapAction(OP_CLIENT_UPDATE),
+        ...buildBasicAuthHeader(config.onecHttpUser, config.onecHttpPassword),
       },
       body: envelope,
       signal: controller.signal,
@@ -192,6 +194,7 @@ export async function createOrderViaSoap(
       headers: {
         "Content-Type": "text/xml; charset=utf-8",
         SOAPAction: buildSoapAction(OP_ORDER_CREATE),
+        ...buildBasicAuthHeader(config.onecHttpUser, config.onecHttpPassword),
       },
       body: envelope,
       signal: controller.signal,
@@ -278,6 +281,7 @@ export async function createPaymentViaSoap(
       headers: {
         "Content-Type": "text/xml; charset=utf-8",
         SOAPAction: buildSoapAction(OP_PAYMENT_CREATE),
+        ...buildBasicAuthHeader(config.onecHttpUser, config.onecHttpPassword),
       },
       body: envelope,
       signal: controller.signal,
@@ -365,6 +369,7 @@ export async function createRealizationViaSoap(
       headers: {
         "Content-Type": "text/xml; charset=utf-8",
         SOAPAction: buildSoapAction(OP_REALIZATION_CREATE),
+        ...buildBasicAuthHeader(config.onecHttpUser, config.onecHttpPassword),
       },
       body: envelope,
       signal: controller.signal,
@@ -459,6 +464,7 @@ export async function createCashOrderViaSoap(
       headers: {
         "Content-Type": "text/xml; charset=utf-8",
         SOAPAction: buildSoapAction(OP_CASH_ORDER_CREATE),
+        ...buildBasicAuthHeader(config.onecHttpUser, config.onecHttpPassword),
       },
       body: envelope,
       signal: controller.signal,
@@ -547,6 +553,7 @@ export async function createRouteSheetViaSoap(
       headers: {
         "Content-Type": "text/xml; charset=utf-8",
         SOAPAction: buildSoapAction(OP_ROUTE_SHEET_CREATE),
+        ...buildBasicAuthHeader(config.onecHttpUser, config.onecHttpPassword),
       },
       body: envelope,
       signal: controller.signal,

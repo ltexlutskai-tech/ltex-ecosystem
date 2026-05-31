@@ -24,6 +24,16 @@ const envSchema = z.object({
     .string()
     .optional()
     .or(z.literal("").transform(() => undefined)),
+  // HTTP Basic auth для Apache→1C (1С користувач, напр. `Тарас`).
+  // Окремо від ONEC_SOAP_PASSWORD (sync password у JSON).
+  ONEC_HTTP_USER: z
+    .string()
+    .optional()
+    .or(z.literal("").transform(() => undefined)),
+  ONEC_HTTP_PASSWORD: z
+    .string()
+    .optional()
+    .or(z.literal("").transform(() => undefined)),
   ONEC_SOAP_TIMEOUT_MS: z
     .string()
     .default("30000")
@@ -39,6 +49,8 @@ export interface SyncConfig {
   mockMode: boolean;
   onecUrl: string | undefined;
   onecPassword: string | undefined;
+  onecHttpUser: string | undefined;
+  onecHttpPassword: string | undefined;
   onecTimeoutMs: number;
 }
 
@@ -58,6 +70,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): SyncConfig {
     mockMode: parsed.SYNC_MOCK_MODE,
     onecUrl: parsed.ONEC_SOAP_URL,
     onecPassword: parsed.ONEC_SOAP_PASSWORD,
+    onecHttpUser: parsed.ONEC_HTTP_USER,
+    onecHttpPassword: parsed.ONEC_HTTP_PASSWORD,
     onecTimeoutMs: parsed.ONEC_SOAP_TIMEOUT_MS,
   };
 }

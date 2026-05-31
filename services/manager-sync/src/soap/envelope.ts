@@ -95,6 +95,20 @@ export function buildSoapEnvelope(params: BuildEnvelopeParams): string {
   );
 }
 
+/**
+ * Будує HTTP Basic auth header для Apache → 1C (1С користувач, напр. `Тарас`).
+ * Окремо від `ONEC_SOAP_PASSWORD` (sync password у JSON).
+ * Повертає `{}` коли credentials не задані (mock mode чи розробка).
+ */
+export function buildBasicAuthHeader(
+  user: string | undefined,
+  password: string | undefined,
+): Record<string, string> {
+  if (!user || !password) return {};
+  const token = Buffer.from(`${user}:${password}`, "utf-8").toString("base64");
+  return { Authorization: `Basic ${token}` };
+}
+
 export function buildSoapAction(_operation: string): string {
   // 1С приймає порожній SOAPAction (smoke-test через curl підтвердив).
   // Не можемо вкласти operation name бо у назві Cyrillic (`ОбновитиКлиентаJSON`

@@ -20,6 +20,7 @@
  */
 
 import type { SyncConfig } from "../config";
+import { buildBasicAuthHeader } from "./envelope";
 import type {
   ClosuresCloseRequest,
   ClosuresCloseResult,
@@ -107,7 +108,10 @@ async function callJsonOperation(
       method: "POST",
       headers: {
         "Content-Type": "text/xml; charset=utf-8",
-        SOAPAction: `"${ARM_NS}#MobileExchange:${operation}"`,
+        // Порожній SOAPAction — HTTP header не приймає Cyrillic, а 1С
+        // маршрутизує за element name у SOAP body (smoke-test підтвердив).
+        SOAPAction: `""`,
+        ...buildBasicAuthHeader(config.onecHttpUser, config.onecHttpPassword),
       },
       body: envelope,
       signal: controller.signal,

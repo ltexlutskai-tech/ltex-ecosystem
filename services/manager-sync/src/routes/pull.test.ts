@@ -10,6 +10,8 @@ const mockConfig: SyncConfig = {
   mockMode: true,
   onecUrl: undefined,
   onecPassword: undefined,
+  onecHttpUser: undefined,
+  onecHttpPassword: undefined,
   onecTimeoutMs: 5000,
 };
 
