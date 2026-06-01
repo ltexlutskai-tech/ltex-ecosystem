@@ -96,6 +96,19 @@ export async function updateClientViaSoap(
     );
   }
 
+  // Діагностика: лог raw-результату коли BSL повертає ok=false (бо стандартний
+  // pino-logger тільки HTTP-метадані бачить, а тіло — ні).
+  if (
+    parsed &&
+    typeof parsed === "object" &&
+    (parsed as Record<string, unknown>).ok === false
+  ) {
+    console.warn(
+      "[manager-sync] BSL returned ok=false для ОбновитиКлиентаJSON:",
+      JSON.stringify(parsed),
+    );
+  }
+
   return normalizeClientResult(parsed);
 }
 

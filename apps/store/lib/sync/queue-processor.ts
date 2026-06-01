@@ -64,6 +64,27 @@ export async function processSyncQueue(
         idempotencyKey: job.idempotencyKey,
         payload: job.payload as unknown,
       } as MgrSyncJob);
+
+      // HTTP 200 від manager-sync ще НЕ означає що 1С успішно прийняв запит.
+      // BSL може повернути {ok:false, error:{code,message}} при exception
+      // у бізнес-логіці (відсутні обов'язкові поля, FK не знайдено тощо).
+      // Витягуємо повідомлення помилки і кидаємо як звичайний sync-fail
+      // → retry/failed branch нижче.
+      if (result && result.ok === false) {
+        const errObj =
+          result.error && typeof result.error === "object"
+            ? (result.error as Record<string, unknown>)
+            : null;
+        const code = typeof errObj?.code === "string" ? errObj.code : "error";
+        const msg =
+          typeof errObj?.message === "string"
+            ? errObj.message
+            : typeof result.errorMessage === "string"
+              ? result.errorMessage
+              : "Sync failed";
+        throw new Error(`1C ${code}: ${msg}`);
+      }
+
       await prisma.mgrSyncJob.update({
         where: { id: job.id },
         data: {
