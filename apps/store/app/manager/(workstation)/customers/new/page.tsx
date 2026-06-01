@@ -22,6 +22,9 @@ export default async function NewClientPage() {
       </header>
       <CreateClientForm
         priceTypes={dictionaries.priceTypes}
+        searchChannels={dictionaries.channels}
+        categoriesTT={dictionaries.categoriesTT}
+        assortmentCodes={dictionaries.assortmentCodes}
         agents={dictionaries.agents}
         userRole={user.role}
       />

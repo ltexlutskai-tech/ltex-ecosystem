@@ -285,23 +285,40 @@ export async function POST(req: NextRequest) {
       { status: 403 },
     );
   }
+  if (data.initialComment && user.role !== "admin") {
+    return NextResponse.json(
+      { error: "Коментар при створенні доступний лише адміністратору" },
+      { status: 403 },
+    );
+  }
 
   const createData: Prisma.MgrClientCreateInput = {
     name: data.name,
-    code1C: data.code1C || null,
+    // code1C приходить автоматично з 1С після першого sync (queue-processor
+    // оновлює MgrClient.code1C з відповіді BSL `ОбновитиКлиентаJSON`).
     phonePrimary: data.phonePrimary || null,
     tradePointName: data.tradePointName || null,
     region: data.region || null,
     city: data.city || null,
+    novaPoshtaBranch: data.novaPoshtaBranch || null,
   };
 
-  if (data.priceTypeId) {
+  if (data.priceTypeId)
     createData.priceType = { connect: { id: data.priceTypeId } };
-  }
-  // Якщо admin не призначив агента — за замовчуванням сам non-admin creator стає
-  // власником клієнта (інакше manager не побачить власного нового клієнта).
+  if (data.searchChannelId)
+    createData.searchChannel = { connect: { id: data.searchChannelId } };
+  if (data.categoryTTId)
+    createData.categoryTT = { connect: { id: data.categoryTTId } };
+  if (data.primaryAssortmentId)
+    createData.primaryAssortment = {
+      connect: { id: data.primaryAssortmentId },
+    };
+
+  // Manager (будь-яка не-admin роль) → автоматично стає агентом самостворюваного
+  // клієнта. Admin може не вказати агента (agentUserId === undefined) — тоді
+  // клієнт лишається без агента (видимий тільки адмінам).
   const agentId =
-    data.agentUserId ?? (user.role !== "admin" ? user.id : undefined);
+    user.role !== "admin" ? user.id : (data.agentUserId ?? undefined);
   if (agentId) {
     createData.agent = { connect: { id: agentId } };
   }
@@ -321,6 +338,53 @@ export async function POST(req: NextRequest) {
         agent: true,
       },
     });
+
+    // Опційний admin-коментар → timeline entry kind="comment".
+    if (data.initialComment && user.role === "admin") {
+      await prisma.mgrClientTimelineEntry
+        .create({
+          data: {
+            clientId: created.id,
+            kind: "comment",
+            body: data.initialComment,
+            occurredAt: new Date(),
+            authorUserId: user.id,
+          },
+        })
+        .catch((e: unknown) => {
+          console.warn("[L-TEX] Failed to create initial comment", {
+            clientId: created.id,
+            error: e instanceof Error ? e.message : String(e),
+          });
+        });
+    }
+
+    // Admin призначив агента → одразу-видиме нагадування у дзвіночку менеджера.
+    if (
+      user.role === "admin" &&
+      data.agentUserId &&
+      data.agentUserId !== user.id
+    ) {
+      await prisma.mgrReminder
+        .create({
+          data: {
+            ownerUserId: data.agentUserId,
+            clientId: created.id,
+            body: `Адміністратор призначив вас на клієнта «${created.name}»${
+              data.initialComment ? `\n\nКоментар: ${data.initialComment}` : ""
+            }`,
+            remindAt: new Date(),
+            source: "manual",
+          },
+        })
+        .catch((e: unknown) => {
+          console.warn("[L-TEX] Failed to notify agent of new client", {
+            clientId: created.id,
+            agentUserId: data.agentUserId,
+            error: e instanceof Error ? e.message : String(e),
+          });
+        });
+    }
 
     // М3.5 — best-effort sync до 1С (mock або real залежно від SYNC_MOCK_MODE).
     enqueueClientUpdate(created, "create").catch((e: unknown) => {

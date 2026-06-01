@@ -132,7 +132,7 @@ describe("GET /api/v1/manager/clients/search-all", () => {
       where: { OR?: Array<Record<string, unknown>> };
     };
     expect(callArgs.where.OR).toBeDefined();
-    expect(callArgs.where.OR).toHaveLength(4);
+    expect(callArgs.where.OR).toHaveLength(6);
   });
 
   it("pagination — page=2&pageSize=10 → skip=10, take=10", async () => {

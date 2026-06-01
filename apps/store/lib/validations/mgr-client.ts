@@ -53,13 +53,19 @@ export type MgrClientPatchInput = z.infer<typeof mgrClientPatchSchema>;
 export const mgrClientCreateSchema = z
   .object({
     name: z.string().trim().min(1, "Введіть назву").max(255),
-    code1C: z.string().trim().max(50).optional(),
     phonePrimary: z.string().trim().max(50).optional(),
     tradePointName: z.string().trim().max(255).optional(),
     region: z.string().trim().max(100).optional(),
     city: z.string().trim().max(100).optional(),
+    novaPoshtaBranch: z.string().trim().max(50).optional(),
+    // FK довідники
     priceTypeId: z.string().min(1).max(50).optional(),
+    searchChannelId: z.string().min(1).max(50).optional(),
+    categoryTTId: z.string().min(1).max(50).optional(),
+    primaryAssortmentId: z.string().min(1).max(50).optional(),
+    // Admin-only
     agentUserId: z.string().min(1).max(50).optional(),
+    initialComment: z.string().trim().max(1000).optional(),
   })
   .strict();
 

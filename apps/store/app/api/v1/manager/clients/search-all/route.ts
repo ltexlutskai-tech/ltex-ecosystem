@@ -35,6 +35,8 @@ export async function GET(req: NextRequest) {
       { tradePointName: { contains: q, mode: "insensitive" } },
       { code1C: { contains: q, mode: "insensitive" } },
       { city: { contains: q, mode: "insensitive" } },
+      { phonePrimary: { contains: q } },
+      { phones: { some: { phone: { contains: q } } } },
     ];
   }
 

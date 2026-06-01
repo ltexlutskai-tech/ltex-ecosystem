@@ -58,7 +58,7 @@ export async function processSyncQueue(
 
   for (const job of jobs) {
     try {
-      await send({
+      const result = await send({
         entityType: job.entityType,
         entityId: job.entityId,
         idempotencyKey: job.idempotencyKey,
@@ -73,6 +73,26 @@ export async function processSyncQueue(
           lastError: null,
         },
       });
+      // BSL повертає `code1C` створеного/оновленого Контрагента — пишемо назад
+      // у MgrClient щоб UI бачив що клієнт уже у 1С + майбутні sync шли як
+      // update а не create.
+      if (
+        job.entityType === "client" &&
+        typeof result?.code1C === "string" &&
+        result.code1C.length > 0
+      ) {
+        await prisma.mgrClient
+          .update({
+            where: { id: job.entityId },
+            data: { code1C: result.code1C, lastSyncedAt: nowFn() },
+          })
+          .catch((e: unknown) => {
+            console.warn("[L-TEX] Failed to backfill code1C", {
+              clientId: job.entityId,
+              error: e instanceof Error ? e.message : String(e),
+            });
+          });
+      }
       sent++;
     } catch (err) {
       const message = (err as Error)?.message ?? String(err);

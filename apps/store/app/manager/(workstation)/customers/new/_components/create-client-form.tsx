@@ -1,37 +1,101 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Button, Input } from "@ltex/ui";
+import { Button, Input, Textarea } from "@ltex/ui";
 
 type DictItem = { id: string; code?: string; label?: string };
 type AgentItem = { id: string; fullName: string };
 
+interface DuplicateHit {
+  id: string;
+  name: string;
+  city: string | null;
+  agent: { id: string; fullName: string } | null;
+}
+
 interface Props {
-  priceTypes: { id: string; code: string; label: string }[];
+  priceTypes: DictItem[];
+  searchChannels: DictItem[];
+  categoriesTT: DictItem[];
+  assortmentCodes: DictItem[];
   agents: AgentItem[];
   userRole: "manager" | "senior_manager" | "admin";
 }
 
-export function CreateClientForm({ priceTypes, agents, userRole }: Props) {
+export function CreateClientForm({
+  priceTypes,
+  searchChannels,
+  categoriesTT,
+  assortmentCodes,
+  agents,
+  userRole,
+}: Props) {
   const router = useRouter();
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [phoneDuplicates, setPhoneDuplicates] = useState<DuplicateHit[]>([]);
   const [form, setForm] = useState({
     name: "",
-    code1C: "",
     phonePrimary: "",
     tradePointName: "",
     region: "",
     city: "",
+    novaPoshtaBranch: "",
     priceTypeId: "",
+    searchChannelId: "",
+    categoryTTId: "",
+    primaryAssortmentId: "",
     agentUserId: "",
+    initialComment: "",
   });
 
   function set<K extends keyof typeof form>(key: K, value: string) {
     setForm((f) => ({ ...f, [key]: value }));
   }
+
+  // Дебаунсована перевірка телефону — якщо знайдено хоч одного клієнта зі
+  // схожим номером (Code1C: 0978545991 збігається з +380978545991 тощо),
+  // показуємо warning з агентом.
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    const raw = form.phonePrimary.trim();
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    if (raw.length < 4) {
+      setPhoneDuplicates([]);
+      return;
+    }
+    // Прибираємо нецифрові символи для пошуку (бо у БД може бути різний формат).
+    const digits = raw.replace(/\D/g, "");
+    const query = digits.length >= 4 ? digits.slice(-9) : raw;
+    debounceRef.current = setTimeout(async () => {
+      try {
+        const res = await fetch(
+          `/api/v1/manager/clients/search-all?q=${encodeURIComponent(query)}&pageSize=5`,
+        );
+        if (!res.ok) {
+          setPhoneDuplicates([]);
+          return;
+        }
+        const data = await res.json();
+        const hits = Array.isArray(data.items) ? data.items : [];
+        setPhoneDuplicates(
+          hits.map((c: DuplicateHit) => ({
+            id: c.id,
+            name: c.name,
+            city: c.city,
+            agent: c.agent,
+          })),
+        );
+      } catch {
+        setPhoneDuplicates([]);
+      }
+    }, 400);
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, [form.phonePrimary]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -45,15 +109,24 @@ export function CreateClientForm({ priceTypes, agents, userRole }: Props) {
     setSubmitting(true);
     try {
       const body: Record<string, string> = { name: form.name.trim() };
-      if (form.code1C.trim()) body.code1C = form.code1C.trim();
       if (form.phonePrimary.trim())
         body.phonePrimary = form.phonePrimary.trim();
       if (form.tradePointName.trim())
         body.tradePointName = form.tradePointName.trim();
       if (form.region.trim()) body.region = form.region.trim();
       if (form.city.trim()) body.city = form.city.trim();
+      if (form.novaPoshtaBranch.trim())
+        body.novaPoshtaBranch = form.novaPoshtaBranch.trim();
       if (form.priceTypeId) body.priceTypeId = form.priceTypeId;
-      if (form.agentUserId) body.agentUserId = form.agentUserId;
+      if (form.searchChannelId) body.searchChannelId = form.searchChannelId;
+      if (form.categoryTTId) body.categoryTTId = form.categoryTTId;
+      if (form.primaryAssortmentId)
+        body.primaryAssortmentId = form.primaryAssortmentId;
+      if (userRole === "admin") {
+        if (form.agentUserId) body.agentUserId = form.agentUserId;
+        if (form.initialComment.trim())
+          body.initialComment = form.initialComment.trim();
+      }
 
       const res = await fetch("/api/v1/manager/clients", {
         method: "POST",
@@ -79,7 +152,7 @@ export function CreateClientForm({ priceTypes, agents, userRole }: Props) {
       onSubmit={handleSubmit}
       className="space-y-4 rounded-lg border border-gray-200 bg-white p-6 shadow-sm"
     >
-      <Field label="Назва *" required>
+      <Field label="Назва" required>
         <Input
           value={form.name}
           onChange={(e) => set("name", e.target.value)}
@@ -90,24 +163,41 @@ export function CreateClientForm({ priceTypes, agents, userRole }: Props) {
         />
       </Field>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <Field label="Код 1С">
-          <Input
-            value={form.code1C}
-            onChange={(e) => set("code1C", e.target.value)}
-            placeholder="наприклад 000005798"
-            maxLength={50}
-          />
-        </Field>
-        <Field label="Телефон">
-          <Input
-            value={form.phonePrimary}
-            onChange={(e) => set("phonePrimary", e.target.value)}
-            placeholder="+380501234567"
-            maxLength={50}
-          />
-        </Field>
-      </div>
+      <Field label="Телефон">
+        <Input
+          value={form.phonePrimary}
+          onChange={(e) => set("phonePrimary", e.target.value)}
+          placeholder="+380501234567"
+          maxLength={50}
+        />
+      </Field>
+
+      {phoneDuplicates.length > 0 && (
+        <div className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm">
+          <p className="font-medium text-amber-900">
+            ⚠ Клієнт з цим номером вже зареєстрований:
+          </p>
+          <ul className="mt-2 space-y-1">
+            {phoneDuplicates.map((c) => (
+              <li key={c.id}>
+                <Link
+                  href={`/manager/customers/${c.id}`}
+                  className="text-amber-900 underline hover:text-amber-700"
+                >
+                  {c.name}
+                </Link>
+                {c.city && <span className="text-amber-800"> · {c.city}</span>}
+                {c.agent && (
+                  <span className="text-amber-800">
+                    {" "}
+                    · Менеджер: {c.agent.fullName}
+                  </span>
+                )}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       <Field label="Назва торгової точки">
         <Input
@@ -137,31 +227,68 @@ export function CreateClientForm({ priceTypes, agents, userRole }: Props) {
         </Field>
       </div>
 
-      <Field label="Тип цін">
-        <SelectNative
-          value={form.priceTypeId}
-          onChange={(v) => set("priceTypeId", v)}
-          options={[
-            { value: "", label: "— не обрано —" },
-            ...priceTypes.map((p: DictItem) => ({
-              value: p.id,
-              label: p.label ?? p.code ?? p.id,
-            })),
-          ]}
+      <Field label="Відділення Нової Пошти">
+        <Input
+          value={form.novaPoshtaBranch}
+          onChange={(e) => set("novaPoshtaBranch", e.target.value)}
+          placeholder="№42"
+          maxLength={50}
         />
       </Field>
 
-      {userRole === "admin" && (
-        <Field label="Торговий агент">
-          <SelectNative
-            value={form.agentUserId}
-            onChange={(v) => set("agentUserId", v)}
-            options={[
-              { value: "", label: "— не обрано —" },
-              ...agents.map((a) => ({ value: a.id, label: a.fullName })),
-            ]}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <Field label="Тип цін">
+          <DictSelect
+            value={form.priceTypeId}
+            onChange={(v) => set("priceTypeId", v)}
+            items={priceTypes}
           />
         </Field>
+        <Field label="Канал пошуку">
+          <DictSelect
+            value={form.searchChannelId}
+            onChange={(v) => set("searchChannelId", v)}
+            items={searchChannels}
+          />
+        </Field>
+        <Field label="Категорія ТТ">
+          <DictSelect
+            value={form.categoryTTId}
+            onChange={(v) => set("categoryTTId", v)}
+            items={categoriesTT}
+          />
+        </Field>
+        <Field label="Асортимент">
+          <DictSelect
+            value={form.primaryAssortmentId}
+            onChange={(v) => set("primaryAssortmentId", v)}
+            items={assortmentCodes}
+          />
+        </Field>
+      </div>
+
+      {userRole === "admin" && (
+        <>
+          <Field label="Торговий агент">
+            <SelectNative
+              value={form.agentUserId}
+              onChange={(v) => set("agentUserId", v)}
+              options={[
+                { value: "", label: "— не обрано —" },
+                ...agents.map((a) => ({ value: a.id, label: a.fullName })),
+              ]}
+            />
+          </Field>
+          <Field label="Коментар для менеджера">
+            <Textarea
+              value={form.initialComment}
+              onChange={(e) => set("initialComment", e.target.value)}
+              placeholder="Контекст контакту, побажання клієнта, важливі деталі…"
+              maxLength={1000}
+              rows={3}
+            />
+          </Field>
+        </>
       )}
 
       {error && (
@@ -183,8 +310,8 @@ export function CreateClientForm({ priceTypes, agents, userRole }: Props) {
       </div>
 
       <p className="text-xs text-gray-500">
-        Після створення клієнт автоматично синхронізується з 1С (Контрагент
-        додасться/оновиться через кілька хвилин).
+        Після створення клієнт автоматично синхронізується з 1С (Код 1С
+        проставиться через кілька хвилин, коли Контрагент створиться у 1С базі).
       </p>
     </form>
   );
@@ -207,6 +334,30 @@ function Field({
       </span>
       {children}
     </label>
+  );
+}
+
+function DictSelect({
+  value,
+  onChange,
+  items,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  items: DictItem[];
+}) {
+  return (
+    <SelectNative
+      value={value}
+      onChange={onChange}
+      options={[
+        { value: "", label: "— не обрано —" },
+        ...items.map((d) => ({
+          value: d.id,
+          label: d.label ?? d.code ?? d.id,
+        })),
+      ]}
+    />
   );
 }
 
