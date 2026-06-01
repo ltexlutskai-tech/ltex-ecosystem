@@ -4,7 +4,7 @@ import Link from "next/link";
 import { Prisma, prisma } from "@ltex/db";
 import { Badge, Button } from "@ltex/ui";
 import { requireAdmin } from "@/lib/admin-auth";
-import { retrySyncJob } from "./actions";
+import { retrySyncJob, deleteSyncJob } from "./actions";
 
 const STATUS_FILTERS = [
   "all",
@@ -159,16 +159,33 @@ export default async function AdminSyncJobsPage({
                   </td>
                   <td className="px-4 py-3">
                     {job.status === "failed" || job.status === "retrying" ? (
-                      <form
-                        action={async () => {
-                          "use server";
-                          await retrySyncJob(job.id);
-                        }}
-                      >
-                        <Button type="submit" size="sm" variant="outline">
-                          Повторити
-                        </Button>
-                      </form>
+                      <div className="flex gap-2">
+                        <form
+                          action={async () => {
+                            "use server";
+                            await retrySyncJob(job.id);
+                          }}
+                        >
+                          <Button type="submit" size="sm" variant="outline">
+                            Повторити
+                          </Button>
+                        </form>
+                        <form
+                          action={async () => {
+                            "use server";
+                            await deleteSyncJob(job.id);
+                          }}
+                        >
+                          <Button
+                            type="submit"
+                            size="sm"
+                            variant="outline"
+                            className="text-red-600 hover:bg-red-50"
+                          >
+                            Видалити
+                          </Button>
+                        </form>
+                      </div>
                     ) : null}
                   </td>
                 </tr>

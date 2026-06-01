@@ -36,3 +36,16 @@ export async function retrySyncJob(id: string): Promise<void> {
 
   revalidatePath("/admin/sync-jobs");
 }
+
+/**
+ * Видалити job з черги (для отруєних testовими даними jobs які постійно
+ * фейлять і не критичні). Адмін підтверджує що клієнт у MgrClient збережений
+ * і sync можна пропустити.
+ */
+export async function deleteSyncJob(id: string): Promise<void> {
+  await requireAdmin();
+  await prisma.mgrSyncJob.delete({ where: { id } }).catch(() => {
+    // ignore — already deleted
+  });
+  revalidatePath("/admin/sync-jobs");
+}
