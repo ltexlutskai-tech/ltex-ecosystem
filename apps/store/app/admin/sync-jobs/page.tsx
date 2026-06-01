@@ -158,7 +158,7 @@ export default async function AdminSyncJobsPage({
                     )}
                   </td>
                   <td className="px-4 py-3">
-                    {job.status === "failed" ? (
+                    {job.status === "failed" || job.status === "retrying" ? (
                       <form
                         action={async () => {
                           "use server";
