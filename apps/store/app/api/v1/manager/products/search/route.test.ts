@@ -7,6 +7,7 @@ process.env.MANAGER_JWT_SECRET = VALID_SECRET;
 const { mockPrisma, getCurrentUserMock } = vi.hoisted(() => ({
   mockPrisma: {
     product: { findMany: vi.fn() },
+    orderItem: { findMany: vi.fn() },
   },
   getCurrentUserMock: vi.fn(),
 }));
@@ -35,6 +36,9 @@ const USER = {
 beforeEach(() => {
   vi.clearAllMocks();
   getCurrentUserMock.mockResolvedValue(USER);
+  // За замовчуванням нема активних замовлень — щоб не змінювати поведінку
+  // існуючих тестів. Окремий case нижче перевизначає mockResolvedValueOnce.
+  mockPrisma.orderItem.findMany.mockResolvedValue([]);
 });
 
 function req(qs: string): NextRequest {
@@ -101,5 +105,55 @@ describe("GET /api/v1/manager/products/search", () => {
     expect(json.items[0]?.priceUnit).toBe("kg");
     expect(json.items[0]?.prices).toHaveLength(2);
     expect(json.items[0]?.prices?.[0]?.priceType).toBe("wholesale");
+  });
+
+  it("додає activeClaim для товарів з активними замовленнями (Етап 1)", async () => {
+    mockPrisma.product.findMany.mockResolvedValueOnce([
+      {
+        id: "p1",
+        code1C: null,
+        articleCode: null,
+        name: "Прод 1",
+        slug: "p1",
+        priceUnit: "kg",
+        averageWeight: 20,
+        inStock: true,
+        prices: [],
+      },
+      {
+        id: "p2",
+        code1C: null,
+        articleCode: null,
+        name: "Прод 2",
+        slug: "p2",
+        priceUnit: "kg",
+        averageWeight: 25,
+        inStock: true,
+        prices: [],
+      },
+    ]);
+    mockPrisma.orderItem.findMany.mockResolvedValueOnce([
+      { productId: "p1", orderId: "o1", weight: 100, quantity: 5 },
+      { productId: "p1", orderId: "o2", weight: 80, quantity: 4 },
+      // p2 — без активних замовлень
+    ]);
+    const res = await GET(req("?q=Прод"));
+    const json = (await res.json()) as {
+      items: Array<{
+        id: string;
+        activeClaim: {
+          totalQuantity: number;
+          totalWeight: number;
+          ordersCount: number;
+        } | null;
+      }>;
+    };
+    expect(json.items).toHaveLength(2);
+    expect(json.items[0]?.activeClaim).toEqual({
+      totalQuantity: 9,
+      totalWeight: 180,
+      ordersCount: 2,
+    });
+    expect(json.items[1]?.activeClaim).toBeNull();
   });
 });

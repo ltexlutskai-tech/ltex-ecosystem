@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRef, useState } from "react";
 import type { PriceRow } from "@/lib/manager/prices";
 import { buildProductShareText } from "@/lib/manager/share-message";
+import { ProductClaimsBadge } from "./product-claims-panel";
 import { ProductRowMenu, type ProductRowMenuTarget } from "./product-row-menu";
 
 interface Props {
@@ -140,6 +141,13 @@ export function PricesList({ items, rateUah, sellerName }: Props) {
                     {row.hasVideo && (
                       <Badge className="bg-sky-600">Відео</Badge>
                     )}
+                    {row.claim ? (
+                      <ProductClaimsBadge
+                        totalQuantity={row.claim.totalQuantity}
+                        totalWeight={row.claim.totalWeight}
+                        ordersCount={row.claim.ordersCount}
+                      />
+                    ) : null}
                   </div>
                 </td>
                 <td className="px-4 py-2 align-top whitespace-nowrap text-gray-800">
@@ -193,9 +201,16 @@ export function PricesList({ items, rateUah, sellerName }: Props) {
                 {row.hasVideo && <Badge className="bg-sky-600">Відео</Badge>}
               </div>
             </div>
-            <div className="mt-1 flex flex-wrap gap-1 text-xs text-gray-500">
+            <div className="mt-1 flex flex-wrap items-center gap-1 text-xs text-gray-500">
               {row.articleCode && <span>Арт. {row.articleCode}</span>}
               {row.categoryName && <span>· {row.categoryName}</span>}
+              {row.claim ? (
+                <ProductClaimsBadge
+                  totalQuantity={row.claim.totalQuantity}
+                  totalWeight={row.claim.totalWeight}
+                  ordersCount={row.claim.ordersCount}
+                />
+              ) : null}
             </div>
             <div className="mt-2 flex items-center justify-between text-sm">
               <span className="text-gray-600">{formatRemaining(row)}</span>

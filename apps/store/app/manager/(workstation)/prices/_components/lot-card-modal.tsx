@@ -117,6 +117,12 @@ export function LotCardModal({ lotId, onClose, rateUah, sellerName }: Props) {
   const [bookClientId, setBookClientId] = useState<string | null>(null);
   const [bookUntil, setBookUntil] = useState<string>(defaultUntilDate());
   const [booking, setBooking] = useState(false);
+  // ── Активні замовлення на товар (Етап 1 блоку Замовлень) ──
+  const [claim, setClaim] = useState<{
+    totalQuantity: number;
+    totalWeight: number;
+    ordersCount: number;
+  } | null>(null);
 
   // Завантажуємо деталь лоту при відкритті.
   useEffect(() => {
@@ -141,6 +147,20 @@ export function LotCardModal({ lotId, onClose, rateUah, sellerName }: Props) {
         if (cancelled) return;
         setLot(loaded);
         setEdit(toEditState(loaded));
+        // Підтягуємо активні замовлення на цей товар (фон, не блокує UI).
+        fetch(`/api/v1/manager/products/${loaded.product.id}/active-claims`)
+          .then(async (res) => (res.ok ? res.json() : null))
+          .then((data) => {
+            if (cancelled || !data) return;
+            setClaim({
+              totalQuantity: data.totalQuantity,
+              totalWeight: data.totalWeight,
+              ordersCount: data.ordersCount,
+            });
+          })
+          .catch(() => {
+            // best-effort; мовчки ігноруємо
+          });
       })
       .catch(() => {
         if (!cancelled) setError("Не вдалося завантажити лот.");
@@ -275,6 +295,18 @@ export function LotCardModal({ lotId, onClose, rateUah, sellerName }: Props) {
 
         {lot && edit && (
           <div className="space-y-4 text-sm">
+            {/* ── Активні замовлення на товар (Етап 1 блоку Замовлень) ── */}
+            {claim && claim.totalQuantity > 0 ? (
+              <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                📋 На товар{" "}
+                <span className="font-medium">{lot.product.name}</span> вже
+                замовлено{" "}
+                <span className="font-medium">{claim.totalQuantity} шт</span> /{" "}
+                {claim.totalWeight} кг ({claim.ordersCount}{" "}
+                {claim.ordersCount === 1 ? "замовлення" : "замовлень"})
+              </div>
+            ) : null}
+
             {/* ── Read-only зведення (дані з 1С) ── */}
             <div className="grid gap-2 rounded-md border bg-gray-50 p-3 sm:grid-cols-2">
               <ReadOnlyRow label="Товар" value={lot.product.name} />

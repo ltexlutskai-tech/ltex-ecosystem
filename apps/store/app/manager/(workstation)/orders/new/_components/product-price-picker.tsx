@@ -229,6 +229,15 @@ export function ProductPricePicker({
                       {hasPrice ? "" : " · ціна вручну"}
                       {p.averageWeight ? ` · ~${p.averageWeight} кг/міш.` : ""}
                     </div>
+                    {p.activeClaim && p.activeClaim.totalQuantity > 0 ? (
+                      <div
+                        className="mt-1 inline-flex items-center gap-1 rounded-sm bg-amber-100 px-1.5 py-0.5 text-[11px] font-medium text-amber-900"
+                        title={`Активних замовлень: ${p.activeClaim.ordersCount}; сумарно ${p.activeClaim.totalWeight} кг`}
+                      >
+                        📋 вже замовлено {p.activeClaim.totalQuantity} шт /{" "}
+                        {p.activeClaim.totalWeight} кг
+                      </div>
+                    ) : null}
                   </div>
                 </div>
 

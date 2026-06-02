@@ -22,6 +22,13 @@ export interface ProductSummary {
   inStock: boolean;
   /** Усі записи Price товара — для перерахунку ціни рядка за типом цін. */
   prices: ProductPriceEntry[];
+  /** Сумарні активні замовлення на товар (Етап 1 блоку Замовлень), null коли
+   *  не запрошувалось АБО активних претензій нема. */
+  activeClaim?: {
+    totalQuantity: number;
+    totalWeight: number;
+    ordersCount: number;
+  } | null;
 }
 
 export interface LotSummary {
