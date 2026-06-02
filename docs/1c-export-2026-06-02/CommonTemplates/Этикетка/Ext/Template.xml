@@ -1,0 +1,439 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<document xmlns="http://v8.1c.ru/8.2/data/spreadsheet" xmlns:style="http://v8.1c.ru/8.1/data/ui/style" xmlns:v8="http://v8.1c.ru/8.1/data/core" xmlns:v8ui="http://v8.1c.ru/8.1/data/ui" xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+	<languageSettings>
+		<currentLanguage>ru</currentLanguage>
+		<defaultLanguage>ru</defaultLanguage>
+		<languageInfo>
+			<id>ru</id>
+			<code>Русский</code>
+			<description>Русский</description>
+		</languageInfo>
+	</languageSettings>
+	<columns>
+		<size>4</size>
+		<columnsItem>
+			<index>0</index>
+			<column>
+				<formatIndex>1</formatIndex>
+			</column>
+		</columnsItem>
+		<columnsItem>
+			<index>1</index>
+			<column>
+				<formatIndex>2</formatIndex>
+			</column>
+		</columnsItem>
+		<columnsItem>
+			<index>2</index>
+			<column>
+				<formatIndex>3</formatIndex>
+			</column>
+		</columnsItem>
+		<columnsItem>
+			<index>3</index>
+			<column>
+				<formatIndex>4</formatIndex>
+			</column>
+		</columnsItem>
+	</columns>
+	<rowsItem>
+		<index>0</index>
+		<row>
+			<formatIndex>5</formatIndex>
+			<c>
+				<c>
+					<f>0</f>
+				</c>
+			</c>
+			<c>
+				<c>
+					<f>0</f>
+					<tl/>
+				</c>
+			</c>
+		</row>
+	</rowsItem>
+	<rowsItem>
+		<index>1</index>
+		<row>
+			<formatIndex>6</formatIndex>
+			<c>
+				<c>
+					<f>0</f>
+				</c>
+			</c>
+			<c>
+				<c>
+					<f>7</f>
+				</c>
+			</c>
+			<c>
+				<c>
+					<f>8</f>
+				</c>
+			</c>
+		</row>
+	</rowsItem>
+	<rowsItem>
+		<index>2</index>
+		<row>
+			<formatIndex>9</formatIndex>
+			<c>
+				<c>
+					<f>0</f>
+				</c>
+			</c>
+			<c>
+				<c>
+					<f>0</f>
+					<tl/>
+				</c>
+			</c>
+		</row>
+	</rowsItem>
+	<rowsItem>
+		<index>3</index>
+		<row>
+			<formatIndex>10</formatIndex>
+			<c>
+				<i>1</i>
+				<c>
+					<f>11</f>
+				</c>
+			</c>
+		</row>
+	</rowsItem>
+	<rowsItem>
+		<index>4</index>
+		<row>
+			<formatIndex>6</formatIndex>
+			<c>
+				<c>
+					<f>0</f>
+				</c>
+			</c>
+			<c>
+				<c>
+					<f>12</f>
+				</c>
+			</c>
+		</row>
+	</rowsItem>
+	<rowsItem>
+		<index>5</index>
+		<row>
+			<formatIndex>13</formatIndex>
+			<c>
+				<i>1</i>
+				<c>
+					<f>0</f>
+					<tl/>
+				</c>
+			</c>
+		</row>
+	</rowsItem>
+	<rowsItem>
+		<index>7</index>
+		<row>
+			<empty>true</empty>
+		</row>
+	</rowsItem>
+	<drawing>
+		<drawingType>Line</drawingType>
+		<id>25</id>
+		<formatIndex>14</formatIndex>
+		<beginRow>5</beginRow>
+		<beginRowOffset>12</beginRowOffset>
+		<endRow>5</endRow>
+		<endRowOffset>11</endRowOffset>
+		<beginColumn>1</beginColumn>
+		<beginColumnOffset>3</beginColumnOffset>
+		<endColumn>2</endColumn>
+		<endColumnOffset>0</endColumnOffset>
+		<autoSize>false</autoSize>
+		<pictureSize>Stretch</pictureSize>
+		<zOrder>0</zOrder>
+	</drawing>
+	<drawing>
+		<drawingType>Line</drawingType>
+		<id>26</id>
+		<formatIndex>14</formatIndex>
+		<beginRow>2</beginRow>
+		<beginRowOffset>3</beginRowOffset>
+		<endRow>2</endRow>
+		<endRowOffset>459</endRowOffset>
+		<beginColumn>3</beginColumn>
+		<beginColumnOffset>9</beginColumnOffset>
+		<endColumn>3</endColumn>
+		<endColumnOffset>9</endColumnOffset>
+		<autoSize>false</autoSize>
+		<pictureSize>Stretch</pictureSize>
+		<zOrder>0</zOrder>
+	</drawing>
+	<drawing>
+		<drawingType>Object</drawingType>
+		<id>28</id>
+		<formatIndex>15</formatIndex>
+		<beginRow>2</beginRow>
+		<beginRowOffset>111</beginRowOffset>
+		<endRow>2</endRow>
+		<endRowOffset>192</endRowOffset>
+		<beginColumn>1</beginColumn>
+		<beginColumnOffset>3</beginColumnOffset>
+		<endColumn>1</endColumn>
+		<endColumnOffset>708</endColumnOffset>
+		<autoSize>false</autoSize>
+		<pictureSize>Stretch</pictureSize>
+		<zOrder>0</zOrder>
+		<object xsi:type="xs:base64Binary">FfGVHmJPBtQRlAAAgEjaEfnElcwu8ERKPHNErQew25BIrZ/Fiw6N6APEgc////8A
+IKsQjegDxIHBIKqN6QPIg4HMFKKLZKsKjegDxIHBICCjwZr7EwAAAgAAEwAAAAAA
+EwD///8ACwD//wgAGgAAADEAMgAzADQANQA2ADcAOAA5ADAAMQAyAAAAAwAAAAAA
+AwAAAAAAAwAAAAAAAwAAAAAAAwAeAAAAAwABAAAAAwAEAAAAAwAAAAAACQADUuML
+kY/OEZ3jAKoAS7hRAcwAAJABsDABAAxNUyBTaGVsbCBEbGcTAAAAAAALAAAACwAA
+AAsAAAALAP//CwD//wMAAgAAAAMAAAAAAAMAAAAAAAMAAQAAAAMABAAAAAMAAQAA
+AAgAHAAAADEAMgAzADQANQA2ADcAOAA5ADAAMQAyADgAAAADAC8YAAADALACAACp
+jS8YjbACwZtuEAEACQAAAzcIAAAGABwAAAAAAAMAAAAeAAUAAAALAgAAAAAFAAAA
+DAIhACQBBQAAAAIBAQAAAAUAAAACAQEAAAAIAAAA+gIAAAEAAAD///8ABAAAAC0B
+AAAHAAAA/AIAAP///wAAAAQAAAAtAQEADAAAACQDBAAAAAAAJAEAACQBIQAAACEA
+CAAAAPoCAAAAAAAAAAAAAAQAAAAtAQIABwAAAPwCAAD///8AAAAEAAAALQEDAAQA
+AADwAQAABAAAAPABAQAHAAAA/AIAAAAAAAAAAAQAAAAtAQAAFAAAAP8GAAAGAPYC
+AAAkAAEAAgAzAAAANQARAAIAAAARADMANQACAAUAAAAoAgEAAAAEAAAA8AEBAAQA
+AAAtAQMABAAAAPABAAAHAAAA/AIAAAAAAAAAAAQAAAAtAQAAFAAAAP8GAAAGAPYC
+AAAkAAEAAgA3AAAAOQARAAIAAAARADcAOQACAAUAAAAoAgEAAAAEAAAA8AEBAAQA
+AAAtAQMABAAAAPABAAAHAAAA/AIAAAAAAAAAAAQAAAAtAQAAFAAAAP8GAAAGAPYC
+AAAkAAEAAgA9AAAAPwARAAIAAAARAD0APwACAAUAAAAoAgEAAAAEAAAA8AEBAAQA
+AAAtAQMABAAAAPABAAAHAAAA/AIAAAAAAAAAAAQAAAAtAQAAFAAAAP8GAAAGAPYC
+AAAkAAEAAgBDAAAARwARAAIAAAARAEMARwACAAUAAAAoAgEAAAAEAAAA8AEBAAQA
+AAAtAQMABAAAAPABAAAHAAAA/AIAAAAAAAAAAAQAAAAtAQAAFAAAAP8GAAAGAPYC
+AAAkAAEAAgBJAAAAUQARAAIAAAARAEkAUQACAAUAAAAoAgEAAAAEAAAA8AEBAAQA
+AAAtAQMABAAAAPABAAAHAAAA/AIAAAAAAAAAAAQAAAAtAQAAFAAAAP8GAAAGAPYC
+AAAkAAEAAgBTAAAAVQARAAIAAAARAFMAVQACAAUAAAAoAgEAAAAEAAAA8AEBAAQA
+AAAtAQMABAAAAPABAAAHAAAA/AIAAAAAAAAAAAQAAAAtAQAAFAAAAP8GAAAGAPYC
+AAAkAAEAAgBZAAAAXwARAAIAAAARAFkAXwACAAUAAAAoAgEAAAAEAAAA8AEBAAQA
+AAAtAQMABAAAAPABAAAHAAAA/AIAAAAAAAAAAAQAAAAtAQAAFAAAAP8GAAAGAPYC
+AAAkAAEAAgBhAAAAYwARAAIAAAARAGEAYwACAAUAAAAoAgEAAAAEAAAA8AEBAAQA
+AAAtAQMABAAAAPABAAAHAAAA/AIAAAAAAAAAAAQAAAAtAQAAFAAAAP8GAAAGAPYC
+AAAkAAEAAgBlAAAAaQARAAIAAAARAGUAaQACAAUAAAAoAgEAAAAEAAAA8AEBAAQA
+AAAtAQMABAAAAPABAAAHAAAA/AIAAAAAAAAAAAQAAAAtAQAAFAAAAP8GAAAGAPYC
+AAAkAAEAAgBvAAAAcQARAAIAAAARAG8AcQACAAUAAAAoAgEAAAAEAAAA8AEBAAQA
+AAAtAQMABAAAAPABAAAHAAAA/AIAAAAAAAAAAAQAAAAtAQAAFAAAAP8GAAAGAPYC
+AAAkAAEAAgB5AAAAewARAAIAAAARAHkAewACAAUAAAAoAgEAAAAEAAAA8AEBAAQA
+AAAtAQMABAAAAPABAAAHAAAA/AIAAAAAAAAAAAQAAAAtAQAAFAAAAP8GAAAGAPYC
+AAAkAAEAAgB9AAAAfwARAAIAAAARAH0AfwACAAUAAAAoAgEAAAAEAAAA8AEBAAQA
+AAAtAQMABAAAAPABAAAHAAAA/AIAAAAAAAAAAAQAAAAtAQAAFAAAAP8GAAAGAPYC
+AAAkAAEAAgCDAAAAhQARAAIAAAARAIMAhQACAAUAAAAoAgEAAAAEAAAA8AEBAAQA
+AAAtAQMABAAAAPABAAAHAAAA/AIAAAAAAAAAAAQAAAAtAQAAFAAAAP8GAAAGAPYC
+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</object>
+	</drawing>
+	<templateMode>true</templateMode>
+	<height>6</height>
+	<vgRows>6</vgRows>
+	<namedItem xsi:type="NamedItemCells">
+		<name>Вес</name>
+		<area>
+			<type>Rectangle</type>
+			<beginRow>4</beginRow>
+			<endRow>4</endRow>
+			<beginColumn>1</beginColumn>
+			<endColumn>1</endColumn>
+		</area>
+	</namedItem>
+	<namedItem xsi:type="NamedItemDrawing">
+		<name>ГраницаСнизу</name>
+		<drawingID>25</drawingID>
+	</namedItem>
+	<namedItem xsi:type="NamedItemDrawing">
+		<name>ГраницаСправа</name>
+		<drawingID>26</drawingID>
+	</namedItem>
+	<namedItem xsi:type="NamedItemCells">
+		<name>Номенклатура</name>
+		<area>
+			<type>Rectangle</type>
+			<beginRow>1</beginRow>
+			<endRow>1</endRow>
+			<beginColumn>1</beginColumn>
+			<endColumn>1</endColumn>
+		</area>
+	</namedItem>
+	<namedItem xsi:type="NamedItemCells">
+		<name>ОбластьГраницаСнизу</name>
+		<area>
+			<type>Rectangle</type>
+			<beginRow>5</beginRow>
+			<endRow>5</endRow>
+			<beginColumn>1</beginColumn>
+			<endColumn>1</endColumn>
+		</area>
+	</namedItem>
+	<namedItem xsi:type="NamedItemCells">
+		<name>ОбластьГраницаСправа</name>
+		<area>
+			<type>Rectangle</type>
+			<beginRow>3</beginRow>
+			<endRow>3</endRow>
+			<beginColumn>3</beginColumn>
+			<endColumn>3</endColumn>
+		</area>
+	</namedItem>
+	<namedItem xsi:type="NamedItemCells">
+		<name>ОбластьГраницаСправа1</name>
+		<area>
+			<type>Rectangle</type>
+			<beginRow>2</beginRow>
+			<endRow>2</endRow>
+			<beginColumn>3</beginColumn>
+			<endColumn>3</endColumn>
+		</area>
+	</namedItem>
+	<namedItem xsi:type="NamedItemCells">
+		<name>ОбластьШтрихкод</name>
+		<area>
+			<type>Rectangle</type>
+			<beginRow>2</beginRow>
+			<endRow>2</endRow>
+			<beginColumn>1</beginColumn>
+			<endColumn>1</endColumn>
+		</area>
+	</namedItem>
+	<namedItem xsi:type="NamedItemCells">
+		<name>Цена</name>
+		<area>
+			<type>Rectangle</type>
+			<beginRow>3</beginRow>
+			<endRow>3</endRow>
+			<beginColumn>1</beginColumn>
+			<endColumn>1</endColumn>
+		</area>
+	</namedItem>
+	<namedItem xsi:type="NamedItemDrawing">
+		<name>Штрихкод</name>
+		<drawingID>28</drawingID>
+	</namedItem>
+	<line width="1" gap="false">
+		<v8ui:style xsi:type="v8ui:SpreadsheetDocumentDrawingLineType">DashDottedDotted</v8ui:style>
+	</line>
+	<line width="1" gap="false">
+		<v8ui:style xsi:type="v8ui:SpreadsheetDocumentDrawingLineType">None</v8ui:style>
+	</line>
+	<font faceName="Arial" height="18" bold="true" italic="false" underline="false" strikeout="false" kind="Absolute"/>
+	<font faceName="Arial" height="14" bold="true" italic="false" underline="false" strikeout="false" kind="Absolute"/>
+	<format>
+		<width>2</width>
+	</format>
+	<format>
+		<width>273</width>
+	</format>
+	<format>
+		<width>112</width>
+	</format>
+	<format>
+		<width>8</width>
+	</format>
+	<format>
+		<height>6</height>
+	</format>
+	<format>
+		<height>114</height>
+	</format>
+	<format>
+		<font>0</font>
+		<horizontalAlignment>Left</horizontalAlignment>
+		<verticalAlignment>Top</verticalAlignment>
+		<textPlacement>Wrap</textPlacement>
+	</format>
+	<format>
+		<font>1</font>
+		<horizontalAlignment>Right</horizontalAlignment>
+		<verticalAlignment>Top</verticalAlignment>
+		<textPlacement>Wrap</textPlacement>
+	</format>
+	<format>
+		<height>333</height>
+	</format>
+	<format>
+		<height>78</height>
+	</format>
+	<format>
+		<font>0</font>
+		<height>78</height>
+		<width>273</width>
+		<horizontalAlignment>Center</horizontalAlignment>
+		<verticalAlignment>Top</verticalAlignment>
+		<textPlacement>Wrap</textPlacement>
+	</format>
+	<format>
+		<font>0</font>
+		<horizontalAlignment>Center</horizontalAlignment>
+		<verticalAlignment>Top</verticalAlignment>
+	</format>
+	<format>
+		<height>21</height>
+	</format>
+	<format>
+		<drawingBorder>0</drawingBorder>
+		<verticalAlignment>Top</verticalAlignment>
+		<backColor>style:FieldBackColor</backColor>
+	</format>
+	<format>
+		<drawingBorder>1</drawingBorder>
+		<verticalAlignment>Top</verticalAlignment>
+		<backColor>style:FieldBackColor</backColor>
+	</format>
+</document>

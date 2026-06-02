@@ -1,0 +1,228 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<DataCompositionSchema xmlns="http://v8.1c.ru/8.1/data-composition-system/schema" xmlns:dcscom="http://v8.1c.ru/8.1/data-composition-system/common" xmlns:dcscor="http://v8.1c.ru/8.1/data-composition-system/core" xmlns:dcsset="http://v8.1c.ru/8.1/data-composition-system/settings" xmlns:v8="http://v8.1c.ru/8.1/data/core" xmlns:v8ui="http://v8.1c.ru/8.1/data/ui" xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+	<dataSource>
+		<name>ИсточникДанных1</name>
+		<dataSourceType>Local</dataSourceType>
+	</dataSource>
+	<dataSet xsi:type="DataSetQuery">
+		<name>НаборДанных1</name>
+		<field xsi:type="DataSetFieldField">
+			<dataPath>Описание</dataPath>
+			<field>Описание</field>
+		</field>
+		<field xsi:type="DataSetFieldField">
+			<dataPath>СсылкаНаYouTube</dataPath>
+			<field>СсылкаНаYouTube</field>
+		</field>
+		<field xsi:type="DataSetFieldField">
+			<dataPath>Період</dataPath>
+			<field>Період</field>
+			<title xsi:type="v8:LocalStringType">
+				<v8:item>
+					<v8:lang>ru</v8:lang>
+					<v8:content>Період</v8:content>
+				</v8:item>
+			</title>
+		</field>
+		<field xsi:type="DataSetFieldField">
+			<dataPath>ХарактеристикаНоменклатури</dataPath>
+			<field>ХарактеристикаНоменклатури</field>
+			<role>
+				<dcscom:dimension>true</dcscom:dimension>
+			</role>
+		</field>
+		<field xsi:type="DataSetFieldField">
+			<dataPath>Открыт</dataPath>
+			<field>Открыт</field>
+		</field>
+		<field xsi:type="DataSetFieldField">
+			<dataPath>ЕстьВидео</dataPath>
+			<field>ЕстьВидео</field>
+		</field>
+		<field xsi:type="DataSetFieldField">
+			<dataPath>Штрихкод</dataPath>
+			<field>Штрихкод</field>
+		</field>
+		<field xsi:type="DataSetFieldField">
+			<dataPath>Целевой</dataPath>
+			<field>Целевой</field>
+		</field>
+		<field xsi:type="DataSetFieldField">
+			<dataPath>Бронь</dataPath>
+			<field>Бронь</field>
+		</field>
+		<field xsi:type="DataSetFieldField">
+			<dataPath>ПериодБрони</dataPath>
+			<field>ПериодБрони</field>
+		</field>
+		<field xsi:type="DataSetFieldField">
+			<dataPath>Контрагент</dataPath>
+			<field>Контрагент</field>
+		</field>
+		<field xsi:type="DataSetFieldField">
+			<dataPath>Ефір</dataPath>
+			<field>Ефір</field>
+		</field>
+		<field xsi:type="DataSetFieldField">
+			<dataPath>ЕфірНаДоставку</dataPath>
+			<field>ЕфірНаДоставку</field>
+		</field>
+		<field xsi:type="DataSetFieldField">
+			<dataPath>Коментар</dataPath>
+			<field>Коментар</field>
+		</field>
+		<field xsi:type="DataSetFieldField">
+			<dataPath>СекторНаСкладі</dataPath>
+			<field>СекторНаСкладі</field>
+		</field>
+		<field xsi:type="DataSetFieldField">
+			<dataPath>Відповідальний</dataPath>
+			<field>Відповідальний</field>
+		</field>
+		<field xsi:type="DataSetFieldField">
+			<dataPath>Реєстратор</dataPath>
+			<field>Реєстратор</field>
+			<title xsi:type="v8:LocalStringType">
+				<v8:item>
+					<v8:lang>ru</v8:lang>
+					<v8:content>Реєстратор</v8:content>
+				</v8:item>
+			</title>
+		</field>
+		<dataSource>ИсточникДанных1</dataSource>
+		<query>ВЫБРАТЬ
+	Штрихкоды.Владелец,
+	Штрихкоды.ХарактеристикаНоменклатуры
+ПОМЕСТИТЬ Характеристика
+ИЗ
+	РегистрСведений.Штрихкоды КАК Штрихкоды
+ГДЕ
+	Штрихкоды.Штрихкод = &amp;Штрихкод
+;
+
+////////////////////////////////////////////////////////////////////////////////
+ВЫБРАТЬ
+	ІсторіяЗміниСтануМішка.Период КАК Період,
+	ІсторіяЗміниСтануМішка.Регистратор КАК Реєстратор,
+	ІсторіяЗміниСтануМішка.ХарактеристикаНоменклатури,
+	ІсторіяЗміниСтануМішка.Открыт,
+	ІсторіяЗміниСтануМішка.ЕстьВидео,
+	ІсторіяЗміниСтануМішка.Штрихкод,
+	ІсторіяЗміниСтануМішка.Целевой,
+	ІсторіяЗміниСтануМішка.СсылкаНаYouTube,
+	ІсторіяЗміниСтануМішка.Описание,
+	ІсторіяЗміниСтануМішка.Бронь,
+	ІсторіяЗміниСтануМішка.ПериодБрони,
+	ІсторіяЗміниСтануМішка.Контрагент,
+	ІсторіяЗміниСтануМішка.Ефір,
+	ІсторіяЗміниСтануМішка.ЕфірНаДоставку,
+	ІсторіяЗміниСтануМішка.Коментар,
+	ІсторіяЗміниСтануМішка.СекторНаСкладі,
+	ІсторіяЗміниСтануМішка.Відповідальний
+ИЗ
+	Характеристика КАК Характеристика
+		ЛЕВОЕ СОЕДИНЕНИЕ РегистрСведений.ІсторіяЗміниСтануМішка КАК ІсторіяЗміниСтануМішка
+		ПО Характеристика.ХарактеристикаНоменклатуры = ІсторіяЗміниСтануМішка.ХарактеристикаНоменклатури</query>
+	</dataSet>
+	<parameter>
+		<name>Штрихкод</name>
+		<title xsi:type="v8:LocalStringType">
+			<v8:item>
+				<v8:lang>ru</v8:lang>
+				<v8:content>Штрихкод</v8:content>
+			</v8:item>
+		</title>
+		<valueType>
+			<v8:TypeSet xmlns:d4p1="http://v8.1c.ru/8.1/data/enterprise/current-config">d4p1:Characteristic.ТипыШтрихкодов</v8:TypeSet>
+		</valueType>
+		<value xsi:nil="true"/>
+		<useRestriction>false</useRestriction>
+		<use>Always</use>
+	</parameter>
+	<settingsVariant>
+		<dcsset:name>Основной</dcsset:name>
+		<dcsset:presentation xsi:type="xs:string">Основний</dcsset:presentation>
+		<dcsset:settings xmlns:style="http://v8.1c.ru/8.1/data/ui/style" xmlns:sys="http://v8.1c.ru/8.1/data/ui/fonts/system" xmlns:web="http://v8.1c.ru/8.1/data/ui/colors/web" xmlns:win="http://v8.1c.ru/8.1/data/ui/colors/windows">
+			<dcsset:selection>
+				<dcsset:item xsi:type="dcsset:SelectedItemField">
+					<dcsset:field>Період</dcsset:field>
+				</dcsset:item>
+				<dcsset:item xsi:type="dcsset:SelectedItemField">
+					<dcsset:field>Відповідальний</dcsset:field>
+				</dcsset:item>
+				<dcsset:item xsi:type="dcsset:SelectedItemField">
+					<dcsset:field>ХарактеристикаНоменклатури</dcsset:field>
+				</dcsset:item>
+				<dcsset:item xsi:type="dcsset:SelectedItemField">
+					<dcsset:field>Реєстратор</dcsset:field>
+				</dcsset:item>
+				<dcsset:item xsi:type="dcsset:SelectedItemField">
+					<dcsset:field>Штрихкод</dcsset:field>
+				</dcsset:item>
+				<dcsset:item xsi:type="dcsset:SelectedItemField">
+					<dcsset:field>Бронь</dcsset:field>
+				</dcsset:item>
+				<dcsset:item xsi:type="dcsset:SelectedItemField">
+					<dcsset:field>ПериодБрони</dcsset:field>
+				</dcsset:item>
+				<dcsset:item xsi:type="dcsset:SelectedItemField">
+					<dcsset:field>ЕстьВидео</dcsset:field>
+				</dcsset:item>
+				<dcsset:item xsi:type="dcsset:SelectedItemField">
+					<dcsset:field>Ефір</dcsset:field>
+				</dcsset:item>
+				<dcsset:item xsi:type="dcsset:SelectedItemField">
+					<dcsset:field>ЕфірНаДоставку</dcsset:field>
+				</dcsset:item>
+				<dcsset:item xsi:type="dcsset:SelectedItemField">
+					<dcsset:field>Коментар</dcsset:field>
+				</dcsset:item>
+				<dcsset:item xsi:type="dcsset:SelectedItemField">
+					<dcsset:field>Контрагент</dcsset:field>
+				</dcsset:item>
+				<dcsset:item xsi:type="dcsset:SelectedItemField">
+					<dcsset:field>Описание</dcsset:field>
+				</dcsset:item>
+				<dcsset:item xsi:type="dcsset:SelectedItemField">
+					<dcsset:field>Открыт</dcsset:field>
+				</dcsset:item>
+				<dcsset:item xsi:type="dcsset:SelectedItemField">
+					<dcsset:field>СекторНаСкладі</dcsset:field>
+				</dcsset:item>
+				<dcsset:item xsi:type="dcsset:SelectedItemField">
+					<dcsset:field>СсылкаНаYouTube</dcsset:field>
+				</dcsset:item>
+				<dcsset:item xsi:type="dcsset:SelectedItemField">
+					<dcsset:field>Целевой</dcsset:field>
+				</dcsset:item>
+			</dcsset:selection>
+			<dcsset:filter>
+				<dcsset:item xsi:type="dcsset:FilterItemComparison">
+					<dcsset:use>false</dcsset:use>
+					<dcsset:left xsi:type="dcscor:Field">ХарактеристикаНоменклатури</dcsset:left>
+					<dcsset:comparisonType>Equal</dcsset:comparisonType>
+				</dcsset:item>
+			</dcsset:filter>
+			<dcsset:dataParameters>
+				<dcscor:item xsi:type="dcsset:SettingsParameterValue">
+					<dcscor:parameter>Штрихкод</dcscor:parameter>
+					<dcscor:value xsi:type="xs:string"/>
+				</dcscor:item>
+			</dcsset:dataParameters>
+			<dcsset:order>
+				<dcsset:item xsi:type="dcsset:OrderItemField">
+					<dcsset:field>Період</dcsset:field>
+					<dcsset:orderType>Asc</dcsset:orderType>
+				</dcsset:item>
+			</dcsset:order>
+			<dcsset:item xsi:type="dcsset:StructureItemGroup">
+				<dcsset:order>
+					<dcsset:item xsi:type="dcsset:OrderItemAuto"/>
+				</dcsset:order>
+				<dcsset:selection>
+					<dcsset:item xsi:type="dcsset:SelectedItemAuto"/>
+				</dcsset:selection>
+			</dcsset:item>
+		</dcsset:settings>
+	</settingsVariant>
+</DataCompositionSchema>

@@ -1,0 +1,33 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<PredefinedData xmlns="http://v8.1c.ru/8.3/xcf/predef" xmlns:v8="http://v8.1c.ru/8.1/data/core" xmlns:xr="http://v8.1c.ru/8.3/xcf/readable" xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="CatalogPredefinedItems" version="2.7">
+	<Item id="3e2e32d0-88fb-4531-ab71-def1d98431d5">
+		<Name>Доставка</Name>
+		<Code>000000003</Code>
+		<Description>Доставка</Description>
+		<IsFolder>false</IsFolder>
+	</Item>
+	<Item id="7894e767-5276-4e35-b0c4-7a7d7cf3b7a0">
+		<Name>Доставка_Пошта</Name>
+		<Code>000000004</Code>
+		<Description>Доставка / Пошта</Description>
+		<IsFolder>false</IsFolder>
+	</Item>
+	<Item id="78ab0d20-77cf-40df-8778-7194f399bb65">
+		<Name>Доставка_Самовивіз</Name>
+		<Code>000000005</Code>
+		<Description>Доставка / Самовивіз</Description>
+		<IsFolder>false</IsFolder>
+	</Item>
+	<Item id="504a0ad9-baef-4620-b5b4-645a5289825f">
+		<Name>Пошта</Name>
+		<Code>000000001</Code>
+		<Description>Пошта</Description>
+		<IsFolder>false</IsFolder>
+	</Item>
+	<Item id="ff47dbc2-057c-4a7c-9fcd-abf2b1db99b8">
+		<Name>Самовивіз</Name>
+		<Code>000000002</Code>
+		<Description>Самовивіз</Description>
+		<IsFolder>false</IsFolder>
+	</Item>
+</PredefinedData>

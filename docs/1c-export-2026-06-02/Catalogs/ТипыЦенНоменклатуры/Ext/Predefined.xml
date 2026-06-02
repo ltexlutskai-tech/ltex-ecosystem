@@ -1,0 +1,21 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<PredefinedData xmlns="http://v8.1c.ru/8.3/xcf/predef" xmlns:v8="http://v8.1c.ru/8.1/data/core" xmlns:xr="http://v8.1c.ru/8.3/xcf/readable" xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="CatalogPredefinedItems" version="2.7">
+	<Item id="20e02560-a93c-410f-84ff-4bf7a1a942b2">
+		<Name>ПродажБезАкций</Name>
+		<Code>000000004</Code>
+		<Description>Акційна (кг)</Description>
+		<IsFolder>false</IsFolder>
+	</Item>
+	<Item id="978d2fae-2fd1-42be-92c6-883ea0521ff3">
+		<Name>ЦенаЗакупкиВес</Name>
+		<Code>000000001</Code>
+		<Description>Цена закупки (кг)</Description>
+		<IsFolder>false</IsFolder>
+	</Item>
+	<Item id="c94e329c-200e-4f15-bd04-c42df13141a4">
+		<Name>ЦенаПродажиВес</Name>
+		<Code>000000002</Code>
+		<Description>Цена продажи (кг)</Description>
+		<IsFolder>false</IsFolder>
+	</Item>
+</PredefinedData>
