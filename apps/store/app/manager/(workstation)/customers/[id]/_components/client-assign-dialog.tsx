@@ -19,7 +19,15 @@ interface ManagerOption {
   id: string;
   email: string;
   fullName: string;
-  role: "manager" | "senior_manager" | "admin";
+  role:
+    | "manager"
+    | "senior_manager"
+    | "admin"
+    | "owner"
+    | "supervisor"
+    | "analyst"
+    | "warehouse"
+    | "bookkeeper";
   isActive: boolean;
 }
 

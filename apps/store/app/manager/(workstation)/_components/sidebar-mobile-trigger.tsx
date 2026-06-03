@@ -7,6 +7,8 @@ import type { ManagerRole } from "@/lib/auth/jwt";
 import { ChatUnreadBadge } from "./chat-unread-badge";
 import { SidebarNavLink } from "./sidebar-nav-link";
 import {
+  ADMIN_AUDIT_LINK,
+  ADMIN_PERMISSIONS_LINK,
   ADMIN_REGION_AGENTS_LINK,
   ADMIN_USERS_LINK,
   CHAT_LINK,
@@ -67,6 +69,22 @@ export function SidebarMobileTrigger({ role }: { role: ManagerRole }) {
                 href={ADMIN_REGION_AGENTS_LINK.href}
                 label={ADMIN_REGION_AGENTS_LINK.label}
                 icon={iconFor(ADMIN_REGION_AGENTS_LINK)}
+                onNavigate={close}
+              />
+            </>
+          )}
+          {(role === "admin" || role === "owner") && (
+            <>
+              <SidebarNavLink
+                href={ADMIN_PERMISSIONS_LINK.href}
+                label={ADMIN_PERMISSIONS_LINK.label}
+                icon={iconFor(ADMIN_PERMISSIONS_LINK)}
+                onNavigate={close}
+              />
+              <SidebarNavLink
+                href={ADMIN_AUDIT_LINK.href}
+                label={ADMIN_AUDIT_LINK.label}
+                icon={iconFor(ADMIN_AUDIT_LINK)}
                 onNavigate={close}
               />
             </>

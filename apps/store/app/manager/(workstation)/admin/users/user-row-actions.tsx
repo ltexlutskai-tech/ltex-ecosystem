@@ -5,7 +5,15 @@ import { useRouter } from "next/navigation";
 import { Button, useToast } from "@ltex/ui";
 import type { ManagerUserRow } from "./users-table";
 
-type Role = "manager" | "senior_manager" | "admin";
+type Role =
+  | "manager"
+  | "senior_manager"
+  | "admin"
+  | "owner"
+  | "supervisor"
+  | "analyst"
+  | "warehouse"
+  | "bookkeeper";
 
 const ROLE_OPTIONS: { value: Role; label: string }[] = [
   { value: "manager", label: "Менеджер" },

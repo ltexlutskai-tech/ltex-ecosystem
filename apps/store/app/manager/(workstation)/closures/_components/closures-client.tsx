@@ -27,7 +27,15 @@ export function ClosuresClient({
   userRole,
 }: {
   currentUserId: string;
-  userRole: "admin" | "manager" | "senior_manager";
+  userRole:
+    | "admin"
+    | "manager"
+    | "senior_manager"
+    | "owner"
+    | "supervisor"
+    | "analyst"
+    | "warehouse"
+    | "bookkeeper";
 }) {
   const [clientId, setClientId] = useState<string | null>(null);
   const [clientSummary, setClientSummary] = useState<ClientPickerItem | null>(

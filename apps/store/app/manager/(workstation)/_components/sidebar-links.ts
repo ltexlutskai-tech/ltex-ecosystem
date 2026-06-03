@@ -10,7 +10,9 @@ import {
   Map,
   MapPin,
   MessageCircle,
+  ScrollText,
   Settings,
+  ShieldCheck,
   Truck,
   UserCog,
   Users,
@@ -68,6 +70,19 @@ export const ADMIN_REGION_AGENTS_LINK: SidebarLink = {
   href: "/manager/admin/region-agents",
   label: "Регіони менеджерів",
   icon: MapPin,
+};
+
+// ── Тиждень 1 блоку Ролі (2026-06-03) ────────────────────────────────────
+export const ADMIN_AUDIT_LINK: SidebarLink = {
+  href: "/manager/admin/audit",
+  label: "Журнал дій",
+  icon: ScrollText,
+};
+
+export const ADMIN_PERMISSIONS_LINK: SidebarLink = {
+  href: "/manager/admin/permissions",
+  label: "Матриця прав",
+  icon: ShieldCheck,
 };
 
 export const SETTINGS_LINK: SidebarLink = {

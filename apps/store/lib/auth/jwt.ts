@@ -9,7 +9,16 @@ const ALG = "HS256";
 const ACCESS_TTL_SEC = 15 * 60; // 15 хв
 const REFRESH_TTL_SEC = 30 * 24 * 60 * 60; // 30 днів
 
-export type ManagerRole = "manager" | "senior_manager" | "admin";
+export type ManagerRole =
+  | "manager"
+  | "senior_manager"
+  | "admin"
+  // Розширення (Тиждень 1 блоку Ролі, 2026-06-03)
+  | "owner"
+  | "supervisor"
+  | "analyst"
+  | "warehouse"
+  | "bookkeeper";
 
 export interface AccessTokenPayload {
   sub: string; // userId

@@ -685,6 +685,21 @@ enum UserRole {
   manager
   senior_manager
   admin
+  // ── Розширення (Тиждень 1 блоку Ролі, 2026-06-03) ─────────────────────────
+  // Власник бізнесу — повний доступ + усі дії логуються в `audit_logs` з
+  // is_owner_action=true для окремого фільтру у admin-UI.
+  owner
+  // Старший менеджер — бачить ВСІ замовлення усіх менеджерів + Telegram-
+  // сповіщення про прострочені (Етап 3 блоку Замовлень).
+  supervisor
+  // Аналітик — read-only до фінансів/звітів, повний доступ до експорту.
+  analyst
+  // Складський працівник — приймає товар (Поступлення), генерує лоти,
+  // готує замовлення до відвантаження. Без цін закупки і маржі.
+  warehouse
+  // Бухгалтер — каса/банк/оплати/взаєморозрахунки. Без редагування товарів/
+  // клієнтів/замовлень.
+  bookkeeper
 }
 
 model User {
@@ -714,6 +729,11 @@ model User {
   failedLoginCount Int       @default(0) @map("failed_login_count")
   lockedUntil      DateTime? @map("locked_until")
 
+  // Per-user permission overrides (← Тиждень 1 блоку Ролі). NULL = успадковує
+  // дефолти ролі з `lib/permissions/role-permissions.ts`. Структура:
+  // `{ "<resource>": { "view": bool, "create": bool, "edit": bool, ... } }`.
+  permissions Json?
+
   refreshTokens        UserRefreshToken[]
   passwordResets       PasswordResetToken[]
   assignedClients      ClientAssignment[]
@@ -726,8 +746,39 @@ model User {
   chatConversations    ChatConversation[]       @relation("ChatConversationAgent")
   chatInboxMessages    ChatInboxMessage[]       @relation("ChatInboxMessageAuthor")
   regionAgents         MgrRegionAgent[]         @relation("RegionAgentUser")
+  auditLogs            AuditLog[]               @relation("AuditLogUser")
 
   @@map("users")
+}
+
+// ─── Audit Log (← Тиждень 1 блоку Ролі, 2026-06-03) ────────────────────────
+// Універсальна таблиця подій усієї системи. Кожна мутаційна дія
+// (create/update/delete у будь-якій моделі) пише сюди один запис.
+// Для дій власника (`role = owner`) додатково ставиться `isOwnerAction=true`
+// — для швидкого фільтру у admin-UI `/manager/admin/audit?ownerOnly=true`.
+// Запис ніколи не редагується після створення (append-only журнал).
+model AuditLog {
+  id            String   @id @default(cuid())
+  userId        String?  @map("user_id")
+  userEmail     String?  @map("user_email")
+  userRole      String   @map("user_role")
+  action        String // create / update / delete / login / logout / failed_login / ...
+  resource      String // order / client / lot / payment / receiving / ...
+  resourceId    String?  @map("resource_id")
+  summary       String?
+  dataBefore    Json?    @map("data_before")
+  dataAfter     Json?    @map("data_after")
+  ip            String?
+  userAgent     String?  @map("user_agent")
+  isOwnerAction Boolean  @default(false) @map("is_owner_action")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  user User? @relation("AuditLogUser", fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([createdAt(sort: Desc)])
+  @@index([userId])
+  @@index([resource, resourceId])
+  @@map("audit_logs")
 }
 
 model UserRefreshToken {
