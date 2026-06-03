@@ -15,6 +15,7 @@ import {
   PRIMARY_LINKS,
   SECONDARY_LINKS,
   SETTINGS_LINK,
+  WAREHOUSE_RECEIVINGS_LINK,
   type SidebarLink,
 } from "./sidebar-links";
 
@@ -56,6 +57,14 @@ export function SidebarMobileTrigger({ role }: { role: ManagerRole }) {
             badgeSlot={<ChatUnreadBadge />}
             onNavigate={close}
           />
+          {(role === "warehouse" || role === "admin" || role === "owner") && (
+            <SidebarNavLink
+              href={WAREHOUSE_RECEIVINGS_LINK.href}
+              label={WAREHOUSE_RECEIVINGS_LINK.label}
+              icon={iconFor(WAREHOUSE_RECEIVINGS_LINK)}
+              onNavigate={close}
+            />
+          )}
           <Separator />
           {role === "admin" && (
             <>

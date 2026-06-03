@@ -10,6 +10,7 @@ import {
   Map,
   MapPin,
   MessageCircle,
+  PackagePlus,
   ScrollText,
   Settings,
   ShieldCheck,
@@ -70,6 +71,13 @@ export const ADMIN_REGION_AGENTS_LINK: SidebarLink = {
   href: "/manager/admin/region-agents",
   label: "Регіони менеджерів",
   icon: MapPin,
+};
+
+// ── Тиждень 2 блоку Поступлення (2026-06-04) ─────────────────────────────
+export const WAREHOUSE_RECEIVINGS_LINK: SidebarLink = {
+  href: "/manager/receivings",
+  label: "Поступлення",
+  icon: PackagePlus,
 };
 
 // ── Тиждень 1 блоку Ролі (2026-06-03) ────────────────────────────────────

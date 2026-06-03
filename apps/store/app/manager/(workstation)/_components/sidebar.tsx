@@ -10,6 +10,7 @@ import {
   PRIMARY_LINKS,
   SECONDARY_LINKS,
   SETTINGS_LINK,
+  WAREHOUSE_RECEIVINGS_LINK,
   renderLinkIcon,
   type SidebarLink,
 } from "./sidebar-links";
@@ -27,6 +28,13 @@ export function ManagerSidebar({ role }: { role: ManagerRole }) {
         icon={renderLinkIcon(CHAT_LINK)}
         badgeSlot={<ChatUnreadBadge />}
       />
+      {(role === "warehouse" || role === "admin" || role === "owner") && (
+        <SidebarNavLink
+          href={WAREHOUSE_RECEIVINGS_LINK.href}
+          label={WAREHOUSE_RECEIVINGS_LINK.label}
+          icon={renderLinkIcon(WAREHOUSE_RECEIVINGS_LINK)}
+        />
+      )}
       <Separator />
       {role === "admin" && (
         <>
