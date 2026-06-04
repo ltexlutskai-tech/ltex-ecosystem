@@ -8,6 +8,7 @@ import {
   ADMIN_USERS_LINK,
   CHAT_LINK,
   PRIMARY_LINKS,
+  REPORTS_LINK,
   SECONDARY_LINKS,
   SETTINGS_LINK,
   WAREHOUSE_RECEIVINGS_LINK,
@@ -33,6 +34,17 @@ export function ManagerSidebar({ role }: { role: ManagerRole }) {
           href={WAREHOUSE_RECEIVINGS_LINK.href}
           label={WAREHOUSE_RECEIVINGS_LINK.label}
           icon={renderLinkIcon(WAREHOUSE_RECEIVINGS_LINK)}
+        />
+      )}
+      {(role === "analyst" ||
+        role === "admin" ||
+        role === "owner" ||
+        role === "supervisor" ||
+        role === "bookkeeper") && (
+        <SidebarNavLink
+          href={REPORTS_LINK.href}
+          label={REPORTS_LINK.label}
+          icon={renderLinkIcon(REPORTS_LINK)}
         />
       )}
       <Separator />

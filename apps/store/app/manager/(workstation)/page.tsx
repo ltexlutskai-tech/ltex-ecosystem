@@ -5,6 +5,7 @@ import { getFinanceStats, type PeriodPreset } from "@/lib/finance/owner-stats";
 import { getBookkeeperStats } from "@/lib/finance/bookkeeper-stats";
 import { getSupervisorStats } from "@/lib/finance/supervisor-stats";
 import { BookkeeperDashboard } from "./_components/bookkeeper-dashboard";
+import { AnalystDashboard } from "./_components/analyst-dashboard";
 import { DashboardCurrencyRow } from "./_components/dashboard-currency-row";
 import { DashboardGreeting } from "./_components/dashboard-greeting";
 import { DashboardStatsRow } from "./_components/dashboard-stats-row";
@@ -103,6 +104,20 @@ export default async function WorkstationDashboard({
     return (
       <div className="mx-auto max-w-6xl">
         <SupervisorDashboard
+          fullName={user.fullName}
+          stats={stats}
+          currentPreset={preset}
+        />
+      </div>
+    );
+  }
+
+  // ─── Analyst: аналітичний дашборд зі звітами (← Тиждень 5) ───────────────
+  if (user.role === "analyst") {
+    const stats = await getFinanceStats(preset);
+    return (
+      <div className="mx-auto max-w-6xl">
+        <AnalystDashboard
           fullName={user.fullName}
           stats={stats}
           currentPreset={preset}

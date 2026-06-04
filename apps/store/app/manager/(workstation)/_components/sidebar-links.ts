@@ -11,6 +11,7 @@ import {
   MapPin,
   MessageCircle,
   PackagePlus,
+  PieChart,
   ScrollText,
   Settings,
   ShieldCheck,
@@ -71,6 +72,13 @@ export const ADMIN_REGION_AGENTS_LINK: SidebarLink = {
   href: "/manager/admin/region-agents",
   label: "Регіони менеджерів",
   icon: MapPin,
+};
+
+// ── Тиждень 5 блоку Ролі (Analyst) ──────────────────────────────────────
+export const REPORTS_LINK: SidebarLink = {
+  href: "/manager/reports/sales-by-client",
+  label: "Звіти",
+  icon: PieChart,
 };
 
 // ── Тиждень 2 блоку Поступлення (2026-06-04) ─────────────────────────────
