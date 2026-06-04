@@ -19,6 +19,11 @@ const ROLE_OPTIONS: { value: Role; label: string }[] = [
   { value: "manager", label: "Менеджер" },
   { value: "senior_manager", label: "Старший менеджер" },
   { value: "admin", label: "Адміністратор" },
+  { value: "owner", label: "Власник" },
+  { value: "supervisor", label: "Супервайзер" },
+  { value: "analyst", label: "Аналітик" },
+  { value: "warehouse", label: "Склад" },
+  { value: "bookkeeper", label: "Бухгалтер" },
 ];
 
 export function UserRowActions({
