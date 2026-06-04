@@ -69,6 +69,11 @@ export const updateOrderSchema = z.object({
   // ─── Status (Етап 2) ──────────────────────────────────────────────────────
   /** Бажаний наступний статус документа (валідність переходу — у endpoint). */
   status: z.enum(MANAGER_ORDER_STATUSES).optional(),
+
+  // ─── Optimistic lock (Етап 4 блоку Замовлення, 2026-06-09) ───────────────
+  // Клієнт надсилає поточну версію документа що бачив. Backward-compat —
+  // якщо не передано, перевірка пропускається.
+  version: z.number().int().optional(),
 });
 
 export type OrderItemInput = z.infer<typeof orderItemInputSchema>;

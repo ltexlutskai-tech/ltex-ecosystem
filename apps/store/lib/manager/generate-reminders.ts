@@ -24,7 +24,23 @@ import { prisma } from "@ltex/db";
 export interface GenerateRemindersResult {
   bronCreated: number;
   videoFired: number;
+  orderRemindersCreated: number;
+  ordersEscalatedToSupervisor: number;
 }
+
+/**
+ * Активні статуси замовлення для генерації нагадувань.
+ * Виключаємо posted/cancelled/delivered + archived/closed.
+ */
+const ORDER_ACTIVE_STATUSES = [
+  "draft",
+  "sent",
+  "pending",
+  "approved",
+  "shipped",
+] as const;
+
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 /** Детектор A — знімає протерміновані броні + створює нагадування «Перенести бронь?». */
 export async function detectExpiredBookings(
@@ -208,11 +224,114 @@ export async function detectVideoAppeared(
   return fired;
 }
 
-/** Запускає обидва детектори. */
+/**
+ * Детектор C — прострочені замовлення (Етап 3 блоку Замовлення, 2026-06-09).
+ *
+ * Узгоджено з user 2026-06-02:
+ *   - Замовлення на пошту/самовивіз → нагадувати кожні 3 дні
+ *   - Замовлення на власну доставку → кожні 7 днів
+ *   - Якщо замовленню > 90 днів → ескалація супервайзеру
+ *
+ * Створює `MgrReminder` для assignedAgentUserId. Для ескалації — додаткове
+ * нагадування supervisor-у (роль supervisor / senior_manager).
+ *
+ * Не створює дубль якщо `lastReminderAt` був надто недавно
+ * (відносно правила цього замовлення).
+ */
+export async function detectOverdueOrders(
+  now: Date = new Date(),
+): Promise<{ remindersCreated: number; escalated: number }> {
+  const orders = await prisma.order.findMany({
+    where: {
+      status: { in: ORDER_ACTIVE_STATUSES as unknown as string[] },
+      archived: false,
+      closedAt: null,
+      assignedAgentUserId: { not: null },
+    },
+    select: {
+      id: true,
+      assignedAgentUserId: true,
+      deliveryMethod: true,
+      createdAt: true,
+      lastReminderAt: true,
+      escalatedToSupervisorAt: true,
+      customer: { select: { name: true } },
+    },
+  });
+  if (orders.length === 0) return { remindersCreated: 0, escalated: 0 };
+
+  // Знаходимо supervisor-ів один раз для ескалацій
+  const supervisors = await prisma.user.findMany({
+    where: {
+      isActive: true,
+      role: { in: ["supervisor", "senior_manager"] },
+    },
+    select: { id: true },
+  });
+
+  let remindersCreated = 0;
+  let escalated = 0;
+
+  for (const o of orders) {
+    if (!o.assignedAgentUserId) continue;
+    // Інтервал нагадувань залежить від типу доставки
+    const intervalDays = o.deliveryMethod === "delivery" ? 7 : 3; // post|pickup → 3, delivery → 7
+    const lastBase = o.lastReminderAt ?? o.createdAt;
+    const sinceLast = now.getTime() - lastBase.getTime();
+    const shouldRemind = sinceLast >= intervalDays * DAY_MS;
+    if (shouldRemind) {
+      await prisma.mgrReminder.create({
+        data: {
+          ownerUserId: o.assignedAgentUserId,
+          body: `Замовлення «висить» — клієнт ${o.customer?.name ?? "—"}. Перевірте статус.`,
+          remindAt: now,
+          source: "manual",
+        },
+      });
+      await prisma.order.update({
+        where: { id: o.id },
+        data: {
+          lastReminderAt: now,
+          remindersSentCount: { increment: 1 },
+        },
+      });
+      remindersCreated++;
+    }
+
+    // Ескалація: вік > 90 днів і ще не ескалували
+    const ageDays = (now.getTime() - o.createdAt.getTime()) / DAY_MS;
+    if (ageDays >= 90 && !o.escalatedToSupervisorAt && supervisors.length > 0) {
+      // Створюємо нагадування для всіх supervisor-ів
+      await prisma.mgrReminder.createMany({
+        data: supervisors.map((s) => ({
+          ownerUserId: s.id,
+          body: `⚠ Замовлення прострочене >90 днів — клієнт ${o.customer?.name ?? "—"}.`,
+          remindAt: now,
+          source: "manual" as const,
+        })),
+      });
+      await prisma.order.update({
+        where: { id: o.id },
+        data: { escalatedToSupervisorAt: now },
+      });
+      escalated++;
+    }
+  }
+
+  return { remindersCreated, escalated };
+}
+
+/** Запускає всі детектори (3 шт). */
 export async function generateAutoReminders(
   now: Date = new Date(),
 ): Promise<GenerateRemindersResult> {
   const bronCreated = await detectExpiredBookings(now);
   const videoFired = await detectVideoAppeared(now);
-  return { bronCreated, videoFired };
+  const overdue = await detectOverdueOrders(now);
+  return {
+    bronCreated,
+    videoFired,
+    orderRemindersCreated: overdue.remindersCreated,
+    ordersEscalatedToSupervisor: overdue.escalated,
+  };
 }

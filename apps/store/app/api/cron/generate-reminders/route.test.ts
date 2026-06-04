@@ -9,8 +9,12 @@ const { mockPrisma } = vi.hoisted(() => ({
       findFirst: vi.fn(),
       findMany: vi.fn(),
       create: vi.fn(),
+      createMany: vi.fn(),
       update: vi.fn(),
     },
+    // Order + User — для детектора C (прострочені замовлення)
+    order: { findMany: vi.fn(), update: vi.fn() },
+    user: { findMany: vi.fn() },
     // $transaction просто виконує передані promise-и (масив операцій).
     $transaction: vi.fn((ops: Promise<unknown>[]) => Promise.all(ops)),
   },
@@ -39,8 +43,12 @@ describe("GET /api/cron/generate-reminders", () => {
     mockPrisma.mgrReminder.findFirst.mockResolvedValue(null);
     mockPrisma.mgrReminder.findMany.mockResolvedValue([]);
     mockPrisma.mgrReminder.create.mockResolvedValue({ id: "r1" });
+    mockPrisma.mgrReminder.createMany.mockResolvedValue({ count: 0 });
     mockPrisma.mgrReminder.update.mockResolvedValue({ id: "r1" });
     mockPrisma.lot.update.mockResolvedValue({ id: "lot1" });
+    mockPrisma.order.findMany.mockResolvedValue([]);
+    mockPrisma.order.update.mockResolvedValue({ id: "ord1" });
+    mockPrisma.user.findMany.mockResolvedValue([]);
   });
 
   it("returns 401 without a valid secret", async () => {
@@ -53,7 +61,12 @@ describe("GET /api/cron/generate-reminders", () => {
     const res = await GET(req({ "x-cron-secret": SECRET }));
     const body = await res.json();
     expect(res.status).toBe(200);
-    expect(body).toEqual({ bronCreated: 0, videoFired: 0 });
+    expect(body).toEqual({
+      bronCreated: 0,
+      videoFired: 0,
+      orderRemindersCreated: 0,
+      ordersEscalatedToSupervisor: 0,
+    });
   });
 
   it("authorizes via Authorization Bearer header", async () => {

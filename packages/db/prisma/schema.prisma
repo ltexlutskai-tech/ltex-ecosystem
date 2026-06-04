@@ -237,18 +237,53 @@ model Order {
   isActual            Boolean @default(true) @map("is_actual")
   routeSheetId        String? @map("route_sheet_id") // зворотне посилання на МЛ (1С Заказ.МаршрутныйЛист)
 
+  // ─── Закриття замовлень (Етап 3 блоку Замовлення, 2026-06-09) ────────────
+  closedAt        DateTime? @map("closed_at")
+  closeReasonId   String?   @map("close_reason_id")
+  closedByUserId  String?   @map("closed_by_user_id")
+  closeNotes      String?   @map("close_notes")
+
+  // ─── Auto-нагадування (Етап 3) ───────────────────────────────────────────
+  lastReminderAt           DateTime? @map("last_reminder_at")
+  remindersSentCount       Int       @default(0) @map("reminders_sent_count")
+  escalatedToSupervisorAt  DateTime? @map("escalated_to_supervisor_at")
+
+  // ─── Optimistic lock (Етап 4) ────────────────────────────────────────────
+  // Інкрементується при кожному PATCH. Клієнт надсилає поточну версію —
+  // якщо у БД більша → 409 і вимога перезавантажити.
+  version Int @default(0)
+
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  customer  Customer    @relation(fields: [customerId], references: [id])
-  items     OrderItem[]
-  shipments Shipment[]
-  payments  Payment[]
+  customer    Customer          @relation(fields: [customerId], references: [id])
+  closeReason OrderCloseReason? @relation(fields: [closeReasonId], references: [id])
+  closedBy    User?             @relation("OrderClosedBy", fields: [closedByUserId], references: [id])
+  items       OrderItem[]
+  shipments   Shipment[]
+  payments    Payment[]
 
   @@index([customerId])
   @@index([status])
   @@index([routeSheetId])
+  @@index([closedAt])
+  @@index([lastReminderAt])
   @@map("orders")
+}
+
+// ─── Довідник причин закриття замовлень (Етап 3 блоку Замовлення) ─────────
+model OrderCloseReason {
+  id        String   @id @default(cuid())
+  code      String   @unique
+  label     String
+  isActive  Boolean  @default(true) @map("is_active")
+  sortOrder Int      @default(0) @map("sort_order")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  orders Order[]
+
+  @@index([isActive, sortOrder])
+  @@map("order_close_reasons")
 }
 
 // ─── Order Items (← табличні секції документів) ─────────────────────────────
@@ -942,6 +977,7 @@ model User {
   receivingsCreated    Receiving[]              @relation("ReceivingCreatedBy")
   receivingsPosted     Receiving[]              @relation("ReceivingPostedBy")
   receivingsCancelled  Receiving[]              @relation("ReceivingCancelledBy")
+  ordersClosed         Order[]                  @relation("OrderClosedBy")
 
   @@map("users")
 }
