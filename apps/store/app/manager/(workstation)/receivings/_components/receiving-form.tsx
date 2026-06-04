@@ -88,6 +88,134 @@ export function ReceivingForm({
   const barcodeRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const priceRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const searchRef = useRef<HTMLInputElement | null>(null);
+  const skipRestoreRef = useRef(false);
+
+  // Довідник секторів (autocomplete)
+  const [sectorOptions, setSectorOptions] = useState<string[]>([]);
+  useEffect(() => {
+    fetch("/api/v1/manager/warehouse/sectors")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: { items: { name: string }[] } | null) => {
+        if (d) setSectorOptions(d.items.map((s) => s.name));
+      })
+      .catch(() => {});
+  }, []);
+
+  // ── Авто-збереження у localStorage ────────────────────────────────────────
+  // Уникнення втрати при випадковому закритті / відсутності інтернету.
+  // На завантаження пропонує відновити збережений стан, якщо є.
+  const STORAGE_KEY = "ltex:receiving-draft:new";
+  const [lastBackupAt, setLastBackupAt] = useState<Date | null>(null);
+  const [restorePrompt, setRestorePrompt] = useState<null | {
+    backupTime: string;
+    itemsCount: number;
+  }>(null);
+
+  // Restore on mount
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return;
+      const data = JSON.parse(raw);
+      if (data && Array.isArray(data.items) && data.items.length > 0) {
+        setRestorePrompt({
+          backupTime: data.savedAt ?? "—",
+          itemsCount: data.items.length,
+        });
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  function restoreBackup() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return;
+      const data = JSON.parse(raw);
+      if (data.supplierId) setSupplierId(data.supplierId);
+      if (data.warehouseId) setWarehouseId(data.warehouseId);
+      if (data.docDate) setDocDate(data.docDate);
+      if (data.notes) setNotes(data.notes);
+      if (Array.isArray(data.items)) {
+        setItems(
+          data.items.map((it: Partial<ItemDraft>) => ({
+            uid: nextUid(),
+            productId: it.productId ?? "",
+            productName: it.productName ?? "",
+            articleCode: it.articleCode ?? null,
+            weight: it.weight ?? 0,
+            purchasePrice: it.purchasePrice ?? 0,
+            barcode: it.barcode ?? "",
+            barcodeSource: it.barcodeSource ?? "generated",
+            sector: it.sector ?? "",
+            barcodeWarning: null,
+          })),
+        );
+      }
+    } catch {
+      // ignore
+    }
+    setRestorePrompt(null);
+  }
+
+  function dismissBackup() {
+    localStorage.removeItem(STORAGE_KEY);
+    setRestorePrompt(null);
+  }
+
+  // Save on changes (debounced)
+  useEffect(() => {
+    if (skipRestoreRef.current) return;
+    if (
+      items.length === 0 &&
+      !notes &&
+      supplierId === (suppliers[0]?.id ?? "")
+    ) {
+      return; // Не зберігаємо порожній шаблон
+    }
+    const handle = setTimeout(() => {
+      try {
+        const payload = {
+          supplierId,
+          warehouseId,
+          docDate,
+          notes,
+          items: items.map((it) => ({
+            productId: it.productId,
+            productName: it.productName,
+            articleCode: it.articleCode,
+            weight: it.weight,
+            purchasePrice: it.purchasePrice,
+            barcode: it.barcode,
+            barcodeSource: it.barcodeSource,
+            sector: it.sector,
+          })),
+          savedAt: new Date().toISOString(),
+        };
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+        setLastBackupAt(new Date());
+      } catch {
+        // ignore (e.g. quota exceeded)
+      }
+    }, 2000);
+    return () => clearTimeout(handle);
+  }, [items, supplierId, warehouseId, docDate, notes, suppliers]);
+
+  // Автопідстановка останньої ціни закупки
+  async function fetchLastPrice(productId: string): Promise<number> {
+    if (!supplierId) return 0;
+    try {
+      const res = await fetch(
+        `/api/v1/manager/warehouse/last-purchase-price?productId=${encodeURIComponent(productId)}&supplierId=${encodeURIComponent(supplierId)}`,
+      );
+      if (!res.ok) return 0;
+      const data = (await res.json()) as { price: number | null };
+      return data.price ?? 0;
+    } catch {
+      return 0;
+    }
+  }
 
   // ── Smart-сканер: спробує розпізнати зашитий штрихкод і додати рядок ──
   async function trySmartScan(code: string): Promise<boolean> {
@@ -117,6 +245,7 @@ export function ReceivingForm({
         return true; // обробка завершена (хай навіть негативна)
       }
       const uid = nextUid();
+      const lastPrice = await fetchLastPrice(data.product!.id);
       setItems((arr) => [
         ...arr,
         {
@@ -125,7 +254,7 @@ export function ReceivingForm({
           productName: data.product!.name,
           articleCode: data.product!.articleCode,
           weight: data.weight ?? 0,
-          purchasePrice: 0,
+          purchasePrice: lastPrice,
           barcode: trimmed,
           barcodeSource: "scanned",
           sector: "",
@@ -146,7 +275,7 @@ export function ReceivingForm({
     }
   }
 
-  function addItem(product: {
+  async function addItem(product: {
     id: string;
     name: string;
     articleCode: string | null;
@@ -171,6 +300,15 @@ export function ReceivingForm({
     setProductSearch("");
     setHighlightedIdx(0);
     setTimeout(() => weightRefs.current[uid]?.focus(), 0);
+    // Автопідстановка останньої ціни закупки (Хвиля 2 правок)
+    const lastPrice = await fetchLastPrice(product.id);
+    if (lastPrice > 0) {
+      setItems((arr) =>
+        arr.map((i) =>
+          i.uid === uid ? { ...i, purchasePrice: lastPrice } : i,
+        ),
+      );
+    }
   }
 
   function copyItem(srcUid: string) {
@@ -397,6 +535,12 @@ export function ReceivingForm({
           return;
         }
       }
+      // Cleanup localStorage backup (Хвиля 2 — успішне збереження)
+      try {
+        localStorage.removeItem(STORAGE_KEY);
+      } catch {
+        // ignore
+      }
       router.push(`/manager/receivings/${data.id}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Помилка збереження");
@@ -407,6 +551,40 @@ export function ReceivingForm({
 
   return (
     <form onSubmit={(e) => e.preventDefault()} className="space-y-4">
+      {/* Restore-prompt — є збережений автосейв */}
+      {restorePrompt && (
+        <div className="flex items-center justify-between gap-2 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm">
+          <span className="text-amber-900">
+            💾 Знайдено незбережену чернетку від{" "}
+            {new Date(restorePrompt.backupTime).toLocaleString("uk-UA")} (
+            {restorePrompt.itemsCount} рядків). Відновити?
+          </span>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={restoreBackup}
+              className="rounded-md bg-emerald-600 px-3 py-1 text-xs font-medium text-white hover:bg-emerald-700"
+            >
+              ✅ Відновити
+            </button>
+            <button
+              type="button"
+              onClick={dismissBackup}
+              className="rounded-md border border-gray-300 bg-white px-3 py-1 text-xs text-gray-700"
+            >
+              🗑 Скинути
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Datalist для autocomplete секторів */}
+      <datalist id="sector-options">
+        {sectorOptions.map((s) => (
+          <option key={s} value={s} />
+        ))}
+      </datalist>
+
       {/* Шапка */}
       <section className="grid gap-2 rounded-md border bg-white p-3 sm:grid-cols-3">
         <Field label="Постачальник *">
@@ -455,9 +633,16 @@ export function ReceivingForm({
           <h2 className="text-sm font-medium">
             Рядки документа ({items.length})
           </h2>
-          <div className="text-xs text-gray-500">
-            Σ {totalWeight().toFixed(1)} кг
-            {canSeePrice && ` · Σ ${totalAmount().toFixed(2)} €`}
+          <div className="flex items-center gap-3 text-xs text-gray-500">
+            {lastBackupAt && (
+              <span className="text-emerald-600" title="Автозбережено локально">
+                💾 {lastBackupAt.toLocaleTimeString("uk-UA")}
+              </span>
+            )}
+            <span>
+              Σ {totalWeight().toFixed(1)} кг
+              {canSeePrice && ` · Σ ${totalAmount().toFixed(2)} €`}
+            </span>
           </div>
         </div>
         <div className="relative mb-2 space-y-1">
@@ -599,6 +784,7 @@ export function ReceivingForm({
                       <input
                         type="text"
                         value={it.sector}
+                        list="sector-options"
                         onChange={(e) =>
                           updateItem(it.uid, { sector: e.target.value })
                         }

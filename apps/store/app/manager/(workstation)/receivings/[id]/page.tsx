@@ -120,15 +120,24 @@ export default async function ReceivingDetailPage({
       <div className="rounded-md border bg-white p-4">
         <div className="mb-3 flex items-center justify-between">
           <h2 className="text-sm font-medium">Рядки ({doc.items.length})</h2>
-          {doc.items.some((it) => it.barcode) && (
+          <div className="flex gap-2">
             <Link
-              href={`/manager/receivings/${doc.id}/labels`}
+              href={`/manager/receivings/${doc.id}/print`}
               target="_blank"
-              className="rounded-md border border-emerald-300 bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-800 hover:bg-emerald-100"
+              className="rounded-md border border-gray-300 bg-white px-3 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50"
             >
-              🖨 Друкувати етикетки
+              📄 Накладна
             </Link>
-          )}
+            {doc.items.some((it) => it.barcode) && (
+              <Link
+                href={`/manager/receivings/${doc.id}/labels`}
+                target="_blank"
+                className="rounded-md border border-emerald-300 bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-800 hover:bg-emerald-100"
+              >
+                🖨 Друкувати етикетки
+              </Link>
+            )}
+          </div>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">

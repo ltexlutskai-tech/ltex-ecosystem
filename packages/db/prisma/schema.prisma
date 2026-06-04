@@ -66,6 +66,7 @@ model Product {
   saleItems          SaleItem[]
   cartItems          CartItem[]
   receivingItems     ReceivingItem[]
+  purchasePrices     PurchasePrice[]
   videoSubscriptions VideoSubscription[]
   favorites          Favorite[]
   featuredEntry      FeaturedProduct?
@@ -699,8 +700,9 @@ model Supplier {
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
-  lots       Lot[]
-  receivings Receiving[]
+  lots           Lot[]
+  receivings     Receiving[]
+  purchasePrices PurchasePrice[]
 
   @@index([name])
   @@index([isActive])
@@ -719,9 +721,50 @@ model Warehouse {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   receivings Receiving[]
+  sectors    WarehouseSector[]
 
   @@index([name])
   @@map("warehouses")
+}
+
+// ── Регістр історії цін закупки (← Хвиля 2 правок Поступлення) ────────────
+// При проведенні поступлення для кожного рядка з ціною > 0 пишеться запис.
+// Endpoint last-purchase-price підтягує останню ціну для (товар, постачальник)
+// → автопідстановка у форму при наступному додаванні.
+model PurchasePrice {
+  id              String   @id @default(cuid())
+  productId       String   @map("product_id")
+  supplierId      String   @map("supplier_id")
+  priceEur        Float    @map("price_eur")
+  validFrom       DateTime @default(now()) @map("valid_from")
+  source          String   @default("receiving") // 'receiving' | 'manual'
+  receivingId     String?  @map("receiving_id")
+  receivingItemId String?  @map("receiving_item_id")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  product   Product    @relation(fields: [productId], references: [id], onDelete: Cascade)
+  supplier  Supplier   @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  receiving Receiving? @relation(fields: [receivingId], references: [id], onDelete: SetNull)
+
+  @@index([productId, supplierId, validFrom(sort: Desc)])
+  @@index([supplierId])
+  @@map("purchase_prices")
+}
+
+// Довідник секторів складу (← Хвиля 2).
+// Поки що використовується тільки як autocomplete-джерело у формі
+// поступлення — `receiving_items.sector` залишається вільним стрингом.
+model WarehouseSector {
+  id          String   @id @default(cuid())
+  warehouseId String?  @map("warehouse_id")
+  name        String
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  warehouse Warehouse? @relation(fields: [warehouseId], references: [id], onDelete: Cascade)
+
+  @@index([isActive])
+  @@map("warehouse_sectors")
 }
 
 model Receiving {
@@ -760,8 +803,9 @@ model Receiving {
   createdBy   User?     @relation("ReceivingCreatedBy", fields: [createdByUserId], references: [id])
   postedBy    User?     @relation("ReceivingPostedBy", fields: [postedByUserId], references: [id])
   cancelledBy User?     @relation("ReceivingCancelledBy", fields: [cancelledByUserId], references: [id])
-  items       ReceivingItem[]
-  lots        Lot[]
+  items          ReceivingItem[]
+  lots           Lot[]
+  purchasePrices PurchasePrice[]
 
   @@index([status])
   @@index([supplierId])
