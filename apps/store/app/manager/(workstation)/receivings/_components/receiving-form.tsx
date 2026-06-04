@@ -21,7 +21,7 @@ interface ItemDraft {
   purchasePrice: number;
   barcode: string;
   barcodeSource: "scanned" | "manual" | "generated";
-  // UI-стан
+  sector: string;
   barcodeWarning: string | null;
 }
 
@@ -32,16 +32,20 @@ function nextUid(): string {
 }
 
 /**
- * Форма створення документа поступлення (← правки 2026-06-04).
+ * Форма створення документа поступлення (правки 2026-06-05).
  *
- * Компактна табличного-вигляду форма у стилі 1С:
- *   - валюта/курс/№ накладної постачальника — прибрано (управ. облік у EUR)
- *   - quantity завжди = 1 (штрихкод унікальний)
- *   - ціна закупки прихована для warehouse
- *   - авто-фокус: вибрав товар → вага → enter → штрихкод → enter → next
- *   - на штрихкоді робиться live-перевірка дублів
- *   - 3 кнопки збереження: «Зберегти чернетку» (всі) і «Зберегти і провести»
- *     (тільки admin/owner) — узгоджено з user 2026-06-04
+ * Smart-сканер: поле пошуку приймає і звичайний текст, і зашитий штрихкод
+ * постачальника (XYYYYYZTTTUUU... — артикул у позиціях 2-6, вага у 9-11).
+ *
+ * Клавіатурна навігація:
+ *   - У полі пошуку: ↑/↓ — навігація по результатах, Enter — додати виділений
+ *     (або єдиний результат), Esc — закрити dropdown
+ *   - У полі ваги: Enter → перехід на штрихкод цього ж рядка
+ *   - У полі штрихкоду: Enter → перехід на пошук (всередині форми)
+ *   - У полі ціни закупки: Enter → ціна наступного рядка
+ *
+ * Per-row дії: Копіювати (дублювати товар без ваги), Згенерувати ШК,
+ * Друкувати етикетку (відкриває нову вкладку з 1 етикеткою), ×.
  */
 export function ReceivingForm({
   suppliers,
@@ -63,7 +67,6 @@ export function ReceivingForm({
     | "bookkeeper";
 }) {
   const router = useRouter();
-
   const canSeePrice = userRole === "admin" || userRole === "owner";
   const canPost = userRole === "admin" || userRole === "owner";
 
@@ -76,12 +79,72 @@ export function ReceivingForm({
   const [productResults, setProductResults] = useState<
     { id: string; name: string; articleCode: string | null }[]
   >([]);
+  const [highlightedIdx, setHighlightedIdx] = useState(0);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [scanMsg, setScanMsg] = useState<string | null>(null);
 
-  // Refs для авто-фокусу на полі ваги / штрихкоду останнього доданого рядка
   const weightRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const barcodeRefs = useRef<Record<string, HTMLInputElement | null>>({});
+  const priceRefs = useRef<Record<string, HTMLInputElement | null>>({});
+  const searchRef = useRef<HTMLInputElement | null>(null);
+
+  // ── Smart-сканер: спробує розпізнати зашитий штрихкод і додати рядок ──
+  async function trySmartScan(code: string): Promise<boolean> {
+    const trimmed = code.trim();
+    if (trimmed.length < 12) return false;
+    try {
+      const res = await fetch(
+        `/api/v1/manager/warehouse/barcode/lookup?code=${encodeURIComponent(trimmed)}`,
+      );
+      if (!res.ok) return false;
+      const data = (await res.json()) as {
+        recognized: boolean;
+        pattern: string;
+        articleCode?: string;
+        weight?: number | null;
+        product: {
+          id: string;
+          name: string;
+          articleCode: string | null;
+        } | null;
+      };
+      if (!data.recognized) return false;
+      if (!data.product) {
+        setScanMsg(
+          `⚠ Розпізнано артикул ${data.articleCode}, але товар у довіднику не знайдено`,
+        );
+        return true; // обробка завершена (хай навіть негативна)
+      }
+      const uid = nextUid();
+      setItems((arr) => [
+        ...arr,
+        {
+          uid,
+          productId: data.product!.id,
+          productName: data.product!.name,
+          articleCode: data.product!.articleCode,
+          weight: data.weight ?? 0,
+          purchasePrice: 0,
+          barcode: trimmed,
+          barcodeSource: "scanned",
+          sector: "",
+          barcodeWarning: null,
+        },
+      ]);
+      setProductSearch("");
+      setProductResults([]);
+      setScanMsg(
+        `✅ Зчитано: ${data.product.name} · ${data.weight} кг · ШК "${trimmed}"`,
+      );
+      setTimeout(() => setScanMsg(null), 3000);
+      // Перевірка дубля ШК у БД (на випадок повторного сканування)
+      void checkBarcode(uid, trimmed);
+      return true;
+    } catch {
+      return false;
+    }
+  }
 
   function addItem(product: {
     id: string;
@@ -100,12 +163,35 @@ export function ReceivingForm({
         purchasePrice: 0,
         barcode: "",
         barcodeSource: "generated",
+        sector: "",
         barcodeWarning: null,
       },
     ]);
     setProductResults([]);
     setProductSearch("");
-    // Авто-фокус на полі ваги нового рядка
+    setHighlightedIdx(0);
+    setTimeout(() => weightRefs.current[uid]?.focus(), 0);
+  }
+
+  function copyItem(srcUid: string) {
+    const src = items.find((i) => i.uid === srcUid);
+    if (!src) return;
+    const uid = nextUid();
+    setItems((arr) => [
+      ...arr,
+      {
+        uid,
+        productId: src.productId,
+        productName: src.productName,
+        articleCode: src.articleCode,
+        weight: 0,
+        purchasePrice: src.purchasePrice,
+        barcode: "",
+        barcodeSource: "generated",
+        sector: src.sector,
+        barcodeWarning: null,
+      },
+    ]);
     setTimeout(() => weightRefs.current[uid]?.focus(), 0);
   }
 
@@ -119,6 +205,7 @@ export function ReceivingForm({
 
   async function searchProducts(q: string) {
     setProductSearch(q);
+    setHighlightedIdx(0);
     if (q.trim().length < 2) {
       setProductResults([]);
       return;
@@ -137,12 +224,33 @@ export function ReceivingForm({
     }
   }
 
+  async function handleSearchKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setHighlightedIdx((idx) => Math.min(productResults.length - 1, idx + 1));
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setHighlightedIdx((idx) => Math.max(0, idx - 1));
+    } else if (e.key === "Escape") {
+      setProductResults([]);
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      const value = productSearch.trim();
+      // Спочатку — спроба smart-сканування зашитого ШК
+      const scanned = await trySmartScan(value);
+      if (scanned) return;
+      // Якщо у списку — додати виділений (або єдиний)
+      const target =
+        productResults[highlightedIdx] ?? productResults[0] ?? null;
+      if (target) addItem(target);
+    }
+  }
+
   async function checkBarcode(uid: string, code: string) {
     if (!code || code.length < 2) {
       updateItem(uid, { barcodeWarning: null });
       return;
     }
-    // Локальний дубль у поточному документі
     const dupLocal = items.find(
       (i) => i.uid !== uid && i.barcode.trim() === code.trim(),
     );
@@ -152,7 +260,6 @@ export function ReceivingForm({
       });
       return;
     }
-    // Дубль у БД
     try {
       const res = await fetch(
         `/api/v1/manager/warehouse/barcode/check?code=${encodeURIComponent(code)}`,
@@ -199,6 +306,29 @@ export function ReceivingForm({
     }
   }
 
+  function printSingleLabel(it: ItemDraft) {
+    if (!it.barcode) {
+      alert("Спершу згенеруйте або скануйте штрихкод для цього рядка");
+      return;
+    }
+    const params = new URLSearchParams({
+      code: it.barcode,
+      name: it.productName,
+      article: it.articleCode ?? "",
+      weight: String(it.weight),
+    });
+    window.open(
+      `/manager/receivings/preview-label?${params.toString()}`,
+      "_blank",
+    );
+  }
+
+  function focusPriceOfNextRow(uid: string) {
+    const idx = items.findIndex((i) => i.uid === uid);
+    const next = items[idx + 1];
+    if (next) priceRefs.current[next.uid]?.focus();
+  }
+
   function totalWeight(): number {
     return items.reduce((s, i) => s + i.weight, 0);
   }
@@ -216,7 +346,6 @@ export function ReceivingForm({
       setError("Додайте хоча б один рядок");
       return;
     }
-    // Локальна валідація
     for (const it of items) {
       if (it.weight <= 0) {
         setError(`Вага не вказана для товару "${it.productName}"`);
@@ -244,6 +373,7 @@ export function ReceivingForm({
             purchasePrice: i.purchasePrice,
             barcode: i.barcode || null,
             barcodeSource: i.barcodeSource,
+            sector: i.sector || null,
           })),
         }),
       });
@@ -254,14 +384,12 @@ export function ReceivingForm({
       }
       const data = await res.json();
       if (postAfter) {
-        // Одразу проводимо
         const postRes = await fetch(
           `/api/v1/manager/warehouse/receivings/${data.id}/post`,
           { method: "POST" },
         );
         if (!postRes.ok) {
           const errData = await postRes.json().catch(() => ({}));
-          // Документ збережено, але провести не вдалось — переходимо у деталі
           router.push(`/manager/receivings/${data.id}`);
           alert(
             `Документ збережено, але провести не вдалось: ${errData.error ?? postRes.status}`,
@@ -279,7 +407,7 @@ export function ReceivingForm({
 
   return (
     <form onSubmit={(e) => e.preventDefault()} className="space-y-4">
-      {/* Шапка — компактно: постачальник + склад + дата */}
+      {/* Шапка */}
       <section className="grid gap-2 rounded-md border bg-white p-3 sm:grid-cols-3">
         <Field label="Постачальник *">
           <select
@@ -321,7 +449,7 @@ export function ReceivingForm({
         </Field>
       </section>
 
-      {/* Пошук + результат */}
+      {/* Smart-сканер / пошук */}
       <section className="rounded-md border bg-white p-3">
         <div className="mb-2 flex items-center justify-between">
           <h2 className="text-sm font-medium">
@@ -332,22 +460,30 @@ export function ReceivingForm({
             {canSeePrice && ` · Σ ${totalAmount().toFixed(2)} €`}
           </div>
         </div>
-        <div className="mb-2 space-y-1">
+        <div className="relative mb-2 space-y-1">
           <input
+            ref={searchRef}
             type="search"
             value={productSearch}
             onChange={(e) => searchProducts(e.target.value)}
-            placeholder="🔍 Знайти товар (назва / артикул / 1С-код)…"
+            onKeyDown={handleSearchKeyDown}
+            placeholder="🔍 Сканер / пошук товару (назва, артикул, 1С-код)…"
             className="w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm"
+            autoComplete="off"
           />
           {productResults.length > 0 && (
-            <ul className="max-h-48 overflow-y-auto rounded-md border bg-white shadow-sm">
-              {productResults.map((p) => (
+            <ul className="absolute z-10 max-h-60 w-full overflow-y-auto rounded-md border bg-white shadow-lg">
+              {productResults.map((p, idx) => (
                 <li key={p.id}>
                   <button
                     type="button"
+                    onMouseEnter={() => setHighlightedIdx(idx)}
                     onClick={() => addItem(p)}
-                    className="block w-full px-3 py-1.5 text-left text-sm hover:bg-emerald-50"
+                    className={`block w-full px-3 py-1.5 text-left text-sm ${
+                      idx === highlightedIdx
+                        ? "bg-emerald-50"
+                        : "hover:bg-emerald-50"
+                    }`}
                   >
                     <span className="font-medium">{p.name}</span>
                     {p.articleCode && (
@@ -360,12 +496,16 @@ export function ReceivingForm({
               ))}
             </ul>
           )}
+          {scanMsg && (
+            <div className="rounded-md border border-emerald-200 bg-emerald-50 px-2 py-1 text-xs text-emerald-900">
+              {scanMsg}
+            </div>
+          )}
         </div>
 
-        {/* Компактна таблиця */}
         {items.length === 0 ? (
           <div className="rounded-md border border-dashed border-gray-200 p-4 text-center text-sm text-gray-500">
-            Знайдіть товар у полі вище і додайте.
+            Скануйте штрихкод або знайдіть товар у полі вище.
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -375,13 +515,13 @@ export function ReceivingForm({
                   <th className="px-1 py-1.5 w-8">№</th>
                   <th className="px-2 py-1.5 w-20">Артикул</th>
                   <th className="px-2 py-1.5">Товар</th>
-                  <th className="px-2 py-1.5 w-24">Вага, кг</th>
+                  <th className="px-2 py-1.5 w-20">Вага, кг</th>
                   <th className="px-2 py-1.5 w-44">Штрихкод</th>
+                  <th className="px-2 py-1.5 w-24">Сектор</th>
                   {canSeePrice && (
-                    <th className="px-2 py-1.5 w-24">Ціна закупки €/кг</th>
+                    <th className="px-2 py-1.5 w-20">Ціна закуп. €/кг</th>
                   )}
-                  <th className="px-2 py-1.5 w-24">Спосіб</th>
-                  <th className="px-1 py-1.5 w-12"></th>
+                  <th className="px-1 py-1.5 w-32">Дії</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -443,12 +583,8 @@ export function ReceivingForm({
                           if (e.key === "Enter") {
                             e.preventDefault();
                             checkBarcode(it.uid, e.currentTarget.value);
-                            // Поставити фокус на пошук для наступного товару
-                            (
-                              document.querySelector(
-                                'input[type="search"]',
-                              ) as HTMLInputElement | null
-                            )?.focus();
+                            // Фокус на пошук _у формі_ для наступного товару
+                            searchRef.current?.focus();
                           }
                         }}
                         placeholder="(згенерується)"
@@ -459,9 +595,23 @@ export function ReceivingForm({
                         }`}
                       />
                     </td>
+                    <td className="px-2 py-1">
+                      <input
+                        type="text"
+                        value={it.sector}
+                        onChange={(e) =>
+                          updateItem(it.uid, { sector: e.target.value })
+                        }
+                        placeholder="—"
+                        className="w-full rounded border border-gray-300 px-1.5 py-1 text-xs"
+                      />
+                    </td>
                     {canSeePrice && (
                       <td className="px-2 py-1">
                         <input
+                          ref={(el) => {
+                            priceRefs.current[it.uid] = el;
+                          }}
                           type="number"
                           min="0"
                           step="0.01"
@@ -472,28 +622,51 @@ export function ReceivingForm({
                               purchasePrice: parseNumberOrZero(e.target.value),
                             })
                           }
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              focusPriceOfNextRow(it.uid);
+                            }
+                          }}
                           className="w-full rounded border border-gray-300 px-1.5 py-1 text-sm text-right"
                         />
                       </td>
                     )}
-                    <td className="px-2 py-1">
-                      <button
-                        type="button"
-                        onClick={() => generateBarcode(it.uid, it.productId)}
-                        className="rounded border border-emerald-300 bg-emerald-50 px-1.5 py-0.5 text-xs text-emerald-800 hover:bg-emerald-100"
-                      >
-                        🎯 Згенер.
-                      </button>
-                    </td>
-                    <td className="px-1 py-1 text-center">
-                      <button
-                        type="button"
-                        onClick={() => removeItem(it.uid)}
-                        className="text-red-600 hover:underline"
-                        aria-label="Видалити рядок"
-                      >
-                        ×
-                      </button>
+                    <td className="px-1 py-1">
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => generateBarcode(it.uid, it.productId)}
+                          title="Згенерувати штрихкод"
+                          className="rounded border border-emerald-300 bg-emerald-50 px-1 py-0.5 text-xs text-emerald-800 hover:bg-emerald-100"
+                        >
+                          🎯
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => printSingleLabel(it)}
+                          title="Друкувати етикетку"
+                          className="rounded border border-sky-300 bg-sky-50 px-1 py-0.5 text-xs text-sky-800 hover:bg-sky-100"
+                        >
+                          🖨
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => copyItem(it.uid)}
+                          title="Копіювати рядок (без ваги)"
+                          className="rounded border border-gray-300 bg-white px-1 py-0.5 text-xs text-gray-700 hover:bg-gray-50"
+                        >
+                          📋
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => removeItem(it.uid)}
+                          title="Видалити рядок"
+                          className="rounded border border-red-300 bg-white px-1 py-0.5 text-xs text-red-700 hover:bg-red-50"
+                        >
+                          ×
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -554,7 +727,6 @@ export function ReceivingForm({
   );
 }
 
-/** Парсить число або повертає 0 — для UX «порожнє поле → 0». */
 function parseNumberOrZero(v: string): number {
   const n = parseFloat(v.replace(",", "."));
   return Number.isFinite(n) && n >= 0 ? n : 0;

@@ -788,6 +788,9 @@ model ReceivingItem {
   //   'manual'    — введено вручну (наклеєна бірка)
   //   'generated' — згенерує система при проведенні (default)
   barcodeSource String  @default("generated") @map("barcode_source")
+  // Сектор на складі (← правки 2026-06-05). Вільний ввід або сканування
+  // штрихкоду сектора. Переходить на `lot.sector` при проведенні.
+  sector        String?
   createdLotId  String? @map("created_lot_id")
   notes         String?
   createdAt     DateTime @default(now()) @map("created_at")

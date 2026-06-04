@@ -90,21 +90,66 @@ export interface ParsedBarcode {
   articleCode: string | null;
   weight: number | null;
   recognized: boolean;
+  /** Який паттерн розпізнали: 'ltex-internal' | 'ltex-supplier' | 'unknown' */
+  pattern: "ltex-internal" | "ltex-supplier" | "unknown";
 }
 
+/**
+ * Парсер штрихкоду L-TEX (← правки 2026-06-05).
+ *
+ * Підтримує 2 паттерни:
+ *
+ *   1. **Власний паттерн `L-{article}-{seq:05}`** — генерує наша система
+ *      (наприклад `L-040-00001`).
+ *
+ *   2. **Зашитий штрихкод постачальника** — формат `XYYYYYZTTTUUU...`
+ *      довжиною ~25-26 символів де:
+ *        - позиції 2-6 (1-indexed) = артикул товару (5 цифр)
+ *        - позиції 9-11 (1-indexed) = вага × 10 (3 цифри: 180 = 18.0 кг)
+ *      Приклад: `0370474018010000432665008t` → артикул `37047`, вага `18.0`
+ *      кг. Приклад: `1640924015201301512006008T` → артикул `64092`, вага
+ *      `15.2` кг. (узгоджено з user 2026-06-05)
+ *
+ * Сканер у формі поступлення:
+ *   - Якщо `pattern='ltex-supplier'` і `articleCode` знайдено у довіднику
+ *     товарів — авто-додавання рядка з відповідною вагою
+ *   - Якщо нерозпізнано → раз як ШК для лоту (manual режим)
+ */
 export function parseBarcode(raw: string): ParsedBarcode {
   const trimmed = raw.trim();
   // Власний паттерн L-XXX-NNNNN
-  const m = trimmed.match(/^L-([A-Za-z0-9]+)-(\d+)$/);
-  if (m) {
+  const internal = trimmed.match(/^L-([A-Za-z0-9]+)-(\d+)$/);
+  if (internal) {
     return {
       raw: trimmed,
-      articleCode: m[1] ?? null,
+      articleCode: internal[1] ?? null,
       weight: null,
       recognized: true,
+      pattern: "ltex-internal",
     };
   }
-  return { raw: trimmed, articleCode: null, weight: null, recognized: false };
+  // Зашитий паттерн постачальника: довжина ≥ 12 і позиції 2-6 + 9-11 — цифри
+  if (trimmed.length >= 12 && /^[A-Za-z0-9]+$/.test(trimmed)) {
+    const articleRaw = trimmed.slice(1, 6); // 2-6 (1-indexed) → 1..5 (0-indexed)
+    const weightRaw = trimmed.slice(8, 11); // 9-11 (1-indexed) → 8..10 (0-indexed)
+    if (/^\d{5}$/.test(articleRaw) && /^\d{3}$/.test(weightRaw)) {
+      const weight = parseInt(weightRaw, 10) / 10;
+      return {
+        raw: trimmed,
+        articleCode: articleRaw,
+        weight,
+        recognized: true,
+        pattern: "ltex-supplier",
+      };
+    }
+  }
+  return {
+    raw: trimmed,
+    articleCode: null,
+    weight: null,
+    recognized: false,
+    pattern: "unknown",
+  };
 }
 
 function sanitize(v: string | null | undefined): string | null {

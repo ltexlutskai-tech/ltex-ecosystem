@@ -22,6 +22,7 @@ export const receivingItemSchema = z.object({
   purchasePrice: z.number().nonnegative().max(1_000_000).default(0),
   barcode: z.string().trim().min(2).max(64).optional().nullable(),
   barcodeSource: z.enum(BARCODE_SOURCES).default("generated"),
+  sector: z.string().trim().max(64).optional().nullable(),
   notes: z.string().trim().max(500).optional().nullable(),
 });
 export type ReceivingItemInput = z.infer<typeof receivingItemSchema>;

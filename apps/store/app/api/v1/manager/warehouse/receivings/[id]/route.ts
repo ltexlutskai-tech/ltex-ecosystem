@@ -160,6 +160,7 @@ export async function PATCH(
             lineAmount,
             barcode: item.barcode ?? null,
             barcodeSource: item.barcodeSource,
+            sector: item.sector ?? null,
             notes: item.notes ?? null,
           },
         });

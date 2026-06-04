@@ -96,18 +96,56 @@ describe("parseBarcode", () => {
     const res = parseBarcode("L-040-00001");
     expect(res.recognized).toBe(true);
     expect(res.articleCode).toBe("040");
-  });
-
-  it("повертає raw для нерозпізнаних паттернів", () => {
-    const res = parseBarcode("4820012345678");
-    expect(res.recognized).toBe(false);
-    expect(res.articleCode).toBeNull();
-    expect(res.raw).toBe("4820012345678");
+    expect(res.pattern).toBe("ltex-internal");
   });
 
   it("тримує whitespace", () => {
     const res = parseBarcode("  L-X-00001  ");
     expect(res.raw).toBe("L-X-00001");
     expect(res.recognized).toBe(true);
+  });
+
+  // ── Зашитий паттерн постачальника (приклади від user 2026-06-05) ────────
+  it("парсить артикул 37047 + вагу 18.0 з '0370474018010000432665008t'", () => {
+    const res = parseBarcode("0370474018010000432665008t");
+    expect(res.pattern).toBe("ltex-supplier");
+    expect(res.articleCode).toBe("37047");
+    expect(res.weight).toBeCloseTo(18.0, 1);
+  });
+
+  it("парсить артикул 37047 + вагу 18.2 з '137047701820I201592006008T'", () => {
+    const res = parseBarcode("137047701820I201592006008T");
+    expect(res.articleCode).toBe("37047");
+    expect(res.weight).toBeCloseTo(18.2, 1);
+  });
+
+  it("парсить артикул 64092 + вагу 15.2 з '1640924015201301512006008T'", () => {
+    const res = parseBarcode("1640924015201301512006008T");
+    expect(res.articleCode).toBe("64092");
+    expect(res.weight).toBeCloseTo(15.2, 1);
+  });
+
+  it("парсить артикул 64092 + вагу 16.5 з '164092901650G100112006008T'", () => {
+    const res = parseBarcode("164092901650G100112006008T");
+    expect(res.articleCode).toBe("64092");
+    expect(res.weight).toBeCloseTo(16.5, 1);
+  });
+
+  it("парсить артикул 31002 + вагу 28.8 з '03100250288005004426550009'", () => {
+    const res = parseBarcode("03100250288005004426550009");
+    expect(res.articleCode).toBe("31002");
+    expect(res.weight).toBeCloseTo(28.8, 1);
+  });
+
+  it("парсить артикул 31002 + вагу 29.2 з '03100230292003002326550009'", () => {
+    const res = parseBarcode("03100230292003002326550009");
+    expect(res.articleCode).toBe("31002");
+    expect(res.weight).toBeCloseTo(29.2, 1);
+  });
+
+  it("повертає 'unknown' для коротких/невалідних паттернів", () => {
+    const res = parseBarcode("abc");
+    expect(res.pattern).toBe("unknown");
+    expect(res.recognized).toBe(false);
   });
 });

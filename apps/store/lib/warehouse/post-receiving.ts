@@ -116,6 +116,7 @@ export async function postReceiving(
             receivingId: doc.id,
             purchasePriceEur,
             arrivalDate: doc.docDate,
+            sector: item.sector ?? null,
           },
         });
         createdLotIds.push(lot.id);
