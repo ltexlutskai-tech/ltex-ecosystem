@@ -43,9 +43,13 @@ export default async function ReceivingDetailPage({
   });
   if (!doc) notFound();
 
-  const canActWarehouse =
+  // Узгоджено user 2026-06-04: проводити документ може ТІЛЬКИ admin/owner.
+  // Warehouse може лише створювати/редагувати draft + видаляти свої draft.
+  const canPost = user.role === "admin" || user.role === "owner";
+  const canDeleteDraft =
     user.role === "warehouse" || user.role === "admin" || user.role === "owner";
   const canCancel = user.role === "admin" || user.role === "owner";
+  const canSeePrice = user.role === "admin" || user.role === "owner";
 
   return (
     <div className="mx-auto max-w-5xl space-y-4">
@@ -70,7 +74,8 @@ export default async function ReceivingDetailPage({
           <ReceivingActions
             id={doc.id}
             status={doc.status}
-            canActWarehouse={canActWarehouse}
+            canPost={canPost}
+            canDeleteDraft={canDeleteDraft}
             canCancel={canCancel}
           />
         </div>
@@ -78,11 +83,6 @@ export default async function ReceivingDetailPage({
         <div className="mt-4 grid gap-2 text-sm text-gray-700 sm:grid-cols-2 lg:grid-cols-3">
           <Row label="Постачальник" value={doc.supplier.name} />
           <Row label="Склад" value={doc.warehouse.name} />
-          <Row label="Валюта" value={doc.currency} />
-          <Row label="Курс до EUR" value={String(doc.exchangeRate)} />
-          {doc.inboundDocNumber && (
-            <Row label="№ накладної постач." value={doc.inboundDocNumber} />
-          )}
           <Row label="Створив" value={doc.createdBy?.fullName ?? "—"} />
           {doc.postedBy && (
             <Row
@@ -100,11 +100,13 @@ export default async function ReceivingDetailPage({
             label="Сумарна вага"
             value={`${doc.totalWeight.toFixed(1)} кг`}
           />
-          <Row label="Сумарно мішків" value={String(doc.totalQuantity)} />
-          <Row
-            label="Сума документа"
-            value={`${doc.totalAmount.toFixed(2)} ${doc.currency}`}
-          />
+          <Row label="Мішків" value={String(doc.totalQuantity)} />
+          {canSeePrice && (
+            <Row
+              label="Сума документа"
+              value={`${doc.totalAmount.toFixed(2)} €`}
+            />
+          )}
         </div>
 
         {doc.notes && (
@@ -116,50 +118,72 @@ export default async function ReceivingDetailPage({
 
       {/* Рядки */}
       <div className="rounded-md border bg-white p-4">
-        <h2 className="mb-3 text-sm font-medium">Рядки ({doc.items.length})</h2>
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className="text-sm font-medium">Рядки ({doc.items.length})</h2>
+          {doc.items.some((it) => it.barcode) && (
+            <Link
+              href={`/manager/receivings/${doc.id}/labels`}
+              target="_blank"
+              className="rounded-md border border-emerald-300 bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-800 hover:bg-emerald-100"
+            >
+              🖨 Друкувати етикетки
+            </Link>
+          )}
+        </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="text-left text-xs uppercase tracking-wide text-gray-500">
+            <thead className="bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
               <tr>
+                <th className="px-1 py-1.5 w-8">№</th>
+                <th className="px-2 py-1.5 w-20">Артикул</th>
                 <th className="px-2 py-1.5">Товар</th>
-                <th className="px-2 py-1.5 text-right">Вага, кг</th>
-                <th className="px-2 py-1.5 text-right">К-сть</th>
-                <th className="px-2 py-1.5 text-right">Ціна / Сума</th>
-                <th className="px-2 py-1.5">Штрихкод</th>
-                <th className="px-2 py-1.5">Лот</th>
+                <th className="px-2 py-1.5 text-right w-20">Вага, кг</th>
+                <th className="px-2 py-1.5 w-40">Штрихкод</th>
+                {canSeePrice && (
+                  <>
+                    <th className="px-2 py-1.5 text-right w-20">Ціна €</th>
+                    <th className="px-2 py-1.5 text-right w-20">Сума €</th>
+                  </>
+                )}
+                <th className="px-2 py-1.5 w-40">Лот</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {doc.items.map((it) => (
+              {doc.items.map((it, idx) => (
                 <tr key={it.id}>
-                  <td className="px-2 py-1.5 text-gray-900">
+                  <td className="px-1 py-1 text-gray-500">{idx + 1}</td>
+                  <td className="px-2 py-1 text-xs text-gray-600">
+                    {it.product.articleCode ?? "—"}
+                  </td>
+                  <td className="px-2 py-1 text-gray-900">
                     <Link
                       href={`/manager/prices/${it.product.id}`}
                       className="hover:underline"
                     >
                       {it.product.name}
                     </Link>
-                    {it.product.articleCode && (
-                      <span className="ml-1 text-xs text-gray-500">
-                        ({it.product.articleCode})
-                      </span>
-                    )}
                   </td>
-                  <td className="px-2 py-1.5 text-right">
+                  <td className="px-2 py-1 text-right">
                     {it.weight.toFixed(1)}
                   </td>
-                  <td className="px-2 py-1.5 text-right">{it.quantity}</td>
-                  <td className="px-2 py-1.5 text-right text-gray-600 whitespace-nowrap">
-                    {it.purchasePrice.toFixed(2)} / {it.lineAmount.toFixed(2)}
-                  </td>
-                  <td className="px-2 py-1.5 text-xs font-mono">
+                  <td className="px-2 py-1 text-xs font-mono">
                     {it.barcode ?? (
                       <span className="text-gray-400">
                         ({it.barcodeSource})
                       </span>
                     )}
                   </td>
-                  <td className="px-2 py-1.5">
+                  {canSeePrice && (
+                    <>
+                      <td className="px-2 py-1 text-right text-gray-600">
+                        {it.purchasePrice.toFixed(2)}
+                      </td>
+                      <td className="px-2 py-1 text-right text-gray-700">
+                        {it.lineAmount.toFixed(2)}
+                      </td>
+                    </>
+                  )}
+                  <td className="px-2 py-1">
                     {it.createdLot ? (
                       <Link
                         href={`/manager/prices/lots?barcode=${encodeURIComponent(it.createdLot.barcode)}`}

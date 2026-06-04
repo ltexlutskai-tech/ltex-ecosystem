@@ -14,7 +14,7 @@ export default async function NewReceivingPage() {
     prisma.supplier.findMany({
       where: { isActive: true },
       orderBy: { name: "asc" },
-      select: { id: true, name: true, currency: true },
+      select: { id: true, name: true },
     }),
     prisma.warehouse.findMany({
       where: { isActive: true },
@@ -28,18 +28,19 @@ export default async function NewReceivingPage() {
   ]);
 
   return (
-    <div className="mx-auto max-w-5xl space-y-4">
+    <div className="mx-auto max-w-7xl space-y-3">
       <div>
-        <h1 className="text-2xl font-semibold">Нове поступлення</h1>
-        <p className="mt-1 text-sm text-gray-500">
-          Створіть документ-чернетку, додайте рядки, потім проведіть. Після
-          проведення у Прайсі з&apos;являться нові лоти.
+        <h1 className="text-xl font-semibold">Нове поступлення</h1>
+        <p className="mt-0.5 text-xs text-gray-500">
+          Скануйте штрихкоди / введіть вручну / генеруйте нові. Рядок = один
+          мішок (штрихкод унікальний).
         </p>
       </div>
       <ReceivingForm
         suppliers={suppliers}
         warehouses={warehouses}
         defaultWarehouseId={defaultWarehouse?.id ?? warehouses[0]?.id ?? ""}
+        userRole={user.role}
       />
     </div>
   );

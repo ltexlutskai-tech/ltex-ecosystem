@@ -4,20 +4,26 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 /**
- * Кнопки дій для документа поступлення.
- * `draft`     → Провести / Видалити
- * `posted`    → Скасувати (тільки admin/owner)
+ * Кнопки дій для документа поступлення (правки 2026-06-04):
+ * `draft`     → ✅ Провести (admin/owner) / 🗑 Видалити (warehouse може свій)
+ * `posted`    → ⨯ Скасувати (admin/owner)
  * `cancelled` → (немає дій)
+ *
+ * Узгоджено user: warehouse зберігає чернетки, admin/owner перевіряє і
+ * проводить (аналогічно як у 1С: документ спочатку «не проведений» →
+ * відповідальна особа перевіряє → проводить).
  */
 export function ReceivingActions({
   id,
   status,
-  canActWarehouse,
+  canPost,
+  canDeleteDraft,
   canCancel,
 }: {
   id: string;
   status: string;
-  canActWarehouse: boolean;
+  canPost: boolean;
+  canDeleteDraft: boolean;
   canCancel: boolean;
 }) {
   const router = useRouter();
@@ -96,16 +102,18 @@ export function ReceivingActions({
   return (
     <div className="flex flex-col items-end gap-1">
       <div className="flex gap-2">
-        {status === "draft" && canActWarehouse && (
+        {status === "draft" && canPost && (
+          <button
+            type="button"
+            onClick={handlePost}
+            disabled={busy}
+            className="rounded-md bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
+          >
+            ✅ Провести
+          </button>
+        )}
+        {status === "draft" && canDeleteDraft && (
           <>
-            <button
-              type="button"
-              onClick={handlePost}
-              disabled={busy}
-              className="rounded-md bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
-            >
-              ✔ Провести
-            </button>
             <button
               type="button"
               onClick={handleDelete}

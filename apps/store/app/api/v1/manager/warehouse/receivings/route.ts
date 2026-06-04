@@ -37,7 +37,6 @@ export async function GET(req: NextRequest) {
   if (q) {
     where.OR = [
       { docNumber: { contains: q, mode: "insensitive" } },
-      { inboundDocNumber: { contains: q, mode: "insensitive" } },
       { supplier: { name: { contains: q, mode: "insensitive" } } },
     ];
   }
@@ -109,6 +108,33 @@ export async function POST(req: NextRequest) {
 
   const docNumber = await generateReceivingDocNumber(data.docDate);
 
+  // ── Перевірка дублів штрихкодів усередині документа ────────────────────
+  const itemBarcodes = data.items
+    .map((i) => (i.barcode ?? "").trim())
+    .filter((b) => b.length > 0);
+  const dupBarcode = itemBarcodes.find((b, i) => itemBarcodes.indexOf(b) !== i);
+  if (dupBarcode) {
+    return NextResponse.json(
+      { error: `Штрихкод "${dupBarcode}" повторюється у документі` },
+      { status: 400 },
+    );
+  }
+  // Дублі з уже існуючих лотів — також помилка
+  if (itemBarcodes.length > 0) {
+    const existing = await prisma.lot.findMany({
+      where: { barcode: { in: itemBarcodes } },
+      select: { barcode: true },
+    });
+    if (existing.length > 0) {
+      return NextResponse.json(
+        {
+          error: `Штрихкод вже існує у системі: ${existing[0]?.barcode ?? ""}`,
+        },
+        { status: 409 },
+      );
+    }
+  }
+
   // Транзакція: створення документа + рядків
   const created = await prisma.$transaction(async (tx) => {
     const receiving = await tx.receiving.create({
@@ -117,10 +143,9 @@ export async function POST(req: NextRequest) {
         docDate: data.docDate,
         supplierId: data.supplierId,
         warehouseId: data.warehouseId,
-        currency: data.currency,
-        exchangeRate: data.exchangeRate,
-        inboundDocNumber: data.inboundDocNumber,
-        inboundDocDate: data.inboundDocDate,
+        // EUR-only управлінський облік (узгоджено user 2026-06-04)
+        currency: "EUR",
+        exchangeRate: 1,
         notes: data.notes,
         status: "draft",
         createdByUserId: user.id,
@@ -129,15 +154,15 @@ export async function POST(req: NextRequest) {
 
     let totalWeight = 0;
     let totalAmount = 0;
-    let totalQuantity = 0;
     for (const item of data.items) {
-      const lineAmount = item.weight * item.quantity * item.purchasePrice;
+      // quantity завжди = 1 (узгоджено user: штрихкод унікальний → рядок = 1 мішок)
+      const lineAmount = item.weight * item.purchasePrice;
       await tx.receivingItem.create({
         data: {
           receivingId: receiving.id,
           productId: item.productId,
           weight: item.weight,
-          quantity: item.quantity,
+          quantity: 1,
           purchasePrice: item.purchasePrice,
           lineAmount,
           barcode: item.barcode ?? null,
@@ -145,10 +170,10 @@ export async function POST(req: NextRequest) {
           notes: item.notes ?? null,
         },
       });
-      totalWeight += item.weight * item.quantity;
+      totalWeight += item.weight;
       totalAmount += lineAmount;
-      totalQuantity += item.quantity;
     }
+    const totalQuantity = data.items.length;
 
     if (data.items.length > 0) {
       await tx.receiving.update({

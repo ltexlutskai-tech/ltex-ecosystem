@@ -1,12 +1,11 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 interface SupplierOption {
   id: string;
   name: string;
-  currency: string;
 }
 interface WarehouseOption {
   id: string;
@@ -17,12 +16,13 @@ interface ItemDraft {
   uid: string;
   productId: string;
   productName: string;
-  productSearch: string;
+  articleCode: string | null;
   weight: number;
-  quantity: number;
   purchasePrice: number;
   barcode: string;
   barcodeSource: "scanned" | "manual" | "generated";
+  // UI-стан
+  barcodeWarning: string | null;
 }
 
 let uidCounter = 0;
@@ -32,29 +32,44 @@ function nextUid(): string {
 }
 
 /**
- * Форма створення документа поступлення (← Тиждень 2 блоку Поступлення).
- * 3 сценарії штрихкодів (узгоджено з user 2026-06-03 питання 1):
- *  - scanned   → штрихкод зчитано сканером (зашита інфо)
- *  - manual    → введено вручну (паперова бірка)
- *  - generated → згенерує система при проведенні
+ * Форма створення документа поступлення (← правки 2026-06-04).
+ *
+ * Компактна табличного-вигляду форма у стилі 1С:
+ *   - валюта/курс/№ накладної постачальника — прибрано (управ. облік у EUR)
+ *   - quantity завжди = 1 (штрихкод унікальний)
+ *   - ціна закупки прихована для warehouse
+ *   - авто-фокус: вибрав товар → вага → enter → штрихкод → enter → next
+ *   - на штрихкоді робиться live-перевірка дублів
+ *   - 3 кнопки збереження: «Зберегти чернетку» (всі) і «Зберегти і провести»
+ *     (тільки admin/owner) — узгоджено з user 2026-06-04
  */
 export function ReceivingForm({
   suppliers,
   warehouses,
   defaultWarehouseId,
+  userRole,
 }: {
   suppliers: SupplierOption[];
   warehouses: WarehouseOption[];
   defaultWarehouseId: string;
+  userRole:
+    | "warehouse"
+    | "admin"
+    | "owner"
+    | "manager"
+    | "senior_manager"
+    | "supervisor"
+    | "analyst"
+    | "bookkeeper";
 }) {
   const router = useRouter();
 
+  const canSeePrice = userRole === "admin" || userRole === "owner";
+  const canPost = userRole === "admin" || userRole === "owner";
+
   const [supplierId, setSupplierId] = useState(suppliers[0]?.id ?? "");
   const [warehouseId, setWarehouseId] = useState(defaultWarehouseId);
-  const [currency, setCurrency] = useState(suppliers[0]?.currency ?? "EUR");
-  const [exchangeRate, setExchangeRate] = useState(1);
   const [docDate, setDocDate] = useState(new Date().toISOString().slice(0, 10));
-  const [inboundDocNumber, setInboundDocNumber] = useState("");
   const [notes, setNotes] = useState("");
   const [items, setItems] = useState<ItemDraft[]>([]);
   const [productSearch, setProductSearch] = useState("");
@@ -64,27 +79,34 @@ export function ReceivingForm({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Refs для авто-фокусу на полі ваги / штрихкоду останнього доданого рядка
+  const weightRefs = useRef<Record<string, HTMLInputElement | null>>({});
+  const barcodeRefs = useRef<Record<string, HTMLInputElement | null>>({});
+
   function addItem(product: {
     id: string;
     name: string;
     articleCode: string | null;
   }) {
+    const uid = nextUid();
     setItems((arr) => [
       ...arr,
       {
-        uid: nextUid(),
+        uid,
         productId: product.id,
         productName: product.name,
-        productSearch: "",
-        weight: 20,
-        quantity: 1,
+        articleCode: product.articleCode,
+        weight: 0,
         purchasePrice: 0,
         barcode: "",
         barcodeSource: "generated",
+        barcodeWarning: null,
       },
     ]);
     setProductResults([]);
     setProductSearch("");
+    // Авто-фокус на полі ваги нового рядка
+    setTimeout(() => weightRefs.current[uid]?.focus(), 0);
   }
 
   function removeItem(uid: string) {
@@ -115,18 +137,76 @@ export function ReceivingForm({
     }
   }
 
-  function totalWeight() {
-    return items.reduce((s, i) => s + i.weight * i.quantity, 0);
-  }
-  function totalAmount() {
-    return items.reduce(
-      (s, i) => s + i.weight * i.quantity * i.purchasePrice,
-      0,
+  async function checkBarcode(uid: string, code: string) {
+    if (!code || code.length < 2) {
+      updateItem(uid, { barcodeWarning: null });
+      return;
+    }
+    // Локальний дубль у поточному документі
+    const dupLocal = items.find(
+      (i) => i.uid !== uid && i.barcode.trim() === code.trim(),
     );
+    if (dupLocal) {
+      updateItem(uid, {
+        barcodeWarning: `⚠ Дубль: уже у рядку з товаром "${dupLocal.productName}"`,
+      });
+      return;
+    }
+    // Дубль у БД
+    try {
+      const res = await fetch(
+        `/api/v1/manager/warehouse/barcode/check?code=${encodeURIComponent(code)}`,
+      );
+      if (!res.ok) return;
+      const data = (await res.json()) as {
+        exists: boolean;
+        lot: { productName: string; supplierName: string | null } | null;
+      };
+      if (data.exists && data.lot) {
+        updateItem(uid, {
+          barcodeWarning: `⚠ Цей мішок уже у системі: ${data.lot.productName}${
+            data.lot.supplierName ? ` (${data.lot.supplierName})` : ""
+          }`,
+        });
+      } else {
+        updateItem(uid, { barcodeWarning: null });
+      }
+    } catch {
+      // ignore
+    }
   }
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  async function generateBarcode(uid: string, productId: string) {
+    try {
+      const res = await fetch("/api/v1/manager/warehouse/barcode/generate", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ productId }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        alert(data.error ?? "Не вдалося згенерувати штрихкод");
+        return;
+      }
+      const data = (await res.json()) as { barcode: string };
+      updateItem(uid, {
+        barcode: data.barcode,
+        barcodeSource: "generated",
+        barcodeWarning: null,
+      });
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Помилка");
+    }
+  }
+
+  function totalWeight(): number {
+    return items.reduce((s, i) => s + i.weight, 0);
+  }
+  function totalAmount(): number {
+    return items.reduce((s, i) => s + i.weight * i.purchasePrice, 0);
+  }
+
+  async function handleSubmit(postAfter: boolean) {
     setError(null);
     if (!supplierId || !warehouseId) {
       setError("Оберіть постачальника і склад");
@@ -136,6 +216,17 @@ export function ReceivingForm({
       setError("Додайте хоча б один рядок");
       return;
     }
+    // Локальна валідація
+    for (const it of items) {
+      if (it.weight <= 0) {
+        setError(`Вага не вказана для товару "${it.productName}"`);
+        return;
+      }
+      if (it.barcodeWarning) {
+        setError(`Виправте попередження: ${it.barcodeWarning}`);
+        return;
+      }
+    }
     setSaving(true);
     try {
       const res = await fetch("/api/v1/manager/warehouse/receivings", {
@@ -144,15 +235,12 @@ export function ReceivingForm({
         body: JSON.stringify({
           supplierId,
           warehouseId,
-          currency,
-          exchangeRate,
           docDate: new Date(docDate).toISOString(),
-          inboundDocNumber: inboundDocNumber || null,
           notes: notes || null,
           items: items.map((i) => ({
             productId: i.productId,
             weight: i.weight,
-            quantity: i.quantity,
+            quantity: 1,
             purchasePrice: i.purchasePrice,
             barcode: i.barcode || null,
             barcodeSource: i.barcodeSource,
@@ -165,6 +253,22 @@ export function ReceivingForm({
         return;
       }
       const data = await res.json();
+      if (postAfter) {
+        // Одразу проводимо
+        const postRes = await fetch(
+          `/api/v1/manager/warehouse/receivings/${data.id}/post`,
+          { method: "POST" },
+        );
+        if (!postRes.ok) {
+          const errData = await postRes.json().catch(() => ({}));
+          // Документ збережено, але провести не вдалось — переходимо у деталі
+          router.push(`/manager/receivings/${data.id}`);
+          alert(
+            `Документ збережено, але провести не вдалось: ${errData.error ?? postRes.status}`,
+          );
+          return;
+        }
+      }
       router.push(`/manager/receivings/${data.id}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Помилка збереження");
@@ -174,17 +278,13 @@ export function ReceivingForm({
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      {/* Шапка документа */}
-      <section className="grid gap-3 rounded-md border bg-white p-4 sm:grid-cols-2 lg:grid-cols-3">
+    <form onSubmit={(e) => e.preventDefault()} className="space-y-4">
+      {/* Шапка — компактно: постачальник + склад + дата */}
+      <section className="grid gap-2 rounded-md border bg-white p-3 sm:grid-cols-3">
         <Field label="Постачальник *">
           <select
             value={supplierId}
-            onChange={(e) => {
-              setSupplierId(e.target.value);
-              const s = suppliers.find((x) => x.id === e.target.value);
-              if (s) setCurrency(s.currency);
-            }}
+            onChange={(e) => setSupplierId(e.target.value)}
             required
             className="w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm"
           >
@@ -196,7 +296,6 @@ export function ReceivingForm({
             ))}
           </select>
         </Field>
-
         <Field label="Склад *">
           <select
             value={warehouseId}
@@ -211,7 +310,6 @@ export function ReceivingForm({
             ))}
           </select>
         </Field>
-
         <Field label="Дата документа *">
           <input
             type="date"
@@ -221,55 +319,25 @@ export function ReceivingForm({
             className="w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm"
           />
         </Field>
-
-        <Field label="Валюта">
-          <select
-            value={currency}
-            onChange={(e) => setCurrency(e.target.value)}
-            className="w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm"
-          >
-            <option>EUR</option>
-            <option>USD</option>
-            <option>UAH</option>
-          </select>
-        </Field>
-
-        <Field label="Курс до EUR">
-          <input
-            type="number"
-            min="0.0001"
-            step="0.0001"
-            value={exchangeRate}
-            onChange={(e) => setExchangeRate(Number(e.target.value))}
-            disabled={currency === "EUR"}
-            className="w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm disabled:bg-gray-100"
-          />
-        </Field>
-
-        <Field label="№ накладної постачальника">
-          <input
-            type="text"
-            value={inboundDocNumber}
-            onChange={(e) => setInboundDocNumber(e.target.value)}
-            className="w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm"
-          />
-        </Field>
       </section>
 
-      {/* Рядки товарів */}
-      <section className="rounded-md border bg-white p-4">
-        <div className="mb-3 flex items-center justify-between">
+      {/* Пошук + результат */}
+      <section className="rounded-md border bg-white p-3">
+        <div className="mb-2 flex items-center justify-between">
           <h2 className="text-sm font-medium">
             Рядки документа ({items.length})
           </h2>
+          <div className="text-xs text-gray-500">
+            Σ {totalWeight().toFixed(1)} кг
+            {canSeePrice && ` · Σ ${totalAmount().toFixed(2)} €`}
+          </div>
         </div>
-
-        <div className="mb-3 space-y-1">
+        <div className="mb-2 space-y-1">
           <input
             type="search"
             value={productSearch}
             onChange={(e) => searchProducts(e.target.value)}
-            placeholder="Знайти товар (назва / артикул / 1С-код)…"
+            placeholder="🔍 Знайти товар (назва / артикул / 1С-код)…"
             className="w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm"
           />
           {productResults.length > 0 && (
@@ -279,7 +347,7 @@ export function ReceivingForm({
                   <button
                     type="button"
                     onClick={() => addItem(p)}
-                    className="block w-full px-3 py-1.5 text-left text-sm hover:bg-gray-50"
+                    className="block w-full px-3 py-1.5 text-left text-sm hover:bg-emerald-50"
                   >
                     <span className="font-medium">{p.name}</span>
                     {p.articleCode && (
@@ -294,6 +362,7 @@ export function ReceivingForm({
           )}
         </div>
 
+        {/* Компактна таблиця */}
         {items.length === 0 ? (
           <div className="rounded-md border border-dashed border-gray-200 p-4 text-center text-sm text-gray-500">
             Знайдіть товар у полі вище і додайте.
@@ -301,101 +370,122 @@ export function ReceivingForm({
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="text-left text-xs uppercase tracking-wide text-gray-500">
+              <thead className="bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
                 <tr>
-                  <th className="py-1.5 pr-2">Товар</th>
-                  <th className="py-1.5 pr-2">Вага, кг</th>
-                  <th className="py-1.5 pr-2">К-сть</th>
-                  <th className="py-1.5 pr-2">Ціна закупки</th>
-                  <th className="py-1.5 pr-2">Штрихкод</th>
-                  <th className="py-1.5 pr-2">Спосіб</th>
-                  <th className="py-1.5"></th>
+                  <th className="px-1 py-1.5 w-8">№</th>
+                  <th className="px-2 py-1.5 w-20">Артикул</th>
+                  <th className="px-2 py-1.5">Товар</th>
+                  <th className="px-2 py-1.5 w-24">Вага, кг</th>
+                  <th className="px-2 py-1.5 w-44">Штрихкод</th>
+                  {canSeePrice && (
+                    <th className="px-2 py-1.5 w-24">Ціна закупки €/кг</th>
+                  )}
+                  <th className="px-2 py-1.5 w-24">Спосіб</th>
+                  <th className="px-1 py-1.5 w-12"></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {items.map((it) => (
+                {items.map((it, idx) => (
                   <tr key={it.uid}>
-                    <td className="py-1.5 pr-2 align-top text-gray-900">
-                      {it.productName}
+                    <td className="px-1 py-1 text-gray-500">{idx + 1}</td>
+                    <td className="px-2 py-1 text-xs text-gray-600">
+                      {it.articleCode ?? "—"}
                     </td>
-                    <td className="py-1.5 pr-2 align-top">
-                      <input
-                        type="number"
-                        min="0.001"
-                        step="0.1"
-                        value={it.weight}
-                        onChange={(e) =>
-                          updateItem(it.uid, { weight: Number(e.target.value) })
-                        }
-                        className="w-20 rounded border border-gray-300 px-1.5 py-1 text-sm"
-                      />
+                    <td className="px-2 py-1 text-gray-900">
+                      <div className="truncate">{it.productName}</div>
+                      {it.barcodeWarning && (
+                        <div className="mt-0.5 text-xs text-amber-700">
+                          {it.barcodeWarning}
+                        </div>
+                      )}
                     </td>
-                    <td className="py-1.5 pr-2 align-top">
+                    <td className="px-2 py-1">
                       <input
-                        type="number"
-                        min="1"
-                        step="1"
-                        value={it.quantity}
-                        onChange={(e) =>
-                          updateItem(it.uid, {
-                            quantity: Number(e.target.value),
-                          })
-                        }
-                        className="w-16 rounded border border-gray-300 px-1.5 py-1 text-sm"
-                      />
-                    </td>
-                    <td className="py-1.5 pr-2 align-top">
-                      <input
+                        ref={(el) => {
+                          weightRefs.current[it.uid] = el;
+                        }}
                         type="number"
                         min="0"
-                        step="0.01"
-                        value={it.purchasePrice}
+                        step="0.1"
+                        value={it.weight}
+                        onFocus={(e) => e.currentTarget.select()}
                         onChange={(e) =>
                           updateItem(it.uid, {
-                            purchasePrice: Number(e.target.value),
+                            weight: parseNumberOrZero(e.target.value),
                           })
                         }
-                        className="w-24 rounded border border-gray-300 px-1.5 py-1 text-sm"
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            barcodeRefs.current[it.uid]?.focus();
+                          }
+                        }}
+                        className="w-full rounded border border-gray-300 px-1.5 py-1 text-sm text-right"
                       />
                     </td>
-                    <td className="py-1.5 pr-2 align-top">
+                    <td className="px-2 py-1">
                       <input
+                        ref={(el) => {
+                          barcodeRefs.current[it.uid] = el;
+                        }}
                         type="text"
                         value={it.barcode}
-                        onChange={(e) =>
+                        onChange={(e) => {
+                          const v = e.target.value;
                           updateItem(it.uid, {
-                            barcode: e.target.value,
+                            barcode: v,
                             barcodeSource:
-                              e.target.value.length > 0
-                                ? "manual"
-                                : "generated",
-                          })
-                        }
-                        placeholder={
-                          it.barcodeSource === "generated"
-                            ? "(згенерується)"
-                            : ""
-                        }
-                        className="w-36 rounded border border-gray-300 px-1.5 py-1 text-sm"
+                              v.length > 0 ? "manual" : "generated",
+                          });
+                        }}
+                        onBlur={(e) => checkBarcode(it.uid, e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            checkBarcode(it.uid, e.currentTarget.value);
+                            // Поставити фокус на пошук для наступного товару
+                            (
+                              document.querySelector(
+                                'input[type="search"]',
+                              ) as HTMLInputElement | null
+                            )?.focus();
+                          }
+                        }}
+                        placeholder="(згенерується)"
+                        className={`w-full rounded border px-1.5 py-1 font-mono text-xs ${
+                          it.barcodeWarning
+                            ? "border-amber-400 bg-amber-50"
+                            : "border-gray-300"
+                        }`}
                       />
                     </td>
-                    <td className="py-1.5 pr-2 align-top">
-                      <select
-                        value={it.barcodeSource}
-                        onChange={(e) =>
-                          updateItem(it.uid, {
-                            barcodeSource: e.target
-                              .value as ItemDraft["barcodeSource"],
-                          })
-                        }
-                        className="rounded border border-gray-300 px-1.5 py-1 text-sm"
+                    {canSeePrice && (
+                      <td className="px-2 py-1">
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={it.purchasePrice}
+                          onFocus={(e) => e.currentTarget.select()}
+                          onChange={(e) =>
+                            updateItem(it.uid, {
+                              purchasePrice: parseNumberOrZero(e.target.value),
+                            })
+                          }
+                          className="w-full rounded border border-gray-300 px-1.5 py-1 text-sm text-right"
+                        />
+                      </td>
+                    )}
+                    <td className="px-2 py-1">
+                      <button
+                        type="button"
+                        onClick={() => generateBarcode(it.uid, it.productId)}
+                        className="rounded border border-emerald-300 bg-emerald-50 px-1.5 py-0.5 text-xs text-emerald-800 hover:bg-emerald-100"
                       >
-                        <option value="generated">Згенерувати</option>
-                        <option value="manual">Вручну</option>
-                        <option value="scanned">Зі сканера</option>
-                      </select>
+                        🎯 Згенер.
+                      </button>
                     </td>
-                    <td className="py-1.5 align-top">
+                    <td className="px-1 py-1 text-center">
                       <button
                         type="button"
                         onClick={() => removeItem(it.uid)}
@@ -408,19 +498,6 @@ export function ReceivingForm({
                   </tr>
                 ))}
               </tbody>
-              <tfoot className="text-sm font-medium text-gray-700">
-                <tr>
-                  <td className="pt-2"></td>
-                  <td className="pt-2">Σ {totalWeight().toFixed(1)} кг</td>
-                  <td className="pt-2">
-                    Σ {items.reduce((s, i) => s + i.quantity, 0)} шт
-                  </td>
-                  <td className="pt-2">
-                    Σ {totalAmount().toFixed(2)} {currency}
-                  </td>
-                  <td colSpan={3}></td>
-                </tr>
-              </tfoot>
             </table>
           </div>
         )}
@@ -441,14 +518,25 @@ export function ReceivingForm({
         </div>
       )}
 
-      <div className="flex gap-2">
+      <div className="flex flex-wrap gap-2">
         <button
-          type="submit"
+          type="button"
+          onClick={() => handleSubmit(false)}
           disabled={saving}
-          className="rounded-md bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
+          className="rounded-md bg-gray-800 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700 disabled:opacity-50"
         >
-          {saving ? "Зберігаю…" : "Зберегти як чернетку"}
+          {saving ? "Зберігаю…" : "💾 Зберегти чернетку"}
         </button>
+        {canPost && (
+          <button
+            type="button"
+            onClick={() => handleSubmit(true)}
+            disabled={saving}
+            className="rounded-md bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
+          >
+            {saving ? "…" : "✅ Зберегти і провести"}
+          </button>
+        )}
         <button
           type="button"
           onClick={() => router.push("/manager/receivings")}
@@ -456,9 +544,20 @@ export function ReceivingForm({
         >
           Скасувати
         </button>
+        {!canPost && items.length > 0 && (
+          <div className="ml-auto text-xs text-gray-500 self-center">
+            ℹ Документ буде проведено адміністратором/власником після перевірки
+          </div>
+        )}
       </div>
     </form>
   );
+}
+
+/** Парсить число або повертає 0 — для UX «порожнє поле → 0». */
+function parseNumberOrZero(v: string): number {
+  const n = parseFloat(v.replace(",", "."));
+  return Number.isFinite(n) && n >= 0 ? n : 0;
 }
 
 function Field({

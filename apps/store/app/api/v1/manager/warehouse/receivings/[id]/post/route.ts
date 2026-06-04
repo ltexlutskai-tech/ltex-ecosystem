@@ -1,15 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/manager-auth";
-import { canEdit } from "@/lib/permissions/role-permissions";
 import { logAuditEvent } from "@/lib/audit/audit-log";
 import { postReceiving, ReceivingError } from "@/lib/warehouse/post-receiving";
 
 /**
  * POST /api/v1/manager/warehouse/receivings/[id]/post
  *
- * Проводить документ → транзакційно створює лоти + апдейт балансу складу.
- * Тільки якщо документ у статусі `draft` і має хоча б 1 рядок.
- * Аналог 1С `ОбработкаПроведения` для `ПоступленняТоварівУслуг`.
+ * Проведення документа — ТІЛЬКИ admin/owner (узгоджено з user 2026-06-04):
+ * warehouse зберігає чернетку, admin/owner перевіряє і проводить
+ * (аналогічно як у 1С: «Зберегти» vs «Записати і провести»).
+ *
+ * Транзакційно створює лоти + апдейт балансу. Аналог 1С
+ * `ОбработкаПроведения` документа `ПоступленняТоварівУслуг`.
  */
 export async function POST(
   req: NextRequest,
@@ -19,8 +21,11 @@ export async function POST(
   if (!user) {
     return NextResponse.json({ error: "Не авторизовано" }, { status: 401 });
   }
-  if (!canEdit({ role: user.role }, "receivings")) {
-    return NextResponse.json({ error: "Нема доступу" }, { status: 403 });
+  if (user.role !== "admin" && user.role !== "owner") {
+    return NextResponse.json(
+      { error: "Проводити документ може лише admin або owner" },
+      { status: 403 },
+    );
   }
   const { id } = await params;
 

@@ -110,21 +110,52 @@ export async function PATCH(
   }
   const data = parsed.data;
 
+  // Перевірка дублів штрихкодів у нових items
+  if (data.items !== undefined) {
+    const itemBarcodes = data.items
+      .map((i) => (i.barcode ?? "").trim())
+      .filter((b) => b.length > 0);
+    const dup = itemBarcodes.find((b, i) => itemBarcodes.indexOf(b) !== i);
+    if (dup) {
+      return NextResponse.json(
+        { error: `Штрихкод "${dup}" повторюється у документі` },
+        { status: 400 },
+      );
+    }
+    if (itemBarcodes.length > 0) {
+      const existing = await prisma.lot.findMany({
+        where: {
+          barcode: { in: itemBarcodes },
+          // Виключаємо лоти що належать цьому ж документу (раніше створені)
+          receivingId: { not: id },
+        },
+        select: { barcode: true },
+      });
+      if (existing.length > 0) {
+        return NextResponse.json(
+          {
+            error: `Штрихкод вже існує у системі: ${existing[0]?.barcode ?? ""}`,
+          },
+          { status: 409 },
+        );
+      }
+    }
+  }
+
   const updated = await prisma.$transaction(async (tx) => {
     // Якщо передано items — replace-all
     if (data.items !== undefined) {
       await tx.receivingItem.deleteMany({ where: { receivingId: id } });
       let totalWeight = 0;
       let totalAmount = 0;
-      let totalQuantity = 0;
       for (const item of data.items) {
-        const lineAmount = item.weight * item.quantity * item.purchasePrice;
+        const lineAmount = item.weight * item.purchasePrice;
         await tx.receivingItem.create({
           data: {
             receivingId: id,
             productId: item.productId,
             weight: item.weight,
-            quantity: item.quantity,
+            quantity: 1,
             purchasePrice: item.purchasePrice,
             lineAmount,
             barcode: item.barcode ?? null,
@@ -132,20 +163,18 @@ export async function PATCH(
             notes: item.notes ?? null,
           },
         });
-        totalWeight += item.weight * item.quantity;
+        totalWeight += item.weight;
         totalAmount += lineAmount;
-        totalQuantity += item.quantity;
       }
+      const totalQuantity = data.items.length;
       return tx.receiving.update({
         where: { id },
         data: {
           supplierId: data.supplierId,
           warehouseId: data.warehouseId,
           docDate: data.docDate,
-          currency: data.currency,
-          exchangeRate: data.exchangeRate,
-          inboundDocNumber: data.inboundDocNumber,
-          inboundDocDate: data.inboundDocDate,
+          currency: "EUR",
+          exchangeRate: 1,
           notes: data.notes,
           totalWeight,
           totalAmount,
@@ -160,10 +189,6 @@ export async function PATCH(
         supplierId: data.supplierId,
         warehouseId: data.warehouseId,
         docDate: data.docDate,
-        currency: data.currency,
-        exchangeRate: data.exchangeRate,
-        inboundDocNumber: data.inboundDocNumber,
-        inboundDocDate: data.inboundDocDate,
         notes: data.notes,
       },
     });
