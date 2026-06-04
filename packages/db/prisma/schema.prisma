@@ -825,6 +825,9 @@ model ReceivingItem {
   quantity      Int    @default(1)
   // Ціна закупки за кг (у валюті документа `receivings.currency`)
   purchasePrice Float  @default(0) @map("purchase_price")
+  // Ціна продажу (€/кг) — vid admin/owner для актуалізації прайсу при
+  // проведенні. Null = ціна не змінювалась (← правки 2026-06-05).
+  salePrice     Float? @map("sale_price")
   lineAmount    Float  @default(0) @map("line_amount")
   // Штрихкод. null коли треба згенерувати при проведенні (3-й сценарій).
   barcode String?

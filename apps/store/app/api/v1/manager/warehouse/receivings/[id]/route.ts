@@ -157,6 +157,7 @@ export async function PATCH(
             weight: item.weight,
             quantity: 1,
             purchasePrice: item.purchasePrice,
+            salePrice: item.salePrice ?? null,
             lineAmount,
             barcode: item.barcode ?? null,
             barcodeSource: item.barcodeSource,

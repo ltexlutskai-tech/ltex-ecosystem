@@ -20,6 +20,7 @@ export const receivingItemSchema = z.object({
   // Залишено у схемі для backward-compat, але .default(1) і ігнорується.
   quantity: z.literal(1).default(1),
   purchasePrice: z.number().nonnegative().max(1_000_000).default(0),
+  salePrice: z.number().nonnegative().max(1_000_000).optional().nullable(),
   barcode: z.string().trim().min(2).max(64).optional().nullable(),
   barcodeSource: z.enum(BARCODE_SOURCES).default("generated"),
   sector: z.string().trim().max(64).optional().nullable(),

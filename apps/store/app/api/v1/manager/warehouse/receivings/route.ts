@@ -165,6 +165,7 @@ export async function POST(req: NextRequest) {
           weight: item.weight,
           quantity: 1,
           purchasePrice: item.purchasePrice,
+          salePrice: item.salePrice ?? null,
           lineAmount,
           barcode: item.barcode ?? null,
           barcodeSource: item.barcodeSource,

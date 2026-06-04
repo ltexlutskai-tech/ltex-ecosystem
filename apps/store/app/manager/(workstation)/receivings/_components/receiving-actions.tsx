@@ -72,6 +72,33 @@ export function ReceivingActions({
     }
   }
 
+  async function handleReopen() {
+    if (
+      !confirm(
+        "Розпровести документ? Створені лоти буде видалено, документ повернеться у чернетку. Дані рядків залишаться.",
+      )
+    )
+      return;
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch(
+        `/api/v1/manager/warehouse/receivings/${id}/reopen`,
+        { method: "POST" },
+      );
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setError(data.error ?? `HTTP ${res.status}`);
+        return;
+      }
+      router.push(`/manager/receivings/${id}/edit`);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Помилка");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function handleCancel() {
     const reason = prompt("Причина скасування проведеного документа:", "");
     if (!reason || reason.trim().length < 3) return;
@@ -133,14 +160,25 @@ export function ReceivingActions({
           </>
         )}
         {status === "posted" && canCancel && (
-          <button
-            type="button"
-            onClick={handleCancel}
-            disabled={busy}
-            className="rounded-md border border-amber-300 bg-white px-3 py-1.5 text-sm text-amber-800 hover:bg-amber-50 disabled:opacity-50"
-          >
-            ⨯ Скасувати проведення
-          </button>
+          <>
+            <button
+              type="button"
+              onClick={handleReopen}
+              disabled={busy}
+              className="rounded-md border border-emerald-300 bg-white px-3 py-1.5 text-sm text-emerald-800 hover:bg-emerald-50 disabled:opacity-50"
+              title="Повернути у чернетку для редагування"
+            >
+              ↩ Розпровести
+            </button>
+            <button
+              type="button"
+              onClick={handleCancel}
+              disabled={busy}
+              className="rounded-md border border-amber-300 bg-white px-3 py-1.5 text-sm text-amber-800 hover:bg-amber-50 disabled:opacity-50"
+            >
+              ⨯ Скасувати проведення
+            </button>
+          </>
         )}
       </div>
       {error && <div className="text-xs text-red-700">{error}</div>}

@@ -150,7 +150,8 @@ export default async function ReceivingDetailPage({
                 <th className="px-2 py-1.5 w-40">Штрихкод</th>
                 {canSeePrice && (
                   <>
-                    <th className="px-2 py-1.5 text-right w-20">Ціна €</th>
+                    <th className="px-2 py-1.5 text-right w-20">Закуп. €</th>
+                    <th className="px-2 py-1.5 text-right w-20">Продаж €</th>
                     <th className="px-2 py-1.5 text-right w-20">Сума €</th>
                   </>
                 )}
@@ -186,6 +187,9 @@ export default async function ReceivingDetailPage({
                     <>
                       <td className="px-2 py-1 text-right text-gray-600">
                         {it.purchasePrice.toFixed(2)}
+                      </td>
+                      <td className="px-2 py-1 text-right text-emerald-700">
+                        {it.salePrice != null ? it.salePrice.toFixed(2) : "—"}
                       </td>
                       <td className="px-2 py-1 text-right text-gray-700">
                         {it.lineAmount.toFixed(2)}

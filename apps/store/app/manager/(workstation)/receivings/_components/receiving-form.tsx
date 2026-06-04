@@ -19,6 +19,7 @@ interface ItemDraft {
   articleCode: string | null;
   weight: number;
   purchasePrice: number;
+  salePrice: number;
   barcode: string;
   barcodeSource: "scanned" | "manual" | "generated";
   sector: string;
@@ -59,6 +60,7 @@ export interface ReceivingFormInitial {
     articleCode: string | null;
     weight: number;
     purchasePrice: number;
+    salePrice?: number;
     barcode: string;
     barcodeSource: "scanned" | "manual" | "generated";
     sector: string;
@@ -111,6 +113,7 @@ export function ReceivingForm({
           articleCode: it.articleCode,
           weight: it.weight,
           purchasePrice: it.purchasePrice,
+          salePrice: it.salePrice ?? 0,
           barcode: it.barcode,
           barcodeSource: it.barcodeSource,
           sector: it.sector,
@@ -189,6 +192,7 @@ export function ReceivingForm({
             articleCode: it.articleCode ?? null,
             weight: it.weight ?? 0,
             purchasePrice: it.purchasePrice ?? 0,
+            salePrice: it.salePrice ?? 0,
             barcode: it.barcode ?? "",
             barcodeSource: it.barcodeSource ?? "generated",
             sector: it.sector ?? "",
@@ -230,6 +234,7 @@ export function ReceivingForm({
             articleCode: it.articleCode,
             weight: it.weight,
             purchasePrice: it.purchasePrice,
+            salePrice: it.salePrice,
             barcode: it.barcode,
             barcodeSource: it.barcodeSource,
             sector: it.sector,
@@ -251,6 +256,21 @@ export function ReceivingForm({
     try {
       const res = await fetch(
         `/api/v1/manager/warehouse/last-purchase-price?productId=${encodeURIComponent(productId)}&supplierId=${encodeURIComponent(supplierId)}`,
+      );
+      if (!res.ok) return 0;
+      const data = (await res.json()) as { price: number | null };
+      return data.price ?? 0;
+    } catch {
+      return 0;
+    }
+  }
+
+  // Автопідстановка поточної ціни продажу (правки 2026-06-05)
+  async function fetchLastSalePrice(productId: string): Promise<number> {
+    if (!canSeePrice) return 0;
+    try {
+      const res = await fetch(
+        `/api/v1/manager/warehouse/last-sale-price?productId=${encodeURIComponent(productId)}`,
       );
       if (!res.ok) return 0;
       const data = (await res.json()) as { price: number | null };
@@ -288,7 +308,10 @@ export function ReceivingForm({
         return true; // обробка завершена (хай навіть негативна)
       }
       const uid = nextUid();
-      const lastPrice = await fetchLastPrice(data.product!.id);
+      const [lastPurchase, lastSale] = await Promise.all([
+        fetchLastPrice(data.product!.id),
+        fetchLastSalePrice(data.product!.id),
+      ]);
       setItems((arr) => [
         ...arr,
         {
@@ -297,7 +320,8 @@ export function ReceivingForm({
           productName: data.product!.name,
           articleCode: data.product!.articleCode,
           weight: data.weight ?? 0,
-          purchasePrice: lastPrice,
+          purchasePrice: lastPurchase,
+          salePrice: lastSale,
           barcode: trimmed,
           barcodeSource: "scanned",
           sector: "",
@@ -333,6 +357,7 @@ export function ReceivingForm({
         articleCode: product.articleCode,
         weight: 0,
         purchasePrice: 0,
+        salePrice: 0,
         barcode: "",
         barcodeSource: "generated",
         sector: "",
@@ -343,15 +368,18 @@ export function ReceivingForm({
     setProductSearch("");
     setHighlightedIdx(0);
     setTimeout(() => weightRefs.current[uid]?.focus(), 0);
-    // Автопідстановка останньої ціни закупки (Хвиля 2 правок)
-    const lastPrice = await fetchLastPrice(product.id);
-    if (lastPrice > 0) {
-      setItems((arr) =>
-        arr.map((i) =>
-          i.uid === uid ? { ...i, purchasePrice: lastPrice } : i,
-        ),
-      );
-    }
+    // Автопідстановка останніх цін (закупки + продажу) — правки 2026-06-05
+    const [lastPurchase, lastSale] = await Promise.all([
+      fetchLastPrice(product.id),
+      fetchLastSalePrice(product.id),
+    ]);
+    setItems((arr) =>
+      arr.map((i) =>
+        i.uid === uid
+          ? { ...i, purchasePrice: lastPurchase, salePrice: lastSale }
+          : i,
+      ),
+    );
   }
 
   function copyItem(srcUid: string) {
@@ -367,6 +395,7 @@ export function ReceivingForm({
         articleCode: src.articleCode,
         weight: 0,
         purchasePrice: src.purchasePrice,
+        salePrice: src.salePrice,
         barcode: "",
         barcodeSource: "generated",
         sector: src.sector,
@@ -556,6 +585,7 @@ export function ReceivingForm({
             weight: i.weight,
             quantity: 1,
             purchasePrice: i.purchasePrice,
+            salePrice: i.salePrice > 0 ? i.salePrice : null,
             barcode: i.barcode || null,
             barcodeSource: i.barcodeSource,
             sector: i.sector || null,
@@ -751,7 +781,10 @@ export function ReceivingForm({
                   <th className="px-2 py-1.5 w-44">Штрихкод</th>
                   <th className="px-2 py-1.5 w-24">Сектор</th>
                   {canSeePrice && (
-                    <th className="px-2 py-1.5 w-20">Ціна закуп. €/кг</th>
+                    <>
+                      <th className="px-2 py-1.5 w-20">Ціна закуп. €/кг</th>
+                      <th className="px-2 py-1.5 w-20">Ціна прод. €/кг</th>
+                    </>
                   )}
                   <th className="px-1 py-1.5 w-32">Дії</th>
                 </tr>
@@ -840,30 +873,49 @@ export function ReceivingForm({
                       />
                     </td>
                     {canSeePrice && (
-                      <td className="px-2 py-1">
-                        <input
-                          ref={(el) => {
-                            priceRefs.current[it.uid] = el;
-                          }}
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          value={it.purchasePrice}
-                          onFocus={(e) => e.currentTarget.select()}
-                          onChange={(e) =>
-                            updateItem(it.uid, {
-                              purchasePrice: parseNumberOrZero(e.target.value),
-                            })
-                          }
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter") {
-                              e.preventDefault();
-                              focusPriceOfNextRow(it.uid);
+                      <>
+                        <td className="px-2 py-1">
+                          <input
+                            ref={(el) => {
+                              priceRefs.current[it.uid] = el;
+                            }}
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={it.purchasePrice}
+                            onFocus={(e) => e.currentTarget.select()}
+                            onChange={(e) =>
+                              updateItem(it.uid, {
+                                purchasePrice: parseNumberOrZero(
+                                  e.target.value,
+                                ),
+                              })
                             }
-                          }}
-                          className="w-full rounded border border-gray-300 px-1.5 py-1 text-sm text-right"
-                        />
-                      </td>
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") {
+                                e.preventDefault();
+                                focusPriceOfNextRow(it.uid);
+                              }
+                            }}
+                            className="w-full rounded border border-gray-300 px-1.5 py-1 text-sm text-right"
+                          />
+                        </td>
+                        <td className="px-2 py-1">
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={it.salePrice}
+                            onFocus={(e) => e.currentTarget.select()}
+                            onChange={(e) =>
+                              updateItem(it.uid, {
+                                salePrice: parseNumberOrZero(e.target.value),
+                              })
+                            }
+                            className="w-full rounded border border-emerald-200 bg-emerald-50/40 px-1.5 py-1 text-sm text-right"
+                          />
+                        </td>
+                      </>
                     )}
                     <td className="px-1 py-1">
                       <div className="flex items-center gap-1">

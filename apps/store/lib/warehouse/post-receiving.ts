@@ -136,21 +136,45 @@ export async function postReceiving(
       }
     }
 
-    // Реєструємо ціни закупки (Хвиля 2 правок). Для кожного рядка з price > 0
-    // пишемо запис у регістр історії — щоб наступного разу автопідставляти
-    // останню ціну при додаванні товару з тим самим постачальником.
+    // Реєструємо ціни закупки + продажу при проведенні (правки 2026-06-05).
+    // - purchasePrice → PurchasePrice (історія для автопідстановки)
+    // - salePrice → Price (priceType='wholesale') — одразу актуалізує прайс
     for (const item of doc.items) {
       if (item.purchasePrice > 0) {
         await tx.purchasePrice.create({
           data: {
             productId: item.productId,
             supplierId: doc.supplierId,
-            // Конвертуємо у EUR (документ завжди у EUR — узгоджено 2026-06-04)
             priceEur: item.purchasePrice,
             validFrom: doc.docDate,
             source: "receiving",
             receivingId: doc.id,
             receivingItemId: item.id,
+          },
+        });
+      }
+      if (
+        item.salePrice !== null &&
+        item.salePrice !== undefined &&
+        item.salePrice > 0
+      ) {
+        // Оновлюємо актуальний прайс. Закриваємо попередню активну ціну
+        // (validTo = now), створюємо новий запис.
+        await tx.price.updateMany({
+          where: {
+            productId: item.productId,
+            priceType: "wholesale",
+            validTo: null,
+          },
+          data: { validTo: doc.docDate },
+        });
+        await tx.price.create({
+          data: {
+            productId: item.productId,
+            priceType: "wholesale",
+            currency: "EUR",
+            amount: item.salePrice,
+            validFrom: doc.docDate,
           },
         });
       }

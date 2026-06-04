@@ -87,6 +87,7 @@ export default async function EditReceivingPage({
             articleCode: it.product.articleCode,
             weight: it.weight,
             purchasePrice: it.purchasePrice,
+            salePrice: it.salePrice ?? 0,
             barcode: it.barcode ?? "",
             barcodeSource: it.barcodeSource as
               | "scanned"
