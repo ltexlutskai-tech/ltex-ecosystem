@@ -47,11 +47,30 @@ function nextUid(): string {
  * Per-row дії: Копіювати (дублювати товар без ваги), Згенерувати ШК,
  * Друкувати етикетку (відкриває нову вкладку з 1 етикеткою), ×.
  */
+export interface ReceivingFormInitial {
+  id: string;
+  supplierId: string;
+  warehouseId: string;
+  docDate: string; // ISO date (YYYY-MM-DD)
+  notes: string;
+  items: Array<{
+    productId: string;
+    productName: string;
+    articleCode: string | null;
+    weight: number;
+    purchasePrice: number;
+    barcode: string;
+    barcodeSource: "scanned" | "manual" | "generated";
+    sector: string;
+  }>;
+}
+
 export function ReceivingForm({
   suppliers,
   warehouses,
   defaultWarehouseId,
   userRole,
+  initial,
 }: {
   suppliers: SupplierOption[];
   warehouses: WarehouseOption[];
@@ -65,16 +84,40 @@ export function ReceivingForm({
     | "supervisor"
     | "analyst"
     | "bookkeeper";
+  /** Якщо передано — режим РЕДАГУВАННЯ існуючої чернетки (PATCH). */
+  initial?: ReceivingFormInitial;
 }) {
   const router = useRouter();
   const canSeePrice = userRole === "admin" || userRole === "owner";
   const canPost = userRole === "admin" || userRole === "owner";
+  const isEdit = !!initial;
 
-  const [supplierId, setSupplierId] = useState(suppliers[0]?.id ?? "");
-  const [warehouseId, setWarehouseId] = useState(defaultWarehouseId);
-  const [docDate, setDocDate] = useState(new Date().toISOString().slice(0, 10));
-  const [notes, setNotes] = useState("");
-  const [items, setItems] = useState<ItemDraft[]>([]);
+  const [supplierId, setSupplierId] = useState(
+    initial?.supplierId ?? suppliers[0]?.id ?? "",
+  );
+  const [warehouseId, setWarehouseId] = useState(
+    initial?.warehouseId ?? defaultWarehouseId,
+  );
+  const [docDate, setDocDate] = useState(
+    initial?.docDate ?? new Date().toISOString().slice(0, 10),
+  );
+  const [notes, setNotes] = useState(initial?.notes ?? "");
+  const [items, setItems] = useState<ItemDraft[]>(
+    initial
+      ? initial.items.map((it) => ({
+          uid: nextUid(),
+          productId: it.productId,
+          productName: it.productName,
+          articleCode: it.articleCode,
+          weight: it.weight,
+          purchasePrice: it.purchasePrice,
+          barcode: it.barcode,
+          barcodeSource: it.barcodeSource,
+          sector: it.sector,
+          barcodeWarning: null,
+        }))
+      : [],
+  );
   const [productSearch, setProductSearch] = useState("");
   const [productResults, setProductResults] = useState<
     { id: string; name: string; articleCode: string | null }[]
@@ -104,7 +147,7 @@ export function ReceivingForm({
   // ── Авто-збереження у localStorage ────────────────────────────────────────
   // Уникнення втрати при випадковому закритті / відсутності інтернету.
   // На завантаження пропонує відновити збережений стан, якщо є.
-  const STORAGE_KEY = "ltex:receiving-draft:new";
+  const STORAGE_KEY = `ltex:receiving-draft:${initial?.id ?? "new"}`;
   const [lastBackupAt, setLastBackupAt] = useState<Date | null>(null);
   const [restorePrompt, setRestorePrompt] = useState<null | {
     backupTime: string;
@@ -496,8 +539,12 @@ export function ReceivingForm({
     }
     setSaving(true);
     try {
-      const res = await fetch("/api/v1/manager/warehouse/receivings", {
-        method: "POST",
+      const url = isEdit
+        ? `/api/v1/manager/warehouse/receivings/${initial!.id}`
+        : "/api/v1/manager/warehouse/receivings";
+      const method = isEdit ? "PATCH" : "POST";
+      const res = await fetch(url, {
+        method,
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
           supplierId,
@@ -520,7 +567,7 @@ export function ReceivingForm({
         setError(data.error ?? `HTTP ${res.status}`);
         return;
       }
-      const data = await res.json();
+      const data = isEdit ? { id: initial!.id } : await res.json();
       if (postAfter) {
         const postRes = await fetch(
           `/api/v1/manager/warehouse/receivings/${data.id}/post`,

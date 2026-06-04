@@ -6,6 +6,7 @@ import {
   ReceivingError,
 } from "@/lib/warehouse/post-receiving";
 import { receivingCancelSchema } from "@/lib/warehouse/validations";
+import { completeReceivingReviewReminders } from "@/lib/warehouse/review-reminders";
 
 /**
  * POST /api/v1/manager/warehouse/receivings/[id]/cancel
@@ -52,6 +53,7 @@ export async function POST(
       summary: `Скасовано проведений документ: ${parsed.data.reason}`,
       req,
     });
+    void completeReceivingReviewReminders(id).catch(() => {});
     return NextResponse.json({ ok: true });
   } catch (err) {
     if (err instanceof ReceivingError) {

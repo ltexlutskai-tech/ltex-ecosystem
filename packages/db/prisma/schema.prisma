@@ -803,9 +803,10 @@ model Receiving {
   createdBy   User?     @relation("ReceivingCreatedBy", fields: [createdByUserId], references: [id])
   postedBy    User?     @relation("ReceivingPostedBy", fields: [postedByUserId], references: [id])
   cancelledBy User?     @relation("ReceivingCancelledBy", fields: [cancelledByUserId], references: [id])
-  items          ReceivingItem[]
-  lots           Lot[]
-  purchasePrices PurchasePrice[]
+  items           ReceivingItem[]
+  lots            Lot[]
+  purchasePrices  PurchasePrice[]
+  reviewReminders MgrReminder[]
 
   @@index([status])
   @@index([supplierId])
@@ -1489,6 +1490,7 @@ enum MgrReminderSource {
   manual
   auto_video
   auto_bron
+  auto_receiving_review
 
   @@map("mgr_reminder_source")
 }
@@ -1508,12 +1510,14 @@ model MgrReminder {
   source            MgrReminderSource @default(manual)
   lotId             String?           @map("lot_id")
   productId         String?           @map("product_id")
+  receivingId       String?           @map("receiving_id")
   createdAt         DateTime          @default(now()) @map("created_at")
   updatedAt         DateTime          @updatedAt @map("updated_at")
 
-  client MgrClient?        @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  owner  User              @relation("UserReminders", fields: [ownerUserId], references: [id], onDelete: Cascade)
-  items  MgrReminderItem[]
+  client    MgrClient?        @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  owner     User              @relation("UserReminders", fields: [ownerUserId], references: [id], onDelete: Cascade)
+  receiving Receiving?        @relation(fields: [receivingId], references: [id], onDelete: SetNull)
+  items     MgrReminderItem[]
 
   @@index([clientId, remindAt])
   @@index([ownerUserId, completedAt, remindAt])

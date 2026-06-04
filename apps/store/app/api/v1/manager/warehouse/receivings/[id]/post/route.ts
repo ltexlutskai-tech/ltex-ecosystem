@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/manager-auth";
 import { logAuditEvent } from "@/lib/audit/audit-log";
 import { postReceiving, ReceivingError } from "@/lib/warehouse/post-receiving";
+import { completeReceivingReviewReminders } from "@/lib/warehouse/review-reminders";
 
 /**
  * POST /api/v1/manager/warehouse/receivings/[id]/post
@@ -40,6 +41,8 @@ export async function POST(
       dataAfter: { ...result },
       req,
     });
+    // Завершити нагадування про перевірку (fire-and-forget)
+    void completeReceivingReviewReminders(id).catch(() => {});
     return NextResponse.json({ ok: true, ...result });
   } catch (err) {
     if (err instanceof ReceivingError) {

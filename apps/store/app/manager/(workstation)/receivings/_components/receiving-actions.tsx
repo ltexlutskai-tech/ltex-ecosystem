@@ -102,6 +102,14 @@ export function ReceivingActions({
   return (
     <div className="flex flex-col items-end gap-1">
       <div className="flex gap-2">
+        {status === "draft" && (
+          <a
+            href={`/manager/receivings/${id}/edit`}
+            className="rounded-md border border-emerald-300 bg-white px-3 py-1.5 text-sm font-medium text-emerald-800 hover:bg-emerald-50"
+          >
+            ✏ Редагувати
+          </a>
+        )}
         {status === "draft" && canPost && (
           <button
             type="button"

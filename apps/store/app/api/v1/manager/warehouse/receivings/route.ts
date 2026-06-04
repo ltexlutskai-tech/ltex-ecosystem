@@ -5,6 +5,7 @@ import { canCreate, canView } from "@/lib/permissions/role-permissions";
 import { logAuditEvent } from "@/lib/audit/audit-log";
 import { receivingCreateSchema } from "@/lib/warehouse/validations";
 import { generateReceivingDocNumber } from "@/lib/warehouse/doc-number";
+import { createReceivingReviewReminders } from "@/lib/warehouse/review-reminders";
 
 /**
  * GET /api/v1/manager/warehouse/receivings
@@ -199,6 +200,17 @@ export async function POST(req: NextRequest) {
     },
     req,
   });
+
+  // Якщо створив warehouse — нагадуємо admin/owner перевірити (fire-and-forget).
+  void createReceivingReviewReminders({
+    receivingId: created.id,
+    docNumber,
+    createdByUserId: user.id,
+    createdByUserRole: user.role,
+    createdByUserName: user.fullName,
+  }).catch((err) =>
+    console.warn("[L-TEX] createReceivingReviewReminders failed", err),
+  );
 
   return NextResponse.json({ id: created.id, docNumber }, { status: 201 });
 }
