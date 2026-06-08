@@ -520,8 +520,9 @@ async function importCustomers(ctx: ImportContext): Promise<Recon> {
     for (const row of rows) {
       const hex = bufToHex(row["_IDRRef"]);
       const code1C = asString(row["_Code"]);
-      // Групи (папки) не імпортуємо.
-      if (asBool(row["_Folder"])) {
+      // 1С `_Folder`: 1 = елемент, 0 = група (ІНВЕРСНА логіка 1С!).
+      // Пропускаємо групи (папки), імпортуємо елементи.
+      if (!asBool(row["_Folder"])) {
         recon.skipped++;
         continue;
       }
@@ -665,7 +666,9 @@ async function importProducts(ctx: ImportContext): Promise<Recon> {
     for (const row of rows) {
       const hex = bufToHex(row["_IDRRef"]);
       const code1C = asString(row["_Code"]);
-      if (asBool(row["_Folder"])) {
+      // 1С `_Folder`: 1 = елемент, 0 = група (ІНВЕРСНА логіка 1С!).
+      // Пропускаємо групи (папки), імпортуємо елементи.
+      if (!asBool(row["_Folder"])) {
         recon.skipped++;
         continue;
       }
