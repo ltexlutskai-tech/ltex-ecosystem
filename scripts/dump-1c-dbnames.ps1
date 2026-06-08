@@ -12,8 +12,13 @@
 
 $ErrorActionPreference = "Stop"
 
+# Anchor all paths to the repo root (script lives in <repo>\scripts).
+# .NET [System.IO.File] uses the process CWD (often C:\Windows\system32),
+# NOT the PowerShell location, so relative paths must be made absolute.
+$RepoRoot = Split-Path -Parent $PSScriptRoot
+
 # --- 1. Parse LEGACY_1C_DB_URL (same logic as dump-1c-mssql-schema.ps1) ---
-$envPath = "apps\store\.env"
+$envPath = Join-Path $RepoRoot "apps\store\.env"
 if (-not (Test-Path $envPath)) { Write-Error "Not found: $envPath"; exit 1 }
 
 $envLine = Get-Content $envPath |
@@ -61,7 +66,7 @@ if ($null -eq $blob -or $blob -eq [System.DBNull]::Value) {
 }
 
 [byte[]]$bytes = $blob
-$OutDir = "docs\1c-mssql-schema"
+$OutDir = Join-Path $RepoRoot "docs\1c-mssql-schema"
 New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
 
 # keep raw blob locally for safety (NOT committed - see .gitignore note)
