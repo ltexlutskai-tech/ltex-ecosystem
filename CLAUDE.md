@@ -65,28 +65,25 @@ Contacts: Telegram @L_TEX, +380 67 671 05 15, +380 99 358 49 92, ltex.lutsk.ai@g
 
   **Тести в кінці сесії:** 2012 store passed / 2 skipped (197 test files); typecheck чистий; prettier чистий. Гілка `claude/sweet-pascal-OHSke` синхронізована з origin.
 
-  **Наступна сесія — ORCHESTRATOR 5.2 — старт Пріоритету 2 (імпорт історичних даних з 1С).** Робочий процес — без змін, orchestrator-only: план/перевірка/мердж + диктує user-у команди на сервер. Цьогораз ВЕЛИКА робота — мапування 1С PostgreSQL таблиць (`_Document108_…`/`_Reference77_…`/`_AccumRg…`) на нашу модель + написання idempotent скрипта-маппера + тестовий прогон на копії БД + фінальний імпорт за 1 ніч.
+  **Наступна сесія — ORCHESTRATOR 5.2 — старт Пріоритету 2 (імпорт історичних даних з 1С).** Робочий процес — без змін, orchestrator-only: план/перевірка/мердж + диктує user-у команди на сервер. Цьогораз ВЕЛИКА робота — мапування 1С MSSQL таблиць (`_Reference77_…`/`_Document108_…`/`_AccumRg…`) на нашу модель + написання idempotent скрипта-маппера + тестовий прогон на копії БД + фінальний імпорт за 1 ніч.
 
-  **Що user має ЗРОБИТИ перед стартом сесії 5.2** (одноразово, 5 хвилин у psql/pgAdmin на 1С базі `ltex_prod`):
+  **⚠️ ВАЖЛИВЕ ВІДКРИТТЯ 2026-06-08:** 1С у L-TEX **НЕ на PostgreSQL, а на MS SQL Server 2019 Enterprise** (Windows Server 2022). Назва бази у 1С — **`ltex`** (НЕ `ltex_prod`). PostgreSQL `E:\PostgreSQL\16` — це окрема наша Next.js база. Це міняє інструменти імпорту: npm пакет `mssql` замість `pg`, T-SQL замість PL/pgSQL, connection string `mssql://`.
 
-  ```sql
-  CREATE USER ltex_app_reader WITH PASSWORD '<згенеруйте 24+ символи рандом>';
-  GRANT CONNECT ON DATABASE ltex_prod TO ltex_app_reader;
-  GRANT USAGE ON SCHEMA public TO ltex_app_reader;
-  GRANT SELECT ON ALL TABLES IN SCHEMA public TO ltex_app_reader;
-  ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO ltex_app_reader;
-  ```
+  **Що user ВЖЕ ЗРОБИВ перед стартом сесії 5.2** (2026-06-08, разом з orchestrator-ом):
+  - Створено SQL Login `ltex_app_reader` на MSSQL з паролем (CHECK_POLICY = OFF) + database user у базі `ltex` + роль `db_datareader` (read-only на ВСІ таблиці) + `VIEW DEFINITION` для читання метаданих
+  - Додано `srv\тарас` (Windows-користувача) як sysadmin на MSSQL — через **single-user mode recovery** (Stop-Service MSSQLSERVER → старт з `-mSQLCMD` → `CREATE LOGIN [srv\тарас] FROM WINDOWS` + `ALTER SERVER ROLE sysadmin ADD MEMBER` → перезапуск нормально). Mixed Mode (LoginMode=2) уже був.
+  - Додано у `E:\ltex-ecosystem\apps\store\.env`: `LEGACY_1C_DB_URL=mssql://ltex_app_reader:<пароль>@localhost:1433/ltex`
+  - **Перевірено:** `sqlcmd -S localhost -U ltex_app_reader -P <pass> -d ltex -Q "SELECT TOP 5 name FROM sys.tables"` повертає 1С таблиці (`_AccRg…`, `_AccumRg…` тощо)
 
-  Додати у `E:\ltex-ecosystem\apps\store\.env`:
-
-  ```
-  LEGACY_1C_DB_URL=postgres://ltex_app_reader:<пароль>@localhost:5432/ltex_prod
-  ```
+  **Безпекові TODO для user-а (після успішного імпорту):**
+  - **Ротувати sa-пароль на MSSQL** (зашифрований у `C:\Program Files (x86)\1cv8\srvinfo\reg_1541\1CV8Clst.lst`, у чат випадково запостили base64-вигляд `odSLA9QE...` — теоретично можна decrypt-нути)
+  - Видалити `C:\temp\clst_active.txt` (копія `1CV8Clst.lst` з sa-паролем у зашифрованому вигляді)
+  - Опціонально: видалити `ltex_app_reader` логін коли імпорт завершиться
 
   **Стратегія сесії 5.2:**
-  1. Explore-агент аналізує структуру 1С PostgreSQL (`information_schema.tables` + `\d _Document108_` для ключових таблиць замовлення/реалізації/контрагенти/номенклатура), створює `docs/HISTORY_MIGRATION_MAP.md` з повним полем-у-поле мапінгом.
+  1. Explore-агент аналізує структуру 1С MSSQL (`SELECT name FROM sys.tables`, `INFORMATION_SCHEMA.COLUMNS`, `sp_help <table>` для ключових таблиць замовлення/реалізації/контрагенти/номенклатура), декодує системну таблицю `_Config`/`Params` для мапування `_Reference77` → реальна назва метаданих (`Контрагенты` тощо), створює `docs/HISTORY_MIGRATION_MAP.md` з повним полем-у-поле мапінгом 1С MSSQL → наша Prisma-схема (Customer, Order, Sale, MgrCashOrder, Payment, RouteSheet, Lot, Product, тощо).
   2. User читає, корегує.
-  3. Скрипт-маппер `apps/store/scripts/import-1c-historical.ts` (Node+pg+Prisma, idempotent: `Order.code1C` як унікальний ключ — повторне виконання НЕ дублює).
+  3. Скрипт-маппер `apps/store/scripts/import-1c-historical.ts` (Node+`mssql` package+Prisma, idempotent: `Order.code1C` як унікальний ключ — повторне виконання НЕ дублює).
   4. Тестовий прогон на тест-БД (`ltex_test` або копія `pg_dump|pg_restore`); звірки кількостей з 1С звітами.
   5. Фінальний імпорт у production за 1 нічну сесію (зупинка 1С на ~2 години).
   6. Місяць паралельного режиму (1С тримаємо у режимі довідки).
