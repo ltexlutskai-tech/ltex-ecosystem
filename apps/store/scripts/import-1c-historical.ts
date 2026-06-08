@@ -919,7 +919,10 @@ async function importLots(ctx: ImportContext): Promise<Recon> {
       const arrivalDate = asDate(row["_Fld7693"]);
       const sector = asString(row["_Fld7727"]);
       const comment = asString(row["_Fld7728"]);
-      const status = asBool(row["_Marked"]) ? "sold" : "free";
+      // Історичний лот ховаємо від публічної вітрини: статус "archived"
+      // НЕ входить у публічний фільтр free/on_sale. (_Marked не використовуємо —
+      // усі імпортовані лоти історичні за визначенням.)
+      const status = "archived";
 
       try {
         let lotId = "(pending)";
@@ -941,27 +944,19 @@ async function importLots(ctx: ImportContext): Promise<Recon> {
               comment,
               description,
             },
-            update: {
-              productId: product.id,
-              weight,
-              status,
-              videoUrl,
-              isTarget,
-              isOpen,
-              arrivalDate,
-              sector,
-              comment,
-              description,
-            },
+            // НЕ чіпаємо наявні лоти — вони можуть бути ЖИВІ (в наявності на
+            // сайті). Імпорт суто адитивний: новий barcode → створюємо archived;
+            // наявний → лишаємо як є, щоб не прибрати доступний товар з вітрини.
+            update: {},
             select: { id: true },
           });
           lotId = lot.id;
 
-          // Усі штрихкоди характеристики (поки що лише основний з мапи).
+          // Штрихкод створюємо лише для нового лоту; наявні не чіпаємо.
           await prisma.barcode.upsert({
             where: { code: barcode },
             create: { lotId: lot.id, code: barcode },
-            update: { lotId: lot.id },
+            update: {},
           });
         }
         recon.written++;
