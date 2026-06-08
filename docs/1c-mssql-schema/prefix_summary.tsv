@@ -1,0 +1,14 @@
+metadata_type	table_count
+-------------	-----------
+Document	419
+Reference (Catalogs)	222
+InfoRg (Information)	196
+Enum	178
+AccumRg (Accumulation)	92
+AccumRgT (Totals)	51
+Other (System)	25
+Node (ExchangePlans)	15
+Chrc (Characteristics)	13
+BusinessProcess	9
+Task	2
+Const (Constants)	2
