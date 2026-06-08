@@ -1,0 +1,550 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<DataCompositionSchema xmlns="http://v8.1c.ru/8.1/data-composition-system/schema" xmlns:dcscom="http://v8.1c.ru/8.1/data-composition-system/common" xmlns:dcscor="http://v8.1c.ru/8.1/data-composition-system/core" xmlns:dcsset="http://v8.1c.ru/8.1/data-composition-system/settings" xmlns:v8="http://v8.1c.ru/8.1/data/core" xmlns:v8ui="http://v8.1c.ru/8.1/data/ui" xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+	<dataSource>
+		<name>ИсточникДанных1</name>
+		<dataSourceType>Local</dataSourceType>
+	</dataSource>
+	<dataSet xsi:type="DataSetQuery">
+		<name>Продажи</name>
+		<field xsi:type="DataSetFieldField">
+			<dataPath>Номенклатура</dataPath>
+			<field>Номенклатура</field>
+			<title xsi:type="v8:LocalStringType">
+				<v8:item>
+					<v8:lang>ru</v8:lang>
+					<v8:content>Номенклатура</v8:content>
+				</v8:item>
+				<v8:item>
+					<v8:lang>uk</v8:lang>
+					<v8:content>Номенклатура</v8:content>
+				</v8:item>
+			</title>
+			<role>
+				<dcscom:dimension>true</dcscom:dimension>
+			</role>
+		</field>
+		<field xsi:type="DataSetFieldField">
+			<dataPath>Валюта</dataPath>
+			<field>Валюта</field>
+		</field>
+		<field xsi:type="DataSetFieldField">
+			<dataPath>ЦенаЗакупки</dataPath>
+			<field>ЦенаЗакупки</field>
+			<title xsi:type="v8:LocalStringType">
+				<v8:item>
+					<v8:lang>ru</v8:lang>
+					<v8:content>Цена закупки</v8:content>
+				</v8:item>
+			</title>
+		</field>
+		<field xsi:type="DataSetFieldField">
+			<dataPath>ЕдиницаИзмерения</dataPath>
+			<field>ЕдиницаИзмерения</field>
+		</field>
+		<field xsi:type="DataSetFieldField">
+			<dataPath>Артикул</dataPath>
+			<field>Артикул</field>
+			<title xsi:type="v8:LocalStringType">
+				<v8:item>
+					<v8:lang>ru</v8:lang>
+					<v8:content>Артикул</v8:content>
+				</v8:item>
+			</title>
+		</field>
+		<field xsi:type="DataSetFieldField">
+			<dataPath>ЦенаАкция</dataPath>
+			<field>ЦенаАкция</field>
+			<title xsi:type="v8:LocalStringType">
+				<v8:item>
+					<v8:lang>ru</v8:lang>
+					<v8:content>Цена акция</v8:content>
+				</v8:item>
+			</title>
+		</field>
+		<field xsi:type="DataSetFieldField">
+			<dataPath>ЦенаПродажи</dataPath>
+			<field>ЦенаПродажи</field>
+			<title xsi:type="v8:LocalStringType">
+				<v8:item>
+					<v8:lang>ru</v8:lang>
+					<v8:content>Цена продажи</v8:content>
+				</v8:item>
+			</title>
+		</field>
+		<field xsi:type="DataSetFieldField">
+			<dataPath>РегистраторЦениПродажу</dataPath>
+			<field>РегистраторЦениПродажу</field>
+			<title xsi:type="v8:LocalStringType">
+				<v8:item>
+					<v8:lang>ru</v8:lang>
+					<v8:content>Регистратор цени продажу</v8:content>
+				</v8:item>
+			</title>
+		</field>
+		<field xsi:type="DataSetFieldField">
+			<dataPath>РегистраторЦениЗакупки</dataPath>
+			<field>РегистраторЦениЗакупки</field>
+			<title xsi:type="v8:LocalStringType">
+				<v8:item>
+					<v8:lang>ru</v8:lang>
+					<v8:content>Регистратор цени закупки</v8:content>
+				</v8:item>
+			</title>
+		</field>
+		<field xsi:type="DataSetFieldField">
+			<dataPath>ДополнительноеОписаниеНоменклатуры</dataPath>
+			<field>ДополнительноеОписаниеНоменклатуры</field>
+			<title xsi:type="v8:LocalStringType">
+				<v8:item>
+					<v8:lang>ru</v8:lang>
+					<v8:content>Опис</v8:content>
+				</v8:item>
+			</title>
+		</field>
+		<field xsi:type="DataSetFieldField">
+			<dataPath>Категории</dataPath>
+			<field>Категории</field>
+			<title xsi:type="v8:LocalStringType">
+				<v8:item>
+					<v8:lang>ru</v8:lang>
+					<v8:content>Категорії</v8:content>
+				</v8:item>
+			</title>
+		</field>
+		<dataSource>ИсточникДанных1</dataSource>
+		<query>ВЫБРАТЬ РАЗЛИЧНЫЕ
+	КатегорииОбъектов.Объект КАК Номенклатура,
+	КатегорииОбъектов.Категория.Код КАК КодКатегории,
+	КатегорииОбъектов.Категория.Наименование КАК Категория
+ПОМЕСТИТЬ ВТКатегорииОбъектов
+ИЗ
+	РегистрСведений.КатегорииОбъектов КАК КатегорииОбъектов
+ГДЕ
+	КатегорииОбъектов.Объект ССЫЛКА Справочник.Номенклатура
+	И НЕ КатегорииОбъектов.Категория.ПометкаУдаления
+;
+
+////////////////////////////////////////////////////////////////////////////////
+ВЫБРАТЬ
+	КатегорииОбъектов.Номенклатура,
+	КатегорииОбъектов.Категория,
+	КОЛИЧЕСТВО(КатегорииОбъектовПредыдущие.КодКатегории) КАК НомерКатегории
+ПОМЕСТИТЬ ВТКатегорииСНомерами
+ИЗ
+	ВТКатегорииОбъектов КАК КатегорииОбъектов
+		ЛЕВОЕ СОЕДИНЕНИЕ ВТКатегорииОбъектов КАК КатегорииОбъектовПредыдущие
+		ПО КатегорииОбъектов.Номенклатура = КатегорииОбъектовПредыдущие.Номенклатура
+			И КатегорииОбъектовПредыдущие.КодКатегории &lt;= КатегорииОбъектов.КодКатегории
+
+СГРУППИРОВАТЬ ПО
+	КатегорииОбъектов.Номенклатура,
+	КатегорииОбъектов.Категория
+;
+
+////////////////////////////////////////////////////////////////////////////////
+ВЫБРАТЬ
+	ВТКатегорииСНомерами.Номенклатура,
+	МАКСИМУМ(ВЫБОР КОГДА ВТКатегорииСНомерами.НомерКатегории = 1 ТОГДА ВТКатегорииСНомерами.Категория ИНАЧЕ "" КОНЕЦ) КАК Категория1,
+	МАКСИМУМ(ВЫБОР КОГДА ВТКатегорииСНомерами.НомерКатегории = 2 ТОГДА ВТКатегорииСНомерами.Категория ИНАЧЕ "" КОНЕЦ) КАК Категория2,
+	МАКСИМУМ(ВЫБОР КОГДА ВТКатегорииСНомерами.НомерКатегории = 3 ТОГДА ВТКатегорииСНомерами.Категория ИНАЧЕ "" КОНЕЦ) КАК Категория3,
+	МАКСИМУМ(ВЫБОР КОГДА ВТКатегорииСНомерами.НомерКатегории = 4 ТОГДА ВТКатегорииСНомерами.Категория ИНАЧЕ "" КОНЕЦ) КАК Категория4,
+	МАКСИМУМ(ВЫБОР КОГДА ВТКатегорииСНомерами.НомерКатегории = 5 ТОГДА ВТКатегорииСНомерами.Категория ИНАЧЕ "" КОНЕЦ) КАК Категория5,
+	МАКСИМУМ(ВЫБОР КОГДА ВТКатегорииСНомерами.НомерКатегории = 6 ТОГДА ВТКатегорииСНомерами.Категория ИНАЧЕ "" КОНЕЦ) КАК Категория6,
+	МАКСИМУМ(ВЫБОР КОГДА ВТКатегорииСНомерами.НомерКатегории = 7 ТОГДА ВТКатегорииСНомерами.Категория ИНАЧЕ "" КОНЕЦ) КАК Категория7,
+	МАКСИМУМ(ВЫБОР КОГДА ВТКатегорииСНомерами.НомерКатегории = 8 ТОГДА ВТКатегорииСНомерами.Категория ИНАЧЕ "" КОНЕЦ) КАК Категория8,
+	МАКСИМУМ(ВЫБОР КОГДА ВТКатегорииСНомерами.НомерКатегории = 9 ТОГДА ВТКатегорииСНомерами.Категория ИНАЧЕ "" КОНЕЦ) КАК Категория9,
+	МАКСИМУМ(ВЫБОР КОГДА ВТКатегорииСНомерами.НомерКатегории = 10 ТОГДА ВТКатегорииСНомерами.Категория ИНАЧЕ "" КОНЕЦ) КАК Категория10,
+	МАКСИМУМ(ВЫБОР КОГДА ВТКатегорииСНомерами.НомерКатегории = 11 ТОГДА ВТКатегорииСНомерами.Категория ИНАЧЕ "" КОНЕЦ) КАК Категория11,
+	МАКСИМУМ(ВЫБОР КОГДА ВТКатегорииСНомерами.НомерКатегории = 12 ТОГДА ВТКатегорииСНомерами.Категория ИНАЧЕ "" КОНЕЦ) КАК Категория12,
+	МАКСИМУМ(ВЫБОР КОГДА ВТКатегорииСНомерами.НомерКатегории = 13 ТОГДА ВТКатегорииСНомерами.Категория ИНАЧЕ "" КОНЕЦ) КАК Категория13,
+	МАКСИМУМ(ВЫБОР КОГДА ВТКатегорииСНомерами.НомерКатегории = 14 ТОГДА ВТКатегорииСНомерами.Категория ИНАЧЕ "" КОНЕЦ) КАК Категория14,
+	МАКСИМУМ(ВЫБОР КОГДА ВТКатегорииСНомерами.НомерКатегории = 15 ТОГДА ВТКатегорииСНомерами.Категория ИНАЧЕ "" КОНЕЦ) КАК Категория15,
+	МАКСИМУМ(ВЫБОР КОГДА ВТКатегорииСНомерами.НомерКатегории = 16 ТОГДА ВТКатегорииСНомерами.Категория ИНАЧЕ "" КОНЕЦ) КАК Категория16,
+	МАКСИМУМ(ВЫБОР КОГДА ВТКатегорииСНомерами.НомерКатегории = 17 ТОГДА ВТКатегорииСНомерами.Категория ИНАЧЕ "" КОНЕЦ) КАК Категория17,
+	МАКСИМУМ(ВЫБОР КОГДА ВТКатегорииСНомерами.НомерКатегории = 18 ТОГДА ВТКатегорииСНомерами.Категория ИНАЧЕ "" КОНЕЦ) КАК Категория18,
+	МАКСИМУМ(ВЫБОР КОГДА ВТКатегорииСНомерами.НомерКатегории = 19 ТОГДА ВТКатегорииСНомерами.Категория ИНАЧЕ "" КОНЕЦ) КАК Категория19,
+	МАКСИМУМ(ВЫБОР КОГДА ВТКатегорииСНомерами.НомерКатегории = 20 ТОГДА ВТКатегорииСНомерами.Категория ИНАЧЕ "" КОНЕЦ) КАК Категория20
+ПОМЕСТИТЬ ВТКатегорииСводная
+ИЗ
+	ВТКатегорииСНомерами КАК ВТКатегорииСНомерами
+
+СГРУППИРОВАТЬ ПО
+	ВТКатегорииСНомерами.Номенклатура
+;
+
+////////////////////////////////////////////////////////////////////////////////
+ВЫБРАТЬ
+	ВТКатегорииСводная.Номенклатура,
+	ВЫРАЗИТЬ(ВТКатегорииСводная.Категория1
+		+ ВЫБОР КОГДА ВТКатегорииСводная.Категория2 &lt;&gt; "" ТОГДА ", " + ВТКатегорииСводная.Категория2 ИНАЧЕ "" КОНЕЦ
+		+ ВЫБОР КОГДА ВТКатегорииСводная.Категория3 &lt;&gt; "" ТОГДА ", " + ВТКатегорииСводная.Категория3 ИНАЧЕ "" КОНЕЦ
+		+ ВЫБОР КОГДА ВТКатегорииСводная.Категория4 &lt;&gt; "" ТОГДА ", " + ВТКатегорииСводная.Категория4 ИНАЧЕ "" КОНЕЦ
+		+ ВЫБОР КОГДА ВТКатегорииСводная.Категория5 &lt;&gt; "" ТОГДА ", " + ВТКатегорииСводная.Категория5 ИНАЧЕ "" КОНЕЦ
+		+ ВЫБОР КОГДА ВТКатегорииСводная.Категория6 &lt;&gt; "" ТОГДА ", " + ВТКатегорииСводная.Категория6 ИНАЧЕ "" КОНЕЦ
+		+ ВЫБОР КОГДА ВТКатегорииСводная.Категория7 &lt;&gt; "" ТОГДА ", " + ВТКатегорииСводная.Категория7 ИНАЧЕ "" КОНЕЦ
+		+ ВЫБОР КОГДА ВТКатегорииСводная.Категория8 &lt;&gt; "" ТОГДА ", " + ВТКатегорииСводная.Категория8 ИНАЧЕ "" КОНЕЦ
+		+ ВЫБОР КОГДА ВТКатегорииСводная.Категория9 &lt;&gt; "" ТОГДА ", " + ВТКатегорииСводная.Категория9 ИНАЧЕ "" КОНЕЦ
+		+ ВЫБОР КОГДА ВТКатегорииСводная.Категория10 &lt;&gt; "" ТОГДА ", " + ВТКатегорииСводная.Категория10 ИНАЧЕ "" КОНЕЦ
+		+ ВЫБОР КОГДА ВТКатегорииСводная.Категория11 &lt;&gt; "" ТОГДА ", " + ВТКатегорииСводная.Категория11 ИНАЧЕ "" КОНЕЦ
+		+ ВЫБОР КОГДА ВТКатегорииСводная.Категория12 &lt;&gt; "" ТОГДА ", " + ВТКатегорииСводная.Категория12 ИНАЧЕ "" КОНЕЦ
+		+ ВЫБОР КОГДА ВТКатегорииСводная.Категория13 &lt;&gt; "" ТОГДА ", " + ВТКатегорииСводная.Категория13 ИНАЧЕ "" КОНЕЦ
+		+ ВЫБОР КОГДА ВТКатегорииСводная.Категория14 &lt;&gt; "" ТОГДА ", " + ВТКатегорииСводная.Категория14 ИНАЧЕ "" КОНЕЦ
+		+ ВЫБОР КОГДА ВТКатегорииСводная.Категория15 &lt;&gt; "" ТОГДА ", " + ВТКатегорииСводная.Категория15 ИНАЧЕ "" КОНЕЦ
+		+ ВЫБОР КОГДА ВТКатегорииСводная.Категория16 &lt;&gt; "" ТОГДА ", " + ВТКатегорииСводная.Категория16 ИНАЧЕ "" КОНЕЦ
+		+ ВЫБОР КОГДА ВТКатегорииСводная.Категория17 &lt;&gt; "" ТОГДА ", " + ВТКатегорииСводная.Категория17 ИНАЧЕ "" КОНЕЦ
+		+ ВЫБОР КОГДА ВТКатегорииСводная.Категория18 &lt;&gt; "" ТОГДА ", " + ВТКатегорииСводная.Категория18 ИНАЧЕ "" КОНЕЦ
+		+ ВЫБОР КОГДА ВТКатегорииСводная.Категория19 &lt;&gt; "" ТОГДА ", " + ВТКатегорииСводная.Категория19 ИНАЧЕ "" КОНЕЦ
+		+ ВЫБОР КОГДА ВТКатегорииСводная.Категория20 &lt;&gt; "" ТОГДА ", " + ВТКатегорииСводная.Категория20 ИНАЧЕ "" КОНЕЦ
+		КАК СТРОКА(255)) КАК Категории
+ПОМЕСТИТЬ ВТКатегорииНоменклатуры
+ИЗ
+	ВТКатегорииСводная КАК ВТКатегорииСводная
+;
+
+////////////////////////////////////////////////////////////////////////////////
+ВЫБРАТЬ
+	ВложенныйЗапрос.Номенклатура,
+	ВЫРАЗИТЬ(ВложенныйЗапрос.Номенклатура.ДополнительноеОписаниеНоменклатуры КАК СТРОКА(255)) КАК ДополнительноеОписаниеНоменклатуры,
+	ЕСТЬNULL(ВТКатегорииНоменклатуры.Категории, "") КАК Категории,
+	ВложенныйЗапрос.Валюта,
+	ВложенныйЗапрос.ЕдиницаИзмерения,
+	ВложенныйЗапрос.Артикул КАК Артикул,
+	МАКСИМУМ(ВложенныйЗапрос.ЦенаЗакупки) КАК ЦенаЗакупки,
+	МАКСИМУМ(ВложенныйЗапрос.ЦенаПродажи) КАК ЦенаПродажи,
+	МАКСИМУМ(ВложенныйЗапрос.ЦенаАкция) КАК ЦенаАкция,
+	МАКСИМУМ(ВложенныйЗапрос.РегистраторЦениЗакупки) КАК РегистраторЦениЗакупки,
+	МАКСИМУМ(ВложенныйЗапрос.РегистраторЦениПродажу) КАК РегистраторЦениПродажу
+ИЗ
+	(ВЫБРАТЬ
+		ЦеныНоменклатурыСрезПоследних.Номенклатура.Артикул КАК Артикул,
+		ЦеныНоменклатурыСрезПоследних.Номенклатура КАК Номенклатура,
+		ЦеныНоменклатурыСрезПоследних.Валюта КАК Валюта,
+		ЦеныНоменклатурыСрезПоследних.ЕдиницаИзмерения КАК ЕдиницаИзмерения,
+		МАКСИМУМ(ЕСТЬNULL(МаксЦіни.Цена, ЦеныНоменклатурыСрезПоследних.Цена)) КАК ЦенаЗакупки,
+		МАКСИМУМ(0) КАК ЦенаПродажи,
+		МАКСИМУМ(ВЫБОР
+				КОГДА МаксЦіни.Цена ЕСТЬ NULL
+					ТОГДА ЦеныНоменклатурыСрезПоследних.Регистратор
+				ИНАЧЕ МаксЦіни.Регистратор
+			КОНЕЦ) КАК РегистраторЦениЗакупки,
+		МАКСИМУМ(0) КАК ЦенаАкция,
+		NULL КАК РегистраторЦениПродажу
+	ИЗ
+		РегистрСведений.ЦеныНоменклатуры.СрезПоследних(
+				{(&amp;НачалоПериода)},
+				ТипЦен = ЗНАЧЕНИЕ(Справочник.ТипыЦенНоменклатуры.ЦенаЗакупкиВес)
+					И НЕ Регистратор ССЫЛКА Документ.Перепаковка) КАК ЦеныНоменклатурыСрезПоследних
+			ЛЕВОЕ СОЕДИНЕНИЕ (ВЫБРАТЬ
+				ЦеныНоменклатуры.Номенклатура КАК Номенклатура,
+				МАКСИМУМ(ЦеныНоменклатуры.Цена) КАК Цена,
+				МАКСИМУМ(ЦеныНоменклатуры.Регистратор) КАК Регистратор,
+				ЦеныНоменклатуры.Валюта КАК Валюта,
+				ЦеныНоменклатуры.ЕдиницаИзмерения КАК ЕдиницаИзмерения,
+				МаксимальніЦіни.ТипЦен КАК ТипЦен
+			ИЗ
+				(ВЫБРАТЬ
+					МАКСИМУМ(ЦеныНоменклатуры.Цена) КАК Цена,
+					ЦеныНоменклатуры.Номенклатура КАК Номенклатура,
+					ЦеныНоменклатуры.ТипЦен КАК ТипЦен
+				ИЗ
+					РегистрСведений.ЦеныНоменклатуры КАК ЦеныНоменклатуры
+				ГДЕ
+					ЦеныНоменклатуры.ТипЦен = ЗНАЧЕНИЕ(Справочник.ТипыЦенНоменклатуры.ЦенаЗакупкиВес)
+					И НЕ ЦеныНоменклатуры.Регистратор ССЫЛКА Документ.Перепаковка
+				
+				СГРУППИРОВАТЬ ПО
+					ЦеныНоменклатуры.Номенклатура,
+					ЦеныНоменклатуры.ТипЦен) КАК МаксимальніЦіни
+					ВНУТРЕННЕЕ СОЕДИНЕНИЕ РегистрСведений.ЦеныНоменклатуры КАК ЦеныНоменклатуры
+					ПО МаксимальніЦіни.Номенклатура = ЦеныНоменклатуры.Номенклатура
+						И МаксимальніЦіни.Цена = ЦеныНоменклатуры.Цена
+						И МаксимальніЦіни.ТипЦен = ЦеныНоменклатуры.ТипЦен
+						И (НЕ ЦеныНоменклатуры.Регистратор ССЫЛКА Документ.Перепаковка)
+			
+			СГРУППИРОВАТЬ ПО
+				ЦеныНоменклатуры.Номенклатура,
+				ЦеныНоменклатуры.Валюта,
+				ЦеныНоменклатуры.ЕдиницаИзмерения,
+				МаксимальніЦіни.ТипЦен) КАК МаксЦіни
+			ПО ЦеныНоменклатурыСрезПоследних.Номенклатура = МаксЦіни.Номенклатура
+				И ЦеныНоменклатурыСрезПоследних.ЕдиницаИзмерения = МаксЦіни.ЕдиницаИзмерения
+				И ЦеныНоменклатурыСрезПоследних.Валюта = МаксЦіни.Валюта
+				И ЦеныНоменклатурыСрезПоследних.ТипЦен = МаксЦіни.ТипЦен
+	
+	СГРУППИРОВАТЬ ПО
+		ЦеныНоменклатурыСрезПоследних.Номенклатура.Артикул,
+		ЦеныНоменклатурыСрезПоследних.Номенклатура,
+		ЦеныНоменклатурыСрезПоследних.Валюта,
+		ЦеныНоменклатурыСрезПоследних.ЕдиницаИзмерения
+	
+	ОБЪЕДИНИТЬ ВСЕ
+	
+	ВЫБРАТЬ
+		ЦеныНоменклатурыСрезПоследних.Номенклатура.Артикул,
+		ЦеныНоменклатурыСрезПоследних.Номенклатура,
+		ЦеныНоменклатурыСрезПоследних.Валюта,
+		ЦеныНоменклатурыСрезПоследних.ЕдиницаИзмерения,
+		МАКСИМУМ(0),
+		МАКСИМУМ(ЦеныНоменклатурыСрезПоследних.Цена),
+		NULL,
+		МАКСИМУМ(ВЫБОР
+				КОГДА ЦеныНоменклатурыСрезПоследних.Цена = ЦеныНоменклатурыСрезПоследних1.Цена
+					ТОГДА 0
+				ИНАЧЕ ЦеныНоменклатурыСрезПоследних1.Цена
+			КОНЕЦ),
+		МАКСИМУМ(ЦеныНоменклатурыСрезПоследних.Регистратор)
+	ИЗ
+		РегистрСведений.ЦеныНоменклатуры.СрезПоследних(&amp;НачалоПериода, ТипЦен = ЗНАЧЕНИЕ(Справочник.ТипыЦенНоменклатуры.ЦенаПродажиВес)) КАК ЦеныНоменклатурыСрезПоследних
+			ЛЕВОЕ СОЕДИНЕНИЕ РегистрСведений.ЦеныНоменклатуры.СрезПоследних(&amp;ПериодАкция, ) КАК ЦеныНоменклатурыСрезПоследних1
+			ПО ЦеныНоменклатурыСрезПоследних.ТипЦен = ЦеныНоменклатурыСрезПоследних1.ТипЦен
+				И ЦеныНоменклатурыСрезПоследних.Номенклатура = ЦеныНоменклатурыСрезПоследних1.Номенклатура
+				И ЦеныНоменклатурыСрезПоследних.ХарактеристикаНоменклатуры = ЦеныНоменклатурыСрезПоследних1.ХарактеристикаНоменклатуры
+	
+	СГРУППИРОВАТЬ ПО
+		ЦеныНоменклатурыСрезПоследних.Номенклатура.Артикул,
+			ЦеныНоменклатурыСрезПоследних.Номенклатура,
+			ЦеныНоменклатурыСрезПоследних.Валюта,
+			ЦеныНоменклатурыСрезПоследних.ЕдиницаИзмерения) КАК ВложенныйЗапрос
+			ЛЕВОЕ СОЕДИНЕНИЕ ВТКатегорииНоменклатуры КАК ВТКатегорииНоменклатуры
+			ПО ВложенныйЗапрос.Номенклатура = ВТКатегорииНоменклатуры.Номенклатура
+
+	СГРУППИРОВАТЬ ПО
+		ВложенныйЗапрос.Номенклатура,
+		ВЫРАЗИТЬ(ВложенныйЗапрос.Номенклатура.ДополнительноеОписаниеНоменклатуры КАК СТРОКА(255)),
+		ЕСТЬNULL(ВТКатегорииНоменклатуры.Категории, ""),
+		ВложенныйЗапрос.Валюта,
+		ВложенныйЗапрос.ЕдиницаИзмерения,
+		ВложенныйЗапрос.Артикул
+</query>
+	</dataSet>
+	<totalField>
+		<dataPath>ЦенаЗакупки</dataPath>
+		<expression>Максимум(ЦенаЗакупки)</expression>
+		<group>Номенклатура Иерархия</group>
+	</totalField>
+	<totalField>
+		<dataPath>ЦенаПродажи</dataPath>
+		<expression>Максимум(ЦенаПродажи)</expression>
+		<group>Номенклатура Иерархия</group>
+	</totalField>
+	<totalField>
+		<dataPath>ЦенаАкция</dataPath>
+		<expression>Максимум(ЦенаАкция)</expression>
+		<group>Номенклатура Иерархия</group>
+	</totalField>
+	<parameter>
+		<name>НачалоПериода</name>
+		<title xsi:type="v8:LocalStringType">
+			<v8:item>
+				<v8:lang>ru</v8:lang>
+				<v8:content>Начало периода</v8:content>
+			</v8:item>
+		</title>
+		<valueType>
+			<v8:Type>xs:dateTime</v8:Type>
+			<v8:DateQualifiers>
+				<v8:DateFractions>DateTime</v8:DateFractions>
+			</v8:DateQualifiers>
+		</valueType>
+		<value xsi:type="xs:dateTime">0001-01-01T00:00:00</value>
+		<useRestriction>false</useRestriction>
+		<expression>КОНЕЦПЕРИОДА(&amp;НачалоПериода, "ДЕНЬ")</expression>
+	</parameter>
+	<parameter>
+		<name>Период</name>
+		<title xsi:type="v8:LocalStringType">
+			<v8:item>
+				<v8:lang>ru</v8:lang>
+				<v8:content>Период</v8:content>
+			</v8:item>
+		</title>
+		<valueType>
+			<v8:Type>xs:dateTime</v8:Type>
+			<v8:DateQualifiers>
+				<v8:DateFractions>DateTime</v8:DateFractions>
+			</v8:DateQualifiers>
+		</valueType>
+		<value xsi:type="xs:dateTime">0001-01-01T00:00:00</value>
+		<useRestriction>false</useRestriction>
+	</parameter>
+	<parameter>
+		<name>ПериодАкция</name>
+		<title xsi:type="v8:LocalStringType">
+			<v8:item>
+				<v8:lang>ru</v8:lang>
+				<v8:content>Период акция</v8:content>
+			</v8:item>
+		</title>
+		<valueType>
+			<v8:Type>xs:dateTime</v8:Type>
+			<v8:DateQualifiers>
+				<v8:DateFractions>DateTime</v8:DateFractions>
+			</v8:DateQualifiers>
+		</valueType>
+		<value xsi:type="xs:dateTime">0001-01-01T00:00:00</value>
+		<useRestriction>true</useRestriction>
+		<expression>&amp;НачалоПериода</expression>
+	</parameter>
+	<settingsVariant>
+		<dcsset:name>Основной</dcsset:name>
+		<dcsset:presentation xsi:type="xs:string">Основний</dcsset:presentation>
+		<dcsset:settings xmlns:style="http://v8.1c.ru/8.1/data/ui/style" xmlns:sys="http://v8.1c.ru/8.1/data/ui/fonts/system" xmlns:web="http://v8.1c.ru/8.1/data/ui/colors/web" xmlns:win="http://v8.1c.ru/8.1/data/ui/colors/windows">
+			<dcsset:selection>
+				<dcsset:item xsi:type="dcsset:SelectedItemField">
+					<dcsset:field>Артикул</dcsset:field>
+				</dcsset:item>
+				<dcsset:item xsi:type="dcsset:SelectedItemField">
+					<dcsset:field>Номенклатура</dcsset:field>
+				</dcsset:item>
+				<dcsset:item xsi:type="dcsset:SelectedItemField">
+					<dcsset:field>Валюта</dcsset:field>
+				</dcsset:item>
+				<dcsset:item xsi:type="dcsset:SelectedItemField">
+					<dcsset:field>ЕдиницаИзмерения</dcsset:field>
+				</dcsset:item>
+				<dcsset:item xsi:type="dcsset:SelectedItemField">
+					<dcsset:field>ДополнительноеОписаниеНоменклатуры</dcsset:field>
+				</dcsset:item>
+				<dcsset:item xsi:type="dcsset:SelectedItemField">
+					<dcsset:field>Категории</dcsset:field>
+				</dcsset:item>
+				<dcsset:item xsi:type="dcsset:SelectedItemField">
+					<dcsset:field>ЦенаЗакупки</dcsset:field>
+				</dcsset:item>
+				<dcsset:item xsi:type="dcsset:SelectedItemField">
+					<dcsset:field>ЦенаПродажи</dcsset:field>
+				</dcsset:item>
+				<dcsset:item xsi:type="dcsset:SelectedItemField">
+					<dcsset:field>ЦенаАкция</dcsset:field>
+				</dcsset:item>
+			</dcsset:selection>
+			<dcsset:filter>
+				<dcsset:item xsi:type="dcsset:FilterItemComparison">
+					<dcsset:use>false</dcsset:use>
+					<dcsset:left xsi:type="dcscor:Field">Номенклатура</dcsset:left>
+					<dcsset:comparisonType>Equal</dcsset:comparisonType>
+					<dcsset:right xsi:type="dcscor:DesignTimeValue">Справочник.Номенклатура.ПустаяСсылка</dcsset:right>
+				</dcsset:item>
+				<dcsset:item xsi:type="dcsset:FilterItemComparison">
+					<dcsset:use>false</dcsset:use>
+					<dcsset:left xsi:type="dcscor:Field">ЦенаАкция</dcsset:left>
+					<dcsset:comparisonType>Greater</dcsset:comparisonType>
+					<dcsset:right xsi:type="xs:decimal">0</dcsset:right>
+				</dcsset:item>
+			</dcsset:filter>
+			<dcsset:dataParameters>
+				<dcscor:item xsi:type="dcsset:SettingsParameterValue">
+					<dcscor:parameter>НачалоПериода</dcscor:parameter>
+					<dcscor:value xsi:type="xs:dateTime">0001-01-01T00:00:00</dcscor:value>
+				</dcscor:item>
+			</dcsset:dataParameters>
+			<dcsset:order>
+				<dcsset:item xsi:type="dcsset:OrderItemField">
+					<dcsset:field>Артикул</dcsset:field>
+					<dcsset:orderType>Asc</dcsset:orderType>
+				</dcsset:item>
+				<dcsset:item xsi:type="dcsset:OrderItemField">
+					<dcsset:field>Номенклатура</dcsset:field>
+					<dcsset:orderType>Asc</dcsset:orderType>
+				</dcsset:item>
+				<dcsset:item xsi:type="dcsset:OrderItemField">
+					<dcsset:field>Валюта</dcsset:field>
+					<dcsset:orderType>Asc</dcsset:orderType>
+				</dcsset:item>
+				<dcsset:item xsi:type="dcsset:OrderItemField">
+					<dcsset:field>ЕдиницаИзмерения</dcsset:field>
+					<dcsset:orderType>Asc</dcsset:orderType>
+				</dcsset:item>
+			</dcsset:order>
+			<dcsset:conditionalAppearance>
+				<dcsset:item>
+					<dcsset:selection>
+						<dcsset:item>
+							<dcsset:field>ЦенаЗакупки</dcsset:field>
+						</dcsset:item>
+						<dcsset:item>
+							<dcsset:field>ЦенаПродажи</dcsset:field>
+						</dcsset:item>
+					</dcsset:selection>
+					<dcsset:filter/>
+					<dcsset:appearance>
+						<dcscor:item xsi:type="dcsset:SettingsParameterValue">
+							<dcscor:parameter>Формат</dcscor:parameter>
+							<dcscor:value xsi:type="xs:string">ЧЦ=10; ЧДЦ=2</dcscor:value>
+						</dcscor:item>
+					</dcsset:appearance>
+				</dcsset:item>
+			</dcsset:conditionalAppearance>
+			<dcsset:outputParameters>
+				<dcscor:item xsi:type="dcsset:SettingsParameterValue">
+					<dcscor:parameter>МакетОформления</dcscor:parameter>
+					<dcscor:value xsi:type="xs:string">Зеленый</dcscor:value>
+				</dcscor:item>
+				<dcscor:item xsi:type="dcsset:SettingsParameterValue">
+					<dcscor:parameter>ГоризонтальноеРасположениеОбщихИтогов</dcscor:parameter>
+					<dcscor:value xsi:type="dcscor:DataCompositionTotalPlacement">None</dcscor:value>
+				</dcscor:item>
+				<dcscor:item xsi:type="dcsset:SettingsParameterValue">
+					<dcscor:parameter>ВертикальноеРасположениеОбщихИтогов</dcscor:parameter>
+					<dcscor:value xsi:type="dcscor:DataCompositionTotalPlacement">None</dcscor:value>
+				</dcscor:item>
+				<dcscor:item xsi:type="dcsset:SettingsParameterValue">
+					<dcscor:parameter>Заголовок</dcscor:parameter>
+					<dcscor:value xsi:type="v8:LocalStringType"/>
+				</dcscor:item>
+			</dcsset:outputParameters>
+			<dcsset:item xsi:type="dcsset:StructureItemGroup">
+				<dcsset:groupItems>
+					<dcsset:item xsi:type="dcsset:GroupItemField">
+						<dcsset:field>Артикул</dcsset:field>
+						<dcsset:groupType>Items</dcsset:groupType>
+						<dcsset:periodAdditionType>None</dcsset:periodAdditionType>
+						<dcsset:periodAdditionBegin xsi:type="xs:dateTime">0001-01-01T00:00:00</dcsset:periodAdditionBegin>
+						<dcsset:periodAdditionEnd xsi:type="xs:dateTime">0001-01-01T00:00:00</dcsset:periodAdditionEnd>
+					</dcsset:item>
+					<dcsset:item xsi:type="dcsset:GroupItemField">
+						<dcsset:field>Номенклатура</dcsset:field>
+						<dcsset:groupType>Hierarchy</dcsset:groupType>
+						<dcsset:periodAdditionType>None</dcsset:periodAdditionType>
+						<dcsset:periodAdditionBegin xsi:type="xs:dateTime">0001-01-01T00:00:00</dcsset:periodAdditionBegin>
+						<dcsset:periodAdditionEnd xsi:type="xs:dateTime">0001-01-01T00:00:00</dcsset:periodAdditionEnd>
+					</dcsset:item>
+					<dcsset:item xsi:type="dcsset:GroupItemField">
+						<dcsset:field>Валюта</dcsset:field>
+						<dcsset:groupType>Items</dcsset:groupType>
+						<dcsset:periodAdditionType>None</dcsset:periodAdditionType>
+						<dcsset:periodAdditionBegin xsi:type="xs:dateTime">0001-01-01T00:00:00</dcsset:periodAdditionBegin>
+						<dcsset:periodAdditionEnd xsi:type="xs:dateTime">0001-01-01T00:00:00</dcsset:periodAdditionEnd>
+					</dcsset:item>
+					<dcsset:item xsi:type="dcsset:GroupItemField">
+						<dcsset:field>ЕдиницаИзмерения</dcsset:field>
+						<dcsset:groupType>Items</dcsset:groupType>
+						<dcsset:periodAdditionType>None</dcsset:periodAdditionType>
+						<dcsset:periodAdditionBegin xsi:type="xs:dateTime">0001-01-01T00:00:00</dcsset:periodAdditionBegin>
+						<dcsset:periodAdditionEnd xsi:type="xs:dateTime">0001-01-01T00:00:00</dcsset:periodAdditionEnd>
+					</dcsset:item>
+					<dcsset:item xsi:type="dcsset:GroupItemField">
+						<dcsset:field>ДополнительноеОписаниеНоменклатуры</dcsset:field>
+						<dcsset:groupType>Items</dcsset:groupType>
+						<dcsset:periodAdditionType>None</dcsset:periodAdditionType>
+						<dcsset:periodAdditionBegin xsi:type="xs:dateTime">0001-01-01T00:00:00</dcsset:periodAdditionBegin>
+						<dcsset:periodAdditionEnd xsi:type="xs:dateTime">0001-01-01T00:00:00</dcsset:periodAdditionEnd>
+					</dcsset:item>
+					<dcsset:item xsi:type="dcsset:GroupItemField">
+						<dcsset:field>Категории</dcsset:field>
+						<dcsset:groupType>Items</dcsset:groupType>
+						<dcsset:periodAdditionType>None</dcsset:periodAdditionType>
+						<dcsset:periodAdditionBegin xsi:type="xs:dateTime">0001-01-01T00:00:00</dcsset:periodAdditionBegin>
+						<dcsset:periodAdditionEnd xsi:type="xs:dateTime">0001-01-01T00:00:00</dcsset:periodAdditionEnd>
+					</dcsset:item>
+				</dcsset:groupItems>
+				<dcsset:order>
+					<dcsset:item xsi:type="dcsset:OrderItemAuto"/>
+				</dcsset:order>
+				<dcsset:selection>
+					<dcsset:item xsi:type="dcsset:SelectedItemAuto"/>
+				</dcsset:selection>
+			</dcsset:item>
+		</dcsset:settings>
+	</settingsVariant>
+</DataCompositionSchema>

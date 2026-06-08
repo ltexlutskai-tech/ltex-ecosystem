@@ -10,6 +10,7 @@ import {
 import type { ProductCardVM, ProductLotVM } from "../_lib/load-product";
 import { LotCardModal } from "./lot-card-modal";
 import { OrderVideoButton } from "./order-video-button";
+import { ProductClaimsPanel } from "./product-claims-panel";
 import { ShareSheet } from "./share-sheet";
 
 const SITE_BASE = "https://new.ltex.com.ua";
@@ -170,6 +171,9 @@ export function ProductCardView({
           </div>
         </div>
       </div>
+
+      {/* ── Активні замовлення на товар (Етап 1 блоку Замовлень) ─── */}
+      {product.claims ? <ProductClaimsPanel claims={product.claims} /> : null}
 
       {/* ── Опис-прайс (collapsible, closed за замовчуванням) ───── */}
       {product.description.trim() && (

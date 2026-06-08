@@ -11,6 +11,7 @@ import {
   orderDeliveryLabel,
 } from "@/lib/manager/order-delivery";
 import { OrderForm } from "../new/_components/order-form";
+import { OrderCloseButton } from "./_components/order-close-button";
 import type {
   ClientPickerItem,
   OrderEditInitial,
@@ -89,8 +90,21 @@ export default async function ManagerOrderDetailPage({
   });
   if (!order) notFound();
 
-  const editable = canEditOrder(order.status);
-  const locked = isOrderLocked(order.status);
+  // Закрите замовлення (Етап 3 блоку Замовлення) — підвантажуємо причину.
+  const orderClose = order.closedAt
+    ? await prisma.order.findUnique({
+        where: { id: order.id },
+        select: {
+          closedAt: true,
+          closeNotes: true,
+          closeReason: { select: { label: true } },
+          closedBy: { select: { fullName: true } },
+        },
+      })
+    : null;
+
+  const editable = canEditOrder(order.status) && !order.closedAt;
+  const locked = isOrderLocked(order.status) || !!order.closedAt;
 
   // Допоміжні дані для форми (тільки коли редагуємо).
   const [priceTypeRows, exchangeRate, mgr] = await Promise.all([
@@ -198,8 +212,34 @@ export default async function ManagerOrderDetailPage({
           </h1>
           <p className="mt-1 text-sm text-gray-500">Створено: {date}</p>
         </div>
-        {!editable && <OrderStatusBadge status={order.status} />}
+        <div className="flex items-center gap-2">
+          {!editable && <OrderStatusBadge status={order.status} />}
+          <OrderCloseButton
+            orderId={order.id}
+            status={order.status}
+            isAlreadyClosed={!!order.closedAt}
+          />
+        </div>
       </header>
+
+      {/* Інфо про закриття (Етап 3 блоку Замовлення) */}
+      {orderClose && (
+        <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm">
+          <div className="font-medium text-red-900">❌ Замовлення закрите</div>
+          <div className="mt-1 text-xs text-red-800">
+            Причина: <strong>{orderClose.closeReason?.label ?? "—"}</strong>
+            {orderClose.closedBy?.fullName &&
+              ` · Закрив: ${orderClose.closedBy.fullName}`}
+            {orderClose.closedAt &&
+              ` · ${new Date(orderClose.closedAt).toLocaleString("uk-UA")}`}
+          </div>
+          {orderClose.closeNotes && (
+            <div className="mt-1 text-xs text-red-700">
+              Коментар: {orderClose.closeNotes}
+            </div>
+          )}
+        </div>
+      )}
 
       {editable ? (
         <OrderForm

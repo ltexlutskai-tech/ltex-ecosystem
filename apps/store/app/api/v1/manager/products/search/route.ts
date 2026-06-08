@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@ltex/db";
 import { getCurrentUser } from "@/lib/auth/manager-auth";
+import { getProductClaimsSummaries } from "@/lib/manager/product-claims";
 
 /**
  * GET /api/v1/manager/products/search?q=...
@@ -10,7 +11,9 @@ import { getCurrentUser } from "@/lib/auth/manager-auth";
  *
  * Returns minimal product shape — id/name/articleCode/code1C/priceUnit/averageWeight —
  * + `prices` (усі записи Price: priceType/amount) для перерахунку рядка
- * при зміні типу цін у формі замовлення (Етап 1).
+ * при зміні типу цін у формі замовлення (Етап 1)
+ * + `activeClaim` (Етап 1 блоку Замовлень) — сумарна кількість активних
+ * замовлень на товар, щоб менеджер бачив «вже замовлено N» при виборі.
  */
 export async function GET(req: NextRequest) {
   const user = await getCurrentUser(req);
@@ -48,6 +51,8 @@ export async function GET(req: NextRequest) {
     },
   });
 
+  const claimMap = await getProductClaimsSummaries(products.map((p) => p.id));
+
   return NextResponse.json({
     items: products.map((p) => ({
       id: p.id,
@@ -63,6 +68,7 @@ export async function GET(req: NextRequest) {
         amount: pr.amount,
         currency: pr.currency,
       })),
+      activeClaim: claimMap.get(p.id) ?? null,
     })),
   });
 }

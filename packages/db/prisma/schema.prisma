@@ -65,6 +65,8 @@ model Product {
   orderItems         OrderItem[]
   saleItems          SaleItem[]
   cartItems          CartItem[]
+  receivingItems     ReceivingItem[]
+  purchasePrices     PurchasePrice[]
   videoSubscriptions VideoSubscription[]
   favorites          Favorite[]
   featuredEntry      FeaturedProduct?
@@ -123,18 +125,31 @@ model Lot {
   reservedByUserId    String?   @map("reserved_by_user_id")
   reservedByName      String?   @map("reserved_by_name")
   reservedUntil       DateTime? @map("reserved_until")
+  // ── Поступлення товарів (Тиждень 2, 2026-06-04) ────────────────────────────
+  // Постачальник прописується у КОЖНОМУ лоті для звітів «продажі за
+  // постачальниками» — узгоджено з user 2026-06-03 (питання 2).
+  supplierId          String?   @map("supplier_id")
+  // Документ поступлення що створив цей лот (null для legacy-лотів з 1С).
+  receivingId         String?   @map("receiving_id")
+  // Закупкова ціна (€/кг) — собівартість партії, для маржі.
+  purchasePriceEur    Float?    @map("purchase_price_eur")
   createdAt           DateTime  @default(now()) @map("created_at")
   updatedAt           DateTime  @updatedAt @map("updated_at")
 
   product    Product     @relation(fields: [productId], references: [id])
+  supplier   Supplier?   @relation(fields: [supplierId], references: [id])
+  receiving  Receiving?  @relation(fields: [receivingId], references: [id])
   barcodes   Barcode[]
   orderItems OrderItem[]
   saleItems  SaleItem[]
   cartItems  CartItem[]
+  receivingItems ReceivingItem[]
 
   @@index([productId])
   @@index([status])
   @@index([isTarget])
+  @@index([supplierId])
+  @@index([receivingId])
   @@map("lots")
 }
 
@@ -222,18 +237,53 @@ model Order {
   isActual            Boolean @default(true) @map("is_actual")
   routeSheetId        String? @map("route_sheet_id") // зворотне посилання на МЛ (1С Заказ.МаршрутныйЛист)
 
+  // ─── Закриття замовлень (Етап 3 блоку Замовлення, 2026-06-09) ────────────
+  closedAt        DateTime? @map("closed_at")
+  closeReasonId   String?   @map("close_reason_id")
+  closedByUserId  String?   @map("closed_by_user_id")
+  closeNotes      String?   @map("close_notes")
+
+  // ─── Auto-нагадування (Етап 3) ───────────────────────────────────────────
+  lastReminderAt           DateTime? @map("last_reminder_at")
+  remindersSentCount       Int       @default(0) @map("reminders_sent_count")
+  escalatedToSupervisorAt  DateTime? @map("escalated_to_supervisor_at")
+
+  // ─── Optimistic lock (Етап 4) ────────────────────────────────────────────
+  // Інкрементується при кожному PATCH. Клієнт надсилає поточну версію —
+  // якщо у БД більша → 409 і вимога перезавантажити.
+  version Int @default(0)
+
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  customer  Customer    @relation(fields: [customerId], references: [id])
-  items     OrderItem[]
-  shipments Shipment[]
-  payments  Payment[]
+  customer    Customer          @relation(fields: [customerId], references: [id])
+  closeReason OrderCloseReason? @relation(fields: [closeReasonId], references: [id])
+  closedBy    User?             @relation("OrderClosedBy", fields: [closedByUserId], references: [id])
+  items       OrderItem[]
+  shipments   Shipment[]
+  payments    Payment[]
 
   @@index([customerId])
   @@index([status])
   @@index([routeSheetId])
+  @@index([closedAt])
+  @@index([lastReminderAt])
   @@map("orders")
+}
+
+// ─── Довідник причин закриття замовлень (Етап 3 блоку Замовлення) ─────────
+model OrderCloseReason {
+  id        String   @id @default(cuid())
+  code      String   @unique
+  label     String
+  isActive  Boolean  @default(true) @map("is_active")
+  sortOrder Int      @default(0) @map("sort_order")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  orders Order[]
+
+  @@index([isActive, sortOrder])
+  @@map("order_close_reasons")
 }
 
 // ─── Order Items (← табличні секції документів) ─────────────────────────────
@@ -662,6 +712,183 @@ model PromoStripe {
   @@map("promo_stripe")
 }
 
+// ─── Suppliers / Warehouses / Receivings (Тиждень 2 блоку Поступлення) ─────
+// Документ-аналог 1С `ПоступленняТоварівУслуг`. Склад приймає товар →
+// створює документ → проводить → автоматично створюються лоти у `Lot`.
+// Постачальник прописується у КОЖНОМУ лоті (для звітів продажі/закупки за
+// постачальниками — узгоджено з user 2026-06-03).
+
+model Supplier {
+  id          String   @id @default(cuid())
+  code1C      String?  @unique @map("code_1c")
+  name        String
+  fullName    String?  @map("full_name")
+  edrpou      String?
+  phone       String?
+  email       String?
+  address     String?
+  country     String?
+  bankAccount String?  @map("bank_account")
+  currency    String   @default("EUR")
+  isActive    Boolean  @default(true) @map("is_active")
+  comment     String?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  lots           Lot[]
+  receivings     Receiving[]
+  purchasePrices PurchasePrice[]
+
+  @@index([name])
+  @@index([isActive])
+  @@map("suppliers")
+}
+
+model Warehouse {
+  id        String   @id @default(cuid())
+  code1C    String?  @unique @map("code_1c")
+  name      String
+  address   String?
+  isActive  Boolean  @default(true) @map("is_active")
+  isDefault Boolean  @default(false) @map("is_default")
+  comment   String?
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  receivings Receiving[]
+  sectors    WarehouseSector[]
+
+  @@index([name])
+  @@map("warehouses")
+}
+
+// ── Регістр історії цін закупки (← Хвиля 2 правок Поступлення) ────────────
+// При проведенні поступлення для кожного рядка з ціною > 0 пишеться запис.
+// Endpoint last-purchase-price підтягує останню ціну для (товар, постачальник)
+// → автопідстановка у форму при наступному додаванні.
+model PurchasePrice {
+  id              String   @id @default(cuid())
+  productId       String   @map("product_id")
+  supplierId      String   @map("supplier_id")
+  priceEur        Float    @map("price_eur")
+  validFrom       DateTime @default(now()) @map("valid_from")
+  source          String   @default("receiving") // 'receiving' | 'manual'
+  receivingId     String?  @map("receiving_id")
+  receivingItemId String?  @map("receiving_item_id")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  product   Product    @relation(fields: [productId], references: [id], onDelete: Cascade)
+  supplier  Supplier   @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  receiving Receiving? @relation(fields: [receivingId], references: [id], onDelete: SetNull)
+
+  @@index([productId, supplierId, validFrom(sort: Desc)])
+  @@index([supplierId])
+  @@map("purchase_prices")
+}
+
+// Довідник секторів складу (← Хвиля 2).
+// Поки що використовується тільки як autocomplete-джерело у формі
+// поступлення — `receiving_items.sector` залишається вільним стрингом.
+model WarehouseSector {
+  id          String   @id @default(cuid())
+  warehouseId String?  @map("warehouse_id")
+  name        String
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  warehouse Warehouse? @relation(fields: [warehouseId], references: [id], onDelete: Cascade)
+
+  @@index([isActive])
+  @@map("warehouse_sectors")
+}
+
+model Receiving {
+  id     String  @id @default(cuid())
+  code1C String? @unique @map("code_1c")
+  // Внутрішній номер документа (LT-RCV-YYYYMM-NNNN — auto-генерується)
+  docNumber String   @unique @map("doc_number")
+  docDate   DateTime @default(now()) @map("doc_date")
+  // Постачальник + склад (RESTRICT — не дозволити випадковий drop)
+  supplierId  String @map("supplier_id")
+  warehouseId String @map("warehouse_id")
+  // Валюта документа + курс на дату (для конвертації EUR/UAH)
+  currency     String @default("EUR")
+  exchangeRate Float  @default(1) @map("exchange_rate")
+  // Вхідний № і дата документа від постачальника (PDF / email)
+  inboundDocNumber String?   @map("inbound_doc_number")
+  inboundDocDate   DateTime? @map("inbound_doc_date") @db.Date
+  // Сумарні значення (заповнюються автоматично при збереженні рядків)
+  totalWeight   Float @default(0) @map("total_weight")
+  totalQuantity Int   @default(0) @map("total_quantity")
+  totalAmount   Float @default(0) @map("total_amount")
+  // Статус: draft → posted → cancelled
+  status            String    @default("draft")
+  notes             String?
+  createdByUserId   String?   @map("created_by_user_id")
+  postedAt          DateTime? @map("posted_at")
+  postedByUserId    String?   @map("posted_by_user_id")
+  cancelledAt       DateTime? @map("cancelled_at")
+  cancelledByUserId String?   @map("cancelled_by_user_id")
+  cancelReason      String?   @map("cancel_reason")
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+
+  supplier    Supplier  @relation(fields: [supplierId], references: [id])
+  warehouse   Warehouse @relation(fields: [warehouseId], references: [id])
+  createdBy   User?     @relation("ReceivingCreatedBy", fields: [createdByUserId], references: [id])
+  postedBy    User?     @relation("ReceivingPostedBy", fields: [postedByUserId], references: [id])
+  cancelledBy User?     @relation("ReceivingCancelledBy", fields: [cancelledByUserId], references: [id])
+  items           ReceivingItem[]
+  lots            Lot[]
+  purchasePrices  PurchasePrice[]
+  reviewReminders MgrReminder[]
+
+  @@index([status])
+  @@index([supplierId])
+  @@index([warehouseId])
+  @@index([docDate(sort: Desc)])
+  @@map("receivings")
+}
+
+// Рядок документа поступлення. Один рядок = один мішок або партія
+// однакових мішків (за `quantity > 1` створюється N лотів при проведенні).
+model ReceivingItem {
+  id            String @id @default(cuid())
+  receivingId   String @map("receiving_id")
+  productId     String @map("product_id")
+  weight        Float
+  quantity      Int    @default(1)
+  // Ціна закупки за кг (у валюті документа `receivings.currency`)
+  purchasePrice Float  @default(0) @map("purchase_price")
+  // Ціна продажу (€/кг) — vid admin/owner для актуалізації прайсу при
+  // проведенні. Null = ціна не змінювалась (← правки 2026-06-05).
+  salePrice     Float? @map("sale_price")
+  lineAmount    Float  @default(0) @map("line_amount")
+  // Штрихкод. null коли треба згенерувати при проведенні (3-й сценарій).
+  barcode String?
+  // Метод поступлення штрихкоду — для аудиту + UI:
+  //   'scanned'   — зчитано сканером (зашита інфо у штрихкоді)
+  //   'manual'    — введено вручну (наклеєна бірка)
+  //   'generated' — згенерує система при проведенні (default)
+  barcodeSource String  @default("generated") @map("barcode_source")
+  // Сектор на складі (← правки 2026-06-05). Вільний ввід або сканування
+  // штрихкоду сектора. Переходить на `lot.sector` при проведенні.
+  sector        String?
+  createdLotId  String? @map("created_lot_id")
+  notes         String?
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  receiving  Receiving @relation(fields: [receivingId], references: [id], onDelete: Cascade)
+  product    Product   @relation(fields: [productId], references: [id])
+  createdLot Lot?      @relation(fields: [createdLotId], references: [id])
+
+  @@index([receivingId])
+  @@index([productId])
+  @@index([createdLotId])
+  @@map("receiving_items")
+}
+
 // ─── Product View Log (recommendations + analytics) ──────────────────────────
 
 model ViewLog {
@@ -685,6 +912,21 @@ enum UserRole {
   manager
   senior_manager
   admin
+  // ── Розширення (Тиждень 1 блоку Ролі, 2026-06-03) ─────────────────────────
+  // Власник бізнесу — повний доступ + усі дії логуються в `audit_logs` з
+  // is_owner_action=true для окремого фільтру у admin-UI.
+  owner
+  // Старший менеджер — бачить ВСІ замовлення усіх менеджерів + Telegram-
+  // сповіщення про прострочені (Етап 3 блоку Замовлень).
+  supervisor
+  // Аналітик — read-only до фінансів/звітів, повний доступ до експорту.
+  analyst
+  // Складський працівник — приймає товар (Поступлення), генерує лоти,
+  // готує замовлення до відвантаження. Без цін закупки і маржі.
+  warehouse
+  // Бухгалтер — каса/банк/оплати/взаєморозрахунки. Без редагування товарів/
+  // клієнтів/замовлень.
+  bookkeeper
 }
 
 model User {
@@ -714,6 +956,11 @@ model User {
   failedLoginCount Int       @default(0) @map("failed_login_count")
   lockedUntil      DateTime? @map("locked_until")
 
+  // Per-user permission overrides (← Тиждень 1 блоку Ролі). NULL = успадковує
+  // дефолти ролі з `lib/permissions/role-permissions.ts`. Структура:
+  // `{ "<resource>": { "view": bool, "create": bool, "edit": bool, ... } }`.
+  permissions Json?
+
   refreshTokens        UserRefreshToken[]
   passwordResets       PasswordResetToken[]
   assignedClients      ClientAssignment[]
@@ -726,8 +973,43 @@ model User {
   chatConversations    ChatConversation[]       @relation("ChatConversationAgent")
   chatInboxMessages    ChatInboxMessage[]       @relation("ChatInboxMessageAuthor")
   regionAgents         MgrRegionAgent[]         @relation("RegionAgentUser")
+  auditLogs            AuditLog[]               @relation("AuditLogUser")
+  receivingsCreated    Receiving[]              @relation("ReceivingCreatedBy")
+  receivingsPosted     Receiving[]              @relation("ReceivingPostedBy")
+  receivingsCancelled  Receiving[]              @relation("ReceivingCancelledBy")
+  ordersClosed         Order[]                  @relation("OrderClosedBy")
 
   @@map("users")
+}
+
+// ─── Audit Log (← Тиждень 1 блоку Ролі, 2026-06-03) ────────────────────────
+// Універсальна таблиця подій усієї системи. Кожна мутаційна дія
+// (create/update/delete у будь-якій моделі) пише сюди один запис.
+// Для дій власника (`role = owner`) додатково ставиться `isOwnerAction=true`
+// — для швидкого фільтру у admin-UI `/manager/admin/audit?ownerOnly=true`.
+// Запис ніколи не редагується після створення (append-only журнал).
+model AuditLog {
+  id            String   @id @default(cuid())
+  userId        String?  @map("user_id")
+  userEmail     String?  @map("user_email")
+  userRole      String   @map("user_role")
+  action        String // create / update / delete / login / logout / failed_login / ...
+  resource      String // order / client / lot / payment / receiving / ...
+  resourceId    String?  @map("resource_id")
+  summary       String?
+  dataBefore    Json?    @map("data_before")
+  dataAfter     Json?    @map("data_after")
+  ip            String?
+  userAgent     String?  @map("user_agent")
+  isOwnerAction Boolean  @default(false) @map("is_owner_action")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  user User? @relation("AuditLogUser", fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([createdAt(sort: Desc)])
+  @@index([userId])
+  @@index([resource, resourceId])
+  @@map("audit_logs")
 }
 
 model UserRefreshToken {
@@ -1247,6 +1529,7 @@ enum MgrReminderSource {
   manual
   auto_video
   auto_bron
+  auto_receiving_review
 
   @@map("mgr_reminder_source")
 }
@@ -1266,12 +1549,14 @@ model MgrReminder {
   source            MgrReminderSource @default(manual)
   lotId             String?           @map("lot_id")
   productId         String?           @map("product_id")
+  receivingId       String?           @map("receiving_id")
   createdAt         DateTime          @default(now()) @map("created_at")
   updatedAt         DateTime          @updatedAt @map("updated_at")
 
-  client MgrClient?        @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  owner  User              @relation("UserReminders", fields: [ownerUserId], references: [id], onDelete: Cascade)
-  items  MgrReminderItem[]
+  client    MgrClient?        @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  owner     User              @relation("UserReminders", fields: [ownerUserId], references: [id], onDelete: Cascade)
+  receiving Receiving?        @relation(fields: [receivingId], references: [id], onDelete: SetNull)
+  items     MgrReminderItem[]
 
   @@index([clientId, remindAt])
   @@index([ownerUserId, completedAt, remindAt])

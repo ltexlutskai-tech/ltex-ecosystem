@@ -7,12 +7,16 @@ import type { ManagerRole } from "@/lib/auth/jwt";
 import { ChatUnreadBadge } from "./chat-unread-badge";
 import { SidebarNavLink } from "./sidebar-nav-link";
 import {
+  ADMIN_AUDIT_LINK,
+  ADMIN_PERMISSIONS_LINK,
   ADMIN_REGION_AGENTS_LINK,
   ADMIN_USERS_LINK,
   CHAT_LINK,
   PRIMARY_LINKS,
+  REPORTS_LINK,
   SECONDARY_LINKS,
   SETTINGS_LINK,
+  WAREHOUSE_RECEIVINGS_LINK,
   type SidebarLink,
 } from "./sidebar-links";
 
@@ -54,6 +58,26 @@ export function SidebarMobileTrigger({ role }: { role: ManagerRole }) {
             badgeSlot={<ChatUnreadBadge />}
             onNavigate={close}
           />
+          {(role === "warehouse" || role === "admin" || role === "owner") && (
+            <SidebarNavLink
+              href={WAREHOUSE_RECEIVINGS_LINK.href}
+              label={WAREHOUSE_RECEIVINGS_LINK.label}
+              icon={iconFor(WAREHOUSE_RECEIVINGS_LINK)}
+              onNavigate={close}
+            />
+          )}
+          {(role === "analyst" ||
+            role === "admin" ||
+            role === "owner" ||
+            role === "supervisor" ||
+            role === "bookkeeper") && (
+            <SidebarNavLink
+              href={REPORTS_LINK.href}
+              label={REPORTS_LINK.label}
+              icon={iconFor(REPORTS_LINK)}
+              onNavigate={close}
+            />
+          )}
           <Separator />
           {role === "admin" && (
             <>
@@ -67,6 +91,22 @@ export function SidebarMobileTrigger({ role }: { role: ManagerRole }) {
                 href={ADMIN_REGION_AGENTS_LINK.href}
                 label={ADMIN_REGION_AGENTS_LINK.label}
                 icon={iconFor(ADMIN_REGION_AGENTS_LINK)}
+                onNavigate={close}
+              />
+            </>
+          )}
+          {(role === "admin" || role === "owner") && (
+            <>
+              <SidebarNavLink
+                href={ADMIN_PERMISSIONS_LINK.href}
+                label={ADMIN_PERMISSIONS_LINK.label}
+                icon={iconFor(ADMIN_PERMISSIONS_LINK)}
+                onNavigate={close}
+              />
+              <SidebarNavLink
+                href={ADMIN_AUDIT_LINK.href}
+                label={ADMIN_AUDIT_LINK.label}
+                icon={iconFor(ADMIN_AUDIT_LINK)}
                 onNavigate={close}
               />
             </>

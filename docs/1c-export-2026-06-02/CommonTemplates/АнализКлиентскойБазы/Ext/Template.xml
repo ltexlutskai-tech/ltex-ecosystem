@@ -1,0 +1,1185 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<DataCompositionSchema xmlns="http://v8.1c.ru/8.1/data-composition-system/schema" xmlns:dcscom="http://v8.1c.ru/8.1/data-composition-system/common" xmlns:dcscor="http://v8.1c.ru/8.1/data-composition-system/core" xmlns:dcsset="http://v8.1c.ru/8.1/data-composition-system/settings" xmlns:v8="http://v8.1c.ru/8.1/data/core" xmlns:v8ui="http://v8.1c.ru/8.1/data/ui" xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+	<dataSource>
+		<name>ИсточникДанных1</name>
+		<dataSourceType>Local</dataSourceType>
+	</dataSource>
+	<dataSet xsi:type="DataSetObject">
+		<name>ТЗКонтрагентов</name>
+		<field xsi:type="DataSetFieldField">
+			<dataPath>Контрагент</dataPath>
+			<field>Контрагент</field>
+			<title xsi:type="v8:LocalStringType">
+				<v8:item>
+					<v8:lang>ru</v8:lang>
+					<v8:content>Контрагент</v8:content>
+				</v8:item>
+			</title>
+			<valueType>
+				<v8:Type xmlns:d5p1="http://v8.1c.ru/8.1/data/enterprise/current-config">d5p1:CatalogRef.Контрагенты</v8:Type>
+			</valueType>
+		</field>
+		<field xsi:type="DataSetFieldField">
+			<dataPath>КлиентскаяБаза</dataPath>
+			<field>КлиентскаяБаза</field>
+			<title xsi:type="v8:LocalStringType">
+				<v8:item>
+					<v8:lang>ru</v8:lang>
+					<v8:content>Загальна КБ</v8:content>
+				</v8:item>
+			</title>
+			<valueType>
+				<v8:Type>xs:decimal</v8:Type>
+				<v8:NumberQualifiers>
+					<v8:Digits>10</v8:Digits>
+					<v8:FractionDigits>0</v8:FractionDigits>
+					<v8:AllowedSign>Any</v8:AllowedSign>
+				</v8:NumberQualifiers>
+			</valueType>
+		</field>
+		<field xsi:type="DataSetFieldField">
+			<dataPath>ОбработаноКонтрагентов</dataPath>
+			<field>ОбработаноКонтрагентов</field>
+			<title xsi:type="v8:LocalStringType">
+				<v8:item>
+					<v8:lang>ru</v8:lang>
+					<v8:content>Опрацьовано (з початку дня)</v8:content>
+				</v8:item>
+			</title>
+			<valueType>
+				<v8:Type>xs:decimal</v8:Type>
+				<v8:NumberQualifiers>
+					<v8:Digits>0</v8:Digits>
+					<v8:FractionDigits>0</v8:FractionDigits>
+					<v8:AllowedSign>Any</v8:AllowedSign>
+				</v8:NumberQualifiers>
+			</valueType>
+		</field>
+		<field xsi:type="DataSetFieldField">
+			<dataPath>ОсталосьОбработать</dataPath>
+			<field>ОсталосьОбработать</field>
+			<title xsi:type="v8:LocalStringType">
+				<v8:item>
+					<v8:lang>ru</v8:lang>
+					<v8:content>Залишилось опрацювати</v8:content>
+				</v8:item>
+			</title>
+			<valueType>
+				<v8:Type>xs:decimal</v8:Type>
+				<v8:NumberQualifiers>
+					<v8:Digits>0</v8:Digits>
+					<v8:FractionDigits>0</v8:FractionDigits>
+					<v8:AllowedSign>Any</v8:AllowedSign>
+				</v8:NumberQualifiers>
+			</valueType>
+		</field>
+		<field xsi:type="DataSetFieldField">
+			<dataPath>ОбработаноКонтрагентовСНачалаДня</dataPath>
+			<field>ОбработаноКонтрагентовСНачалаДня</field>
+			<title xsi:type="v8:LocalStringType">
+				<v8:item>
+					<v8:lang>ru</v8:lang>
+					<v8:content>Обработано контрагентов с начала дня</v8:content>
+				</v8:item>
+			</title>
+			<valueType>
+				<v8:Type>xs:decimal</v8:Type>
+				<v8:NumberQualifiers>
+					<v8:Digits>0</v8:Digits>
+					<v8:FractionDigits>0</v8:FractionDigits>
+					<v8:AllowedSign>Any</v8:AllowedSign>
+				</v8:NumberQualifiers>
+			</valueType>
+		</field>
+		<dataSource>ИсточникДанных1</dataSource>
+		<objectName>ТЗКонтрагентов</objectName>
+	</dataSet>
+	<dataSet xsi:type="DataSetQuery">
+		<name>ЗапросКБазеДанных</name>
+		<field xsi:type="DataSetFieldField">
+			<dataPath>Контрагент</dataPath>
+			<field>Контрагент</field>
+			<title xsi:type="v8:LocalStringType">
+				<v8:item>
+					<v8:lang>ru</v8:lang>
+					<v8:content>Контрагент</v8:content>
+				</v8:item>
+			</title>
+		</field>
+		<field xsi:type="DataSetFieldField">
+			<dataPath>Область</dataPath>
+			<field>Область</field>
+		</field>
+		<field xsi:type="DataSetFieldField">
+			<dataPath>Город</dataPath>
+			<field>Город</field>
+			<title xsi:type="v8:LocalStringType">
+				<v8:item>
+					<v8:lang>ru</v8:lang>
+					<v8:content>Місто</v8:content>
+				</v8:item>
+			</title>
+		</field>
+		<field xsi:type="DataSetFieldField">
+			<dataPath>ОПМалоактивний</dataPath>
+			<field>ОПМалоактивний</field>
+			<title xsi:type="v8:LocalStringType">
+				<v8:item>
+					<v8:lang>ru</v8:lang>
+					<v8:content>ОПМалоактивний</v8:content>
+				</v8:item>
+			</title>
+		</field>
+		<field xsi:type="DataSetFieldField">
+			<dataPath>Неактивний</dataPath>
+			<field>Неактивний</field>
+			<title xsi:type="v8:LocalStringType">
+				<v8:item>
+					<v8:lang>ru</v8:lang>
+					<v8:content>Неактивний</v8:content>
+				</v8:item>
+			</title>
+		</field>
+		<field xsi:type="DataSetFieldField">
+			<dataPath>Малоактивний</dataPath>
+			<field>Малоактивний</field>
+			<title xsi:type="v8:LocalStringType">
+				<v8:item>
+					<v8:lang>ru</v8:lang>
+					<v8:content>Малоактивний</v8:content>
+				</v8:item>
+			</title>
+		</field>
+		<field xsi:type="DataSetFieldField">
+			<dataPath>Активный</dataPath>
+			<field>Активный</field>
+			<title xsi:type="v8:LocalStringType">
+				<v8:item>
+					<v8:lang>ru</v8:lang>
+					<v8:content>Активный</v8:content>
+				</v8:item>
+			</title>
+		</field>
+		<field xsi:type="DataSetFieldField">
+			<dataPath>ОПАктивный</dataPath>
+			<field>ОПАктивный</field>
+			<title xsi:type="v8:LocalStringType">
+				<v8:item>
+					<v8:lang>ru</v8:lang>
+					<v8:content>ОПАктивный</v8:content>
+				</v8:item>
+			</title>
+		</field>
+		<field xsi:type="DataSetFieldField">
+			<dataPath>ОПНеактивний</dataPath>
+			<field>ОПНеактивний</field>
+			<title xsi:type="v8:LocalStringType">
+				<v8:item>
+					<v8:lang>ru</v8:lang>
+					<v8:content>ОПНеактивний</v8:content>
+				</v8:item>
+			</title>
+		</field>
+		<field xsi:type="DataSetFieldField">
+			<dataPath>ДоговорКонтрагента</dataPath>
+			<field>ДоговорКонтрагента</field>
+		</field>
+		<field xsi:type="DataSetFieldField">
+			<dataPath>СтатусПартии</dataPath>
+			<field>СтатусПартии</field>
+		</field>
+		<field xsi:type="DataSetFieldField">
+			<dataPath>ЗаказПокупателя</dataPath>
+			<field>ЗаказПокупателя</field>
+		</field>
+		<field xsi:type="DataSetFieldField">
+			<dataPath>Номенклатура</dataPath>
+			<field>Номенклатура</field>
+		</field>
+		<field xsi:type="DataSetFieldField">
+			<dataPath>ЕдиницаИзмерения</dataPath>
+			<field>ЕдиницаИзмерения</field>
+		</field>
+		<field xsi:type="DataSetFieldField">
+			<dataPath>ХарактеристикаНоменклатуры</dataPath>
+			<field>ХарактеристикаНоменклатуры</field>
+		</field>
+		<field xsi:type="DataSetFieldField">
+			<dataPath>Цена</dataPath>
+			<field>Цена</field>
+		</field>
+		<field xsi:type="DataSetFieldField">
+			<dataPath>ПроцентСкидкиНаценки</dataPath>
+			<field>ПроцентСкидкиНаценки</field>
+		</field>
+		<field xsi:type="DataSetFieldField">
+			<dataPath>ПроцентАвтоматическихСкидок</dataPath>
+			<field>ПроцентАвтоматическихСкидок</field>
+		</field>
+		<field xsi:type="DataSetFieldField">
+			<dataPath>УсловиеАвтоматическойСкидки</dataPath>
+			<field>УсловиеАвтоматическойСкидки</field>
+		</field>
+		<field xsi:type="DataSetFieldField">
+			<dataPath>ЗначениеУсловияАвтоматическойСкидки</dataPath>
+			<field>ЗначениеУсловияАвтоматическойСкидки</field>
+		</field>
+		<field xsi:type="DataSetFieldField">
+			<dataPath>СтавкаНДС</dataPath>
+			<field>СтавкаНДС</field>
+		</field>
+		<field xsi:type="DataSetFieldField">
+			<dataPath>ДокументПродажи</dataPath>
+			<field>ДокументПродажи</field>
+		</field>
+		<field xsi:type="DataSetFieldField">
+			<dataPath>Подразделение</dataPath>
+			<field>Подразделение</field>
+		</field>
+		<field xsi:type="DataSetFieldField">
+			<dataPath>Организация</dataPath>
+			<field>Организация</field>
+		</field>
+		<field xsi:type="DataSetFieldField">
+			<dataPath>Проект</dataPath>
+			<field>Проект</field>
+		</field>
+		<field xsi:type="DataSetFieldField">
+			<dataPath>КоличествоЗаказов</dataPath>
+			<field>КоличествоЗаказов</field>
+			<title xsi:type="v8:LocalStringType">
+				<v8:item>
+					<v8:lang>ru</v8:lang>
+					<v8:content>Количество заказов</v8:content>
+				</v8:item>
+			</title>
+			<role>
+				<dcscom:periodNumber>1</dcscom:periodNumber>
+				<dcscom:periodType>Main</dcscom:periodType>
+			</role>
+		</field>
+		<field xsi:type="DataSetFieldField">
+			<dataPath>КоличествоПродаж</dataPath>
+			<field>КоличествоПродаж</field>
+			<title xsi:type="v8:LocalStringType">
+				<v8:item>
+					<v8:lang>ru</v8:lang>
+					<v8:content>Количество продаж</v8:content>
+				</v8:item>
+			</title>
+			<role>
+				<dcscom:periodNumber>2</dcscom:periodNumber>
+				<dcscom:periodType>Main</dcscom:periodType>
+			</role>
+		</field>
+		<field xsi:type="DataSetFieldField">
+			<dataPath>Новий</dataPath>
+			<field>Новий</field>
+			<title xsi:type="v8:LocalStringType">
+				<v8:item>
+					<v8:lang>ru</v8:lang>
+					<v8:content>Новий</v8:content>
+				</v8:item>
+			</title>
+		</field>
+		<field xsi:type="DataSetFieldField">
+			<dataPath>ОПНовий</dataPath>
+			<field>ОПНовий</field>
+			<title xsi:type="v8:LocalStringType">
+				<v8:item>
+					<v8:lang>ru</v8:lang>
+					<v8:content>ОПНовий</v8:content>
+				</v8:item>
+			</title>
+		</field>
+		<field xsi:type="DataSetFieldField">
+			<dataPath>КоличествоПродажСНачалаДня</dataPath>
+			<field>КоличествоПродажСНачалаДня</field>
+			<title xsi:type="v8:LocalStringType">
+				<v8:item>
+					<v8:lang>ru</v8:lang>
+					<v8:content>Количество продаж с начала дня</v8:content>
+				</v8:item>
+			</title>
+			<role>
+				<dcscom:periodNumber>4</dcscom:periodNumber>
+				<dcscom:periodType>Main</dcscom:periodType>
+			</role>
+		</field>
+		<field xsi:type="DataSetFieldField">
+			<dataPath>КоличествоЗаказовСНачалаДня</dataPath>
+			<field>КоличествоЗаказовСНачалаДня</field>
+			<title xsi:type="v8:LocalStringType">
+				<v8:item>
+					<v8:lang>ru</v8:lang>
+					<v8:content>Количество заказов с начала дня</v8:content>
+				</v8:item>
+			</title>
+			<role>
+				<dcscom:periodNumber>3</dcscom:periodNumber>
+				<dcscom:periodType>Main</dcscom:periodType>
+			</role>
+		</field>
+		<dataSource>ИсточникДанных1</dataSource>
+		<query>ВЫБРАТЬ
+	КОЛИЧЕСТВО(РАЗЛИЧНЫЕ ЗаказыПокупателейОбороты.Регистратор) КАК КоличествоЗаказов,
+	ЗаказыПокупателейОбороты.Регистратор.Контрагент КАК Контрагент
+ПОМЕСТИТЬ ТабПродажКоличествоЗаказов
+ИЗ
+	РегистрНакопления.ЗаказыПокупателей.Обороты({(&amp;НачалоМесяца)}, , Регистратор, ЗаказПокупателя.ТорговийАгент = &amp;ТорговийАгент) КАК ЗаказыПокупателейОбороты
+ГДЕ
+	ЗаказыПокупателейОбороты.Регистратор ССЫЛКА Документ.ЗаказПокупателя
+
+СГРУППИРОВАТЬ ПО
+	ЗаказыПокупателейОбороты.Регистратор.Контрагент
+;
+
+////////////////////////////////////////////////////////////////////////////////
+ВЫБРАТЬ
+	КОЛИЧЕСТВО(РАЗЛИЧНЫЕ ЗаказыПокупателейОбороты.Регистратор) КАК КоличествоЗаказовСНачалаДня,
+	ЗаказыПокупателейОбороты.Регистратор.Контрагент КАК Контрагент
+ПОМЕСТИТЬ ТабПродажКоличествоЗаказовСНачалаДня
+ИЗ
+	РегистрНакопления.ЗаказыПокупателей.Обороты({(&amp;НачалоДня)}, , Регистратор, ЗаказПокупателя.ТорговийАгент = &amp;ТорговийАгент) КАК ЗаказыПокупателейОбороты
+ГДЕ
+	ЗаказыПокупателейОбороты.Регистратор ССЫЛКА Документ.ЗаказПокупателя
+
+СГРУППИРОВАТЬ ПО
+	ЗаказыПокупателейОбороты.Регистратор.Контрагент
+;
+
+////////////////////////////////////////////////////////////////////////////////
+ВЫБРАТЬ
+	ПродажиОбороты.ДокументПродажи.Контрагент КАК Контрагент,
+	КОЛИЧЕСТВО(РАЗЛИЧНЫЕ ПродажиОбороты.Регистратор) КАК КоличествоПродаж
+ПОМЕСТИТЬ ТабПродажКоличествоРеализаций
+ИЗ
+	РегистрНакопления.Продажи.Обороты({(&amp;НачалоМесяца)}, , Регистратор, ДокументПродажи.ТорговийАгент = &amp;ТорговийАгент) КАК ПродажиОбороты
+ГДЕ
+	ПродажиОбороты.Регистратор ССЫЛКА Документ.РеализацияТоваровУслуг
+
+СГРУППИРОВАТЬ ПО
+	ПродажиОбороты.ДокументПродажи.Контрагент
+;
+
+////////////////////////////////////////////////////////////////////////////////
+ВЫБРАТЬ
+	ПродажиОбороты.ДокументПродажи.Контрагент КАК Контрагент,
+	КОЛИЧЕСТВО(РАЗЛИЧНЫЕ ПродажиОбороты.Регистратор) КАК КоличествоПродажСНачалаДня
+ПОМЕСТИТЬ ТабПродажКоличествоРеализацийСНачалаДня
+ИЗ
+	РегистрНакопления.Продажи.Обороты({(&amp;НачалоДня)}, , Регистратор, ДокументПродажи.ТорговийАгент = &amp;ТорговийАгент) КАК ПродажиОбороты
+ГДЕ
+	ПродажиОбороты.Регистратор ССЫЛКА Документ.РеализацияТоваровУслуг
+
+СГРУППИРОВАТЬ ПО
+	ПродажиОбороты.ДокументПродажи.Контрагент
+;
+
+////////////////////////////////////////////////////////////////////////////////
+ВЫБРАТЬ
+	Контрагенты.Ссылка КАК Контрагент,
+	Контрагенты.Область,
+	Контрагенты.Город,
+	ВЫБОР
+		КОГДА Контрагенты.СтатусКонтрагента = ЗНАЧЕНИЕ(Справочник.СтатусыКонтрагентов.Активний)
+			ТОГДА 1
+		ИНАЧЕ 0
+	КОНЕЦ КАК Активный,
+	ВЫБОР
+		КОГДА Контрагенты.СтатусКонтрагента = ЗНАЧЕНИЕ(Справочник.СтатусыКонтрагентов.Малоактивний)
+			ТОГДА 1
+		ИНАЧЕ 0
+	КОНЕЦ КАК Малоактивний,
+	ВЫБОР
+		КОГДА Контрагенты.СтатусКонтрагента = ЗНАЧЕНИЕ(Справочник.СтатусыКонтрагентов.Неактивний)
+			ТОГДА 1
+		ИНАЧЕ 0
+	КОНЕЦ КАК Неактивний,
+	ВЫБОР
+		КОГДА Контрагенты.СтатусКонтрагента = ЗНАЧЕНИЕ(Справочник.СтатусыКонтрагентов.Новий)
+			ТОГДА 1
+		ИНАЧЕ 0
+	КОНЕЦ КАК Новий,
+	ВЫБОР
+		КОГДА Контрагенты.ОперативныйСтатусКонтрагента = ЗНАЧЕНИЕ(Справочник.СтатусыКонтрагентов.Активний)
+			ТОГДА 1
+		ИНАЧЕ 0
+	КОНЕЦ КАК ОПАктивный,
+	ВЫБОР
+		КОГДА Контрагенты.ОперативныйСтатусКонтрагента = ЗНАЧЕНИЕ(Справочник.СтатусыКонтрагентов.Малоактивний)
+			ТОГДА 1
+		ИНАЧЕ 0
+	КОНЕЦ КАК ОПМалоактивний,
+	ВЫБОР
+		КОГДА Контрагенты.ОперативныйСтатусКонтрагента = ЗНАЧЕНИЕ(Справочник.СтатусыКонтрагентов.Неактивний)
+			ТОГДА 1
+		ИНАЧЕ 0
+	КОНЕЦ КАК ОПНеактивний,
+	ВЫБОР
+		КОГДА Контрагенты.ДатаСоздания &gt;= &amp;НачалоПериодаНеделя
+			ТОГДА 1
+		ИНАЧЕ 0
+	КОНЕЦ КАК ОПНовий,
+	ТабПродажКоличествоЗаказов.КоличествоЗаказов,
+	ТабПродажКоличествоРеализаций.КоличествоПродаж,
+	ТабПродажКоличествоЗаказовСНачалаДня.КоличествоЗаказовСНачалаДня,
+	ТабПродажКоличествоРеализацийСНачалаДня.КоличествоПродажСНачалаДня
+ИЗ
+	Справочник.Контрагенты КАК Контрагенты
+		ЛЕВОЕ СОЕДИНЕНИЕ ТабПродажКоличествоЗаказов КАК ТабПродажКоличествоЗаказов
+		ПО Контрагенты.Ссылка = ТабПродажКоличествоЗаказов.Контрагент
+		ЛЕВОЕ СОЕДИНЕНИЕ ТабПродажКоличествоРеализаций КАК ТабПродажКоличествоРеализаций
+		ПО Контрагенты.Ссылка = ТабПродажКоличествоРеализаций.Контрагент
+		ЛЕВОЕ СОЕДИНЕНИЕ ТабПродажКоличествоЗаказовСНачалаДня КАК ТабПродажКоличествоЗаказовСНачалаДня
+		ПО Контрагенты.Ссылка = ТабПродажКоличествоЗаказовСНачалаДня.Контрагент
+		ЛЕВОЕ СОЕДИНЕНИЕ ТабПродажКоличествоРеализацийСНачалаДня КАК ТабПродажКоличествоРеализацийСНачалаДня
+		ПО Контрагенты.Ссылка = ТабПродажКоличествоРеализацийСНачалаДня.Контрагент
+ГДЕ
+	Контрагенты.ЭтоГруппа = ЛОЖЬ</query>
+	</dataSet>
+	<dataSet xsi:type="DataSetQuery">
+		<name>Сток_Секонд_Фабрики</name>
+		<field xsi:type="DataSetFieldField">
+			<dataPath>Подразделение</dataPath>
+			<field>Подразделение</field>
+		</field>
+		<field xsi:type="DataSetFieldField">
+			<dataPath>Номенклатура</dataPath>
+			<field>Номенклатура</field>
+		</field>
+		<field xsi:type="DataSetFieldField">
+			<dataPath>ХарактеристикаНоменклатуры</dataPath>
+			<field>ХарактеристикаНоменклатуры</field>
+		</field>
+		<field xsi:type="DataSetFieldField">
+			<dataPath>ДокументПродажи</dataPath>
+			<field>ДокументПродажи</field>
+		</field>
+		<field xsi:type="DataSetFieldField">
+			<dataPath>ЗаказПокупателя</dataPath>
+			<field>ЗаказПокупателя</field>
+		</field>
+		<field xsi:type="DataSetFieldField">
+			<dataPath>ДоговорКонтрагента</dataPath>
+			<field>ДоговорКонтрагента</field>
+		</field>
+		<field xsi:type="DataSetFieldField">
+			<dataPath>ВесПродажиСеконд</dataPath>
+			<field>ВесПродажиСеконд</field>
+			<title xsi:type="v8:LocalStringType">
+				<v8:item>
+					<v8:lang>ru</v8:lang>
+					<v8:content>Вес продажи секонд</v8:content>
+				</v8:item>
+			</title>
+		</field>
+		<field xsi:type="DataSetFieldField">
+			<dataPath>Проект</dataPath>
+			<field>Проект</field>
+		</field>
+		<field xsi:type="DataSetFieldField">
+			<dataPath>Организация</dataPath>
+			<field>Организация</field>
+		</field>
+		<field xsi:type="DataSetFieldField">
+			<dataPath>Контрагент</dataPath>
+			<field>Контрагент</field>
+		</field>
+		<field xsi:type="DataSetFieldField">
+			<dataPath>СтоимостьПродажиСток</dataPath>
+			<field>СтоимостьПродажиСток</field>
+			<title xsi:type="v8:LocalStringType">
+				<v8:item>
+					<v8:lang>ru</v8:lang>
+					<v8:content>Стоимость продажи сток</v8:content>
+				</v8:item>
+			</title>
+		</field>
+		<field xsi:type="DataSetFieldField">
+			<dataPath>ВесПродажиНеВиве</dataPath>
+			<field>ВесПродажиНеВиве</field>
+			<title xsi:type="v8:LocalStringType">
+				<v8:item>
+					<v8:lang>ru</v8:lang>
+					<v8:content>Вес продажи не виве</v8:content>
+				</v8:item>
+			</title>
+		</field>
+		<field xsi:type="DataSetFieldField">
+			<dataPath>ВесПродажиСток</dataPath>
+			<field>ВесПродажиСток</field>
+			<title xsi:type="v8:LocalStringType">
+				<v8:item>
+					<v8:lang>ru</v8:lang>
+					<v8:content>Вес продажи сток</v8:content>
+				</v8:item>
+			</title>
+		</field>
+		<field xsi:type="DataSetFieldField">
+			<dataPath>СтоимостьПродажиСеконд</dataPath>
+			<field>СтоимостьПродажиСеконд</field>
+			<title xsi:type="v8:LocalStringType">
+				<v8:item>
+					<v8:lang>ru</v8:lang>
+					<v8:content>Стоимость продажи секонд</v8:content>
+				</v8:item>
+			</title>
+		</field>
+		<field xsi:type="DataSetFieldField">
+			<dataPath>СтоимостьПродажиВиве</dataPath>
+			<field>СтоимостьПродажиВиве</field>
+			<title xsi:type="v8:LocalStringType">
+				<v8:item>
+					<v8:lang>ru</v8:lang>
+					<v8:content>Стоимость продажи виве</v8:content>
+				</v8:item>
+			</title>
+		</field>
+		<field xsi:type="DataSetFieldField">
+			<dataPath>ВесПродажиВиве</dataPath>
+			<field>ВесПродажиВиве</field>
+			<title xsi:type="v8:LocalStringType">
+				<v8:item>
+					<v8:lang>ru</v8:lang>
+					<v8:content>Вес продажи виве</v8:content>
+				</v8:item>
+			</title>
+		</field>
+		<field xsi:type="DataSetFieldField">
+			<dataPath>СтоимостьПродажиНеВиве</dataPath>
+			<field>СтоимостьПродажиНеВиве</field>
+			<title xsi:type="v8:LocalStringType">
+				<v8:item>
+					<v8:lang>ru</v8:lang>
+					<v8:content>Стоимость продажи не виве</v8:content>
+				</v8:item>
+			</title>
+		</field>
+		<dataSource>ИсточникДанных1</dataSource>
+		<query>ВЫБРАТЬ
+	Номенклатура.Ссылка
+ПОМЕСТИТЬ ТабГруппаСток
+ИЗ
+	Справочник.Номенклатура КАК Номенклатура
+ГДЕ
+	Номенклатура.ЭтоГруппа = ИСТИНА
+	И Номенклатура.Код = "00000000005"
+;
+
+////////////////////////////////////////////////////////////////////////////////
+ВЫБРАТЬ
+	Номенклатура.Ссылка
+ПОМЕСТИТЬ ТабГруппаСеконд
+ИЗ
+	Справочник.Номенклатура КАК Номенклатура
+ГДЕ
+	Номенклатура.ЭтоГруппа = ИСТИНА
+	И Номенклатура.Код = "00000000001"
+;
+
+////////////////////////////////////////////////////////////////////////////////
+ВЫБРАТЬ
+	Производители.Ссылка
+ПОМЕСТИТЬ ТабПроизводительВиве
+ИЗ
+	Справочник.Производители КАК Производители
+ГДЕ
+	Производители.Код = "000000001"
+;
+
+////////////////////////////////////////////////////////////////////////////////
+ВЫБРАТЬ
+	ПродажиОбороты.ДокументПродажи.Контрагент КАК Контрагент,
+	СУММА(ПродажиОбороты.СтоимостьОборот) КАК СтоимостьПродажиСток,
+	СУММА(ПродажиОбороты.ВесОборот) КАК ВесПродажиСток
+ПОМЕСТИТЬ ТабПродажиСток
+ИЗ
+	РегистрНакопления.Продажи.Обороты(
+			{(&amp;НачалоМесяца)},
+			,
+			Период,
+			Номенклатура В ИЕРАРХИИ
+					(ВЫБРАТЬ
+						ТабГруппаСток.Ссылка
+					ИЗ
+						ТабГруппаСток КАК ТабГруппаСток)
+				И ДокументПродажи.ТорговийАгент = &amp;ТорговийАгент) КАК ПродажиОбороты
+
+СГРУППИРОВАТЬ ПО
+	ПродажиОбороты.ДокументПродажи.Контрагент
+;
+
+////////////////////////////////////////////////////////////////////////////////
+ВЫБРАТЬ
+	ПродажиОбороты.ДокументПродажи.Контрагент КАК Контрагент,
+	СУММА(ПродажиОбороты.СтоимостьОборот) КАК СтоимостьПродажиСеконд,
+	СУММА(ПродажиОбороты.ВесОборот) КАК ВесПродажиСеконд
+ПОМЕСТИТЬ ТабПродажиСеконд
+ИЗ
+	РегистрНакопления.Продажи.Обороты(
+			{(&amp;НачалоМесяца)},
+			,
+			Период,
+			Номенклатура В ИЕРАРХИИ
+					(ВЫБРАТЬ
+						ТабГруппаСеконд.Ссылка
+					ИЗ
+						ТабГруппаСеконд КАК ТабГруппаСеконд)
+				И ДокументПродажи.ТорговийАгент = &amp;ТорговийАгент) КАК ПродажиОбороты
+
+СГРУППИРОВАТЬ ПО
+	ПродажиОбороты.ДокументПродажи.Контрагент
+;
+
+////////////////////////////////////////////////////////////////////////////////
+ВЫБРАТЬ
+	ПродажиОбороты.ДокументПродажи.Контрагент КАК Контрагент,
+	СУММА(ПродажиОбороты.СтоимостьОборот) КАК СтоимостьПродажиВиве,
+	СУММА(ПродажиОбороты.ВесОборот) КАК ВесПродажиВиве
+ПОМЕСТИТЬ ТабПродажиВиве
+ИЗ
+	РегистрНакопления.Продажи.Обороты(
+			{(&amp;НачалоМесяца)},
+			,
+			Период,
+			Номенклатура.Производитель В ИЕРАРХИИ
+					(ВЫБРАТЬ
+						ТабПроизводительВиве.Ссылка
+					ИЗ
+						ТабПроизводительВиве КАК ТабПроизводительВиве)
+				И ДокументПродажи.ТорговийАгент = &amp;ТорговийАгент) КАК ПродажиОбороты
+
+СГРУППИРОВАТЬ ПО
+	ПродажиОбороты.ДокументПродажи.Контрагент
+;
+
+////////////////////////////////////////////////////////////////////////////////
+ВЫБРАТЬ
+	ПродажиОбороты.ДокументПродажи.Контрагент КАК Контрагент,
+	СУММА(ПродажиОбороты.СтоимостьОборот) КАК СтоимостьПродажиНеВиве,
+	СУММА(ПродажиОбороты.ВесОборот) КАК ВесПродажиНеВиве
+ПОМЕСТИТЬ ТабПродажиНеВиве
+ИЗ
+	РегистрНакопления.Продажи.Обороты(
+			{(&amp;НачалоМесяца)},
+			,
+			Период,
+			НЕ Номенклатура.Производитель В ИЕРАРХИИ
+						(ВЫБРАТЬ
+							ТабПроизводительВиве.Ссылка
+						ИЗ
+							ТабПроизводительВиве КАК ТабПроизводительВиве)
+				И Номенклатура В ИЕРАРХИИ
+					(ВЫБРАТЬ
+						ТабГруппаСеконд.Ссылка
+					ИЗ
+						ТабГруппаСеконд КАК ТабГруппаСеконд)
+				И ДокументПродажи.ТорговийАгент = &amp;ТорговийАгент) КАК ПродажиОбороты
+
+СГРУППИРОВАТЬ ПО
+	ПродажиОбороты.ДокументПродажи.Контрагент
+;
+
+////////////////////////////////////////////////////////////////////////////////
+ВЫБРАТЬ
+	ТабПродажиСток.Контрагент,
+	ТабПродажиСток.СтоимостьПродажиСток,
+	ТабПродажиСток.ВесПродажиСток,
+	0 КАК СтоимостьПродажиСеконд,
+	0 КАК ВесПродажиСеконд,
+	0 КАК СтоимостьПродажиВиве,
+	0 КАК ВесПродажиВиве,
+	0 КАК СтоимостьПродажиНеВиве,
+	0 КАК ВесПродажиНеВиве
+ПОМЕСТИТЬ ТабПромежуточная
+ИЗ
+	ТабПродажиСток КАК ТабПродажиСток
+
+ОБЪЕДИНИТЬ ВСЕ
+
+ВЫБРАТЬ
+	ТабПродажиСеконд.Контрагент,
+	0,
+	0,
+	ТабПродажиСеконд.СтоимостьПродажиСеконд,
+	ТабПродажиСеконд.ВесПродажиСеконд,
+	0,
+	0,
+	0,
+	0
+ИЗ
+	ТабПродажиСеконд КАК ТабПродажиСеконд
+
+ОБЪЕДИНИТЬ ВСЕ
+
+ВЫБРАТЬ
+	ТабПродажиВиве.Контрагент,
+	0,
+	0,
+	0,
+	0,
+	ТабПродажиВиве.СтоимостьПродажиВиве,
+	ТабПродажиВиве.ВесПродажиВиве,
+	0,
+	0
+ИЗ
+	ТабПродажиВиве КАК ТабПродажиВиве
+
+ОБЪЕДИНИТЬ ВСЕ
+
+ВЫБРАТЬ
+	ТабПродажиНеВиве.Контрагент,
+	0,
+	0,
+	0,
+	0,
+	0,
+	0,
+	ТабПродажиНеВиве.СтоимостьПродажиНеВиве,
+	ТабПродажиНеВиве.ВесПродажиНеВиве
+ИЗ
+	ТабПродажиНеВиве КАК ТабПродажиНеВиве
+;
+
+////////////////////////////////////////////////////////////////////////////////
+ВЫБРАТЬ
+	ТабПромежуточная.Контрагент,
+	СУММА(ТабПромежуточная.СтоимостьПродажиСток) КАК СтоимостьПродажиСток,
+	СУММА(ТабПромежуточная.ВесПродажиСток) КАК ВесПродажиСток,
+	СУММА(ТабПромежуточная.СтоимостьПродажиСеконд) КАК СтоимостьПродажиСеконд,
+	СУММА(ТабПромежуточная.ВесПродажиСеконд) КАК ВесПродажиСеконд,
+	СУММА(ТабПромежуточная.СтоимостьПродажиВиве) КАК СтоимостьПродажиВиве,
+	СУММА(ТабПромежуточная.ВесПродажиВиве) КАК ВесПродажиВиве,
+	СУММА(ТабПромежуточная.СтоимостьПродажиНеВиве) КАК СтоимостьПродажиНеВиве,
+	СУММА(ТабПромежуточная.ВесПродажиНеВиве) КАК ВесПродажиНеВиве
+ИЗ
+	ТабПромежуточная КАК ТабПромежуточная
+
+СГРУППИРОВАТЬ ПО
+	ТабПромежуточная.Контрагент</query>
+	</dataSet>
+	<dataSetLink>
+		<sourceDataSet>ЗапросКБазеДанных</sourceDataSet>
+		<destinationDataSet>ТЗКонтрагентов</destinationDataSet>
+		<sourceExpression>Контрагент</sourceExpression>
+		<destinationExpression>Контрагент</destinationExpression>
+	</dataSetLink>
+	<dataSetLink>
+		<sourceDataSet>ЗапросКБазеДанных</sourceDataSet>
+		<destinationDataSet>Сток_Секонд_Фабрики</destinationDataSet>
+		<sourceExpression>Контрагент</sourceExpression>
+		<destinationExpression>Контрагент</destinationExpression>
+	</dataSetLink>
+	<totalField>
+		<dataPath>КлиентскаяБаза</dataPath>
+		<expression>Сумма(КлиентскаяБаза)</expression>
+	</totalField>
+	<totalField>
+		<dataPath>ОбработаноКонтрагентов</dataPath>
+		<expression>ВЫБОР КОГДА Сумма(ОбработаноКонтрагентовСНачалаДня)= 0 И Сумма(ОбработаноКонтрагентов)= 0
+ТОГДА ""
+КОГДА Сумма(ОбработаноКонтрагентовСНачалаДня)= 0 И НЕ Сумма(ОбработаноКонтрагентов)= 0
+ТОГДА Строка(Сумма(ОбработаноКонтрагентов))
+КОГДА  НЕ Сумма(ОбработаноКонтрагентовСНачалаДня)= 0 И Сумма(ОбработаноКонтрагентов)= 0
+ТОГДА " (" + Строка(Сумма(ОбработаноКонтрагентовСНачалаДня)) + ")" 
+ИНАЧЕ Строка(Сумма(ОбработаноКонтрагентов)) + " (" + Строка(Сумма(ОбработаноКонтрагентовСНачалаДня)) + ")"
+КОНЕЦ
+</expression>
+	</totalField>
+	<totalField>
+		<dataPath>ОсталосьОбработать</dataPath>
+		<expression>Сумма(ОсталосьОбработать)</expression>
+	</totalField>
+	<totalField>
+		<dataPath>Активный</dataPath>
+		<expression>ВЫБОР КОГДА Сумма(ОПАктивный)= 0 И Сумма(Активный)= 0
+ТОГДА ""
+КОГДА Сумма(ОПАктивный)= 0 И НЕ Сумма(Активный)= 0
+ТОГДА Строка(Сумма(Активный))
+КОГДА  НЕ Сумма(ОПАктивный)= 0 И Сумма(Активный)= 0
+ТОГДА " (" + Строка(Сумма(ОПАктивный)) + ")" 
+ИНАЧЕ Строка(Сумма(Активный)) + " (" + Строка(Сумма(ОПАктивный)) + ")"
+КОНЕЦ
+</expression>
+	</totalField>
+	<totalField>
+		<dataPath>Малоактивний</dataPath>
+		<expression>ВЫБОР КОГДА Сумма(ОПМалоактивний)= 0 И Сумма(Малоактивний)= 0
+ТОГДА ""
+КОГДА Сумма(ОПМалоактивний)= 0 И НЕ Сумма(Малоактивний)= 0
+ТОГДА Строка(Сумма(Малоактивний))
+КОГДА  НЕ Сумма(ОПМалоактивний)= 0 И Сумма(Малоактивний)= 0
+ТОГДА " (" + Строка(Сумма(ОПМалоактивний)) + ")" 
+ИНАЧЕ Строка(Сумма(Малоактивний)) + " (" + Строка(Сумма(ОПМалоактивний)) + ")"
+КОНЕЦ
+</expression>
+	</totalField>
+	<totalField>
+		<dataPath>Неактивний</dataPath>
+		<expression>ВЫБОР КОГДА Сумма(ОПНеактивний)= 0 И Сумма(Неактивний)= 0
+ТОГДА ""
+КОГДА Сумма(ОПНеактивний)= 0 И НЕ Сумма(Неактивний)= 0
+ТОГДА Строка(Сумма(Неактивний))
+КОГДА  НЕ Сумма(ОПНеактивний)= 0 И Сумма(Неактивний)= 0
+ТОГДА " (" + Строка(Сумма(ОПНеактивний)) + ")" 
+ИНАЧЕ Строка(Сумма(Неактивний)) + " (" + Строка(Сумма(ОПНеактивний)) + ")"
+КОНЕЦ
+</expression>
+	</totalField>
+	<totalField>
+		<dataPath>КоличествоЗаказов</dataPath>
+		<expression>ВЫБОР КОГДА Сумма(КоличествоЗаказовСНачалаДня)&gt; 0 
+ТОГДА	Строка(Сумма(КоличествоЗаказов)) + " (" + Строка(Сумма(КоличествоЗаказовСНачалаДня)) + ")"
+ИНАЧЕ  Строка(Сумма(КоличествоЗаказов))
+КОНЕЦ
+</expression>
+	</totalField>
+	<totalField>
+		<dataPath>КоличествоПродаж</dataPath>
+		<expression>ВЫБОР КОГДА Сумма(КоличествоПродажСНачалаДня)&gt; 0 
+ТОГДА	Строка(Сумма(КоличествоПродаж)) + " (" + Строка(Сумма(КоличествоПродажСНачалаДня)) + ")"
+ИНАЧЕ  Строка(Сумма(КоличествоПродаж))
+КОНЕЦ
+</expression>
+	</totalField>
+	<totalField>
+		<dataPath>ВесПродажиВиве</dataPath>
+		<expression>Сумма(ВесПродажиВиве)</expression>
+	</totalField>
+	<totalField>
+		<dataPath>ВесПродажиНеВиве</dataPath>
+		<expression>Сумма(ВесПродажиНеВиве)</expression>
+	</totalField>
+	<totalField>
+		<dataPath>ВесПродажиСеконд</dataPath>
+		<expression>Сумма(ВесПродажиСеконд)</expression>
+	</totalField>
+	<totalField>
+		<dataPath>ВесПродажиСток</dataPath>
+		<expression>Сумма(ВесПродажиСток)</expression>
+	</totalField>
+	<totalField>
+		<dataPath>СтоимостьПродажиСеконд</dataPath>
+		<expression>Сумма(СтоимостьПродажиСеконд)</expression>
+	</totalField>
+	<totalField>
+		<dataPath>СтоимостьПродажиСток</dataPath>
+		<expression>Сумма(СтоимостьПродажиСток)</expression>
+	</totalField>
+	<totalField>
+		<dataPath>СтоимостьПродажиНеВиве</dataPath>
+		<expression>Сумма(СтоимостьПродажиНеВиве)</expression>
+	</totalField>
+	<totalField>
+		<dataPath>СтоимостьПродажиВиве</dataPath>
+		<expression>Сумма(СтоимостьПродажиВиве)</expression>
+	</totalField>
+	<totalField>
+		<dataPath>Новий</dataPath>
+		<expression>ВЫБОР КОГДА Сумма(ОПНовий)= 0 И Сумма(Новий)= 0
+ТОГДА ""
+КОГДА Сумма(ОПНовий)= 0 И НЕ Сумма(Новий)= 0
+ТОГДА Строка(Сумма(Новий))
+КОГДА  НЕ Сумма(ОПНовий)= 0 И Сумма(Новий)= 0
+ТОГДА " (" + Строка(Сумма(ОПНовий)) + ")" 
+ИНАЧЕ Строка(Сумма(Новий)) + " (" + Строка(Сумма(ОПНовий)) + ")"
+КОНЕЦ
+</expression>
+	</totalField>
+	<parameter>
+		<name>КонецПериода</name>
+		<title xsi:type="v8:LocalStringType">
+			<v8:item>
+				<v8:lang>ru</v8:lang>
+				<v8:content>Конец периода</v8:content>
+			</v8:item>
+		</title>
+		<valueType>
+			<v8:Type>xs:dateTime</v8:Type>
+			<v8:DateQualifiers>
+				<v8:DateFractions>DateTime</v8:DateFractions>
+			</v8:DateQualifiers>
+		</valueType>
+		<value xsi:type="xs:dateTime">0001-01-01T00:00:00</value>
+		<useRestriction>true</useRestriction>
+		<expression>ТекущаяДата()</expression>
+	</parameter>
+	<parameter>
+		<name>НачалоМесяца</name>
+		<title xsi:type="v8:LocalStringType">
+			<v8:item>
+				<v8:lang>ru</v8:lang>
+				<v8:content>Начало месяца</v8:content>
+			</v8:item>
+		</title>
+		<valueType>
+			<v8:Type>xs:dateTime</v8:Type>
+			<v8:DateQualifiers>
+				<v8:DateFractions>DateTime</v8:DateFractions>
+			</v8:DateQualifiers>
+		</valueType>
+		<value xsi:type="xs:dateTime">0001-01-01T00:00:00</value>
+		<useRestriction>true</useRestriction>
+		<expression>НАЧАЛОПЕРИОДА(ТекущаяДата(), "МЕСЯЦ")</expression>
+	</parameter>
+	<parameter>
+		<name>НачалоПериодаНеделя</name>
+		<title xsi:type="v8:LocalStringType">
+			<v8:item>
+				<v8:lang>ru</v8:lang>
+				<v8:content>Начало периода неделя</v8:content>
+			</v8:item>
+		</title>
+		<valueType>
+			<v8:Type>xs:dateTime</v8:Type>
+			<v8:DateQualifiers>
+				<v8:DateFractions>Date</v8:DateFractions>
+			</v8:DateQualifiers>
+		</valueType>
+		<value xsi:type="xs:dateTime">0001-01-01T00:00:00</value>
+		<useRestriction>true</useRestriction>
+		<expression>НАЧАЛОПЕРИОДА(ТекущаяДата(), "НЕДЕЛЯ")</expression>
+	</parameter>
+	<parameter>
+		<name>НачалоДня</name>
+		<title xsi:type="v8:LocalStringType">
+			<v8:item>
+				<v8:lang>ru</v8:lang>
+				<v8:content>Начало дня</v8:content>
+			</v8:item>
+		</title>
+		<valueType>
+			<v8:Type>xs:dateTime</v8:Type>
+			<v8:DateQualifiers>
+				<v8:DateFractions>DateTime</v8:DateFractions>
+			</v8:DateQualifiers>
+		</valueType>
+		<value xsi:type="xs:dateTime">0001-01-01T00:00:00</value>
+		<useRestriction>true</useRestriction>
+		<expression>НАЧАЛОПЕРИОДА(ТекущаяДата(), "ДЕНЬ")</expression>
+	</parameter>
+	<parameter>
+		<name>ТорговийАгент</name>
+		<title xsi:type="v8:LocalStringType">
+			<v8:item>
+				<v8:lang>ru</v8:lang>
+				<v8:content>Торговий агент</v8:content>
+			</v8:item>
+		</title>
+		<valueType>
+			<v8:Type xmlns:d4p1="http://v8.1c.ru/8.1/data/enterprise/current-config">d4p1:CatalogRef.ТорговыеАгенты</v8:Type>
+		</valueType>
+		<value xsi:nil="true"/>
+		<useRestriction>true</useRestriction>
+	</parameter>
+	<settingsVariant>
+		<dcsset:name>Основной</dcsset:name>
+		<dcsset:presentation xsi:type="xs:string">Основний</dcsset:presentation>
+		<dcsset:settings xmlns:style="http://v8.1c.ru/8.1/data/ui/style" xmlns:sys="http://v8.1c.ru/8.1/data/ui/fonts/system" xmlns:web="http://v8.1c.ru/8.1/data/ui/colors/web" xmlns:win="http://v8.1c.ru/8.1/data/ui/colors/windows">
+			<dcsset:selection>
+				<dcsset:item xsi:type="dcsset:SelectedItemField">
+					<dcsset:field>Контрагент</dcsset:field>
+				</dcsset:item>
+				<dcsset:item xsi:type="dcsset:SelectedItemFolder">
+					<dcsset:lwsTitle>
+						<v8:item>
+							<v8:lang>ru</v8:lang>
+							<v8:content>Клієнти</v8:content>
+						</v8:item>
+					</dcsset:lwsTitle>
+					<dcsset:item xsi:type="dcsset:SelectedItemField">
+						<dcsset:field>КлиентскаяБаза</dcsset:field>
+					</dcsset:item>
+					<dcsset:item xsi:type="dcsset:SelectedItemField">
+						<dcsset:field>Активный</dcsset:field>
+					</dcsset:item>
+					<dcsset:item xsi:type="dcsset:SelectedItemField">
+						<dcsset:field>Малоактивний</dcsset:field>
+					</dcsset:item>
+					<dcsset:item xsi:type="dcsset:SelectedItemField">
+						<dcsset:field>Неактивний</dcsset:field>
+					</dcsset:item>
+					<dcsset:item xsi:type="dcsset:SelectedItemField">
+						<dcsset:field>Новий</dcsset:field>
+					</dcsset:item>
+					<dcsset:placement>Auto</dcsset:placement>
+				</dcsset:item>
+				<dcsset:item xsi:type="dcsset:SelectedItemFolder">
+					<dcsset:lwsTitle>
+						<v8:item>
+							<v8:lang>ru</v8:lang>
+							<v8:content>Робота з КБ (в циклі тижня)</v8:content>
+						</v8:item>
+					</dcsset:lwsTitle>
+					<dcsset:item xsi:type="dcsset:SelectedItemField">
+						<dcsset:field>ОбработаноКонтрагентов</dcsset:field>
+					</dcsset:item>
+					<dcsset:item xsi:type="dcsset:SelectedItemField">
+						<dcsset:field>ОсталосьОбработать</dcsset:field>
+					</dcsset:item>
+					<dcsset:placement>Auto</dcsset:placement>
+				</dcsset:item>
+				<dcsset:item xsi:type="dcsset:SelectedItemFolder">
+					<dcsset:lwsTitle>
+						<v8:item>
+							<v8:lang>ru</v8:lang>
+							<v8:content>З початку місяця (з початку дня)</v8:content>
+						</v8:item>
+					</dcsset:lwsTitle>
+					<dcsset:item xsi:type="dcsset:SelectedItemFolder">
+						<dcsset:lwsTitle>
+							<v8:item>
+								<v8:lang>ru</v8:lang>
+								<v8:content>Кількість</v8:content>
+							</v8:item>
+						</dcsset:lwsTitle>
+						<dcsset:item xsi:type="dcsset:SelectedItemField">
+							<dcsset:field>КоличествоЗаказов</dcsset:field>
+							<dcsset:lwsTitle>
+								<v8:item>
+									<v8:lang>ru</v8:lang>
+									<v8:content>Заказів </v8:content>
+								</v8:item>
+							</dcsset:lwsTitle>
+						</dcsset:item>
+						<dcsset:item xsi:type="dcsset:SelectedItemField">
+							<dcsset:field>КоличествоПродаж</dcsset:field>
+							<dcsset:lwsTitle>
+								<v8:item>
+									<v8:lang>ru</v8:lang>
+									<v8:content>Продажів </v8:content>
+								</v8:item>
+							</dcsset:lwsTitle>
+						</dcsset:item>
+						<dcsset:placement>Auto</dcsset:placement>
+					</dcsset:item>
+					<dcsset:item xsi:type="dcsset:SelectedItemFolder">
+						<dcsset:lwsTitle>
+							<v8:item>
+								<v8:lang>ru</v8:lang>
+								<v8:content>Виручка Євро</v8:content>
+							</v8:item>
+						</dcsset:lwsTitle>
+						<dcsset:item xsi:type="dcsset:SelectedItemField">
+							<dcsset:field>СтоимостьПродажиСток</dcsset:field>
+							<dcsset:lwsTitle>
+								<v8:item>
+									<v8:lang>ru</v8:lang>
+									<v8:content>Сток</v8:content>
+								</v8:item>
+							</dcsset:lwsTitle>
+						</dcsset:item>
+						<dcsset:item xsi:type="dcsset:SelectedItemField">
+							<dcsset:field>СтоимостьПродажиСеконд</dcsset:field>
+							<dcsset:lwsTitle>
+								<v8:item>
+									<v8:lang>ru</v8:lang>
+									<v8:content>Секонд</v8:content>
+								</v8:item>
+							</dcsset:lwsTitle>
+						</dcsset:item>
+						<dcsset:placement>Auto</dcsset:placement>
+					</dcsset:item>
+					<dcsset:item xsi:type="dcsset:SelectedItemFolder">
+						<dcsset:lwsTitle>
+							<v8:item>
+								<v8:lang>ru</v8:lang>
+								<v8:content>Вага кг</v8:content>
+							</v8:item>
+						</dcsset:lwsTitle>
+						<dcsset:item xsi:type="dcsset:SelectedItemField">
+							<dcsset:field>ВесПродажиСток</dcsset:field>
+							<dcsset:lwsTitle>
+								<v8:item>
+									<v8:lang>ru</v8:lang>
+									<v8:content>Сток</v8:content>
+								</v8:item>
+							</dcsset:lwsTitle>
+						</dcsset:item>
+						<dcsset:item xsi:type="dcsset:SelectedItemField">
+							<dcsset:field>ВесПродажиСеконд</dcsset:field>
+							<dcsset:lwsTitle>
+								<v8:item>
+									<v8:lang>ru</v8:lang>
+									<v8:content>Секонд</v8:content>
+								</v8:item>
+							</dcsset:lwsTitle>
+						</dcsset:item>
+						<dcsset:placement>Auto</dcsset:placement>
+					</dcsset:item>
+					<dcsset:placement>Auto</dcsset:placement>
+				</dcsset:item>
+			</dcsset:selection>
+			<dcsset:filter>
+				<dcsset:item xsi:type="dcsset:FilterItemComparison">
+					<dcsset:use>false</dcsset:use>
+					<dcsset:left xsi:type="dcscor:Field">Контрагент</dcsset:left>
+					<dcsset:comparisonType>InList</dcsset:comparisonType>
+					<dcsset:right xsi:type="dcscor:DesignTimeValue">Справочник.Контрагенты.ПустаяСсылка</dcsset:right>
+				</dcsset:item>
+			</dcsset:filter>
+			<dcsset:outputParameters>
+				<dcscor:item xsi:type="dcsset:SettingsParameterValue">
+					<dcscor:parameter>ВыводитьЗаголовок</dcscor:parameter>
+					<dcscor:value xsi:type="dcsset:DataCompositionTextOutputType">DontOutput</dcscor:value>
+				</dcscor:item>
+				<dcscor:item xsi:type="dcsset:SettingsParameterValue">
+					<dcscor:parameter>ВыводитьОтбор</dcscor:parameter>
+					<dcscor:value xsi:type="dcsset:DataCompositionTextOutputType">DontOutput</dcscor:value>
+				</dcscor:item>
+			</dcsset:outputParameters>
+			<dcsset:item xsi:type="dcsset:StructureItemGroup">
+				<dcsset:groupItems>
+					<dcsset:item xsi:type="dcsset:GroupItemField">
+						<dcsset:field>Область</dcsset:field>
+						<dcsset:groupType>Items</dcsset:groupType>
+						<dcsset:periodAdditionType>None</dcsset:periodAdditionType>
+						<dcsset:periodAdditionBegin xsi:type="xs:dateTime">0001-01-01T00:00:00</dcsset:periodAdditionBegin>
+						<dcsset:periodAdditionEnd xsi:type="xs:dateTime">0001-01-01T00:00:00</dcsset:periodAdditionEnd>
+					</dcsset:item>
+				</dcsset:groupItems>
+				<dcsset:order>
+					<dcsset:item xsi:type="dcsset:OrderItemAuto"/>
+				</dcsset:order>
+				<dcsset:selection>
+					<dcsset:item xsi:type="dcsset:SelectedItemAuto"/>
+				</dcsset:selection>
+				<dcsset:item xsi:type="dcsset:StructureItemGroup">
+					<dcsset:groupItems>
+						<dcsset:item xsi:type="dcsset:GroupItemField">
+							<dcsset:field>Город</dcsset:field>
+							<dcsset:groupType>Items</dcsset:groupType>
+							<dcsset:periodAdditionType>None</dcsset:periodAdditionType>
+							<dcsset:periodAdditionBegin xsi:type="xs:dateTime">0001-01-01T00:00:00</dcsset:periodAdditionBegin>
+							<dcsset:periodAdditionEnd xsi:type="xs:dateTime">0001-01-01T00:00:00</dcsset:periodAdditionEnd>
+						</dcsset:item>
+					</dcsset:groupItems>
+					<dcsset:order>
+						<dcsset:item xsi:type="dcsset:OrderItemAuto"/>
+					</dcsset:order>
+					<dcsset:selection>
+						<dcsset:item xsi:type="dcsset:SelectedItemAuto"/>
+					</dcsset:selection>
+					<dcsset:item xsi:type="dcsset:StructureItemGroup">
+						<dcsset:groupItems>
+							<dcsset:item xsi:type="dcsset:GroupItemField">
+								<dcsset:field>Контрагент</dcsset:field>
+								<dcsset:groupType>Items</dcsset:groupType>
+								<dcsset:periodAdditionType>None</dcsset:periodAdditionType>
+								<dcsset:periodAdditionBegin xsi:type="xs:dateTime">0001-01-01T00:00:00</dcsset:periodAdditionBegin>
+								<dcsset:periodAdditionEnd xsi:type="xs:dateTime">0001-01-01T00:00:00</dcsset:periodAdditionEnd>
+							</dcsset:item>
+						</dcsset:groupItems>
+						<dcsset:order>
+							<dcsset:item xsi:type="dcsset:OrderItemAuto"/>
+						</dcsset:order>
+						<dcsset:selection>
+							<dcsset:item xsi:type="dcsset:SelectedItemAuto"/>
+						</dcsset:selection>
+					</dcsset:item>
+				</dcsset:item>
+			</dcsset:item>
+		</dcsset:settings>
+	</settingsVariant>
+</DataCompositionSchema>

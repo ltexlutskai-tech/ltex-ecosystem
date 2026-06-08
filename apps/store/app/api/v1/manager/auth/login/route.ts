@@ -18,6 +18,7 @@ import {
   MANAGER_REFRESH_COOKIE,
 } from "@/lib/auth/manager-auth";
 import { rateLimit, getClientIp } from "@/lib/rate-limit";
+import { logAuditEvent } from "@/lib/audit/audit-log";
 
 export async function POST(req: NextRequest) {
   const ip = getClientIp(req);
@@ -71,6 +72,13 @@ export async function POST(req: NextRequest) {
   const ok = await verifyPassword(password, user.passwordHash);
   if (!ok) {
     await recordFailedLogin(user.id);
+    void logAuditEvent({
+      user: { id: user.id, email: user.email, role: user.role },
+      action: "failed_login",
+      resource: "auth",
+      summary: "Невірний пароль",
+      req,
+    });
     return NextResponse.json(
       { error: "Невірний email або пароль" },
       { status: 401 },
@@ -81,6 +89,13 @@ export async function POST(req: NextRequest) {
   await prisma.user.update({
     where: { id: user.id },
     data: { lastSeenAt: new Date(), lastLoginIp: ip },
+  });
+
+  void logAuditEvent({
+    user: { id: user.id, email: user.email, role: user.role },
+    action: "login",
+    resource: "auth",
+    req,
   });
 
   const accessToken = signAccessToken(user.id, user.role);

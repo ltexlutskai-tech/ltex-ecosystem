@@ -15,6 +15,10 @@ import {
   SALE_PRICE_TYPE,
   newProductCutoff,
 } from "@/lib/manager/prices";
+import {
+  getProductClaims,
+  type ProductClaims,
+} from "@/lib/manager/product-claims";
 
 /**
  * Server loader для картки товару (`/manager/prices/[id]`).
@@ -87,6 +91,9 @@ export interface ProductCardVM {
   lots: ProductLotVM[];
   /** Загальна кількість лотів товару (для заголовка «Лоти (N)»). */
   totalLotsCount: number;
+  /** Активні замовлення на товар (← Етап 1 блоку Замовлень). null коли viewer
+   *  не передано (анонімний рендер). */
+  claims: ProductClaims | null;
 }
 
 export async function loadProductCard(
@@ -151,6 +158,11 @@ export async function loadProductCard(
   });
 
   if (!product) return null;
+
+  // Активні замовлення на цей товар (Етап 1 блоку Замовлень). Тягнемо тут, щоб
+  // картка товару одразу мала повний контекст (хто і на скільки претендує).
+  // Анонімний рендер (viewerUserId не передано) → null (відключаємо панель).
+  const claims = viewerUserId ? await getProductClaims(id, viewerUserId) : null;
 
   const rawPrices: RawPrice[] = product.prices.map((p) => ({
     priceType: p.priceType,
@@ -233,5 +245,6 @@ export async function loadProductCard(
     lotStats,
     lots,
     totalLotsCount: product.lots.length,
+    claims,
   };
 }

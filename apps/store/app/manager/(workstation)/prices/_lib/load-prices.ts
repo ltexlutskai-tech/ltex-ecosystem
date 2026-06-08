@@ -9,6 +9,7 @@ import {
   type PriceSort,
   type SortDir,
 } from "@/lib/manager/prices";
+import { getProductClaimsSummaries } from "@/lib/manager/product-claims";
 
 export interface LoadPricesParams extends BuildPricesWhereParams {
   sort: PriceSort;
@@ -54,9 +55,16 @@ export async function loadPrices(
   ]);
 
   const now = new Date();
-  const items = rows
+  const baseItems = rows
     .map((r) => deriveProductRow(r, now))
     .filter((row) => (p.onSale ? row.salePrice !== null : true));
+
+  // Активні замовлення (Етап 1) — один батч-запит на всю сторінку.
+  const claimMap = await getProductClaimsSummaries(baseItems.map((r) => r.id));
+  const items: PriceRow[] = baseItems.map((r) => ({
+    ...r,
+    claim: claimMap.get(r.id) ?? null,
+  }));
 
   return {
     items,

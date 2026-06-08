@@ -204,6 +204,13 @@ export interface PriceRow {
   isTarget: boolean;
   isNew: boolean;
   hasVideo: boolean;
+  /** Активні замовлення на товар (Етап 1 блоку Замовлень). null коли немає або
+   *  не запрошувалось (опційне — backward-compat). */
+  claim: {
+    totalQuantity: number;
+    totalWeight: number;
+    ordersCount: number;
+  } | null;
 }
 
 /**
@@ -247,6 +254,7 @@ export function deriveProductRow(
     isTarget,
     isNew,
     hasVideo,
+    claim: null,
   };
 }
 

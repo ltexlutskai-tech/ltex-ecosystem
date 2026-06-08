@@ -21,7 +21,15 @@ interface Props {
   categoriesTT: DictItem[];
   assortmentCodes: DictItem[];
   agents: AgentItem[];
-  userRole: "manager" | "senior_manager" | "admin";
+  userRole:
+    | "manager"
+    | "senior_manager"
+    | "admin"
+    | "owner"
+    | "supervisor"
+    | "analyst"
+    | "warehouse"
+    | "bookkeeper";
 }
 
 export function CreateClientForm({

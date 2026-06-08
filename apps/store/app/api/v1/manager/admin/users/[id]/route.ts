@@ -65,7 +65,15 @@ export async function PATCH(
 
   const data: {
     isActive?: boolean;
-    role?: "manager" | "senior_manager" | "admin";
+    role?:
+      | "manager"
+      | "senior_manager"
+      | "admin"
+      | "owner"
+      | "supervisor"
+      | "analyst"
+      | "warehouse"
+      | "bookkeeper";
     fullName?: string;
   } = {};
   if (isActive !== undefined) data.isActive = isActive;

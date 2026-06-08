@@ -15,12 +15,25 @@ import {
   useToast,
 } from "@ltex/ui";
 
-type Role = "manager" | "senior_manager" | "admin";
+type Role =
+  | "manager"
+  | "senior_manager"
+  | "admin"
+  | "owner"
+  | "supervisor"
+  | "analyst"
+  | "warehouse"
+  | "bookkeeper";
 
 const ROLE_LABELS: Record<Role, string> = {
   manager: "Менеджер",
   senior_manager: "Старший менеджер",
   admin: "Адміністратор",
+  owner: "Власник",
+  supervisor: "Супервайзер",
+  analyst: "Аналітик",
+  warehouse: "Склад",
+  bookkeeper: "Бухгалтер",
 };
 
 export function InviteModal() {

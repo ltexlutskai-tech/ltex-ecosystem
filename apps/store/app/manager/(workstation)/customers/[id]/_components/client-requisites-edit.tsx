@@ -62,7 +62,15 @@ function DebtValue({
 interface Props {
   client: ClientDetail;
   dictionaries: EditDictionaries;
-  currentUserRole: "manager" | "senior_manager" | "admin";
+  currentUserRole:
+    | "manager"
+    | "senior_manager"
+    | "admin"
+    | "owner"
+    | "supervisor"
+    | "analyst"
+    | "warehouse"
+    | "bookkeeper";
   onCancel: () => void;
   onSaved: () => void;
 }

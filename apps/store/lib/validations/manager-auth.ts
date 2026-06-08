@@ -31,16 +31,29 @@ export const refreshSchema = z.object({
 });
 export type RefreshInput = z.infer<typeof refreshSchema>;
 
+// Усі ролі системи (← Тиждень 1 блоку Ролі, 2026-06-03).
+// Має співпадати з `ManagerRole` у `lib/auth/jwt.ts` і Prisma `UserRole`.
+export const MANAGER_ROLES = [
+  "manager",
+  "senior_manager",
+  "admin",
+  "owner",
+  "supervisor",
+  "analyst",
+  "warehouse",
+  "bookkeeper",
+] as const;
+
 export const inviteUserSchema = z.object({
   email: z.string().email().max(120),
   fullName: z.string().min(2).max(120),
-  role: z.enum(["manager", "senior_manager", "admin"]).default("manager"),
+  role: z.enum(MANAGER_ROLES).default("manager"),
 });
 export type InviteUserInput = z.infer<typeof inviteUserSchema>;
 
 export const updateUserSchema = z.object({
   isActive: z.boolean().optional(),
-  role: z.enum(["manager", "senior_manager", "admin"]).optional(),
+  role: z.enum(MANAGER_ROLES).optional(),
   fullName: z.string().min(2).max(120).optional(),
   forcePasswordReset: z.boolean().optional(),
 });

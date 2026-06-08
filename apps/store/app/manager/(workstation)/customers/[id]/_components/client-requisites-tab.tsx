@@ -6,7 +6,15 @@ interface Props {
   client: ClientDetail;
   dictionaries: EditDictionaries;
   canEdit: boolean;
-  currentUserRole: "manager" | "senior_manager" | "admin";
+  currentUserRole:
+    | "manager"
+    | "senior_manager"
+    | "admin"
+    | "owner"
+    | "supervisor"
+    | "analyst"
+    | "warehouse"
+    | "bookkeeper";
   editDisabledReason?: string;
   isForeign?: boolean;
   /** `Customer.id` (дзеркало по code1C) для prefill Замовлення/Реалізації. */

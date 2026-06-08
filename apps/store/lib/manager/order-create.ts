@@ -159,6 +159,8 @@ export async function updateOrderWithItems(
         assignedAgentUserId: input.assignedAgentUserId ?? actor.userId,
         exportTo1C: input.exportTo1C ?? true,
         items: { create: itemRows },
+        // Optimistic lock: інкрементуємо version при кожному PATCH.
+        version: { increment: 1 },
       },
       include: ORDER_INCLUDE,
     });

@@ -96,12 +96,26 @@ export async function PATCH(
 
   const existing = await prisma.order.findUnique({
     where: { id },
-    select: { id: true, status: true },
+    select: {
+      id: true,
+      status: true,
+      version: true,
+      updatedAt: true,
+      closedAt: true,
+    },
   });
   if (!existing) {
     return NextResponse.json(
       { error: "Замовлення не знайдено" },
       { status: 404 },
+    );
+  }
+
+  // Закрите замовлення — не редагувати.
+  if (existing.closedAt) {
+    return NextResponse.json(
+      { error: "Замовлення закрите — редагування заборонено" },
+      { status: 409 },
     );
   }
 
@@ -122,6 +136,22 @@ export async function PATCH(
     );
   }
   const input = parsed.data;
+
+  // ─── Optimistic lock (Етап 4 блоку Замовлення) ───────────────────────────
+  // Клієнт надсилає `version` яку бачив. Якщо у БД більша → 409 з підказкою
+  // перезавантажити. Якщо version не передано — пропускаємо перевірку
+  // (backward-compat зі старими API-клієнтами).
+  if (typeof input.version === "number" && input.version !== existing.version) {
+    return NextResponse.json(
+      {
+        error:
+          "Замовлення було змінено іншим користувачем. Перезавантажте сторінку.",
+        code: "version_conflict",
+        currentVersion: existing.version,
+      },
+      { status: 409 },
+    );
+  }
 
   // Якщо змінюється статус — перевіряємо дозволеність переходу.
   let nextStatus: string | undefined;

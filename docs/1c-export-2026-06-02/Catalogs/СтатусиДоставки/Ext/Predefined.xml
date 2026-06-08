@@ -1,0 +1,21 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<PredefinedData xmlns="http://v8.1c.ru/8.3/xcf/predef" xmlns:v8="http://v8.1c.ru/8.1/data/core" xmlns:xr="http://v8.1c.ru/8.3/xcf/readable" xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="CatalogPredefinedItems" version="2.7">
+	<Item id="31378c4a-b2fc-4e02-92ed-07b514ae1710">
+		<Name>Доставка</Name>
+		<Code>000000002</Code>
+		<Description>Доставка</Description>
+		<IsFolder>false</IsFolder>
+	</Item>
+	<Item id="03cd61d6-6a3f-4ac5-b33a-52711f5600d6">
+		<Name>Почта</Name>
+		<Code>000000003</Code>
+		<Description>Почта</Description>
+		<IsFolder>false</IsFolder>
+	</Item>
+	<Item id="f4ec1534-2688-49c8-b17b-8f8ed1007a40">
+		<Name>Самовывоз</Name>
+		<Code>000000001</Code>
+		<Description>Самовывоз</Description>
+		<IsFolder>false</IsFolder>
+	</Item>
+</PredefinedData>
