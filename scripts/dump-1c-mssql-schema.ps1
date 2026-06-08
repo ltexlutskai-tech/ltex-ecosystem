@@ -1,100 +1,129 @@
-# Дамп схеми 1С MSSQL у CSV для аналізу та побудови HISTORY_MIGRATION_MAP.md
+# Dump 1C MSSQL schema to TSV files for the historical-import mapping (session 5.2).
+# ASCII-only on purpose (Windows PowerShell 5.1 reads non-BOM files as cp1251).
 #
-# Запуск (на Windows-сервері з 1С):
+# Run on the Windows server that hosts 1C:
 #   cd E:\ltex-ecosystem
 #   .\scripts\dump-1c-mssql-schema.ps1
 #
-# Потребує:
-#   - sqlcmd (входить у SQL Server Command Line Utilities)
-#   - SQL Login ltex_app_reader з паролем (read-only db_datareader)
-#   - apps/store/.env з LEGACY_1C_DB_URL=mssql://ltex_app_reader:<pass>@localhost:1433/ltex
+# Reads the connection string from apps\store\.env :: LEGACY_1C_DB_URL
+#   expected format: mssql://user:pass@host:port/db
+# Nothing secret is written into git (only schema metadata).
 
 $ErrorActionPreference = "Stop"
 
-# 1. Витягнути пароль з .env
+# --- 1. Read LEGACY_1C_DB_URL from .env ---
 $envPath = "apps\store\.env"
 if (-not (Test-Path $envPath)) {
-    Write-Error "Не знайдено $envPath. Додайте LEGACY_1C_DB_URL у нього."
+    Write-Error "Not found: $envPath  (add LEGACY_1C_DB_URL there)."
     exit 1
 }
 
-$envLine = Get-Content $envPath | Where-Object { $_ -match '^LEGACY_1C_DB_URL\s*=' }
+$envLine = Get-Content $envPath |
+    Where-Object { $_ -match '^\s*LEGACY_1C_DB_URL\s*=' } |
+    Select-Object -First 1
+
 if (-not $envLine) {
-    Write-Error "LEGACY_1C_DB_URL не знайдено у $envPath"
+    Write-Error "LEGACY_1C_DB_URL not found in $envPath"
     exit 1
 }
 
-# Парс mssql://user:pass@host:port/db
-if ($envLine -notmatch 'mssql://([^:]+):([^@]+)@([^:/]+)(:(\d+))?/(.+?)(\s*$|"$)') {
-    Write-Error "LEGACY_1C_DB_URL не відповідає формату mssql://user:pass@host:port/db"
+# Strip 'KEY=' prefix and any wrapping quotes
+$raw = $envLine.Substring($envLine.IndexOf('=') + 1).Trim().Trim('"').Trim("'")
+
+if (-not $raw.StartsWith("mssql://")) {
+    Write-Error "LEGACY_1C_DB_URL must start with mssql://"
     exit 1
 }
 
-$SqlUser = $Matches[1]
-$SqlPass = $Matches[2]
-$SqlSrv  = $Matches[3]
-$SqlDb   = $Matches[6].Trim('"').Trim()
+# --- 2. Parse mssql://user:pass@host:port/db (substring-based, regex-free) ---
+$body = $raw.Substring("mssql://".Length)          # user:pass@host:port/db
 
+$lastAt = $body.LastIndexOf('@')                   # split on LAST @ (password may contain @)
+if ($lastAt -lt 0) { Write-Error "No '@' in connection string"; exit 1 }
+$userpass = $body.Substring(0, $lastAt)
+$hostpart = $body.Substring($lastAt + 1)
+
+$firstColon = $userpass.IndexOf(':')               # first : splits user from password
+if ($firstColon -lt 0) { Write-Error "No ':' between user and password"; exit 1 }
+$SqlUser = $userpass.Substring(0, $firstColon)
+$SqlPass = $userpass.Substring($firstColon + 1)
+
+$slash = $hostpart.IndexOf('/')                    # host:port / db
+if ($slash -lt 0) { Write-Error "No '/db' in connection string"; exit 1 }
+$hostPort = $hostpart.Substring(0, $slash)
+$SqlDb = $hostpart.Substring($slash + 1).Trim()
+
+$hpColon = $hostPort.IndexOf(':')
+if ($hpColon -ge 0) {
+    $h = $hostPort.Substring(0, $hpColon)
+    $p = $hostPort.Substring($hpColon + 1)
+    $SqlServer = "$h,$p"                            # sqlcmd uses host,port (comma)
+} else {
+    $SqlServer = $hostPort
+}
+
+# --- 3. Output dir ---
 $OutDir = "docs\1c-mssql-schema"
 New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
 
-Write-Host "Дамп схеми бази $SqlDb на $SqlSrv (user: $SqlUser)..." -ForegroundColor Cyan
-Write-Host "Вихід: $OutDir`n"
+Write-Host "Dumping schema of DB '$SqlDb' on '$SqlServer' (user: $SqlUser)..." -ForegroundColor Cyan
+Write-Host "Output dir: $OutDir`n"
 
-# Helper для запуску запиту і запису у TSV
-function Run-Query {
+function Invoke-DumpQuery {
     param([string]$Name, [string]$Query)
     Write-Host "[$Name]..." -NoNewline
     $outFile = Join-Path $OutDir "$Name.tsv"
-    sqlcmd -S $SqlSrv -U $SqlUser -P $SqlPass -d $SqlDb -Q $Query -s "`t" -W -h -1 -o $outFile
+    sqlcmd -S $SqlServer -U $SqlUser -P $SqlPass -d $SqlDb -Q $Query -s "`t" -W -o $outFile
     if ($LASTEXITCODE -ne 0) {
-        Write-Host " FAIL" -ForegroundColor Red
-        Write-Error "sqlcmd завершився з кодом $LASTEXITCODE для $Name"
+        Write-Host " FAIL (exit $LASTEXITCODE)" -ForegroundColor Red
     } else {
-        $lineCount = (Get-Content $outFile | Measure-Object -Line).Lines
-        Write-Host " OK ($lineCount рядків)" -ForegroundColor Green
+        $lines = (Get-Content $outFile | Measure-Object -Line).Lines
+        Write-Host " OK ($lines lines)" -ForegroundColor Green
     }
 }
 
-# 1. Список таблиць з розмірами + кількістю рядків
-Run-Query "tables" @"
+# --- 4. Queries ---
+
+# 4.1 tables with row counts and size
+Invoke-DumpQuery "tables" @"
 SET NOCOUNT ON;
 SELECT
-  s.name + '.' + t.name AS qualified_name,
+  t.name AS table_name,
   SUM(p.rows) AS row_count,
   CAST(SUM(au.total_pages) * 8.0 / 1024 AS DECIMAL(18,2)) AS size_mb
 FROM sys.tables t
-JOIN sys.schemas s ON t.schema_id = s.schema_id
 JOIN sys.partitions p ON t.object_id = p.object_id AND p.index_id IN (0, 1)
 JOIN sys.allocation_units au ON p.partition_id = au.container_id
-GROUP BY s.name, t.name
+GROUP BY t.name
 ORDER BY t.name;
 "@
 
-# 2. Колонки усіх таблиць
-Run-Query "columns" @"
+# 4.2 all columns
+Invoke-DumpQuery "columns" @"
 SET NOCOUNT ON;
 SELECT
-  TABLE_SCHEMA, TABLE_NAME, COLUMN_NAME, ORDINAL_POSITION,
+  TABLE_NAME,
+  ORDINAL_POSITION AS pos,
+  COLUMN_NAME,
   DATA_TYPE,
   ISNULL(CAST(CHARACTER_MAXIMUM_LENGTH AS VARCHAR(20)), '') AS max_len,
   ISNULL(CAST(NUMERIC_PRECISION AS VARCHAR(20)), '') AS num_prec,
   ISNULL(CAST(NUMERIC_SCALE AS VARCHAR(20)), '') AS num_scale,
-  IS_NULLABLE
+  IS_NULLABLE AS nullable
 FROM INFORMATION_SCHEMA.COLUMNS
 WHERE TABLE_SCHEMA = 'dbo'
 ORDER BY TABLE_NAME, ORDINAL_POSITION;
 "@
 
-# 3. Індекси
-Run-Query "indexes" @"
+# 4.3 indexes with key columns
+Invoke-DumpQuery "indexes" @"
 SET NOCOUNT ON;
 SELECT
-  s.name + '.' + t.name AS qualified_name,
+  t.name AS table_name,
   i.name AS index_name,
   i.type_desc,
   CAST(i.is_unique AS INT) AS is_unique,
-  CAST(i.is_primary_key AS INT) AS is_primary_key,
+  CAST(i.is_primary_key AS INT) AS is_pk,
   STUFF((
     SELECT ', ' + c.name
     FROM sys.index_columns ic
@@ -102,34 +131,33 @@ SELECT
     WHERE ic.object_id = i.object_id AND ic.index_id = i.index_id
     ORDER BY ic.key_ordinal
     FOR XML PATH('')
-  ), 1, 2, '') AS index_columns
+  ), 1, 2, '') AS key_columns
 FROM sys.indexes i
 JOIN sys.tables t ON i.object_id = t.object_id
-JOIN sys.schemas s ON t.schema_id = s.schema_id
 WHERE i.index_id > 0
 ORDER BY t.name, i.index_id;
 "@
 
-# 4. Зведення за типом метаданих 1С (Reference / Document / AccumRg ...)
-Run-Query "prefix_summary" @"
+# 4.4 summary by 1C metadata prefix (ASCII labels)
+Invoke-DumpQuery "prefix_summary" @"
 SET NOCOUNT ON;
 WITH classified AS (
-  SELECT
-    name,
+  SELECT name,
     CASE
-      WHEN name LIKE 'Reference%' OR name LIKE '_Reference%' THEN 'Reference (Довідники)'
-      WHEN name LIKE 'Document%'  OR name LIKE '_Document%'  THEN 'Document (Документи)'
-      WHEN name LIKE 'DocumentJournal%' OR name LIKE '_DocumentJournal%' THEN 'DocumentJournal'
-      WHEN name LIKE 'AccumRg%'   OR name LIKE '_AccumRg%'   THEN 'AccumRg (Регістри накопичення)'
-      WHEN name LIKE 'AccumRgT%'  OR name LIKE '_AccumRgT%'  THEN 'AccumRgT (Підсумки)'
-      WHEN name LIKE 'AccRg%'     OR name LIKE '_AccRg%'     THEN 'AccRg (Бухгалтерські регістри)'
-      WHEN name LIKE 'InfoRg%'    OR name LIKE '_InfoRg%'    THEN 'InfoRg (Регістри відомостей)'
-      WHEN name LIKE 'Const%'     OR name LIKE '_Const%'     THEN 'Const (Константи)'
-      WHEN name LIKE 'Enum%'      OR name LIKE '_Enum%'      THEN 'Enum (Перерахунки)'
-      WHEN name LIKE 'Chrc%'      OR name LIKE '_Chrc%'      THEN 'Chrc (Плани видів характеристик)'
-      WHEN name LIKE 'BPr%'       OR name LIKE '_BPr%'       THEN 'BPr (Бізнес-процеси)'
-      WHEN name LIKE 'Task%'      OR name LIKE '_Task%'      THEN 'Task (Завдання)'
-      ELSE 'Other (Системні)'
+      WHEN name LIKE '[_]Reference%'      THEN 'Reference (Catalogs)'
+      WHEN name LIKE '[_]Document%'       THEN 'Document'
+      WHEN name LIKE '[_]DocumentJournal%' THEN 'DocumentJournal'
+      WHEN name LIKE '[_]AccumRgT%'       THEN 'AccumRgT (Totals)'
+      WHEN name LIKE '[_]AccumRg%'        THEN 'AccumRg (Accumulation)'
+      WHEN name LIKE '[_]AccRg%'          THEN 'AccRg (Accounting)'
+      WHEN name LIKE '[_]InfoRg%'         THEN 'InfoRg (Information)'
+      WHEN name LIKE '[_]Const%'          THEN 'Const (Constants)'
+      WHEN name LIKE '[_]Enum%'           THEN 'Enum'
+      WHEN name LIKE '[_]Chrc%'           THEN 'Chrc (Characteristics)'
+      WHEN name LIKE '[_]Node%'           THEN 'Node (ExchangePlans)'
+      WHEN name LIKE '[_]Task%'           THEN 'Task'
+      WHEN name LIKE '[_]BPr%'            THEN 'BusinessProcess'
+      ELSE 'Other (System)'
     END AS metadata_type
   FROM sys.tables
 )
@@ -139,25 +167,30 @@ GROUP BY metadata_type
 ORDER BY table_count DESC;
 "@
 
-# 5. Зразок _Config / Params — таблиці що містять декодер метаданих 1С
-Run-Query "config_tables" @"
+# 4.5 config / system tables (name decoder lives here, packed)
+Invoke-DumpQuery "config_tables" @"
 SET NOCOUNT ON;
 SELECT
-  s.name + '.' + t.name AS qualified_name,
+  t.name AS table_name,
   SUM(p.rows) AS row_count
 FROM sys.tables t
-JOIN sys.schemas s ON t.schema_id = s.schema_id
 JOIN sys.partitions p ON t.object_id = p.object_id AND p.index_id IN (0, 1)
-WHERE t.name IN ('Config', '_Config', 'Params', '_Params', 'ConfigSave', '_ConfigSave', 'DBSchema', '_DBSchema', 'IBVersion', '_IBVersion', 'YearOffset', '_YearOffset')
-   OR t.name LIKE 'Config%' OR t.name LIKE '_Config%'
-GROUP BY s.name, t.name
+WHERE t.name LIKE '[_]Config%'
+   OR t.name LIKE 'Config%'
+   OR t.name LIKE '[_]Params%'
+   OR t.name LIKE 'Params%'
+   OR t.name LIKE '[_]IBVersion%'
+   OR t.name LIKE '[_]DBSchema%'
+GROUP BY t.name
 ORDER BY t.name;
 "@
 
-Write-Host "`nГотово." -ForegroundColor Green
-Write-Host "Файли у $OutDir готові до коміту:"
-Get-ChildItem $OutDir -File | ForEach-Object {
-    $sizeKb = [math]::Round($_.Length / 1024, 1)
-    Write-Host "  $($_.Name) — $sizeKb КБ"
+Write-Host "`nDone." -ForegroundColor Green
+Get-ChildItem $OutDir -File -Filter *.tsv | ForEach-Object {
+    $kb = [math]::Round($_.Length / 1024, 1)
+    Write-Host ("  {0} - {1} KB" -f $_.Name, $kb)
 }
-Write-Host "`nДалі: git add docs/1c-mssql-schema/ && git commit -m 'docs: дамп схеми 1С MSSQL для сесії 5.2' && git push origin main"
+Write-Host "`nNext:"
+Write-Host "  git add docs/1c-mssql-schema/"
+Write-Host "  git commit -m 'docs: 1C MSSQL schema dump for session 5.2'"
+Write-Host "  git push origin main"
