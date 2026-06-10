@@ -1580,7 +1580,12 @@ async function importCashOrderTable(
     params,
   })) {
     for (const row of rows) {
-      const code1C = asString(row[map.number]);
+      // Документний code1C = hex(_IDRRef): унікальний у всій 1С-базі.
+      // НЕ беремо `_Number` (map.number) — 1С нумерує щорічно з 0, отже
+      // один номер зустрічається у кожному році → upsert затирав би
+      // попередні роки (баг було помічено: 30k вхідних → 8k у БД).
+      const hex = bufToHex(row["_IDRRef"]);
+      const code1C = hex;
       if (!code1C) {
         recon.skipped++;
         continue;
