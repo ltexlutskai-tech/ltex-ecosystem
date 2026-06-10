@@ -1246,6 +1246,10 @@ async function importOrders(ctx: ImportContext): Promise<Recon> {
                 notes,
                 archived: posted,
                 closedAt: closed ? (createdAt ?? new Date()) : null,
+                // Дата теж оновлюється на реімпорті: усі історичні документи
+                // вже існують з 5.2 → upsert іде шляхом update; без цього
+                // createdAt лишався б дефолтним now() (= дата 1-го імпорту).
+                ...(createdAt ? { createdAt } : {}),
               },
               select: { id: true },
             });
@@ -1451,6 +1455,8 @@ async function importSales(ctx: ImportContext): Promise<Recon> {
                 expressWaybill: waybill,
                 notes,
                 archived: posted,
+                // Дата оновлюється і на реімпорті (див. коментар у importOrders).
+                ...(createdAt ? { createdAt } : {}),
               },
               select: { id: true },
             });
