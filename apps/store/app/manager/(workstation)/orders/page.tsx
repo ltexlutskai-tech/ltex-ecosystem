@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Plus } from "lucide-react";
-import { prisma } from "@ltex/db";
+import { prisma, Prisma } from "@ltex/db";
 import { getCurrentUser } from "@/lib/auth/manager-auth";
 import { getMyClientCodes1C } from "@/lib/manager/order-ownership";
 import {
@@ -17,6 +17,31 @@ import { parseOrdersFilterFromSearchParams } from "./_components/orders-filter-s
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Замовлення — L-TEX Manager" };
+
+function buildOrderBy(
+  sort: string,
+  dir: "asc" | "desc",
+): Prisma.OrderOrderByWithRelationInput {
+  switch (sort) {
+    case "sum":
+      return { totalUah: dir };
+    case "code":
+      return { code1C: dir };
+    case "client":
+      return { customer: { name: dir } };
+    case "city":
+      return { customer: { city: dir } };
+    case "status":
+      return { status: dir };
+    case "positions":
+      return { items: { _count: dir } };
+    case "actual":
+      return { isActual: dir };
+    case "date":
+    default:
+      return { createdAt: dir };
+  }
+}
 
 export default async function ManagerOrdersPage({
   searchParams,
@@ -56,7 +81,7 @@ export default async function ManagerOrdersPage({
   const [items, total] = await Promise.all([
     prisma.order.findMany({
       where,
-      orderBy: { createdAt: "desc" },
+      orderBy: buildOrderBy(filter.sort, filter.dir),
       skip: (filter.page - 1) * filter.pageSize,
       take: filter.pageSize,
       include: orderRowInclude,

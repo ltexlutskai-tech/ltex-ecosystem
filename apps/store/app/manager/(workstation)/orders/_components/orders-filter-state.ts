@@ -3,6 +3,19 @@ import {
   type OrderStatus,
 } from "@/lib/manager/order-status";
 
+export const ORDER_SORT_KEYS = [
+  "date",
+  "sum",
+  "code",
+  "client",
+  "city",
+  "status",
+  "positions",
+  "actual",
+] as const;
+
+export type OrderSortKey = (typeof ORDER_SORT_KEYS)[number];
+
 export interface OrdersFilterState {
   search: string;
   status: OrderStatus | "";
@@ -13,9 +26,12 @@ export interface OrdersFilterState {
   showArchived: boolean;
   page: number;
   pageSize: number;
+  sort: string;
+  dir: "asc" | "desc";
 }
 
 const ORDER_STATUS_SET = new Set<string>(ORDER_STATUS_LIST);
+const ORDER_SORT_KEY_SET = new Set<string>(ORDER_SORT_KEYS);
 
 function pickString(
   v: string | string[] | undefined,
@@ -52,6 +68,12 @@ export function parseOrdersFilterFromSearchParams(
       ? pageSizeNum
       : 20;
 
+  const sortRaw = pickString(sp.sort) ?? "";
+  const sort = ORDER_SORT_KEY_SET.has(sortRaw) ? sortRaw : "date";
+
+  const dirRaw = pickString(sp.dir) ?? "";
+  const dir: "asc" | "desc" = dirRaw === "asc" ? "asc" : "desc";
+
   return {
     search,
     status,
@@ -61,6 +83,8 @@ export function parseOrdersFilterFromSearchParams(
     showArchived,
     page,
     pageSize,
+    sort,
+    dir,
   };
 }
 
@@ -77,6 +101,14 @@ export function ordersFilterToQueryString(
   if (state.page && state.page > 1) sp.set("page", String(state.page));
   if (state.pageSize && state.pageSize !== 20) {
     sp.set("pageSize", String(state.pageSize));
+  }
+  if (state.sort !== undefined || state.dir !== undefined) {
+    const sort = state.sort ?? "date";
+    const dir = state.dir ?? "desc";
+    if (sort !== "date" || dir !== "desc") {
+      sp.set("sort", sort);
+      sp.set("dir", dir);
+    }
   }
   return sp.toString();
 }

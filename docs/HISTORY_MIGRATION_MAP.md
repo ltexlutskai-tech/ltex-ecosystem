@@ -522,3 +522,279 @@ Recipe `/tmp/decode_table.sh <фізична_таблиця> <шлях_до_conf
 - `Document.ПриходныйКассовыйОрдер` `_Document183` → **52 668**; `Расходный` `_Document187` → **9 116** ✓
 - `Document.МаршрутныйЛист` uuid `8b928f15-…100c` → `_Document6630` → **2 000** ✓
 - `InfoRg.Штрихкоды` → `_InfoRg5249` → **95 688**; `InfoRg.ЦеныНоменклатуры` → `_InfoRg5225` → **39 760** ✓
+
+---
+
+## §10.2 МаршрутныйЛист дочірні VT (декодовано 5.3)
+
+Документ `Document.МаршрутныйЛист` → `_Document6630` (uuid `8b928f15-6418-4e20-85da-518544f8100c`, ~2 000 рядків). Має **10 дочірніх табличних частин (VT)**. Кожна VT-таблиця має службові колонки:
+- **owner FK** — `_Document6630_IDRRef` (binary(16)) → шапка маршрутного листа;
+- **lineno** — `_LineNo<N>` (numeric), унікальний номер на VT (див. нижче);
+- **`_KeyField`** (binary) — внутрішній 1С ключ рядка (ігнорувати при імпорті).
+
+**Резолв ref-полів (загальні правила):**
+- `*RRef` (одно-типний ref) — `binary(16)` = 1С-UUID → шукати у нашій DB за `code1C` = hex-рядок.
+- полі-тип (трио `_TYPE`/`_RTRef`/`_RRRef`, інколи + `_S`) — мішаний тип посилання; `_RRRef` = UUID цілі, `_RTRef` = таблиця-ціль. Для `ДокументРезерва`/`КассовыйОрдер` зазвичай НЕ імпортуємо (резерв 1С-внутрішній).
+- `ЗаказПокупателя` (DocumentRef.ЗаказПокупателя) → наш `Order.code1C` = hex.
+- `Контрагент` (CatalogRef.Контрагенты) → `Customer.code1C` / `MgrClient.code1C` = hex.
+- `Номенклатура` (CatalogRef.Номенклатура) → `Product.code1C` = hex.
+- `ХарактеристикаНоменклатуры` (CatalogRef.ХарактеристикиНоменклатуры) → характеристика → наш **Lot** (резолв через `Lot.barcode` зі `Штрихкод`-поля коли воно є у VT, інакше через характеристику-UUID).
+- `Штрихкод` (string) — пряме поле → `Lot.barcode`.
+- `ЕдиницаИзмерения` (CatalogRef.ЕдиницыИзмерения) → `unit` (текст; резолв назви одиниці окремо).
+
+---
+
+### VT6648 — `Заказы` (замовлення у маршруті) → **RouteSheetOrder** (+ часткова `RouteSheetItem` агрегація)
+Owner: `_Document6630_IDRRef` · lineno: `_LineNo6649`
+
+| 1С атрибут | _Fld col | тип | ціль 1С |
+|---|---|---|---|
+| ЗаказПокупателя | `_Fld6650RRef` | binary ref | DocumentRef.ЗаказПокупателя |
+| Контрагент | `_Fld6651RRef` | binary ref | CatalogRef.Контрагенты |
+| Сумма | `_Fld6652` | numeric | — |
+| Отгружен | `_Fld6653` | binary(bool) | — |
+| Количество | `_Fld6911` | numeric | — |
+| КоличествоЗагружено | `_Fld6912` | numeric | — |
+| КоличествоОстаток | `_Fld6913` | numeric | — |
+| КоличествоФакт | `_Fld6918` | numeric | — |
+
+**Mapping → RouteSheetOrder:**
+- `orderId` ← резолв `_Fld6650RRef` через `Order.code1C`=hex
+- `customerId` ← резолв `_Fld6651RRef` через `Customer.code1C`=hex
+- `city` ← немає у VT; брати з резолвленого `Customer.city` (нема прямого поля)
+
+> Примітка: `Сумма/Количество/Отгружен` стосуються замовлення в цілому, не товарних рядків. У нашій моделі `RouteSheetOrder` цих полів нема — можна ігнорувати або (якщо потрібно) тримати у `RouteSheetItem.sum` на рівні замовлення. Деталізація товарів — у VT6654.
+
+---
+
+### VT6654 — `ТоварыЗаказов` (товари замовлень) → **RouteSheetItem**
+Owner: `_Document6630_IDRRef` · lineno: `_LineNo6655`
+
+| 1С атрибут | _Fld col | тип | ціль 1С |
+|---|---|---|---|
+| Номенклатура | `_Fld6656RRef` | ref | CatalogRef.Номенклатура |
+| ХарактеристикаНоменклатуры | `_Fld6657RRef` | ref | CatalogRef.ХарактеристикиНоменклатуры |
+| СерияНоменклатуры | `_Fld6658RRef` | ref | CatalogRef.СерииНоменклатуры (0 рядків — ігнор) |
+| ЕдиницаИзмерения | `_Fld6659RRef` | ref | CatalogRef.ЕдиницыИзмерения |
+| Количество | `_Fld6660` | numeric | — |
+| Цена | `_Fld6661` | numeric | — |
+| Сумма | `_Fld6662` | numeric | — |
+| Качество | `_Fld6663RRef` | ref | CatalogRef.Качество |
+| ЗаказПокупателя | `_Fld6664RRef` | ref | DocumentRef.ЗаказПокупателя |
+| ПроданВесь | `_Fld6665` | binary(bool) | — |
+| КоличествоПродано | `_Fld6666` | numeric | — |
+| ДокументРезерва | `_Fld6667_TYPE`/`_RTRef`/`_RRRef` | поліморф | Заказ/ПриходОрдер/ВнутрЗаказ/Перемещ/Реализация (ігнор) |
+| Загружен | `_Fld6817` | binary(bool) | — |
+| НетНаСкладе | `_Fld6818` | binary(bool) | — |
+| КоличествоОстаток | `_Fld6819` | numeric | — |
+| КоличествоЗагружено | `_Fld6820` | numeric | — |
+| НомерСтрокиЗаказов | `_Fld6829` | numeric | — (link на рядок VT6648) |
+| КоличествоФакт | `_Fld6919` | numeric | — |
+
+**Mapping → RouteSheetItem:**
+- `orderId` ← `_Fld6664RRef` → `Order.code1C`=hex
+- `customerId` ← немає прямо; брати з резолвленого замовлення (Order→Customer)
+- `productId` ← `_Fld6656RRef` → `Product.code1C`=hex
+- `lotId` ← `_Fld6657RRef` (характеристика) → Lot (нема Штрихкод у цій VT — резолв через характеристику-UUID або null)
+- `unit` ← `_Fld6659RRef` (резолв назви одиниці)
+- `quantity` ← `_Fld6660`
+- `price` ← `_Fld6661`
+- `sum` ← `_Fld6662`
+- `quantityLoaded` ← `_Fld6820` (КоличествоЗагружено)
+
+---
+
+### VT6668 — `Продажи` (фактичні продажі під час виїзду) → **RouteSheetSaleItem** (+ агрегація у RouteSheetSale)
+Owner: `_Document6630_IDRRef` · lineno: `_LineNo6669`
+
+| 1С атрибут | _Fld col | тип | ціль 1С |
+|---|---|---|---|
+| Контрагент | `_Fld6676RRef` | ref | CatalogRef.Контрагенты |
+| ЗаказПокупателя | `_Fld6773RRef` | ref | DocumentRef.ЗаказПокупателя |
+| Номенклатура | `_Fld6670RRef` | ref | CatalogRef.Номенклатура |
+| ХарактеристикаНоменклатуры | `_Fld6671RRef` | ref | CatalogRef.ХарактеристикиНоменклатуры |
+| СерияНоменклатуры | `_Fld6774RRef` | ref | СерииНоменклатуры (ігнор) |
+| ЕдиницаИзмерения | `_Fld6672RRef` | ref | CatalogRef.ЕдиницыИзмерения |
+| Количество | `_Fld6673` | numeric | — |
+| Цена | `_Fld6674` | numeric | — |
+| Сумма | `_Fld6675` | numeric | — |
+| Качество | `_Fld6677RRef` | ref | CatalogRef.Качество |
+| ДокументРезерва | `_Fld6775_TYPE`/`_RTRef`/`_RRRef` | поліморф | (ігнор) |
+| Загружен | `_Fld6826` | binary(bool) | — |
+| Возврат | `_Fld6827` | binary(bool) | — |
+| Штрихкод | `_Fld6828` | nvarchar | → Lot.barcode |
+| ЦенаПродажиВес | `_Fld6851` | numeric | ціна за кг |
+
+**Mapping → RouteSheetSaleItem:**
+- `saleId` ← немає прямого DocumentRef.РеализацияТоваровУслуг у цій VT; РеализацияТоваровУслуг створюється при проведенні. Заповнювати після резолву пов'язаної реалізації (через клієнт+дату) АБО лишити null/код маршруту. (`RouteSheetSale.saleId` теж під питанням — див. нижче.)
+- `orderId` ← `_Fld6773RRef` → `Order.code1C`=hex
+- `customerId` ← `_Fld6676RRef` → `Customer.code1C`=hex
+- `productId` ← `_Fld6670RRef` → `Product.code1C`=hex
+- `lotId` ← `Lot.barcode` = `_Fld6828` (Штрихкод), fallback характеристика `_Fld6671RRef`
+- `unit` ← `_Fld6672RRef`
+- `quantity` ← `_Fld6673`
+- `price` ← `_Fld6674`
+- `sum` ← `_Fld6675`
+- `pricePerKg` ← `_Fld6851` (ЦенаПродажиВес)
+
+> `RouteSheetSale` (orderId, customerId, saleId, sum) — НЕ має окремої власної VT. Її можна **агрегувати** з VT6668 по (Контрагент, ЗаказПокупателя): `sum` = Σ `Сумма`. `saleId` лишається null доки не зрезолвимо РеализациюТоваровУслуг.
+
+---
+
+### VT6787 — `Оплата` (оплати/каса під час виїзду) → **RouteSheetPayment**
+Owner: `_Document6630_IDRRef` · lineno: `_LineNo6788`
+
+| 1С атрибут | _Fld col | тип | ціль 1С |
+|---|---|---|---|
+| Контрагент | `_Fld6789RRef` | ref | CatalogRef.Контрагенты |
+| ДоговорКонтрагента | `_Fld6790RRef` | ref | CatalogRef.ДоговорыКонтрагентов (ігнор) |
+| ЗаказПокупателя | `_Fld6791RRef` | ref | DocumentRef.ЗаказПокупателя |
+| Валюта | `_Fld6792RRef` | ref | CatalogRef.Валюты |
+| КурсВал | `_Fld6909` | numeric | курс валютний |
+| КурсУпр | `_Fld6910` | numeric | курс упр. |
+| Сумма | `_Fld6793` | numeric | — |
+| Безналичные | `_Fld6794` | binary(bool) | — |
+| Возврат | `_Fld6908` | binary(bool) | — |
+| КассовыйОрдер | `_Fld7321_TYPE`/`_S`/`_RTRef`/`_RRRef` | поліморф | ПКО/РКО/string/ПлатіжнеДоручення |
+
+**Mapping → RouteSheetPayment:**
+- `orderId` ← `_Fld6791RRef` → `Order.code1C`=hex
+- `customerId` ← `_Fld6789RRef` → `Customer.code1C`=hex
+- `saleId` ← немає; null
+- `cashOrderId` ← `_Fld7321_RRRef` (касовий ордер UUID) → `MgrCashOrder.code1C`=hex; коли `_Fld7321_S` (рядок) — це ручний ідентифікатор. Може бути null.
+- `amount` ← `_Fld6793` (Сумма)
+
+> Курси (`КурсВал`/`КурсУпр`) і `Безналичные`/`Возврат` нема куди класти у поточній моделі `RouteSheetPayment` — ігнор або follow-up. `cashOrderId` у схемі required (`String`) — при імпорті без резолву ставити placeholder/skip-рядок.
+
+---
+
+### VT6795 — `ЗагрузкаМашины` (фізичне завантаження/скан) → **RouteSheetLoading**
+Owner: `_Document6630_IDRRef` · lineno: `_LineNo6796`
+
+| 1С атрибут | _Fld col | тип | ціль 1С |
+|---|---|---|---|
+| Контрагент | `_Fld6848RRef` | ref | CatalogRef.Контрагенты |
+| ЗаказПокупателя | `_Fld6797RRef` | ref | DocumentRef.ЗаказПокупателя |
+| Номенклатура | `_Fld6798RRef` | ref | CatalogRef.Номенклатура |
+| ХарактеристикаНоменклатуры | `_Fld6799RRef` | ref | CatalogRef.ХарактеристикиНоменклатуры |
+| ЕдиницаИзмерения | `_Fld6800RRef` | ref | CatalogRef.ЕдиницыИзмерения |
+| Количество | `_Fld6801` | numeric | — |
+| Вес | `_Fld6802` | numeric | — |
+| Цена | `_Fld6803` | numeric | — |
+| Сумма | `_Fld6804` | numeric | — |
+| Загружен | `_Fld6805` | binary(bool) | — |
+| Возврат | `_Fld6816` | binary(bool) | — |
+| Штрихкод | `_Fld6821` | nvarchar | → Lot.barcode |
+| Качество | `_Fld6823RRef` | ref | CatalogRef.Качество |
+| СерияНоменклатуры | `_Fld6824RRef` | ref | СерииНоменклатуры (ігнор) |
+| ДокументРезерва | `_Fld6825_TYPE`/`_RTRef`/`_RRRef` | поліморф | (ігнор) |
+| ЦенаПродажиВес | `_Fld6852` | numeric | ціна за кг |
+
+**Mapping → RouteSheetLoading:**
+- `orderId` ← `_Fld6797RRef` → `Order.code1C`=hex
+- `customerId` ← `_Fld6848RRef` → `Customer.code1C`=hex
+- `productId` ← `_Fld6798RRef` → `Product.code1C`=hex
+- `lotId` ← `Lot.barcode` = `_Fld6821` (Штрихкод), fallback характеристика `_Fld6799RRef`
+- `barcode` ← `_Fld6821` (Штрихкод) — required `String`
+- `unit` ← `_Fld6800RRef`
+- `quantity` ← `_Fld6801`
+- `weight` ← `_Fld6802` (Вес)
+- `price` ← `_Fld6803`
+- `sum` ← `_Fld6804`
+- `pricePerKg` ← `_Fld6852` (ЦенаПродажиВес)
+- `loaded` ← `_Fld6805` (Загружен)
+- `isReturn` ← `_Fld6816` (Возврат)
+
+---
+
+### VT6897 — `Расчеты` (взаєморозрахунки, допоміжна) → **немає прямої моделі / skip** (опц. збагачення RouteSheetSale.sum)
+Owner: `_Document6630_IDRRef` · lineno: `_LineNo6898`
+
+| 1С атрибут | _Fld col | тип | ціль 1С |
+|---|---|---|---|
+| Контрагент | `_Fld6899RRef` | ref | CatalogRef.Контрагенты |
+| ДоговорКонтрагента | `_Fld6900RRef` | ref | ДоговорыКонтрагентов |
+| ЗаказПокупателя | `_Fld6901RRef` | ref | DocumentRef.ЗаказПокупателя |
+| Валюта | `_Fld6902RRef` | ref | CatalogRef.Валюты |
+| СуммаБезСкидки | `_Fld6903` | numeric | — |
+| СуммаСкидкиНаценки | `_Fld6904` | numeric | — |
+| Сумма | `_Fld6905` | numeric | — |
+| СуммаОплаты | `_Fld6906` | numeric | — |
+| СуммаОстатка | `_Fld6907` | numeric | — |
+
+**Рішення:** службова таблиця взаєморозрахунків (борг/оплата/залишок на момент виїзду). У нашій схемі окремої моделі нема. **Skip** при імпорті (дані-дублі продажів+оплат). За потреби — джерело для `RouteSheetSale.sum` per замовлення.
+
+---
+
+### VT6853 — `КурсыВалют` (курси валют документа, допоміжна) → **немає моделі / skip**
+Owner: `_Document6630_IDRRef` · lineno: `_LineNo6854`
+
+| 1С атрибут | _Fld col | тип | ціль 1С |
+|---|---|---|---|
+| Валюта | `_Fld6855RRef` | ref | CatalogRef.Валюты |
+| Курс | `_Fld6856` | numeric | — |
+
+**Рішення:** знімок курсів валют на дату документа. Нема цільової моделі. **Skip** (курси у нас на рівні Sale/CashOrder).
+
+---
+
+### VT7311 — `ТорговыеАгенты` (торгові агенти маршруту, допоміжна) → **немає моделі / skip**
+Owner: `_Document6630_IDRRef` · lineno: `_LineNo7312`
+
+| 1С атрибут | _Fld col | тип | ціль 1С |
+|---|---|---|---|
+| ТорговыйАгент | `_Fld7313RRef` | ref | CatalogRef.ТорговыеАгенты |
+
+**Рішення:** список агентів, прикріплених до маршруту. У шапці `RouteSheet` є `expeditorUserId`. **Skip** (або перший агент → `RouteSheet.expeditorUserId` follow-up).
+
+---
+
+### VT7334 — `Витрати` (витрати маршруту, статті ДДС) → **немає моделі / skip**
+Owner: `_Document6630_IDRRef` · lineno: `_LineNo7335`
+
+| 1С атрибут | _Fld col | тип | ціль 1С |
+|---|---|---|---|
+| СтаттяВитрат | `_Fld7336RRef` | ref | CatalogRef.СтатьиДвиженияДенежныхСредств |
+| Сума | `_Fld7337` | numeric | — |
+
+**Рішення:** витрати на виїзд (пальне тощо). Нема цільової моделі. **Skip** (follow-up: окрема модель витрат маршруту).
+
+---
+
+### VT7622 — `Завдання` (завдання менеджеру по клієнту) → **RouteSheetTask**
+Owner: `_Document6630_IDRRef` · lineno: `_LineNo7623`
+
+| 1С атрибут | _Fld col | тип | ціль 1С |
+|---|---|---|---|
+| Контрагент | `_Fld7624RRef` | ref | CatalogRef.Контрагенты |
+| Коментар | `_Fld7625` | ntext | — |
+
+**Mapping → RouteSheetTask:**
+- `customerId` ← `_Fld7624RRef` → `Customer.code1C`=hex
+- `comment` ← `_Fld7625` (Коментар) — required `String`
+
+---
+
+### Підсумкова таблиця: VT → секція → модель
+
+| VT-таблиця | Рос. назва | Цільова Prisma-модель | Ключові колонки |
+|---|---|---|---|
+| `_Document6630_VT6648` | Заказы | **RouteSheetOrder** | order `_Fld6650RRef`, customer `_Fld6651RRef`; lineno `_LineNo6649` |
+| `_Document6630_VT6654` | ТоварыЗаказов | **RouteSheetItem** | order `_Fld6664RRef`, product `_Fld6656RRef`, char `_Fld6657RRef`, qty `_Fld6660`, price `_Fld6661`, sum `_Fld6662`, loaded `_Fld6820`; lineno `_LineNo6655` |
+| `_Document6630_VT6668` | Продажи | **RouteSheetSaleItem** (+ агр. RouteSheetSale) | customer `_Fld6676RRef`, order `_Fld6773RRef`, product `_Fld6670RRef`, barcode `_Fld6828`, qty `_Fld6673`, price `_Fld6674`, sum `_Fld6675`, perKg `_Fld6851`; lineno `_LineNo6669` |
+| `_Document6630_VT6787` | Оплата | **RouteSheetPayment** | customer `_Fld6789RRef`, order `_Fld6791RRef`, amount `_Fld6793`, cashOrder `_Fld7321_RRRef`; lineno `_LineNo6788` |
+| `_Document6630_VT6795` | ЗагрузкаМашины | **RouteSheetLoading** | customer `_Fld6848RRef`, order `_Fld6797RRef`, product `_Fld6798RRef`, barcode `_Fld6821`, qty `_Fld6801`, weight `_Fld6802`, price `_Fld6803`, sum `_Fld6804`, perKg `_Fld6852`, loaded `_Fld6805`, isReturn `_Fld6816`; lineno `_LineNo6796` |
+| `_Document6630_VT6897` | Расчеты | — (skip, допоміжна) | customer `_Fld6899RRef`, order `_Fld6901RRef`, sum `_Fld6905`; lineno `_LineNo6898` |
+| `_Document6630_VT6853` | КурсыВалют | — (skip, допоміжна) | currency `_Fld6855RRef`, rate `_Fld6856`; lineno `_LineNo6854` |
+| `_Document6630_VT7311` | ТорговыеАгенты | — (skip; опц. expeditor) | agent `_Fld7313RRef`; lineno `_LineNo7312` |
+| `_Document6630_VT7334` | Витрати | — (skip; follow-up витрати) | article `_Fld7336RRef`, amount `_Fld7337`; lineno `_LineNo7335` |
+| `_Document6630_VT7622` | Завдання | **RouteSheetTask** | customer `_Fld7624RRef`, comment `_Fld7625`; lineno `_LineNo7623` |
+
+**Покриття моделей:** RouteSheetOrder ✓ (VT6648), RouteSheetItem ✓ (VT6654), RouteSheetLoading ✓ (VT6795), RouteSheetSale ⚠ (агрегація з VT6668, saleId=null), RouteSheetSaleItem ✓ (VT6668, saleId=null), RouteSheetPayment ✓ (VT6787), RouteSheetTask ✓ (VT7622). Допоміжні без моделі: Расчеты, КурсыВалют, ТорговыеАгенты, Витрати.
+
+**Загальні застереження для імпортера:**
+1. Усі `*RRef`/`_RRRef` = binary(16) → конвертувати у hex-рядок (lowercase, без дефісів — як 1С зберігає UUID) і шукати наш `code1C`.
+2. `boolean` 1С зберігає як binary(1) `0x00`/`0x01`.
+3. Поліморфні ref (`ДокументРезерва`, `КассовыйОрдер`) — НЕ імпортувати окрім `КассовыйОрдер._RRRef`→MgrCashOrder (best-effort, може бути null).
+4. `lot` резолв: пріоритет `Lot.barcode` зі `Штрихкод`-колонки (VT6668/VT6795 мають її), інакше характеристика-UUID `ХарактеристикаНоменклатуры` → Lot, інакше null.
+5. `RouteSheetSale.saleId`/`RouteSheetSaleItem.saleId` — VT6668 НЕ містить DocumentRef.РеализацияТоваровУслуг; реалізація створюється при проведенні. Лишати null або резолвити окремо (по клієнт+дата) — follow-up.

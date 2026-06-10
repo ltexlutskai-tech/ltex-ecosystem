@@ -255,15 +255,59 @@ function asBool(v: unknown): boolean {
 function asDate(v: unknown): Date | null {
   if (v == null) return null;
   if (v instanceof Date) {
-    // TODO(year-offset): окремі 1С-бази зміщують рік (base-year quirk). Поки
-    // пропускаємо `_Date_Time` як є — user звіряє sample у --dry-run і за потреби
-    // вмикає корекцію тут. Дати поза розумним діапазоном (рік < 1980) → null.
-    const y = v.getUTCFullYear();
-    if (y < 1980 || y > 2100) return null;
-    return v;
+    // The year-offset is read from `_YearOffset` at startup and stored in
+    // YEAR_OFFSET. We subtract it from the raw UTC year to get the real date.
+    // If a sample date still looks wrong in --dry-run, flip the sign here
+    // (add instead of subtract) — that covers the opposite-shift edge case.
+    const realYear = v.getUTCFullYear() - YEAR_OFFSET;
+    const d = new Date(
+      Date.UTC(
+        realYear,
+        v.getUTCMonth(),
+        v.getUTCDate(),
+        v.getUTCHours(),
+        v.getUTCMinutes(),
+        v.getUTCSeconds(),
+      ),
+    );
+    const y = d.getUTCFullYear();
+    if (y < 1990 || y > 2100) return null; // implausible after shift → null
+    return d;
   }
   const d = new Date(String(v));
   return Number.isNaN(d.getTime()) ? null : d;
+}
+
+const DEFAULT_HISTORICAL_RATE = 43; // fallback EUR→UAH when doc rate is 0
+
+// ─── Year-offset (A1) ─────────────────────────────────────────────────────────
+// 1С on MS SQL stores dates shifted by a base-year value kept in `_YearOffset`.
+// We read the offset once at startup and subtract it from every Date value.
+let YEAR_OFFSET = 0;
+
+async function loadYearOffset(pool: mssql.ConnectionPool): Promise<number> {
+  try {
+    const result = await pool
+      .request()
+      .query<Record<string, unknown>>("SELECT * FROM _YearOffset");
+    const row = result.recordset?.[0];
+    if (!row) {
+      warn("_YearOffset table is empty — using 0");
+      return 0;
+    }
+    for (const val of Object.values(row)) {
+      const n = typeof val === "number" ? val : Number(val);
+      if (Number.isFinite(n)) {
+        log(`year-offset = ${n}`);
+        return n;
+      }
+    }
+    warn("_YearOffset: no numeric column found — using 0");
+    return 0;
+  } catch (e) {
+    warn(`loadYearOffset: ${errMsg(e)} — using 0`);
+    return 0;
+  }
 }
 
 // ─── Лічильники звірки ────────────────────────────────────────────────────────
@@ -423,9 +467,9 @@ async function loadDictNames(
   try {
     const result = await pool
       .request()
-      .query<Record<string, unknown>>(
-        `SELECT [_IDRRef], [${valueCol}] FROM [${table}]`,
-      );
+      .query<
+        Record<string, unknown>
+      >(`SELECT [_IDRRef], [${valueCol}] FROM [${table}]`);
     for (const row of result.recordset ?? []) {
       const hex = bufToHex(row["_IDRRef"]);
       const val = asString(row[valueCol]);
@@ -537,7 +581,9 @@ async function importCustomers(ctx: ImportContext): Promise<Recon> {
       const cityHex = bufToHex(row["_Fld6812RRef"]);
       const regionHex = bufToHex(row["_Fld6813RRef"]);
       const city = cityHex ? (ctx.cityNames.get(cityHex) ?? null) : null;
-      const region = regionHex ? (ctx.regionNames.get(regionHex) ?? null) : null;
+      const region = regionHex
+        ? (ctx.regionNames.get(regionHex) ?? null)
+        : null;
       const notes = asString(row["_Fld6049"]);
 
       // Заповнюємо резолв-словник hex→{id,code1C} для документів. У dry-run id
@@ -796,7 +842,10 @@ function makeUniqueSlug(
   used: Set<string>,
 ): string {
   const base = slugify(name) || "product";
-  const codeSlug = code1C.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-");
+  const codeSlug = code1C
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-");
   let candidate = `${base}-${codeSlug}`.replace(/-+/g, "-").slice(0, 90);
   if (!candidate || candidate === "-") candidate = `product-${codeSlug}`;
   let i = 2;
@@ -1165,6 +1214,10 @@ async function importOrders(ctx: ImportContext): Promise<Recon> {
 
       // Рядки замовлення.
       const items = await loadOrderItems(ctx, hex);
+      const itemsTotalEur = items.reduce((s, it) => s + it.priceEur, 0);
+      const totalEur = itemsTotalEur > 0 ? itemsTotalEur : totalDoc;
+      const rate = exchangeRate > 0 ? exchangeRate : DEFAULT_HISTORICAL_RATE;
+      const totalUah = totalEur * rate;
 
       try {
         if (willWrite(ctx)) {
@@ -1175,8 +1228,8 @@ async function importOrders(ctx: ImportContext): Promise<Recon> {
                 code1C,
                 customerId: customer.id,
                 status: posted ? "posted" : "draft",
-                totalEur: totalDoc,
-                totalUah: exchangeRate > 0 ? totalDoc * exchangeRate : 0,
+                totalEur,
+                totalUah,
                 exchangeRate,
                 notes,
                 archived: posted,
@@ -1187,8 +1240,8 @@ async function importOrders(ctx: ImportContext): Promise<Recon> {
               update: {
                 customerId: customer.id,
                 status: posted ? "posted" : "draft",
-                totalEur: totalDoc,
-                totalUah: exchangeRate > 0 ? totalDoc * exchangeRate : 0,
+                totalEur,
+                totalUah,
                 exchangeRate,
                 notes,
                 archived: posted,
@@ -1358,6 +1411,10 @@ async function importSales(ctx: ImportContext): Promise<Recon> {
       const waybill = asString(row["_Fld7768"]);
 
       const items = await loadSaleItems(ctx, hex);
+      const itemsTotalEur = items.reduce((s, it) => s + it.priceEur, 0);
+      const totalEur = itemsTotalEur > 0 ? itemsTotalEur : totalDoc;
+      const rate = rateEur > 0 ? rateEur : DEFAULT_HISTORICAL_RATE;
+      const totalUah = totalEur * rate;
 
       try {
         if (willWrite(ctx)) {
@@ -1368,8 +1425,8 @@ async function importSales(ctx: ImportContext): Promise<Recon> {
                 code1C,
                 customerId: customer.id,
                 status: posted ? "posted" : "draft",
-                totalEur: totalDoc,
-                totalUah: rateEur > 0 ? totalDoc * rateEur : 0,
+                totalEur,
+                totalUah,
                 exchangeRateEur: rateEur,
                 exchangeRateUsd: rateUsd,
                 cashOnDelivery: cod,
@@ -1384,8 +1441,8 @@ async function importSales(ctx: ImportContext): Promise<Recon> {
               update: {
                 customerId: customer.id,
                 status: posted ? "posted" : "draft",
-                totalEur: totalDoc,
-                totalUah: rateEur > 0 ? totalDoc * rateEur : 0,
+                totalEur,
+                totalUah,
                 exchangeRateEur: rateEur,
                 exchangeRateUsd: rateUsd,
                 cashOnDelivery: cod,
@@ -1654,14 +1711,19 @@ async function importCashOrderTable(
   }
 }
 
-// ─── 9. МаршрутныйЛист → RouteSheet (STUB) ─ _Document6630 ───────────────────
-// TODO(routesheets): дочірні VT (Заказы/ТоварыЗаказов/Загрузка/Продажи/Расчеты/
-// Оплата/Завдання) мають по 10+ _Fld-колонок, чиї бізнес-імена НЕ розкриті
-// поіменно у HISTORY_MIGRATION_MAP §10.2 (там сказано декодувати кожен VT
-// окремо через recipe). Щоб не імпортувати їх наосліп (ризик зіпсувати дані),
-// зараз імпортуємо ЛИШЕ шапку RouteSheet; дочірні VT — наступний раунд після
-// поіменного декодування. `--entity routesheets` працює (не падає), але імпортує
-// тільки шапки.
+// ─── 9. МаршрутныйЛист → RouteSheet (+дочірні VT) ─ _Document6630 ────────────
+// Імпортуємо шапку RouteSheet ПЛЮС дочірні табличні частини (VT) у наші child-
+// таблиці + зворотні посилання, які додаток читає для вкладок картки:
+//   Заказы       VT6648 → RouteSheetOrder
+//   ТоварыЗаказов VT6654 → RouteSheetItem
+//   ЗагрузкаМашины VT6795 → RouteSheetLoading
+//   Завдання     VT7622 → RouteSheetTask
+//   Реалізації/Продажі — ЗВОРОТНЕ посилання Sale.routeSheetId (_Document189._Fld6729RRef)
+//   Оплати       VT6787 → ЗВОРОТНЕ посилання MgrCashOrder.routeSheetId
+// УВАГА: RouteSheetSale/RouteSheetSaleItem/RouteSheetPayment child-таблиці
+// додаток свідомо ІГНОРУЄ (вкладки Реалізації/Продажі/Оплати беруться зі
+// зворотних посилань) — тому у них НЕ пишемо.
+// Дрібні follow-up: `unit` рядків і `RouteSheetOrder.city` лишаються null.
 
 const ROUTE_SHEET_COLS = [
   "_IDRRef",
@@ -1681,11 +1743,17 @@ async function importRouteSheets(ctx: ImportContext): Promise<Recon> {
   const sink = new ErrorSink(recon, "routesheets");
   const { args, src, prisma } = ctx;
 
+  // Дочірні VT резолвлять order/customer/product/lot/barcode → підвантажуємо
+  // словники (orders/sales вже існують у цільовій базі — routesheets останні).
+  await ensureCustomerDict(ctx);
+  await ensureProductLotDicts(ctx);
+  await ensureOrderDict(ctx);
+
   const where = args.since ? "_Date_Time >= @since" : undefined;
   const params = args.since ? { since: args.since } : undefined;
 
   recon.sourceRows = await countTable(src, "_Document6630", where, params);
-  log(`routesheets: source rows = ${recon.sourceRows} (шапки; VT — TODO)`);
+  log(`routesheets: source rows = ${recon.sourceRows} (шапки + VT)`);
 
   for await (const rows of streamTable(src, "_Document6630", ROUTE_SHEET_COLS, {
     batch: args.batch,
@@ -1716,8 +1784,9 @@ async function importRouteSheets(ctx: ImportContext): Promise<Recon> {
       const archived = asBool(row["_Fld7352"]);
 
       try {
+        let routeId = "(pending)";
         if (willWrite(ctx)) {
-          await prisma.routeSheet.upsert({
+          const rs = await prisma.routeSheet.upsert({
             where: { code1C },
             create: {
               code1C,
@@ -1744,17 +1813,338 @@ async function importRouteSheets(ctx: ImportContext): Promise<Recon> {
               archived,
             },
           });
+          routeId = rs.id;
+          await importRouteSheetChildren(ctx, hex, rs.id);
         }
         recon.written++;
-        ctx.routeSheets.set(hex, { id: "(pending)", code1C });
+        ctx.routeSheets.set(hex, { id: routeId, code1C });
       } catch (e) {
         sink.record(code1C, e);
       }
     }
-    log(`routesheets: processed ${recon.written + recon.skipped + recon.errors}`);
+    log(
+      `routesheets: processed ${recon.written + recon.skipped + recon.errors}`,
+    );
   }
 
   return recon;
+}
+
+// ─── Дочірні табличні частини маршрутного листа (VT) ─────────────────────────
+// Усі VT мають спільну колонку-власника `_Document6630_IDRRef` (binary(16)).
+
+// Резолв-хелпери: повертають наш id лише коли він не "(pending)" (інакше null).
+function resolveOrderId(ctx: ImportContext, hex: string | null): string | null {
+  if (!hex) return null;
+  const e = ctx.orders.get(hex);
+  return e && e.id !== "(pending)" ? e.id : null;
+}
+function resolveCustomerId(
+  ctx: ImportContext,
+  hex: string | null,
+): string | null {
+  if (!hex) return null;
+  const e = ctx.customers.get(hex);
+  return e && e.id !== "(pending)" ? e.id : null;
+}
+function resolveProductId(
+  ctx: ImportContext,
+  hex: string | null,
+): string | null {
+  if (!hex) return null;
+  const e = ctx.products.get(hex);
+  return e && e.id !== "(pending)" ? e.id : null;
+}
+function resolveLotId(
+  ctx: ImportContext,
+  charHex: string | null,
+): string | null {
+  if (!charHex) return null;
+  const e = ctx.lots.get(charHex);
+  return e && e.id !== "(pending)" ? e.id : null;
+}
+
+const RS_ORDER_COLS = [
+  "_LineNo6649",
+  "_Fld6650RRef", // ЗаказПокупателя
+  "_Fld6651RRef", // Контрагент
+];
+const RS_ITEM_COLS = [
+  "_LineNo6655",
+  "_Fld6664RRef", // ЗаказПокупателя
+  "_Fld6656RRef", // Номенклатура
+  "_Fld6657RRef", // Характеристика (лот)
+  "_Fld6660", // Количество
+  "_Fld6661", // Цена
+  "_Fld6662", // Сумма
+  "_Fld6820", // КоличествоЗагружено
+];
+const RS_LOADING_COLS = [
+  "_LineNo6796",
+  "_Fld6848RRef", // Контрагент
+  "_Fld6797RRef", // ЗаказПокупателя
+  "_Fld6798RRef", // Номенклатура
+  "_Fld6799RRef", // Характеристика (лот)
+  "_Fld6821", // Штрихкод
+  "_Fld6801", // Количество
+  "_Fld6802", // Вес
+  "_Fld6803", // Цена
+  "_Fld6804", // Сумма
+  "_Fld6852", // ЦенаЗаКг
+  "_Fld6805", // Загружено (bin1)
+  "_Fld6816", // Возврат (bin1)
+];
+const RS_TASK_COLS = [
+  "_LineNo7623",
+  "_Fld7624RRef", // Контрагент
+  "_Fld7625", // Комментарий (ntext)
+];
+const RS_PAYMENT_COLS = [
+  "_LineNo6788",
+  "_Fld7321_RRRef", // поліморфне посилання на касовий ордер
+];
+
+async function importRouteSheetChildren(
+  ctx: ImportContext,
+  routeHex: string,
+  routeId: string,
+): Promise<void> {
+  const { src, prisma } = ctx;
+  const owner = Buffer.from(routeHex, "hex");
+
+  // ── Заказы → RouteSheetOrder ──
+  const orderRows: {
+    routeSheetId: string;
+    orderId: string;
+    customerId: string | null;
+    city: null;
+  }[] = [];
+  for await (const rows of streamTable(
+    src,
+    "_Document6630_VT6648",
+    RS_ORDER_COLS,
+    {
+      batch: 1000,
+      limit: null,
+      orderBy: ["_LineNo6649"],
+      where: "_Document6630_IDRRef = @owner",
+      params: { owner },
+    },
+  )) {
+    for (const row of rows) {
+      const orderId = resolveOrderId(ctx, bufToHex(row["_Fld6650RRef"]));
+      if (!orderId) continue;
+      orderRows.push({
+        routeSheetId: routeId,
+        orderId,
+        customerId: resolveCustomerId(ctx, bufToHex(row["_Fld6651RRef"])),
+        city: null,
+      });
+    }
+  }
+
+  // ── ТоварыЗаказов → RouteSheetItem ──
+  const itemRows: {
+    routeSheetId: string;
+    orderId: string | null;
+    productId: string;
+    lotId: string | null;
+    unit: null;
+    quantity: number;
+    price: number;
+    sum: number;
+    quantityLoaded: number;
+  }[] = [];
+  for await (const rows of streamTable(
+    src,
+    "_Document6630_VT6654",
+    RS_ITEM_COLS,
+    {
+      batch: 1000,
+      limit: null,
+      orderBy: ["_LineNo6655"],
+      where: "_Document6630_IDRRef = @owner",
+      params: { owner },
+    },
+  )) {
+    for (const row of rows) {
+      const productId = resolveProductId(ctx, bufToHex(row["_Fld6656RRef"]));
+      if (!productId) continue;
+      itemRows.push({
+        routeSheetId: routeId,
+        orderId: resolveOrderId(ctx, bufToHex(row["_Fld6664RRef"])),
+        productId,
+        lotId: resolveLotId(ctx, bufToHex(row["_Fld6657RRef"])),
+        unit: null,
+        quantity: asNumberOr(row["_Fld6660"], 0),
+        price: asNumberOr(row["_Fld6661"], 0),
+        sum: asNumberOr(row["_Fld6662"], 0),
+        quantityLoaded: asNumberOr(row["_Fld6820"], 0),
+      });
+    }
+  }
+
+  // ── ЗагрузкаМашины → RouteSheetLoading ──
+  const loadingRows: {
+    routeSheetId: string;
+    orderId: string | null;
+    customerId: string | null;
+    productId: string;
+    lotId: string;
+    barcode: string;
+    unit: null;
+    quantity: number;
+    weight: number;
+    price: number;
+    sum: number;
+    pricePerKg: number;
+    loaded: boolean;
+    isReturn: boolean;
+  }[] = [];
+  for await (const rows of streamTable(
+    src,
+    "_Document6630_VT6795",
+    RS_LOADING_COLS,
+    {
+      batch: 1000,
+      limit: null,
+      orderBy: ["_LineNo6796"],
+      where: "_Document6630_IDRRef = @owner",
+      params: { owner },
+    },
+  )) {
+    for (const row of rows) {
+      const productId = resolveProductId(ctx, bufToHex(row["_Fld6798RRef"]));
+      const charHex = bufToHex(row["_Fld6799RRef"]);
+      const lotId = resolveLotId(ctx, charHex);
+      const barcode =
+        asString(row["_Fld6821"]) ??
+        (charHex ? (ctx.lotBarcodeByCharHex.get(charHex) ?? null) : null);
+      if (!productId || !lotId || !barcode) continue;
+      loadingRows.push({
+        routeSheetId: routeId,
+        orderId: resolveOrderId(ctx, bufToHex(row["_Fld6797RRef"])),
+        customerId: resolveCustomerId(ctx, bufToHex(row["_Fld6848RRef"])),
+        productId,
+        lotId,
+        barcode,
+        unit: null,
+        quantity: asNumberOr(row["_Fld6801"], 0),
+        weight: asNumberOr(row["_Fld6802"], 0),
+        price: asNumberOr(row["_Fld6803"], 0),
+        sum: asNumberOr(row["_Fld6804"], 0),
+        pricePerKg: asNumberOr(row["_Fld6852"], 0),
+        loaded: asBool(row["_Fld6805"]),
+        isReturn: asBool(row["_Fld6816"]),
+      });
+    }
+  }
+
+  // ── Завдання → RouteSheetTask ──
+  const taskRows: {
+    routeSheetId: string;
+    customerId: string | null;
+    comment: string;
+  }[] = [];
+  for await (const rows of streamTable(
+    src,
+    "_Document6630_VT7622",
+    RS_TASK_COLS,
+    {
+      batch: 1000,
+      limit: null,
+      orderBy: ["_LineNo7623"],
+      where: "_Document6630_IDRRef = @owner",
+      params: { owner },
+    },
+  )) {
+    for (const row of rows) {
+      const comment = asString(row["_Fld7625"]);
+      if (!comment) continue;
+      taskRows.push({
+        routeSheetId: routeId,
+        customerId: resolveCustomerId(ctx, bufToHex(row["_Fld7624RRef"])),
+        comment,
+      });
+    }
+  }
+
+  // Запис дочірніх таблиць (delete-then-insert = idempotent повторний прогон).
+  await prisma.$transaction(async (tx) => {
+    await tx.routeSheetOrder.deleteMany({ where: { routeSheetId: routeId } });
+    if (orderRows.length > 0) {
+      await tx.routeSheetOrder.createMany({ data: orderRows });
+    }
+    await tx.routeSheetItem.deleteMany({ where: { routeSheetId: routeId } });
+    if (itemRows.length > 0) {
+      await tx.routeSheetItem.createMany({ data: itemRows });
+    }
+    await tx.routeSheetLoading.deleteMany({ where: { routeSheetId: routeId } });
+    if (loadingRows.length > 0) {
+      await tx.routeSheetLoading.createMany({ data: loadingRows });
+    }
+    await tx.routeSheetTask.deleteMany({ where: { routeSheetId: routeId } });
+    if (taskRows.length > 0) {
+      await tx.routeSheetTask.createMany({ data: taskRows });
+    }
+  });
+
+  // ── Зворотне посилання: Реалізації/Продажі ─ Sale.routeSheetId ──
+  // Запитуємо реалізації, що вказують на цей маршрут (_Document189._Fld6729RRef).
+  try {
+    const saleHexes: string[] = [];
+    for await (const rows of streamTable(src, "_Document189", ["_IDRRef"], {
+      batch: 1000,
+      limit: null,
+      orderBy: ["_IDRRef"],
+      where: "_Fld6729RRef = @owner",
+      params: { owner },
+    })) {
+      for (const row of rows) {
+        const h = bufToHex(row["_IDRRef"]);
+        if (h) saleHexes.push(h);
+      }
+    }
+    if (saleHexes.length > 0) {
+      await prisma.sale.updateMany({
+        where: { code1C: { in: saleHexes } },
+        data: { routeSheetId: routeId },
+      });
+    }
+  } catch (e) {
+    warn(`routesheets ${routeHex}: sale back-link: ${errMsg(e)}`);
+  }
+
+  // ── Зворотне посилання: Оплати ─ MgrCashOrder.routeSheetId ──
+  // VT6787 містить поліморфні посилання на касові ордери (_Fld7321_RRRef).
+  try {
+    const cashHexes: string[] = [];
+    for await (const rows of streamTable(
+      src,
+      "_Document6630_VT6787",
+      RS_PAYMENT_COLS,
+      {
+        batch: 1000,
+        limit: null,
+        orderBy: ["_LineNo6788"],
+        where: "_Document6630_IDRRef = @owner",
+        params: { owner },
+      },
+    )) {
+      for (const row of rows) {
+        const h = bufToHex(row["_Fld7321_RRRef"]);
+        if (h) cashHexes.push(h);
+      }
+    }
+    if (cashHexes.length > 0) {
+      await prisma.mgrCashOrder.updateMany({
+        where: { code1C: { in: cashHexes } },
+        data: { routeSheetId: routeId },
+      });
+    }
+  } catch (e) {
+    warn(`routesheets ${routeHex}: cash-order back-link: ${errMsg(e)}`);
+  }
 }
 
 // ─── Підвантаження словників для ізольованих --entity запусків ────────────────
@@ -1773,7 +2163,10 @@ async function ensureCustomerDict(ctx: ImportContext): Promise<void> {
       const hex = bufToHex(row["_IDRRef"]);
       const code1C = asString(row["_Code"]);
       if (!hex || !code1C) continue;
-      ctx.customers.set(hex, { id: existing.get(code1C) ?? "(pending)", code1C });
+      ctx.customers.set(hex, {
+        id: existing.get(code1C) ?? "(pending)",
+        code1C,
+      });
     }
   }
 }
@@ -1794,12 +2187,11 @@ async function buildLotDictFromSource(ctx: ImportContext): Promise<void> {
     });
     for (const l of lots) byBarcode.set(l.barcode, l.id);
   }
-  for await (const rows of streamTable(
-    ctx.src,
-    "_Reference113",
-    ["_IDRRef"],
-    { batch: 2000, limit: null, orderBy: ["_IDRRef"] },
-  )) {
+  for await (const rows of streamTable(ctx.src, "_Reference113", ["_IDRRef"], {
+    batch: 2000,
+    limit: null,
+    orderBy: ["_IDRRef"],
+  })) {
     for (const row of rows) {
       const hex = bufToHex(row["_IDRRef"]);
       if (!hex) continue;
@@ -1824,6 +2216,23 @@ async function ensureSaleDict(ctx: ImportContext): Promise<void> {
       const code1C = hex;
       if (!hex || !code1C) continue;
       ctx.sales.set(hex, { id: existing.get(code1C) ?? "(pending)", code1C });
+    }
+  }
+}
+
+async function ensureOrderDict(ctx: ImportContext): Promise<void> {
+  if (ctx.orders.size > 0) return;
+  const existing = await loadExistingByCode1C(ctx.prisma, "order");
+  for await (const rows of streamTable(ctx.src, "_Document130", ["_IDRRef"], {
+    batch: 2000,
+    limit: null,
+    orderBy: ["_IDRRef"],
+  })) {
+    for (const row of rows) {
+      const hex = bufToHex(row["_IDRRef"]);
+      const code1C = hex;
+      if (!hex || !code1C) continue;
+      ctx.orders.set(hex, { id: existing.get(code1C) ?? "(pending)", code1C });
     }
   }
 }
@@ -1862,7 +2271,14 @@ const DEFAULT_ORDER: EntityName[] = [
 
 function printReconTable(recons: Recon[], dryRun: boolean): void {
   const head = dryRun
-    ? ["entity", "source rows", "would write", "skipped", "errors", "unresolved"]
+    ? [
+        "entity",
+        "source rows",
+        "would write",
+        "skipped",
+        "errors",
+        "unresolved",
+      ]
     : ["entity", "source rows", "written", "skipped", "errors", "unresolved"];
   const rows = recons.map((r) => [
     r.entity,
@@ -1928,6 +2344,7 @@ async function main(): Promise<void> {
     `connecting to 1C MSSQL ${mssqlConfig.server}:${mssqlConfig.port}/${mssqlConfig.database} (read-only)`,
   );
   const src = await new mssql.ConnectionPool(mssqlConfig).connect();
+  YEAR_OFFSET = await loadYearOffset(src);
 
   const prisma = new PrismaClient({
     datasources: { db: { url: targetUrl } },
@@ -1953,10 +2370,12 @@ async function main(): Promise<void> {
   const entities = args.entity ? [args.entity] : DEFAULT_ORDER;
   if (entities.includes("customers")) {
     ctx.cityNames = await loadDictNames(src, "_Reference6810", "_Description");
-    ctx.regionNames = await loadDictNames(src, "_Reference6811", "_Description");
-    log(
-      `dicts: cities=${ctx.cityNames.size} regions=${ctx.regionNames.size}`,
+    ctx.regionNames = await loadDictNames(
+      src,
+      "_Reference6811",
+      "_Description",
     );
+    log(`dicts: cities=${ctx.cityNames.size} regions=${ctx.regionNames.size}`);
   }
 
   const recons: Recon[] = [];
