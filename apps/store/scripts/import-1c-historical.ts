@@ -1132,7 +1132,12 @@ async function importOrders(ctx: ImportContext): Promise<Recon> {
   })) {
     for (const row of rows) {
       const hex = bufToHex(row["_IDRRef"]);
-      const code1C = asString(row["_Number"]);
+      // Документний code1C = hex(_IDRRef): унікальний у всій 1С-базі.
+      // НЕ беремо `_Number` — 1С нумерує щорічно з 0, отже один номер
+      // зустрічається у кожному році → upsert затирав би попередні роки.
+      // (1С `_Number` тут не пишемо — у Sale/CashOrder/RouteSheet поле
+      // `docNumber` має autoincrement, конфлікт послідовності не вартий.)
+      const code1C = hex;
       if (!hex || !code1C) {
         recon.skipped++;
         continue;
@@ -1319,7 +1324,12 @@ async function importSales(ctx: ImportContext): Promise<Recon> {
   })) {
     for (const row of rows) {
       const hex = bufToHex(row["_IDRRef"]);
-      const code1C = asString(row["_Number"]);
+      // Документний code1C = hex(_IDRRef): унікальний у всій 1С-базі.
+      // НЕ беремо `_Number` — 1С нумерує щорічно з 0, отже один номер
+      // зустрічається у кожному році → upsert затирав би попередні роки.
+      // (1С `_Number` тут не пишемо — у Sale/CashOrder/RouteSheet поле
+      // `docNumber` має autoincrement, конфлікт послідовності не вартий.)
+      const code1C = hex;
       if (!hex || !code1C) {
         recon.skipped++;
         continue;
@@ -1681,7 +1691,12 @@ async function importRouteSheets(ctx: ImportContext): Promise<Recon> {
   })) {
     for (const row of rows) {
       const hex = bufToHex(row["_IDRRef"]);
-      const code1C = asString(row["_Number"]);
+      // Документний code1C = hex(_IDRRef): унікальний у всій 1С-базі.
+      // НЕ беремо `_Number` — 1С нумерує щорічно з 0, отже один номер
+      // зустрічається у кожному році → upsert затирав би попередні роки.
+      // (1С `_Number` тут не пишемо — у Sale/CashOrder/RouteSheet поле
+      // `docNumber` має autoincrement, конфлікт послідовності не вартий.)
+      const code1C = hex;
       if (!hex || !code1C) {
         recon.skipped++;
         continue;
@@ -1801,7 +1816,7 @@ async function ensureSaleDict(ctx: ImportContext): Promise<void> {
   )) {
     for (const row of rows) {
       const hex = bufToHex(row["_IDRRef"]);
-      const code1C = asString(row["_Number"]);
+      const code1C = hex;
       if (!hex || !code1C) continue;
       ctx.sales.set(hex, { id: existing.get(code1C) ?? "(pending)", code1C });
     }
