@@ -546,6 +546,12 @@ const CUSTOMER_COLS = [
   "_Fld7640", // КоличествоДнейОтПоследнейПокупки
   "_Fld7760", // ДатаПоследнейПокупки
   "_Fld6049", // Комментарий
+  "_Fld6047", // ИНН
+  "_Fld6061", // КодПоЕДРПОУ
+  "_Fld6050", // НаименованиеПолное
+  "_Fld6046", // ДополнительноеОписание
+  "_Fld6058", // РасписаниеРаботыСтрокой
+  "_Fld6044RRef", // ГоловнойКонтрагент (self-ref head client)
 ];
 
 async function importCustomers(ctx: ImportContext): Promise<Recon> {
@@ -617,6 +623,19 @@ async function importCustomers(ctx: ImportContext): Promise<Recon> {
               monthlyVolume: asDecimalString(row["_Fld7522"]),
               daysSinceLastPurchase: asNumber(row["_Fld7640"]),
               lastPurchaseAt: asDate(row["_Fld7760"]),
+              // ── 5.4.0 — паритет з 1С (Catalog.Контрагенты) ──
+              email,
+              inn: asString(row["_Fld6047"]),
+              edrpou: asString(row["_Fld6061"]),
+              fullName: asString(row["_Fld6050"]),
+              comment: notes, // notes = asString(_Fld6049)
+              additionalDescription: asString(row["_Fld6046"]),
+              workingHours: asString(row["_Fld6058"]),
+              parentCode1C: (() => {
+                const h = bufToHex(row["_Fld6044RRef"]);
+                return h ? (ctx.customers.get(h)?.code1C ?? null) : null;
+              })(),
+              // legalType (_Fld6060RRef = EnumRef) — заповнюється окремим кроком (декод enum).
             },
             update: {
               uid1C: hex,
@@ -632,6 +651,19 @@ async function importCustomers(ctx: ImportContext): Promise<Recon> {
               monthlyVolume: asDecimalString(row["_Fld7522"]),
               daysSinceLastPurchase: asNumber(row["_Fld7640"]),
               lastPurchaseAt: asDate(row["_Fld7760"]),
+              // ── 5.4.0 — паритет з 1С (Catalog.Контрагенты) ──
+              email,
+              inn: asString(row["_Fld6047"]),
+              edrpou: asString(row["_Fld6061"]),
+              fullName: asString(row["_Fld6050"]),
+              comment: notes, // notes = asString(_Fld6049)
+              additionalDescription: asString(row["_Fld6046"]),
+              workingHours: asString(row["_Fld6058"]),
+              parentCode1C: (() => {
+                const h = bufToHex(row["_Fld6044RRef"]);
+                return h ? (ctx.customers.get(h)?.code1C ?? null) : null;
+              })(),
+              // legalType (_Fld6060RRef = EnumRef) — заповнюється окремим кроком (декод enum).
             },
           });
         }
@@ -917,6 +949,8 @@ const LOT_COLS = [
   "_Fld7693", // ДатаПоставки
   "_Fld7727", // СекторНаСкладі
   "_Fld7728", // Коментар
+  "_Fld7729", // Ефір
+  "_Fld7730", // ЕфірНаДоставку
 ];
 
 async function importLots(ctx: ImportContext): Promise<Recon> {
@@ -968,6 +1002,8 @@ async function importLots(ctx: ImportContext): Promise<Recon> {
       const arrivalDate = asDate(row["_Fld7693"]);
       const sector = asString(row["_Fld7727"]);
       const comment = asString(row["_Fld7728"]);
+      const onAir = asBool(row["_Fld7729"]);
+      const onAirDelivery = asBool(row["_Fld7730"]);
       // Історичний лот ховаємо від публічної вітрини: статус "archived"
       // НЕ входить у публічний фільтр free/on_sale. (_Marked не використовуємо —
       // усі імпортовані лоти історичні за визначенням.)
@@ -992,6 +1028,8 @@ async function importLots(ctx: ImportContext): Promise<Recon> {
               sector,
               comment,
               description,
+              onAir,
+              onAirDelivery,
             },
             // НЕ чіпаємо наявні лоти — вони можуть бути ЖИВІ (в наявності на
             // сайті). Імпорт суто адитивний: новий barcode → створюємо archived;
@@ -1157,6 +1195,7 @@ const ORDER_ITEM_COLS = [
   "_Fld1102", // Количество
   "_Fld1110", // Сумма (line total)
   "_Fld6618", // ЦенаПродажиВес
+  "_Fld1107", // ПроцентСкидкиНаценки
 ];
 
 async function importOrders(ctx: ImportContext): Promise<Recon> {
@@ -1274,6 +1313,8 @@ async function importOrders(ctx: ImportContext): Promise<Recon> {
                   priceEur: it.priceEur,
                   weight: it.weight,
                   quantity: it.quantity,
+                  unitPriceEur: it.unitPriceEur,
+                  discountPercent: it.discountPercent,
                 })),
               });
             }
@@ -1298,6 +1339,8 @@ interface ResolvedItem {
   priceEur: number;
   weight: number;
   quantity: number;
+  unitPriceEur: number | null;
+  discountPercent: number | null;
 }
 
 async function loadOrderItems(
@@ -1331,6 +1374,8 @@ async function loadOrderItems(
         priceEur: asNumberOr(row["_Fld1110"], 0),
         weight: asNumberOr(row["_Fld1102"], 0),
         quantity: 1,
+        unitPriceEur: asNumber(row["_Fld6618"]),
+        discountPercent: asNumber(row["_Fld1107"]),
       });
     }
   }
@@ -1351,6 +1396,7 @@ const SALE_COLS = [
   "_Fld7298", // КурсUSD
   "_Fld6887RRef", // ТорговийАгент
   "_Fld6729RRef", // МаршрутныйЛист
+  "_Fld3490_RRRef", // Сделка → Заказ (polymorphic, читаємо тільки RRRef)
   "_Fld7327", // Наложка
   "_Fld7775", // СумаОплатиНаложкою
   "_Fld7332", // НомерВідділенняНП
@@ -1376,6 +1422,7 @@ async function importSales(ctx: ImportContext): Promise<Recon> {
 
   await ensureCustomerDict(ctx);
   await ensureProductLotDicts(ctx);
+  await ensureOrderDict(ctx);
 
   const where = args.since ? "_Date_Time >= @since" : undefined;
   const params = args.since ? { since: args.since } : undefined;
@@ -1433,6 +1480,12 @@ async function importSales(ctx: ImportContext): Promise<Recon> {
       const codAmount = asNumber(row["_Fld7775"]);
       const npBranch = asString(row["_Fld7332"]);
       const waybill = asString(row["_Fld7768"]);
+      // Сделка → Заказ (полиморфне посилання, читаємо лише RRRef-частину).
+      const orderId = (() => {
+        const h = bufToHex(row["_Fld3490_RRRef"]);
+        const o = h ? ctx.orders.get(h) : null;
+        return o && o.id !== "(pending)" ? o.id : null;
+      })();
 
       const items = await loadSaleItems(ctx, hex);
       const itemsTotalEur = items.reduce((s, it) => s + it.priceEur, 0);
@@ -1458,6 +1511,7 @@ async function importSales(ctx: ImportContext): Promise<Recon> {
                 novaPoshtaBranch: npBranch,
                 expressWaybill: waybill,
                 notes,
+                orderId,
                 archived: posted,
                 exportTo1C: false,
                 ...(createdAt ? { createdAt } : {}),
@@ -1474,6 +1528,7 @@ async function importSales(ctx: ImportContext): Promise<Recon> {
                 novaPoshtaBranch: npBranch,
                 expressWaybill: waybill,
                 notes,
+                orderId,
                 archived: posted,
                 // Дата оновлюється і на реімпорті (див. коментар у importOrders).
                 ...(createdAt ? { createdAt } : {}),
