@@ -79,6 +79,9 @@ export default async function ManagerSaleDetailPage({
       customer: {
         select: { id: true, name: true, code1C: true, phone: true, city: true },
       },
+      order: {
+        select: { id: true, code1C: true },
+      },
       items: {
         include: {
           product: {
@@ -316,6 +319,9 @@ async function loadSaleForView(id: string) {
       customer: {
         select: { id: true, name: true, code1C: true, phone: true, city: true },
       },
+      order: {
+        select: { id: true, code1C: true },
+      },
       items: {
         include: {
           product: { select: { id: true, name: true } },
@@ -365,6 +371,25 @@ function ReadOnlySale({
           <Field label="Наложка">{sale.cashOnDelivery ? "Так" : "Ні"}</Field>
         </dl>
       </section>
+
+      {sale.orderId && sale.order && (
+        <section className="rounded-lg border bg-white p-5">
+          <h2 className="text-base font-semibold text-gray-800">
+            Замовлення-підстава
+          </h2>
+          <p className="mt-2 text-sm text-gray-700">
+            <Link
+              href={`/manager/orders/${sale.order.id}`}
+              className="text-blue-600 hover:text-blue-700"
+            >
+              {sale.order.code1C
+                ? `№${sale.order.code1C}`
+                : `ID: ${sale.order.id.slice(0, 8)}…`}
+              {" →"}
+            </Link>
+          </p>
+        </section>
+      )}
 
       <section className="rounded-lg border bg-white p-5">
         <h2 className="text-base font-semibold text-gray-800">

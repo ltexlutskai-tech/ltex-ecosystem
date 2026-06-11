@@ -90,6 +90,16 @@ export default async function ManagerOrderDetailPage({
   });
   if (!order) notFound();
 
+  // «Продано» — агрегат по SaleItem для реалізацій, прив'язаних до цього замовлення.
+  const soldRows = await prisma.saleItem.groupBy({
+    by: ["productId"],
+    where: { sale: { orderId: order.id } },
+    _sum: { quantity: true },
+  });
+  const soldMap: Record<string, number> = Object.fromEntries(
+    soldRows.map((g) => [g.productId, g._sum.quantity ?? 0]),
+  );
+
   // Закрите замовлення (Етап 3 блоку Замовлення) — підвантажуємо причину.
   const orderClose = order.closedAt
     ? await prisma.order.findUnique({
@@ -259,6 +269,7 @@ export default async function ManagerOrderDetailPage({
           order={order}
           deliveryLabel={orderDeliveryLabel(order.deliveryMethod)}
           locked={locked}
+          soldMap={soldMap}
         />
       )}
     </div>
@@ -277,7 +288,7 @@ async function loadOrderForView(id: string) {
       },
       items: {
         include: {
-          product: { select: { id: true, name: true } },
+          product: { select: { id: true, name: true, priceUnit: true } },
           lot: { select: { id: true, barcode: true } },
         },
       },
@@ -289,10 +300,12 @@ function ReadOnlyOrder({
   order,
   deliveryLabel,
   locked,
+  soldMap,
 }: {
   order: OrderForView;
   deliveryLabel: string;
   locked: boolean;
+  soldMap: Record<string, number>;
 }) {
   return (
     <div className="space-y-6">
@@ -342,29 +355,39 @@ function ReadOnlyOrder({
                   <th className="px-3 py-2 font-medium">Лот</th>
                   <th className="px-3 py-2 text-right font-medium">Вага, кг</th>
                   <th className="px-3 py-2 text-right font-medium">К-сть</th>
+                  <th className="px-3 py-2 text-right font-medium">Продано</th>
                   <th className="px-3 py-2 text-right font-medium">Ціна, €</th>
                 </tr>
               </thead>
               <tbody>
-                {order.items.map((it) => (
-                  <tr key={it.id} className="border-b last:border-b-0">
-                    <td className="px-3 py-2 text-gray-800">
-                      {it.product.name}
-                    </td>
-                    <td className="px-3 py-2 font-mono text-gray-600">
-                      {it.lot?.barcode ?? "—"}
-                    </td>
-                    <td className="px-3 py-2 text-right text-gray-700">
-                      {it.weight.toFixed(2)}
-                    </td>
-                    <td className="px-3 py-2 text-right text-gray-700">
-                      {it.quantity}
-                    </td>
-                    <td className="px-3 py-2 text-right text-gray-700">
-                      {it.priceEur.toFixed(2)}
-                    </td>
-                  </tr>
-                ))}
+                {order.items.map((it) => {
+                  const sold = soldMap[it.product.id] ?? 0;
+                  const fulfilled = sold >= it.quantity;
+                  return (
+                    <tr key={it.id} className="border-b last:border-b-0">
+                      <td className="px-3 py-2 text-gray-800">
+                        {it.product.name}
+                      </td>
+                      <td className="px-3 py-2 font-mono text-gray-600">
+                        {it.lot?.barcode ?? "—"}
+                      </td>
+                      <td className="px-3 py-2 text-right text-gray-700">
+                        {it.weight.toFixed(2)}
+                      </td>
+                      <td className="px-3 py-2 text-right text-gray-700">
+                        {it.quantity}
+                      </td>
+                      <td
+                        className={`px-3 py-2 text-right ${fulfilled ? "font-medium text-green-700" : "text-gray-700"}`}
+                      >
+                        {sold}
+                      </td>
+                      <td className="px-3 py-2 text-right text-gray-700">
+                        {it.priceEur.toFixed(2)}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
