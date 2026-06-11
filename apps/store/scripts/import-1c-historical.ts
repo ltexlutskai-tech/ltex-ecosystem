@@ -1700,6 +1700,13 @@ async function importCashOrderTable(
         ? asNumberOr(row[map.cashlessAmount], 0)
         : 0;
       const paidAt = asDate(row[map.date]);
+      // Зведена сума у EUR (СуммаДокумента) — як `reduceToEur` у живій касі:
+      // суми ПКО/РКО зберігаються у гривні (підтверджено даними проду), тож
+      // EUR = (готівка + безнал) ÷ курс. Без цього вкладка Оплати показує «0 €».
+      const documentSumEur =
+        rateEur > 0
+          ? Math.round(((amount + cashless) / rateEur) * 100) / 100
+          : 0;
       const customerId =
         customer && customer.id !== "(pending)" ? customer.id : null;
       const saleId = sale && sale.id !== "(pending)" ? sale.id : null;
@@ -1718,6 +1725,7 @@ async function importCashOrderTable(
               amountUahCashless: cashless,
               rateEur,
               rateUsd,
+              documentSumEur,
               archived: asBool(row[map.posted]),
               comment,
               ...(paidAt ? { paidAt } : {}),
@@ -1730,6 +1738,7 @@ async function importCashOrderTable(
               amountUahCashless: cashless,
               rateEur,
               rateUsd,
+              documentSumEur,
               archived: asBool(row[map.posted]),
               comment,
               ...(paidAt ? { paidAt } : {}),
