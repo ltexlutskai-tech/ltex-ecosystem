@@ -1,5 +1,5 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it } from "vitest";
+import { cleanup, render, screen } from "@testing-library/react";
 import { ClosuresTable, type ClosureRow } from "./closures-table";
 
 afterEach(() => cleanup());
@@ -14,45 +14,34 @@ function makeRow(overrides: Partial<ClosureRow> = {}): ClosureRow {
     quantity: 100,
     sum: 5000,
     sold: 25,
-    status: "Новий",
+    status: "open",
     ...overrides,
   };
 }
 
 describe("ClosuresTable", () => {
-  it("рендерить рядки з 1С-подібними колонками", () => {
+  it("рендерить рядки з колонками", () => {
     const rows = [
       makeRow({ productName: "Mix A" }),
       makeRow({ orderUid: "u-2", productUid: "p-2", productName: "Mix B" }),
     ];
-    render(
-      <ClosuresTable
-        rows={rows}
-        addToNewOrder={{}}
-        onToggleAddToNew={() => {}}
-      />,
-    );
+    render(<ClosuresTable rows={rows} />);
     expect(screen.getByText("Mix A")).toBeDefined();
     expect(screen.getByText("Mix B")).toBeDefined();
     // Заголовки колонок
     expect(screen.getByText("Замовлення")).toBeDefined();
     expect(screen.getByText("Продано")).toBeDefined();
-    expect(screen.getByText("Додати в нове")).toBeDefined();
+    // Чекбокс «Додати в нове» прибрано (SOAP-закриття скасовано).
+    expect(screen.queryByText("Додати в нове")).toBeNull();
   });
 
-  it("підсвічує рядки де sold >= quantity (green BG, як у 1С v0)", () => {
+  it("підсвічує рядки де sold >= quantity (green BG)", () => {
     const rows = [
       makeRow({ orderUid: "u-1", quantity: 100, sold: 25 }), // not fully sold
       makeRow({ orderUid: "u-2", quantity: 50, sold: 50 }), // fully sold
       makeRow({ orderUid: "u-3", quantity: 30, sold: 35 }), // over-sold
     ];
-    render(
-      <ClosuresTable
-        rows={rows}
-        addToNewOrder={{}}
-        onToggleAddToNew={() => {}}
-      />,
-    );
+    render(<ClosuresTable rows={rows} />);
     const trs = document.querySelectorAll("tr[data-fully-sold]");
     expect(trs).toHaveLength(3);
     expect(trs[0]?.getAttribute("data-fully-sold")).toBe("false");
@@ -60,36 +49,12 @@ describe("ClosuresTable", () => {
     expect(trs[2]?.getAttribute("data-fully-sold")).toBe("true");
   });
 
-  it("чекбокс додавання у нове замовлення викликає onToggleAddToNew з ключем", () => {
-    const onToggle = vi.fn();
-    const rows = [makeRow({ orderUid: "uA", productUid: "pA" })];
-    render(
-      <ClosuresTable
-        rows={rows}
-        addToNewOrder={{}}
-        onToggleAddToNew={onToggle}
-      />,
-    );
-    const checkbox = screen.getByRole("checkbox");
-    fireEvent.click(checkbox);
-    expect(onToggle).toHaveBeenCalledWith("uA::pA", true);
-  });
-
-  it("checked-state відображається коли передано у addToNewOrder", () => {
+  it("номер замовлення — лінк на сторінку замовлення", () => {
     const rows = [
-      makeRow({ orderUid: "uX", productUid: "pX" }),
-      makeRow({ orderUid: "uY", productUid: "pY" }),
+      makeRow({ orderUid: "order-abc", orderNumber: "L-2026-009" }),
     ];
-    render(
-      <ClosuresTable
-        rows={rows}
-        addToNewOrder={{ "uX::pX": true }}
-        onToggleAddToNew={() => {}}
-      />,
-    );
-    const checkboxes = screen.getAllByRole("checkbox") as HTMLInputElement[];
-    expect(checkboxes).toHaveLength(2);
-    expect(checkboxes[0]?.checked).toBe(true);
-    expect(checkboxes[1]?.checked).toBe(false);
+    render(<ClosuresTable rows={rows} />);
+    const link = screen.getByRole("link", { name: "L-2026-009" });
+    expect(link.getAttribute("href")).toBe("/manager/orders/order-abc");
   });
 });

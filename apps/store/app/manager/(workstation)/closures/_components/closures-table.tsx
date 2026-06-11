@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback } from "react";
+import Link from "next/link";
 
 export interface ClosureRow {
   orderUid: string;
@@ -16,8 +16,6 @@ export interface ClosureRow {
 
 interface ClosuresTableProps {
   rows: ClosureRow[];
-  addToNewOrder: Record<string, boolean>;
-  onToggleAddToNew: (rowKey: string, checked: boolean) => void;
 }
 
 function fmtDate(raw: string): string {
@@ -36,27 +34,14 @@ function fmtNum(n: number): string {
 }
 
 /**
- * Read-only таблиця незакритих замовлень з 1С + чекбокс «Додати в нове».
+ * READ-ONLY таблиця незакритих замовлень клієнта з прогресом продажів.
  *
- * Особливості 1С-форми (port-овано з MobileAgent):
- *  - Рядки де `sold >= quantity` (продано все або більше) — підсвічуються
- *    зеленим (як у v0-формі CSS-style `BackColor=Green`).
- *  - Рядки можна тільки редагувати у колонці «Додати в нове замовлення»
- *    (read-only решта).
+ * Дані рахуються локально (`Sale.orderId` → `SaleItem`):
+ *  - Рядки де `sold >= quantity` (продано все) — підсвічуються зеленим.
+ *  - Номер замовлення — лінк на `/manager/orders/[id]`, де є робоча кнопка
+ *    закриття (саме закриття у цьому блоці більше не робиться).
  */
-export function ClosuresTable({
-  rows,
-  addToNewOrder,
-  onToggleAddToNew,
-}: ClosuresTableProps) {
-  const handleChange = useCallback(
-    (rowKey: string) =>
-      (event: React.ChangeEvent<HTMLInputElement>): void => {
-        onToggleAddToNew(rowKey, event.target.checked);
-      },
-    [onToggleAddToNew],
-  );
-
+export function ClosuresTable({ rows }: ClosuresTableProps) {
   return (
     <div className="overflow-x-auto rounded-lg border bg-white">
       <table className="min-w-full divide-y divide-gray-200 text-sm">
@@ -66,10 +51,9 @@ export function ClosuresTable({
             <th className="px-3 py-2">Дата</th>
             <th className="px-3 py-2">Номенклатура</th>
             <th className="px-3 py-2 text-right">Замовлено</th>
-            <th className="px-3 py-2 text-right">Сума</th>
             <th className="px-3 py-2 text-right">Продано</th>
+            <th className="px-3 py-2 text-right">Сума</th>
             <th className="px-3 py-2">Статус</th>
-            <th className="px-3 py-2 text-center">Додати в нове</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-100">
@@ -86,8 +70,13 @@ export function ClosuresTable({
                 }
                 data-fully-sold={isFullySold ? "true" : "false"}
               >
-                <td className="px-3 py-2 font-mono text-xs text-gray-700">
-                  {row.orderNumber || "—"}
+                <td className="px-3 py-2 font-mono text-xs">
+                  <Link
+                    href={`/manager/orders/${row.orderUid}`}
+                    className="text-green-700 underline hover:text-green-800"
+                  >
+                    {row.orderNumber || "—"}
+                  </Link>
                 </td>
                 <td className="px-3 py-2 text-gray-700">
                   {fmtDate(row.orderDate)}
@@ -97,22 +86,13 @@ export function ClosuresTable({
                   {fmtNum(row.quantity)}
                 </td>
                 <td className="px-3 py-2 text-right text-gray-900">
-                  {fmtNum(row.sum)} €
-                </td>
-                <td className="px-3 py-2 text-right text-gray-900">
                   {fmtNum(row.sold)}
                 </td>
-                <td className="px-3 py-2 text-xs text-gray-600">
-                  {row.status || "—"}
+                <td className="px-3 py-2 text-right text-gray-900">
+                  {fmtNum(row.sum)} €
                 </td>
-                <td className="px-3 py-2 text-center">
-                  <input
-                    type="checkbox"
-                    checked={addToNewOrder[rowKey] === true}
-                    onChange={handleChange(rowKey)}
-                    aria-label={`Додати ${row.productName} у нове замовлення`}
-                    className="h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
-                  />
+                <td className="px-3 py-2 text-xs text-gray-600">
+                  {isFullySold ? "Продано" : "Відкрите"}
                 </td>
               </tr>
             );
