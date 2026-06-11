@@ -11,22 +11,28 @@ const {
   shortageMock,
   countersMock,
   documentsMock,
+  expensesMock,
   mileageWarningMock,
   enqueueRouteSheetCreateMock,
 } = vi.hoisted(() => ({
   mockPrisma: {
     routeSheet: { findUnique: vi.fn(), update: vi.fn() },
-    order: { findMany: vi.fn() },
+    order: { findMany: vi.fn(), updateMany: vi.fn() },
     customer: { findMany: vi.fn() },
     product: { findMany: vi.fn() },
-    lot: { findMany: vi.fn() },
+    lot: { findMany: vi.fn(), updateMany: vi.fn() },
     mgrClient: { findMany: vi.fn() },
+    routeSheetLoading: { findMany: vi.fn() },
+    routeSheetOrder: { findMany: vi.fn() },
+    // 5.4.3: PATCH обгортає оновлення у транзакцію; tx === mockPrisma.
+    $transaction: vi.fn(),
   },
   getCurrentUserMock: vi.fn(),
   loadingRowsMock: vi.fn(),
   shortageMock: vi.fn(),
   countersMock: vi.fn(),
   documentsMock: vi.fn(),
+  expensesMock: vi.fn(),
   mileageWarningMock: vi.fn(),
   enqueueRouteSheetCreateMock: vi.fn(),
 }));
@@ -44,6 +50,7 @@ vi.mock("@/lib/manager/route-sheet-loading", () => ({
 }));
 vi.mock("@/lib/manager/route-sheet-documents", () => ({
   getRouteSheetDocuments: (...args: unknown[]) => documentsMock(...args),
+  getRouteSheetExpenses: (...args: unknown[]) => expensesMock(...args),
 }));
 vi.mock("@/lib/manager/route-sheet-mileage", () => ({
   getUnclosedMileageWarning: (...args: unknown[]) =>
@@ -118,6 +125,14 @@ beforeEach(() => {
   mockPrisma.product.findMany.mockResolvedValue([]);
   mockPrisma.lot.findMany.mockResolvedValue([]);
   mockPrisma.mgrClient.findMany.mockResolvedValue([]);
+  // 5.4.3: транзакція + dispatch-побічні ефекти (за замовч. порожні).
+  mockPrisma.$transaction.mockImplementation(
+    async (fn: (tx: typeof mockPrisma) => unknown) => fn(mockPrisma),
+  );
+  mockPrisma.routeSheetLoading.findMany.mockResolvedValue([]);
+  mockPrisma.routeSheetOrder.findMany.mockResolvedValue([]);
+  mockPrisma.lot.updateMany.mockResolvedValue({ count: 0 });
+  mockPrisma.order.updateMany.mockResolvedValue({ count: 0 });
   loadingRowsMock.mockResolvedValue([]);
   shortageMock.mockResolvedValue([]);
   countersMock.mockResolvedValue({
@@ -127,6 +142,7 @@ beforeEach(() => {
     shortageQty: 0,
   });
   documentsMock.mockResolvedValue({ sales: [], saleItems: [], payments: [] });
+  expensesMock.mockResolvedValue([]);
   mileageWarningMock.mockResolvedValue(null);
   enqueueRouteSheetCreateMock.mockResolvedValue({ id: "j-rsh" });
 });
