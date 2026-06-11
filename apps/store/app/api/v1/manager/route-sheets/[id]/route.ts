@@ -10,8 +10,15 @@ import {
   computeRouteSheetShortage,
   getRouteSheetLoadingRows,
 } from "@/lib/manager/route-sheet-loading";
-import { getRouteSheetDocuments } from "@/lib/manager/route-sheet-documents";
+import {
+  getRouteSheetDocuments,
+  getRouteSheetExpenses,
+} from "@/lib/manager/route-sheet-documents";
 import { getUnclosedMileageWarning } from "@/lib/manager/route-sheet-mileage";
+import {
+  markRouteSheetOrdersInactive,
+  releaseRouteSheetReservations,
+} from "@/lib/manager/route-sheet-actions";
 import { updateRouteSheetSchema } from "@/lib/validations/manager-route-sheet";
 import { enqueueRouteSheetCreate } from "@/lib/sync/enqueue";
 
@@ -117,12 +124,13 @@ export async function GET(
   // Етап 2: Загрузка + Бракує + лічильники (обчислювані / резолвлені окремо).
   // Етап 3: Реалізації / Продажи / Оплати — derived із зворотних посилань.
   // Етап 4: попередження про незакритий кілометраж попередньої зміни (м'яке).
-  const [loading, shortage, counters, documents, mileageWarning] =
+  const [loading, shortage, counters, documents, expenses, mileageWarning] =
     await Promise.all([
       getRouteSheetLoadingRows(sheet.id),
       computeRouteSheetShortage(sheet.id),
       computeRouteSheetCounters(sheet.id),
       getRouteSheetDocuments(sheet.id),
+      getRouteSheetExpenses(sheet.id),
       getUnclosedMileageWarning(sheet.expeditorUserId, sheet.id),
     ]);
 
@@ -190,6 +198,7 @@ export async function GET(
       sales: documents.sales,
       saleItems: documents.saleItems,
       payments: documents.payments,
+      expenses,
       tasks: sheet.tasks.map((t) => {
         const client = t.customerId ? taskClientMap.get(t.customerId) : null;
         return {
@@ -293,17 +302,29 @@ export async function PATCH(
   if (input.gpsLat !== undefined) data.gpsLat = input.gpsLat;
   if (input.gpsLng !== undefined) data.gpsLng = input.gpsLng;
 
-  const sheet = await prisma.routeSheet.update({ where: { id }, data });
+  // Чи це значущий статус-перехід у виїзд / завершення дня?
+  const statusChanged =
+    input.status !== undefined && input.status !== existing.status;
+  const newStatus = input.status;
+  const triggersSideEffects =
+    statusChanged && (newStatus === "dispatched" || newStatus === "completed");
+
+  // Транзакція: оновлюємо шапку + (на переході у dispatched/completed) дзеркалимо
+  // 1С — знімаємо бронь із завантажених лотів + позначаємо замовлення неактуальними.
+  const sheet = await prisma.$transaction(async (tx) => {
+    const updated = await tx.routeSheet.update({ where: { id }, data });
+    if (triggersSideEffects) {
+      await releaseRouteSheetReservations(tx, id);
+      await markRouteSheetOrdersInactive(tx, id);
+    }
+    return updated;
+  });
 
   // Sync-каркас (Етап 5): значущий момент синку — відправка у виїзд / завершення
   // дня (не створення чернетки). Ставимо МЛ у чергу `mgr_sync_jobs` лише на
   // переході статусу у `dispatched`/`completed`. Fire-and-forget — ніколи не
   // блокує і не валить відповідь (sync — best-effort).
-  if (
-    input.status !== undefined &&
-    input.status !== existing.status &&
-    (input.status === "dispatched" || input.status === "completed")
-  ) {
+  if (triggersSideEffects) {
     void enqueueRouteSheetCreate(id).catch((e: unknown) => {
       console.warn("[L-TEX] enqueueRouteSheetCreate failed", {
         routeSheetId: id,
