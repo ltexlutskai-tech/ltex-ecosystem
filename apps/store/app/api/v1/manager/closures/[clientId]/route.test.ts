@@ -50,13 +50,6 @@ function getReq(clientId: string): NextRequest {
   );
 }
 
-function postReq(clientId: string): NextRequest {
-  return new NextRequest(
-    `http://localhost/api/v1/manager/closures/${clientId}`,
-    { method: "POST" },
-  );
-}
-
 function ctx(clientId: string): { params: Promise<{ clientId: string }> } {
   return { params: Promise.resolve({ clientId }) };
 }
@@ -183,7 +176,8 @@ describe("GET /api/v1/manager/closures/[clientId]", () => {
 
 describe("POST /api/v1/manager/closures/[clientId]", () => {
   it("returns 501 — закриття виконується на сторінці замовлення", async () => {
-    const res = await POST(postReq("c1"), ctx("c1"));
+    // POST більше не приймає args — закриття скасовано (виконується у замовленні).
+    const res = await POST();
     expect(res.status).toBe(501);
     const json = (await res.json()) as { ok: boolean; error: string };
     expect(json.ok).toBe(false);
