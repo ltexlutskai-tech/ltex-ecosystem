@@ -43,6 +43,18 @@ export const mgrClientPatchSchema = z
     agentUserId: optionalIdField,
     // Картка клієнта — Фаза 3: вільний текст ключових слів (теги через кому).
     keywords: z.string().max(500).nullable().optional(),
+    // Картка клієнта — 5.4.1: нові скалярні поля (паритет з 1С Контрагенти).
+    email: z
+      .union([z.literal(""), z.string().email().max(255), z.null()])
+      .optional(),
+    legalType: z.string().max(50).nullable().optional(),
+    inn: z.string().max(50).nullable().optional(),
+    edrpou: z.string().max(50).nullable().optional(),
+    fullName: z.string().max(255).nullable().optional(),
+    comment: z.string().max(1000).nullable().optional(),
+    additionalDescription: z.string().max(1000).nullable().optional(),
+    workingHours: z.string().max(255).nullable().optional(),
+    parentCode1C: z.string().max(50).nullable().optional(),
   })
   .strict();
 

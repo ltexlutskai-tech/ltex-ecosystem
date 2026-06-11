@@ -107,7 +107,7 @@ export default async function ClientDetailPage({
             currentUserRole={user.role}
           />
         }
-        salesHistory={<ClientSalesHistoryTab />}
+        salesHistory={<ClientSalesHistoryTab clientId={client.id} />}
         orders={<ClientOrdersTab clientId={client.id} />}
         reminders={
           <ClientRemindersTab

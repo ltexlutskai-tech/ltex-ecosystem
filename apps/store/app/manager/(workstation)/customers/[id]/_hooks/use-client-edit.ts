@@ -14,6 +14,15 @@ export interface EditableClientFields {
   websiteUrl: string | null;
   geolocation: string | null;
   viberContact: string | null;
+  email: string | null;
+  legalType: string | null;
+  inn: string | null;
+  edrpou: string | null;
+  fullName: string | null;
+  comment: string | null;
+  additionalDescription: string | null;
+  workingHours: string | null;
+  parentCode1C: string | null;
   monthlyVolume: number | null;
   licenseExpiresAt: string | null;
   hasNewMessage: boolean;
@@ -46,6 +55,15 @@ export function extractEditableFields(
     websiteUrl: client.websiteUrl,
     geolocation: client.geolocation,
     viberContact: client.viberContact,
+    email: client.email,
+    legalType: client.legalType,
+    inn: client.inn,
+    edrpou: client.edrpou,
+    fullName: client.fullName,
+    comment: client.comment,
+    additionalDescription: client.additionalDescription,
+    workingHours: client.workingHours,
+    parentCode1C: client.parentCode1C,
     monthlyVolume:
       client.monthlyVolume == null || client.monthlyVolume === ""
         ? null

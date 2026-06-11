@@ -120,6 +120,15 @@ export interface ClientDetail {
   monthlyVolume: string | null;
   licenseExpiresAt: string | null;
   isOwn: boolean;
+  email: string | null;
+  legalType: string | null;
+  inn: string | null;
+  edrpou: string | null;
+  fullName: string | null;
+  comment: string | null;
+  additionalDescription: string | null;
+  workingHours: string | null;
+  parentCode1C: string | null;
   debt: string;
   overdueDebt: string;
   tovDebt: string | null;
