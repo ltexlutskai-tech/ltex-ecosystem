@@ -449,6 +449,7 @@ interface ImportContext {
   cityNames: Map<string, string>;
   regionNames: Map<string, string>;
   priceTypeCodes: Map<string, string>; // hex → _Code (= наш Price.priceType)
+  legalTypeByHex: Map<string, string>; // hex(_IDRRef of _Enum377) → label
 }
 
 // Чи робимо реальні записи (НЕ dry-run).
@@ -477,6 +478,42 @@ async function loadDictNames(
     }
   } catch (e) {
     warn(`loadDictNames(${table}): ${errMsg(e)} — пропускаю довідник.`);
+  }
+  return map;
+}
+
+// ─── Enum ЮрФизЛицо (_Enum377) ──────────────────────────────────────────────────
+// XML-декларація: Enums/ЮрФизЛицо.xml, UUID aef6efc5-46ab-40f2-87c8-81d03c6718af.
+// Фізична таблиця: _Enum377 (dbnames.txt рядок 379).
+// Порядок оголошення у XML (= _EnumOrder у MSSQL, 0-based):
+//   0 = ЮрЛицо  → "Юридична особа"
+//   1 = ФизЛицо → "Фізична особа"
+
+const LEGAL_TYPE_ORDER_MAP: Record<number, string> = {
+  0: "Юридична особа",
+  1: "Фізична особа",
+};
+
+async function loadLegalTypeEnum(
+  pool: mssql.ConnectionPool,
+): Promise<Map<string, string>> {
+  const map = new Map<string, string>();
+  try {
+    const result = await pool
+      .request()
+      .query<
+        Record<string, unknown>
+      >("SELECT [_IDRRef], [_EnumOrder] FROM [_Enum377]");
+    for (const row of result.recordset ?? []) {
+      const hex = bufToHex(row["_IDRRef"]);
+      const order = asNumber(row["_EnumOrder"]);
+      if (!hex || order == null) continue;
+      const label = LEGAL_TYPE_ORDER_MAP[order] ?? null;
+      if (label) map.set(hex, label);
+    }
+    log(`dicts: legalType=${map.size} entries loaded from _Enum377`);
+  } catch (e) {
+    warn(`loadLegalTypeEnum(_Enum377): ${errMsg(e)} — пропускаю довідник.`);
   }
   return map;
 }
@@ -552,12 +589,19 @@ const CUSTOMER_COLS = [
   "_Fld6046", // ДополнительноеОписание
   "_Fld6058", // РасписаниеРаботыСтрокой
   "_Fld6044RRef", // ГоловнойКонтрагент (self-ref head client)
+  "_Fld6060RRef", // ЮрФизЛицо (EnumRef)
 ];
 
 async function importCustomers(ctx: ImportContext): Promise<Recon> {
   const recon = newRecon("customers");
   const sink = new ErrorSink(recon, "customers");
   const { args, src, prisma } = ctx;
+
+  // Lazy load guard — при ізольованому --entity customers карта може бути порожньою,
+  // якщо customers не входив до блоку дрібних довідників у main() (напр. cold run).
+  if (ctx.legalTypeByHex.size === 0) {
+    ctx.legalTypeByHex = await loadLegalTypeEnum(src);
+  }
 
   recon.sourceRows = await countTable(src, "_Reference66");
   log(`customers: source rows = ${recon.sourceRows}`);
@@ -591,6 +635,10 @@ async function importCustomers(ctx: ImportContext): Promise<Recon> {
         ? (ctx.regionNames.get(regionHex) ?? null)
         : null;
       const notes = asString(row["_Fld6049"]);
+      const legalType = (() => {
+        const h = bufToHex(row["_Fld6060RRef"]);
+        return h ? (ctx.legalTypeByHex.get(h) ?? null) : null;
+      })();
 
       // Заповнюємо резолв-словник hex→{id,code1C} для документів. У dry-run id
       // лишається "(pending)" (зв'язок усе одно є за hex; документи нічого не пишуть).
@@ -635,7 +683,7 @@ async function importCustomers(ctx: ImportContext): Promise<Recon> {
                 const h = bufToHex(row["_Fld6044RRef"]);
                 return h ? (ctx.customers.get(h)?.code1C ?? null) : null;
               })(),
-              // legalType (_Fld6060RRef = EnumRef) — заповнюється окремим кроком (декод enum).
+              legalType,
             },
             update: {
               uid1C: hex,
@@ -663,7 +711,7 @@ async function importCustomers(ctx: ImportContext): Promise<Recon> {
                 const h = bufToHex(row["_Fld6044RRef"]);
                 return h ? (ctx.customers.get(h)?.code1C ?? null) : null;
               })(),
-              // legalType (_Fld6060RRef = EnumRef) — заповнюється окремим кроком (декод enum).
+              legalType,
             },
           });
         }
@@ -2474,6 +2522,7 @@ async function main(): Promise<void> {
     cityNames: new Map(),
     regionNames: new Map(),
     priceTypeCodes: new Map(),
+    legalTypeByHex: new Map(),
   };
 
   // Дрібні довідники назв (city/region) — потрібні для Customer.
@@ -2485,6 +2534,7 @@ async function main(): Promise<void> {
       "_Reference6811",
       "_Description",
     );
+    ctx.legalTypeByHex = await loadLegalTypeEnum(src);
     log(`dicts: cities=${ctx.cityNames.size} regions=${ctx.regionNames.size}`);
   }
 

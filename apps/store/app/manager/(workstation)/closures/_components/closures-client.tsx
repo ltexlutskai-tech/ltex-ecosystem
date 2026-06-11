@@ -1,23 +1,13 @@
 "use client";
 
 import { useCallback, useState } from "react";
-import Link from "next/link";
 import { Button } from "@ltex/ui";
 import { ClientPicker } from "../../orders/new/_components/client-picker";
 import type { ClientPickerItem } from "../../orders/new/_components/types";
 import { ClosuresTable, type ClosureRow } from "./closures-table";
 
-interface CloseResponse {
-  ok?: boolean;
-  closedCount?: number;
-  newOrderUid?: string | null;
-  newOrderNumber?: string | null;
-  alreadyProcessed?: boolean;
-  localOrderId?: string | null;
-  error?: string;
-}
-
 interface FetchResponse {
+  ok?: boolean;
   items?: ClosureRow[];
   error?: string;
 }
@@ -42,25 +32,17 @@ export function ClosuresClient({
     null,
   );
   const [rows, setRows] = useState<ClosureRow[]>([]);
-  const [addToNewOrder, setAddToNewOrder] = useState<Record<string, boolean>>(
-    {},
-  );
   const [loading, setLoading] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
+  const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<{
-    message: string;
-    localOrderId: string | null;
-  } | null>(null);
 
   const handleClientChange = useCallback(
     (id: string | null, summary: ClientPickerItem | null) => {
       setClientId(id);
       setClientSummary(summary);
       setRows([]);
-      setAddToNewOrder({});
+      setLoaded(false);
       setError(null);
-      setSuccess(null);
     },
     [],
   );
@@ -69,7 +51,7 @@ export function ClosuresClient({
     if (!clientId) return;
     setLoading(true);
     setError(null);
-    setSuccess(null);
+    setLoaded(false);
     try {
       const res = await fetch(
         `/api/v1/manager/closures/${encodeURIComponent(clientId)}`,
@@ -81,61 +63,13 @@ export function ClosuresClient({
         return;
       }
       setRows(Array.isArray(json.items) ? json.items : []);
-      setAddToNewOrder({});
+      setLoaded(true);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
       setLoading(false);
     }
   }, [clientId]);
-
-  const toggleAddToNew = useCallback((rowKey: string, checked: boolean) => {
-    setAddToNewOrder((prev) => ({ ...prev, [rowKey]: checked }));
-  }, []);
-
-  const submitClose = useCallback(async () => {
-    if (!clientId || rows.length === 0) return;
-    setSubmitting(true);
-    setError(null);
-    setSuccess(null);
-    try {
-      const items = rows.map((r) => ({
-        orderUid: r.orderUid,
-        productUid: r.productUid,
-        quantity: r.quantity,
-        price: r.quantity > 0 ? Number((r.sum / r.quantity).toFixed(2)) : r.sum,
-        addToNewOrder: addToNewOrder[`${r.orderUid}::${r.productUid}`] === true,
-      }));
-      const res = await fetch(
-        `/api/v1/manager/closures/${encodeURIComponent(clientId)}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ items }),
-        },
-      );
-      const json = (await res.json()) as CloseResponse;
-      if (!res.ok || !json.ok) {
-        setError(json.error ?? `Помилка ${res.status}`);
-        return;
-      }
-      const head = `Закрито ${json.closedCount ?? 0} замовлень`;
-      const tail = json.newOrderNumber
-        ? ` · нове замовлення ${json.newOrderNumber}`
-        : "";
-      setSuccess({
-        message: head + tail,
-        localOrderId: json.localOrderId ?? null,
-      });
-      // Скинути табличку — все закрито (можна повторно завантажити).
-      setRows([]);
-      setAddToNewOrder({});
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setSubmitting(false);
-    }
-  }, [clientId, rows, addToNewOrder]);
 
   return (
     <div className="space-y-6">
@@ -174,48 +108,25 @@ export function ClosuresClient({
         </div>
       )}
 
-      {success && (
-        <div className="rounded-lg border border-green-200 bg-green-50 p-3 text-sm text-green-800">
-          {success.message}
-          {success.localOrderId && (
-            <span className="ml-2">
-              <Link
-                href={`/manager/orders/${success.localOrderId}`}
-                className="font-medium underline"
-              >
-                Відкрити →
-              </Link>
-            </span>
-          )}
-        </div>
-      )}
-
       {rows.length > 0 && (
-        <div className="space-y-4">
-          <ClosuresTable
-            rows={rows}
-            addToNewOrder={addToNewOrder}
-            onToggleAddToNew={toggleAddToNew}
-          />
-          <div className="flex items-center justify-between">
-            <span className="text-xs text-gray-500">
-              {rows.length} позицій до закриття
-            </span>
-            <Button
-              type="button"
-              onClick={submitClose}
-              disabled={submitting}
-              className="bg-red-600 hover:bg-red-700"
-            >
-              {submitting ? "Закриваємо…" : "Закрити замовлення"}
-            </Button>
-          </div>
+        <div className="space-y-3">
+          <ClosuresTable rows={rows} />
+          <p className="text-xs text-gray-500">
+            {rows.length} позицій · Щоб закрити — відкрийте замовлення (клік по
+            номеру).
+          </p>
         </div>
       )}
 
-      {!loading && rows.length === 0 && clientId && !error && !success && (
+      {!loading && loaded && rows.length === 0 && (
         <p className="text-sm text-gray-500">
-          Натисніть «Заповнити» щоб завантажити список незакритих замовлень.
+          У клієнта немає незакритих замовлень.
+        </p>
+      )}
+
+      {!loading && !loaded && clientId && !error && (
+        <p className="text-sm text-gray-500">
+          Натисніть «Заповнити» щоб завантажити незакриті замовлення клієнта.
         </p>
       )}
     </div>
