@@ -139,13 +139,13 @@ model Lot {
   createdAt           DateTime  @default(now()) @map("created_at")
   updatedAt           DateTime  @updatedAt @map("updated_at")
 
-  product    Product     @relation(fields: [productId], references: [id])
-  supplier   Supplier?   @relation(fields: [supplierId], references: [id])
-  receiving  Receiving?  @relation(fields: [receivingId], references: [id])
-  barcodes   Barcode[]
-  orderItems OrderItem[]
-  saleItems  SaleItem[]
-  cartItems  CartItem[]
+  product        Product         @relation(fields: [productId], references: [id])
+  supplier       Supplier?       @relation(fields: [supplierId], references: [id])
+  receiving      Receiving?      @relation(fields: [receivingId], references: [id])
+  barcodes       Barcode[]
+  orderItems     OrderItem[]
+  saleItems      SaleItem[]
+  cartItems      CartItem[]
   receivingItems ReceivingItem[]
 
   @@index([productId])
@@ -241,15 +241,15 @@ model Order {
   routeSheetId        String? @map("route_sheet_id") // зворотне посилання на МЛ (1С Заказ.МаршрутныйЛист)
 
   // ─── Закриття замовлень (Етап 3 блоку Замовлення, 2026-06-09) ────────────
-  closedAt        DateTime? @map("closed_at")
-  closeReasonId   String?   @map("close_reason_id")
-  closedByUserId  String?   @map("closed_by_user_id")
-  closeNotes      String?   @map("close_notes")
+  closedAt       DateTime? @map("closed_at")
+  closeReasonId  String?   @map("close_reason_id")
+  closedByUserId String?   @map("closed_by_user_id")
+  closeNotes     String?   @map("close_notes")
 
   // ─── Auto-нагадування (Етап 3) ───────────────────────────────────────────
-  lastReminderAt           DateTime? @map("last_reminder_at")
-  remindersSentCount       Int       @default(0) @map("reminders_sent_count")
-  escalatedToSupervisorAt  DateTime? @map("escalated_to_supervisor_at")
+  lastReminderAt          DateTime? @map("last_reminder_at")
+  remindersSentCount      Int       @default(0) @map("reminders_sent_count")
+  escalatedToSupervisorAt DateTime? @map("escalated_to_supervisor_at")
 
   // ─── Optimistic lock (Етап 4) ────────────────────────────────────────────
   // Інкрементується при кожному PATCH. Клієнт надсилає поточну версію —
@@ -293,16 +293,16 @@ model OrderCloseReason {
 // ─── Order Items (← табличні секції документів) ─────────────────────────────
 
 model OrderItem {
-  id        String  @id @default(cuid())
-  orderId   String  @map("order_id")
-  lotId     String? @map("lot_id")
-  productId String  @map("product_id")
-  priceEur  Float   @map("price_eur")
-  weight    Float
-  quantity  Int     @default(1)
+  id              String  @id @default(cuid())
+  orderId         String  @map("order_id")
+  lotId           String? @map("lot_id")
+  productId       String  @map("product_id")
+  priceEur        Float   @map("price_eur")
+  weight          Float
+  quantity        Int     @default(1)
   // ── 5.4.0 — паритет з 1С (ЦенаПродажиВес / ПроцентСкидкиНаценки) ──
-  unitPriceEur    Float? @map("unit_price_eur")
-  discountPercent Float? @map("discount_percent")
+  unitPriceEur    Float?  @map("unit_price_eur")
+  discountPercent Float?  @map("discount_percent")
 
   order   Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
   lot     Lot?    @relation(fields: [lotId], references: [id])
@@ -812,24 +812,24 @@ model WarehouseSector {
 }
 
 model Receiving {
-  id     String  @id @default(cuid())
-  code1C String? @unique @map("code_1c")
+  id                String    @id @default(cuid())
+  code1C            String?   @unique @map("code_1c")
   // Внутрішній номер документа (LT-RCV-YYYYMM-NNNN — auto-генерується)
-  docNumber String   @unique @map("doc_number")
-  docDate   DateTime @default(now()) @map("doc_date")
+  docNumber         String    @unique @map("doc_number")
+  docDate           DateTime  @default(now()) @map("doc_date")
   // Постачальник + склад (RESTRICT — не дозволити випадковий drop)
-  supplierId  String @map("supplier_id")
-  warehouseId String @map("warehouse_id")
+  supplierId        String    @map("supplier_id")
+  warehouseId       String    @map("warehouse_id")
   // Валюта документа + курс на дату (для конвертації EUR/UAH)
-  currency     String @default("EUR")
-  exchangeRate Float  @default(1) @map("exchange_rate")
+  currency          String    @default("EUR")
+  exchangeRate      Float     @default(1) @map("exchange_rate")
   // Вхідний № і дата документа від постачальника (PDF / email)
-  inboundDocNumber String?   @map("inbound_doc_number")
-  inboundDocDate   DateTime? @map("inbound_doc_date") @db.Date
+  inboundDocNumber  String?   @map("inbound_doc_number")
+  inboundDocDate    DateTime? @map("inbound_doc_date") @db.Date
   // Сумарні значення (заповнюються автоматично при збереженні рядків)
-  totalWeight   Float @default(0) @map("total_weight")
-  totalQuantity Int   @default(0) @map("total_quantity")
-  totalAmount   Float @default(0) @map("total_amount")
+  totalWeight       Float     @default(0) @map("total_weight")
+  totalQuantity     Int       @default(0) @map("total_quantity")
+  totalAmount       Float     @default(0) @map("total_amount")
   // Статус: draft → posted → cancelled
   status            String    @default("draft")
   notes             String?
@@ -842,11 +842,11 @@ model Receiving {
   createdAt         DateTime  @default(now()) @map("created_at")
   updatedAt         DateTime  @updatedAt @map("updated_at")
 
-  supplier    Supplier  @relation(fields: [supplierId], references: [id])
-  warehouse   Warehouse @relation(fields: [warehouseId], references: [id])
-  createdBy   User?     @relation("ReceivingCreatedBy", fields: [createdByUserId], references: [id])
-  postedBy    User?     @relation("ReceivingPostedBy", fields: [postedByUserId], references: [id])
-  cancelledBy User?     @relation("ReceivingCancelledBy", fields: [cancelledByUserId], references: [id])
+  supplier        Supplier        @relation(fields: [supplierId], references: [id])
+  warehouse       Warehouse       @relation(fields: [warehouseId], references: [id])
+  createdBy       User?           @relation("ReceivingCreatedBy", fields: [createdByUserId], references: [id])
+  postedBy        User?           @relation("ReceivingPostedBy", fields: [postedByUserId], references: [id])
+  cancelledBy     User?           @relation("ReceivingCancelledBy", fields: [cancelledByUserId], references: [id])
   items           ReceivingItem[]
   lots            Lot[]
   purchasePrices  PurchasePrice[]
@@ -862,28 +862,28 @@ model Receiving {
 // Рядок документа поступлення. Один рядок = один мішок або партія
 // однакових мішків (за `quantity > 1` створюється N лотів при проведенні).
 model ReceivingItem {
-  id            String @id @default(cuid())
-  receivingId   String @map("receiving_id")
-  productId     String @map("product_id")
+  id            String   @id @default(cuid())
+  receivingId   String   @map("receiving_id")
+  productId     String   @map("product_id")
   weight        Float
-  quantity      Int    @default(1)
+  quantity      Int      @default(1)
   // Ціна закупки за кг (у валюті документа `receivings.currency`)
-  purchasePrice Float  @default(0) @map("purchase_price")
+  purchasePrice Float    @default(0) @map("purchase_price")
   // Ціна продажу (€/кг) — vid admin/owner для актуалізації прайсу при
   // проведенні. Null = ціна не змінювалась (← правки 2026-06-05).
-  salePrice     Float? @map("sale_price")
-  lineAmount    Float  @default(0) @map("line_amount")
+  salePrice     Float?   @map("sale_price")
+  lineAmount    Float    @default(0) @map("line_amount")
   // Штрихкод. null коли треба згенерувати при проведенні (3-й сценарій).
-  barcode String?
+  barcode       String?
   // Метод поступлення штрихкоду — для аудиту + UI:
   //   'scanned'   — зчитано сканером (зашита інфо у штрихкоді)
   //   'manual'    — введено вручну (наклеєна бірка)
   //   'generated' — згенерує система при проведенні (default)
-  barcodeSource String  @default("generated") @map("barcode_source")
+  barcodeSource String   @default("generated") @map("barcode_source")
   // Сектор на складі (← правки 2026-06-05). Вільний ввід або сканування
   // штрихкоду сектора. Переходить на `lot.sector` при проведенні.
   sector        String?
-  createdLotId  String? @map("created_lot_id")
+  createdLotId  String?  @map("created_lot_id")
   notes         String?
   createdAt     DateTime @default(now()) @map("created_at")
   updatedAt     DateTime @updatedAt @map("updated_at")
@@ -1183,6 +1183,7 @@ model RouteSheet {
   saleItems RouteSheetSaleItem[]
   payments  RouteSheetPayment[]
   tasks     RouteSheetTask[]
+  expenses  RouteSheetExpense[]
 
   @@index([status])
   @@index([routeId])
@@ -1306,6 +1307,18 @@ model RouteSheetTask {
 
   @@index([routeSheetId])
   @@map("mgr_route_sheet_tasks")
+}
+
+model RouteSheetExpense {
+  id           String  @id @default(cuid())
+  routeSheetId String  @map("route_sheet_id")
+  articleName  String? @map("article_name")
+  amount       Float   @default(0)
+
+  routeSheet RouteSheet @relation(fields: [routeSheetId], references: [id], onDelete: Cascade)
+
+  @@index([routeSheetId])
+  @@map("mgr_route_sheet_expenses")
 }
 
 model MgrClient {

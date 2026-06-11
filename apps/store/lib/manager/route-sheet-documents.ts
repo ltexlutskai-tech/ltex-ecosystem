@@ -196,3 +196,30 @@ export async function getRouteSheetDocuments(
 
   return { sales, saleItems, payments };
 }
+
+/** Рядок вкладки «Витрати» (1С таб. частина `Витрати`, VT7334). */
+export interface RouteSheetExpenseView {
+  id: string;
+  /** Назва статті витрат (поки null — довідника статей з 1С ще нема). */
+  articleName: string | null;
+  amount: number;
+}
+
+/**
+ * Витрати маршрутного листа (read-only вкладка). Стаття витрат поки не
+ * резолвиться (немає довідника) — `articleName` лишається null.
+ */
+export async function getRouteSheetExpenses(
+  routeSheetId: string,
+): Promise<RouteSheetExpenseView[]> {
+  const rows = await prisma.routeSheetExpense.findMany({
+    where: { routeSheetId },
+    orderBy: { id: "asc" },
+    select: { id: true, articleName: true, amount: true },
+  });
+  return rows.map((r) => ({
+    id: r.id,
+    articleName: r.articleName,
+    amount: r.amount,
+  }));
+}

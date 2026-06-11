@@ -54,6 +54,7 @@ function makeView(over: Partial<RouteSheetView> = {}): RouteSheetView {
     sales: [],
     saleItems: [],
     payments: [],
+    expenses: [],
     tasks: [],
     ...over,
   };

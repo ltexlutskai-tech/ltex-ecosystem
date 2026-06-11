@@ -136,6 +136,13 @@ export interface RouteSheetPaymentView {
   documentSumEur: number;
 }
 
+/** Рядок вкладки «Витрати» (1С таб. частина `Витрати`, read-only). */
+export interface RouteSheetExpenseView {
+  id: string;
+  articleName: string | null;
+  amount: number;
+}
+
 /** Рядок вкладки «Завдання» (вільна нотатка клієнт+коментар). */
 export interface RouteSheetTaskView {
   id: string;
@@ -169,6 +176,7 @@ export interface RouteSheetView {
   sales: RouteSheetSaleView[];
   saleItems: RouteSheetSaleItemView[];
   payments: RouteSheetPaymentView[];
+  expenses: RouteSheetExpenseView[];
   tasks: RouteSheetTaskView[];
 }
 
@@ -179,6 +187,7 @@ const TABS = [
   { id: "sales", label: "Реалізації" },
   { id: "products", label: "Продажи" },
   { id: "payments", label: "Оплати" },
+  { id: "expenses", label: "Витрати" },
   { id: "shortage", label: "Бракує" },
   { id: "tasks", label: "Завдання" },
 ] as const;
@@ -251,6 +260,8 @@ export function RouteSheetForm({
   const [payments, setPayments] = useState<RouteSheetPaymentView[]>(
     initial.payments,
   );
+  // Витрати — read-only (імпортуються з 1С, VT7334).
+  const [expenses] = useState<RouteSheetExpenseView[]>(initial.expenses);
   const [totalEur, setTotalEur] = useState(initial.totalEur);
   const [totalUah, setTotalUah] = useState(initial.totalUah);
 
@@ -1214,6 +1225,46 @@ export function RouteSheetForm({
                       </td>
                       <td className="px-4 py-2 text-right text-gray-700">
                         {p.documentSumEur.toFixed(2)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+      )}
+
+      {/* ─── Витрати (read-only, імпорт з 1С) ────────────────────────────── */}
+      {tab === "expenses" && (
+        <section className="space-y-3">
+          <h3 className="text-sm font-semibold text-gray-700">
+            Витрати ({expenses.length})
+          </h3>
+
+          {expenses.length === 0 ? (
+            <div className="rounded-lg border border-dashed border-gray-200 bg-gray-50 px-6 py-8 text-center text-sm text-gray-500">
+              Витрат ще немає.
+            </div>
+          ) : (
+            <div className="overflow-x-auto rounded-lg border bg-white">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b bg-gray-50 text-left text-gray-500">
+                    <th className="px-4 py-2 font-medium">Назва</th>
+                    <th className="px-4 py-2 text-right font-medium">
+                      Сума, €
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {expenses.map((e) => (
+                    <tr key={e.id} className="border-b last:border-b-0">
+                      <td className="px-4 py-2 text-gray-800">
+                        {e.articleName ?? "—"}
+                      </td>
+                      <td className="px-4 py-2 text-right text-gray-700">
+                        {e.amount.toFixed(2)}
                       </td>
                     </tr>
                   ))}

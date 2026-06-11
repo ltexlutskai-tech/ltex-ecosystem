@@ -8,7 +8,10 @@ import {
   computeRouteSheetShortage,
   getRouteSheetLoadingRows,
 } from "@/lib/manager/route-sheet-loading";
-import { getRouteSheetDocuments } from "@/lib/manager/route-sheet-documents";
+import {
+  getRouteSheetDocuments,
+  getRouteSheetExpenses,
+} from "@/lib/manager/route-sheet-documents";
 import { getUnclosedMileageWarning } from "@/lib/manager/route-sheet-mileage";
 import {
   RouteSheetForm,
@@ -179,12 +182,13 @@ export default async function ManagerRouteSheetDetailPage({
 
   // Етап 2: Загрузка (резолвлені рядки) + Бракує + лічильники (обчислювані).
   // Етап 3: Реалізації / Продажи / Оплати — derived із зворотних посилань.
-  const [loading, shortage, counters, documents, mileageWarning] =
+  const [loading, shortage, counters, documents, expenses, mileageWarning] =
     await Promise.all([
       getRouteSheetLoadingRows(sheet.id),
       computeRouteSheetShortage(sheet.id),
       computeRouteSheetCounters(sheet.id),
       getRouteSheetDocuments(sheet.id),
+      getRouteSheetExpenses(sheet.id),
       getUnclosedMileageWarning(sheet.expeditorUserId, sheet.id),
     ]);
 
@@ -212,6 +216,7 @@ export default async function ManagerRouteSheetDetailPage({
     sales: documents.sales,
     saleItems: documents.saleItems,
     payments: documents.payments,
+    expenses,
     tasks: taskViews,
   };
 

@@ -1866,6 +1866,7 @@ async function importCashOrderTable(
 //   ТоварыЗаказов VT6654 → RouteSheetItem
 //   ЗагрузкаМашины VT6795 → RouteSheetLoading
 //   Завдання     VT7622 → RouteSheetTask
+//   Витрати      VT7334 → RouteSheetExpense (стаття-довідника нема → articleName=null)
 //   Реалізації/Продажі — ЗВОРОТНЕ посилання Sale.routeSheetId (_Document189._Fld6729RRef)
 //   Оплати       VT6787 → ЗВОРОТНЕ посилання MgrCashOrder.routeSheetId
 // УВАГА: RouteSheetSale/RouteSheetSaleItem/RouteSheetPayment child-таблиці
@@ -2061,6 +2062,11 @@ const RS_PAYMENT_COLS = [
   "_LineNo6788",
   "_Fld7321_RRRef", // поліморфне посилання на касовий ордер
 ];
+const RS_EXPENSE_COLS = [
+  "_LineNo7335",
+  "_Fld7336RRef", // СтаттяВитрат (довідника поки нема → articleName=null)
+  "_Fld7337", // Сума
+];
 
 async function importRouteSheetChildren(
   ctx: ImportContext,
@@ -2227,6 +2233,35 @@ async function importRouteSheetChildren(
     }
   }
 
+  // ── Витрати → RouteSheetExpense ──
+  // Стаття витрат (_Fld7336RRef) — посилання на довідник, якого у нас нема →
+  // articleName лишаємо null (follow-up: дозбір довідника статей з 1С).
+  const expenseRows: {
+    routeSheetId: string;
+    articleName: null;
+    amount: number;
+  }[] = [];
+  for await (const rows of streamTable(
+    src,
+    "_Document6630_VT7334",
+    RS_EXPENSE_COLS,
+    {
+      batch: 1000,
+      limit: null,
+      orderBy: ["_LineNo7335"],
+      where: "_Document6630_IDRRef = @owner",
+      params: { owner },
+    },
+  )) {
+    for (const row of rows) {
+      expenseRows.push({
+        routeSheetId: routeId,
+        articleName: null,
+        amount: asNumberOr(row["_Fld7337"], 0),
+      });
+    }
+  }
+
   // Запис дочірніх таблиць (delete-then-insert = idempotent повторний прогон).
   await prisma.$transaction(async (tx) => {
     await tx.routeSheetOrder.deleteMany({ where: { routeSheetId: routeId } });
@@ -2244,6 +2279,12 @@ async function importRouteSheetChildren(
     await tx.routeSheetTask.deleteMany({ where: { routeSheetId: routeId } });
     if (taskRows.length > 0) {
       await tx.routeSheetTask.createMany({ data: taskRows });
+    }
+    await tx.routeSheetExpense.deleteMany({
+      where: { routeSheetId: routeId },
+    });
+    if (expenseRows.length > 0) {
+      await tx.routeSheetExpense.createMany({ data: expenseRows });
     }
   });
 
