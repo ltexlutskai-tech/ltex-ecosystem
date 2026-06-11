@@ -1136,6 +1136,7 @@ async function importPrices(ctx: ImportContext): Promise<Recon> {
 
 const ORDER_COLS = [
   "_IDRRef",
+  "_Marked",
   "_Number",
   "_Date_Time",
   "_Posted",
@@ -1188,6 +1189,15 @@ async function importOrders(ctx: ImportContext): Promise<Recon> {
       // `docNumber` має autoincrement, конфлікт послідовності не вартий.)
       const code1C = hex;
       if (!hex || !code1C) {
+        recon.skipped++;
+        continue;
+      }
+      // Документи, позначені на вилучення у 1С (_Marked), не переносимо;
+      // якщо такий уже імпортувався раніше — видаляємо (каскад на рядки).
+      if (asBool(row["_Marked"])) {
+        if (willWrite(ctx)) {
+          await prisma.order.deleteMany({ where: { code1C } });
+        }
         recon.skipped++;
         continue;
       }
@@ -1331,6 +1341,7 @@ async function loadOrderItems(
 
 const SALE_COLS = [
   "_IDRRef",
+  "_Marked",
   "_Number",
   "_Date_Time",
   "_Posted",
@@ -1388,6 +1399,15 @@ async function importSales(ctx: ImportContext): Promise<Recon> {
       // `docNumber` має autoincrement, конфлікт послідовності не вартий.)
       const code1C = hex;
       if (!hex || !code1C) {
+        recon.skipped++;
+        continue;
+      }
+      // Документи, позначені на вилучення у 1С (_Marked), не переносимо;
+      // якщо такий уже імпортувався раніше — видаляємо (каскад на рядки).
+      if (asBool(row["_Marked"])) {
+        if (willWrite(ctx)) {
+          await prisma.sale.deleteMany({ where: { code1C } });
+        }
         recon.skipped++;
         continue;
       }
@@ -1615,6 +1635,7 @@ async function importCashOrderTable(
 
   const cols = [
     "_IDRRef",
+    "_Marked",
     map.number,
     map.date,
     map.posted,
@@ -1650,6 +1671,15 @@ async function importCashOrderTable(
       const hex = bufToHex(row["_IDRRef"]);
       const code1C = hex;
       if (!code1C) {
+        recon.skipped++;
+        continue;
+      }
+      // Документи, позначені на вилучення у 1С (_Marked), не переносимо;
+      // якщо такий уже імпортувався раніше — видаляємо (каскад на рядки).
+      if (asBool(row["_Marked"])) {
+        if (willWrite(ctx)) {
+          await prisma.mgrCashOrder.deleteMany({ where: { code1C } });
+        }
         recon.skipped++;
         continue;
       }
@@ -1733,6 +1763,7 @@ async function importCashOrderTable(
 
 const ROUTE_SHEET_COLS = [
   "_IDRRef",
+  "_Marked",
   "_Number",
   "_Date_Time",
   "_Posted",
@@ -1777,6 +1808,15 @@ async function importRouteSheets(ctx: ImportContext): Promise<Recon> {
       // `docNumber` має autoincrement, конфлікт послідовності не вартий.)
       const code1C = hex;
       if (!hex || !code1C) {
+        recon.skipped++;
+        continue;
+      }
+      // Документи, позначені на вилучення у 1С (_Marked), не переносимо;
+      // якщо такий уже імпортувався раніше — видаляємо (каскад на рядки).
+      if (asBool(row["_Marked"])) {
+        if (willWrite(ctx)) {
+          await prisma.routeSheet.deleteMany({ where: { code1C } });
+        }
         recon.skipped++;
         continue;
       }
