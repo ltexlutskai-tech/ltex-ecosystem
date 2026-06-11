@@ -147,6 +147,21 @@ export async function PATCH(
         ? null
         : data.websiteUrl;
   }
+  if (data.email !== undefined) {
+    updateData.email =
+      data.email === "" || data.email === null ? null : data.email;
+  }
+  if (data.legalType !== undefined) updateData.legalType = data.legalType;
+  if (data.inn !== undefined) updateData.inn = data.inn;
+  if (data.edrpou !== undefined) updateData.edrpou = data.edrpou;
+  if (data.fullName !== undefined) updateData.fullName = data.fullName;
+  if (data.comment !== undefined) updateData.comment = data.comment;
+  if (data.additionalDescription !== undefined)
+    updateData.additionalDescription = data.additionalDescription;
+  if (data.workingHours !== undefined)
+    updateData.workingHours = data.workingHours;
+  if (data.parentCode1C !== undefined)
+    updateData.parentCode1C = data.parentCode1C;
   if (data.monthlyVolume !== undefined) {
     updateData.monthlyVolume =
       data.monthlyVolume === null
@@ -254,6 +269,15 @@ function serializeMgrClient(client: LoadedMgrClient) {
       : null,
     licenseExpiresAt: client.licenseExpiresAt,
     isOwn: client.isOwn,
+    email: client.email,
+    legalType: client.legalType,
+    inn: client.inn,
+    edrpou: client.edrpou,
+    fullName: client.fullName,
+    comment: client.comment,
+    additionalDescription: client.additionalDescription,
+    workingHours: client.workingHours,
+    parentCode1C: client.parentCode1C,
     notDirectInput: client.notDirectInput,
     tradePointName: client.tradePointName,
     viberContact: client.viberContact,

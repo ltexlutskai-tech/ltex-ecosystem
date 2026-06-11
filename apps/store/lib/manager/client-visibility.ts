@@ -99,6 +99,10 @@ interface MaskableClient {
   viberContact: string | null;
   websiteUrl: string | null;
   geolocation: string | null;
+  // 5.4.1: контактні/внутрішні нотатки — маскуються для foreign-view.
+  email?: string | null;
+  comment?: string | null;
+  additionalDescription?: string | null;
   messengers?: unknown[];
   bankAccounts?: unknown[];
   reminders?: unknown[];
@@ -116,6 +120,8 @@ interface MaskableClient {
  * - `phones[].phone` → ідем по списку, кожен номер маскується; невалідні
  *   зберігаються як empty string (UI прибере row)
  * - `viberContact`, `websiteUrl`, `geolocation` → `null`
+ * - `email`, `comment`, `additionalDescription` → `null` (контактні/внутрішні
+ *   нотатки; бізнес-ідентифікатори ІНН/ЄДРПОУ/повна назва лишаються видимими)
  * - `messengers`, `bankAccounts`, `reminders`, `presentations`, `timeline`
  *   → `[]` (порожні масиви)
  */
@@ -132,6 +138,9 @@ export function maskClientForForeign<T extends MaskableClient>(client: T): T {
     viberContact: null,
     websiteUrl: null,
     geolocation: null,
+    email: null,
+    comment: null,
+    additionalDescription: null,
     messengers: [],
     bankAccounts: [],
     reminders: [],

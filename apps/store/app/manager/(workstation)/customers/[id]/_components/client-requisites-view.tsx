@@ -164,6 +164,31 @@ export function ClientRequisitesView({
           />
           <Row label="Торгова точка" value={client.tradePointName ?? "—"} />
 
+          <Row label="Повна назва" value={client.fullName ?? "—"} />
+          <Row label="Тип особи" value={client.legalType ?? "—"} />
+
+          <Row
+            label="Email"
+            value={
+              client.email ? (
+                <a
+                  href={`mailto:${client.email}`}
+                  className="text-blue-600 hover:underline"
+                >
+                  {client.email}
+                </a>
+              ) : (
+                "—"
+              )
+            }
+          />
+          <Row label="Графік роботи" value={client.workingHours ?? "—"} />
+
+          <Row label="ІНН" value={client.inn ?? "—"} />
+          <Row label="ЄДРПОУ" value={client.edrpou ?? "—"} />
+
+          <Row label="Код голови-клієнта" value={client.parentCode1C ?? "—"} />
+
           <Row label="Борг" value={<DebtValue value={client.debt} />} />
           <Row
             label="Протерміновано"
@@ -241,6 +266,12 @@ export function ClientRequisitesView({
           />
 
           <Row
+            label="Днів з останньої покупки"
+            value={client.daysSinceLastPurchase ?? "—"}
+          />
+          <Row label="Остання покупка" value={fmtDate(client.lastPurchaseAt)} />
+
+          <Row
             label="Ліцензія дійсна до"
             value={fmtDate(client.licenseExpiresAt)}
           />
@@ -268,6 +299,34 @@ export function ClientRequisitesView({
                   <ClientBankAccountRow account={primaryBankAccount} />
                 ) : (
                   <span className="text-gray-400">—</span>
+                )
+              }
+            />
+          </div>
+
+          <div className="sm:col-span-2">
+            <Row
+              label="Коментар"
+              value={
+                client.comment ? (
+                  <span className="whitespace-pre-wrap">{client.comment}</span>
+                ) : (
+                  "—"
+                )
+              }
+            />
+          </div>
+
+          <div className="sm:col-span-2">
+            <Row
+              label="Додатковий опис"
+              value={
+                client.additionalDescription ? (
+                  <span className="whitespace-pre-wrap">
+                    {client.additionalDescription}
+                  </span>
+                ) : (
+                  "—"
                 )
               }
             />

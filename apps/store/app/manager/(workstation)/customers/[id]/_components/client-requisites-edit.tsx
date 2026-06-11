@@ -164,6 +164,54 @@ export function ClientRequisitesEdit({
             maxLength={255}
           />
 
+          <EditTextRow
+            label="Повна назва"
+            value={values.fullName}
+            onChange={(v) => setField("fullName", v)}
+            maxLength={255}
+          />
+          <EditTextRow
+            label="Тип особи"
+            value={values.legalType}
+            onChange={(v) => setField("legalType", v)}
+            maxLength={50}
+          />
+
+          <EditTextRow
+            label="Email"
+            value={values.email}
+            onChange={(v) => setField("email", v)}
+            type="text"
+            placeholder="client@example.com"
+            maxLength={255}
+          />
+          <EditTextRow
+            label="Графік роботи"
+            value={values.workingHours}
+            onChange={(v) => setField("workingHours", v)}
+            maxLength={255}
+          />
+
+          <EditTextRow
+            label="ІНН"
+            value={values.inn}
+            onChange={(v) => setField("inn", v)}
+            maxLength={50}
+          />
+          <EditTextRow
+            label="ЄДРПОУ"
+            value={values.edrpou}
+            onChange={(v) => setField("edrpou", v)}
+            maxLength={50}
+          />
+
+          <EditTextRow
+            label="Код голови-клієнта (1С)"
+            value={values.parentCode1C}
+            onChange={(v) => setField("parentCode1C", v)}
+            maxLength={50}
+          />
+
           <ReadonlyRow
             label="Борг"
             value={<DebtValue value={client.debt} />}
@@ -341,8 +389,55 @@ export function ClientRequisitesEdit({
             value={values.isViberLinked}
             onChange={(v) => setField("isViberLinked", v)}
           />
+
+          <div className="sm:col-span-2">
+            <EditTextareaRow
+              label="Коментар"
+              value={values.comment}
+              onChange={(v) => setField("comment", v)}
+              maxLength={1000}
+            />
+          </div>
+          <div className="sm:col-span-2">
+            <EditTextareaRow
+              label="Додатковий опис"
+              value={values.additionalDescription}
+              onChange={(v) => setField("additionalDescription", v)}
+              maxLength={1000}
+            />
+          </div>
         </dl>
       </section>
     </form>
+  );
+}
+
+function EditTextareaRow({
+  label,
+  value,
+  onChange,
+  maxLength,
+}: {
+  label: string;
+  value: string | null;
+  onChange: (value: string | null) => void;
+  maxLength?: number;
+}) {
+  return (
+    <div className="flex items-start gap-2 text-sm">
+      <dt className="w-44 shrink-0 pt-1.5 text-gray-500">{label}:</dt>
+      <dd className="min-w-0 flex-1">
+        <textarea
+          value={value ?? ""}
+          onChange={(e) => {
+            const v = e.target.value;
+            onChange(v === "" ? null : v);
+          }}
+          rows={3}
+          maxLength={maxLength}
+          className="w-full rounded-md border border-gray-300 px-2 py-1 text-sm focus:border-blue-500 focus:outline-none"
+        />
+      </dd>
+    </div>
   );
 }
