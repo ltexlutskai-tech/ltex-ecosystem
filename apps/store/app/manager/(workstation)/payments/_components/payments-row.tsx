@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ArrowRight } from "lucide-react";
 import { CashOrderTypeBadge } from "./cash-order-type-badge";
 
 export interface PaymentsRowData {
@@ -38,7 +39,12 @@ export function PaymentsRow({ order }: { order: PaymentsRowData }) {
           dimmed ? "text-gray-400" : "text-gray-700"
         }`}
       >
-        {formatDocNumber(order)}
+        <Link
+          href={`/manager/payments/${order.id}`}
+          className="hover:text-blue-600"
+        >
+          {formatDocNumber(order)}
+        </Link>
       </td>
       <td className="px-4 py-3">
         <CashOrderTypeBadge type={order.type} />
@@ -75,6 +81,15 @@ export function PaymentsRow({ order }: { order: PaymentsRowData }) {
       </td>
       <td className="px-4 py-3 text-sm text-gray-600">
         {order.bankAccountName ?? "—"}
+      </td>
+      <td className="px-4 py-3 text-right">
+        <Link
+          href={`/manager/payments/${order.id}`}
+          className="inline-flex items-center gap-1 text-sm text-blue-600 hover:text-blue-700"
+          aria-label="Відкрити касовий ордер"
+        >
+          <ArrowRight className="h-4 w-4" />
+        </Link>
       </td>
     </tr>
   );

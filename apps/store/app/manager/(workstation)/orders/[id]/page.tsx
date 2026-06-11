@@ -224,6 +224,13 @@ export default async function ManagerOrderDetailPage({
         </div>
         <div className="flex items-center gap-2">
           {!editable && <OrderStatusBadge status={order.status} />}
+          <Link
+            href={`/manager/orders/${id}/print`}
+            target="_blank"
+            className="rounded-md border border-gray-300 bg-white px-3 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50"
+          >
+            📄 Рахунок
+          </Link>
           <OrderCloseButton
             orderId={order.id}
             status={order.status}

@@ -14,6 +14,7 @@ export function PaymentsTable({ items }: { items: PaymentsRowData[] }) {
             <th className="px-4 py-2 font-medium">Стаття</th>
             <th className="px-4 py-2 text-right font-medium">Сума</th>
             <th className="px-4 py-2 font-medium">Рахунок</th>
+            <th className="px-4 py-2" />
           </tr>
         </thead>
         <tbody>
