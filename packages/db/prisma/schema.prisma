@@ -118,6 +118,9 @@ model Lot {
   comment             String?   @map("comment")
   description         String?   @map("description")
   videoDate           DateTime? @map("video_date")
+  // ── 5.4.0 — паритет з 1С (ХарактеристикиНоменклатуры: Ефір/ЕфірНаДоставку) ──
+  onAir               Boolean   @default(false) @map("on_air")
+  onAirDelivery       Boolean   @default(false) @map("on_air_delivery")
   // ── Бронь (Етап 4, денормалізована — як у 1С зберігається рядком; БЕЗ FK
   //    щоб уникнути cross-concern relations між магазином і менеджеркою) ──
   reservedForClientId String?   @map("reserved_for_client_id")
@@ -262,6 +265,7 @@ model Order {
   items       OrderItem[]
   shipments   Shipment[]
   payments    Payment[]
+  sales       Sale[]            @relation("SaleOrder")
 
   @@index([customerId])
   @@index([status])
@@ -296,6 +300,9 @@ model OrderItem {
   priceEur  Float   @map("price_eur")
   weight    Float
   quantity  Int     @default(1)
+  // ── 5.4.0 — паритет з 1С (ЦенаПродажиВес / ПроцентСкидкиНаценки) ──
+  unitPriceEur    Float? @map("unit_price_eur")
+  discountPercent Float? @map("discount_percent")
 
   order   Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
   lot     Lot?    @relation(fields: [lotId], references: [id])
@@ -339,12 +346,14 @@ model Sale {
   updatedAt           DateTime @updatedAt @map("updated_at")
 
   customer   Customer       @relation(fields: [customerId], references: [id])
+  order      Order?         @relation("SaleOrder", fields: [orderId], references: [id], onDelete: SetNull)
   items      SaleItem[]
   cashOrders MgrCashOrder[]
 
   @@index([customerId])
   @@index([status])
   @@index([routeSheetId])
+  @@index([orderId])
   @@map("mgr_sales")
 }
 
@@ -1345,6 +1354,17 @@ model MgrClient {
   // Картка клієнта — Фаза 3: ключові слова (теги через кому) для пошуку/фільтра
   // у списку клієнтів. Вільний текст, керується вручну менеджером.
   keywords String? @map("keywords")
+
+  // ─── 5.4.0 — паритет з 1С (Catalog.Контрагенты) ───────────────────────────
+  email                 String? @map("email")
+  legalType             String? @map("legal_type")
+  inn                   String? @map("inn")
+  edrpou                String? @map("edrpou")
+  fullName              String? @map("full_name")
+  comment               String? @map("comment")
+  additionalDescription String? @map("additional_description")
+  workingHours          String? @map("working_hours")
+  parentCode1C          String? @map("parent_code_1c")
 
   // ─── M1.3c additions (full 1С parity) ─────────────────────────────────────
   tradePointName   String?  @map("trade_point_name")
