@@ -29,6 +29,7 @@ interface Props {
     | "supervisor"
     | "analyst"
     | "warehouse"
+    | "expeditor"
     | "bookkeeper";
 }
 

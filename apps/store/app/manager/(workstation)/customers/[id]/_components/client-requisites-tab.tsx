@@ -14,6 +14,7 @@ interface Props {
     | "supervisor"
     | "analyst"
     | "warehouse"
+    | "expeditor"
     | "bookkeeper";
   editDisabledReason?: string;
   isForeign?: boolean;

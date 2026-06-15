@@ -21,6 +21,7 @@ const ROLES = [
   "supervisor",
   "analyst",
   "warehouse",
+  "expeditor",
   "bookkeeper",
 ];
 const ACTIONS = [

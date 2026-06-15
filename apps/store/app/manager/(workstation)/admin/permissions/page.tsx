@@ -19,6 +19,7 @@ const ROLES_ORDER: ManagerRole[] = [
   "supervisor",
   "analyst",
   "warehouse",
+  "expeditor",
   "bookkeeper",
 ];
 
@@ -30,6 +31,7 @@ const ROLE_LABEL: Record<ManagerRole, string> = {
   supervisor: "Супервайзер",
   analyst: "Аналітик",
   warehouse: "Склад",
+  expeditor: "Експедитор",
   bookkeeper: "Бухгалтер",
 };
 

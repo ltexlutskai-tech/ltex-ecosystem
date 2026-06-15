@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button, useToast } from "@ltex/ui";
 import type { ManagerUserRow } from "./users-table";
+import { EditUserModal } from "./edit-user-modal";
 
 type Role =
   | "manager"
@@ -13,6 +14,7 @@ type Role =
   | "supervisor"
   | "analyst"
   | "warehouse"
+  | "expeditor"
   | "bookkeeper";
 
 const ROLE_OPTIONS: { value: Role; label: string }[] = [
@@ -23,6 +25,7 @@ const ROLE_OPTIONS: { value: Role; label: string }[] = [
   { value: "supervisor", label: "Супервайзер" },
   { value: "analyst", label: "Аналітик" },
   { value: "warehouse", label: "Склад" },
+  { value: "expeditor", label: "Експедитор" },
   { value: "bookkeeper", label: "Бухгалтер" },
 ];
 
@@ -106,6 +109,7 @@ export function UserRowActions({
           </option>
         ))}
       </select>
+      <EditUserModal user={user} />
       <Button
         type="button"
         variant="secondary"

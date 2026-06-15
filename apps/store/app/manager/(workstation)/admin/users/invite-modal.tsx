@@ -23,6 +23,7 @@ type Role =
   | "supervisor"
   | "analyst"
   | "warehouse"
+  | "expeditor"
   | "bookkeeper";
 
 const ROLE_LABELS: Record<Role, string> = {
@@ -33,6 +34,7 @@ const ROLE_LABELS: Record<Role, string> = {
   supervisor: "Супервайзер",
   analyst: "Аналітик",
   warehouse: "Склад",
+  expeditor: "Експедитор",
   bookkeeper: "Бухгалтер",
 };
 
