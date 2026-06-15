@@ -2878,7 +2878,9 @@ async function importRates(ctx: ImportContext): Promise<Recon> {
   for await (const rows of streamTable(src, "_InfoRg4655", RATE_COLS, {
     batch: args.batch,
     limit: args.limit,
-    orderBy: ["_Period", "_RecorderRRef", "_LineNo"],
+    // _InfoRg4655 (КурсыВалют) — незалежний періодичний регістр: НЕМАЄ
+    // _RecorderRRef/_LineNo. Сортуємо по періоду+валюті+курсу (детерміновано).
+    orderBy: ["_Period", "_Fld4656RRef", "_Fld4657"],
   })) {
     for (const row of rows) {
       const curHex = bufToHex(row["_Fld4656RRef"]);
