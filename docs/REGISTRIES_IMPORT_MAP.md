@@ -188,3 +188,232 @@ Catalogs first (they're dimension/label targets), then balance registers.
    flat dict (verify the order/sale line's unit `_Fld…RRef` actually points to `_Reference52`).
 5. **Row counts** can't be checked offline (read-only schema dump). Confirm non-empty
    `_AccumRg5269` / `_InfoRg4655` on the live MSSQL before scheduling the import.
+
+---
+
+## 5.4.6 — декодовані колонки довідників/реєстрів
+
+Exact physical columns verified `metadata.xml` → `dbnames.txt` → `columns.tsv`. These go
+**verbatim** into `import-1c-historical.ts`. `RRef` = single ref `binary(16)`; `_TYPE/_RTRef/_RRRef`
+trio = polymorphic ref. **ABSENT** = column does not exist (do not invent).
+
+### Catalogs
+
+#### 1. `_Reference96` СтатьиДвиженияДенежныхСредств (cash-flow articles)
+
+| Target       | Column          | Type          | Notes                                |
+| ------------ | --------------- | ------------- | ------------------------------------ |
+| ID           | `_IDRRef`       | binary(16)    | PK (hex → `code1C`)                  |
+| Code         | `_Code`         | nchar(9)      |                                      |
+| Name         | `_Description`  | nvarchar(100) |                                      |
+| Group flag   | `_Folder`       | binary(1)     | **hierarchical** (`0x01`=group)      |
+| Parent       | `_ParentIDRRef` | binary(16)    | self-ref → article hierarchy         |
+| Постачальник | `_Fld7697RRef`  | binary(16)    | ref Постачальник (ignore for import) |
+
+#### 2. `_Reference29` БанковскиеСчета (bank accounts) — _prior map was wrong, corrected here_
+
+| Target                                  | Column                        | Type          | Notes                                                                 |
+| --------------------------------------- | ----------------------------- | ------------- | --------------------------------------------------------------------- |
+| ID                                      | `_IDRRef`                     | binary(16)    | PK                                                                    |
+| Code                                    | `_Code`                       | nchar(9)      |                                                                       |
+| Account name                            | `_Description`                | nvarchar(100) |                                                                       |
+| **Owner**                               | `_OwnerID_TYPE/_RTRef/_RRRef` | trio          | **OWNED** catalog (owner = Организации/Контрагенты)                   |
+| **НомерСчета** (acct no./IBAN)          | `_Fld5869`                    | nvarchar(34)  | ← the account-number/IBAN field                                       |
+| Банк                                    | `_Fld5870RRef`                | binary(16)    | ref bank                                                              |
+| ТекстНазначения                         | `_Fld5871`                    | ntext         |                                                                       |
+| ВидСчета                                | `_Fld5872`                    | nvarchar(15)  | **NOT МФО** (prior map guess wrong)                                   |
+| ВалютаДенежныхСредств                   | `_Fld5873RRef`                | binary(16)    | ref `_Reference30` Валюты                                             |
+| НомерИДатаРазрешения                    | `_Fld5874`                    | nvarchar(30)  |                                                                       |
+| ДатаОткрытия                            | `_Fld5875`                    | datetime      |                                                                       |
+| ДатаЗакрытия                            | `_Fld5876`                    | datetime      |                                                                       |
+| СуммаБезКопеек                          | `_Fld5877`                    | binary(1)     | bool                                                                  |
+| НомерСчетаУстаревший                    | `_Fld5878`                    | nvarchar(20)  | legacy acct no. — **NOT IBAN** (prior guess wrong)                    |
+| Опис                                    | `_Fld7646`                    | nvarchar(500) | notes                                                                 |
+| **НеВідображатиВДодатку** (hide-in-app) | `_Fld7710`                    | binary(1)     | ← the «не відображати» flag (`0x01`=hidden) — prior map **missed it** |
+
+#### 3. `_Reference52` ЕдиницыИзмерения (units of measure)
+
+| Target                  | Column                        | Type          | Notes                                                        |
+| ----------------------- | ----------------------------- | ------------- | ------------------------------------------------------------ |
+| ID                      | `_IDRRef`                     | binary(16)    | PK                                                           |
+| **Owner**               | `_OwnerID_TYPE/_RTRef/_RRRef` | trio          | **OWNED** (owner = Номенклатура — units belong to a product) |
+| Code                    | `_Code`                       | nchar(9)      |                                                              |
+| Short name (кг/шт/пара) | `_Description`                | nvarchar(50)  |                                                              |
+| ЕдиницаПоКлассификатору | `_Fld5987RRef`                | binary(16)    | ref classifier                                               |
+| Вес                     | `_Fld5988`                    | numeric(15,3) |                                                              |
+| Объем                   | `_Fld5989`                    | numeric(15,3) |                                                              |
+| Коэффициент             | `_Fld5990`                    | numeric(10,3) |                                                              |
+
+`_Folder` **ABSENT** (flat, not hierarchical). Because OWNED, resolve unit per doc-line via the
+line's unit-ref, not via a flat global dict.
+
+#### 4. `_Reference7513` Маршруты (routes)
+
+| Target | Column         | Type         | Notes |
+| ------ | -------------- | ------------ | ----- |
+| ID     | `_IDRRef`      | binary(16)   | PK    |
+| Code   | `_Code`        | nvarchar(9)  |       |
+| Name   | `_Description` | nvarchar(25) |       |
+
+`_Folder` **ABSENT** (flat — no hierarchy, contrary to the §1 table guess).
+
+#### 5. `_Reference6628` ТорговыеАгенты (trade agents)
+
+| Target                     | Column         | Type          | Notes                                   |
+| -------------------------- | -------------- | ------------- | --------------------------------------- |
+| ID                         | `_IDRRef`      | binary(16)    | PK                                      |
+| Code                       | `_Code`        | nvarchar(9)   |                                         |
+| Agent name                 | `_Description` | nvarchar(25)  |                                         |
+| Склад                      | `_Fld6890RRef` | binary(16)    | ref warehouse                           |
+| ПолныеПрава                | `_Fld6944`     | binary(1)     | bool                                    |
+| **Користувач** (User link) | `_Fld7445RRef` | binary(16)    | ref Пользователи → map agent→our `User` |
+| ТипЦенПродажи              | `_Fld7446RRef` | binary(16)    | ref price type                          |
+| Область                    | `_Fld7638`     | nvarchar(500) | text                                    |
+
+`_Folder` **ABSENT** (flat). `_Fld6890RRef` is the **first** attribute (Склад), not «фізособа» as §1
+guessed; `_Fld6891` (nvarchar 32) = ПарольДоступаАндроід.
+
+### Info register
+
+#### 6. `_InfoRg4655` КурсыВалют (currency rates)
+
+| Target                   | Column         | Type          | Notes                     |
+| ------------------------ | -------------- | ------------- | ------------------------- |
+| Period                   | `_Period`      | datetime      |                           |
+| Валюта (dim)             | `_Fld4656RRef` | binary(16)    | ref `_Reference30` Валюты |
+| Курс (rate)              | `_Fld4657`     | numeric(10,4) |                           |
+| Кратность (multiplicity) | `_Fld4658`     | numeric(10,0) | divide rate by this       |
+
+`_Reference30` **Валюты**: `_IDRRef` (PK) · `_Code` **nchar(3)** = **ISO numeric** code
+(`"978"`=EUR, `"840"`=USD — padded to 3, NOT alpha) · `_Description` **nvarchar(10)** = **alpha**
+short name (`"EUR"`/`"USD"` — what users typed; case as entered). `_Fld5880` (nvarchar 50) =
+НаименованиеПолное. **Importer match strategy:** match `_Description IN ('EUR','USD')` OR
+`_Code IN ('978','840')` — actual values must be confirmed on live data (catalog has no
+predefined items; both columns populated by user, so EUR may appear as `'EUR'`/`'Евро'`).
+
+### Cash documents (СтатьяДвижения + bank/cash desk + operation type)
+
+#### 7. `_Document183` ПриходныйКассовыйОрдер (ПКО / incoming)
+
+| Target                                     | Column                        | Type          | Targets                           |
+| ------------------------------------------ | ----------------------------- | ------------- | --------------------------------- |
+| Касса (cash desk)                          | `_Fld3261RRef`                | binary(16)    | → `_Reference56` Кассы            |
+| **ВидОперации**                            | `_Fld3263RRef`                | binary(16)    | → enum `_Enum262` ВидыОперацийПКО |
+| Контрагент                                 | `_Fld3264_TYPE/_RTRef/_RRRef` | **trio**      | polymorphic (Контрагенты/etc.)    |
+| СуммаДокумента                             | `_Fld3268`                    | numeric(15,2) |                                   |
+| **СтатьяДвиженияДенежныхСредств** (header) | `_Fld3282RRef`                | binary(16)    | → `_Reference96`                  |
+| **СчетОрганизации** (bank account)         | `_Fld3283RRef`                | binary(16)    | → `_Reference29`                  |
+| МаршрутныйЛист                             | `_Fld6771RRef`                | binary(16)    | → route sheet `_Document6630`     |
+| КурсEUR                                    | `_Fld7345`                    | numeric(12,2) |                                   |
+| КурсUSD                                    | `_Fld7346`                    | numeric(12,2) |                                   |
+
+#### 8. `_Document187` РасходныйКассовыйОрдер (РКО / outgoing)
+
+| Target                                     | Column                        | Type          | Targets                           |
+| ------------------------------------------ | ----------------------------- | ------------- | --------------------------------- |
+| Касса (cash desk)                          | `_Fld3399RRef`                | binary(16)    | → `_Reference56` Кассы            |
+| **ВидОперации**                            | `_Fld3401RRef`                | binary(16)    | → enum `_Enum274` ВидыОперацийРКО |
+| Контрагент                                 | `_Fld3403_TYPE/_RTRef/_RRRef` | **trio**      | polymorphic                       |
+| СуммаДокумента                             | `_Fld3407`                    | numeric(15,2) |                                   |
+| **СтатьяДвиженияДенежныхСредств** (header) | `_Fld3422RRef`                | binary(16)    | → `_Reference96`                  |
+| **СчетОрганизации** (bank account)         | `_Fld3423RRef`                | binary(16)    | → `_Reference29`                  |
+| МаршрутныйЛист                             | `_Fld6861RRef`                | binary(16)    | → route sheet                     |
+| КурсEUR                                    | `_Fld7347`                    | numeric(12,2) |                                   |
+| КурсUSD                                    | `_Fld7348`                    | numeric(12,2) |                                   |
+
+> Both docs also carry **tabular-section duplicates** of СтатьяДвижения (e.g. ПКО
+> `_Fld3282`-equivalent in VT, РКО `_Fld44dc1ae2…`) — for MgrCashOrder use the **header** Fld
+> above. Контрагент is a polymorphic trio; resolve via `_RRRef` once `_RTRef` confirms the ref
+> type points at Контрагенты.
+
+#### Enum value resolution (ВидОперации)
+
+Enum ref stores the element `_IDRRef`; join `_Enum262`/`_Enum274` (`_EnumOrder` follows XML order).
+
+- **`_Enum262` ВидыОперацийПКО** (incoming): ОплатаПокупателя, ПриходДенежныхСредствРозничнаяВыручка,
+  ВозвратДенежныхСредствПодотчетником, ВозвратДенежныхСредствПоставщиком,
+  ПолучениеНаличныхДенежныхСредствВБанке, РасчетыПоКредитамИЗаймамСКонтрагентами,
+  ПриходДенежныхСредствПрочее, ПрочиеРасчетыСКонтрагентами. **Key:** `ОплатаПокупателя` = payment from client.
+- **`_Enum274` ВидыОперацийРКО** (outgoing): ОплатаПоставщику, ВозвратДенежныхСредствПокупателю,
+  РасчетыПоКредитамИЗаймамСКонтрагентами, ПрочиеРасчетыСКонтрагентами,
+  ВыдачаДенежныхСредствПодотчетнику, ВыдачаДенежныхСредствКассеККМ, ВзносНаличнымиВБанк,
+  РасходДенежныхСредствПрочее. **Key:** `ОплатаПоставщику` / `ВозвратДенежныхСредствПокупателю`.
+
+## 5.4.6b — регістр боргу (звірка BSL)
+
+**Вердикт: борг клієнта, який показує мобільний АРМ, береться з `_AccumRg5269` =
+`РегистрНакопления.ВзаиморасчетыСКонтрагентами`, ресурс `СуммаУпр` (= `_Fld5275`),
+згрупований по Контрагент (`_Fld5273RRef`). Валюта — управлінська = EUR.**
+
+### Чому саме цей регістр (а не `_AccumRg5668`)
+
+Звірено по `CommonModules/ОбменАРМ/Ext/Module.bsl`:
+
+- **Активна** процедура `ЗаповнитиБоргиКонтрагентів` (рядок 1991), яку реально кличе вивантаження
+  АРМ (виклик на рядку **1143**), читає `РегистрНакопления.ВзаиморасчетыСКонтрагентами.Остатки`
+  і бере ресурс **`СуммаУпрОстаток`** (= `СуммаУпр`) → пише у `СтрокаТЗ.Борг` (рядок 2079).
+- Сусідня процедура `ЗаповнитиБоргиКонтрагентів_НеВикористовувати` (рядок 1937) — за назвою
+  «\_НеВикористовувати» (не використовувати), теж читає той самий регістр/ресурс `СуммаУпр`. Підтверджує
+  вибір регістру, але не кличеться.
+- Процедура `ОтриматиБорг` (рядок 1740) — окрема, **по-документна** деталізація для одного клієнта
+  з ТРЕТЬОГО регістру `ВзаиморасчетыСКонтрагентамиПоДокументамРасчетов` (ресурс `СуммаВзаиморасчетов`,
+  з розбивкою Організація ТзОВ/БезТзОВ). Це НЕ загальний борг картки — це розшифровка по документах розрахунків.
+- `Функція ПолучитьДолгПартенра(...)` (рядок 4625) — заглушка `ВОЗВРАТ 0`, ігнорувати.
+- Мапінг GUID→ім'я підтверджено через `ConfigDumpInfo.xml` + `dbnames.txt`:
+  - `_AccumRg5269` ↔ GUID `a24b508c-…` = **`ВзаиморасчетыСКонтрагентами`** ← борг АРМ
+  - `_AccumRg5668` ↔ GUID `53f61efb-…` = `РасчетыСКонтрагентами` ← **НЕ використовується** кодом АРМ (інший/регламентований облік, не чіпаємо)
+  - `_AccumRgT5276` — таблиця підсумків того ж регістру 5269 (той самий GUID `a24b508c-…`)
+
+### Колонки на обраному регістрі `_AccumRg5269` (підтверджено `columns.tsv` + порядок полів у XML)
+
+| Призначення               | Колонка                            | Тип           | Примітка                                      |
+| ------------------------- | ---------------------------------- | ------------- | --------------------------------------------- |
+| Період                    | `_Period`                          | datetime      | є                                             |
+| Реєстратор                | `_RecorderRRef` (+`_RecorderTRef`) | binary        | є                                             |
+| Вид руху                  | `_RecordKind`                      | numeric(1)    | **0 = приход, 1 = расход**                    |
+| ДоговорКонтрагента (dim)  | `_Fld5270RRef`                     | binary(16)    |                                               |
+| Сделка (dim, полиморф.)   | `_Fld5271_TYPE/_RTRef/_RRRef`      | trio          |                                               |
+| Организация (dim)         | `_Fld5272RRef`                     | binary(16)    | АРМ-запит НЕ фільтрує по орг → сумує по всіх  |
+| **Контрагент (dim)**      | **`_Fld5273RRef`**                 | binary(16)    | → ключ групування                             |
+| СуммаВзаиморасчетов (res) | `_Fld5274`                         | numeric(15,2) | НЕ використовується для боргу АРМ             |
+| **СуммаУпр (res)**        | **`_Fld5275`**                     | numeric(15,2) | **значення боргу, EUR (управлінська валюта)** |
+
+### Формула боргу (знак)
+
+1С-вираз `Остатки(...)` уже нетить рух за `_RecordKind`. При імпорті з «плоских» рухів формула:
+
+```
+debt(Контрагент) = Σ( приход.СуммаУпр )  −  Σ( расход.СуммаУпр )
+                 = Σ over _Fld5273RRef of ( _RecordKind=0 ? +_Fld5275 : −_Fld5275 )
+```
+
+**Знак:** для розрахунків з покупцем у цій конфігурації **приход регістру = нарахування боргу
+(Реалізація), расход = погашення (ПКО/оплата)**. Тому **позитивний залишок (`debt > 0`) означає,
+що КЛІЄНТ ВИНЕН нам (дебіторка)**, а **негативний (`debt < 0`) = переплата клієнта**.
+Це узгоджується з логікою `ЗаповнитиБоргиКонтрагентів` (рядки 2050-2073): `СуммаБоргу < 0` трактується
+як переплата і йде у борг зі знаком мінус; додатні документи реалізації «з'їдають» позитивний залишок.
+
+> ⚠️ TODO (підтвердити на живих даних): напрям знаку 1С-регістрів іноді інвертований конфігурацією.
+> Перевірити на 1-2 відомих клієнтах з ненульовим боргом, що `Σ(приход)−Σ(расход)` дає той самий
+> знак/величину (в EUR), що й картка в 1С / мобільному АРМ. Якщо вийде з протилежним знаком —
+> перевернути формулу на `Σ(расход)−Σ(приход)`.
+
+### Що заповнювати в `MgrClient`
+
+- **`debt`** — так, з формули вище (нетований залишок `СуммаУпр` по Контрагент, EUR). Це головне поле.
+- **`overdueDebt`** — у 1С прострочення для боргу АРМ рахується **НЕ з регістру**, а FIFO-проходом по
+  документах Реалізації (`ЗаповнитиБоргиКонтрагентів`, рядки 2007-2083: поріг `ТекущаяДата − 14 днів`,
+  списання боргу по датах реалізацій). У batch-запиті з самого регістру 5269 поле `ПростроченийБорг`
+  закоментоване → повертає 0. **Рекомендація:** при імпорті НЕ намагатися відтворити цей FIFO зі
+  знімку регістру — лишити `overdueDebt = NULL`/0, або порахувати окремо по датах Реалізацій уже
+  після імпорту. Не блокує імпорт боргу.
+- **`tovDebt` / `boргТзОВ`** — це борг по конкретній організації (ТзОВ vs БезТзОВ) з регістру
+  `ВзаиморасчетыСКонтрагентамиПоДокументамРасчетов` (процедура `ОтриматиБорг`). Для основного імпорту
+  не обов'язкове; якщо знадобиться — це інший регістр (не 5269/5668). Лишити NULL поки.
+- **`sessionRemainder`** — у BSL АРМ-боргу немає поняття «залишок по сеансу» (`Залишок/ОстатокПоСеансу`)
+  у цій ділянці коду. Поле приходить з картки Контрагента (`СеансОстаток`/реквізит довідника), а не з
+  регістру взаєморозрахунків. Тут не заповнюємо — джерело окреме (довідник Контрагенты).
+
+**Підсумок для імпортера:** netити `_AccumRg5269._Fld5275` по `_Fld5273RRef` з урахуванням
+`_RecordKind` (0:+ /1:−) → `MgrClient.debt` (EUR). `overdueDebt`/`tovDebt`/`sessionRemainder` —
+поки не заповнювати з цього регістру.
