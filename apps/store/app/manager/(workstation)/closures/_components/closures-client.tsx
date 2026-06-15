@@ -25,6 +25,7 @@ export function ClosuresClient({
     | "supervisor"
     | "analyst"
     | "warehouse"
+    | "expeditor"
     | "bookkeeper";
 }) {
   const [clientId, setClientId] = useState<string | null>(null);

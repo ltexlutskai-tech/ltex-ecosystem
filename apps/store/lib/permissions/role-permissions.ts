@@ -15,6 +15,8 @@
  *   - `analyst` — read-only до фінансів і всієї історії + експорт у Excel.
  *   - `warehouse` — поступлення товарів (приймає, генерує лоти) + збірка
  *     замовлень (без цін закупки і маржі).
+ *   - `expeditor` — водій маршрутних листів: бачить і відмічає свої маршрути,
+ *     read-only на замовлення/клієнтів (кому везти). Без фінансів/цін/адмінки.
  *   - `bookkeeper` — каса/банк/оплати, без редагування товарів/клієнтів.
  *
  * Дозволи per-user можуть бути перевизначені у `User.permissions JSON` —
@@ -319,6 +321,23 @@ export const ROLE_PERMISSIONS: Record<ManagerRole, RolePermissions> = {
       export: false,
     }, // редагує статус відвантажено
     prices: READ_ONLY_NO_EXPORT, // без цін закупки/маржі
+    exchange_rates: READ_ONLY_NO_EXPORT,
+  }),
+
+  // ── expeditor: водій маршрутних листів — свої маршрути + read-only ──────
+  // Мінімальний route-focused набір (дзеркало restrictiveness `warehouse`,
+  // але фокус на маршрутних листах замість поступлень). Без фінансів/цін/
+  // адмінки/користувачів.
+  expeditor: fillResources({
+    route_sheets: {
+      view: "mine", // бачить свої маршрути
+      create: false,
+      edit: "mine", // відмічає статус/завдання своїх маршрутів
+      delete: "none",
+      export: false,
+    },
+    orders: READ_ONLY_NO_EXPORT, // бачить кому везти, не редагує
+    clients: READ_ONLY_NO_EXPORT, // бачить контакти клієнта, не редагує
     exchange_rates: READ_ONLY_NO_EXPORT,
   }),
 

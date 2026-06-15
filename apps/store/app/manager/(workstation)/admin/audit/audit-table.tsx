@@ -9,6 +9,7 @@ const ROLE_LABEL: Record<string, string> = {
   supervisor: "Супервайзер",
   analyst: "Аналітик",
   warehouse: "Склад",
+  expeditor: "Експедитор",
   bookkeeper: "Бухгалтер",
   anonymous: "—",
 };

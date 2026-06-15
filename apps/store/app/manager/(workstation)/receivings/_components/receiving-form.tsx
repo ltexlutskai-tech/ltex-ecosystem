@@ -85,6 +85,7 @@ export function ReceivingForm({
     | "senior_manager"
     | "supervisor"
     | "analyst"
+    | "expeditor"
     | "bookkeeper";
   /** Якщо передано — режим РЕДАГУВАННЯ існуючої чернетки (PATCH). */
   initial?: ReceivingFormInitial;

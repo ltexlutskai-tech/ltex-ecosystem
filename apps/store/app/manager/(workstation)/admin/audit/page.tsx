@@ -41,6 +41,7 @@ export default async function AuditLogPage({
       | "supervisor"
       | "analyst"
       | "warehouse"
+      | "expeditor"
       | "bookkeeper"
       | undefined,
     action: sp.action as

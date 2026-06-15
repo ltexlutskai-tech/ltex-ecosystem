@@ -73,6 +73,7 @@ export async function PATCH(
       | "supervisor"
       | "analyst"
       | "warehouse"
+      | "expeditor"
       | "bookkeeper";
     fullName?: string;
   } = {};

@@ -41,6 +41,7 @@ export const MANAGER_ROLES = [
   "supervisor",
   "analyst",
   "warehouse",
+  "expeditor",
   "bookkeeper",
 ] as const;
 

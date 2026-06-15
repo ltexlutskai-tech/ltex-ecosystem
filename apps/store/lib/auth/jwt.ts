@@ -18,6 +18,8 @@ export type ManagerRole =
   | "supervisor"
   | "analyst"
   | "warehouse"
+  // Експедитор — водій маршрутних листів (доставка/завантаження)
+  | "expeditor"
   | "bookkeeper";
 
 export interface AccessTokenPayload {

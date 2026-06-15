@@ -70,6 +70,7 @@ interface Props {
     | "supervisor"
     | "analyst"
     | "warehouse"
+    | "expeditor"
     | "bookkeeper";
   onCancel: () => void;
   onSaved: () => void;

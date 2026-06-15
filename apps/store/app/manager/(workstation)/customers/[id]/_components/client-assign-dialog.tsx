@@ -27,6 +27,7 @@ interface ManagerOption {
     | "supervisor"
     | "analyst"
     | "warehouse"
+    | "expeditor"
     | "bookkeeper";
   isActive: boolean;
 }
