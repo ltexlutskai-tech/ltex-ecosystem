@@ -57,5 +57,13 @@ export const updateUserSchema = z.object({
   role: z.enum(MANAGER_ROLES).optional(),
   fullName: z.string().min(2).max(120).optional(),
   forcePasswordReset: z.boolean().optional(),
+  email: z.string().trim().email("Невірний email").max(255).optional(),
+  newPassword: z
+    .string()
+    .min(12, "Мінімум 12 символів")
+    .max(200)
+    .refine((v) => /[0-9]/.test(v), "Хоча б одна цифра")
+    .refine((v) => /[A-Za-zА-Яа-яҐІЇЄ]/.test(v), "Хоча б одна буква")
+    .optional(),
 });
 export type UpdateUserInput = z.infer<typeof updateUserSchema>;

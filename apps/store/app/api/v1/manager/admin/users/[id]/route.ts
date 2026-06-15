@@ -3,6 +3,7 @@ import { prisma } from "@ltex/db";
 import { randomBytes } from "crypto";
 import { updateUserSchema } from "@/lib/validations/manager-auth";
 import { requireRole } from "@/lib/auth/manager-auth";
+import { hashPassword } from "@/lib/auth/password";
 import { sha256 } from "@/lib/auth/jwt";
 import { enqueueEmail } from "@/lib/email";
 import { buildManagerPasswordResetEmail } from "@/lib/email/templates/manager-password-reset";
@@ -38,7 +39,8 @@ export async function PATCH(
     );
   }
 
-  const { isActive, role, fullName, forcePasswordReset } = parsed.data;
+  const { isActive, role, fullName, forcePasswordReset, email, newPassword } =
+    parsed.data;
 
   // Prevent the last admin from being demoted/deactivated by mistake.
   if (
@@ -76,13 +78,42 @@ export async function PATCH(
       | "expeditor"
       | "bookkeeper";
     fullName?: string;
+    email?: string;
+    passwordHash?: string;
   } = {};
   if (isActive !== undefined) data.isActive = isActive;
   if (role !== undefined) data.role = role;
   if (fullName !== undefined) data.fullName = fullName;
 
+  // Зміна email — з перевіркою унікальності.
+  if (email !== undefined && email !== target.email) {
+    const existing = await prisma.user.findUnique({ where: { email } });
+    if (existing && existing.id !== target.id) {
+      return NextResponse.json(
+        { error: "Email вже використовується" },
+        { status: 409 },
+      );
+    }
+    data.email = email;
+  }
+
+  // Пряме встановлення пароля адміністратором.
+  let passwordSet = false;
+  if (newPassword !== undefined) {
+    data.passwordHash = await hashPassword(newPassword);
+    passwordSet = true;
+  }
+
   if (Object.keys(data).length > 0) {
     await prisma.user.update({ where: { id }, data });
+  }
+
+  // Встановлення нового пароля завершує всі активні сесії користувача.
+  if (passwordSet) {
+    await prisma.userRefreshToken.updateMany({
+      where: { userId: id, revokedAt: null },
+      data: { revokedAt: new Date() },
+    });
   }
 
   // Deactivating a user also revokes all their refresh tokens.
@@ -150,5 +181,6 @@ export async function PATCH(
       telegramLinked: updated.telegramChatId !== null,
     },
     forcedPasswordReset: forcePasswordReset === true,
+    passwordSet,
   });
 }

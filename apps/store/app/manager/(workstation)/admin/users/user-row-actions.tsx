@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button, useToast } from "@ltex/ui";
 import type { ManagerUserRow } from "./users-table";
+import { EditUserModal } from "./edit-user-modal";
 
 type Role =
   | "manager"
@@ -108,6 +109,7 @@ export function UserRowActions({
           </option>
         ))}
       </select>
+      <EditUserModal user={user} />
       <Button
         type="button"
         variant="secondary"
