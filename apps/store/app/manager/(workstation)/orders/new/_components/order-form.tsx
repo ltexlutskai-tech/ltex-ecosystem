@@ -3,7 +3,16 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { MessageSquare, ListPlus } from "lucide-react";
-import { Button, Textarea } from "@ltex/ui";
+import {
+  Button,
+  Textarea,
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@ltex/ui";
 import { ClientPicker } from "./client-picker";
 import { ItemsEditor } from "./items-editor";
 import { OrderTotals } from "./order-totals";
@@ -34,7 +43,12 @@ export interface OrderFormProps {
   deliveryMethods: OrderDeliveryOption[];
   currentUserId: string;
   currentUserName: string;
+  /** Роль поточного користувача — визначає, чи доступний force-create. */
+  currentUserRole?: string;
 }
+
+/** Ролі, що можуть форсувати створення другого активного замовлення (N1). */
+const FORCE_ROLES = ["admin", "owner", "senior_manager"];
 
 /**
  * Зіставляє код способу доставки клієнта (MgrDeliveryMethod.code, напр.
@@ -69,9 +83,11 @@ export function OrderForm({
   priceTypes,
   deliveryMethods,
   currentUserName,
+  currentUserRole,
 }: OrderFormProps) {
   const router = useRouter();
   const isEdit = mode === "edit";
+  const canForce = FORCE_ROLES.includes(currentUserRole ?? "");
 
   const [clientId, setClientId] = useState<string | null>(
     initialClientId ?? null,
@@ -90,6 +106,12 @@ export function OrderForm({
   const [pickerOpen, setPickerOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // ─── Конфлікт «у клієнта вже є актуальне замовлення» (N2) ─────────────────
+  const [activeConflict, setActiveConflict] = useState<{
+    existingOrderId: string;
+    existingOrderNumber: string;
+  } | null>(null);
 
   // ─── Менеджерські поля (Етап 1) ───────────────────────────────────────────
   const [priceTypeId, setPriceTypeId] = useState<string>(
@@ -228,7 +250,7 @@ export function OrderForm({
    * Зберігає замовлення (POST у create, PATCH у edit). Статус документа з UI
    * не змінюється (керується 1С). Після успіху — перехід до списку замовлень.
    */
-  async function submit(): Promise<void> {
+  async function submit(force = false): Promise<void> {
     if (!isEdit && !clientId) return;
     if (isEdit && !orderId) return;
     setSubmitting(true);
@@ -247,8 +269,24 @@ export function OrderForm({
           priceTypeId: priceTypeId || null,
           deliveryMethod: deliveryMethod || null,
           exportTo1C,
+          ...(force ? { force: true } : {}),
         }),
       });
+      // 409 + active_order_exists — у клієнта вже є актуальне замовлення.
+      if (res.status === 409 && !isEdit) {
+        const body = (await res.json().catch(() => ({}))) as {
+          code?: string;
+          existingOrderId?: string;
+          existingOrderNumber?: string;
+        };
+        if (body.code === "active_order_exists" && body.existingOrderId) {
+          setActiveConflict({
+            existingOrderId: body.existingOrderId,
+            existingOrderNumber: body.existingOrderNumber ?? "",
+          });
+          return;
+        }
+      }
       if (!res.ok) {
         const errBody = (await res.json().catch(() => ({}))) as {
           error?: string;
@@ -530,6 +568,61 @@ export function OrderForm({
         priceTypeCode={priceTypeCode}
         onAdd={onAddFromPicker}
       />
+
+      {/* ─── Діалог: у клієнта вже є актуальне замовлення (N2) ──────────────── */}
+      <Dialog
+        open={!!activeConflict}
+        onOpenChange={(open) => {
+          if (!open) setActiveConflict(null);
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>
+              У клієнта вже є актуальне замовлення №
+              {activeConflict?.existingOrderNumber || ""}
+            </DialogTitle>
+            <DialogDescription>
+              Згідно правила, у клієнта має бути одне активне замовлення. Що
+              зробити?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="flex-col gap-2 sm:flex-col sm:space-x-0">
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full"
+              onClick={() => {
+                const id = activeConflict?.existingOrderId;
+                if (id) router.push(`/manager/orders/${id}`);
+              }}
+            >
+              Відкрити існуюче
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full"
+              onClick={() => router.push("/manager/closures")}
+            >
+              Закрити старі
+            </Button>
+            {canForce && (
+              <Button
+                type="button"
+                className="w-full bg-green-600 text-white hover:bg-green-700"
+                disabled={submitting}
+                onClick={() => {
+                  setActiveConflict(null);
+                  void submit(true);
+                }}
+              >
+                Все одно створити
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

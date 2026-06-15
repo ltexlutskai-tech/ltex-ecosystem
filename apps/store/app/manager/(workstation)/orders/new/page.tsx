@@ -106,6 +106,7 @@ export default async function NewOrderPage({
         deliveryMethods={deliveryMethods}
         currentUserId={user.id}
         currentUserName={user.fullName}
+        currentUserRole={user.role}
       />
     </div>
   );

@@ -85,28 +85,44 @@ export async function createOrderWithItems(
   input: CreateOrderInputRaw,
   customer: CreateOrderCustomer,
   actor: CreateOrderActor,
+  options?: { clearOtherActual?: boolean },
 ) {
   const rate = input.exchangeRate ?? (await getCurrentRate());
   const items = (input.items ?? []) as OrderItemInput[];
   const { totalEur, totalUah, itemRows } = buildOrderTotals(items, rate);
 
-  const order = await prisma.order.create({
-    data: {
-      customerId: customer.id,
-      status: "draft",
-      totalEur,
-      totalUah,
-      exchangeRate: rate,
-      notes: input.notes,
-      priceTypeId: input.priceTypeId ?? null,
-      deliveryMethod: input.deliveryMethod ?? null,
-      cashOnDelivery: input.cashOnDelivery ?? false,
-      assignedAgentUserId: input.assignedAgentUserId ?? actor.userId,
-      exportTo1C: input.exportTo1C ?? true,
-      items: { create: itemRows },
-    },
-    include: ORDER_INCLUDE,
-  });
+  const createData = {
+    customerId: customer.id,
+    status: "draft",
+    totalEur,
+    totalUah,
+    exchangeRate: rate,
+    notes: input.notes,
+    priceTypeId: input.priceTypeId ?? null,
+    deliveryMethod: input.deliveryMethod ?? null,
+    cashOnDelivery: input.cashOnDelivery ?? false,
+    assignedAgentUserId: input.assignedAgentUserId ?? actor.userId,
+    exportTo1C: input.exportTo1C ?? true,
+    items: { create: itemRows },
+  } satisfies Prisma.OrderCreateInput | Prisma.OrderUncheckedCreateInput;
+
+  // Force-create (admin/owner/senior_manager): знімаємо `isActual` зі старих
+  // актуальних замовлень цього клієнта у тій самій транзакції перед створенням
+  // нового (м'який аналог 1С-автозакриття, БЕЗ постингу документа закриття).
+  const order = options?.clearOtherActual
+    ? await prisma.$transaction(async (tx) => {
+        await tx.order.updateMany({
+          where: {
+            customerId: customer.id,
+            isActual: true,
+            archived: false,
+            closedAt: null,
+          },
+          data: { isActual: false },
+        });
+        return tx.order.create({ data: createData, include: ORDER_INCLUDE });
+      })
+    : await prisma.order.create({ data: createData, include: ORDER_INCLUDE });
 
   enqueueOrderSyncSafe(order);
 
@@ -143,6 +159,9 @@ export async function updateOrderWithItems(
   const items = (input.items ?? []) as OrderItemInput[];
   const { totalEur, totalUah, itemRows } = buildOrderTotals(items, rate);
 
+  // Інваріант: проведене (`posted` = archived) замовлення = НЕ актуальне.
+  const becomesArchived = options?.nextStatus === "posted";
+
   const order = await prisma.$transaction(async (tx) => {
     await tx.orderItem.deleteMany({ where: { orderId } });
     return tx.order.update({
@@ -161,6 +180,7 @@ export async function updateOrderWithItems(
         items: { create: itemRows },
         // Optimistic lock: інкрементуємо version при кожному PATCH.
         version: { increment: 1 },
+        ...(becomesArchived ? { archived: true, isActual: false } : {}),
       },
       include: ORDER_INCLUDE,
     });

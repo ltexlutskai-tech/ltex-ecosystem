@@ -30,7 +30,7 @@ const {
   return {
     mockPrisma: {
       mgrClient: { findMany: vi.fn() },
-      order: { findMany: vi.fn(), count: vi.fn() },
+      order: { findMany: vi.fn(), count: vi.fn(), findFirst: vi.fn() },
       customer: { findUnique: vi.fn() },
     },
     getCurrentUserMock: vi.fn(),
@@ -110,6 +110,8 @@ function fakeOrder(id: string, code: string): unknown {
 beforeEach(() => {
   vi.clearAllMocks();
   getCurrentUserMock.mockResolvedValue(MANAGER);
+  // Дефолт: у клієнта немає активного замовлення (актуальність guard пропускає).
+  mockPrisma.order.findFirst.mockResolvedValue(null);
 });
 
 describe("GET /api/v1/manager/orders", () => {
@@ -458,5 +460,113 @@ describe("POST /api/v1/manager/orders", () => {
     );
     const res = await POST(postReq(validBody));
     expect(res.status).toBe(400);
+  });
+
+  // ─── N1 — Актуальність guard ───────────────────────────────────────────
+  describe("active-order guard (N1)", () => {
+    function setupOwnedClient() {
+      resolveCustomerForOrderMock.mockResolvedValueOnce({
+        id: "cust1",
+        code1C: "000001",
+        name: "Mine",
+      });
+      mockPrisma.mgrClient.findMany.mockResolvedValueOnce([
+        { code1C: "000001" },
+      ]);
+    }
+
+    it("повертає 409 active_order_exists коли у клієнта вже є активне", async () => {
+      setupOwnedClient();
+      mockPrisma.order.findFirst.mockResolvedValueOnce({
+        id: "old1",
+        code1C: "000000099",
+        docNumber: 5,
+      });
+      const res = await POST(postReq(validBody));
+      expect(res.status).toBe(409);
+      const json = (await res.json()) as {
+        code: string;
+        existingOrderId: string;
+        existingOrderNumber: string;
+      };
+      expect(json.code).toBe("active_order_exists");
+      expect(json.existingOrderId).toBe("old1");
+      expect(json.existingOrderNumber).toBe("000000099");
+      expect(createOrderWithItemsMock).not.toHaveBeenCalled();
+    });
+
+    it("force від manager → 403 (немає прав)", async () => {
+      setupOwnedClient();
+      mockPrisma.order.findFirst.mockResolvedValueOnce({
+        id: "old1",
+        code1C: "000000099",
+        docNumber: 5,
+      });
+      const res = await POST(postReq({ ...validBody, force: true }));
+      expect(res.status).toBe(403);
+      expect(createOrderWithItemsMock).not.toHaveBeenCalled();
+    });
+
+    it("force від admin → знімає старі активні + створює нове", async () => {
+      getCurrentUserMock.mockResolvedValueOnce(ADMIN);
+      resolveCustomerForOrderMock.mockResolvedValueOnce({
+        id: "cust1",
+        code1C: "FOREIGN",
+        name: "Any",
+      });
+      mockPrisma.order.findFirst.mockResolvedValueOnce({
+        id: "old1",
+        code1C: "000000099",
+        docNumber: 5,
+      });
+      createOrderWithItemsMock.mockResolvedValueOnce(fakeCreatedOrder());
+      const res = await POST(postReq({ ...validBody, force: true }));
+      expect(res.status).toBe(201);
+      const args = createOrderWithItemsMock.mock.calls[0] as [
+        unknown,
+        unknown,
+        unknown,
+        { clearOtherActual: boolean },
+      ];
+      expect(args[3].clearOtherActual).toBe(true);
+    });
+
+    it("force через ?force=true query теж приймається (admin)", async () => {
+      getCurrentUserMock.mockResolvedValueOnce(ADMIN);
+      resolveCustomerForOrderMock.mockResolvedValueOnce({
+        id: "cust1",
+        code1C: "FOREIGN",
+        name: "Any",
+      });
+      mockPrisma.order.findFirst.mockResolvedValueOnce({
+        id: "old1",
+        code1C: null,
+        docNumber: 5,
+      });
+      createOrderWithItemsMock.mockResolvedValueOnce(fakeCreatedOrder());
+      const res = await POST(
+        new NextRequest("http://localhost/api/v1/manager/orders?force=true", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(validBody),
+        }),
+      );
+      expect(res.status).toBe(201);
+    });
+
+    it("немає активного → створює нормально (clearOtherActual=false)", async () => {
+      setupOwnedClient();
+      // findFirst дефолтить null (beforeEach)
+      createOrderWithItemsMock.mockResolvedValueOnce(fakeCreatedOrder());
+      const res = await POST(postReq(validBody));
+      expect(res.status).toBe(201);
+      const args = createOrderWithItemsMock.mock.calls[0] as [
+        unknown,
+        unknown,
+        unknown,
+        { clearOtherActual: boolean },
+      ];
+      expect(args[3].clearOtherActual).toBe(false);
+    });
   });
 });

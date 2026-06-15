@@ -41,6 +41,13 @@ export const createOrderSchema = z.object({
   assignedAgentUserId: z.string().min(1).nullable().optional(),
   /** Вивантажувати в 1С (дефолт true). */
   exportTo1C: z.boolean().optional().default(true),
+
+  /**
+   * Форсоване створення другого активного замовлення (N1). Дозволено лише
+   * admin/owner/senior_manager — старі активні замовлення цього клієнта
+   * втрачають `isActual`. Можна також передати через `?force=true`.
+   */
+  force: z.boolean().optional(),
 });
 
 /**

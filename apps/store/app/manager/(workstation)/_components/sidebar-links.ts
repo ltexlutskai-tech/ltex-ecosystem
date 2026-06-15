@@ -11,6 +11,7 @@ import {
   MapPin,
   MessageCircle,
   PackagePlus,
+  PackageSearch,
   PieChart,
   ScrollText,
   Settings,
@@ -49,6 +50,7 @@ export const SECONDARY_LINKS: readonly SidebarLink[] = [
     icon: FileText,
   },
   { href: "/manager/reminders", label: "Нагадування", icon: Bell },
+  { href: "/manager/needs", label: "Потреби", icon: PackageSearch },
   {
     href: "/manager/closures",
     label: "Закриття старих замовлень",

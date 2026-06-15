@@ -8,13 +8,18 @@ const {
 } = vi.hoisted(() => {
   const tx = {
     orderItem: { deleteMany: vi.fn() },
-    order: { update: vi.fn() },
+    order: { update: vi.fn(), create: vi.fn(), updateMany: vi.fn() },
   };
   return {
     mockPrisma: {
-      order: { create: vi.fn(), update: tx.order.update },
+      order: {
+        create: vi.fn(),
+        update: tx.order.update,
+        updateMany: tx.order.updateMany,
+      },
       orderItem: tx.orderItem,
       $transaction: vi.fn(async (cb: (t: typeof tx) => unknown) => cb(tx)),
+      _tx: tx,
     },
     getCurrentRateMock: vi.fn(),
     enqueueOrderCreateMock: vi.fn(),
@@ -226,6 +231,34 @@ describe("createOrderWithItems", () => {
     expect(call.data.deliveryMethod).toBeNull();
     expect(call.data.cashOnDelivery).toBe(false);
     expect(call.data.exportTo1C).toBe(true);
+  });
+
+  it("clearOtherActual=false → НЕ використовує транзакцію, прямий create", async () => {
+    mockPrisma.order.create.mockResolvedValueOnce(fakeOrder());
+    await createOrderWithItems(baseInput, baseCustomer, actor, {
+      clearOtherActual: false,
+    });
+    expect(mockPrisma.$transaction).not.toHaveBeenCalled();
+    expect(mockPrisma.order.create).toHaveBeenCalledOnce();
+    expect(mockPrisma._tx.order.updateMany).not.toHaveBeenCalled();
+  });
+
+  it("clearOtherActual=true → у транзакції знімає isActual зі старих + create", async () => {
+    mockPrisma._tx.order.create.mockResolvedValueOnce(fakeOrder());
+    await createOrderWithItems(baseInput, baseCustomer, actor, {
+      clearOtherActual: true,
+    });
+    expect(mockPrisma.$transaction).toHaveBeenCalledOnce();
+    expect(mockPrisma._tx.order.updateMany).toHaveBeenCalledWith({
+      where: {
+        customerId: "cust1",
+        isActual: true,
+        archived: false,
+        closedAt: null,
+      },
+      data: { isActual: false },
+    });
+    expect(mockPrisma._tx.order.create).toHaveBeenCalledOnce();
   });
 });
 
