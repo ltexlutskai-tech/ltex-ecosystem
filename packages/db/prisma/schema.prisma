@@ -226,6 +226,7 @@ model Order {
   totalUah     Float   @default(0) @map("total_uah")
   exchangeRate Float   @default(0) @map("exchange_rate")
   notes        String?
+  agentName    String? @map("agent_name") // ТорговийАгент._Description (історичний імпорт 5.4.6a)
 
   // ─── Manager order fields (← 1С Document.Заказ, Етап 1) ──────────────────
   // Тип цін — id з довідника MgrPriceType (зберігаємо id, без жорсткого FK,
@@ -337,6 +338,7 @@ model Sale {
   exportTo1C          Boolean  @default(true) @map("export_to_1c")
   expressWaybill      String?  @map("express_waybill")
   notes               String?
+  agentName           String?  @map("agent_name") // ТорговийАгент._Description (історичний імпорт 5.4.6a)
   orderId             String?  @map("order_id")
   routeId             String?  @map("route_id")
   archived            Boolean  @default(false)

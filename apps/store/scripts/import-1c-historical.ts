@@ -19,7 +19,7 @@
  *   --dry-run            читає 1С + резолвить зв'язки, нічого не пише
  *   --limit N            лише перші N рядків кожної сутності (пробний прогон)
  *   --entity <name>      одна сутність: customers|products|lots|barcodes|prices|
- *                        orders|sales|cashorders|routesheets (дефолт = всі в порядку)
+ *                        orders|sales|cashorders|routesheets|debt (дефолт = всі в порядку)
  *   --confirm-prod       дозволити запис коли ціль = бойова база
  *   --batch N            розмір батчу запису (дефолт 500)
  *   --since YYYY-MM-DD   (опц.) лише документи з цієї дати
@@ -56,10 +56,12 @@ const ENTITY_NAMES = [
   "lots",
   "barcodes",
   "prices",
+  "dictionaries",
   "orders",
   "sales",
   "cashorders",
   "routesheets",
+  "debt",
 ] as const;
 
 type EntityName = (typeof ENTITY_NAMES)[number];
@@ -280,6 +282,11 @@ function asDate(v: unknown): Date | null {
 
 const DEFAULT_HISTORICAL_RATE = 43; // fallback EUR→UAH when doc rate is 0
 
+// Округлення до 2 знаків (для грошових EUR-сум).
+function round2(n: number): number {
+  return Math.round(n * 100) / 100;
+}
+
 // ─── Year-offset (A1) ─────────────────────────────────────────────────────────
 // 1С on MS SQL stores dates shifted by a base-year value kept in `_YearOffset`.
 // We read the offset once at startup and subtract it from every Date value.
@@ -450,6 +457,12 @@ interface ImportContext {
   regionNames: Map<string, string>;
   priceTypeCodes: Map<string, string>; // hex → _Code (= наш Price.priceType)
   legalTypeByHex: Map<string, string>; // hex(_IDRRef of _Enum377) → label
+  // ── 5.4.6a — довідники + резолв-мапи для документів (частина 2) ──
+  cashFlowArticleByHex: Map<string, string>; // hex → MgrCashFlowArticle.id
+  bankAccountByHex: Map<string, string>; // hex → MgrBankAccount.id
+  agentNameByHex: Map<string, string>; // hex → ТорговийАгент._Description
+  unitNameByHex: Map<string, string>; // hex → ЕдиницаИзмерения._Description
+  eurRateByDay: Map<string, number>; // "YYYY-MM-DD" → грн за 1 EUR
 }
 
 // Чи робимо реальні записи (НЕ dry-run).
@@ -1240,6 +1253,7 @@ const ORDER_ITEM_COLS = [
   "_LineNo1099",
   "_Fld1105RRef", // Номенклатура
   "_Fld1112RRef", // Характеристика (лот)
+  "_Fld1100RRef", // ЕдиницаИзмерения (Товары) → _Reference52 (CatalogRef.ЕдиницыИзмерения)
   "_Fld1102", // Количество
   "_Fld1110", // Сумма (line total)
   "_Fld6618", // ЦенаПродажиВес
@@ -1253,6 +1267,7 @@ async function importOrders(ctx: ImportContext): Promise<Recon> {
 
   await ensureCustomerDict(ctx);
   await ensureProductLotDicts(ctx);
+  await ensureDictMaps(ctx);
 
   const where = args.since ? "_Date_Time >= @since" : undefined;
   const params = args.since ? { since: args.since } : undefined;
@@ -1308,12 +1323,19 @@ async function importOrders(ctx: ImportContext): Promise<Recon> {
       const createdAt = asDate(row["_Date_Time"]);
       const notes = asString(row["_Fld1074"]);
       const closed = asBool(row["_Fld6914"]);
+      const agentName = (() => {
+        const h = bufToHex(row["_Fld6886RRef"]);
+        return h ? (ctx.agentNameByHex.get(h) ?? null) : null;
+      })();
 
       // Рядки замовлення.
       const items = await loadOrderItems(ctx, hex);
       const itemsTotalEur = items.reduce((s, it) => s + it.priceEur, 0);
       const totalEur = itemsTotalEur > 0 ? itemsTotalEur : totalDoc;
-      const rate = exchangeRate > 0 ? exchangeRate : DEFAULT_HISTORICAL_RATE;
+      // Курс на дату документа (історичний); fallback на курс документа → дефолт.
+      const rate =
+        eurRateForDate(ctx, createdAt) ??
+        (exchangeRate > 0 ? exchangeRate : DEFAULT_HISTORICAL_RATE);
       const totalUah = totalEur * rate;
 
       try {
@@ -1329,6 +1351,7 @@ async function importOrders(ctx: ImportContext): Promise<Recon> {
                 totalUah,
                 exchangeRate,
                 notes,
+                agentName,
                 archived: posted,
                 closedAt: closed ? (createdAt ?? new Date()) : null,
                 exportTo1C: false,
@@ -1341,6 +1364,7 @@ async function importOrders(ctx: ImportContext): Promise<Recon> {
                 totalUah,
                 exchangeRate,
                 notes,
+                agentName,
                 archived: posted,
                 closedAt: closed ? (createdAt ?? new Date()) : null,
                 // Дата теж оновлюється на реімпорті: усі історичні документи
@@ -1363,6 +1387,9 @@ async function importOrders(ctx: ImportContext): Promise<Recon> {
                   quantity: it.quantity,
                   unitPriceEur: it.unitPriceEur,
                   discountPercent: it.discountPercent,
+                  // it.unit декодовано (_Fld1100RRef → ЕдиницаИзмерения), але
+                  // модель OrderItem не має поля `unit` — не пишемо у БД.
+                  // (схему свідомо не розширюємо у 5.4.6a-2; follow-up за потреби)
                 })),
               });
             }
@@ -1389,6 +1416,9 @@ interface ResolvedItem {
   quantity: number;
   unitPriceEur: number | null;
   discountPercent: number | null;
+  // Декодовано з _Fld1100RRef (ЕдиницаИзмерения → _Reference52). OrderItem
+  // не має поля `unit`, тож у БД не пишемо — лишаємо для майбутнього use.
+  unit: string | null;
 }
 
 async function loadOrderItems(
@@ -1416,6 +1446,8 @@ async function loadOrderItems(
       const lotHex = bufToHex(row["_Fld1112RRef"]);
       const lot = lotHex ? ctx.lots.get(lotHex) : null;
       const lotId = lot && lot.id !== "(pending)" ? lot.id : null;
+      const unitHex = bufToHex(row["_Fld1100RRef"]);
+      const unit = unitHex ? (ctx.unitNameByHex.get(unitHex) ?? null) : null;
       out.push({
         productId: product.id,
         lotId,
@@ -1424,6 +1456,7 @@ async function loadOrderItems(
         quantity: 1,
         unitPriceEur: asNumber(row["_Fld6618"]),
         discountPercent: asNumber(row["_Fld1107"]),
+        unit,
       });
     }
   }
@@ -1471,6 +1504,7 @@ async function importSales(ctx: ImportContext): Promise<Recon> {
   await ensureCustomerDict(ctx);
   await ensureProductLotDicts(ctx);
   await ensureOrderDict(ctx);
+  await ensureDictMaps(ctx);
 
   const where = args.since ? "_Date_Time >= @since" : undefined;
   const params = args.since ? { since: args.since } : undefined;
@@ -1528,6 +1562,10 @@ async function importSales(ctx: ImportContext): Promise<Recon> {
       const codAmount = asNumber(row["_Fld7775"]);
       const npBranch = asString(row["_Fld7332"]);
       const waybill = asString(row["_Fld7768"]);
+      const agentName = (() => {
+        const h = bufToHex(row["_Fld6887RRef"]);
+        return h ? (ctx.agentNameByHex.get(h) ?? null) : null;
+      })();
       // Сделка → Заказ (полиморфне посилання, читаємо лише RRRef-частину).
       const orderId = (() => {
         const h = bufToHex(row["_Fld3490_RRRef"]);
@@ -1538,7 +1576,10 @@ async function importSales(ctx: ImportContext): Promise<Recon> {
       const items = await loadSaleItems(ctx, hex);
       const itemsTotalEur = items.reduce((s, it) => s + it.priceEur, 0);
       const totalEur = itemsTotalEur > 0 ? itemsTotalEur : totalDoc;
-      const rate = rateEur > 0 ? rateEur : DEFAULT_HISTORICAL_RATE;
+      // Курс на дату документа (історичний); fallback на курс реалізації → дефолт.
+      const rate =
+        eurRateForDate(ctx, createdAt) ??
+        (rateEur > 0 ? rateEur : DEFAULT_HISTORICAL_RATE);
       const totalUah = totalEur * rate;
 
       try {
@@ -1559,6 +1600,7 @@ async function importSales(ctx: ImportContext): Promise<Recon> {
                 novaPoshtaBranch: npBranch,
                 expressWaybill: waybill,
                 notes,
+                agentName,
                 orderId,
                 archived: posted,
                 exportTo1C: false,
@@ -1576,6 +1618,7 @@ async function importSales(ctx: ImportContext): Promise<Recon> {
                 novaPoshtaBranch: npBranch,
                 expressWaybill: waybill,
                 notes,
+                agentName,
                 orderId,
                 archived: posted,
                 // Дата оновлюється і на реімпорті (див. коментар у importOrders).
@@ -1622,6 +1665,8 @@ interface ResolvedSaleItem {
   priceEur: number;
 }
 
+// SaleItem-одиниці (ЕдиницаИзмерения у _Document189_VT3525) НЕ переносимо —
+// модель SaleItem не має поля `unit`; схему у 5.4.6a-2 свідомо не розширюємо.
 async function loadSaleItems(
   ctx: ImportContext,
   saleHex: string,
@@ -1684,6 +1729,8 @@ interface CashOrderFieldMap {
   comment: string;
   baseDocRRef: string; // ДокументОснование _Fld..._RRRef
   cashlessAmount: string | null; // тільки ПКО
+  articleRRef: string; // СтаттяРухуГрошовихКоштів → _Reference96
+  bankRRef: string; // БанковскийСчет → _Reference29
 }
 
 const PKO_MAP: CashOrderFieldMap = {
@@ -1700,6 +1747,8 @@ const PKO_MAP: CashOrderFieldMap = {
   comment: "_Fld3278",
   baseDocRRef: "_Fld3279_RRRef",
   cashlessAmount: "_Fld3290",
+  articleRRef: "_Fld3282RRef",
+  bankRRef: "_Fld3283RRef",
 };
 
 const RKO_MAP: CashOrderFieldMap = {
@@ -1716,6 +1765,8 @@ const RKO_MAP: CashOrderFieldMap = {
   comment: "_Fld3402",
   baseDocRRef: "_Fld3419_RRRef",
   cashlessAmount: null,
+  articleRRef: "_Fld3422RRef",
+  bankRRef: "_Fld3423RRef",
 };
 
 async function importCashOrders(ctx: ImportContext): Promise<Recon> {
@@ -1736,6 +1787,9 @@ async function importCashOrderTable(
   const sink = new ErrorSink(recon, `cashorders(${map.type})`);
   const { args, src, prisma } = ctx;
 
+  // Резолв-мапи довідників (стаття/банк/курс/агент) для standalone-прогону.
+  await ensureDictMaps(ctx);
+
   const cols = [
     "_IDRRef",
     "_Marked",
@@ -1749,6 +1803,8 @@ async function importCashOrderTable(
     map.docNumber,
     map.comment,
     map.baseDocRRef,
+    map.articleRRef,
+    map.bankRRef,
     ...(map.cashlessAmount ? [map.cashlessAmount] : []),
   ];
 
@@ -1806,13 +1862,26 @@ async function importCashOrderTable(
       // Зведена сума у EUR (СуммаДокумента) — як `reduceToEur` у живій касі:
       // суми ПКО/РКО зберігаються у гривні (підтверджено даними проду), тож
       // EUR = (готівка + безнал) ÷ курс. Без цього вкладка Оплати показує «0 €».
+      // Курс беремо історичний на дату документа; fallback — курс документа → дефолт.
+      const histRate = eurRateForDate(ctx, paidAt);
+      const effRate =
+        histRate ?? (rateEur > 0 ? rateEur : DEFAULT_HISTORICAL_RATE);
       const documentSumEur =
-        rateEur > 0
-          ? Math.round(((amount + cashless) / rateEur) * 100) / 100
-          : 0;
+        effRate > 0 ? round2((amount + cashless) / effRate) : 0;
       const customerId =
         customer && customer.id !== "(pending)" ? customer.id : null;
       const saleId = sale && sale.id !== "(pending)" ? sale.id : null;
+      // Стаття руху коштів + банк-рахунок (← довідники _Reference96 / _Reference29).
+      const cashFlowArticleId = (() => {
+        const id = ctx.cashFlowArticleByHex.get(
+          bufToHex(row[map.articleRRef]) ?? "",
+        );
+        return id && id !== "(pending)" ? id : null;
+      })();
+      const bankAccountId = (() => {
+        const id = ctx.bankAccountByHex.get(bufToHex(row[map.bankRRef]) ?? "");
+        return id && id !== "(pending)" ? id : null;
+      })();
 
       try {
         if (willWrite(ctx)) {
@@ -1824,6 +1893,8 @@ async function importCashOrderTable(
               ...(docNumber != null ? { docNumber } : {}),
               customerId,
               saleId,
+              cashFlowArticleId,
+              bankAccountId,
               amountUah: amount,
               amountUahCashless: cashless,
               rateEur,
@@ -1837,6 +1908,8 @@ async function importCashOrderTable(
               type: map.type,
               customerId,
               saleId,
+              cashFlowArticleId,
+              bankAccountId,
               amountUah: amount,
               amountUahCashless: cashless,
               rateEur,
@@ -1898,6 +1971,7 @@ async function importRouteSheets(ctx: ImportContext): Promise<Recon> {
   await ensureCustomerDict(ctx);
   await ensureProductLotDicts(ctx);
   await ensureOrderDict(ctx);
+  await ensureDictMaps(ctx);
 
   const where = args.since ? "_Date_Time >= @since" : undefined;
   const params = args.since ? { since: args.since } : undefined;
@@ -2436,6 +2510,533 @@ async function ensureOrderDict(ctx: ImportContext): Promise<void> {
   }
 }
 
+// ─── Підвантаження довідкових резолв-мап для документів (5.4.6a, частина 2) ───
+// При ізольованому `--entity orders|sales|cashorders|routesheets` мапи з main()
+// порожні (бо dictionaries не виконувався). Заповнюємо їх ліниво (guard по size),
+// щоб standalone-прогони документів резолвили агента/курс/статтю/банк-рахунок.
+async function ensureDictMaps(ctx: ImportContext): Promise<void> {
+  if (ctx.agentNameByHex.size === 0) await loadAgentNames(ctx);
+  if (ctx.unitNameByHex.size === 0) await loadUnitNames(ctx);
+  if (ctx.eurRateByDay.size === 0) {
+    // importRates і апсертить ExchangeRate, і наповнює eurRateByDay; на повторі
+    // upsert ідемпотентний — безпечно.
+    await importRates(ctx);
+  }
+  if (ctx.cashFlowArticleByHex.size === 0 || ctx.bankAccountByHex.size === 0) {
+    // Id-мапи беремо з ЦІЛЬОВОЇ бази за code1C (= hex), бо довідники вже
+    // імпортовані окремою сутністю `dictionaries`.
+    try {
+      const articles = await ctx.prisma.mgrCashFlowArticle.findMany({
+        select: { id: true, code1C: true },
+      });
+      for (const a of articles) {
+        if (a.code1C) ctx.cashFlowArticleByHex.set(a.code1C, a.id);
+      }
+    } catch (e) {
+      warn(`ensureDictMaps(cashFlowArticles): ${errMsg(e)}`);
+    }
+    try {
+      const banks = await ctx.prisma.mgrBankAccount.findMany({
+        select: { id: true, code1C: true },
+      });
+      for (const b of banks) {
+        if (b.code1C) ctx.bankAccountByHex.set(b.code1C, b.id);
+      }
+    } catch (e) {
+      warn(`ensureDictMaps(bankAccounts): ${errMsg(e)}`);
+    }
+  }
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// 10. ДОВІДНИКИ + КУРСИ ВАЛЮТ (5.4.6a, частина 1)
+// ════════════════════════════════════════════════════════════════════════════
+// Імпортуємо довідкові каталоги у наші таблиці + будуємо резолв-мапи у
+// ImportContext, на які покладатиметься дозбір документів (частина 2). Усі
+// підімпорти самодостатні (будують власні мапи + таблиці) — стандалон-запуск
+// `--entity dictionaries` не залежить від інших сутностей.
+
+// ─── 10.1 СтатьиДвиженияДенежныхСредств → MgrCashFlowArticle ─ _Reference96 ───
+// Ієрархічний довідник (_Folder/_ParentIDRRef). parentId на цьому проході
+// лишаємо null (follow-up: 2-й прохід для зв'язування ієрархії за hex батька).
+
+const CASH_FLOW_ARTICLE_COLS = [
+  "_IDRRef",
+  "_Code", // nchar(9)
+  "_Description", // nvarchar(100)
+];
+
+async function importCashFlowArticles(ctx: ImportContext): Promise<Recon> {
+  const recon = newRecon("cashflowarticles");
+  const sink = new ErrorSink(recon, "cashflowarticles");
+  const { args, src, prisma } = ctx;
+
+  recon.sourceRows = await countTable(src, "_Reference96");
+  log(`cashflowarticles: source rows = ${recon.sourceRows}`);
+
+  for await (const rows of streamTable(
+    src,
+    "_Reference96",
+    CASH_FLOW_ARTICLE_COLS,
+    {
+      batch: args.batch,
+      limit: args.limit,
+      orderBy: ["_IDRRef"],
+    },
+  )) {
+    for (const row of rows) {
+      const hex = bufToHex(row["_IDRRef"]);
+      if (!hex) {
+        recon.skipped++;
+        continue;
+      }
+      const code = asString(row["_Code"]);
+      const name = asTrimmed(row["_Description"]) || hex;
+      try {
+        let id = "(pending)";
+        if (willWrite(ctx)) {
+          const created = await prisma.mgrCashFlowArticle.upsert({
+            where: { code1C: hex },
+            // parentId лишаємо null цього проходу (ієрархія — follow-up).
+            create: { code1C: hex, code, name },
+            update: { code, name },
+            select: { id: true },
+          });
+          id = created.id;
+        }
+        ctx.cashFlowArticleByHex.set(hex, id);
+        recon.written++;
+      } catch (e) {
+        sink.record(code ?? hex, e);
+      }
+    }
+  }
+  log(`cashflowarticles: mapped ${ctx.cashFlowArticleByHex.size} hex→id`);
+  return recon;
+}
+
+// ─── 10.2 БанковскиеСчета → MgrBankAccount ─ _Reference29 ─────────────────────
+
+const BANK_ACCOUNT_COLS = [
+  "_IDRRef",
+  "_Description", // name
+  "_Fld5869", // IBAN/№ рахунку (nvarchar34)
+  "_Fld7710", // НеВідображатиВДодатку (bin1)
+];
+
+async function importBankAccounts(ctx: ImportContext): Promise<Recon> {
+  const recon = newRecon("bankaccounts");
+  const sink = new ErrorSink(recon, "bankaccounts");
+  const { args, src, prisma } = ctx;
+
+  recon.sourceRows = await countTable(src, "_Reference29");
+  log(`bankaccounts: source rows = ${recon.sourceRows}`);
+
+  for await (const rows of streamTable(src, "_Reference29", BANK_ACCOUNT_COLS, {
+    batch: args.batch,
+    limit: args.limit,
+    orderBy: ["_IDRRef"],
+  })) {
+    for (const row of rows) {
+      const hex = bufToHex(row["_IDRRef"]);
+      if (!hex) {
+        recon.skipped++;
+        continue;
+      }
+      const name = asTrimmed(row["_Description"]) || hex;
+      const description = asString(row["_Fld5869"]);
+      const hiddenInApp = asBool(row["_Fld7710"]);
+      try {
+        let id = "(pending)";
+        if (willWrite(ctx)) {
+          const created = await prisma.mgrBankAccount.upsert({
+            where: { code1C: hex },
+            create: { code1C: hex, name, description, hiddenInApp },
+            update: { name, description, hiddenInApp },
+            select: { id: true },
+          });
+          id = created.id;
+        }
+        ctx.bankAccountByHex.set(hex, id);
+        recon.written++;
+      } catch (e) {
+        sink.record(hex, e);
+      }
+    }
+  }
+  log(`bankaccounts: mapped ${ctx.bankAccountByHex.size} hex→id`);
+  return recon;
+}
+
+// ─── 10.3 Маршруты → MgrRoute ─ _Reference7513 ───────────────────────────────
+// Recon-сутність "routes1c" (щоб не плутати з документами "routesheets").
+
+const ROUTE_COLS = [
+  "_IDRRef",
+  "_Description", // name
+];
+
+async function importRoutes(ctx: ImportContext): Promise<Recon> {
+  const recon = newRecon("routes1c");
+  const sink = new ErrorSink(recon, "routes1c");
+  const { args, src, prisma } = ctx;
+
+  recon.sourceRows = await countTable(src, "_Reference7513");
+  log(`routes1c: source rows = ${recon.sourceRows}`);
+
+  for await (const rows of streamTable(src, "_Reference7513", ROUTE_COLS, {
+    batch: args.batch,
+    limit: args.limit,
+    orderBy: ["_IDRRef"],
+  })) {
+    for (const row of rows) {
+      const hex = bufToHex(row["_IDRRef"]);
+      if (!hex) {
+        recon.skipped++;
+        continue;
+      }
+      const name = asTrimmed(row["_Description"]) || hex;
+      try {
+        if (willWrite(ctx)) {
+          await prisma.mgrRoute.upsert({
+            where: { code1C: hex },
+            create: { code1C: hex, name },
+            update: { name },
+          });
+        }
+        recon.written++;
+      } catch (e) {
+        sink.record(hex, e);
+      }
+    }
+  }
+  return recon;
+}
+
+// ─── 10.4 ТорговыеАгенты → мапа hex→назва ─ _Reference6628 ────────────────────
+// Лише пам'ять-мапа (таблиці нема — менеджери/агенти резолвляться окремо).
+
+async function loadAgentNames(ctx: ImportContext): Promise<Recon> {
+  const recon = newRecon("agents");
+  const { args, src } = ctx;
+
+  recon.sourceRows = await countTable(src, "_Reference6628");
+  log(`agents: source rows = ${recon.sourceRows}`);
+
+  for await (const rows of streamTable(
+    src,
+    "_Reference6628",
+    ["_IDRRef", "_Description"],
+    { batch: args.batch, limit: args.limit, orderBy: ["_IDRRef"] },
+  )) {
+    for (const row of rows) {
+      const hex = bufToHex(row["_IDRRef"]);
+      const name = asTrimmed(row["_Description"]);
+      if (!hex || !name) {
+        recon.skipped++;
+        continue;
+      }
+      ctx.agentNameByHex.set(hex, name);
+      recon.written++; // "written" тут = додано у мапу
+    }
+  }
+  log(`agents: mapped ${ctx.agentNameByHex.size} hex→name`);
+  return recon;
+}
+
+// ─── 10.5 ЕдиницыИзмерения → мапа hex→назва ─ _Reference52 ────────────────────
+// Лише пам'ять-мапа (кг/шт/пара) для майбутнього резолву одиниць у рядках.
+
+async function loadUnitNames(ctx: ImportContext): Promise<Recon> {
+  const recon = newRecon("units");
+  const { args, src } = ctx;
+
+  recon.sourceRows = await countTable(src, "_Reference52");
+  log(`units: source rows = ${recon.sourceRows}`);
+
+  for await (const rows of streamTable(
+    src,
+    "_Reference52",
+    ["_IDRRef", "_Description"],
+    { batch: args.batch, limit: args.limit, orderBy: ["_IDRRef"] },
+  )) {
+    for (const row of rows) {
+      const hex = bufToHex(row["_IDRRef"]);
+      const name = asTrimmed(row["_Description"]);
+      if (!hex || !name) {
+        recon.skipped++;
+        continue;
+      }
+      ctx.unitNameByHex.set(hex, name);
+      recon.written++; // "written" тут = додано у мапу
+    }
+  }
+  log(`units: mapped ${ctx.unitNameByHex.size} hex→name`);
+  return recon;
+}
+
+// ─── 10.6 КурсыВалют → ExchangeRate ─ _InfoRg4655 (+ _Reference30 Валюты) ─────
+// EUR/USD визначаємо за Валютою: _Description="EUR"/"USD" АБО ISO _Code
+// "978"/"840". Курс = _Fld4657 / _Fld4658(кратність). Дата = _Period (вже з
+// year-offset через asDate). EUR-рядки також пишемо у ctx.eurRateByDay для
+// документів частини 2.
+
+const CURRENCY_COLS = [
+  "_IDRRef",
+  "_Code", // nchar(3) ISO numeric
+  "_Description", // nvarchar(10) alpha
+];
+
+function classifyCurrency(
+  code: string | null,
+  desc: string | null,
+): "EUR" | "USD" | null {
+  const d = (desc ?? "").trim().toUpperCase();
+  const c = (code ?? "").trim();
+  if (d === "EUR" || c === "978") return "EUR";
+  if (d === "USD" || c === "840") return "USD";
+  return null;
+}
+
+function dayKey(date: Date): string {
+  return date.toISOString().slice(0, 10);
+}
+
+// ─── Історичний курс EUR→UAH на дату документа (5.4.6a, частина 2) ────────────
+// Повертає курс грн/EUR для заданого дня з ctx.eurRateByDay: точний день, або —
+// якщо такого нема — НАЙБЛИЖЧИЙ РАНІШИЙ день (≤ цільового). null коли дата
+// порожня або мапа порожня. Відсортований масив [dayKey, rate] кешується ліниво
+// й перебудовується лише коли змінився розмір мапи.
+let _eurRateSorted: [string, number][] | null = null;
+let _eurRateSortedSize = -1;
+
+function eurRateForDate(ctx: ImportContext, date: Date | null): number | null {
+  if (!date) return null;
+  const map = ctx.eurRateByDay;
+  if (map.size === 0) return null;
+  if (_eurRateSorted === null || _eurRateSortedSize !== map.size) {
+    _eurRateSorted = [...map.entries()].sort((a, b) =>
+      a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0,
+    );
+    _eurRateSortedSize = map.size;
+  }
+  const target = dayKey(date);
+  const exact = map.get(target);
+  if (exact != null) return exact;
+  // Найбільший ключ ≤ target (бінарний пошук по відсортованому масиву).
+  const entries = _eurRateSorted;
+  let lo = 0;
+  let hi = entries.length - 1;
+  let best: number | null = null;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    if (entries[mid]![0] <= target) {
+      best = entries[mid]![1];
+      lo = mid + 1;
+    } else {
+      hi = mid - 1;
+    }
+  }
+  return best;
+}
+
+const RATE_COLS = [
+  "_Period",
+  "_RecorderRRef", // тай-брейкер сортування
+  "_LineNo", // тай-брейкер сортування
+  "_Fld4656RRef", // Валюта (FK → _Reference30)
+  "_Fld4657", // Курс (numeric10,4)
+  "_Fld4658", // Кратность (numeric10,0)
+];
+
+async function importRates(ctx: ImportContext): Promise<Recon> {
+  const recon = newRecon("rates");
+  const sink = new ErrorSink(recon, "rates");
+  const { args, src, prisma } = ctx;
+
+  // Локальна мапа hex(валюта) → "EUR"|"USD"|null.
+  const currencyByHex = new Map<string, "EUR" | "USD" | null>();
+  for await (const rows of streamTable(src, "_Reference30", CURRENCY_COLS, {
+    batch: 2000,
+    limit: null,
+    orderBy: ["_IDRRef"],
+  })) {
+    for (const row of rows) {
+      const hex = bufToHex(row["_IDRRef"]);
+      if (!hex) continue;
+      currencyByHex.set(
+        hex,
+        classifyCurrency(asString(row["_Code"]), asString(row["_Description"])),
+      );
+    }
+  }
+  log(`rates: currencies decoded = ${currencyByHex.size}`);
+
+  recon.sourceRows = await countTable(src, "_InfoRg4655");
+  log(`rates: source rows = ${recon.sourceRows}`);
+
+  for await (const rows of streamTable(src, "_InfoRg4655", RATE_COLS, {
+    batch: args.batch,
+    limit: args.limit,
+    orderBy: ["_Period", "_RecorderRRef", "_LineNo"],
+  })) {
+    for (const row of rows) {
+      const curHex = bufToHex(row["_Fld4656RRef"]);
+      const cur = curHex ? (currencyByHex.get(curHex) ?? null) : null;
+      if (!cur) {
+        recon.skipped++;
+        continue;
+      }
+      const mult = asNumberOr(row["_Fld4658"], 1) || 1;
+      const rate = asNumberOr(row["_Fld4657"], 0) / mult;
+      const date = asDate(row["_Period"]);
+      if (!date || rate <= 0) {
+        recon.skipped++;
+        continue;
+      }
+
+      try {
+        if (willWrite(ctx)) {
+          // Idempotent через складений унікальний ключ (currencyFrom, currencyTo,
+          // date). Один прогон = один запис на (валюта, дата).
+          await prisma.exchangeRate.upsert({
+            where: {
+              currencyFrom_currencyTo_date: {
+                currencyFrom: cur,
+                currencyTo: "UAH",
+                date,
+              },
+            },
+            create: {
+              currencyFrom: cur,
+              currencyTo: "UAH",
+              rate,
+              date,
+              source: "1c",
+            },
+            update: { rate, source: "1c" },
+          });
+        }
+        if (cur === "EUR") ctx.eurRateByDay.set(dayKey(date), rate);
+        recon.written++;
+      } catch (e) {
+        sink.record(`${cur}/${dayKey(date)}`, e);
+      }
+    }
+    log(`rates: processed ${recon.written + recon.skipped + recon.errors}`);
+  }
+  log(`rates: eurRateByDay = ${ctx.eurRateByDay.size} days`);
+  return recon;
+}
+
+// ─── 10.0 Раннер сутності `dictionaries` ─────────────────────────────────────
+// Виконує всі підімпорти + мапи; повертає один зведений Recon (лічильники —
+// сума підімпортів) для інформативного звіту.
+
+async function importDictionaries(ctx: ImportContext): Promise<Recon> {
+  const combined = newRecon("dictionaries");
+  const parts = [
+    await importCashFlowArticles(ctx),
+    await importBankAccounts(ctx),
+    await importRoutes(ctx),
+    await loadAgentNames(ctx),
+    await loadUnitNames(ctx),
+    await importRates(ctx),
+  ];
+  for (const p of parts) {
+    combined.sourceRows += p.sourceRows;
+    combined.written += p.written;
+    combined.skipped += p.skipped;
+    combined.errors += p.errors;
+    combined.unresolved += p.unresolved;
+  }
+  return combined;
+}
+
+// ─── 11. ВзаиморасчетыСКонтрагентами → MgrClient.debt ─ _AccumRg5269 ───────────
+// Регістр накопичення «Взаиморасчеты с контрагентами». Агрегуємо чистий борг
+// кожного клієнта (Контрагент _Fld5273RRef) по ресурсу СуммаУпр (_Fld5275)
+// з урахуванням знаку руху (_RecordKind: 0 = приход/+, 1 = расход/−).
+// Результат записуємо у MgrClient.debt, зіставляючи за uid1C (hex _IDRRef
+// контрагента), який importCustomers зберіг раніше.
+//
+// Порядок сортування: ["_RecorderRRef", "_LineNo"] — детермінований складений
+// ключ (обидва наявні у _AccumRg5269 згідно docs/1c-mssql-schema/columns.tsv).
+// Фільтр активних рухів: _Active = 0x01 (колонка _Active binary(1) присутня).
+
+// Множник знаку боргу. Якщо у живих даних борг показується з інвертованим
+// знаком — змінити на -1.
+// TODO: якщо знак боргу інвертований на живих даних — змінити на -1
+const DEBT_SIGN = 1;
+
+const DEBT_COLS = ["_RecordKind", "_Fld5273RRef", "_Fld5275"];
+
+async function importDebt(ctx: ImportContext): Promise<Recon> {
+  const recon = newRecon("debt");
+  const sink = new ErrorSink(recon, "debt");
+  const { args, src, prisma } = ctx;
+
+  const activeWhere = "_Active = 0x01";
+  recon.sourceRows = await countTable(src, "_AccumRg5269", activeWhere);
+  log(`debt: active source rows = ${recon.sourceRows}`);
+
+  // Агрегат: hex(Контрагент) → net EUR-сума (+ приход, - витрата).
+  const debtByHex = new Map<string, number>();
+
+  for await (const rows of streamTable(src, "_AccumRg5269", DEBT_COLS, {
+    batch: args.batch,
+    limit: args.limit,
+    orderBy: ["_RecorderRRef", "_LineNo"],
+    where: activeWhere,
+  })) {
+    for (const row of rows) {
+      const hex = bufToHex(row["_Fld5273RRef"]);
+      if (!hex) continue;
+      const amt = asNumberOr(row["_Fld5275"], 0);
+      const kind = asNumber(row["_RecordKind"]) ?? 0;
+      // RecordKind 0 = приход (збільшує борг клієнта перед нами), 1 = витрата (зменшує).
+      const signed = kind === 0 ? amt : -amt;
+      debtByHex.set(hex, (debtByHex.get(hex) ?? 0) + signed);
+    }
+  }
+
+  log(`debt: aggregated ${debtByHex.size} unique Контрагентів`);
+
+  if (willWrite(ctx)) {
+    let processed = 0;
+    for (const [hex, sum] of debtByHex) {
+      const value = round2(DEBT_SIGN * sum);
+      try {
+        const res = await prisma.mgrClient.updateMany({
+          where: { uid1C: hex },
+          data: { debt: value },
+        });
+        if (res.count > 0) {
+          recon.written++;
+        } else {
+          recon.unresolved++;
+        }
+      } catch (e) {
+        sink.record(hex, e);
+      }
+      processed++;
+      if (processed % 500 === 0) {
+        log(
+          `debt: updated ${recon.written} clients (${recon.unresolved} unresolved, ${processed}/${debtByHex.size} processed)`,
+        );
+      }
+    }
+  } else {
+    // dry-run: рахуємо як "would write"
+    recon.written = debtByHex.size;
+  }
+
+  log(
+    `debt: done — written=${recon.written} unresolved=${recon.unresolved} errors=${recon.errors}`,
+  );
+  return recon;
+}
+
 // ════════════════════════════════════════════════════════════════════════════
 // MAIN
 // ════════════════════════════════════════════════════════════════════════════
@@ -2449,23 +3050,28 @@ const ENTITY_RUNNERS: Record<
   lots: importLots,
   barcodes: importBarcodes,
   prices: importPrices,
+  dictionaries: importDictionaries,
   orders: importOrders,
   sales: importSales,
   cashorders: importCashOrders,
   routesheets: importRouteSheets,
+  debt: importDebt,
 };
 
 // Порядок за FK-залежностями (план §13).
+// `debt` — в кінці: лише оновлює MgrClient.debt, не потребує документів.
 const DEFAULT_ORDER: EntityName[] = [
   "customers",
   "products",
   "barcodes",
   "lots",
   "prices",
+  "dictionaries",
   "orders",
   "sales",
   "cashorders",
   "routesheets",
+  "debt",
 ];
 
 function printReconTable(recons: Recon[], dryRun: boolean): void {
@@ -2564,6 +3170,11 @@ async function main(): Promise<void> {
     regionNames: new Map(),
     priceTypeCodes: new Map(),
     legalTypeByHex: new Map(),
+    cashFlowArticleByHex: new Map(),
+    bankAccountByHex: new Map(),
+    agentNameByHex: new Map(),
+    unitNameByHex: new Map(),
+    eurRateByDay: new Map(),
   };
 
   // Дрібні довідники назв (city/region) — потрібні для Customer.
