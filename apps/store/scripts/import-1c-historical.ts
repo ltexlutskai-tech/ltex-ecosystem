@@ -281,6 +281,11 @@ function asDate(v: unknown): Date | null {
 
 const DEFAULT_HISTORICAL_RATE = 43; // fallback EUR→UAH when doc rate is 0
 
+// Округлення до 2 знаків (для грошових EUR-сум).
+function round2(n: number): number {
+  return Math.round(n * 100) / 100;
+}
+
 // ─── Year-offset (A1) ─────────────────────────────────────────────────────────
 // 1С on MS SQL stores dates shifted by a base-year value kept in `_YearOffset`.
 // We read the offset once at startup and subtract it from every Date value.
@@ -1247,6 +1252,7 @@ const ORDER_ITEM_COLS = [
   "_LineNo1099",
   "_Fld1105RRef", // Номенклатура
   "_Fld1112RRef", // Характеристика (лот)
+  "_Fld1100RRef", // ЕдиницаИзмерения (Товары) → _Reference52 (CatalogRef.ЕдиницыИзмерения)
   "_Fld1102", // Количество
   "_Fld1110", // Сумма (line total)
   "_Fld6618", // ЦенаПродажиВес
@@ -1260,6 +1266,7 @@ async function importOrders(ctx: ImportContext): Promise<Recon> {
 
   await ensureCustomerDict(ctx);
   await ensureProductLotDicts(ctx);
+  await ensureDictMaps(ctx);
 
   const where = args.since ? "_Date_Time >= @since" : undefined;
   const params = args.since ? { since: args.since } : undefined;
@@ -1315,12 +1322,19 @@ async function importOrders(ctx: ImportContext): Promise<Recon> {
       const createdAt = asDate(row["_Date_Time"]);
       const notes = asString(row["_Fld1074"]);
       const closed = asBool(row["_Fld6914"]);
+      const agentName = (() => {
+        const h = bufToHex(row["_Fld6886RRef"]);
+        return h ? (ctx.agentNameByHex.get(h) ?? null) : null;
+      })();
 
       // Рядки замовлення.
       const items = await loadOrderItems(ctx, hex);
       const itemsTotalEur = items.reduce((s, it) => s + it.priceEur, 0);
       const totalEur = itemsTotalEur > 0 ? itemsTotalEur : totalDoc;
-      const rate = exchangeRate > 0 ? exchangeRate : DEFAULT_HISTORICAL_RATE;
+      // Курс на дату документа (історичний); fallback на курс документа → дефолт.
+      const rate =
+        eurRateForDate(ctx, createdAt) ??
+        (exchangeRate > 0 ? exchangeRate : DEFAULT_HISTORICAL_RATE);
       const totalUah = totalEur * rate;
 
       try {
@@ -1336,6 +1350,7 @@ async function importOrders(ctx: ImportContext): Promise<Recon> {
                 totalUah,
                 exchangeRate,
                 notes,
+                agentName,
                 archived: posted,
                 closedAt: closed ? (createdAt ?? new Date()) : null,
                 exportTo1C: false,
@@ -1348,6 +1363,7 @@ async function importOrders(ctx: ImportContext): Promise<Recon> {
                 totalUah,
                 exchangeRate,
                 notes,
+                agentName,
                 archived: posted,
                 closedAt: closed ? (createdAt ?? new Date()) : null,
                 // Дата теж оновлюється на реімпорті: усі історичні документи
@@ -1370,6 +1386,9 @@ async function importOrders(ctx: ImportContext): Promise<Recon> {
                   quantity: it.quantity,
                   unitPriceEur: it.unitPriceEur,
                   discountPercent: it.discountPercent,
+                  // it.unit декодовано (_Fld1100RRef → ЕдиницаИзмерения), але
+                  // модель OrderItem не має поля `unit` — не пишемо у БД.
+                  // (схему свідомо не розширюємо у 5.4.6a-2; follow-up за потреби)
                 })),
               });
             }
@@ -1396,6 +1415,9 @@ interface ResolvedItem {
   quantity: number;
   unitPriceEur: number | null;
   discountPercent: number | null;
+  // Декодовано з _Fld1100RRef (ЕдиницаИзмерения → _Reference52). OrderItem
+  // не має поля `unit`, тож у БД не пишемо — лишаємо для майбутнього use.
+  unit: string | null;
 }
 
 async function loadOrderItems(
@@ -1423,6 +1445,8 @@ async function loadOrderItems(
       const lotHex = bufToHex(row["_Fld1112RRef"]);
       const lot = lotHex ? ctx.lots.get(lotHex) : null;
       const lotId = lot && lot.id !== "(pending)" ? lot.id : null;
+      const unitHex = bufToHex(row["_Fld1100RRef"]);
+      const unit = unitHex ? (ctx.unitNameByHex.get(unitHex) ?? null) : null;
       out.push({
         productId: product.id,
         lotId,
@@ -1431,6 +1455,7 @@ async function loadOrderItems(
         quantity: 1,
         unitPriceEur: asNumber(row["_Fld6618"]),
         discountPercent: asNumber(row["_Fld1107"]),
+        unit,
       });
     }
   }
@@ -1478,6 +1503,7 @@ async function importSales(ctx: ImportContext): Promise<Recon> {
   await ensureCustomerDict(ctx);
   await ensureProductLotDicts(ctx);
   await ensureOrderDict(ctx);
+  await ensureDictMaps(ctx);
 
   const where = args.since ? "_Date_Time >= @since" : undefined;
   const params = args.since ? { since: args.since } : undefined;
@@ -1535,6 +1561,10 @@ async function importSales(ctx: ImportContext): Promise<Recon> {
       const codAmount = asNumber(row["_Fld7775"]);
       const npBranch = asString(row["_Fld7332"]);
       const waybill = asString(row["_Fld7768"]);
+      const agentName = (() => {
+        const h = bufToHex(row["_Fld6887RRef"]);
+        return h ? (ctx.agentNameByHex.get(h) ?? null) : null;
+      })();
       // Сделка → Заказ (полиморфне посилання, читаємо лише RRRef-частину).
       const orderId = (() => {
         const h = bufToHex(row["_Fld3490_RRRef"]);
@@ -1545,7 +1575,10 @@ async function importSales(ctx: ImportContext): Promise<Recon> {
       const items = await loadSaleItems(ctx, hex);
       const itemsTotalEur = items.reduce((s, it) => s + it.priceEur, 0);
       const totalEur = itemsTotalEur > 0 ? itemsTotalEur : totalDoc;
-      const rate = rateEur > 0 ? rateEur : DEFAULT_HISTORICAL_RATE;
+      // Курс на дату документа (історичний); fallback на курс реалізації → дефолт.
+      const rate =
+        eurRateForDate(ctx, createdAt) ??
+        (rateEur > 0 ? rateEur : DEFAULT_HISTORICAL_RATE);
       const totalUah = totalEur * rate;
 
       try {
@@ -1566,6 +1599,7 @@ async function importSales(ctx: ImportContext): Promise<Recon> {
                 novaPoshtaBranch: npBranch,
                 expressWaybill: waybill,
                 notes,
+                agentName,
                 orderId,
                 archived: posted,
                 exportTo1C: false,
@@ -1583,6 +1617,7 @@ async function importSales(ctx: ImportContext): Promise<Recon> {
                 novaPoshtaBranch: npBranch,
                 expressWaybill: waybill,
                 notes,
+                agentName,
                 orderId,
                 archived: posted,
                 // Дата оновлюється і на реімпорті (див. коментар у importOrders).
@@ -1629,6 +1664,8 @@ interface ResolvedSaleItem {
   priceEur: number;
 }
 
+// SaleItem-одиниці (ЕдиницаИзмерения у _Document189_VT3525) НЕ переносимо —
+// модель SaleItem не має поля `unit`; схему у 5.4.6a-2 свідомо не розширюємо.
 async function loadSaleItems(
   ctx: ImportContext,
   saleHex: string,
@@ -1691,6 +1728,8 @@ interface CashOrderFieldMap {
   comment: string;
   baseDocRRef: string; // ДокументОснование _Fld..._RRRef
   cashlessAmount: string | null; // тільки ПКО
+  articleRRef: string; // СтаттяРухуГрошовихКоштів → _Reference96
+  bankRRef: string; // БанковскийСчет → _Reference29
 }
 
 const PKO_MAP: CashOrderFieldMap = {
@@ -1707,6 +1746,8 @@ const PKO_MAP: CashOrderFieldMap = {
   comment: "_Fld3278",
   baseDocRRef: "_Fld3279_RRRef",
   cashlessAmount: "_Fld3290",
+  articleRRef: "_Fld3282RRef",
+  bankRRef: "_Fld3283RRef",
 };
 
 const RKO_MAP: CashOrderFieldMap = {
@@ -1723,6 +1764,8 @@ const RKO_MAP: CashOrderFieldMap = {
   comment: "_Fld3402",
   baseDocRRef: "_Fld3419_RRRef",
   cashlessAmount: null,
+  articleRRef: "_Fld3422RRef",
+  bankRRef: "_Fld3423RRef",
 };
 
 async function importCashOrders(ctx: ImportContext): Promise<Recon> {
@@ -1743,6 +1786,9 @@ async function importCashOrderTable(
   const sink = new ErrorSink(recon, `cashorders(${map.type})`);
   const { args, src, prisma } = ctx;
 
+  // Резолв-мапи довідників (стаття/банк/курс/агент) для standalone-прогону.
+  await ensureDictMaps(ctx);
+
   const cols = [
     "_IDRRef",
     "_Marked",
@@ -1756,6 +1802,8 @@ async function importCashOrderTable(
     map.docNumber,
     map.comment,
     map.baseDocRRef,
+    map.articleRRef,
+    map.bankRRef,
     ...(map.cashlessAmount ? [map.cashlessAmount] : []),
   ];
 
@@ -1813,13 +1861,26 @@ async function importCashOrderTable(
       // Зведена сума у EUR (СуммаДокумента) — як `reduceToEur` у живій касі:
       // суми ПКО/РКО зберігаються у гривні (підтверджено даними проду), тож
       // EUR = (готівка + безнал) ÷ курс. Без цього вкладка Оплати показує «0 €».
+      // Курс беремо історичний на дату документа; fallback — курс документа → дефолт.
+      const histRate = eurRateForDate(ctx, paidAt);
+      const effRate =
+        histRate ?? (rateEur > 0 ? rateEur : DEFAULT_HISTORICAL_RATE);
       const documentSumEur =
-        rateEur > 0
-          ? Math.round(((amount + cashless) / rateEur) * 100) / 100
-          : 0;
+        effRate > 0 ? round2((amount + cashless) / effRate) : 0;
       const customerId =
         customer && customer.id !== "(pending)" ? customer.id : null;
       const saleId = sale && sale.id !== "(pending)" ? sale.id : null;
+      // Стаття руху коштів + банк-рахунок (← довідники _Reference96 / _Reference29).
+      const cashFlowArticleId = (() => {
+        const id = ctx.cashFlowArticleByHex.get(
+          bufToHex(row[map.articleRRef]) ?? "",
+        );
+        return id && id !== "(pending)" ? id : null;
+      })();
+      const bankAccountId = (() => {
+        const id = ctx.bankAccountByHex.get(bufToHex(row[map.bankRRef]) ?? "");
+        return id && id !== "(pending)" ? id : null;
+      })();
 
       try {
         if (willWrite(ctx)) {
@@ -1831,6 +1892,8 @@ async function importCashOrderTable(
               ...(docNumber != null ? { docNumber } : {}),
               customerId,
               saleId,
+              cashFlowArticleId,
+              bankAccountId,
               amountUah: amount,
               amountUahCashless: cashless,
               rateEur,
@@ -1844,6 +1907,8 @@ async function importCashOrderTable(
               type: map.type,
               customerId,
               saleId,
+              cashFlowArticleId,
+              bankAccountId,
               amountUah: amount,
               amountUahCashless: cashless,
               rateEur,
@@ -1905,6 +1970,7 @@ async function importRouteSheets(ctx: ImportContext): Promise<Recon> {
   await ensureCustomerDict(ctx);
   await ensureProductLotDicts(ctx);
   await ensureOrderDict(ctx);
+  await ensureDictMaps(ctx);
 
   const where = args.since ? "_Date_Time >= @since" : undefined;
   const params = args.since ? { since: args.since } : undefined;
@@ -2443,6 +2509,44 @@ async function ensureOrderDict(ctx: ImportContext): Promise<void> {
   }
 }
 
+// ─── Підвантаження довідкових резолв-мап для документів (5.4.6a, частина 2) ───
+// При ізольованому `--entity orders|sales|cashorders|routesheets` мапи з main()
+// порожні (бо dictionaries не виконувався). Заповнюємо їх ліниво (guard по size),
+// щоб standalone-прогони документів резолвили агента/курс/статтю/банк-рахунок.
+async function ensureDictMaps(ctx: ImportContext): Promise<void> {
+  if (ctx.agentNameByHex.size === 0) await loadAgentNames(ctx);
+  if (ctx.unitNameByHex.size === 0) await loadUnitNames(ctx);
+  if (ctx.eurRateByDay.size === 0) {
+    // importRates і апсертить ExchangeRate, і наповнює eurRateByDay; на повторі
+    // upsert ідемпотентний — безпечно.
+    await importRates(ctx);
+  }
+  if (ctx.cashFlowArticleByHex.size === 0 || ctx.bankAccountByHex.size === 0) {
+    // Id-мапи беремо з ЦІЛЬОВОЇ бази за code1C (= hex), бо довідники вже
+    // імпортовані окремою сутністю `dictionaries`.
+    try {
+      const articles = await ctx.prisma.mgrCashFlowArticle.findMany({
+        select: { id: true, code1C: true },
+      });
+      for (const a of articles) {
+        if (a.code1C) ctx.cashFlowArticleByHex.set(a.code1C, a.id);
+      }
+    } catch (e) {
+      warn(`ensureDictMaps(cashFlowArticles): ${errMsg(e)}`);
+    }
+    try {
+      const banks = await ctx.prisma.mgrBankAccount.findMany({
+        select: { id: true, code1C: true },
+      });
+      for (const b of banks) {
+        if (b.code1C) ctx.bankAccountByHex.set(b.code1C, b.id);
+      }
+    } catch (e) {
+      warn(`ensureDictMaps(bankAccounts): ${errMsg(e)}`);
+    }
+  }
+}
+
 // ════════════════════════════════════════════════════════════════════════════
 // 10. ДОВІДНИКИ + КУРСИ ВАЛЮТ (5.4.6a, частина 1)
 // ════════════════════════════════════════════════════════════════════════════
@@ -2695,6 +2799,44 @@ function classifyCurrency(
 
 function dayKey(date: Date): string {
   return date.toISOString().slice(0, 10);
+}
+
+// ─── Історичний курс EUR→UAH на дату документа (5.4.6a, частина 2) ────────────
+// Повертає курс грн/EUR для заданого дня з ctx.eurRateByDay: точний день, або —
+// якщо такого нема — НАЙБЛИЖЧИЙ РАНІШИЙ день (≤ цільового). null коли дата
+// порожня або мапа порожня. Відсортований масив [dayKey, rate] кешується ліниво
+// й перебудовується лише коли змінився розмір мапи.
+let _eurRateSorted: [string, number][] | null = null;
+let _eurRateSortedSize = -1;
+
+function eurRateForDate(ctx: ImportContext, date: Date | null): number | null {
+  if (!date) return null;
+  const map = ctx.eurRateByDay;
+  if (map.size === 0) return null;
+  if (_eurRateSorted === null || _eurRateSortedSize !== map.size) {
+    _eurRateSorted = [...map.entries()].sort((a, b) =>
+      a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0,
+    );
+    _eurRateSortedSize = map.size;
+  }
+  const target = dayKey(date);
+  const exact = map.get(target);
+  if (exact != null) return exact;
+  // Найбільший ключ ≤ target (бінарний пошук по відсортованому масиву).
+  const entries = _eurRateSorted;
+  let lo = 0;
+  let hi = entries.length - 1;
+  let best: number | null = null;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    if (entries[mid]![0] <= target) {
+      best = entries[mid]![1];
+      lo = mid + 1;
+    } else {
+      hi = mid - 1;
+    }
+  }
+  return best;
 }
 
 const RATE_COLS = [
