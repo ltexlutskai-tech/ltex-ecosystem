@@ -56,6 +56,7 @@ const ENTITY_NAMES = [
   "lots",
   "barcodes",
   "prices",
+  "dictionaries",
   "orders",
   "sales",
   "cashorders",
@@ -450,6 +451,12 @@ interface ImportContext {
   regionNames: Map<string, string>;
   priceTypeCodes: Map<string, string>; // hex → _Code (= наш Price.priceType)
   legalTypeByHex: Map<string, string>; // hex(_IDRRef of _Enum377) → label
+  // ── 5.4.6a — довідники + резолв-мапи для документів (частина 2) ──
+  cashFlowArticleByHex: Map<string, string>; // hex → MgrCashFlowArticle.id
+  bankAccountByHex: Map<string, string>; // hex → MgrBankAccount.id
+  agentNameByHex: Map<string, string>; // hex → ТорговийАгент._Description
+  unitNameByHex: Map<string, string>; // hex → ЕдиницаИзмерения._Description
+  eurRateByDay: Map<string, number>; // "YYYY-MM-DD" → грн за 1 EUR
 }
 
 // Чи робимо реальні записи (НЕ dry-run).
@@ -2437,6 +2444,373 @@ async function ensureOrderDict(ctx: ImportContext): Promise<void> {
 }
 
 // ════════════════════════════════════════════════════════════════════════════
+// 10. ДОВІДНИКИ + КУРСИ ВАЛЮТ (5.4.6a, частина 1)
+// ════════════════════════════════════════════════════════════════════════════
+// Імпортуємо довідкові каталоги у наші таблиці + будуємо резолв-мапи у
+// ImportContext, на які покладатиметься дозбір документів (частина 2). Усі
+// підімпорти самодостатні (будують власні мапи + таблиці) — стандалон-запуск
+// `--entity dictionaries` не залежить від інших сутностей.
+
+// ─── 10.1 СтатьиДвиженияДенежныхСредств → MgrCashFlowArticle ─ _Reference96 ───
+// Ієрархічний довідник (_Folder/_ParentIDRRef). parentId на цьому проході
+// лишаємо null (follow-up: 2-й прохід для зв'язування ієрархії за hex батька).
+
+const CASH_FLOW_ARTICLE_COLS = [
+  "_IDRRef",
+  "_Code", // nchar(9)
+  "_Description", // nvarchar(100)
+];
+
+async function importCashFlowArticles(ctx: ImportContext): Promise<Recon> {
+  const recon = newRecon("cashflowarticles");
+  const sink = new ErrorSink(recon, "cashflowarticles");
+  const { args, src, prisma } = ctx;
+
+  recon.sourceRows = await countTable(src, "_Reference96");
+  log(`cashflowarticles: source rows = ${recon.sourceRows}`);
+
+  for await (const rows of streamTable(
+    src,
+    "_Reference96",
+    CASH_FLOW_ARTICLE_COLS,
+    {
+      batch: args.batch,
+      limit: args.limit,
+      orderBy: ["_IDRRef"],
+    },
+  )) {
+    for (const row of rows) {
+      const hex = bufToHex(row["_IDRRef"]);
+      if (!hex) {
+        recon.skipped++;
+        continue;
+      }
+      const code = asString(row["_Code"]);
+      const name = asTrimmed(row["_Description"]) || hex;
+      try {
+        let id = "(pending)";
+        if (willWrite(ctx)) {
+          const created = await prisma.mgrCashFlowArticle.upsert({
+            where: { code1C: hex },
+            // parentId лишаємо null цього проходу (ієрархія — follow-up).
+            create: { code1C: hex, code, name },
+            update: { code, name },
+            select: { id: true },
+          });
+          id = created.id;
+        }
+        ctx.cashFlowArticleByHex.set(hex, id);
+        recon.written++;
+      } catch (e) {
+        sink.record(code ?? hex, e);
+      }
+    }
+  }
+  log(`cashflowarticles: mapped ${ctx.cashFlowArticleByHex.size} hex→id`);
+  return recon;
+}
+
+// ─── 10.2 БанковскиеСчета → MgrBankAccount ─ _Reference29 ─────────────────────
+
+const BANK_ACCOUNT_COLS = [
+  "_IDRRef",
+  "_Description", // name
+  "_Fld5869", // IBAN/№ рахунку (nvarchar34)
+  "_Fld7710", // НеВідображатиВДодатку (bin1)
+];
+
+async function importBankAccounts(ctx: ImportContext): Promise<Recon> {
+  const recon = newRecon("bankaccounts");
+  const sink = new ErrorSink(recon, "bankaccounts");
+  const { args, src, prisma } = ctx;
+
+  recon.sourceRows = await countTable(src, "_Reference29");
+  log(`bankaccounts: source rows = ${recon.sourceRows}`);
+
+  for await (const rows of streamTable(src, "_Reference29", BANK_ACCOUNT_COLS, {
+    batch: args.batch,
+    limit: args.limit,
+    orderBy: ["_IDRRef"],
+  })) {
+    for (const row of rows) {
+      const hex = bufToHex(row["_IDRRef"]);
+      if (!hex) {
+        recon.skipped++;
+        continue;
+      }
+      const name = asTrimmed(row["_Description"]) || hex;
+      const description = asString(row["_Fld5869"]);
+      const hiddenInApp = asBool(row["_Fld7710"]);
+      try {
+        let id = "(pending)";
+        if (willWrite(ctx)) {
+          const created = await prisma.mgrBankAccount.upsert({
+            where: { code1C: hex },
+            create: { code1C: hex, name, description, hiddenInApp },
+            update: { name, description, hiddenInApp },
+            select: { id: true },
+          });
+          id = created.id;
+        }
+        ctx.bankAccountByHex.set(hex, id);
+        recon.written++;
+      } catch (e) {
+        sink.record(hex, e);
+      }
+    }
+  }
+  log(`bankaccounts: mapped ${ctx.bankAccountByHex.size} hex→id`);
+  return recon;
+}
+
+// ─── 10.3 Маршруты → MgrRoute ─ _Reference7513 ───────────────────────────────
+// Recon-сутність "routes1c" (щоб не плутати з документами "routesheets").
+
+const ROUTE_COLS = [
+  "_IDRRef",
+  "_Description", // name
+];
+
+async function importRoutes(ctx: ImportContext): Promise<Recon> {
+  const recon = newRecon("routes1c");
+  const sink = new ErrorSink(recon, "routes1c");
+  const { args, src, prisma } = ctx;
+
+  recon.sourceRows = await countTable(src, "_Reference7513");
+  log(`routes1c: source rows = ${recon.sourceRows}`);
+
+  for await (const rows of streamTable(src, "_Reference7513", ROUTE_COLS, {
+    batch: args.batch,
+    limit: args.limit,
+    orderBy: ["_IDRRef"],
+  })) {
+    for (const row of rows) {
+      const hex = bufToHex(row["_IDRRef"]);
+      if (!hex) {
+        recon.skipped++;
+        continue;
+      }
+      const name = asTrimmed(row["_Description"]) || hex;
+      try {
+        if (willWrite(ctx)) {
+          await prisma.mgrRoute.upsert({
+            where: { code1C: hex },
+            create: { code1C: hex, name },
+            update: { name },
+          });
+        }
+        recon.written++;
+      } catch (e) {
+        sink.record(hex, e);
+      }
+    }
+  }
+  return recon;
+}
+
+// ─── 10.4 ТорговыеАгенты → мапа hex→назва ─ _Reference6628 ────────────────────
+// Лише пам'ять-мапа (таблиці нема — менеджери/агенти резолвляться окремо).
+
+async function loadAgentNames(ctx: ImportContext): Promise<Recon> {
+  const recon = newRecon("agents");
+  const { args, src } = ctx;
+
+  recon.sourceRows = await countTable(src, "_Reference6628");
+  log(`agents: source rows = ${recon.sourceRows}`);
+
+  for await (const rows of streamTable(
+    src,
+    "_Reference6628",
+    ["_IDRRef", "_Description"],
+    { batch: args.batch, limit: args.limit, orderBy: ["_IDRRef"] },
+  )) {
+    for (const row of rows) {
+      const hex = bufToHex(row["_IDRRef"]);
+      const name = asTrimmed(row["_Description"]);
+      if (!hex || !name) {
+        recon.skipped++;
+        continue;
+      }
+      ctx.agentNameByHex.set(hex, name);
+      recon.written++; // "written" тут = додано у мапу
+    }
+  }
+  log(`agents: mapped ${ctx.agentNameByHex.size} hex→name`);
+  return recon;
+}
+
+// ─── 10.5 ЕдиницыИзмерения → мапа hex→назва ─ _Reference52 ────────────────────
+// Лише пам'ять-мапа (кг/шт/пара) для майбутнього резолву одиниць у рядках.
+
+async function loadUnitNames(ctx: ImportContext): Promise<Recon> {
+  const recon = newRecon("units");
+  const { args, src } = ctx;
+
+  recon.sourceRows = await countTable(src, "_Reference52");
+  log(`units: source rows = ${recon.sourceRows}`);
+
+  for await (const rows of streamTable(
+    src,
+    "_Reference52",
+    ["_IDRRef", "_Description"],
+    { batch: args.batch, limit: args.limit, orderBy: ["_IDRRef"] },
+  )) {
+    for (const row of rows) {
+      const hex = bufToHex(row["_IDRRef"]);
+      const name = asTrimmed(row["_Description"]);
+      if (!hex || !name) {
+        recon.skipped++;
+        continue;
+      }
+      ctx.unitNameByHex.set(hex, name);
+      recon.written++; // "written" тут = додано у мапу
+    }
+  }
+  log(`units: mapped ${ctx.unitNameByHex.size} hex→name`);
+  return recon;
+}
+
+// ─── 10.6 КурсыВалют → ExchangeRate ─ _InfoRg4655 (+ _Reference30 Валюты) ─────
+// EUR/USD визначаємо за Валютою: _Description="EUR"/"USD" АБО ISO _Code
+// "978"/"840". Курс = _Fld4657 / _Fld4658(кратність). Дата = _Period (вже з
+// year-offset через asDate). EUR-рядки також пишемо у ctx.eurRateByDay для
+// документів частини 2.
+
+const CURRENCY_COLS = [
+  "_IDRRef",
+  "_Code", // nchar(3) ISO numeric
+  "_Description", // nvarchar(10) alpha
+];
+
+function classifyCurrency(
+  code: string | null,
+  desc: string | null,
+): "EUR" | "USD" | null {
+  const d = (desc ?? "").trim().toUpperCase();
+  const c = (code ?? "").trim();
+  if (d === "EUR" || c === "978") return "EUR";
+  if (d === "USD" || c === "840") return "USD";
+  return null;
+}
+
+function dayKey(date: Date): string {
+  return date.toISOString().slice(0, 10);
+}
+
+const RATE_COLS = [
+  "_Period",
+  "_RecorderRRef", // тай-брейкер сортування
+  "_LineNo", // тай-брейкер сортування
+  "_Fld4656RRef", // Валюта (FK → _Reference30)
+  "_Fld4657", // Курс (numeric10,4)
+  "_Fld4658", // Кратность (numeric10,0)
+];
+
+async function importRates(ctx: ImportContext): Promise<Recon> {
+  const recon = newRecon("rates");
+  const sink = new ErrorSink(recon, "rates");
+  const { args, src, prisma } = ctx;
+
+  // Локальна мапа hex(валюта) → "EUR"|"USD"|null.
+  const currencyByHex = new Map<string, "EUR" | "USD" | null>();
+  for await (const rows of streamTable(src, "_Reference30", CURRENCY_COLS, {
+    batch: 2000,
+    limit: null,
+    orderBy: ["_IDRRef"],
+  })) {
+    for (const row of rows) {
+      const hex = bufToHex(row["_IDRRef"]);
+      if (!hex) continue;
+      currencyByHex.set(
+        hex,
+        classifyCurrency(asString(row["_Code"]), asString(row["_Description"])),
+      );
+    }
+  }
+  log(`rates: currencies decoded = ${currencyByHex.size}`);
+
+  recon.sourceRows = await countTable(src, "_InfoRg4655");
+  log(`rates: source rows = ${recon.sourceRows}`);
+
+  for await (const rows of streamTable(src, "_InfoRg4655", RATE_COLS, {
+    batch: args.batch,
+    limit: args.limit,
+    orderBy: ["_Period", "_RecorderRRef", "_LineNo"],
+  })) {
+    for (const row of rows) {
+      const curHex = bufToHex(row["_Fld4656RRef"]);
+      const cur = curHex ? (currencyByHex.get(curHex) ?? null) : null;
+      if (!cur) {
+        recon.skipped++;
+        continue;
+      }
+      const mult = asNumberOr(row["_Fld4658"], 1) || 1;
+      const rate = asNumberOr(row["_Fld4657"], 0) / mult;
+      const date = asDate(row["_Period"]);
+      if (!date || rate <= 0) {
+        recon.skipped++;
+        continue;
+      }
+
+      try {
+        if (willWrite(ctx)) {
+          // Idempotent через складений унікальний ключ (currencyFrom, currencyTo,
+          // date). Один прогон = один запис на (валюта, дата).
+          await prisma.exchangeRate.upsert({
+            where: {
+              currencyFrom_currencyTo_date: {
+                currencyFrom: cur,
+                currencyTo: "UAH",
+                date,
+              },
+            },
+            create: {
+              currencyFrom: cur,
+              currencyTo: "UAH",
+              rate,
+              date,
+              source: "1c",
+            },
+            update: { rate, source: "1c" },
+          });
+        }
+        if (cur === "EUR") ctx.eurRateByDay.set(dayKey(date), rate);
+        recon.written++;
+      } catch (e) {
+        sink.record(`${cur}/${dayKey(date)}`, e);
+      }
+    }
+    log(`rates: processed ${recon.written + recon.skipped + recon.errors}`);
+  }
+  log(`rates: eurRateByDay = ${ctx.eurRateByDay.size} days`);
+  return recon;
+}
+
+// ─── 10.0 Раннер сутності `dictionaries` ─────────────────────────────────────
+// Виконує всі підімпорти + мапи; повертає один зведений Recon (лічильники —
+// сума підімпортів) для інформативного звіту.
+
+async function importDictionaries(ctx: ImportContext): Promise<Recon> {
+  const combined = newRecon("dictionaries");
+  const parts = [
+    await importCashFlowArticles(ctx),
+    await importBankAccounts(ctx),
+    await importRoutes(ctx),
+    await loadAgentNames(ctx),
+    await loadUnitNames(ctx),
+    await importRates(ctx),
+  ];
+  for (const p of parts) {
+    combined.sourceRows += p.sourceRows;
+    combined.written += p.written;
+    combined.skipped += p.skipped;
+    combined.errors += p.errors;
+    combined.unresolved += p.unresolved;
+  }
+  return combined;
+}
+
+// ════════════════════════════════════════════════════════════════════════════
 // MAIN
 // ════════════════════════════════════════════════════════════════════════════
 
@@ -2449,6 +2823,7 @@ const ENTITY_RUNNERS: Record<
   lots: importLots,
   barcodes: importBarcodes,
   prices: importPrices,
+  dictionaries: importDictionaries,
   orders: importOrders,
   sales: importSales,
   cashorders: importCashOrders,
@@ -2462,6 +2837,7 @@ const DEFAULT_ORDER: EntityName[] = [
   "barcodes",
   "lots",
   "prices",
+  "dictionaries",
   "orders",
   "sales",
   "cashorders",
@@ -2564,6 +2940,11 @@ async function main(): Promise<void> {
     regionNames: new Map(),
     priceTypeCodes: new Map(),
     legalTypeByHex: new Map(),
+    cashFlowArticleByHex: new Map(),
+    bankAccountByHex: new Map(),
+    agentNameByHex: new Map(),
+    unitNameByHex: new Map(),
+    eurRateByDay: new Map(),
   };
 
   // Дрібні довідники назв (city/region) — потрібні для Customer.
