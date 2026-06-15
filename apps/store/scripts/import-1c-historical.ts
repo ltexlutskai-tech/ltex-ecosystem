@@ -2842,8 +2842,6 @@ function eurRateForDate(ctx: ImportContext, date: Date | null): number | null {
 
 const RATE_COLS = [
   "_Period",
-  "_RecorderRRef", // тай-брейкер сортування
-  "_LineNo", // тай-брейкер сортування
   "_Fld4656RRef", // Валюта (FK → _Reference30)
   "_Fld4657", // Курс (numeric10,4)
   "_Fld4658", // Кратность (numeric10,0)
