@@ -19,7 +19,7 @@
  *   --dry-run            читає 1С + резолвить зв'язки, нічого не пише
  *   --limit N            лише перші N рядків кожної сутності (пробний прогон)
  *   --entity <name>      одна сутність: customers|products|lots|barcodes|prices|
- *                        orders|sales|cashorders|routesheets (дефолт = всі в порядку)
+ *                        orders|sales|cashorders|routesheets|debt (дефолт = всі в порядку)
  *   --confirm-prod       дозволити запис коли ціль = бойова база
  *   --batch N            розмір батчу запису (дефолт 500)
  *   --since YYYY-MM-DD   (опц.) лише документи з цієї дати
@@ -61,6 +61,7 @@ const ENTITY_NAMES = [
   "sales",
   "cashorders",
   "routesheets",
+  "debt",
 ] as const;
 
 type EntityName = (typeof ENTITY_NAMES)[number];
@@ -2952,6 +2953,90 @@ async function importDictionaries(ctx: ImportContext): Promise<Recon> {
   return combined;
 }
 
+// ─── 11. ВзаиморасчетыСКонтрагентами → MgrClient.debt ─ _AccumRg5269 ───────────
+// Регістр накопичення «Взаиморасчеты с контрагентами». Агрегуємо чистий борг
+// кожного клієнта (Контрагент _Fld5273RRef) по ресурсу СуммаУпр (_Fld5275)
+// з урахуванням знаку руху (_RecordKind: 0 = приход/+, 1 = расход/−).
+// Результат записуємо у MgrClient.debt, зіставляючи за uid1C (hex _IDRRef
+// контрагента), який importCustomers зберіг раніше.
+//
+// Порядок сортування: ["_RecorderRRef", "_LineNo"] — детермінований складений
+// ключ (обидва наявні у _AccumRg5269 згідно docs/1c-mssql-schema/columns.tsv).
+// Фільтр активних рухів: _Active = 0x01 (колонка _Active binary(1) присутня).
+
+// Множник знаку боргу. Якщо у живих даних борг показується з інвертованим
+// знаком — змінити на -1.
+// TODO: якщо знак боргу інвертований на живих даних — змінити на -1
+const DEBT_SIGN = 1;
+
+const DEBT_COLS = ["_RecordKind", "_Fld5273RRef", "_Fld5275"];
+
+async function importDebt(ctx: ImportContext): Promise<Recon> {
+  const recon = newRecon("debt");
+  const sink = new ErrorSink(recon, "debt");
+  const { args, src, prisma } = ctx;
+
+  const activeWhere = "_Active = 0x01";
+  recon.sourceRows = await countTable(src, "_AccumRg5269", activeWhere);
+  log(`debt: active source rows = ${recon.sourceRows}`);
+
+  // Агрегат: hex(Контрагент) → net EUR-сума (+ приход, - витрата).
+  const debtByHex = new Map<string, number>();
+
+  for await (const rows of streamTable(src, "_AccumRg5269", DEBT_COLS, {
+    batch: args.batch,
+    limit: args.limit,
+    orderBy: ["_RecorderRRef", "_LineNo"],
+    where: activeWhere,
+  })) {
+    for (const row of rows) {
+      const hex = bufToHex(row["_Fld5273RRef"]);
+      if (!hex) continue;
+      const amt = asNumberOr(row["_Fld5275"], 0);
+      const kind = asNumber(row["_RecordKind"]) ?? 0;
+      // RecordKind 0 = приход (збільшує борг клієнта перед нами), 1 = витрата (зменшує).
+      const signed = kind === 0 ? amt : -amt;
+      debtByHex.set(hex, (debtByHex.get(hex) ?? 0) + signed);
+    }
+  }
+
+  log(`debt: aggregated ${debtByHex.size} unique Контрагентів`);
+
+  if (willWrite(ctx)) {
+    let processed = 0;
+    for (const [hex, sum] of debtByHex) {
+      const value = round2(DEBT_SIGN * sum);
+      try {
+        const res = await prisma.mgrClient.updateMany({
+          where: { uid1C: hex },
+          data: { debt: value },
+        });
+        if (res.count > 0) {
+          recon.written++;
+        } else {
+          recon.unresolved++;
+        }
+      } catch (e) {
+        sink.record(hex, e);
+      }
+      processed++;
+      if (processed % 500 === 0) {
+        log(
+          `debt: updated ${recon.written} clients (${recon.unresolved} unresolved, ${processed}/${debtByHex.size} processed)`,
+        );
+      }
+    }
+  } else {
+    // dry-run: рахуємо як "would write"
+    recon.written = debtByHex.size;
+  }
+
+  log(
+    `debt: done — written=${recon.written} unresolved=${recon.unresolved} errors=${recon.errors}`,
+  );
+  return recon;
+}
+
 // ════════════════════════════════════════════════════════════════════════════
 // MAIN
 // ════════════════════════════════════════════════════════════════════════════
@@ -2970,9 +3055,11 @@ const ENTITY_RUNNERS: Record<
   sales: importSales,
   cashorders: importCashOrders,
   routesheets: importRouteSheets,
+  debt: importDebt,
 };
 
 // Порядок за FK-залежностями (план §13).
+// `debt` — в кінці: лише оновлює MgrClient.debt, не потребує документів.
 const DEFAULT_ORDER: EntityName[] = [
   "customers",
   "products",
@@ -2984,6 +3071,7 @@ const DEFAULT_ORDER: EntityName[] = [
   "sales",
   "cashorders",
   "routesheets",
+  "debt",
 ];
 
 function printReconTable(recons: Recon[], dryRun: boolean): void {
