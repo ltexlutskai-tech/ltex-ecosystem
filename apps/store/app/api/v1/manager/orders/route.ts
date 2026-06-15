@@ -105,6 +105,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Не авторизовано" }, { status: 401 });
   }
 
+  const url = new URL(req.url);
   const body = await req.json().catch(() => null);
   const parsed = createOrderSchema.safeParse(body);
   if (!parsed.success) {
@@ -136,10 +137,55 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  // ─── Актуальність guard (N1) ─────────────────────────────────────────────
+  // У клієнта має бути максимум ОДНЕ активне замовлення
+  // (isActual=true AND archived=false AND closedAt IS NULL). Якщо вже є —
+  // блокуємо (409), допоки не передано `force` від admin/owner/senior_manager.
+  const force =
+    url.searchParams.get("force") === "true" || input.force === true;
+
+  const existingActive = await prisma.order.findFirst({
+    where: {
+      customerId: customer.id,
+      isActual: true,
+      archived: false,
+      closedAt: null,
+    },
+    select: { id: true, code1C: true },
+  });
+
+  if (existingActive && !force) {
+    return NextResponse.json(
+      {
+        code: "active_order_exists",
+        existingOrderId: existingActive.id,
+        existingOrderNumber:
+          existingActive.code1C ?? `№${existingActive.id.slice(0, 8)}`,
+      },
+      { status: 409 },
+    );
+  }
+
+  // Force дозволено лише привілейованим ролям.
+  const CAN_FORCE_ROLES = ["admin", "owner", "senior_manager"] as const;
+  const canForce = (CAN_FORCE_ROLES as readonly string[]).includes(user.role);
+  if (existingActive && force && !canForce) {
+    return NextResponse.json(
+      { error: "Лише адмін/власник може створити друге активне замовлення" },
+      { status: 403 },
+    );
+  }
+
+  // Якщо force застосовується — у транзакції знімаємо isActual зі старих.
+  const clearOtherActual = Boolean(existingActive && force && canForce);
+
   try {
-    const order = await createOrderWithItems(input, customer, {
-      userId: user.id,
-    });
+    const order = await createOrderWithItems(
+      input,
+      customer,
+      { userId: user.id },
+      { clearOtherActual },
+    );
     return NextResponse.json(
       {
         id: order.id,

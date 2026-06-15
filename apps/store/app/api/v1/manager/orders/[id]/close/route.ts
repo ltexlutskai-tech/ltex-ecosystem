@@ -100,6 +100,8 @@ export async function POST(
         closedByUserId: user.id,
         closeNotes: parsed.data.notes ?? null,
         archived: true,
+        // Інваріант: закрите/архівне замовлення = НЕ актуальне.
+        isActual: false,
         version: { increment: 1 },
       },
     });
