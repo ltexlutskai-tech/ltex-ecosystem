@@ -311,6 +311,47 @@ describe("PATCH /api/v1/manager/orders/[id]", () => {
     expect(callArgs[3].nextStatus).toBeUndefined();
   });
 
+  it("passes isActual through to updateOrderWithItems + returns it", async () => {
+    mockPrisma.order.findUnique.mockResolvedValueOnce({
+      id: "ord1",
+      status: "draft",
+      archived: false,
+      closedAt: null,
+    });
+    updateOrderWithItemsMock.mockResolvedValueOnce({
+      ...fakeUpdatedOrder("draft"),
+      isActual: false,
+    });
+    const res = await PATCH(
+      patchReq({ ...VALID_PATCH_BODY, isActual: false }),
+      { params: Promise.resolve({ id: "ord1" }) },
+    );
+    expect(res.status).toBe(200);
+    const json = (await res.json()) as { isActual: boolean };
+    expect(json.isActual).toBe(false);
+    const callArgs = updateOrderWithItemsMock.mock.calls[0] as [
+      string,
+      { isActual?: boolean },
+      unknown,
+      unknown,
+    ];
+    expect(callArgs[1].isActual).toBe(false);
+  });
+
+  it("returns 400 when setting isActual=true on archived order", async () => {
+    mockPrisma.order.findUnique.mockResolvedValueOnce({
+      id: "ord1",
+      status: "draft",
+      archived: true,
+      closedAt: null,
+    });
+    const res = await PATCH(patchReq({ ...VALID_PATCH_BODY, isActual: true }), {
+      params: Promise.resolve({ id: "ord1" }),
+    });
+    expect(res.status).toBe(400);
+    expect(updateOrderWithItemsMock).not.toHaveBeenCalled();
+  });
+
   it("returns 400 on FK violation (Prisma P2003)", async () => {
     mockPrisma.order.findUnique.mockResolvedValueOnce({
       id: "ord1",

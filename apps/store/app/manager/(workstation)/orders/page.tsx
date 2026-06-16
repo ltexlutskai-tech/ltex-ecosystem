@@ -37,6 +37,8 @@ function buildOrderBy(
       return { items: { _count: dir } };
     case "actual":
       return { isActual: dir };
+    case "agent":
+      return { agentName: dir };
     case "date":
     default:
       return { createdAt: dir };
@@ -73,9 +75,13 @@ export default async function ManagerOrdersPage({
     clientCode1C: filter.clientCode1C || undefined,
     q: filter.search,
     status: filter.status,
+    actuality: filter.actuality,
     from: fromDate && !Number.isNaN(fromDate.getTime()) ? fromDate : undefined,
     to: toDate && !Number.isNaN(toDate.getTime()) ? toDate : undefined,
     showArchived: filter.showArchived,
+    clientName: filter.clientName || undefined,
+    city: filter.city || undefined,
+    agent: filter.agent || undefined,
   });
 
   const [items, total] = await Promise.all([

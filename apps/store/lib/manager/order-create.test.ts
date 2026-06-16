@@ -357,6 +357,45 @@ describe("updateOrderWithItems", () => {
     expect(call.data.status).toBeUndefined();
   });
 
+  it("застосовує isActual коли переданий", async () => {
+    mockPrisma.order.update.mockResolvedValueOnce(fakeUpdatedOrder());
+    await updateOrderWithItems(
+      "ord1",
+      { ...baseInput, isActual: false },
+      actor,
+    );
+    const call = mockPrisma.order.update.mock.calls[0]?.[0] as {
+      data: { isActual?: boolean };
+    };
+    expect(call.data.isActual).toBe(false);
+  });
+
+  it("posted (archived) форсує isActual=false навіть якщо передано true", async () => {
+    mockPrisma.order.update.mockResolvedValueOnce(fakeUpdatedOrder());
+    await updateOrderWithItems(
+      "ord1",
+      { ...baseInput, isActual: true },
+      actor,
+      {
+        nextStatus: "posted",
+      },
+    );
+    const call = mockPrisma.order.update.mock.calls[0]?.[0] as {
+      data: { isActual?: boolean; archived?: boolean };
+    };
+    expect(call.data.isActual).toBe(false);
+    expect(call.data.archived).toBe(true);
+  });
+
+  it("isActual не чіпається коли не переданий", async () => {
+    mockPrisma.order.update.mockResolvedValueOnce(fakeUpdatedOrder());
+    await updateOrderWithItems("ord1", baseInput, actor);
+    const call = mockPrisma.order.update.mock.calls[0]?.[0] as {
+      data: { isActual?: boolean };
+    };
+    expect(call.data.isActual).toBeUndefined();
+  });
+
   it("викликає enqueueOrderCreate fire-and-forget після update", async () => {
     mockPrisma.order.update.mockResolvedValueOnce(fakeUpdatedOrder());
     await updateOrderWithItems("ord1", baseInput, actor);

@@ -133,6 +133,8 @@ export interface OrderEditInitial {
   /** Номер документа для відображення (code1C або короткий id). */
   displayNumber: string;
   status: string;
+  /** Актуальність документа (1С «Статус заказа: Актуальне»). */
+  isActual: boolean;
   notes: string;
   priceTypeId: string | null;
   deliveryMethod: string | null;

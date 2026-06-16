@@ -2673,6 +2673,56 @@ async function importBankAccounts(ctx: ImportContext): Promise<Recon> {
   return recon;
 }
 
+// ─── 10.2a ТипыЦенНоменклатуры → MgrPriceType ─ _Reference105 ─────────────────
+// Цей довідник наповнює таблицю `mgr_price_types` (dropdow «Тип цін» у формі
+// замовлення). Invariant: MgrPriceType.code === Price.priceType. Upserting by
+// `code` (= _Code) — same value used when importing prices in §5.
+
+const PRICE_TYPE_COLS = [
+  "_IDRRef",
+  "_Code", // nchar(10) — ідентифікатор типу ціни (напр. "wholesale", "akciya")
+  "_Description", // nvarchar(25) — людська назва
+];
+
+async function importPriceTypes(ctx: ImportContext): Promise<Recon> {
+  const recon = newRecon("pricetypes");
+  const sink = new ErrorSink(recon, "pricetypes");
+  const { args, src, prisma } = ctx;
+
+  recon.sourceRows = await countTable(src, "_Reference105");
+  log(`pricetypes: source rows = ${recon.sourceRows}`);
+
+  for await (const rows of streamTable(src, "_Reference105", PRICE_TYPE_COLS, {
+    batch: args.batch,
+    limit: args.limit,
+    orderBy: ["_IDRRef"],
+  })) {
+    for (const row of rows) {
+      const hex = bufToHex(row["_IDRRef"]);
+      if (!hex) {
+        recon.skipped++;
+        continue;
+      }
+      const code = asString(row["_Code"]) ?? hex;
+      const label = asTrimmed(row["_Description"]) || code;
+      try {
+        if (willWrite(ctx)) {
+          await prisma.mgrPriceType.upsert({
+            where: { code },
+            create: { code, label, sortOrder: 0 },
+            update: { label },
+          });
+        }
+        recon.written++;
+      } catch (e) {
+        sink.record(code, e);
+      }
+    }
+  }
+  log(`pricetypes: written ${recon.written} price types`);
+  return recon;
+}
+
 // ─── 10.3 Маршруты → MgrRoute ─ _Reference7513 ───────────────────────────────
 // Recon-сутність "routes1c" (щоб не плутати з документами "routesheets").
 
@@ -2941,6 +2991,7 @@ async function importRates(ctx: ImportContext): Promise<Recon> {
 async function importDictionaries(ctx: ImportContext): Promise<Recon> {
   const combined = newRecon("dictionaries");
   const parts = [
+    await importPriceTypes(ctx),
     await importCashFlowArticles(ctx),
     await importBankAccounts(ctx),
     await importRoutes(ctx),

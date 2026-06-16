@@ -102,6 +102,7 @@ export async function PATCH(
       version: true,
       updatedAt: true,
       closedAt: true,
+      archived: true,
     },
   });
   if (!existing) {
@@ -167,6 +168,19 @@ export async function PATCH(
     nextStatus = input.status;
   }
 
+  // Guard: не можна позначити закрите/архівне замовлення як актуальне.
+  if (
+    input.isActual === true &&
+    (existing.closedAt || existing.archived || isOrderLocked(existing.status))
+  ) {
+    return NextResponse.json(
+      {
+        error: "Закрите або проведене замовлення не може бути актуальним",
+      },
+      { status: 400 },
+    );
+  }
+
   try {
     const order = await updateOrderWithItems(
       id,
@@ -178,6 +192,7 @@ export async function PATCH(
       id: order.id,
       code1C: order.code1C,
       status: order.status,
+      isActual: order.isActual,
       totalEur: order.totalEur,
       totalUah: order.totalUah,
       exchangeRate: order.exchangeRate,

@@ -162,6 +162,13 @@ export async function updateOrderWithItems(
   // Інваріант: проведене (`posted` = archived) замовлення = НЕ актуальне.
   const becomesArchived = options?.nextStatus === "posted";
 
+  // Актуальність: застосовуємо переданий `isActual`, якщо він є. Проведення
+  // (posted) форсує `isActual=false` і має пріоритет над переданим значенням.
+  const isActualUpdate =
+    typeof input.isActual === "boolean" && !becomesArchived
+      ? { isActual: input.isActual }
+      : {};
+
   const order = await prisma.$transaction(async (tx) => {
     await tx.orderItem.deleteMany({ where: { orderId } });
     return tx.order.update({
@@ -180,6 +187,7 @@ export async function updateOrderWithItems(
         items: { create: itemRows },
         // Optimistic lock: інкрементуємо version при кожному PATCH.
         version: { increment: 1 },
+        ...isActualUpdate,
         ...(becomesArchived ? { archived: true, isActual: false } : {}),
       },
       include: ORDER_INCLUDE,

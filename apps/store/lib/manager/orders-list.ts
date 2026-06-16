@@ -51,6 +51,13 @@ export interface BuildOrdersWhereParams {
   q?: string;
   /** Статус документа (вже нормалізований allow-list-ом). */
   status?: OrderStatus | "";
+  /**
+   * Актуальність документа (1С «Статус заказа: Актуальне»):
+   *  • `"actual"` (дефолт)  — лише `isActual = true`;
+   *  • `"inactive"`         — лише `isActual = false`;
+   *  • `"all"`              — без обмеження.
+   */
+  actuality?: OrderActuality;
   /** Період створення. */
   from?: Date;
   to?: Date;
@@ -59,7 +66,15 @@ export interface BuildOrdersWhereParams {
    * архівні (`archived = true`) приховані.
    */
   showArchived?: boolean;
+  /** Точковий фільтр по клієнту (текст → `customer.name contains`). */
+  clientName?: string;
+  /** Точковий фільтр по місту (текст → `customer.city contains`). */
+  city?: string;
+  /** Точковий фільтр по агенту (текст → `agentName contains`). */
+  agent?: string;
 }
+
+export type OrderActuality = "actual" | "inactive" | "all";
 
 /**
  * Будує `where` для `prisma.order.findMany` / `.count`. Чиста функція — без I/O.
@@ -78,13 +93,33 @@ export function buildOrdersWhere(
   if (p.clientCode1C) {
     customerWhere.code1C = p.clientCode1C;
   }
+  // Per-column фільтри по клієнту/місту (текст, LIKE).
+  if (p.clientName && p.clientName.trim().length > 0) {
+    customerWhere.name = { contains: p.clientName.trim(), mode: "insensitive" };
+  }
+  if (p.city && p.city.trim().length > 0) {
+    customerWhere.city = { contains: p.city.trim(), mode: "insensitive" };
+  }
   if (Object.keys(customerWhere).length > 0) {
     where.customer = customerWhere;
+  }
+
+  // Per-column фільтр по агенту (текст, LIKE на `agentName`).
+  if (p.agent && p.agent.trim().length > 0) {
+    where.agentName = { contains: p.agent.trim(), mode: "insensitive" };
   }
 
   // Архів: за замовчуванням приховуємо проведені (archived = true).
   if (!p.showArchived) {
     where.archived = false;
+  }
+
+  // Актуальність документа (дефолт «actual» → лише isActual = true).
+  const actuality = p.actuality ?? "actual";
+  if (actuality === "actual") {
+    where.isActual = true;
+  } else if (actuality === "inactive") {
+    where.isActual = false;
   }
 
   // Пошук: № замовлення / клієнт (ім'я·телефон·місто) / товари (назва·артикул).
@@ -136,6 +171,7 @@ export interface RawOrderRow {
   totalUah: number;
   archived: boolean;
   isActual: boolean;
+  agentName: string | null;
   createdAt: Date;
   customer: {
     id: string;
@@ -155,6 +191,8 @@ export interface OrderListItem {
   totalUah: number;
   archived: boolean;
   isActual: boolean;
+  /** Торговий агент: `Order.agentName` (історичний 1С-імпорт). */
+  agentName: string | null;
   itemCount: number;
   createdAt: Date;
   customer: {
@@ -186,6 +224,7 @@ export function serializeOrderRow(o: RawOrderRow): OrderListItem {
     totalUah: o.totalUah,
     archived: o.archived,
     isActual: o.isActual,
+    agentName: o.agentName,
     itemCount: o._count.items,
     createdAt: o.createdAt,
     customer: {

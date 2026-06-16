@@ -31,6 +31,9 @@ export function OrdersTable({ items }: { items: OrdersRowData[] }) {
                 align="center"
               />
             </th>
+            <th className="px-4 py-2 font-medium">
+              <SortableHeader sortKey="agent" label="Агент" />
+            </th>
             <th className="px-4 py-2 text-center font-medium">
               <SortableHeader
                 sortKey="positions"

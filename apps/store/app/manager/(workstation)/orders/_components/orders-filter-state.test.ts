@@ -61,6 +61,33 @@ describe("parseOrdersFilterFromSearchParams", () => {
       parseOrdersFilterFromSearchParams({ showArchived: "1" }).showArchived,
     ).toBe(false);
   });
+
+  it("defaults actuality to 'actual'", () => {
+    expect(parseOrdersFilterFromSearchParams({}).actuality).toBe("actual");
+  });
+
+  it("parses actuality values + ignores unknown", () => {
+    expect(
+      parseOrdersFilterFromSearchParams({ actuality: "inactive" }).actuality,
+    ).toBe("inactive");
+    expect(
+      parseOrdersFilterFromSearchParams({ actuality: "all" }).actuality,
+    ).toBe("all");
+    expect(
+      parseOrdersFilterFromSearchParams({ actuality: "haxxor" }).actuality,
+    ).toBe("actual");
+  });
+
+  it("parses per-column filters (clientName/city/agent)", () => {
+    const s = parseOrdersFilterFromSearchParams({
+      clientName: "Іван",
+      city: "Луцьк",
+      agent: "Петренко",
+    });
+    expect(s.clientName).toBe("Іван");
+    expect(s.city).toBe("Луцьк");
+    expect(s.agent).toBe("Петренко");
+  });
 });
 
 describe("ordersFilterToQueryString", () => {
@@ -94,6 +121,26 @@ describe("ordersFilterToQueryString", () => {
     expect(ordersFilterToQueryString({ showArchived: true })).toContain(
       "showArchived=true",
     );
+  });
+
+  it("omits default actuality, emits non-default", () => {
+    expect(ordersFilterToQueryString({ actuality: "actual" })).not.toContain(
+      "actuality",
+    );
+    expect(ordersFilterToQueryString({ actuality: "all" })).toContain(
+      "actuality=all",
+    );
+  });
+
+  it("emits per-column filters", () => {
+    const qs = ordersFilterToQueryString({
+      clientName: "Іван",
+      city: "Луцьк",
+      agent: "Петренко",
+    });
+    expect(qs).toContain("clientName=");
+    expect(qs).toContain("city=");
+    expect(qs).toContain("agent=");
   });
 });
 
