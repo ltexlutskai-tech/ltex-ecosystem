@@ -3047,17 +3047,33 @@ async function importDictionaries(ctx: ImportContext): Promise<Recon> {
 }
 
 // ─── 11. ВзаиморасчетыСКонтрагентами → MgrDebtMovement (opening) ─ _AccumRg5269 ─
-// Регістр накопичення «Взаиморасчеты с контрагентами». Агрегуємо чистий борг
-// кожного клієнта (Контрагент _Fld5273RRef) по ресурсу СуммаУпр (_Fld5275)
-// з урахуванням знаку руху (_RecordKind: 0 = приход/+, 1 = расход/−).
+// Регістр накопичення «Взаиморасчеты с контрагентами». Раніше (5.4.5a) ми
+// агрегували чистий борг клієнта в одне число й писали ОДИН `opening`-рух на
+// клієнта (sourceId=hex контрагента). Тепер (5.5-Звіт-0) — пишемо ПОМАШИННІ
+// рухи боргу: по рядку регістра, кожен зі своєю датою (_Period) — фундамент для
+// старіння дебіторки у звіті.
 //
-// 5.4.5a: замість запису одного числа у MgrClient.debt — пишемо ОДИН `opening`-рух
-// у регістр MgrDebtMovement на клієнта (kind=opening, sourceType=accum_rg5269,
-// sourceId=hex контрагента). Реімпорт оновлює суму руху (unique-ключ), не дублює.
-// Після циклу `recomputeDebtForClients` перебудовує кеш MgrClient.debt = Σ рухів
-// (на свіжій базі = opening; live-рухи з 5.4.5b не затираються).
+// Колонки (docs/1c-mssql-schema/columns.tsv):
+//   _Period       — дата руху (occurredAt; asDate віднімає year-offset 1С);
+//   _RecorderRRef — документ-реєстратор (16 байт);
+//   _LineNo       — № рядка у реєстраторі;
+//   _RecordKind   — 0 = приход/+ (збільшує борг клієнта перед нами), 1 = расход/−;
+//   _Fld5273RRef  — Контрагент;
+//   _Fld5275      — СуммаУпр (EUR, ресурс);
+//   _Active       — прапор активного руху.
+//
+// На кожен активний рядок створюємо MgrDebtMovement:
+//   kind=opening (єдиний простий лейбл «з історії 1С»; реальний знак — у amountEur),
+//   sourceType=accum_rg5269, sourceId=`<hexРеєстратора>:<lineNo>`,
+//   occurredAt=_Period, amountEur=±СуммаУпр.
+// Реалізації/оплати НЕ резолвимо тут (це крок Звіт-2 — детальніша класифікація).
+//
 // Клієнтів зіставляємо за uid1C (hex _IDRRef контрагента), який importCustomers
-// зберіг раніше.
+// зберіг раніше. Прелоад мапи uid1C→id (78к рядків — без точкового findUnique).
+//
+// Ідемпотентність: на старті чисто видаляємо всі рухи з sourceType=accum_rg5269
+// (і старий агрегат-opening з 5.4.5a, і попередній помашинний прогін). Live-рухи
+// (sourceType sale/cash_order/manual) НЕ зачіпаються.
 //
 // Порядок сортування: ["_RecorderRRef", "_LineNo"] — детермінований складений
 // ключ (обидва наявні у _AccumRg5269 згідно docs/1c-mssql-schema/columns.tsv).
@@ -3068,10 +3084,30 @@ async function importDictionaries(ctx: ImportContext): Promise<Recon> {
 // TODO: якщо знак боргу інвертований на живих даних — змінити на -1
 const DEBT_SIGN = 1;
 
-// `opening`-рух завжди першим у стрічці рухів боргу (до будь-якого live-руху).
+// Запасна дата руху, якщо _Period порожній (теоретично — поле NOT NULL у 1С).
 const DEBT_OPENING_AS_OF = new Date("2021-01-01T00:00:00Z");
 
-const DEBT_COLS = ["_RecordKind", "_Fld5273RRef", "_Fld5275"];
+const DEBT_COLS = [
+  "_Period",
+  "_RecorderRRef",
+  "_LineNo",
+  "_RecordKind",
+  "_Fld5273RRef",
+  "_Fld5275",
+];
+
+// Тип одного помашинного руху боргу для батчевої вставки.
+type DebtMovementRow = {
+  clientId: string;
+  amountEur: number;
+  kind: "opening";
+  sourceType: string;
+  sourceId: string;
+  occurredAt: Date;
+  note: string;
+};
+
+const DEBT_INSERT_BATCH = 1000;
 
 async function importDebt(ctx: ImportContext): Promise<Recon> {
   const recon = newRecon("debt");
@@ -3082,87 +3118,109 @@ async function importDebt(ctx: ImportContext): Promise<Recon> {
   recon.sourceRows = await countTable(src, "_AccumRg5269", activeWhere);
   log(`debt: active source rows = ${recon.sourceRows}`);
 
-  // Агрегат: hex(Контрагент) → net EUR-сума (+ приход, - витрата).
-  const debtByHex = new Map<string, number>();
-
-  for await (const rows of streamTable(src, "_AccumRg5269", DEBT_COLS, {
-    batch: args.batch,
-    limit: args.limit,
-    orderBy: ["_RecorderRRef", "_LineNo"],
-    where: activeWhere,
-  })) {
-    for (const row of rows) {
-      const hex = bufToHex(row["_Fld5273RRef"]);
-      if (!hex) continue;
-      const amt = asNumberOr(row["_Fld5275"], 0);
-      const kind = asNumber(row["_RecordKind"]) ?? 0;
-      // RecordKind 0 = приход (збільшує борг клієнта перед нами), 1 = витрата (зменшує).
-      const signed = kind === 0 ? amt : -amt;
-      debtByHex.set(hex, (debtByHex.get(hex) ?? 0) + signed);
-    }
+  // Прелоад мапи клієнтів: uid1C (hex контрагента) → MgrClient.id.
+  const clientByHex = new Map<string, string>();
+  const clients = await prisma.mgrClient.findMany({
+    where: { uid1C: { not: null } },
+    select: { id: true, uid1C: true },
+  });
+  for (const c of clients) {
+    if (c.uid1C) clientByHex.set(c.uid1C, c.id);
   }
-
-  log(`debt: aggregated ${debtByHex.size} unique Контрагентів`);
+  log(`debt: preloaded ${clientByHex.size} clients by uid1C`);
 
   if (willWrite(ctx)) {
-    let processed = 0;
-    const touchedClientIds: string[] = [];
-    for (const [hex, sum] of debtByHex) {
-      const value = round2(DEBT_SIGN * sum);
-      try {
-        const client = await prisma.mgrClient.findUnique({
-          where: { uid1C: hex },
-          select: { id: true },
-        });
-        if (!client) {
-          recon.unresolved++;
-        } else {
-          // Один opening-рух на клієнта; реімпорт оновлює суму (unique-ключ).
-          await prisma.mgrDebtMovement.upsert({
-            where: {
-              mgr_debt_movement_source: {
-                kind: "opening",
-                sourceType: "accum_rg5269",
-                sourceId: hex,
-              },
-            },
-            create: {
-              clientId: client.id,
-              amountEur: value,
-              kind: "opening",
-              sourceType: "accum_rg5269",
-              sourceId: hex,
-              occurredAt: DEBT_OPENING_AS_OF,
-              note: "Початковий залишок з 1С (_AccumRg5269)",
-            },
-            update: { amountEur: value, clientId: client.id },
-          });
-          touchedClientIds.push(client.id);
-          recon.written++;
-        }
-      } catch (e) {
-        sink.record(hex, e);
-      }
-      processed++;
-      if (processed % 500 === 0) {
-        log(
-          `debt: upserted ${recon.written} opening movements (${recon.unresolved} unresolved, ${processed}/${debtByHex.size} processed)`,
-        );
-      }
-    }
+    // Чисте перестворення: прибираємо старий агрегат-opening (5.4.5a) і
+    // попередній помашинний прогін. Live-рухи (sale/cash_order/manual) лишаються.
+    const deleted = await prisma.mgrDebtMovement.deleteMany({
+      where: { sourceType: "accum_rg5269" },
+    });
+    log(`debt: deleted ${deleted.count} prior accum_rg5269 movements`);
 
-    // Перебудовуємо кеш MgrClient.debt = Σ рухів лише для зачеплених клієнтів
-    // (на свіжій базі = opening; live-рухи з 5.4.5b не затираються).
-    if (touchedClientIds.length > 0) {
-      const recomputed = await recomputeDebtForClients(
-        prisma,
-        touchedClientIds,
+    let processed = 0;
+    const touchedClientIds = new Set<string>();
+    let buffer: DebtMovementRow[] = [];
+
+    const flush = async (): Promise<void> => {
+      if (buffer.length === 0) return;
+      // Після deleteMany колізій бути не повинно; skipDuplicates — страховка
+      // від дублю recorder:lineNo у вихідних даних.
+      await prisma.mgrDebtMovement.createMany({
+        data: buffer,
+        skipDuplicates: true,
+      });
+      buffer = [];
+    };
+
+    for await (const rows of streamTable(src, "_AccumRg5269", DEBT_COLS, {
+      batch: args.batch,
+      limit: args.limit,
+      orderBy: ["_RecorderRRef", "_LineNo"],
+      where: activeWhere,
+    })) {
+      for (const row of rows) {
+        processed++;
+        try {
+          const clientHex = bufToHex(row["_Fld5273RRef"]);
+          if (!clientHex || !clientByHex.has(clientHex)) {
+            recon.unresolved++;
+            continue;
+          }
+          const amt = asNumberOr(row["_Fld5275"], 0);
+          const kind = asNumber(row["_RecordKind"]) ?? 0;
+          // RecordKind 0 = приход (+), 1 = витрата (−).
+          const signed = round2(DEBT_SIGN * (kind === 0 ? amt : -amt));
+          const recorderHex = bufToHex(row["_RecorderRRef"]) ?? "—";
+          const lineNo = asNumber(row["_LineNo"]) ?? 0;
+          const sourceId = `${recorderHex}:${lineNo}`;
+          const occurredAt = asDate(row["_Period"]) ?? DEBT_OPENING_AS_OF;
+
+          buffer.push({
+            clientId: clientByHex.get(clientHex)!,
+            amountEur: signed,
+            kind: "opening",
+            sourceType: "accum_rg5269",
+            sourceId,
+            occurredAt,
+            note: "Рух боргу з 1С (_AccumRg5269)",
+          });
+          touchedClientIds.add(clientByHex.get(clientHex)!);
+          recon.written++;
+
+          if (buffer.length >= DEBT_INSERT_BATCH) await flush();
+        } catch (e) {
+          sink.record(bufToHex(row["_RecorderRRef"]) ?? `row#${processed}`, e);
+        }
+      }
+      log(
+        `debt: ${recon.written} movements written (${recon.unresolved} unresolved, ${processed} rows processed)`,
       );
-      log(`debt: recomputed cache for ${recomputed} clients`);
     }
+    await flush();
+
+    // Повний прогін: обнуляємо всіх клієнтів і виставляємо MgrClient.debt = Σ
+    // рухів. Коректно, бо ми перестворили всі accum-рухи; live-рухи теж у сумі.
+    const recomputed = await recomputeDebtForClients(prisma);
+    log(
+      `debt: recomputed cache for ${recomputed} clients (touched ${touchedClientIds.size})`,
+    );
   } else {
-    // dry-run: рахуємо як "would write"
-    recon.written = debtByHex.size;
+    // dry-run: рахуємо скільки рядків записали б (без запису в БД).
+    for await (const rows of streamTable(src, "_AccumRg5269", DEBT_COLS, {
+      batch: args.batch,
+      limit: args.limit,
+      orderBy: ["_RecorderRRef", "_LineNo"],
+      where: activeWhere,
+    })) {
+      for (const row of rows) {
+        const clientHex = bufToHex(row["_Fld5273RRef"]);
+        if (!clientHex || !clientByHex.has(clientHex)) {
+          recon.unresolved++;
+          continue;
+        }
+        recon.written++;
+      }
+    }
   }
 
   log(
