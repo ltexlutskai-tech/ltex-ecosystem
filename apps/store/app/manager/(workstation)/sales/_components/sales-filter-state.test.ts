@@ -50,6 +50,45 @@ describe("parseSalesFilterFromSearchParams", () => {
     expect(s.clientCode1C).toBe("000001");
     expect(s.showArchived).toBe(true);
   });
+
+  it("defaults sort to 'date' and dir to 'desc'", () => {
+    const s = parseSalesFilterFromSearchParams({});
+    expect(s.sort).toBe("date");
+    expect(s.dir).toBe("desc");
+  });
+
+  it("parses whitelisted sort + dir, ignores unknown sort", () => {
+    const ok = parseSalesFilterFromSearchParams({ sort: "agent", dir: "asc" });
+    expect(ok.sort).toBe("agent");
+    expect(ok.dir).toBe("asc");
+    const bad = parseSalesFilterFromSearchParams({ sort: "haxxor" });
+    expect(bad.sort).toBe("date");
+  });
+
+  it("treats non-'asc' dir as 'desc'", () => {
+    expect(parseSalesFilterFromSearchParams({ dir: "sideways" }).dir).toBe(
+      "desc",
+    );
+    expect(parseSalesFilterFromSearchParams({ dir: "asc" }).dir).toBe("asc");
+  });
+
+  it("parses per-column filters (clientName/city/agent)", () => {
+    const s = parseSalesFilterFromSearchParams({
+      clientName: "  Іван  ",
+      city: "Луцьк",
+      agent: "Петренко",
+    });
+    expect(s.clientName).toBe("Іван");
+    expect(s.city).toBe("Луцьк");
+    expect(s.agent).toBe("Петренко");
+  });
+
+  it("defaults per-column filters to empty strings", () => {
+    const s = parseSalesFilterFromSearchParams({});
+    expect(s.clientName).toBe("");
+    expect(s.city).toBe("");
+    expect(s.agent).toBe("");
+  });
 });
 
 describe("salesFilterToQueryString", () => {
@@ -82,6 +121,24 @@ describe("salesFilterToQueryString", () => {
     expect(salesFilterToQueryString({ showArchived: true })).toContain(
       "showArchived=true",
     );
+  });
+
+  it("omits default sort/dir, emits non-default", () => {
+    expect(salesFilterToQueryString({ sort: "date", dir: "desc" })).toBe("");
+    const qs = salesFilterToQueryString({ sort: "agent", dir: "asc" });
+    expect(qs).toContain("sort=agent");
+    expect(qs).toContain("dir=asc");
+  });
+
+  it("emits per-column filters", () => {
+    const qs = salesFilterToQueryString({
+      clientName: "Іван",
+      city: "Луцьк",
+      agent: "Петренко",
+    });
+    expect(qs).toContain("clientName=");
+    expect(qs).toContain("city=");
+    expect(qs).toContain("agent=");
   });
 });
 

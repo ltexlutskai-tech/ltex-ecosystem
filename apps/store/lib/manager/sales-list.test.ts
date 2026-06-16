@@ -48,6 +48,51 @@ describe("buildSalesWhere — ownership scope", () => {
   });
 });
 
+describe("buildSalesWhere — per-column filters", () => {
+  it("clientName → customer.name contains", () => {
+    const w = buildSalesWhere({ scope: null, clientName: "Іван" });
+    expect(w.customer).toEqual({
+      name: { contains: "Іван", mode: "insensitive" },
+    });
+  });
+
+  it("city → customer.city contains", () => {
+    const w = buildSalesWhere({ scope: null, city: "Луцьк" });
+    expect(w.customer).toEqual({
+      city: { contains: "Луцьк", mode: "insensitive" },
+    });
+  });
+
+  it("agent → agentName contains", () => {
+    const w = buildSalesWhere({ scope: null, agent: "Петренко" });
+    expect(w.agentName).toEqual({ contains: "Петренко", mode: "insensitive" });
+  });
+
+  it("combines clientName + city + scope on customer", () => {
+    const w = buildSalesWhere({
+      scope: ["000001"],
+      clientName: "Іван",
+      city: "Луцьк",
+    });
+    expect(w.customer).toEqual({
+      code1C: { in: ["000001"] },
+      name: { contains: "Іван", mode: "insensitive" },
+      city: { contains: "Луцьк", mode: "insensitive" },
+    });
+  });
+
+  it("ignores blank per-column filters", () => {
+    const w = buildSalesWhere({
+      scope: null,
+      clientName: "  ",
+      city: "",
+      agent: "   ",
+    });
+    expect(w.agentName).toBeUndefined();
+    expect(w.customer).toBeUndefined();
+  });
+});
+
 describe("buildSalesWhere — archived filter", () => {
   it("hides archived by default (archived = false)", () => {
     const w = buildSalesWhere({ scope: null });
@@ -149,6 +194,7 @@ describe("serializeSaleRow", () => {
     totalUah: 4300,
     archived: true,
     isActual: false,
+    agentName: "Петренко",
     createdAt: new Date("2026-05-10T10:00:00Z"),
     customer: {
       id: "cust1",
@@ -168,6 +214,12 @@ describe("serializeSaleRow", () => {
     expect(row.archived).toBe(true);
     expect(row.itemCount).toBe(3);
     expect(row.totalUah).toBe(4300);
+    expect(row.agentName).toBe("Петренко");
+  });
+
+  it("maps null agentName", () => {
+    const row = serializeSaleRow({ ...raw, agentName: null });
+    expect(row.agentName).toBeNull();
   });
 
   it("tolerates null city", () => {

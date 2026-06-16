@@ -1,5 +1,5 @@
 import { OrdersRow, type OrdersRowData } from "./orders-row";
-import { SortableHeader } from "./sortable-header";
+import { SortableHeader } from "../../_components/sortable-header";
 
 export function OrdersTable({ items }: { items: OrdersRowData[] }) {
   if (items.length === 0) return null;

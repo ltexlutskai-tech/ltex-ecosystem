@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Plus } from "lucide-react";
-import { prisma } from "@ltex/db";
+import { prisma, Prisma } from "@ltex/db";
 import { getCurrentUser } from "@/lib/auth/manager-auth";
 import { getMyClientCodes1C } from "@/lib/manager/sale-ownership";
 import {
@@ -17,6 +17,31 @@ import { parseSalesFilterFromSearchParams } from "./_components/sales-filter-sta
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Реалізація — L-TEX Manager" };
+
+function buildOrderBy(
+  sort: string,
+  dir: "asc" | "desc",
+): Prisma.SaleOrderByWithRelationInput {
+  switch (sort) {
+    case "sum":
+      return { totalEur: dir };
+    case "code":
+      return { docNumber: dir };
+    case "client":
+      return { customer: { name: dir } };
+    case "city":
+      return { customer: { city: dir } };
+    case "status":
+      return { status: dir };
+    case "positions":
+      return { items: { _count: dir } };
+    case "agent":
+      return { agentName: dir };
+    case "date":
+    default:
+      return { createdAt: dir };
+  }
+}
 
 export default async function ManagerSalesPage({
   searchParams,
@@ -51,12 +76,15 @@ export default async function ManagerSalesPage({
     from: fromDate && !Number.isNaN(fromDate.getTime()) ? fromDate : undefined,
     to: toDate && !Number.isNaN(toDate.getTime()) ? toDate : undefined,
     showArchived: filter.showArchived,
+    clientName: filter.clientName || undefined,
+    city: filter.city || undefined,
+    agent: filter.agent || undefined,
   });
 
   const [items, total] = await Promise.all([
     prisma.sale.findMany({
       where,
-      orderBy: { createdAt: "desc" },
+      orderBy: buildOrderBy(filter.sort, filter.dir),
       skip: (filter.page - 1) * filter.pageSize,
       take: filter.pageSize,
       include: saleRowInclude,

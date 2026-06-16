@@ -13,6 +13,7 @@ export interface SalesRowData {
   totalUah: number;
   archived: boolean;
   isActual: boolean;
+  agentName: string | null;
   itemCount: number;
   createdAt: Date;
   customer: {
@@ -68,6 +69,11 @@ export function SalesRow({ sale }: { sale: SalesRowData }) {
       </td>
       <td className="px-4 py-3">
         <SaleStatusBadge status={sale.status} />
+      </td>
+      <td
+        className={`px-4 py-3 text-sm ${dimmed ? "text-gray-400" : "text-gray-700"}`}
+      >
+        {sale.agentName ?? "—"}
       </td>
       <td className="px-4 py-3 text-center text-sm text-gray-700">
         {sale.itemCount}

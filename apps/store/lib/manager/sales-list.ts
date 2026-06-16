@@ -51,6 +51,12 @@ export interface BuildSalesWhereParams {
    * архівні (`archived = true`) приховані.
    */
   showArchived?: boolean;
+  /** Точковий фільтр по клієнту (текст → `customer.name contains`). */
+  clientName?: string;
+  /** Точковий фільтр по місту (текст → `customer.city contains`). */
+  city?: string;
+  /** Точковий фільтр по агенту (текст → `agentName contains`). */
+  agent?: string;
 }
 
 /**
@@ -70,8 +76,20 @@ export function buildSalesWhere(
   if (p.clientCode1C) {
     customerWhere.code1C = p.clientCode1C;
   }
+  // Per-column фільтри по клієнту/місту (текст, LIKE).
+  if (p.clientName && p.clientName.trim().length > 0) {
+    customerWhere.name = { contains: p.clientName.trim(), mode: "insensitive" };
+  }
+  if (p.city && p.city.trim().length > 0) {
+    customerWhere.city = { contains: p.city.trim(), mode: "insensitive" };
+  }
   if (Object.keys(customerWhere).length > 0) {
     where.customer = customerWhere;
+  }
+
+  // Per-column фільтр по агенту (текст, LIKE на `agentName`).
+  if (p.agent && p.agent.trim().length > 0) {
+    where.agentName = { contains: p.agent.trim(), mode: "insensitive" };
   }
 
   // Архів: за замовчуванням приховуємо проведені (archived = true).
@@ -135,6 +153,7 @@ export interface RawSaleRow {
   totalUah: number;
   archived: boolean;
   isActual: boolean;
+  agentName: string | null;
   createdAt: Date;
   customer: {
     id: string;
@@ -155,6 +174,8 @@ export interface SaleListItem {
   totalUah: number;
   archived: boolean;
   isActual: boolean;
+  /** Торговий агент: `Sale.agentName` (історичний 1С-імпорт). */
+  agentName: string | null;
   itemCount: number;
   createdAt: Date;
   customer: {
@@ -187,6 +208,7 @@ export function serializeSaleRow(s: RawSaleRow): SaleListItem {
     totalUah: s.totalUah,
     archived: s.archived,
     isActual: s.isActual,
+    agentName: s.agentName,
     itemCount: s._count.items,
     createdAt: s.createdAt,
     customer: {
