@@ -12,6 +12,8 @@ vi.mock("@ltex/db", () => ({ prisma: mockPrisma }));
 import { canViewOrder, getMyClientCodes1C } from "./order-ownership";
 
 const ADMIN = { id: "admin1", role: "admin" as const };
+const OWNER = { id: "owner1", role: "owner" as const };
+const ANALYST = { id: "an1", role: "analyst" as const };
 const MANAGER = { id: "m1", role: "manager" as const };
 
 beforeEach(() => {
@@ -21,6 +23,18 @@ beforeEach(() => {
 describe("getMyClientCodes1C", () => {
   it("returns null for admin (no restriction)", async () => {
     const out = await getMyClientCodes1C(ADMIN);
+    expect(out).toBeNull();
+    expect(mockPrisma.mgrClient.findMany).not.toHaveBeenCalled();
+  });
+
+  it("returns null for owner (no restriction)", async () => {
+    const out = await getMyClientCodes1C(OWNER);
+    expect(out).toBeNull();
+    expect(mockPrisma.mgrClient.findMany).not.toHaveBeenCalled();
+  });
+
+  it("returns null for analyst (all clients — forms «Потреби» manually)", async () => {
+    const out = await getMyClientCodes1C(ANALYST);
     expect(out).toBeNull();
     expect(mockPrisma.mgrClient.findMany).not.toHaveBeenCalled();
   });
@@ -54,6 +68,12 @@ describe("getMyClientCodes1C", () => {
 describe("canViewOrder", () => {
   it("admin can always view", async () => {
     const ok = await canViewOrder(ADMIN, "ord1");
+    expect(ok).toBe(true);
+    expect(mockPrisma.order.findUnique).not.toHaveBeenCalled();
+  });
+
+  it("analyst can always view", async () => {
+    const ok = await canViewOrder(ANALYST, "ord1");
     expect(ok).toBe(true);
     expect(mockPrisma.order.findUnique).not.toHaveBeenCalled();
   });

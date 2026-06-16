@@ -6,6 +6,7 @@ import { getCurrentUser } from "@/lib/auth/manager-auth";
 import { getCurrentRate } from "@/lib/exchange-rate";
 import { canViewOrder } from "@/lib/manager/order-ownership";
 import { canEditOrder, isOrderLocked } from "@/lib/manager/order-status";
+import { formatOrderNumber } from "@/lib/manager/order-number";
 import {
   ORDER_DELIVERY_METHODS,
   orderDeliveryLabel,
@@ -30,11 +31,11 @@ export async function generateMetadata({
   const { id } = await params;
   const order = await prisma.order.findUnique({
     where: { id },
-    select: { code1C: true },
+    select: { code1C: true, number1C: true },
   });
   return {
-    title: order?.code1C
-      ? `Замовлення №${order.code1C} — L-TEX Manager`
+    title: order
+      ? `Замовлення №${formatOrderNumber(order)} — L-TEX Manager`
       : "Замовлення — L-TEX Manager",
   };
 }
@@ -190,9 +191,11 @@ export default async function ManagerOrderDetailPage({
       it.weight > 0 ? Math.round((it.priceEur / it.weight) * 100) / 100 : 0,
   }));
 
+  const orderNumber = formatOrderNumber(order);
+
   const initialOrder: OrderEditInitial = {
     id: order.id,
-    displayNumber: order.code1C ?? "авто",
+    displayNumber: order.number1C ?? order.code1C ?? "авто",
     status: order.status,
     notes: order.notes ?? "",
     priceTypeId: order.priceTypeId,
@@ -218,7 +221,9 @@ export default async function ManagerOrderDetailPage({
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-gray-800">
-            {order.code1C ? `Замовлення №${order.code1C}` : "Замовлення"}
+            {order.code1C || order.number1C
+              ? `Замовлення №${orderNumber}`
+              : "Замовлення"}
           </h1>
           <p className="mt-1 text-sm text-gray-500">Створено: {date}</p>
         </div>

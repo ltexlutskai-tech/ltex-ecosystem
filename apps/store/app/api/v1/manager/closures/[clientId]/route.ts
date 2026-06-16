@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@ltex/db";
 import { getCurrentUser } from "@/lib/auth/manager-auth";
 import { getMyClientCodes1C } from "@/lib/manager/order-ownership";
+import { formatOrderNumber } from "@/lib/manager/order-number";
 import type { ClosuresListItem } from "@/lib/manager/closures-sync";
 
 /**
@@ -94,7 +95,8 @@ export async function GET(req: NextRequest, ctx: RouteContext) {
 
   const items: ClosuresListItem[] = [];
   for (const order of orders) {
-    const orderNumber = order.code1C ?? `№${order.id.slice(0, 8)}`;
+    const orderNumber =
+      order.number1C ?? order.code1C ?? `№${order.id.slice(0, 8)}`;
     const orderDate = order.createdAt.toISOString();
     for (const item of order.items) {
       const sold = soldMap.get(`${order.id}:${item.productId}`) ?? 0;

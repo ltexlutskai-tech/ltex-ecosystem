@@ -1,10 +1,12 @@
 import Link from "next/link";
 import { ArrowRight, Check, Minus } from "lucide-react";
+import { formatOrderNumber } from "@/lib/manager/order-number";
 import { OrderStatusBadge } from "../../customers/[id]/_components/order-status-badge";
 
 export interface OrdersRowData {
   id: string;
   code1C: string | null;
+  number1C: string | null;
   status: string;
   totalEur: number;
   totalUah: number;
@@ -41,7 +43,7 @@ export function OrdersRow({ order }: { order: OrdersRowData }) {
           href={`/manager/orders/${order.id}`}
           className="hover:text-blue-600"
         >
-          {order.code1C ?? order.id.slice(0, 8)}
+          {formatOrderNumber(order)}
         </Link>
       </td>
       <td
