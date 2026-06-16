@@ -461,6 +461,7 @@ interface ImportContext {
   cashFlowArticleByHex: Map<string, string>; // hex → MgrCashFlowArticle.id
   bankAccountByHex: Map<string, string>; // hex → MgrBankAccount.id
   agentNameByHex: Map<string, string>; // hex → ТорговийАгент._Description
+  agentUserIdByHex: Map<string, string>; // hex(1С-агент _IDRRef = User.code1C) → User.id (Фаза 2 ретро-прив'язка)
   unitNameByHex: Map<string, string>; // hex → ЕдиницаИзмерения._Description
   eurRateByDay: Map<string, number>; // "YYYY-MM-DD" → грн за 1 EUR
 }
@@ -1330,6 +1331,10 @@ async function importOrders(ctx: ImportContext): Promise<Recon> {
         const h = bufToHex(row["_Fld6886RRef"]);
         return h ? (ctx.agentNameByHex.get(h) ?? null) : null;
       })();
+      const assignedAgentUserId = (() => {
+        const h = bufToHex(row["_Fld6886RRef"]);
+        return h ? (ctx.agentUserIdByHex.get(h) ?? null) : null;
+      })();
 
       // Рядки замовлення.
       const items = await loadOrderItems(ctx, hex);
@@ -1356,6 +1361,7 @@ async function importOrders(ctx: ImportContext): Promise<Recon> {
                 exchangeRate,
                 notes,
                 agentName,
+                assignedAgentUserId,
                 archived: posted,
                 closedAt: closed ? (createdAt ?? new Date()) : null,
                 exportTo1C: false,
@@ -1370,6 +1376,7 @@ async function importOrders(ctx: ImportContext): Promise<Recon> {
                 exchangeRate,
                 notes,
                 agentName,
+                assignedAgentUserId,
                 archived: posted,
                 closedAt: closed ? (createdAt ?? new Date()) : null,
                 // Дата теж оновлюється на реімпорті: усі історичні документи
@@ -1571,6 +1578,10 @@ async function importSales(ctx: ImportContext): Promise<Recon> {
         const h = bufToHex(row["_Fld6887RRef"]);
         return h ? (ctx.agentNameByHex.get(h) ?? null) : null;
       })();
+      const assignedAgentUserId = (() => {
+        const h = bufToHex(row["_Fld6887RRef"]);
+        return h ? (ctx.agentUserIdByHex.get(h) ?? null) : null;
+      })();
       // Сделка → Заказ (полиморфне посилання, читаємо лише RRRef-частину).
       const orderId = (() => {
         const h = bufToHex(row["_Fld3490_RRRef"]);
@@ -1607,6 +1618,7 @@ async function importSales(ctx: ImportContext): Promise<Recon> {
                 expressWaybill: waybill,
                 notes,
                 agentName,
+                assignedAgentUserId,
                 orderId,
                 archived: posted,
                 exportTo1C: false,
@@ -1626,6 +1638,7 @@ async function importSales(ctx: ImportContext): Promise<Recon> {
                 expressWaybill: waybill,
                 notes,
                 agentName,
+                assignedAgentUserId,
                 orderId,
                 archived: posted,
                 // Дата оновлюється і на реімпорті (див. коментар у importOrders).
@@ -2528,6 +2541,7 @@ async function ensureOrderDict(ctx: ImportContext): Promise<void> {
 // щоб standalone-прогони документів резолвили агента/курс/статтю/банк-рахунок.
 async function ensureDictMaps(ctx: ImportContext): Promise<void> {
   if (ctx.agentNameByHex.size === 0) await loadAgentNames(ctx);
+  if (ctx.agentUserIdByHex.size === 0) await loadAgentUserIds(ctx);
   if (ctx.unitNameByHex.size === 0) await loadUnitNames(ctx);
   if (ctx.eurRateByDay.size === 0) {
     // importRates і апсертить ExchangeRate, і наповнює eurRateByDay; на повторі
@@ -2804,6 +2818,20 @@ async function loadAgentNames(ctx: ImportContext): Promise<Recon> {
   }
   log(`agents: mapped ${ctx.agentNameByHex.size} hex→name`);
   return recon;
+}
+
+// ─── Мапа hex(1С-агент) → User.id (Фаза 2: ретро-прив'язка документів) ───────
+// Будується з НАШОЇ бази: усі User з заповненим code1C (= hex 1С-агента,
+// lower-case, як bufToHex). Покриває й активних, й архівних менеджерів.
+async function loadAgentUserIds(ctx: ImportContext): Promise<void> {
+  const users = await ctx.prisma.user.findMany({
+    where: { code1C: { not: null } },
+    select: { id: true, code1C: true },
+  });
+  for (const u of users) {
+    if (u.code1C) ctx.agentUserIdByHex.set(u.code1C.toLowerCase(), u.id);
+  }
+  log(`agent-users: mapped ${ctx.agentUserIdByHex.size} hex→User.id`);
 }
 
 // ─── 10.5 ЕдиницыИзмерения → мапа hex→назва ─ _Reference52 ────────────────────
@@ -3236,6 +3264,7 @@ async function main(): Promise<void> {
     cashFlowArticleByHex: new Map(),
     bankAccountByHex: new Map(),
     agentNameByHex: new Map(),
+    agentUserIdByHex: new Map(),
     unitNameByHex: new Map(),
     eurRateByDay: new Map(),
   };
