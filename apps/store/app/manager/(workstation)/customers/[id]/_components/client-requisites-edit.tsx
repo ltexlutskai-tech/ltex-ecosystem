@@ -248,12 +248,6 @@ export function ClientRequisitesEdit({
           />
 
           <EditSelectRow
-            label="Тип цін"
-            value={values.priceTypeId}
-            onChange={(v) => setField("priceTypeId", v)}
-            options={dictionaries.priceTypes}
-          />
-          <EditSelectRow
             label="Асортимент"
             value={values.primaryAssortmentId}
             onChange={(v) => setField("primaryAssortmentId", v)}

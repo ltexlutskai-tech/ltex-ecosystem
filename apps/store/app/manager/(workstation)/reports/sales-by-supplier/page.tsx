@@ -3,6 +3,7 @@ import { requireRole } from "@/lib/auth/manager-auth";
 import { reportSalesBySupplier } from "@/lib/reports/analyst-reports";
 import type { PeriodPreset } from "@/lib/finance/owner-stats";
 import { ReportView } from "../_components/report-view";
+import { ReportsNav } from "../_components/reports-nav";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Продажі по постачальниках | L-TEX" };
@@ -23,6 +24,7 @@ export default async function Page({
   const report = await reportSalesBySupplier(preset);
   return (
     <div className="mx-auto max-w-6xl">
+      <ReportsNav />
       <ReportView
         report={report}
         reportId="sales-by-supplier"

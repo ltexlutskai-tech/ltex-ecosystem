@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { requireRole } from "@/lib/auth/manager-auth";
 import { buildOverdueDebtsReport } from "@/lib/reports/overdue-debts";
 import { EmptyState } from "../../_components/empty-state";
+import { ReportsNav } from "../_components/reports-nav";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Прострочені борги | L-TEX" };
@@ -63,6 +64,8 @@ export default async function Page({
           📥 Експорт CSV
         </a>
       </div>
+
+      <ReportsNav />
 
       <form
         method="get"

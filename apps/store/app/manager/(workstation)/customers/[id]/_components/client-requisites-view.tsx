@@ -210,7 +210,6 @@ export function ClientRequisitesView({
             value={<ClientStatusBadge status={client.statusOperational} />}
           />
 
-          <Row label="Тип цін" value={client.priceType?.label ?? "—"} />
           <Row
             label="Асортимент"
             value={client.primaryAssortment?.label ?? "—"}
