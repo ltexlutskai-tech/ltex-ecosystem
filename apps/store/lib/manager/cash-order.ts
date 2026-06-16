@@ -1,5 +1,6 @@
 import { prisma } from "@ltex/db";
 import type { ChangeCurrency } from "@/lib/validations/manager-cash-order";
+import { applyDebtMovementSafe } from "@/lib/manager/debt-register";
 
 /**
  * Блок «Реалізація» — Етап 4. Касовий ордер (каса) + розрахунок здачі.
@@ -443,7 +444,7 @@ export async function createPaymentOrders(args: CreatePaymentArgs) {
   const documentSumEur = reduceToEur(paid, rates);
   const changeTotal = change.uah + change.eur + change.usd;
 
-  return prisma.$transaction(async (tx) => {
+  const result = await prisma.$transaction(async (tx) => {
     const income = await tx.mgrCashOrder.create({
       data: {
         saleId: saleId ?? null,
@@ -516,4 +517,38 @@ export async function createPaymentOrders(args: CreatePaymentArgs) {
 
     return { income, change: changeOrder };
   });
+
+  // 5.4.5b: рух боргу при оплаті (Приход) — погашення ЗМЕНШУЄ борг (−).
+  // ПІСЛЯ коміту (потрібен income.id; fire-and-forget не тримає транзакцію).
+  // Расход (standalone) НЕ обліковуємо — семантика боргу для нього неоднозначна
+  // (TODO: окремо). Здача (change) окремим рухом не йде — вона вже у `settledEur`.
+  if (type === "income") {
+    let effectiveCustomerId: string | null = customerId ?? null;
+    if (!effectiveCustomerId && saleId) {
+      const sale = await prisma.sale.findUnique({
+        where: { id: saleId },
+        select: { customerId: true },
+      });
+      effectiveCustomerId = sale?.customerId ?? null;
+    }
+
+    // Сума, що фактично пішла в погашення (здача не зменшує борг).
+    const settledEur =
+      reduceToEur(paid, rates) - reduceChangeToEur(change, rates);
+
+    if (effectiveCustomerId && settledEur !== 0) {
+      applyDebtMovementSafe({
+        customerId: effectiveCustomerId,
+        amountEur: -settledEur, // оплата ЗМЕНШУЄ борг
+        kind: "payment",
+        sourceType: "cash_order",
+        sourceId: result.income.id,
+        occurredAt: result.income.createdAt ?? new Date(),
+        note: "Оплата (касовий ордер)",
+        createdByUserId: agentUserId ?? null,
+      });
+    }
+  }
+
+  return result;
 }

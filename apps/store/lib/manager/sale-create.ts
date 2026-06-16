@@ -5,6 +5,7 @@ import {
   buildSaleEventBody,
   recordClientEventSafe,
 } from "@/lib/manager/client-timeline";
+import { applyDebtMovementSafe } from "@/lib/manager/debt-register";
 import type {
   CreateSaleInputRaw,
   SaleItemInput,
@@ -161,6 +162,21 @@ export async function createSaleWithItems(
     metadata: { saleId: sale.id },
   });
 
+  // 5.4.5b: рух боргу при проведенні (+totalEur — борг клієнта зростає).
+  // Ідемпотентно за sourceType+sourceId; чернетка (draft) рух НЕ створює.
+  if (post) {
+    applyDebtMovementSafe({
+      customerId: sale.customerId,
+      amountEur: Number(sale.totalEur),
+      kind: "sale",
+      sourceType: "sale",
+      sourceId: sale.id,
+      occurredAt: sale.createdAt ?? new Date(),
+      note: "Реалізація проведена",
+      createdByUserId: actor.userId,
+    });
+  }
+
   return sale;
 }
 
@@ -217,6 +233,21 @@ export async function updateSaleWithItems(
   });
 
   enqueueSaleSyncSafe(sale);
+
+  // 5.4.5b: рух боргу при переході у `posted` (проведення з картки реалізації).
+  // Ідемпотентно за sourceType+sourceId — повторне проведення лише оновить суму.
+  if (becomesArchived) {
+    applyDebtMovementSafe({
+      customerId: sale.customerId,
+      amountEur: Number(sale.totalEur),
+      kind: "sale",
+      sourceType: "sale",
+      sourceId: sale.id,
+      occurredAt: sale.createdAt ?? new Date(),
+      note: "Реалізація проведена",
+      createdByUserId: _actor.userId,
+    });
+  }
 
   return sale;
 }
