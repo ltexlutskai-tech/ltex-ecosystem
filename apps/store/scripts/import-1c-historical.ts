@@ -48,6 +48,8 @@ import * as mssql from "mssql";
 
 import { PrismaClient } from "@ltex/db";
 
+import { recomputeDebtForClients } from "../lib/manager/debt-register";
+
 // ─── Парсинг аргументів ───────────────────────────────────────────────────────
 
 const ENTITY_NAMES = [
@@ -3044,12 +3046,18 @@ async function importDictionaries(ctx: ImportContext): Promise<Recon> {
   return combined;
 }
 
-// ─── 11. ВзаиморасчетыСКонтрагентами → MgrClient.debt ─ _AccumRg5269 ───────────
+// ─── 11. ВзаиморасчетыСКонтрагентами → MgrDebtMovement (opening) ─ _AccumRg5269 ─
 // Регістр накопичення «Взаиморасчеты с контрагентами». Агрегуємо чистий борг
 // кожного клієнта (Контрагент _Fld5273RRef) по ресурсу СуммаУпр (_Fld5275)
 // з урахуванням знаку руху (_RecordKind: 0 = приход/+, 1 = расход/−).
-// Результат записуємо у MgrClient.debt, зіставляючи за uid1C (hex _IDRRef
-// контрагента), який importCustomers зберіг раніше.
+//
+// 5.4.5a: замість запису одного числа у MgrClient.debt — пишемо ОДИН `opening`-рух
+// у регістр MgrDebtMovement на клієнта (kind=opening, sourceType=accum_rg5269,
+// sourceId=hex контрагента). Реімпорт оновлює суму руху (unique-ключ), не дублює.
+// Після циклу `recomputeDebtForClients` перебудовує кеш MgrClient.debt = Σ рухів
+// (на свіжій базі = opening; live-рухи з 5.4.5b не затираються).
+// Клієнтів зіставляємо за uid1C (hex _IDRRef контрагента), який importCustomers
+// зберіг раніше.
 //
 // Порядок сортування: ["_RecorderRRef", "_LineNo"] — детермінований складений
 // ключ (обидва наявні у _AccumRg5269 згідно docs/1c-mssql-schema/columns.tsv).
@@ -3059,6 +3067,9 @@ async function importDictionaries(ctx: ImportContext): Promise<Recon> {
 // знаком — змінити на -1.
 // TODO: якщо знак боргу інвертований на живих даних — змінити на -1
 const DEBT_SIGN = 1;
+
+// `opening`-рух завжди першим у стрічці рухів боргу (до будь-якого live-руху).
+const DEBT_OPENING_AS_OF = new Date("2021-01-01T00:00:00Z");
 
 const DEBT_COLS = ["_RecordKind", "_Fld5273RRef", "_Fld5275"];
 
@@ -3095,17 +3106,39 @@ async function importDebt(ctx: ImportContext): Promise<Recon> {
 
   if (willWrite(ctx)) {
     let processed = 0;
+    const touchedClientIds: string[] = [];
     for (const [hex, sum] of debtByHex) {
       const value = round2(DEBT_SIGN * sum);
       try {
-        const res = await prisma.mgrClient.updateMany({
+        const client = await prisma.mgrClient.findUnique({
           where: { uid1C: hex },
-          data: { debt: value },
+          select: { id: true },
         });
-        if (res.count > 0) {
-          recon.written++;
-        } else {
+        if (!client) {
           recon.unresolved++;
+        } else {
+          // Один opening-рух на клієнта; реімпорт оновлює суму (unique-ключ).
+          await prisma.mgrDebtMovement.upsert({
+            where: {
+              mgr_debt_movement_source: {
+                kind: "opening",
+                sourceType: "accum_rg5269",
+                sourceId: hex,
+              },
+            },
+            create: {
+              clientId: client.id,
+              amountEur: value,
+              kind: "opening",
+              sourceType: "accum_rg5269",
+              sourceId: hex,
+              occurredAt: DEBT_OPENING_AS_OF,
+              note: "Початковий залишок з 1С (_AccumRg5269)",
+            },
+            update: { amountEur: value, clientId: client.id },
+          });
+          touchedClientIds.push(client.id);
+          recon.written++;
         }
       } catch (e) {
         sink.record(hex, e);
@@ -3113,9 +3146,19 @@ async function importDebt(ctx: ImportContext): Promise<Recon> {
       processed++;
       if (processed % 500 === 0) {
         log(
-          `debt: updated ${recon.written} clients (${recon.unresolved} unresolved, ${processed}/${debtByHex.size} processed)`,
+          `debt: upserted ${recon.written} opening movements (${recon.unresolved} unresolved, ${processed}/${debtByHex.size} processed)`,
         );
       }
+    }
+
+    // Перебудовуємо кеш MgrClient.debt = Σ рухів лише для зачеплених клієнтів
+    // (на свіжій базі = opening; live-рухи з 5.4.5b не затираються).
+    if (touchedClientIds.length > 0) {
+      const recomputed = await recomputeDebtForClients(
+        prisma,
+        touchedClientIds,
+      );
+      log(`debt: recomputed cache for ${recomputed} clients`);
     }
   } else {
     // dry-run: рахуємо як "would write"

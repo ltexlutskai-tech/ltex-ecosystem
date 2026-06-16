@@ -1419,6 +1419,7 @@ model MgrClient {
   bankAccounts      MgrClientBankAccount[]
   reminders         MgrReminder[]
   timeline          MgrClientTimelineEntry[]
+  debtMovements     MgrDebtMovement[]
   assignments       ClientAssignment[]
   chatConversations ChatConversation[]
 
@@ -1642,6 +1643,39 @@ model MgrClientTimelineEntry {
 
   @@index([clientId, occurredAt(sort: Desc)])
   @@map("mgr_client_timeline")
+}
+
+// ─── 5.4.5 — регістр рухів боргу (живий борг клієнтів) ──────────────────────
+// Кожне проведення документа = підписаний рядок руху; MgrClient.debt = Σ
+// amountEur по рухах (кеш). Дзеркалить 1С _AccumRg5269 ВзаиморасчетыСКонтрагентами.
+// `opening` — агрегований початковий залишок з історичного імпорту; `sale` /
+// `payment` / `correction` — живі рухи (5.4.5b/5.4.5c).
+
+enum MgrDebtMovementKind {
+  opening
+  sale
+  payment
+  correction
+
+  @@map("mgr_debt_movement_kind")
+}
+
+model MgrDebtMovement {
+  id              String              @id @default(cuid())
+  clientId        String              @map("client_id")
+  client          MgrClient           @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  amountEur       Decimal             @map("amount_eur") @db.Decimal(12, 2) // + борг клієнта зростає, − зменшується
+  kind            MgrDebtMovementKind
+  sourceType      String?             @map("source_type") // "accum_rg5269" | "sale" | "cash_order" | "manual"
+  sourceId        String?             @map("source_id")
+  occurredAt      DateTime            @map("occurred_at")
+  note            String?
+  createdByUserId String?             @map("created_by_user_id")
+  createdAt       DateTime            @default(now()) @map("created_at")
+
+  @@unique([kind, sourceType, sourceId], name: "mgr_debt_movement_source")
+  @@index([clientId, occurredAt])
+  @@map("mgr_debt_movements")
 }
 
 // ─── Email DLQ (persistent retry queue, Session 70) ─────────────────────────
