@@ -197,6 +197,7 @@ export default async function ManagerOrderDetailPage({
     id: order.id,
     displayNumber: order.number1C ?? order.code1C ?? "авто",
     status: order.status,
+    isActual: order.isActual,
     notes: order.notes ?? "",
     priceTypeId: order.priceTypeId,
     deliveryMethod: order.deliveryMethod,

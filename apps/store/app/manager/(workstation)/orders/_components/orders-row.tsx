@@ -12,6 +12,7 @@ export interface OrdersRowData {
   totalUah: number;
   archived: boolean;
   isActual: boolean;
+  agentName: string | null;
   itemCount: number;
   createdAt: Date;
   customer: {
@@ -80,6 +81,11 @@ export function OrdersRow({ order }: { order: OrdersRowData }) {
             aria-label="Неактуальний"
           />
         )}
+      </td>
+      <td
+        className={`px-4 py-3 text-sm ${dimmed ? "text-gray-400" : "text-gray-700"}`}
+      >
+        {order.agentName ?? "—"}
       </td>
       <td className="px-4 py-3 text-center text-sm text-gray-700">
         {order.itemCount}

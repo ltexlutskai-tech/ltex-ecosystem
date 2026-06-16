@@ -130,6 +130,8 @@ export function OrderForm({
   const [exportTo1C, setExportTo1C] = useState(
     initialOrder?.exportTo1C ?? true,
   );
+  // Актуальність документа (1С «Статус заказа: Актуальне») — лише edit.
+  const [isActual, setIsActual] = useState(initialOrder?.isActual ?? true);
 
   const priceTypeCode =
     priceTypes.find((p) => p.id === priceTypeId)?.code ?? null;
@@ -269,6 +271,7 @@ export function OrderForm({
           priceTypeId: priceTypeId || null,
           deliveryMethod: deliveryMethod || null,
           exportTo1C,
+          ...(isEdit ? { isActual } : {}),
           ...(force ? { force: true } : {}),
         }),
       });
@@ -456,6 +459,33 @@ export function OrderForm({
             </div>
           </div>
         </div>
+
+        {/* Статус замовлення (актуальність) — лише у режимі редагування */}
+        {isEdit && (
+          <div className="mt-4 flex flex-wrap items-center gap-3 border-t pt-4">
+            <span className="text-sm font-medium text-gray-700">
+              Статус замовлення:
+            </span>
+            <select
+              value={isActual ? "actual" : "inactive"}
+              onChange={(e) => setIsActual(e.target.value === "actual")}
+              className="h-9 rounded-md border border-gray-300 bg-white px-3 text-sm focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500"
+              aria-label="Статус замовлення (актуальність)"
+            >
+              <option value="actual">Актуальне</option>
+              <option value="inactive">Неактуальне</option>
+            </select>
+            <span
+              className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
+                isActual
+                  ? "bg-green-100 text-green-700"
+                  : "bg-gray-100 text-gray-500"
+              }`}
+            >
+              {isActual ? "Актуальне" : "Неактуальне"}
+            </span>
+          </div>
+        )}
 
         {/* Чекбокс: експорт у 1С */}
         <div className="mt-4 flex flex-col gap-3 border-t pt-4">

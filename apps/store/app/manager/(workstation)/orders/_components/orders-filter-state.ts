@@ -12,16 +12,28 @@ export const ORDER_SORT_KEYS = [
   "status",
   "positions",
   "actual",
+  "agent",
 ] as const;
 
 export type OrderSortKey = (typeof ORDER_SORT_KEYS)[number];
 
+export const ORDER_ACTUALITY_VALUES = ["actual", "inactive", "all"] as const;
+export type OrderActualityValue = (typeof ORDER_ACTUALITY_VALUES)[number];
+
 export interface OrdersFilterState {
   search: string;
   status: OrderStatus | "";
+  /** Актуальність документа. Дефолт «actual» — лише актуальні. */
+  actuality: OrderActualityValue;
   from: string;
   to: string;
   clientCode1C: string;
+  /** Per-column фільтр по клієнту (текст). */
+  clientName: string;
+  /** Per-column фільтр по місту (текст). */
+  city: string;
+  /** Per-column фільтр по агенту (текст). */
+  agent: string;
   /** Показувати архівні (проведені в 1С). Дефолт false — архівні приховані. */
   showArchived: boolean;
   page: number;
@@ -32,6 +44,7 @@ export interface OrdersFilterState {
 
 const ORDER_STATUS_SET = new Set<string>(ORDER_STATUS_LIST);
 const ORDER_SORT_KEY_SET = new Set<string>(ORDER_SORT_KEYS);
+const ORDER_ACTUALITY_SET = new Set<string>(ORDER_ACTUALITY_VALUES);
 
 function pickString(
   v: string | string[] | undefined,
@@ -52,9 +65,17 @@ export function parseOrdersFilterFromSearchParams(
     ? (statusRaw as OrderStatus)
     : "";
 
+  const actualityRaw = pickString(sp.actuality) ?? "";
+  const actuality: OrderActualityValue = ORDER_ACTUALITY_SET.has(actualityRaw)
+    ? (actualityRaw as OrderActualityValue)
+    : "actual";
+
   const from = pickString(sp.from) ?? "";
   const to = pickString(sp.to) ?? "";
   const clientCode1C = pickString(sp.clientCode1C) ?? "";
+  const clientName = pickString(sp.clientName) ?? "";
+  const city = pickString(sp.city) ?? "";
+  const agent = pickString(sp.agent) ?? "";
   const showArchived = pickString(sp.showArchived) === "true";
 
   const pageStr = pickString(sp.page) ?? "";
@@ -77,9 +98,13 @@ export function parseOrdersFilterFromSearchParams(
   return {
     search,
     status,
+    actuality,
     from,
     to,
     clientCode1C,
+    clientName,
+    city,
+    agent,
     showArchived,
     page,
     pageSize,
@@ -94,9 +119,15 @@ export function ordersFilterToQueryString(
   const sp = new URLSearchParams();
   if (state.search) sp.set("search", state.search);
   if (state.status) sp.set("status", state.status);
+  if (state.actuality && state.actuality !== "actual") {
+    sp.set("actuality", state.actuality);
+  }
   if (state.from) sp.set("from", state.from);
   if (state.to) sp.set("to", state.to);
   if (state.clientCode1C) sp.set("clientCode1C", state.clientCode1C);
+  if (state.clientName) sp.set("clientName", state.clientName);
+  if (state.city) sp.set("city", state.city);
+  if (state.agent) sp.set("agent", state.agent);
   if (state.showArchived) sp.set("showArchived", "true");
   if (state.page && state.page > 1) sp.set("page", String(state.page));
   if (state.pageSize && state.pageSize !== 20) {

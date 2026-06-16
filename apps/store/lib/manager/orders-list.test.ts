@@ -60,6 +60,68 @@ describe("buildOrdersWhere — archived filter", () => {
   });
 });
 
+describe("buildOrdersWhere — actuality filter", () => {
+  it("defaults to actual (isActual = true)", () => {
+    const w = buildOrdersWhere({ customerCodes: null });
+    expect(w.isActual).toBe(true);
+  });
+
+  it("inactive → isActual = false", () => {
+    const w = buildOrdersWhere({ customerCodes: null, actuality: "inactive" });
+    expect(w.isActual).toBe(false);
+  });
+
+  it("all → no isActual constraint", () => {
+    const w = buildOrdersWhere({ customerCodes: null, actuality: "all" });
+    expect(w.isActual).toBeUndefined();
+  });
+});
+
+describe("buildOrdersWhere — per-column filters", () => {
+  it("clientName → customer.name contains", () => {
+    const w = buildOrdersWhere({ customerCodes: null, clientName: "Іван" });
+    expect(w.customer).toEqual({
+      name: { contains: "Іван", mode: "insensitive" },
+    });
+  });
+
+  it("city → customer.city contains", () => {
+    const w = buildOrdersWhere({ customerCodes: null, city: "Луцьк" });
+    expect(w.customer).toEqual({
+      city: { contains: "Луцьк", mode: "insensitive" },
+    });
+  });
+
+  it("agent → agentName contains", () => {
+    const w = buildOrdersWhere({ customerCodes: null, agent: "Петренко" });
+    expect(w.agentName).toEqual({ contains: "Петренко", mode: "insensitive" });
+  });
+
+  it("combines clientName + city + scope on customer", () => {
+    const w = buildOrdersWhere({
+      customerCodes: ["000001"],
+      clientName: "Іван",
+      city: "Луцьк",
+    });
+    expect(w.customer).toEqual({
+      code1C: { in: ["000001"] },
+      name: { contains: "Іван", mode: "insensitive" },
+      city: { contains: "Луцьк", mode: "insensitive" },
+    });
+  });
+
+  it("ignores blank per-column filters", () => {
+    const w = buildOrdersWhere({
+      customerCodes: null,
+      clientName: "  ",
+      city: "",
+      agent: "   ",
+    });
+    expect(w.customer).toBeUndefined();
+    expect(w.agentName).toBeUndefined();
+  });
+});
+
 describe("buildOrdersWhere — search (client + products)", () => {
   it("no OR when q empty / blank", () => {
     expect(buildOrdersWhere({ customerCodes: null }).OR).toBeUndefined();
@@ -144,6 +206,7 @@ describe("serializeOrderRow", () => {
     totalUah: 4300,
     archived: true,
     isActual: false,
+    agentName: "Петренко П.",
     createdAt: new Date("2026-05-10T10:00:00Z"),
     customer: {
       id: "cust1",
@@ -170,5 +233,10 @@ describe("serializeOrderRow", () => {
       customer: { ...raw.customer, city: null },
     });
     expect(row.customer.city).toBeNull();
+  });
+
+  it("maps agentName", () => {
+    expect(serializeOrderRow(raw).agentName).toBe("Петренко П.");
+    expect(serializeOrderRow({ ...raw, agentName: null }).agentName).toBeNull();
   });
 });

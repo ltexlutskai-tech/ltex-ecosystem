@@ -2,7 +2,7 @@
 
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
-import { Search, X } from "lucide-react";
+import { Search, SlidersHorizontal, X } from "lucide-react";
 import { Button, Input } from "@ltex/ui";
 import {
   ORDER_STATUS_LIST,
@@ -18,14 +18,27 @@ export function OrdersToolbar() {
   const [search, setSearch] = useState(searchParams.get("search") ?? "");
   const [from, setFrom] = useState(searchParams.get("from") ?? "");
   const [to, setTo] = useState(searchParams.get("to") ?? "");
+  const [clientName, setClientName] = useState(
+    searchParams.get("clientName") ?? "",
+  );
+  const [city, setCity] = useState(searchParams.get("city") ?? "");
+  const [agent, setAgent] = useState(searchParams.get("agent") ?? "");
   const status = searchParams.get("status") ?? "";
+  const actuality = searchParams.get("actuality") ?? "actual";
   const clientCode1C = searchParams.get("clientCode1C") ?? "";
   const showArchived = searchParams.get("showArchived") === "true";
+
+  // Розгорнути блок per-column фільтрів, якщо хоч один уже застосовано.
+  const hasColumnFilters = !!(clientName || city || agent);
+  const [showFilters, setShowFilters] = useState(hasColumnFilters);
 
   useEffect(() => {
     setSearch(searchParams.get("search") ?? "");
     setFrom(searchParams.get("from") ?? "");
     setTo(searchParams.get("to") ?? "");
+    setClientName(searchParams.get("clientName") ?? "");
+    setCity(searchParams.get("city") ?? "");
+    setAgent(searchParams.get("agent") ?? "");
   }, [searchParams]);
 
   function setParam(name: string, value: string | null) {
@@ -44,6 +57,12 @@ export function OrdersToolbar() {
     else sp.delete("from");
     if (to) sp.set("to", to);
     else sp.delete("to");
+    if (clientName.trim()) sp.set("clientName", clientName.trim());
+    else sp.delete("clientName");
+    if (city.trim()) sp.set("city", city.trim());
+    else sp.delete("city");
+    if (agent.trim()) sp.set("agent", agent.trim());
+    else sp.delete("agent");
     sp.delete("page");
     startTransition(() => router.push(`${pathname}?${sp.toString()}`));
   }
@@ -52,6 +71,9 @@ export function OrdersToolbar() {
     setSearch("");
     setFrom("");
     setTo("");
+    setClientName("");
+    setCity("");
+    setAgent("");
     startTransition(() => router.push(pathname));
   }
 
@@ -94,6 +116,22 @@ export function OrdersToolbar() {
           ))}
         </select>
 
+        <select
+          value={actuality}
+          onChange={(e) =>
+            setParam(
+              "actuality",
+              e.target.value === "actual" ? null : e.target.value,
+            )
+          }
+          className="h-9 rounded-md border border-gray-300 bg-white px-2 text-sm text-gray-700"
+          aria-label="Фільтр за актуальністю"
+        >
+          <option value="actual">Актуальні</option>
+          <option value="inactive">Неактуальні</option>
+          <option value="all">Усі</option>
+        </select>
+
         <div className="flex items-center gap-1">
           <label className="text-xs text-gray-500" htmlFor="from-date">
             З
@@ -134,7 +172,30 @@ export function OrdersToolbar() {
           Відображати архівні
         </label>
 
-        {(search || status || from || to || clientCode1C || showArchived) && (
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => setShowFilters((v) => !v)}
+          className={hasColumnFilters ? "border-green-500 text-green-700" : ""}
+        >
+          <SlidersHorizontal className="mr-1 h-4 w-4" />
+          Фільтри
+          {hasColumnFilters
+            ? ` (${[clientName, city, agent].filter(Boolean).length})`
+            : ""}
+        </Button>
+
+        {(search ||
+          status ||
+          actuality !== "actual" ||
+          from ||
+          to ||
+          clientCode1C ||
+          clientName ||
+          city ||
+          agent ||
+          showArchived) && (
           <Button
             type="button"
             variant="ghost"
@@ -147,6 +208,67 @@ export function OrdersToolbar() {
           </Button>
         )}
       </div>
+
+      {showFilters && (
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            applyAll();
+          }}
+          className="grid gap-3 border-t pt-3 sm:grid-cols-2 lg:grid-cols-4"
+        >
+          <div>
+            <label
+              className="mb-1 block text-xs text-gray-500"
+              htmlFor="filter-client"
+            >
+              Клієнт
+            </label>
+            <Input
+              id="filter-client"
+              value={clientName}
+              onChange={(e) => setClientName(e.target.value)}
+              placeholder="Назва клієнта…"
+              className="h-9"
+            />
+          </div>
+          <div>
+            <label
+              className="mb-1 block text-xs text-gray-500"
+              htmlFor="filter-city"
+            >
+              Місто
+            </label>
+            <Input
+              id="filter-city"
+              value={city}
+              onChange={(e) => setCity(e.target.value)}
+              placeholder="Місто…"
+              className="h-9"
+            />
+          </div>
+          <div>
+            <label
+              className="mb-1 block text-xs text-gray-500"
+              htmlFor="filter-agent"
+            >
+              Агент
+            </label>
+            <Input
+              id="filter-agent"
+              value={agent}
+              onChange={(e) => setAgent(e.target.value)}
+              placeholder="Торговий агент…"
+              className="h-9"
+            />
+          </div>
+          <div className="flex items-end">
+            <Button type="submit" variant="outline" size="sm" className="h-9">
+              Застосувати фільтри
+            </Button>
+          </div>
+        </form>
+      )}
 
       {clientCode1C && (
         <div className="flex items-center gap-2 rounded-md bg-blue-50 px-3 py-2 text-sm text-blue-700">
