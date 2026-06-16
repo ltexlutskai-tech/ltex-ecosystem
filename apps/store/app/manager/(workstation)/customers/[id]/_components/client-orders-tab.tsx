@@ -51,6 +51,7 @@ export async function ClientOrdersTab({ clientId }: { clientId: string }) {
   const rows = orders.map((o) => ({
     id: o.id,
     code1C: o.code1C,
+    number1C: o.number1C,
     status: o.status,
     totalEur: o.totalEur,
     totalUah: o.totalUah,

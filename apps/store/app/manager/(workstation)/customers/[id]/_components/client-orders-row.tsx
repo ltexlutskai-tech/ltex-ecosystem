@@ -1,10 +1,12 @@
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
+import { formatOrderNumber } from "@/lib/manager/order-number";
 import { OrderStatusBadge } from "./order-status-badge";
 
 export interface ClientOrderRowData {
   id: string;
   code1C: string | null;
+  number1C: string | null;
   status: string;
   totalEur: number;
   totalUah: number;
@@ -17,7 +19,7 @@ export function ClientOrdersRow({ order }: { order: ClientOrderRowData }) {
   return (
     <tr className="border-b last:border-b-0 hover:bg-gray-50">
       <td className="px-4 py-3 font-mono text-sm text-gray-700">
-        {order.code1C ?? order.id.slice(0, 8)}
+        {formatOrderNumber(order)}
       </td>
       <td className="px-4 py-3 text-sm text-gray-600">{date}</td>
       <td className="px-4 py-3">

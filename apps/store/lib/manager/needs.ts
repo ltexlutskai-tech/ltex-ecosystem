@@ -3,6 +3,7 @@ import type { CurrentManager } from "@/lib/auth/manager-auth";
 import { getMyClientCodes1C } from "@/lib/manager/order-ownership";
 import { isActiveReservation } from "@/lib/manager/lot-booking";
 import { getOrderStatusMeta } from "@/lib/manager/order-status";
+import { formatOrderNumber } from "@/lib/manager/order-number";
 
 /**
  * Блок «Потреби» (1С `Document.ОбщаяПотребність`) — on-the-fly агрегація
@@ -204,6 +205,7 @@ export async function computeNeeds(
     select: {
       id: true,
       code1C: true,
+      number1C: true,
       status: true,
       agentName: true,
       assignedAgentUserId: true,
@@ -246,7 +248,7 @@ export async function computeNeeds(
     const agentName = resolveAgentName(o);
     return {
       orderId: o.id,
-      orderNumber: o.code1C ?? `№${o.id.slice(-6)}`,
+      orderNumber: formatOrderNumber(o),
       customerName: o.customer.name,
       city: o.customer.city,
       agentName,

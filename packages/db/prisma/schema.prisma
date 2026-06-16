@@ -220,6 +220,10 @@ model Customer {
 model Order {
   id           String  @id @default(cuid())
   code1C       String? @unique @map("code_1c")
+  // Людський номер документа з 1С (_Number, напр. "L0000002477"). НЕ унікальний
+  // (1С нумерує щорічно з 0 → номери повторюються по роках; дата документа
+  // disambiguate). Унікальний ключ лишається `code1C` = hex(_IDRRef).
+  number1C     String? @map("number_1c")
   customerId   String  @map("customer_id")
   status       String  @default("draft")
   totalEur     Float   @default(0) @map("total_eur")
@@ -273,6 +277,7 @@ model Order {
   @@index([routeSheetId])
   @@index([closedAt])
   @@index([lastReminderAt])
+  @@index([number1C])
   @@map("orders")
 }
 

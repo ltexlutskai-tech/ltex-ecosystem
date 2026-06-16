@@ -12,7 +12,9 @@
  *   - `manager` — оперативна робота тільки зі своїми клієнтами і замовленнями.
  *   - `supervisor` — як `manager`, але видимість усіх клієнтів і всіх
  *     замовлень (read), а Telegram-сповіщення про прострочені — на нього.
- *   - `analyst` — read-only до фінансів і всієї історії + експорт у Excel.
+ *   - `analyst` — read-only до фінансів і всієї історії + експорт у Excel;
+ *     окремо може заводити/редагувати замовлення за будь-якого клієнта
+ *     (формує «Потреби» вручну).
  *   - `warehouse` — поступлення товарів (приймає, генерує лоти) + збірка
  *     замовлень (без цін закупки і маржі).
  *   - `expeditor` — водій маршрутних листів: бачить і відмічає свої маршрути,
@@ -264,7 +266,15 @@ export const ROLE_PERMISSIONS: Record<ManagerRole, RolePermissions> = {
   // ── analyst: read-only до всього + експорти ────────────────────────────
   analyst: fillResources({
     clients: READ_ONLY_ALL,
-    orders: READ_ONLY_ALL,
+    // Analyst формує «Потреби» вручну → заводить/редагує замовлення за будь-
+    // якого клієнта. View+create+edit усіх; delete лишається off.
+    orders: {
+      view: "all",
+      create: true,
+      edit: "all",
+      delete: "none",
+      export: true,
+    },
     sales: READ_ONLY_ALL,
     payments: READ_ONLY_ALL,
     route_sheets: READ_ONLY_ALL,

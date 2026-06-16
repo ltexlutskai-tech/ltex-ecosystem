@@ -184,9 +184,11 @@ describe("GET /api/v1/manager/orders", () => {
     const args = mockPrisma.order.findMany.mock.calls[0]?.[0] as {
       where: { OR?: unknown[] };
     };
-    // № / клієнт (ім'я·телефон·місто) / товари (назва·артикул) = 6 clauses
-    expect(args.where.OR).toHaveLength(6);
+    // № (code1C + number1C) / клієнт (ім'я·телефон·місто) /
+    // товари (назва·артикул) = 7 clauses
+    expect(args.where.OR).toHaveLength(7);
     const json = JSON.stringify(args.where.OR);
+    expect(json).toContain('"number1C"');
     expect(json).toContain('"items"');
     expect(json).toContain('"articleCode"');
   });

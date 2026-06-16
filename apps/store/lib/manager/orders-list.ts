@@ -92,6 +92,7 @@ export function buildOrdersWhere(
     const q = p.q.trim();
     where.OR = [
       { code1C: { contains: q, mode: "insensitive" } },
+      { number1C: { contains: q, mode: "insensitive" } },
       { customer: { name: { contains: q, mode: "insensitive" } } },
       { customer: { phone: { contains: q, mode: "insensitive" } } },
       { customer: { city: { contains: q, mode: "insensitive" } } },
@@ -129,6 +130,7 @@ export function buildOrdersWhere(
 export interface RawOrderRow {
   id: string;
   code1C: string | null;
+  number1C: string | null;
   status: string;
   totalEur: number;
   totalUah: number;
@@ -147,6 +149,7 @@ export interface RawOrderRow {
 export interface OrderListItem {
   id: string;
   code1C: string | null;
+  number1C: string | null;
   status: string;
   totalEur: number;
   totalUah: number;
@@ -177,6 +180,7 @@ export function serializeOrderRow(o: RawOrderRow): OrderListItem {
   return {
     id: o.id,
     code1C: o.code1C,
+    number1C: o.number1C,
     status: o.status,
     totalEur: o.totalEur,
     totalUah: o.totalUah,

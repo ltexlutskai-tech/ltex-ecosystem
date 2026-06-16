@@ -2,16 +2,27 @@ import { prisma } from "@ltex/db";
 import type { CurrentManager } from "@/lib/auth/manager-auth";
 
 /**
+ * Ролі з доступом до ВСІХ клієнтів/замовлень (no ownership restriction).
+ * `analyst` тут, бо формує «Потреби» вручну, заводячи замовлення за будь-якого
+ * клієнта (read + create + edit усіх замовлень).
+ */
+const ALL_CLIENTS_ROLES: ReadonlySet<string> = new Set([
+  "admin",
+  "owner",
+  "analyst",
+]);
+
+/**
  * Returns code1C-и усіх MgrClient-ів, призначених на user-а
  * (agentUserId === user.id OR хтось у ClientAssignment).
  *
- * - `admin` → `null` ("no restriction" — будь-який order видимий)
+ * - `admin`/`owner`/`analyst` → `null` ("no restriction" — будь-який order видимий)
  * - `manager` → масив code1C (можливо порожній → 0 orders видно)
  */
 export async function getMyClientCodes1C(
   user: Pick<CurrentManager, "id" | "role">,
 ): Promise<string[] | null> {
-  if (user.role === "admin") return null;
+  if (ALL_CLIENTS_ROLES.has(user.role)) return null;
 
   const clients = await prisma.mgrClient.findMany({
     where: {
@@ -40,7 +51,7 @@ export async function canViewOrder(
   user: Pick<CurrentManager, "id" | "role">,
   orderId: string,
 ): Promise<boolean> {
-  if (user.role === "admin") return true;
+  if (ALL_CLIENTS_ROLES.has(user.role)) return true;
 
   const order = await prisma.order.findUnique({
     where: { id: orderId },

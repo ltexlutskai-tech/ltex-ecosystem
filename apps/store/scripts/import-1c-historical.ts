@@ -1290,6 +1290,9 @@ async function importOrders(ctx: ImportContext): Promise<Recon> {
       // (1С `_Number` тут не пишемо — у Sale/CashOrder/RouteSheet поле
       // `docNumber` має autoincrement, конфлікт послідовності не вартий.)
       const code1C = hex;
+      // Людський номер документа (1С _Number, напр. "L0000002477") — для
+      // відображення. НЕ унікальний (нумерація щорічна) → лишається display-only.
+      const number1C = asString(row["_Number"]);
       if (!hex || !code1C) {
         recon.skipped++;
         continue;
@@ -1345,6 +1348,7 @@ async function importOrders(ctx: ImportContext): Promise<Recon> {
               where: { code1C },
               create: {
                 code1C,
+                number1C,
                 customerId: customer.id,
                 status: posted ? "posted" : "draft",
                 totalEur,
@@ -1358,6 +1362,7 @@ async function importOrders(ctx: ImportContext): Promise<Recon> {
                 ...(createdAt ? { createdAt } : {}),
               },
               update: {
+                number1C,
                 customerId: customer.id,
                 status: posted ? "posted" : "draft",
                 totalEur,

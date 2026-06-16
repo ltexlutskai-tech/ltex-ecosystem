@@ -68,14 +68,15 @@ describe("buildOrdersWhere — search (client + products)", () => {
     ).toBeUndefined();
   });
 
-  it("builds OR over code1C, customer (name/phone/city) and product (name/articleCode)", () => {
+  it("builds OR over code1C, number1C, customer (name/phone/city) and product (name/articleCode)", () => {
     const w = buildOrdersWhere({ customerCodes: null, q: "Іванов" });
     expect(Array.isArray(w.OR)).toBe(true);
-    expect(w.OR).toHaveLength(6);
+    expect(w.OR).toHaveLength(7);
 
     const json = JSON.stringify(w.OR);
-    // № замовлення
+    // № замовлення (hex + людський номер 1С)
     expect(json).toContain('"code1C"');
+    expect(json).toContain('"number1C"');
     // клієнт
     expect(json).toContain('"name"');
     expect(json).toContain('"phone"');
@@ -137,6 +138,7 @@ describe("serializeOrderRow", () => {
   const raw: RawOrderRow = {
     id: "ord1",
     code1C: "000000123",
+    number1C: "L0000000123",
     status: "posted",
     totalEur: 100,
     totalUah: 4300,

@@ -124,9 +124,24 @@ describe("analyst", () => {
     expect(canEdit(u("analyst"), "reports")).toBe(true);
   });
 
-  it("не редагує клієнтів і замовлення", () => {
+  it("не редагує клієнтів (read-only)", () => {
     expect(canEdit(u("analyst"), "clients", true)).toBe(false);
-    expect(canEdit(u("analyst"), "orders", true)).toBe(false);
+    expect(canCreate(u("analyst"), "clients")).toBe(false);
+  });
+
+  it("заводить/редагує замовлення за будь-якого клієнта (формує «Потреби»)", () => {
+    expect(canView(u("analyst"), "orders").allowed).toBe(true);
+    expect(canCreate(u("analyst"), "orders")).toBe(true);
+    expect(canEdit(u("analyst"), "orders", false)).toBe(true);
+    expect(canDelete(u("analyst"), "orders", true)).toBe(false);
+  });
+
+  it("не отримує запис на касу/оплати/ціни/товари", () => {
+    expect(canCreate(u("analyst"), "payments")).toBe(false);
+    expect(canEdit(u("analyst"), "payments", true)).toBe(false);
+    expect(canEdit(u("analyst"), "prices", true)).toBe(false);
+    expect(canEdit(u("analyst"), "products", true)).toBe(false);
+    expect(canView(u("analyst"), "products").allowed).toBe(true);
   });
 
   it("не має доступу до users / settings / audit_log", () => {

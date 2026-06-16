@@ -10,6 +10,7 @@ import {
   ORDER_DELIVERY_METHODS,
   orderDeliveryLabel,
 } from "@/lib/manager/order-delivery";
+import { formatOrderNumber } from "@/lib/manager/order-number";
 import { SaleForm } from "../new/_components/sale-form";
 import type {
   ClientPickerItem,
@@ -80,7 +81,7 @@ export default async function ManagerSaleDetailPage({
         select: { id: true, name: true, code1C: true, phone: true, city: true },
       },
       order: {
-        select: { id: true, code1C: true },
+        select: { id: true, code1C: true, number1C: true },
       },
       items: {
         include: {
@@ -329,7 +330,7 @@ async function loadSaleForView(id: string) {
         select: { id: true, name: true, code1C: true, phone: true, city: true },
       },
       order: {
-        select: { id: true, code1C: true },
+        select: { id: true, code1C: true, number1C: true },
       },
       items: {
         include: {
@@ -391,8 +392,8 @@ function ReadOnlySale({
               href={`/manager/orders/${sale.order.id}`}
               className="text-blue-600 hover:text-blue-700"
             >
-              {sale.order.code1C
-                ? `№${sale.order.code1C}`
+              {sale.order.number1C || sale.order.code1C
+                ? `№${formatOrderNumber(sale.order)}`
                 : `ID: ${sale.order.id.slice(0, 8)}…`}
               {" →"}
             </Link>
