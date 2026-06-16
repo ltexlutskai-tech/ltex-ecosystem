@@ -203,7 +203,6 @@ export default async function ManagerOrderDetailPage({
     deliveryMethod: order.deliveryMethod,
     cashOnDelivery: order.cashOnDelivery,
     assignedAgentUserId: order.assignedAgentUserId,
-    exportTo1C: order.exportTo1C,
     items: itemDrafts,
   };
 

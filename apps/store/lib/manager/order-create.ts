@@ -91,9 +91,15 @@ export async function createOrderWithItems(
   const items = (input.items ?? []) as OrderItemInput[];
   const { totalEur, totalUah, itemRows } = buildOrderTotals(items, rate);
 
+  // Проведення документа (кнопка «Зберегти та провести») → posted + archived.
+  // Інваріант: archived ⇒ isActual=false (проведене лишає активний список).
+  const post = input.post === true;
+
   const createData = {
     customerId: customer.id,
-    status: "draft",
+    status: post ? "posted" : "draft",
+    archived: post,
+    isActual: post ? false : true,
     totalEur,
     totalUah,
     exchangeRate: rate,

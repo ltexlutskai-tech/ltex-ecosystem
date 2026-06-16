@@ -74,11 +74,19 @@ describe("isOrderLocked / canEditOrder", () => {
 });
 
 describe("status transitions", () => {
-  it("draft → sent / cancelled", () => {
-    expect(getAllowedStatusTransitions("draft")).toEqual(["sent", "cancelled"]);
+  it("draft → sent / posted / cancelled", () => {
+    expect(getAllowedStatusTransitions("draft")).toEqual([
+      "sent",
+      "posted",
+      "cancelled",
+    ]);
   });
-  it("sent → draft / cancelled", () => {
-    expect(getAllowedStatusTransitions("sent")).toEqual(["draft", "cancelled"]);
+  it("sent → draft / posted / cancelled", () => {
+    expect(getAllowedStatusTransitions("sent")).toEqual([
+      "draft",
+      "posted",
+      "cancelled",
+    ]);
   });
   it("posted is final — no transitions", () => {
     expect(getAllowedStatusTransitions("posted")).toEqual([]);
@@ -89,6 +97,7 @@ describe("status transitions", () => {
   it("legacy status treated as draft for transitions", () => {
     expect(getAllowedStatusTransitions("delivered")).toEqual([
       "sent",
+      "posted",
       "cancelled",
     ]);
   });
@@ -97,8 +106,12 @@ describe("status transitions", () => {
     expect(isTransitionAllowed("draft", "sent")).toBe(true);
     expect(isTransitionAllowed("sent", "draft")).toBe(true);
     expect(isTransitionAllowed("draft", "cancelled")).toBe(true);
+    // «Зберегти та провести» — draft/sent → posted дозволено.
+    expect(isTransitionAllowed("draft", "posted")).toBe(true);
+    expect(isTransitionAllowed("sent", "posted")).toBe(true);
+    // posted — фінальний; cancelled → posted заборонено.
     expect(isTransitionAllowed("posted", "draft")).toBe(false);
-    expect(isTransitionAllowed("draft", "posted")).toBe(false);
+    expect(isTransitionAllowed("cancelled", "posted")).toBe(false);
     expect(isTransitionAllowed("draft", "delivered")).toBe(false);
     expect(isTransitionAllowed("draft", "bogus")).toBe(false);
   });

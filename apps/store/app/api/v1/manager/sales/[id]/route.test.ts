@@ -288,10 +288,10 @@ describe("PATCH /api/v1/manager/sales/[id]", () => {
     expect(callArgs[3].nextStatus).toBe("sent");
   });
 
-  it("returns 409 on disallowed status transition (draft → posted)", async () => {
+  it("returns 409 on disallowed status transition (cancelled → posted)", async () => {
     mockPrisma.sale.findUnique.mockResolvedValueOnce({
       id: "sale1",
-      status: "draft",
+      status: "cancelled",
     });
     const res = await PATCH(
       patchReq({ ...VALID_PATCH_BODY, status: "posted" }),
@@ -299,6 +299,25 @@ describe("PATCH /api/v1/manager/sales/[id]", () => {
     );
     expect(res.status).toBe(409);
     expect(updateSaleWithItemsMock).not.toHaveBeenCalled();
+  });
+
+  it("post=true → провести: nextStatus=posted (draft → posted дозволено)", async () => {
+    mockPrisma.sale.findUnique.mockResolvedValueOnce({
+      id: "sale1",
+      status: "draft",
+    });
+    updateSaleWithItemsMock.mockResolvedValueOnce(fakeUpdatedSale("posted"));
+    const res = await PATCH(patchReq({ ...VALID_PATCH_BODY, post: true }), {
+      params: Promise.resolve({ id: "sale1" }),
+    });
+    expect(res.status).toBe(200);
+    const callArgs = updateSaleWithItemsMock.mock.calls[0] as [
+      string,
+      unknown,
+      unknown,
+      { nextStatus?: string },
+    ];
+    expect(callArgs[3].nextStatus).toBe("posted");
   });
 
   it("returns 400 on FK violation (Prisma P2003)", async () => {

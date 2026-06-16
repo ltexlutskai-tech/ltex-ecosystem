@@ -216,7 +216,6 @@ export default async function ManagerSaleDetailPage({
     cashOnDelivery: sale.cashOnDelivery,
     assignedAgentUserId: sale.assignedAgentUserId,
     onTradeAgent: sale.onTradeAgent,
-    exportTo1C: sale.exportTo1C,
     expressWaybill: sale.expressWaybill,
     items: itemDrafts,
   };

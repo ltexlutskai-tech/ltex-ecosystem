@@ -167,7 +167,6 @@ export interface SaleEditInitial {
   cashOnDelivery: boolean;
   assignedAgentUserId: string | null;
   onTradeAgent: boolean;
-  exportTo1C: boolean;
   expressWaybill: string | null;
   items: SaleItemDraft[];
 }

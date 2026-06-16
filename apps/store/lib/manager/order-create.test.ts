@@ -233,6 +233,32 @@ describe("createOrderWithItems", () => {
     expect(call.data.exportTo1C).toBe(true);
   });
 
+  it("без post → status=draft, archived=false, isActual=true", async () => {
+    mockPrisma.order.create.mockResolvedValueOnce(fakeOrder());
+    await createOrderWithItems(baseInput, baseCustomer, actor);
+    const call = mockPrisma.order.create.mock.calls[0]?.[0] as {
+      data: { status: string; archived: boolean; isActual: boolean };
+    };
+    expect(call.data.status).toBe("draft");
+    expect(call.data.archived).toBe(false);
+    expect(call.data.isActual).toBe(true);
+  });
+
+  it("post=true → status=posted, archived=true, isActual=false", async () => {
+    mockPrisma.order.create.mockResolvedValueOnce(fakeOrder());
+    await createOrderWithItems(
+      { ...baseInput, post: true },
+      baseCustomer,
+      actor,
+    );
+    const call = mockPrisma.order.create.mock.calls[0]?.[0] as {
+      data: { status: string; archived: boolean; isActual: boolean };
+    };
+    expect(call.data.status).toBe("posted");
+    expect(call.data.archived).toBe(true);
+    expect(call.data.isActual).toBe(false);
+  });
+
   it("clearOtherActual=false → НЕ використовує транзакцію, прямий create", async () => {
     mockPrisma.order.create.mockResolvedValueOnce(fakeOrder());
     await createOrderWithItems(baseInput, baseCustomer, actor, {
