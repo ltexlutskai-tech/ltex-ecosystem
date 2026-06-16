@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { CashOrderTypeBadge } from "./cash-order-type-badge";
 import { formatDocNumber } from "@/lib/manager/order-number";
+import type { RowHandlers } from "../../_components/use-list-context-menu";
 
 export interface PaymentsRowData {
   id: string;
@@ -18,19 +19,34 @@ export interface PaymentsRowData {
   cashFlowArticleName: string | null;
 }
 
-export function PaymentsRow({ order }: { order: PaymentsRowData }) {
+export function PaymentsRow({
+  order,
+  rowHandlers,
+}: {
+  order: PaymentsRowData;
+  rowHandlers?: RowHandlers;
+}) {
   const date = new Date(order.paidAt).toLocaleDateString("uk-UA");
   // Архівні ордери приглушені сірим, як у 1С ФормаСписка.
   const dimmed = order.archived;
 
   return (
     <tr
+      {...rowHandlers}
       className={`border-b last:border-b-0 hover:bg-gray-50 ${
         dimmed ? "bg-gray-50 text-gray-400" : ""
       }`}
     >
-      <td className="px-4 py-3 text-sm text-gray-600">{date}</td>
       <td
+        data-col="date"
+        data-value={date}
+        className="px-4 py-3 text-sm text-gray-600"
+      >
+        {date}
+      </td>
+      <td
+        data-col="code"
+        data-value={formatDocNumber(order)}
         className={`px-4 py-3 font-mono text-sm ${
           dimmed ? "text-gray-400" : "text-gray-700"
         }`}
@@ -42,10 +58,12 @@ export function PaymentsRow({ order }: { order: PaymentsRowData }) {
           {formatDocNumber(order)}
         </Link>
       </td>
-      <td className="px-4 py-3">
+      <td data-col="type" data-value={order.type} className="px-4 py-3">
         <CashOrderTypeBadge type={order.type} />
       </td>
       <td
+        data-col="client"
+        data-value={order.customerName}
         className={`px-4 py-3 text-sm ${
           dimmed ? "text-gray-400" : "text-gray-800"
         }`}
@@ -61,10 +79,16 @@ export function PaymentsRow({ order }: { order: PaymentsRowData }) {
           order.customerName
         )}
       </td>
-      <td className="px-4 py-3 text-sm text-gray-600">
+      <td
+        data-col="article"
+        data-value={order.cashFlowArticleName ?? ""}
+        className="px-4 py-3 text-sm text-gray-600"
+      >
         {order.cashFlowArticleName ?? "—"}
       </td>
       <td
+        data-col="sum"
+        data-value={order.documentSumEur.toFixed(2)}
         className={`px-4 py-3 text-right text-sm font-medium ${
           dimmed ? "text-gray-400" : "text-gray-800"
         }`}
@@ -75,7 +99,11 @@ export function PaymentsRow({ order }: { order: PaymentsRowData }) {
         })}{" "}
         €
       </td>
-      <td className="px-4 py-3 text-sm text-gray-600">
+      <td
+        data-col="account"
+        data-value={order.bankAccountName ?? ""}
+        className="px-4 py-3 text-sm text-gray-600"
+      >
         {order.bankAccountName ?? "—"}
       </td>
       <td className="px-4 py-3 text-right">

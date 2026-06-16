@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ArrowRight, Check, Minus } from "lucide-react";
 import { formatOrderNumber } from "@/lib/manager/order-number";
 import { OrderStatusBadge } from "../../customers/[id]/_components/order-status-badge";
+import type { RowHandlers } from "../../_components/use-list-context-menu";
 
 export interface OrdersRowData {
   id: string;
@@ -24,18 +25,27 @@ export interface OrdersRowData {
   };
 }
 
-export function OrdersRow({ order }: { order: OrdersRowData }) {
+export function OrdersRow({
+  order,
+  rowHandlers,
+}: {
+  order: OrdersRowData;
+  rowHandlers?: RowHandlers;
+}) {
   const date = new Date(order.createdAt).toLocaleDateString("uk-UA");
   // Архівні (проведені в 1С) — приглушені, як у 1С ФормаСписка.
   const dimmed = order.archived || order.status === "posted";
 
   return (
     <tr
+      {...rowHandlers}
       className={`border-b last:border-b-0 hover:bg-gray-50 ${
         dimmed ? "bg-gray-50 text-gray-400" : ""
       }`}
     >
       <td
+        data-col="code"
+        data-value={formatOrderNumber(order)}
         className={`px-4 py-3 font-mono text-sm ${
           dimmed ? "text-gray-400" : "text-gray-700"
         }`}
@@ -48,6 +58,8 @@ export function OrdersRow({ order }: { order: OrdersRowData }) {
         </Link>
       </td>
       <td
+        data-col="client"
+        data-value={order.customer.name}
         className={`px-4 py-3 text-sm ${
           dimmed ? "text-gray-400" : "text-gray-800"
         }`}
@@ -59,17 +71,35 @@ export function OrdersRow({ order }: { order: OrdersRowData }) {
           {order.customer.name}
         </Link>
       </td>
-      <td className="px-4 py-3 text-sm text-gray-600">
+      <td
+        data-col="city"
+        data-value={order.customer.city ?? ""}
+        className="px-4 py-3 text-sm text-gray-600"
+      >
         {order.customer.city ?? "—"}
       </td>
-      <td className="px-4 py-3 text-sm text-gray-600">
+      <td
+        data-col="region"
+        data-value={order.customer.region ?? ""}
+        className="px-4 py-3 text-sm text-gray-600"
+      >
         {order.customer.region ?? "—"}
       </td>
-      <td className="px-4 py-3 text-sm text-gray-600">{date}</td>
-      <td className="px-4 py-3">
+      <td
+        data-col="date"
+        data-value={date}
+        className="px-4 py-3 text-sm text-gray-600"
+      >
+        {date}
+      </td>
+      <td data-col="status" data-value={order.status} className="px-4 py-3">
         <OrderStatusBadge status={order.status} />
       </td>
-      <td className="px-4 py-3 text-center">
+      <td
+        data-col="actual"
+        data-value={order.isActual ? "Актуальний" : "Неактуальний"}
+        className="px-4 py-3 text-center"
+      >
         {order.isActual ? (
           <Check
             className="mx-auto h-4 w-4 text-green-600"
@@ -83,14 +113,22 @@ export function OrdersRow({ order }: { order: OrdersRowData }) {
         )}
       </td>
       <td
+        data-col="agent"
+        data-value={order.agentName ?? ""}
         className={`px-4 py-3 text-sm ${dimmed ? "text-gray-400" : "text-gray-700"}`}
       >
         {order.agentName ?? "—"}
       </td>
-      <td className="px-4 py-3 text-center text-sm text-gray-700">
+      <td
+        data-col="positions"
+        data-value={String(order.itemCount)}
+        className="px-4 py-3 text-center text-sm text-gray-700"
+      >
         {order.itemCount}
       </td>
       <td
+        data-col="sum"
+        data-value={order.totalEur.toFixed(2)}
         className={`px-4 py-3 text-right text-sm font-medium ${
           dimmed ? "text-gray-400" : "text-gray-800"
         }`}

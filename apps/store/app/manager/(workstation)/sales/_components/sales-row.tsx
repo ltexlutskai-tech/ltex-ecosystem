@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { SaleStatusBadge } from "./sale-status-badge";
 import { formatDocNumber } from "@/lib/manager/order-number";
+import type { RowHandlers } from "../../_components/use-list-context-menu";
 
 export interface SalesRowData {
   id: string;
@@ -25,19 +26,34 @@ export interface SalesRowData {
   };
 }
 
-export function SalesRow({ sale }: { sale: SalesRowData }) {
+export function SalesRow({
+  sale,
+  rowHandlers,
+}: {
+  sale: SalesRowData;
+  rowHandlers?: RowHandlers;
+}) {
   const date = new Date(sale.createdAt).toLocaleDateString("uk-UA");
   // Архівні (проведені в 1С) — приглушені, як у 1С ФормаСписка.
   const dimmed = sale.archived || sale.status === "posted";
 
   return (
     <tr
+      {...rowHandlers}
       className={`border-b last:border-b-0 hover:bg-gray-50 ${
         dimmed ? "bg-gray-50 text-gray-400" : ""
       }`}
     >
-      <td className="px-4 py-3 text-sm text-gray-600">{date}</td>
       <td
+        data-col="date"
+        data-value={date}
+        className="px-4 py-3 text-sm text-gray-600"
+      >
+        {date}
+      </td>
+      <td
+        data-col="code"
+        data-value={formatDocNumber(sale)}
         className={`px-4 py-3 font-mono text-sm ${
           dimmed ? "text-gray-400" : "text-gray-700"
         }`}
@@ -50,6 +66,8 @@ export function SalesRow({ sale }: { sale: SalesRowData }) {
         </Link>
       </td>
       <td
+        data-col="client"
+        data-value={sale.customer.name}
         className={`px-4 py-3 text-sm ${
           dimmed ? "text-gray-400" : "text-gray-800"
         }`}
@@ -61,24 +79,40 @@ export function SalesRow({ sale }: { sale: SalesRowData }) {
           {sale.customer.name}
         </Link>
       </td>
-      <td className="px-4 py-3 text-sm text-gray-600">
+      <td
+        data-col="city"
+        data-value={sale.customer.city ?? ""}
+        className="px-4 py-3 text-sm text-gray-600"
+      >
         {sale.customer.city ?? "—"}
       </td>
-      <td className="px-4 py-3 text-sm text-gray-600">
+      <td
+        data-col="region"
+        data-value={sale.customer.region ?? ""}
+        className="px-4 py-3 text-sm text-gray-600"
+      >
         {sale.customer.region ?? "—"}
       </td>
-      <td className="px-4 py-3">
+      <td data-col="status" data-value={sale.status} className="px-4 py-3">
         <SaleStatusBadge status={sale.status} />
       </td>
       <td
+        data-col="agent"
+        data-value={sale.agentName ?? ""}
         className={`px-4 py-3 text-sm ${dimmed ? "text-gray-400" : "text-gray-700"}`}
       >
         {sale.agentName ?? "—"}
       </td>
-      <td className="px-4 py-3 text-center text-sm text-gray-700">
+      <td
+        data-col="positions"
+        data-value={String(sale.itemCount)}
+        className="px-4 py-3 text-center text-sm text-gray-700"
+      >
         {sale.itemCount}
       </td>
       <td
+        data-col="sum"
+        data-value={sale.totalEur.toFixed(2)}
         className={`px-4 py-3 text-right text-sm font-medium ${
           dimmed ? "text-gray-400" : "text-gray-800"
         }`}
