@@ -5,6 +5,7 @@ import { prisma } from "@ltex/db";
 import { getCurrentUser } from "@/lib/auth/manager-auth";
 import { canEditClient } from "@/lib/permissions/mgr-client-edit";
 import { ClientAssortmentTab } from "./_components/client-assortment-tab";
+import { ClientDebtMovementsTab } from "./_components/client-debt-movements-tab";
 import { ClientHeader } from "./_components/client-header";
 import { ClientHistoryTab } from "./_components/client-history-tab";
 import { ClientKeywordsTab } from "./_components/client-keywords-tab";
@@ -133,6 +134,9 @@ export default async function ClientDetailPage({
             canEdit={canEdit}
             isForeign={isForeign}
           />
+        }
+        debtMovements={
+          <ClientDebtMovementsTab clientId={client.id} canEdit={canEdit} />
         }
       />
     </div>

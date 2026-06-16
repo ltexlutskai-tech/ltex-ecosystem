@@ -54,6 +54,12 @@ const KIND_META: Record<
     color: "text-gray-500",
     auto: true,
   },
+  debt_correction: {
+    icon: "⚖️",
+    label: "Корекція боргу",
+    color: "text-amber-700",
+    auto: true,
+  },
 };
 
 export function ClientTimelineItem({

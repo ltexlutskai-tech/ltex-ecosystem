@@ -22,19 +22,27 @@ const PANELS = {
   presentationHistory: <div>presentation-history-panel</div>,
   social: <div>social-panel</div>,
   keywords: <div>keywords-panel</div>,
+  debtMovements: <div>debt-movements-panel</div>,
 };
 
 describe("ClientTabs — M1.3f foreign visibility filtering", () => {
-  it("mine view: рендерить усі 11 tabs", () => {
+  it("mine view: рендерить усі 12 tabs", () => {
     render(<ClientTabs {...PANELS} isForeign={false} />);
     const tabs = screen.getAllByRole("tab");
-    expect(tabs).toHaveLength(11);
+    expect(tabs).toHaveLength(12);
   });
 
-  it("admin view (default isForeign=false): рендерить усі 11 tabs", () => {
+  it("admin view (default isForeign=false): рендерить усі 12 tabs", () => {
     render(<ClientTabs {...PANELS} />);
     const tabs = screen.getAllByRole("tab");
-    expect(tabs).toHaveLength(11);
+    expect(tabs).toHaveLength(12);
+  });
+
+  it("foreign view: вкладка «Рухи боргу» прихована", () => {
+    render(<ClientTabs {...PANELS} isForeign={true} />);
+    const tabs = screen.getAllByRole("tab");
+    const labels = new Set(tabs.map((b) => b.textContent?.trim() ?? ""));
+    expect(labels.has("Рухи боргу")).toBe(false);
   });
 
   it("foreign view: лише 4 tabs (Реквізити, Асортимент, Історія продаж, Замовлення)", () => {
