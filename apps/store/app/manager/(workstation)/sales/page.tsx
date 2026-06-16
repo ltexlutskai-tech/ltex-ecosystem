@@ -37,6 +37,12 @@ function buildOrderBy(
       return { items: { _count: dir } };
     case "agent":
       return { agentName: dir };
+    case "actual":
+      return { isActual: dir };
+    case "delivery":
+      return { deliveryMethod: dir };
+    case "waybill":
+      return { expressWaybill: dir };
     case "date":
     default:
       return { createdAt: dir };

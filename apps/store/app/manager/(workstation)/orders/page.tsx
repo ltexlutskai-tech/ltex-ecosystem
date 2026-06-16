@@ -39,6 +39,8 @@ function buildOrderBy(
       return { isActual: dir };
     case "agent":
       return { agentName: dir };
+    case "delivery":
+      return { deliveryMethod: dir };
     case "date":
     default:
       return { createdAt: dir };

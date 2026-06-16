@@ -154,6 +154,8 @@ export interface RawSaleRow {
   archived: boolean;
   isActual: boolean;
   agentName: string | null;
+  deliveryMethod: string | null;
+  expressWaybill: string | null;
   createdAt: Date;
   customer: {
     id: string;
@@ -176,6 +178,10 @@ export interface SaleListItem {
   isActual: boolean;
   /** Торговий агент: `Sale.agentName` (історичний 1С-імпорт). */
   agentName: string | null;
+  /** Спосіб доставки: `Sale.deliveryMethod` (code → label у UI). */
+  deliveryMethod: string | null;
+  /** Експрес накладна (ТТН Нової Пошти): `Sale.expressWaybill`. */
+  expressWaybill: string | null;
   itemCount: number;
   createdAt: Date;
   customer: {
@@ -209,6 +215,8 @@ export function serializeSaleRow(s: RawSaleRow): SaleListItem {
     archived: s.archived,
     isActual: s.isActual,
     agentName: s.agentName,
+    deliveryMethod: s.deliveryMethod,
+    expressWaybill: s.expressWaybill,
     itemCount: s._count.items,
     createdAt: s.createdAt,
     customer: {

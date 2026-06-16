@@ -1,7 +1,8 @@
 import Link from "next/link";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, Check, Minus } from "lucide-react";
 import { SaleStatusBadge } from "./sale-status-badge";
 import { formatDocNumber } from "@/lib/manager/order-number";
+import { deliveryLabel } from "@/lib/manager/order-delivery";
 import type { RowHandlers } from "../../_components/use-list-context-menu";
 
 export interface SalesRowData {
@@ -15,6 +16,8 @@ export interface SalesRowData {
   archived: boolean;
   isActual: boolean;
   agentName: string | null;
+  deliveryMethod: string | null;
+  expressWaybill: string | null;
   itemCount: number;
   createdAt: Date;
   customer: {
@@ -97,11 +100,42 @@ export function SalesRow({
         <SaleStatusBadge status={sale.status} />
       </td>
       <td
+        data-col="actual"
+        data-value={sale.isActual ? "Актуальний" : "Неактуальний"}
+        className="px-4 py-3 text-center"
+      >
+        {sale.isActual ? (
+          <Check
+            className="mx-auto h-4 w-4 text-green-600"
+            aria-label="Актуальний"
+          />
+        ) : (
+          <Minus
+            className="mx-auto h-4 w-4 text-gray-300"
+            aria-label="Неактуальний"
+          />
+        )}
+      </td>
+      <td
         data-col="agent"
         data-value={sale.agentName ?? ""}
         className={`px-4 py-3 text-sm ${dimmed ? "text-gray-400" : "text-gray-700"}`}
       >
         {sale.agentName ?? "—"}
+      </td>
+      <td
+        data-col="delivery"
+        data-value={deliveryLabel(sale.deliveryMethod)}
+        className={`px-4 py-3 text-sm ${dimmed ? "text-gray-400" : "text-gray-600"}`}
+      >
+        {deliveryLabel(sale.deliveryMethod)}
+      </td>
+      <td
+        data-col="waybill"
+        data-value={sale.expressWaybill ?? ""}
+        className={`px-4 py-3 font-mono text-sm ${dimmed ? "text-gray-400" : "text-gray-600"}`}
+      >
+        {sale.expressWaybill ?? "—"}
       </td>
       <td
         data-col="positions"

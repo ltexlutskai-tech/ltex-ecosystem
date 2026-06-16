@@ -18,7 +18,10 @@ const COLS: Record<string, { sortKey?: string; filterParam?: string }> = {
   city: { sortKey: "city", filterParam: "city" },
   region: {},
   status: { sortKey: "status" },
+  actual: { sortKey: "actual" },
   agent: { sortKey: "agent", filterParam: "agent" },
+  delivery: { sortKey: "delivery" },
+  waybill: { sortKey: "waybill" },
   positions: { sortKey: "positions" },
   sum: { sortKey: "sum" },
 };
@@ -118,8 +121,21 @@ export function SalesTable({ items }: { items: SalesRowData[] }) {
             <th className="px-4 py-2 font-medium">
               <SortableHeader sortKey="status" label="Статус" />
             </th>
+            <th className="px-4 py-2 text-center font-medium">
+              <SortableHeader
+                sortKey="actual"
+                label="Актуальний"
+                align="center"
+              />
+            </th>
             <th className="px-4 py-2 font-medium">
               <SortableHeader sortKey="agent" label="Торговий агент" />
+            </th>
+            <th className="px-4 py-2 font-medium">
+              <SortableHeader sortKey="delivery" label="Спосіб доставки" />
+            </th>
+            <th className="px-4 py-2 font-medium">
+              <SortableHeader sortKey="waybill" label="Експрес накладна" />
             </th>
             <th className="px-4 py-2 text-center font-medium">
               <SortableHeader

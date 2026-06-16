@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ArrowRight, Check, Minus } from "lucide-react";
 import { formatOrderNumber } from "@/lib/manager/order-number";
+import { deliveryLabel } from "@/lib/manager/order-delivery";
 import { OrderStatusBadge } from "../../customers/[id]/_components/order-status-badge";
 import type { RowHandlers } from "../../_components/use-list-context-menu";
 
@@ -14,6 +15,7 @@ export interface OrdersRowData {
   archived: boolean;
   isActual: boolean;
   agentName: string | null;
+  deliveryMethod: string | null;
   itemCount: number;
   createdAt: Date;
   customer: {
@@ -118,6 +120,13 @@ export function OrdersRow({
         className={`px-4 py-3 text-sm ${dimmed ? "text-gray-400" : "text-gray-700"}`}
       >
         {order.agentName ?? "—"}
+      </td>
+      <td
+        data-col="delivery"
+        data-value={deliveryLabel(order.deliveryMethod)}
+        className={`px-4 py-3 text-sm ${dimmed ? "text-gray-400" : "text-gray-600"}`}
+      >
+        {deliveryLabel(order.deliveryMethod)}
       </td>
       <td
         data-col="positions"

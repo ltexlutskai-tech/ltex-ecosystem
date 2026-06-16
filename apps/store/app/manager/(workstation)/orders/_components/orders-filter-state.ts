@@ -13,6 +13,7 @@ export const ORDER_SORT_KEYS = [
   "positions",
   "actual",
   "agent",
+  "delivery",
 ] as const;
 
 export type OrderSortKey = (typeof ORDER_SORT_KEYS)[number];

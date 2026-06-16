@@ -207,6 +207,7 @@ describe("serializeOrderRow", () => {
     archived: true,
     isActual: false,
     agentName: "Петренко П.",
+    deliveryMethod: "post",
     createdAt: new Date("2026-05-10T10:00:00Z"),
     customer: {
       id: "cust1",
@@ -238,5 +239,12 @@ describe("serializeOrderRow", () => {
   it("maps agentName", () => {
     expect(serializeOrderRow(raw).agentName).toBe("Петренко П.");
     expect(serializeOrderRow({ ...raw, agentName: null }).agentName).toBeNull();
+  });
+
+  it("maps deliveryMethod (incl. null)", () => {
+    expect(serializeOrderRow(raw).deliveryMethod).toBe("post");
+    expect(
+      serializeOrderRow({ ...raw, deliveryMethod: null }).deliveryMethod,
+    ).toBeNull();
   });
 });

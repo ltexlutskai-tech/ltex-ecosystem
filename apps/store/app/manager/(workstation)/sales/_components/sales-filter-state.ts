@@ -9,6 +9,9 @@ export const SALE_SORT_KEYS = [
   "status",
   "positions",
   "agent",
+  "actual",
+  "delivery",
+  "waybill",
 ] as const;
 
 export type SaleSortKey = (typeof SALE_SORT_KEYS)[number];

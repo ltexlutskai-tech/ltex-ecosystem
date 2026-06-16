@@ -195,6 +195,8 @@ describe("serializeSaleRow", () => {
     archived: true,
     isActual: false,
     agentName: "Петренко",
+    deliveryMethod: "delivery",
+    expressWaybill: "20450000123456",
     createdAt: new Date("2026-05-10T10:00:00Z"),
     customer: {
       id: "cust1",
@@ -220,6 +222,19 @@ describe("serializeSaleRow", () => {
   it("maps null agentName", () => {
     const row = serializeSaleRow({ ...raw, agentName: null });
     expect(row.agentName).toBeNull();
+  });
+
+  it("maps deliveryMethod + expressWaybill (incl. null)", () => {
+    const row = serializeSaleRow(raw);
+    expect(row.deliveryMethod).toBe("delivery");
+    expect(row.expressWaybill).toBe("20450000123456");
+    const nulled = serializeSaleRow({
+      ...raw,
+      deliveryMethod: null,
+      expressWaybill: null,
+    });
+    expect(nulled.deliveryMethod).toBeNull();
+    expect(nulled.expressWaybill).toBeNull();
   });
 
   it("tolerates null city", () => {

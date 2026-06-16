@@ -172,6 +172,7 @@ export interface RawOrderRow {
   archived: boolean;
   isActual: boolean;
   agentName: string | null;
+  deliveryMethod: string | null;
   createdAt: Date;
   customer: {
     id: string;
@@ -193,6 +194,8 @@ export interface OrderListItem {
   isActual: boolean;
   /** Торговий агент: `Order.agentName` (історичний 1С-імпорт). */
   agentName: string | null;
+  /** Спосіб доставки: `Order.deliveryMethod` (code → label у UI). */
+  deliveryMethod: string | null;
   itemCount: number;
   createdAt: Date;
   customer: {
@@ -225,6 +228,7 @@ export function serializeOrderRow(o: RawOrderRow): OrderListItem {
     archived: o.archived,
     isActual: o.isActual,
     agentName: o.agentName,
+    deliveryMethod: o.deliveryMethod,
     itemCount: o._count.items,
     createdAt: o.createdAt,
     customer: {
