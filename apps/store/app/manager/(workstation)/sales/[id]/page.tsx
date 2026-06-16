@@ -14,7 +14,6 @@ import { formatDocNumber, formatOrderNumber } from "@/lib/manager/order-number";
 import { SaleForm } from "../new/_components/sale-form";
 import type {
   ClientPickerItem,
-  PriceTypeOption,
   SaleEditInitial,
   SaleItemDraft,
 } from "../new/_components/sale-types";
@@ -112,7 +111,6 @@ export default async function ManagerSaleDetailPage({
   const locked = isSaleLocked(sale.status);
 
   const [
-    priceTypeRows,
     exchangeRateEur,
     exchangeRateUsd,
     mgr,
@@ -120,7 +118,6 @@ export default async function ManagerSaleDetailPage({
     paymentSummary,
     bankAccounts,
   ] = await Promise.all([
-    prisma.mgrPriceType.findMany({ orderBy: { sortOrder: "asc" } }),
     getCurrentRate(),
     getUsdRate(),
     sale.customer.code1C
@@ -151,11 +148,6 @@ export default async function ManagerSaleDetailPage({
     ? [mgr.street, mgr.house].filter(Boolean).join(", ") || null
     : null;
 
-  const priceTypes: PriceTypeOption[] = priceTypeRows.map((p) => ({
-    id: p.id,
-    code: p.code,
-    label: p.label,
-  }));
   const deliveryMethods = ORDER_DELIVERY_METHODS.map((d) => ({
     code: d.code,
     label: d.label,
@@ -292,7 +284,6 @@ export default async function ManagerSaleDetailPage({
           initialClient={clientSummary}
           exchangeRateEur={exchangeRateEur}
           exchangeRateUsd={exchangeRateUsd}
-          priceTypes={priceTypes}
           deliveryMethods={deliveryMethods}
           currentUserId={user.id}
           currentUserName={user.fullName}

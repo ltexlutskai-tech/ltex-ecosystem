@@ -11,7 +11,7 @@ import {
   Input,
 } from "@ltex/ui";
 import { useDebouncedValue } from "../../../orders/new/_components/use-debounced-search";
-import { unitPriceForType } from "@/lib/manager/order-pricing";
+import { autoUnitPrice } from "@/lib/manager/order-pricing";
 import { bagWeightForQuantity } from "@/lib/manager/order-bag-weight";
 import type { ProductSummary, SaleLotSummary } from "./sale-types";
 
@@ -48,14 +48,11 @@ export interface SaleGeneralPick {
 export function SaleLotPicker({
   open,
   onOpenChange,
-  priceTypeCode,
   onAddLot,
   onAddGeneral,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  /** Код обраного типу цін — для дефолту ціни за кг. */
-  priceTypeCode: string | null;
   /** Додати рядок з конкретним лотом. */
   onAddLot: (pick: SaleLotPick) => void;
   /** Додати загальну позицію без лота (середня вага × мішки). */
@@ -173,7 +170,7 @@ export function SaleLotPicker({
 
   function addLot(lot: SaleLotSummary): void {
     if (!selected) return;
-    const pricePerKg = unitPriceForType(selected.prices, priceTypeCode) ?? 0;
+    const pricePerKg = autoUnitPrice(selected.prices).unit ?? 0;
     onAddLot({
       product: selected,
       lotId: lot.id,
@@ -186,7 +183,7 @@ export function SaleLotPicker({
 
   function addGeneral(): void {
     if (!selected) return;
-    const pricePerKg = unitPriceForType(selected.prices, priceTypeCode) ?? 0;
+    const pricePerKg = autoUnitPrice(selected.prices).unit ?? 0;
     onAddGeneral({
       product: selected,
       bags: 1,
@@ -195,9 +192,10 @@ export function SaleLotPicker({
     setAddedGeneral(true);
   }
 
-  const previewPrice = selected
-    ? (unitPriceForType(selected.prices, priceTypeCode) ?? 0)
-    : 0;
+  const previewAuto = selected
+    ? autoUnitPrice(selected.prices)
+    : { unit: 0, isAkciya: false };
+  const previewPrice = previewAuto.unit ?? 0;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -239,8 +237,8 @@ export function SaleLotPicker({
                   </div>
                 )}
               {results.map((p) => {
-                const hasPrice =
-                  unitPriceForType(p.prices, priceTypeCode) !== null;
+                const auto = autoUnitPrice(p.prices);
+                const hasPrice = auto.unit !== null;
                 return (
                   <div
                     key={p.id}
@@ -268,6 +266,11 @@ export function SaleLotPicker({
                         {p.averageWeight
                           ? ` · ~${p.averageWeight} кг/міш.`
                           : ""}
+                        {auto.isAkciya && (
+                          <span className="ml-1.5 inline-flex items-center rounded-sm bg-green-100 px-1.5 py-0.5 text-[11px] font-medium text-green-700">
+                            Акція
+                          </span>
+                        )}
                       </div>
                     </div>
                     <Button
@@ -293,10 +296,15 @@ export function SaleLotPicker({
                   {selected.name}
                 </div>
                 <div className="text-xs text-gray-500">
-                  Ціна за кг (тип цін):{" "}
+                  Ціна за кг:{" "}
                   <span className="font-medium text-gray-700">
                     {previewPrice > 0 ? `${previewPrice.toFixed(2)} €` : "—"}
                   </span>
+                  {previewAuto.isAkciya && (
+                    <span className="ml-1.5 inline-flex items-center rounded-sm bg-green-100 px-1.5 py-0.5 text-[11px] font-medium text-green-700">
+                      Акція
+                    </span>
+                  )}
                 </div>
               </div>
               <Button

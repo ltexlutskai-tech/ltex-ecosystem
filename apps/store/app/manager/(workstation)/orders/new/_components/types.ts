@@ -98,6 +98,8 @@ export interface OrderItemDraft {
   priceEur: number;
   /** Ціна за кг (€) — для відображення/перерахунку рядка. */
   unitPriceEur: number;
+  /** Підставлена ціна — акційна (для підсвічування рядка «Акція»). */
+  isAkciya?: boolean;
 }
 
 export interface WireOrderItem {

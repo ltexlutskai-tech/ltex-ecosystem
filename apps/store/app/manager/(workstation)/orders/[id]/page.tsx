@@ -17,7 +17,6 @@ import type {
   ClientPickerItem,
   OrderEditInitial,
   OrderItemDraft,
-  PriceTypeOption,
 } from "../new/_components/types";
 import { OrderStatusBadge } from "../../customers/[id]/_components/order-status-badge";
 
@@ -118,8 +117,7 @@ export default async function ManagerOrderDetailPage({
   const locked = isOrderLocked(order.status) || !!order.closedAt;
 
   // Допоміжні дані для форми (тільки коли редагуємо).
-  const [priceTypeRows, exchangeRate, mgr] = await Promise.all([
-    prisma.mgrPriceType.findMany({ orderBy: { sortOrder: "asc" } }),
+  const [exchangeRate, mgr] = await Promise.all([
     getCurrentRate(),
     order.customer.code1C
       ? prisma.mgrClient.findUnique({
@@ -138,11 +136,6 @@ export default async function ManagerOrderDetailPage({
     ? [mgr.street, mgr.house].filter(Boolean).join(", ") || null
     : null;
 
-  const priceTypes: PriceTypeOption[] = priceTypeRows.map((p) => ({
-    id: p.id,
-    code: p.code,
-    label: p.label,
-  }));
   const deliveryMethods = ORDER_DELIVERY_METHODS.map((d) => ({
     code: d.code,
     label: d.label,
@@ -271,7 +264,6 @@ export default async function ManagerOrderDetailPage({
           initialClientId={order.customer.id}
           initialClient={clientSummary}
           exchangeRate={exchangeRate}
-          priceTypes={priceTypes}
           deliveryMethods={deliveryMethods}
           currentUserId={user.id}
           currentUserName={user.fullName}

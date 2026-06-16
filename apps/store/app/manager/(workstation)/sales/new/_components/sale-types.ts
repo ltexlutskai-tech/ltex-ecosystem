@@ -52,6 +52,8 @@ export interface SaleItemDraft {
   pricePerKg: number;
   /** Сумарна ціна позиції, € = ціна за кг × вага × мішки. */
   priceEur: number;
+  /** Підставлена ціна — акційна (для підсвічування рядка «Акція»). */
+  isAkciya?: boolean;
 }
 
 export interface WireSaleItem {
@@ -129,6 +131,7 @@ export function repeatPriceForProduct(
       ...row,
       pricePerKg: unit,
       priceEur: lineTotalEur(unit, row.weight, row.quantity),
+      isAkciya: source.isAkciya ?? false,
     };
   });
 }

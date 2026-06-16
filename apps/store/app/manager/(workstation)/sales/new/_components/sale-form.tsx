@@ -22,7 +22,11 @@ import {
   type SaleGeneralPick,
   type SaleLotPick,
 } from "./sale-lot-picker";
-import { unitPriceForType } from "@/lib/manager/order-pricing";
+import {
+  unitPriceForType,
+  autoUnitPrice,
+  SELLING_PRICE_TYPES,
+} from "@/lib/manager/order-pricing";
 import { bagWeightForQuantity } from "@/lib/manager/order-bag-weight";
 import { buildPaymentReceiptText } from "@/lib/manager/payment-message";
 import {
@@ -43,7 +47,6 @@ import {
   lineTotalEur,
   type ClientPickerItem,
   type OrderDeliveryOption,
-  type PriceTypeOption,
   type ProductSummary,
   type SaleEditInitial,
   type SaleItemDraft,
@@ -60,7 +63,6 @@ export interface SaleFormProps {
   exchangeRateEur: number;
   /** Знімок курсу USD→UAH (для документа). */
   exchangeRateUsd: number;
-  priceTypes: PriceTypeOption[];
   deliveryMethods: OrderDeliveryOption[];
   currentUserId: string;
   currentUserName: string;
@@ -125,7 +127,6 @@ export function SaleForm({
   initialClient,
   exchangeRateEur,
   exchangeRateUsd,
-  priceTypes,
   deliveryMethods,
   currentUserId,
   currentUserName,
@@ -174,12 +175,10 @@ export function SaleForm({
   const [changeUsd, setChangeUsd] = useState(0);
 
   // ─── Менеджерські поля ──────────────────────────────────────────────────
-  const [priceTypeId, setPriceTypeId] = useState<string>(
-    initialSale?.priceTypeId ??
-      initialClient?.priceTypeId ??
-      priceTypes[0]?.id ??
-      "",
-  );
+  // Тип цін — дві фіксовані опції (продажна / акційна), відв'язані від
+  // MgrPriceType. За замовчуванням «Ціна продажу» (wholesale); при додаванні
+  // товару ціна підставляється авто (акційна якщо є — `autoUnitPrice`).
+  const [sellingTypeCode, setSellingTypeCode] = useState<string>("wholesale");
   const [deliveryMethod, setDeliveryMethod] = useState<string>(
     initialSale?.deliveryMethod ??
       mapClientDelivery(initialClient?.deliveryMethodCode, deliveryMethods),
@@ -197,29 +196,39 @@ export function SaleForm({
     initialSale?.expressWaybill ?? "",
   );
 
-  const priceTypeCode =
-    priceTypes.find((p) => p.id === priceTypeId)?.code ?? null;
-
-  /** Перерахунок цін за кг усіх рядків під обраний тип цін (як у 1С). */
-  function recalcAllRows(nextPriceTypeCode: string | null): void {
+  /**
+   * Перерахунок цін за кг усіх рядків під обраний тип цін (override, як у 1С):
+   *  - `wholesale` → форс продажної ціни кожного рядка (isAkciya=false);
+   *  - `akciya`    → акційна-де-є (`autoUnitPrice`), з прапором isAkciya.
+   */
+  function recalcAllRows(nextSellingCode: string): void {
     setItems((prev) =>
       prev.map((row) => {
         if (!row.product) return row;
-        const unit = unitPriceForType(row.product.prices, nextPriceTypeCode);
+        let unit: number | null;
+        let isAkciya: boolean;
+        if (nextSellingCode === "akciya") {
+          const auto = autoUnitPrice(row.product.prices);
+          unit = auto.unit;
+          isAkciya = auto.isAkciya;
+        } else {
+          unit = unitPriceForType(row.product.prices, "wholesale");
+          isAkciya = false;
+        }
         if (unit === null) return row; // немає прайсу — лишаємо ручний ввід
         return {
           ...row,
           pricePerKg: unit,
           priceEur: lineTotalEur(unit, row.weight, row.quantity),
+          isAkciya,
         };
       }),
     );
   }
 
-  function onPriceTypeChange(nextId: string): void {
-    setPriceTypeId(nextId);
-    const code = priceTypes.find((p) => p.id === nextId)?.code ?? null;
-    recalcAllRows(code);
+  function onPriceTypeChange(nextCode: string): void {
+    setSellingTypeCode(nextCode);
+    recalcAllRows(nextCode);
   }
 
   function onClientChange(
@@ -229,15 +238,8 @@ export function SaleForm({
     setClientId(id);
     setClientSummary(summary);
     if (summary) {
-      if (summary.priceTypeId) {
-        const exists = priceTypes.some((p) => p.id === summary.priceTypeId);
-        if (exists) {
-          setPriceTypeId(summary.priceTypeId);
-          const code =
-            priceTypes.find((p) => p.id === summary.priceTypeId)?.code ?? null;
-          recalcAllRows(code);
-        }
-      }
+      // Тип цін більше не залежить від клієнта (дві фіксовані опції) — лише
+      // підтягуємо спосіб доставки.
       const mapped = mapClientDelivery(
         summary.deliveryMethodCode,
         deliveryMethods,
@@ -255,6 +257,7 @@ export function SaleForm({
       if (prev.some((r) => r.lotId === pick.lotId)) return prev; // дубль лота
       const unit = Math.max(0, pick.pricePerKg);
       const weight = pick.weight > 0 ? pick.weight : 0;
+      const { isAkciya } = autoUnitPrice(pick.product.prices);
       const draft: SaleItemDraft = {
         uid: newUid(),
         product: pick.product,
@@ -264,6 +267,7 @@ export function SaleForm({
         weight,
         pricePerKg: unit,
         priceEur: lineTotalEur(unit, weight, 1),
+        isAkciya,
       };
       return [...prev, draft];
     });
@@ -276,6 +280,7 @@ export function SaleForm({
   function onAddGeneralFromPicker(pick: SaleGeneralPick): void {
     const { product, bags, pricePerKg } = pick;
     const unit = Math.max(0, pricePerKg);
+    const { isAkciya } = autoUnitPrice(product.prices);
     setItems((prev) => {
       // Дубль за товаром (загальна позиція без лота) — додаємо мішки.
       const existing = prev.find(
@@ -295,6 +300,7 @@ export function SaleForm({
                 weight,
                 pricePerKg: unit,
                 priceEur: lineTotalEur(unit, weight, 1),
+                isAkciya,
               }
             : r,
         );
@@ -313,6 +319,7 @@ export function SaleForm({
         weight,
         pricePerKg: unit,
         priceEur: lineTotalEur(unit, weight, 1),
+        isAkciya,
       };
       return [...prev, draft];
     });
@@ -327,7 +334,6 @@ export function SaleForm({
         window.location.origin,
       );
       url.searchParams.set("code", code);
-      if (priceTypeId) url.searchParams.set("priceTypeId", priceTypeId);
       const res = await fetch(url.toString());
       if (res.status === 404) {
         setBarcodeError("Не знайдено товар за ШК");
@@ -357,7 +363,8 @@ export function SaleForm({
         inStock: true,
         prices: data.prices,
       };
-      const unit = unitPriceForType(data.prices, priceTypeCode) ?? 0;
+      const auto = autoUnitPrice(data.prices);
+      const unit = auto.unit ?? 0;
       const weight = data.lot.weight > 0 ? data.lot.weight : 0;
 
       const draft: SaleItemDraft = {
@@ -369,6 +376,7 @@ export function SaleForm({
         weight,
         pricePerKg: unit,
         priceEur: lineTotalEur(unit, weight, 1),
+        isAkciya: auto.isAkciya,
       };
       setItems((prev) => [...prev, draft]);
     } catch (e) {
@@ -428,7 +436,9 @@ export function SaleForm({
           notes: notes.trim() || (isEdit ? null : undefined),
           exchangeRateEur: exchangeRateEur > 0 ? exchangeRateEur : undefined,
           exchangeRateUsd: exchangeRateUsd > 0 ? exchangeRateUsd : undefined,
-          priceTypeId: priceTypeId || null,
+          // Тип цін відв'язаний від MgrPriceType (wholesale/akciya — НЕ id) —
+          // менеджерська ціна фіксується у рядках. На документ пишемо null.
+          priceTypeId: null,
           deliveryMethod: deliveryMethod || null,
           novaPoshtaBranch: novaPoshtaBranch.trim() || null,
           cashOnDelivery,
@@ -686,15 +696,12 @@ export function SaleForm({
             </label>
             <select
               id="sale-price-type"
-              value={priceTypeId}
+              value={sellingTypeCode}
               onChange={(e) => onPriceTypeChange(e.target.value)}
               className="h-10 w-full rounded-md border border-gray-300 bg-white px-3 text-sm focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500"
             >
-              {priceTypes.length === 0 && (
-                <option value="">— Немає типів цін —</option>
-              )}
-              {priceTypes.map((pt) => (
-                <option key={pt.id} value={pt.id}>
+              {SELLING_PRICE_TYPES.map((pt) => (
+                <option key={pt.code} value={pt.code}>
                   {pt.label}
                 </option>
               ))}
@@ -1234,7 +1241,6 @@ export function SaleForm({
       <SaleLotPicker
         open={pickerOpen}
         onOpenChange={setPickerOpen}
-        priceTypeCode={priceTypeCode}
         onAddLot={onAddLotFromPicker}
         onAddGeneral={onAddGeneralFromPicker}
       />

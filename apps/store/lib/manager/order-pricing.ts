@@ -78,3 +78,43 @@ export function recalcLinePrice(
   // Округлення до копійок, щоб уникнути float-шуму.
   return Math.round(total * 100) / 100;
 }
+
+// ─── Фіксовані типи цін продажу (відв'язані від MgrPriceType) ────────────────
+//
+// `MgrPriceType.code` (1С `_Code`) НЕ дорівнює `wholesale`/`akciya`, тому
+// дропдан «Тип цін» з довідника MgrPriceType не давав підставити акційну ціну
+// (падав у wholesale-fallback). У формах Замовлення/Реалізація використовуємо
+// дві фіксовані опції з кодами `Price.priceType`, що реально є у товара.
+
+/** Фіксований тип цін продажу (код = `Price.priceType`). */
+export interface SellingPriceType {
+  code: string;
+  label: string;
+}
+
+/** Дві опції дропдана «Тип цін»: продажна (опт) та акційна. */
+export const SELLING_PRICE_TYPES: SellingPriceType[] = [
+  { code: "wholesale", label: "Ціна продажу" },
+  { code: "akciya", label: "Акційна" },
+];
+
+/**
+ * Авто-ціна товара при додаванні рядка: **акційна якщо є**, інакше продажна
+ * (`wholesale`), інакше перша наявна. Повертає одиничну ціну (€/кг або €/шт)
+ * та прапор `isAkciya` (чи це акційна ціна — для підсвічування рядка).
+ *
+ * @param prices — усі записи `Price` товара.
+ */
+export function autoUnitPrice(prices: PriceEntry[]): {
+  unit: number | null;
+  isAkciya: boolean;
+} {
+  if (!Array.isArray(prices) || prices.length === 0) {
+    return { unit: null, isAkciya: false };
+  }
+  const akc = prices.find((p) => p.priceType === "akciya");
+  if (akc) return { unit: akc.amount, isAkciya: true };
+  const ws = prices.find((p) => p.priceType === "wholesale");
+  if (ws) return { unit: ws.amount, isAkciya: false };
+  return { unit: prices[0]?.amount ?? null, isAkciya: false };
+}

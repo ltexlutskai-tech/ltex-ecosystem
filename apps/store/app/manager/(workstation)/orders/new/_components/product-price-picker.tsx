@@ -11,7 +11,7 @@ import {
   Input,
 } from "@ltex/ui";
 import { useDebouncedValue } from "./use-debounced-search";
-import { unitPriceForType } from "@/lib/manager/order-pricing";
+import { autoUnitPrice } from "@/lib/manager/order-pricing";
 import { bagWeightForQuantity } from "@/lib/manager/order-bag-weight";
 import {
   PRICE_STEP,
@@ -27,18 +27,16 @@ import type { ProductSummary } from "./types";
  * і додає позицію. Конкретний лот не вибирається — позиція завжди загальна.
  *
  * При «Додати» батьку повертається товар + кількість мішків + ціна за кг.
- * Якщо менеджер не чіпав ціну — передається прайсова за обраним типом цін.
+ * Якщо менеджер не чіпав ціну — передається авто-ціна (`autoUnitPrice`:
+ * акційна якщо є, інакше продажна).
  */
 export function ProductPricePicker({
   open,
   onOpenChange,
-  priceTypeCode,
   onAdd,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  /** Код обраного типу цін — для дефолту ціни за кг у списку. */
-  priceTypeCode: string | null;
   /** Додати позицію: товар + кількість мішків + ціна за кг (lotId завжди null). */
   onAdd: (product: ProductSummary, bags: number, unitPriceEur: number) => void;
 }) {
@@ -119,13 +117,11 @@ export function ProductPricePicker({
     setBagsTextByProduct((prev) => ({ ...prev, [id]: text }));
   }
 
-  /** Текст у полі «Ціна за кг» — сирий ввід або дефолт прайсова. */
+  /** Текст у полі «Ціна за кг» — сирий ввід або дефолт авто (акційна/продажна). */
   function priceTextFor(product: ProductSummary): string {
     const raw = priceTextByProduct[product.id];
     if (raw !== undefined) return raw;
-    const def = roundToStep(
-      unitPriceForType(product.prices, priceTypeCode) ?? 0,
-    );
+    const def = roundToStep(autoUnitPrice(product.prices).unit ?? 0);
     return String(def);
   }
 
@@ -133,7 +129,7 @@ export function ProductPricePicker({
   function priceValueFor(product: ProductSummary): number {
     const raw = priceTextByProduct[product.id];
     if (raw === undefined) {
-      return roundToStep(unitPriceForType(product.prices, priceTypeCode) ?? 0);
+      return roundToStep(autoUnitPrice(product.prices).unit ?? 0);
     }
     const n = Number.parseFloat(raw);
     if (!Number.isFinite(n) || n < 0) return 0;
@@ -195,7 +191,8 @@ export function ProductPricePicker({
             const bags = bagsValueFor(p.id);
             const unit = priceValueFor(p);
             const added = addedProductIds.has(p.id);
-            const hasPrice = unitPriceForType(p.prices, priceTypeCode) !== null;
+            const auto = autoUnitPrice(p.prices);
+            const hasPrice = auto.unit !== null;
             const previewWeight = bagWeightForQuantity(
               { averageWeight: p.averageWeight },
               bags,
@@ -228,6 +225,11 @@ export function ProductPricePicker({
                       {p.priceUnit === "kg" ? "за кг" : "за шт"}
                       {hasPrice ? "" : " · ціна вручну"}
                       {p.averageWeight ? ` · ~${p.averageWeight} кг/міш.` : ""}
+                      {auto.isAkciya && (
+                        <span className="ml-1.5 inline-flex items-center rounded-sm bg-green-100 px-1.5 py-0.5 text-[11px] font-medium text-green-700">
+                          Акція
+                        </span>
+                      )}
                     </div>
                     {p.activeClaim && p.activeClaim.totalQuantity > 0 ? (
                       <div

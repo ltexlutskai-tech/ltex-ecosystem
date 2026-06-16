@@ -6,7 +6,7 @@ import { getCurrentUser } from "@/lib/auth/manager-auth";
 import { getCurrentRate } from "@/lib/exchange-rate";
 import { ORDER_DELIVERY_METHODS } from "@/lib/manager/order-delivery";
 import { OrderForm } from "./_components/order-form";
-import type { ClientPickerItem, PriceTypeOption } from "./_components/types";
+import type { ClientPickerItem } from "./_components/types";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Нове замовлення — L-TEX Manager" };
@@ -65,16 +65,8 @@ export default async function NewOrderPage({
   }
 
   // Допоміжні дані для форми.
-  const [priceTypeRows, exchangeRate] = await Promise.all([
-    prisma.mgrPriceType.findMany({ orderBy: { sortOrder: "asc" } }),
-    getCurrentRate(),
-  ]);
+  const exchangeRate = await getCurrentRate();
 
-  const priceTypes: PriceTypeOption[] = priceTypeRows.map((p) => ({
-    id: p.id,
-    code: p.code,
-    label: p.label,
-  }));
   const deliveryMethods = ORDER_DELIVERY_METHODS.map((d) => ({
     code: d.code,
     label: d.label,
@@ -102,7 +94,6 @@ export default async function NewOrderPage({
         initialClientId={initialClient?.id ?? null}
         initialClient={initialClient}
         exchangeRate={exchangeRate}
-        priceTypes={priceTypes}
         deliveryMethods={deliveryMethods}
         currentUserId={user.id}
         currentUserName={user.fullName}

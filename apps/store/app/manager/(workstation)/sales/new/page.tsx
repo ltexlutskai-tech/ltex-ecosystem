@@ -6,10 +6,7 @@ import { getCurrentUser } from "@/lib/auth/manager-auth";
 import { getCurrentRate } from "@/lib/exchange-rate";
 import { ORDER_DELIVERY_METHODS } from "@/lib/manager/order-delivery";
 import { SaleForm } from "./_components/sale-form";
-import type {
-  ClientPickerItem,
-  PriceTypeOption,
-} from "./_components/sale-types";
+import type { ClientPickerItem } from "./_components/sale-types";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Нова реалізація — L-TEX Manager" };
@@ -100,23 +97,16 @@ export default async function NewSalePage({
     }
   }
 
-  const [priceTypeRows, exchangeRateEur, exchangeRateUsd, bankAccounts] =
-    await Promise.all([
-      prisma.mgrPriceType.findMany({ orderBy: { sortOrder: "asc" } }),
-      getCurrentRate(),
-      getUsdRate(),
-      prisma.mgrBankAccount.findMany({
-        where: { archived: false, hiddenInApp: false },
-        select: { id: true, name: true },
-        orderBy: { name: "asc" },
-      }),
-    ]);
+  const [exchangeRateEur, exchangeRateUsd, bankAccounts] = await Promise.all([
+    getCurrentRate(),
+    getUsdRate(),
+    prisma.mgrBankAccount.findMany({
+      where: { archived: false, hiddenInApp: false },
+      select: { id: true, name: true },
+      orderBy: { name: "asc" },
+    }),
+  ]);
 
-  const priceTypes: PriceTypeOption[] = priceTypeRows.map((p) => ({
-    id: p.id,
-    code: p.code,
-    label: p.label,
-  }));
   const deliveryMethods = ORDER_DELIVERY_METHODS.map((d) => ({
     code: d.code,
     label: d.label,
@@ -145,7 +135,6 @@ export default async function NewSalePage({
         initialClient={initialClient}
         exchangeRateEur={exchangeRateEur}
         exchangeRateUsd={exchangeRateUsd}
-        priceTypes={priceTypes}
         deliveryMethods={deliveryMethods}
         currentUserId={user.id}
         currentUserName={user.fullName}

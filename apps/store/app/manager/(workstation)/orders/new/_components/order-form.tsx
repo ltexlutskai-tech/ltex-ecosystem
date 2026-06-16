@@ -17,7 +17,11 @@ import { ClientPicker } from "./client-picker";
 import { ItemsEditor } from "./items-editor";
 import { OrderTotals } from "./order-totals";
 import { ProductPricePicker } from "./product-price-picker";
-import { unitPriceForType } from "@/lib/manager/order-pricing";
+import {
+  unitPriceForType,
+  autoUnitPrice,
+  SELLING_PRICE_TYPES,
+} from "@/lib/manager/order-pricing";
 import { bagWeightForQuantity } from "@/lib/manager/order-bag-weight";
 import {
   draftToWire,
@@ -25,7 +29,6 @@ import {
   type OrderDeliveryOption,
   type OrderEditInitial,
   type OrderItemDraft,
-  type PriceTypeOption,
   type ProductSummary,
 } from "./types";
 
@@ -39,7 +42,6 @@ export interface OrderFormProps {
   initialClientId?: string | null;
   initialClient?: ClientPickerItem | null;
   exchangeRate: number;
-  priceTypes: PriceTypeOption[];
   deliveryMethods: OrderDeliveryOption[];
   currentUserId: string;
   currentUserName: string;
@@ -80,7 +82,6 @@ export function OrderForm({
   initialClientId,
   initialClient,
   exchangeRate,
-  priceTypes,
   deliveryMethods,
   currentUserName,
   currentUserRole,
@@ -114,12 +115,10 @@ export function OrderForm({
   } | null>(null);
 
   // ─── Менеджерські поля (Етап 1) ───────────────────────────────────────────
-  const [priceTypeId, setPriceTypeId] = useState<string>(
-    initialOrder?.priceTypeId ??
-      initialClient?.priceTypeId ??
-      priceTypes[0]?.id ??
-      "",
-  );
+  // Тип цін — дві фіксовані опції (продажна / акційна), відв'язані від
+  // MgrPriceType. За замовчуванням «Ціна продажу» (wholesale); при додаванні
+  // товару ціна підставляється авто (акційна якщо є — `autoUnitPrice`).
+  const [sellingTypeCode, setSellingTypeCode] = useState<string>("wholesale");
   const [deliveryMethod, setDeliveryMethod] = useState<string>(
     initialOrder?.deliveryMethod ??
       mapClientDeliveryToOrder(
@@ -130,26 +129,36 @@ export function OrderForm({
   // Актуальність документа (1С «Статус заказа: Актуальне») — лише edit.
   const [isActual, setIsActual] = useState(initialOrder?.isActual ?? true);
 
-  const priceTypeCode =
-    priceTypes.find((p) => p.id === priceTypeId)?.code ?? null;
-
-  /** Перерахунок цін усіх рядків під обраний тип цін (як у 1С). */
-  function recalcAllRows(nextPriceTypeCode: string | null): void {
+  /**
+   * Перерахунок цін усіх рядків під обраний тип цін (override, як у 1С):
+   *  - `wholesale` → форс продажної ціни кожного рядка (isAkciya=false);
+   *  - `akciya`    → акційна-де-є (`autoUnitPrice`: акційна якщо є, інакше
+   *                  продажна), з прапором isAkciya.
+   */
+  function recalcAllRows(nextSellingCode: string): void {
     setItems((prev) =>
       prev.map((row) => {
         if (!row.product) return row;
-        const unit = unitPriceForType(row.product.prices, nextPriceTypeCode);
+        let unit: number | null;
+        let isAkciya: boolean;
+        if (nextSellingCode === "akciya") {
+          const auto = autoUnitPrice(row.product.prices);
+          unit = auto.unit;
+          isAkciya = auto.isAkciya;
+        } else {
+          unit = unitPriceForType(row.product.prices, "wholesale");
+          isAkciya = false;
+        }
         if (unit === null) return row; // немає прайсу — лишаємо ручний ввід
         const priceEur = Math.round(unit * row.weight * 100) / 100;
-        return { ...row, unitPriceEur: unit, priceEur };
+        return { ...row, unitPriceEur: unit, priceEur, isAkciya };
       }),
     );
   }
 
-  function onPriceTypeChange(nextId: string): void {
-    setPriceTypeId(nextId);
-    const code = priceTypes.find((p) => p.id === nextId)?.code ?? null;
-    recalcAllRows(code);
+  function onPriceTypeChange(nextCode: string): void {
+    setSellingTypeCode(nextCode);
+    recalcAllRows(nextCode);
   }
 
   function onClientChange(
@@ -159,16 +168,8 @@ export function OrderForm({
     setClientId(id);
     setClientSummary(summary);
     if (summary) {
-      // Підтягуємо тип цін клієнта (+ перерахунок), способ доставки.
-      if (summary.priceTypeId) {
-        const exists = priceTypes.some((p) => p.id === summary.priceTypeId);
-        if (exists) {
-          setPriceTypeId(summary.priceTypeId);
-          const code =
-            priceTypes.find((p) => p.id === summary.priceTypeId)?.code ?? null;
-          recalcAllRows(code);
-        }
-      }
+      // Тип цін більше не залежить від клієнта (дві фіксовані опції) — лише
+      // підтягуємо спосіб доставки.
       const mappedDelivery = mapClientDeliveryToOrder(
         summary.deliveryMethodCode,
         deliveryMethods,
@@ -189,6 +190,9 @@ export function OrderForm({
     unitPriceEur: number,
   ): void {
     const unit = Math.max(0, unitPriceEur);
+    // Прапор «акційна» визначаємо за прайсом товара (акційна якщо є) —
+    // незалежно від обраного типу цін (авто-підстановка при додаванні).
+    const { isAkciya } = autoUnitPrice(product.prices);
     setItems((prev) => {
       const existing = prev.find((r) => r.product?.id === product.id);
       if (existing) {
@@ -200,7 +204,7 @@ export function OrderForm({
         const priceEur = Math.round(unit * weight * 100) / 100;
         return prev.map((r) =>
           r.uid === existing.uid
-            ? { ...r, quantity, weight, priceEur, unitPriceEur: unit }
+            ? { ...r, quantity, weight, priceEur, unitPriceEur: unit, isAkciya }
             : r,
         );
       }
@@ -219,6 +223,7 @@ export function OrderForm({
         weight,
         priceEur,
         unitPriceEur: unit,
+        isAkciya,
       };
       return [...prev, draft];
     });
@@ -268,7 +273,9 @@ export function OrderForm({
           ...(isEdit ? {} : { customerId: clientId }),
           items: wireItems,
           notes: notes.trim() || (isEdit ? null : undefined),
-          priceTypeId: priceTypeId || null,
+          // Тип цін відв'язаний від MgrPriceType (wholesale/akciya — НЕ id) —
+          // менеджерська ціна фіксується у рядках. На документ пишемо null.
+          priceTypeId: null,
           deliveryMethod: deliveryMethod || null,
           ...(isEdit ? { isActual } : {}),
           ...(force ? { force: true } : {}),
@@ -393,15 +400,12 @@ export function OrderForm({
             </label>
             <select
               id="order-price-type"
-              value={priceTypeId}
+              value={sellingTypeCode}
               onChange={(e) => onPriceTypeChange(e.target.value)}
               className="h-10 w-full rounded-md border border-gray-300 bg-white px-3 text-sm focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500"
             >
-              {priceTypes.length === 0 && (
-                <option value="">— Немає типів цін —</option>
-              )}
-              {priceTypes.map((pt) => (
-                <option key={pt.id} value={pt.id}>
+              {SELLING_PRICE_TYPES.map((pt) => (
+                <option key={pt.code} value={pt.code}>
                   {pt.label}
                 </option>
               ))}
@@ -588,7 +592,6 @@ export function OrderForm({
       <ProductPricePicker
         open={pickerOpen}
         onOpenChange={setPickerOpen}
-        priceTypeCode={priceTypeCode}
         onAdd={onAddFromPicker}
       />
 

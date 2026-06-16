@@ -111,11 +111,16 @@ export function SaleItemsEditor({
     updateRow(draft.uid, { ...draft, quantity, weight, priceEur });
   }
 
-  /** Зміна ціни за кг — перераховує суму (ціна/кг × вага × мішки). */
+  /** Зміна ціни за кг — перераховує суму; ручний ввід знімає прапор «Акція». */
   function changeUnitPrice(draft: SaleItemDraft, pricePerKg: number): void {
     const unit = Math.max(0, pricePerKg);
     const priceEur = lineTotalEur(unit, draft.weight, draft.quantity);
-    updateRow(draft.uid, { ...draft, pricePerKg: unit, priceEur });
+    updateRow(draft.uid, {
+      ...draft,
+      pricePerKg: unit,
+      priceEur,
+      isAkciya: false,
+    });
   }
 
   /** Повторити ціну рядка на всі рядки того самого товару (1С ПовторитьЦену). */
@@ -226,9 +231,18 @@ export function SaleItemsEditor({
                 {/* Сума (read-only = Ціна × мішки) */}
                 <div className="min-w-[5rem] pb-1 text-right">
                   <div className="text-xs text-gray-400">Сума</div>
-                  <div className="text-base font-semibold text-gray-900">
+                  <div
+                    className={`text-base font-semibold ${
+                      draft.isAkciya ? "text-green-700" : "text-gray-900"
+                    }`}
+                  >
                     {draft.priceEur.toFixed(2)} €
                   </div>
+                  {draft.isAkciya && (
+                    <span className="mt-0.5 inline-flex items-center rounded-sm bg-green-100 px-1.5 py-0.5 text-[11px] font-medium text-green-700">
+                      Акція
+                    </span>
+                  )}
                 </div>
 
                 <button

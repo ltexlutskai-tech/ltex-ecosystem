@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   unitPriceForType,
   recalcLinePrice,
+  autoUnitPrice,
   type PriceEntry,
 } from "./order-pricing";
 
@@ -60,5 +61,32 @@ describe("recalcLinePrice", () => {
   it("при вазі 0 повертає 0 (за наявності прайсу)", () => {
     expect(recalcLinePrice(prices, "wholesale", 0)).toBe(0);
     expect(recalcLinePrice(prices, "wholesale", -5)).toBe(0);
+  });
+});
+
+describe("autoUnitPrice", () => {
+  it("повертає акційну ціну коли вона є (isAkciya:true)", () => {
+    const p: PriceEntry[] = [
+      { priceType: "wholesale", amount: 4 },
+      { priceType: "akciya", amount: 3.5 },
+    ];
+    expect(autoUnitPrice(p)).toEqual({ unit: 3.5, isAkciya: true });
+  });
+
+  it("повертає продажну (wholesale) коли акційної немає (isAkciya:false)", () => {
+    const p: PriceEntry[] = [
+      { priceType: "wholesale", amount: 4 },
+      { priceType: "retail", amount: 7 },
+    ];
+    expect(autoUnitPrice(p)).toEqual({ unit: 4, isAkciya: false });
+  });
+
+  it("повертає першу наявну коли немає ні акційної, ні продажної", () => {
+    const p: PriceEntry[] = [{ priceType: "retail", amount: 7 }];
+    expect(autoUnitPrice(p)).toEqual({ unit: 7, isAkciya: false });
+  });
+
+  it("повертає null коли цін немає взагалі", () => {
+    expect(autoUnitPrice([])).toEqual({ unit: null, isAkciya: false });
   });
 });
