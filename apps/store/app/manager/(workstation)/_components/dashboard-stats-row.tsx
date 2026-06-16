@@ -20,13 +20,13 @@ export function DashboardStatsRow({
       <span className="text-gray-300">·</span>
       <span>
         Загальний борг:{" "}
-        <span className="font-semibold">{formatUah(totalDebt)}</span>
+        <span className="font-semibold">{formatEur(totalDebt)}</span>
       </span>
     </div>
   );
 }
 
-function formatUah(value: number): string {
+function formatEur(value: number): string {
   if (!Number.isFinite(value)) return "—";
-  return `${value.toLocaleString("uk-UA", { maximumFractionDigits: 0 })} ₴`;
+  return `${value.toLocaleString("uk-UA", { maximumFractionDigits: 0 })} €`;
 }

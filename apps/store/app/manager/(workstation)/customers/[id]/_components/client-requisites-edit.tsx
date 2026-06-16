@@ -6,7 +6,7 @@ import { useToast } from "@ltex/ui";
 import { useClientEdit } from "../_hooks/use-client-edit";
 import { useDiscardWarning } from "../_hooks/use-discard-warning";
 import { patchClient } from "@/lib/manager/client-patch-fetch";
-import { formatUah, parseDecimal } from "../../_components/format";
+import { formatEur, formatUah, parseDecimal } from "../../_components/format";
 import type { EditDictionaries } from "../_lib/load-edit-dictionaries";
 import type { ClientDetail } from "./types";
 import { EditTextRow } from "./edit-controls/edit-text-row";
@@ -44,7 +44,7 @@ function DebtValue({
   if (muted) {
     return (
       <span className={n > 0 ? "text-orange-700" : "text-gray-700"}>
-        {formatUah(value)}
+        {formatEur(value)}
       </span>
     );
   }
@@ -54,7 +54,7 @@ function DebtValue({
         n > 0 ? "text-red-700" : n < 0 ? "text-green-700" : "text-gray-700"
       }
     >
-      {formatUah(value)}
+      {formatEur(value)}
     </span>
   );
 }

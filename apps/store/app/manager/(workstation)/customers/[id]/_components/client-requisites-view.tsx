@@ -1,6 +1,6 @@
 import { formatPhoneUkr, phoneToViberUrl } from "@ltex/shared";
 import { ClientStatusBadge } from "../../_components/client-status-badge";
-import { formatUah, parseDecimal } from "../../_components/format";
+import { formatEur, formatUah, parseDecimal } from "../../_components/format";
 import { ClientActionButtons } from "./client-action-buttons";
 import { ClientBankAccountRow } from "./client-bank-account-row";
 import { ClientPhonesSection } from "./client-phones-section";
@@ -50,7 +50,7 @@ function DebtValue({
   if (muted) {
     return (
       <span className={n > 0 ? "text-orange-700" : "text-gray-700"}>
-        {formatUah(value)}
+        {formatEur(value)}
       </span>
     );
   }
@@ -60,7 +60,7 @@ function DebtValue({
         n > 0 ? "text-red-700" : n < 0 ? "text-green-700" : "text-gray-700"
       }
     >
-      {formatUah(value)}
+      {formatEur(value)}
     </span>
   );
 }

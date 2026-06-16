@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import { ClientStatusBadge } from "../_components/client-status-badge";
 import { DebtCell } from "../_components/debt-cell";
 import { DaysSinceCell } from "../_components/days-since-cell";
-import { formatUah } from "../_components/format";
+import { formatEur } from "../_components/format";
 import type { ClientListItem } from "../_components/types";
 
 // Per-key cell renderer. Працює з прев'ю даних з loadClients().
@@ -72,7 +72,7 @@ export function renderCell(key: string, c: ClientListItem): ReactNode {
     case "debt":
       return <DebtCell value={c.debt} />;
     case "overdueDebt":
-      return formatUah(c.overdueDebt);
+      return formatEur(c.overdueDebt);
     case "monthlyVolume":
       return c.monthlyVolume ? `${c.monthlyVolume} кг` : "—";
     case "daysSinceLast":

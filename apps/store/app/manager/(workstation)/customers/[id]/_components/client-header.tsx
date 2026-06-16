@@ -1,5 +1,5 @@
 import { ClientStatusBadge } from "../../_components/client-status-badge";
-import { formatUah, parseDecimal } from "../../_components/format";
+import { formatEur, parseDecimal } from "../../_components/format";
 import { ClientAssignDialog } from "./client-assign-dialog";
 import { ClientContactsStrip } from "./client-contacts-strip";
 import { ClientForeignBanner } from "./client-foreign-banner";
@@ -56,7 +56,7 @@ export function ClientHeader({
                         : "font-semibold text-gray-700"
                   }
                 >
-                  {formatUah(client.debt)}
+                  {formatEur(client.debt)}
                 </span>
               </span>
               <span className="text-gray-300">·</span>
