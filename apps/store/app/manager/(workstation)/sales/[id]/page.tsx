@@ -10,7 +10,7 @@ import {
   ORDER_DELIVERY_METHODS,
   orderDeliveryLabel,
 } from "@/lib/manager/order-delivery";
-import { formatOrderNumber } from "@/lib/manager/order-number";
+import { formatDocNumber, formatOrderNumber } from "@/lib/manager/order-number";
 import { SaleForm } from "../new/_components/sale-form";
 import type {
   ClientPickerItem,
@@ -47,12 +47,11 @@ export async function generateMetadata({
   const { id } = await params;
   const sale = await prisma.sale.findUnique({
     where: { id },
-    select: { code1C: true, docNumber: true },
+    select: { code1C: true, number1C: true, docNumber: true },
   });
-  const num = sale?.code1C ?? sale?.docNumber;
   return {
-    title: num
-      ? `Реалізація №${num} — L-TEX Manager`
+    title: sale
+      ? `Реалізація ${formatDocNumber(sale)} — L-TEX Manager`
       : "Реалізація — L-TEX Manager",
   };
 }
@@ -203,7 +202,7 @@ export default async function ManagerSaleDetailPage({
     priceEur: it.priceEur,
   }));
 
-  const displayNumber = sale.code1C ?? String(sale.docNumber);
+  const displayNumber = formatDocNumber(sale);
 
   const initialSale: SaleEditInitial = {
     id: sale.id,
@@ -268,7 +267,7 @@ export default async function ManagerSaleDetailPage({
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-gray-800">
-            Реалізація №{displayNumber}
+            Реалізація {displayNumber}
           </h1>
           <p className="mt-1 text-sm text-gray-500">Створено: {date}</p>
         </div>

@@ -64,6 +64,7 @@ export function buildRouteSheetsWhere(
   if (p.search && p.search.trim().length > 0) {
     const q = p.search.trim();
     const or: Prisma.RouteSheetWhereInput[] = [
+      { number1C: { contains: q, mode: "insensitive" } },
       { code1C: { contains: q, mode: "insensitive" } },
       { comment: { contains: q, mode: "insensitive" } },
     ];
@@ -94,6 +95,7 @@ export function buildRouteSheetsWhere(
 export interface RawRouteSheetRow {
   id: string;
   code1C: string | null;
+  number1C: string | null;
   docNumber: number;
   date: Date;
   arrivalDate: Date | null;
@@ -110,6 +112,7 @@ export interface RawRouteSheetRow {
 export interface RouteSheetListItem {
   id: string;
   code1C: string | null;
+  number1C: string | null;
   docNumber: number;
   date: Date;
   arrivalDate: Date | null;
@@ -136,6 +139,7 @@ export function serializeRouteSheetRow(
   return {
     id: r.id,
     code1C: r.code1C,
+    number1C: r.number1C,
     docNumber: r.docNumber,
     date: r.date,
     arrivalDate: r.arrivalDate,

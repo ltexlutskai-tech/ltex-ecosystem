@@ -83,6 +83,7 @@ export function buildSalesWhere(
   if (p.search && p.search.trim().length > 0) {
     const q = p.search.trim();
     const or: Prisma.SaleWhereInput[] = [
+      { number1C: { contains: q, mode: "insensitive" } },
       { code1C: { contains: q, mode: "insensitive" } },
       { customer: { name: { contains: q, mode: "insensitive" } } },
       { customer: { phone: { contains: q, mode: "insensitive" } } },
@@ -127,6 +128,7 @@ export function buildSalesWhere(
 export interface RawSaleRow {
   id: string;
   code1C: string | null;
+  number1C: string | null;
   docNumber: number;
   status: string;
   totalEur: number;
@@ -146,6 +148,7 @@ export interface RawSaleRow {
 export interface SaleListItem {
   id: string;
   code1C: string | null;
+  number1C: string | null;
   docNumber: number;
   status: string;
   totalEur: number;
@@ -177,6 +180,7 @@ export function serializeSaleRow(s: RawSaleRow): SaleListItem {
   return {
     id: s.id,
     code1C: s.code1C,
+    number1C: s.number1C,
     docNumber: s.docNumber,
     status: s.status,
     totalEur: s.totalEur,

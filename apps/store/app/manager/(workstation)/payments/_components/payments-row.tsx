@@ -1,10 +1,12 @@
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { CashOrderTypeBadge } from "./cash-order-type-badge";
+import { formatDocNumber } from "@/lib/manager/order-number";
 
 export interface PaymentsRowData {
   id: string;
   code1C: string | null;
+  number1C: string | null;
   docNumber: number;
   type: string;
   documentSumEur: number;
@@ -14,12 +16,6 @@ export interface PaymentsRowData {
   customerId: string | null;
   bankAccountName: string | null;
   cashFlowArticleName: string | null;
-}
-
-/** Номер документа: code1C з central, інакше локальний docNumber «№N». */
-function formatDocNumber(o: PaymentsRowData): string {
-  if (o.code1C) return o.code1C;
-  return `№${o.docNumber}`;
 }
 
 export function PaymentsRow({ order }: { order: PaymentsRowData }) {

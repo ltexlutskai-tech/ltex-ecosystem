@@ -94,6 +94,7 @@ export function buildCashOrdersWhere(
   if (p.search && p.search.trim().length > 0) {
     const q = p.search.trim();
     const or: Prisma.MgrCashOrderWhereInput[] = [
+      { number1C: { contains: q, mode: "insensitive" } },
       { customer: { name: { contains: q, mode: "insensitive" } } },
       { sale: { customer: { name: { contains: q, mode: "insensitive" } } } },
     ];
@@ -129,6 +130,7 @@ export const cashOrderRowInclude = {
 export interface RawCashOrderRow {
   id: string;
   code1C: string | null;
+  number1C: string | null;
   docNumber: number;
   type: string;
   documentSumEur: number;
@@ -147,6 +149,7 @@ export interface RawCashOrderRow {
 export interface CashOrderListItem {
   id: string;
   code1C: string | null;
+  number1C: string | null;
   docNumber: number;
   type: string;
   documentSumEur: number;
@@ -167,6 +170,7 @@ export function serializeCashOrderRow(o: RawCashOrderRow): CashOrderListItem {
   return {
     id: o.id,
     code1C: o.code1C,
+    number1C: o.number1C,
     docNumber: o.docNumber,
     type: o.type,
     documentSumEur: o.documentSumEur,

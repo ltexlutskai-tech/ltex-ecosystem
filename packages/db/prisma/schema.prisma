@@ -326,6 +326,7 @@ model OrderItem {
 model Sale {
   id                  String   @id @default(cuid())
   code1C              String?  @unique @map("code_1c")
+  number1C            String?  @map("number_1c") // 1С _Number (напр. "L0000001335"), display-only
   docNumber           Int      @default(autoincrement()) @map("doc_number")
   customerId          String   @map("customer_id")
   status              String   @default("draft") // draft|sent|posted|cancelled
@@ -361,6 +362,7 @@ model Sale {
   @@index([status])
   @@index([routeSheetId])
   @@index([orderId])
+  @@index([number1C])
   @@map("mgr_sales")
 }
 
@@ -373,6 +375,7 @@ model Sale {
 model MgrCashOrder {
   id                String   @id @default(cuid())
   code1C            String?  @unique @map("code_1c")
+  number1C          String?  @map("number_1c") // 1С _Number, display-only
   docNumber         Int      @default(autoincrement()) @map("doc_number")
   saleId            String?  @map("sale_id")
   customerId        String?  @map("customer_id") // Контрагент (standalone-оплата без реалізації)
@@ -418,6 +421,7 @@ model MgrCashOrder {
   @@index([customerId])
   @@index([archived])
   @@index([routeSheetId])
+  @@index([number1C])
   @@map("mgr_cash_orders")
 }
 
@@ -1161,6 +1165,7 @@ model MgrRoute {
 model RouteSheet {
   id              String    @id @default(cuid())
   code1C          String?   @unique @map("code_1c")
+  number1C        String?   @map("number_1c") // 1С _Number, display-only
   docNumber       Int       @default(autoincrement()) @map("doc_number")
   date            DateTime  @default(now())
   arrivalDate     DateTime? @map("arrival_date")
@@ -1198,6 +1203,7 @@ model RouteSheet {
   @@index([routeId])
   @@index([expeditorUserId])
   @@index([archived])
+  @@index([number1C])
   @@map("mgr_route_sheets")
 }
 

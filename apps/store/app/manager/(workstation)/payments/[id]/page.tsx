@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { prisma } from "@ltex/db";
 import { getCurrentUser } from "@/lib/auth/manager-auth";
+import { formatDocNumber } from "@/lib/manager/order-number";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Касовий ордер — L-TEX Manager" };
@@ -43,7 +44,9 @@ export default async function ManagerCashOrderDetailPage({
     where: { id },
     include: {
       customer: { select: { id: true, name: true, code1C: true } },
-      sale: { select: { id: true, code1C: true, docNumber: true } },
+      sale: {
+        select: { id: true, code1C: true, number1C: true, docNumber: true },
+      },
       bankAccountRef: { select: { name: true } },
       cashFlowArticleRef: { select: { name: true } },
     },
@@ -52,7 +55,7 @@ export default async function ManagerCashOrderDetailPage({
   if (!order) notFound();
 
   const isIncome = order.type === "income";
-  const displayNumber = order.code1C ?? `№${order.docNumber}`;
+  const displayNumber = formatDocNumber(order);
   const date = new Date(order.paidAt).toLocaleString("uk-UA");
 
   return (
@@ -110,7 +113,7 @@ export default async function ManagerCashOrderDetailPage({
                 href={`/manager/sales/${order.sale.id}`}
                 className="text-blue-600 hover:text-blue-700"
               >
-                №{order.sale.code1C ?? order.sale.docNumber}
+                {formatDocNumber(order.sale)}
               </Link>
             ) : (
               "—"
