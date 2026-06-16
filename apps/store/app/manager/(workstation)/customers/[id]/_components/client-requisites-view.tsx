@@ -1,6 +1,6 @@
 import { formatPhoneUkr, phoneToViberUrl } from "@ltex/shared";
 import { ClientStatusBadge } from "../../_components/client-status-badge";
-import { formatEur, formatUah, parseDecimal } from "../../_components/format";
+import { formatEur, parseDecimal } from "../../_components/format";
 import { ClientActionButtons } from "./client-action-buttons";
 import { ClientBankAccountRow } from "./client-bank-account-row";
 import { ClientPhonesSection } from "./client-phones-section";
@@ -25,7 +25,7 @@ function fmtDateTime(iso: string | Date | null | undefined): string {
 
 function fmtMoney(value: string | null | undefined): string {
   if (value == null || value === "") return "—";
-  return formatUah(value);
+  return formatEur(value);
 }
 
 function Row({ label, value }: { label: string; value: React.ReactNode }) {

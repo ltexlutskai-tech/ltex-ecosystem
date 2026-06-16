@@ -610,11 +610,11 @@ export function RouteSheetForm({
           <span className="text-gray-500">
             Сума:{" "}
             <span className="font-semibold text-gray-800">
-              {Math.round(totalUah).toLocaleString("uk-UA")} ₴
+              {totalEur.toFixed(2)} €
             </span>{" "}
             ·{" "}
-            <span className="font-semibold text-gray-800">
-              {totalEur.toFixed(2)} €
+            <span className="text-xs text-gray-400">
+              {Math.round(totalUah).toLocaleString("uk-UA")} ₴
             </span>
           </span>
         </div>
@@ -1076,9 +1076,9 @@ export function RouteSheetForm({
                           {s.customerName ?? "—"}
                         </td>
                         <td className="px-4 py-2 text-right text-gray-700">
-                          {Math.round(s.totalUah).toLocaleString("uk-UA")} ₴
+                          {s.totalEur.toFixed(2)} €
                           <span className="ml-1 text-xs text-gray-400">
-                            · {s.totalEur.toFixed(2)} €
+                            · {Math.round(s.totalUah).toLocaleString("uk-UA")} ₴
                           </span>
                         </td>
                         <td className="px-4 py-2">

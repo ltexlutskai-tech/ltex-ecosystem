@@ -30,9 +30,11 @@ export function OrderTotals({
         </div>
         <div className="text-right">
           <div className="text-2xl font-bold text-gray-900">
+            {totalEur.toFixed(2)} €
+          </div>
+          <div className="text-sm text-gray-500">
             {Math.round(totalUah).toLocaleString("uk-UA")} ₴
           </div>
-          <div className="text-sm text-gray-500">{totalEur.toFixed(2)} €</div>
         </div>
       </div>
     </div>

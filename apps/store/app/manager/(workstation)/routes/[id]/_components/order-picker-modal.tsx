@@ -254,9 +254,9 @@ export function OrderPickerModal({
                       {o.customer.region ?? "—"}
                     </td>
                     <td className="whitespace-nowrap px-3 py-2 text-right text-gray-700">
-                      {Math.round(o.totalUah).toLocaleString("uk-UA")} ₴
+                      {o.totalEur.toFixed(2)} €
                       <span className="ml-1 text-xs text-gray-400">
-                        · {o.totalEur.toFixed(2)} €
+                        · {Math.round(o.totalUah).toLocaleString("uk-UA")} ₴
                       </span>
                     </td>
                   </tr>

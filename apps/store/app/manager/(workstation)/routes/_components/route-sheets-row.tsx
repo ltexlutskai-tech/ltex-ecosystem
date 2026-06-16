@@ -61,13 +61,15 @@ export function RouteSheetsRow({ sheet }: { sheet: RouteSheetsRowData }) {
           dimmed ? "text-gray-400" : "text-gray-800"
         }`}
       >
-        <div>{Math.round(sheet.totalUah).toLocaleString("uk-UA")} ₴</div>
-        <div className="text-xs font-normal text-gray-400">
+        <div>
           {sheet.totalEur.toLocaleString("uk-UA", {
             minimumFractionDigits: 2,
             maximumFractionDigits: 2,
           })}{" "}
           €
+        </div>
+        <div className="text-xs font-normal text-gray-400">
+          {Math.round(sheet.totalUah).toLocaleString("uk-UA")} ₴
         </div>
       </td>
       <td className="px-4 py-3 text-right">

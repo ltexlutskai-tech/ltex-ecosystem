@@ -6,7 +6,7 @@ import { useToast } from "@ltex/ui";
 import { useClientEdit } from "../_hooks/use-client-edit";
 import { useDiscardWarning } from "../_hooks/use-discard-warning";
 import { patchClient } from "@/lib/manager/client-patch-fetch";
-import { formatEur, formatUah, parseDecimal } from "../../_components/format";
+import { formatEur, parseDecimal } from "../../_components/format";
 import type { EditDictionaries } from "../_lib/load-edit-dictionaries";
 import type { ClientDetail } from "./types";
 import { EditTextRow } from "./edit-controls/edit-text-row";
@@ -28,7 +28,7 @@ function fmtDateTime(iso: string | null | undefined): string {
 
 function fmtMoney(value: string | null | undefined): string {
   if (value == null || value === "") return "—";
-  return formatUah(value);
+  return formatEur(value);
 }
 
 function DebtValue({
