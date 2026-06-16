@@ -39,8 +39,16 @@ export const createOrderSchema = z.object({
   cashOnDelivery: z.boolean().optional().default(false),
   /** Торговий агент, кому зараховано продаж (`User.id`); дефолт — поточний. */
   assignedAgentUserId: z.string().min(1).nullable().optional(),
-  /** Вивантажувати в 1С (дефолт true). */
+  /**
+   * Deprecated — більше не керується з UI (1С-вивантаження прибрано). Лишено
+   * опційним для зворотної сумісності зі старими payload-ами.
+   */
   exportTo1C: z.boolean().optional().default(true),
+  /**
+   * Провести документ при збереженні (= status `posted` + `archived`). Кнопка
+   * «Зберегти та провести». Falsy → зберегти як чернетку / без зміни статусу.
+   */
+  post: z.boolean().optional(),
 
   /**
    * Форсоване створення другого активного замовлення (N1). Дозволено лише
@@ -71,7 +79,10 @@ export const updateOrderSchema = z.object({
     .optional(),
   cashOnDelivery: z.boolean().optional().default(false),
   assignedAgentUserId: z.string().min(1).nullable().optional(),
+  /** Deprecated — див. createOrderSchema. Лишено опційним для back-compat. */
   exportTo1C: z.boolean().optional().default(true),
+  /** Провести документ при збереженні (= status `posted` + `archived`). */
+  post: z.boolean().optional(),
 
   // ─── Status (Етап 2) ──────────────────────────────────────────────────────
   /** Бажаний наступний статус документа (валідність переходу — у endpoint). */

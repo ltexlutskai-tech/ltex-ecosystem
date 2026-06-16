@@ -155,17 +155,19 @@ export async function PATCH(
   }
 
   // Якщо змінюється статус — перевіряємо дозволеність переходу.
+  // Кнопка «Зберегти та провести» (`post=true`) ⇒ перехід у `posted`.
   let nextStatus: string | undefined;
-  if (input.status && input.status !== existing.status) {
-    if (!isTransitionAllowed(existing.status, input.status)) {
+  const requestedStatus = input.post ? "posted" : input.status;
+  if (requestedStatus && requestedStatus !== existing.status) {
+    if (!isTransitionAllowed(existing.status, requestedStatus)) {
       return NextResponse.json(
         {
-          error: `Перехід «${existing.status}» → «${input.status}» не дозволено`,
+          error: `Перехід «${existing.status}» → «${requestedStatus}» не дозволено`,
         },
         { status: 409 },
       );
     }
-    nextStatus = input.status;
+    nextStatus = requestedStatus;
   }
 
   // Guard: не можна позначити закрите/архівне замовлення як актуальне.

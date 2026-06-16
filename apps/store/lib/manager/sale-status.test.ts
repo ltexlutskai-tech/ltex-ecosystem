@@ -58,12 +58,20 @@ describe("isSaleLocked / canEditSale", () => {
 });
 
 describe("transitions graph", () => {
-  it("draft → sent / cancelled", () => {
-    expect(getAllowedSaleTransitions("draft")).toEqual(["sent", "cancelled"]);
+  it("draft → sent / posted / cancelled", () => {
+    expect(getAllowedSaleTransitions("draft")).toEqual([
+      "sent",
+      "posted",
+      "cancelled",
+    ]);
   });
 
-  it("sent → draft / cancelled", () => {
-    expect(getAllowedSaleTransitions("sent")).toEqual(["draft", "cancelled"]);
+  it("sent → draft / posted / cancelled", () => {
+    expect(getAllowedSaleTransitions("sent")).toEqual([
+      "draft",
+      "posted",
+      "cancelled",
+    ]);
   });
 
   it("posted — фінальний (немає переходів)", () => {
@@ -75,13 +83,20 @@ describe("transitions graph", () => {
   });
 
   it("невідомий статус трактується як draft", () => {
-    expect(getAllowedSaleTransitions("???")).toEqual(["sent", "cancelled"]);
+    expect(getAllowedSaleTransitions("???")).toEqual([
+      "sent",
+      "posted",
+      "cancelled",
+    ]);
   });
 
   it("isSaleTransitionAllowed: дозволені / заборонені", () => {
     expect(isSaleTransitionAllowed("draft", "sent")).toBe(true);
-    expect(isSaleTransitionAllowed("draft", "posted")).toBe(false);
+    // «Зберегти та провести» — draft/sent → posted дозволено.
+    expect(isSaleTransitionAllowed("draft", "posted")).toBe(true);
+    expect(isSaleTransitionAllowed("sent", "posted")).toBe(true);
     expect(isSaleTransitionAllowed("posted", "draft")).toBe(false);
+    expect(isSaleTransitionAllowed("cancelled", "posted")).toBe(false);
     expect(isSaleTransitionAllowed("draft", "delivered")).toBe(false);
   });
 });

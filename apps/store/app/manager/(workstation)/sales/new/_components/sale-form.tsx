@@ -193,7 +193,6 @@ export function SaleForm({
   const [onTradeAgent, setOnTradeAgent] = useState(
     initialSale?.onTradeAgent ?? true,
   );
-  const [exportTo1C, setExportTo1C] = useState(initialSale?.exportTo1C ?? true);
   const [expressWaybill, setExpressWaybill] = useState(
     initialSale?.expressWaybill ?? "",
   );
@@ -406,6 +405,7 @@ export function SaleForm({
    */
   async function saveSale(
     nextStatus?: ManagerSaleStatus,
+    post = false,
   ): Promise<string | null> {
     if (!isEdit && !clientId) return null;
     if (isEdit && !saleId) return null;
@@ -434,10 +434,10 @@ export function SaleForm({
           cashOnDelivery,
           assignedAgentUserId: payloadAgent,
           onTradeAgent,
-          exportTo1C,
           expressWaybill: expressWaybill.trim() || null,
           ...(isEdit ? {} : { routeSheetId: routeSheetId ?? undefined }),
           ...(isEdit && nextStatus ? { status: nextStatus } : {}),
+          ...(post ? { post: true } : {}),
         }),
       });
       if (!res.ok) {
@@ -460,9 +460,15 @@ export function SaleForm({
     }
   }
 
-  /** Основне збереження — після успіху → список реалізацій (Fix 6). */
-  async function submit(nextStatus?: ManagerSaleStatus): Promise<void> {
-    const id = await saveSale(nextStatus);
+  /**
+   * Основне збереження — після успіху → список реалізацій (Fix 6).
+   * `post=true` → проводимо документ (статус `posted` + `archived`).
+   */
+  async function submit(
+    post = false,
+    nextStatus?: ManagerSaleStatus,
+  ): Promise<void> {
+    const id = await saveSale(nextStatus, post);
     if (id === null) return;
     // Статусний перехід у edit лишає менеджера на сторінці (бачить новий стан).
     if (isEdit && nextStatus) {
@@ -817,15 +823,6 @@ export function SaleForm({
                 className="h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
               />
               <span>На торгового контрагента</span>
-            </label>
-            <label className="inline-flex cursor-pointer items-center gap-2 text-sm text-gray-700">
-              <input
-                type="checkbox"
-                checked={exportTo1C}
-                onChange={(e) => setExportTo1C(e.target.checked)}
-                className="h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
-              />
-              <span>Вивантажувати в 1С</span>
             </label>
           </div>
 
@@ -1200,7 +1197,7 @@ export function SaleForm({
           </Button>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <Button
             type="button"
             variant="outline"
@@ -1217,17 +1214,19 @@ export function SaleForm({
           </Button>
           <Button
             type="button"
+            variant="outline"
             disabled={!canSubmit}
-            onClick={() => submit()}
+            onClick={() => submit(false)}
+          >
+            {submitting ? "Збереження…" : "Зберегти"}
+          </Button>
+          <Button
+            type="button"
+            disabled={!canSubmit}
+            onClick={() => submit(true)}
             className="bg-green-600 text-white hover:bg-green-700"
           >
-            {submitting
-              ? isEdit
-                ? "Збереження…"
-                : "Створення…"
-              : isEdit
-                ? "Зберегти зміни"
-                : "Створити реалізацію"}
+            {submitting ? "Збереження…" : "Зберегти та провести"}
           </Button>
         </div>
       </div>

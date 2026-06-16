@@ -443,6 +443,24 @@ describe("POST /api/v1/manager/orders", () => {
     expect(args[2].userId).toBe("u1");
   });
 
+  it("передає post=true у createOrderWithItems (зберегти та провести)", async () => {
+    resolveCustomerForOrderMock.mockResolvedValueOnce({
+      id: "cust1",
+      code1C: "000001",
+      name: "Mine",
+    });
+    mockPrisma.mgrClient.findMany.mockResolvedValueOnce([{ code1C: "000001" }]);
+    createOrderWithItemsMock.mockResolvedValueOnce(fakeCreatedOrder());
+    const res = await POST(postReq({ ...validBody, post: true }));
+    expect(res.status).toBe(201);
+    const args = createOrderWithItemsMock.mock.calls[0] as [
+      { post?: boolean },
+      unknown,
+      unknown,
+    ];
+    expect(args[0].post).toBe(true);
+  });
+
   it("відхиляє невалідний deliveryMethod (400)", async () => {
     const res = await POST(
       postReq({ ...validBody, deliveryMethod: "teleport" }),

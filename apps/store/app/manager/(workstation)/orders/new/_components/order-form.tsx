@@ -127,9 +127,6 @@ export function OrderForm({
         deliveryMethods,
       ),
   );
-  const [exportTo1C, setExportTo1C] = useState(
-    initialOrder?.exportTo1C ?? true,
-  );
   // Актуальність документа (1С «Статус заказа: Актуальне») — лише edit.
   const [isActual, setIsActual] = useState(initialOrder?.isActual ?? true);
 
@@ -249,10 +246,13 @@ export function OrderForm({
   const orderNumber = isEdit ? (initialOrder?.displayNumber ?? "") : "авто";
 
   /**
-   * Зберігає замовлення (POST у create, PATCH у edit). Статус документа з UI
-   * не змінюється (керується 1С). Після успіху — перехід до списку замовлень.
+   * Зберігає замовлення (POST у create, PATCH у edit).
+   *
+   * `post=true` → проводимо документ (статус `posted` + `archived`). Інакше
+   * зберігаємо як чернетку (create) / оновлюємо без зміни статусу (edit).
+   * Після успіху — перехід до списку замовлень.
    */
-  async function submit(force = false): Promise<void> {
+  async function submit(force = false, post = false): Promise<void> {
     if (!isEdit && !clientId) return;
     if (isEdit && !orderId) return;
     setSubmitting(true);
@@ -270,9 +270,9 @@ export function OrderForm({
           notes: notes.trim() || (isEdit ? null : undefined),
           priceTypeId: priceTypeId || null,
           deliveryMethod: deliveryMethod || null,
-          exportTo1C,
           ...(isEdit ? { isActual } : {}),
           ...(force ? { force: true } : {}),
+          ...(post ? { post: true } : {}),
         }),
       });
       // 409 + active_order_exists — у клієнта вже є актуальне замовлення.
@@ -487,17 +487,8 @@ export function OrderForm({
           </div>
         )}
 
-        {/* Чекбокс: експорт у 1С */}
-        <div className="mt-4 flex flex-col gap-3 border-t pt-4">
-          <label className="inline-flex cursor-pointer items-center gap-2 text-sm text-gray-700">
-            <input
-              type="checkbox"
-              checked={exportTo1C}
-              onChange={(e) => setExportTo1C(e.target.checked)}
-              className="h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
-            />
-            <span>Вивантажувати в 1С</span>
-          </label>
+        {/* Продавець */}
+        <div className="mt-4 border-t pt-4">
           <p className="text-xs text-gray-400">
             Продаж зараховано вам ({currentUserName}).
           </p>
@@ -560,8 +551,8 @@ export function OrderForm({
         </div>
       )}
 
-      {/* ─── Дії: одна кнопка збереження ──────────────────────────────────── */}
-      <div className="flex items-center justify-end gap-3">
+      {/* ─── Дії: зберегти (чернетка) / зберегти та провести ──────────────── */}
+      <div className="flex flex-wrap items-center justify-end gap-3">
         <Button
           type="button"
           variant="outline"
@@ -578,17 +569,19 @@ export function OrderForm({
         </Button>
         <Button
           type="button"
+          variant="outline"
           disabled={!canSubmit}
-          onClick={() => submit()}
+          onClick={() => submit(false, false)}
+        >
+          {submitting ? "Збереження…" : "Зберегти"}
+        </Button>
+        <Button
+          type="button"
+          disabled={!canSubmit}
+          onClick={() => submit(false, true)}
           className="bg-green-600 text-white hover:bg-green-700"
         >
-          {submitting
-            ? isEdit
-              ? "Збереження…"
-              : "Створення…"
-            : isEdit
-              ? "Зберегти"
-              : "Створити замовлення"}
+          {submitting ? "Збереження…" : "Зберегти та провести"}
         </Button>
       </div>
 
@@ -644,7 +637,7 @@ export function OrderForm({
                 disabled={submitting}
                 onClick={() => {
                   setActiveConflict(null);
-                  void submit(true);
+                  void submit(true, false);
                 }}
               >
                 Все одно створити

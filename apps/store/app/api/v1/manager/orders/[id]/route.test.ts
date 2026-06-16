@@ -276,15 +276,46 @@ describe("PATCH /api/v1/manager/orders/[id]", () => {
     expect(callArgs[3].nextStatus).toBe("sent");
   });
 
-  it("returns 409 on disallowed status transition (draft → posted)", async () => {
+  it("returns 409 on disallowed status transition (cancelled → posted)", async () => {
     mockPrisma.order.findUnique.mockResolvedValueOnce({
       id: "ord1",
-      status: "draft",
+      status: "cancelled",
     });
     const res = await PATCH(
       patchReq({ ...VALID_PATCH_BODY, status: "posted" }),
       { params: Promise.resolve({ id: "ord1" }) },
     );
+    expect(res.status).toBe(409);
+    expect(updateOrderWithItemsMock).not.toHaveBeenCalled();
+  });
+
+  it("post=true → провести: nextStatus=posted (draft → posted дозволено)", async () => {
+    mockPrisma.order.findUnique.mockResolvedValueOnce({
+      id: "ord1",
+      status: "draft",
+    });
+    updateOrderWithItemsMock.mockResolvedValueOnce(fakeUpdatedOrder("posted"));
+    const res = await PATCH(patchReq({ ...VALID_PATCH_BODY, post: true }), {
+      params: Promise.resolve({ id: "ord1" }),
+    });
+    expect(res.status).toBe(200);
+    const callArgs = updateOrderWithItemsMock.mock.calls[0] as [
+      string,
+      unknown,
+      unknown,
+      { nextStatus?: string },
+    ];
+    expect(callArgs[3].nextStatus).toBe("posted");
+  });
+
+  it("post=true на cancelled → 409 (провести скасоване заборонено)", async () => {
+    mockPrisma.order.findUnique.mockResolvedValueOnce({
+      id: "ord1",
+      status: "cancelled",
+    });
+    const res = await PATCH(patchReq({ ...VALID_PATCH_BODY, post: true }), {
+      params: Promise.resolve({ id: "ord1" }),
+    });
     expect(res.status).toBe(409);
     expect(updateOrderWithItemsMock).not.toHaveBeenCalled();
   });

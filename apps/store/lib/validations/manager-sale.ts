@@ -57,8 +57,16 @@ export const createSaleSchema = z.object({
   assignedAgentUserId: z.string().min(1).nullable().optional(),
   /** «На торгового контрагента» — продаж зараховується агенту клієнта (дефолт true). */
   onTradeAgent: z.boolean().optional().default(true),
-  /** Вивантажувати в 1С (дефолт true). */
+  /**
+   * Deprecated — більше не керується з UI (1С-вивантаження прибрано). Лишено
+   * опційним для зворотної сумісності зі старими payload-ами.
+   */
   exportTo1C: z.boolean().optional().default(true),
+  /**
+   * Провести документ при збереженні (= status `posted` + `archived`). Кнопка
+   * «Зберегти та провести». Falsy → зберегти як чернетку / без зміни статусу.
+   */
+  post: z.boolean().optional(),
   /** Експрес-накладна / ТТН. */
   expressWaybill: z.string().max(60).nullable().optional(),
   /**
@@ -93,7 +101,10 @@ export const updateSaleSchema = z.object({
   cashOnDelivery: z.boolean().optional().default(false),
   assignedAgentUserId: z.string().min(1).nullable().optional(),
   onTradeAgent: z.boolean().optional().default(true),
+  /** Deprecated — див. createSaleSchema. Лишено опційним для back-compat. */
   exportTo1C: z.boolean().optional().default(true),
+  /** Провести документ при збереженні (= status `posted` + `archived`). */
+  post: z.boolean().optional(),
   expressWaybill: z.string().max(60).nullable().optional(),
 
   // ─── Status (Етап 2) ──────────────────────────────────────────────────────

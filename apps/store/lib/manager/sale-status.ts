@@ -65,8 +65,8 @@ export function getSaleStatusMeta(status: string): {
  *   cancelled → draft       — повернути скасоване у роботу
  */
 const SALE_TRANSITIONS: Record<ManagerSaleStatus, ManagerSaleStatus[]> = {
-  draft: ["sent", "cancelled"],
-  sent: ["draft", "cancelled"],
+  draft: ["sent", "posted", "cancelled"],
+  sent: ["draft", "posted", "cancelled"],
   posted: [],
   cancelled: ["draft"],
 };

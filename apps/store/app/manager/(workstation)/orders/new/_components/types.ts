@@ -140,6 +140,5 @@ export interface OrderEditInitial {
   deliveryMethod: string | null;
   cashOnDelivery: boolean;
   assignedAgentUserId: string | null;
-  exportTo1C: boolean;
   items: OrderItemDraft[];
 }

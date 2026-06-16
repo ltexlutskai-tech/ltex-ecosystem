@@ -223,6 +223,30 @@ describe("createSaleWithItems", () => {
     expect(call.data.items.create[0]?.lotId).toBe("l1");
     expect(call.data.items.create[1]?.lotId).toBeNull();
   });
+
+  it("без post → status=draft, archived=false", async () => {
+    mockPrisma.sale.create.mockResolvedValueOnce(fakeSale());
+    await createSaleWithItems(baseInput, baseCustomer, actor);
+    const call = mockPrisma.sale.create.mock.calls[0]?.[0] as {
+      data: { status: string; archived: boolean };
+    };
+    expect(call.data.status).toBe("draft");
+    expect(call.data.archived).toBe(false);
+  });
+
+  it("post=true → status=posted, archived=true", async () => {
+    mockPrisma.sale.create.mockResolvedValueOnce(fakeSale());
+    await createSaleWithItems(
+      { ...baseInput, post: true },
+      baseCustomer,
+      actor,
+    );
+    const call = mockPrisma.sale.create.mock.calls[0]?.[0] as {
+      data: { status: string; archived: boolean };
+    };
+    expect(call.data.status).toBe("posted");
+    expect(call.data.archived).toBe(true);
+  });
 });
 
 describe("updateSaleWithItems", () => {
@@ -250,6 +274,18 @@ describe("updateSaleWithItems", () => {
       data: { status?: string };
     };
     expect(call.data.status).toBe("sent");
+  });
+
+  it("nextStatus=posted → archived=true", async () => {
+    mockPrisma.sale.update.mockResolvedValueOnce(fakeSale());
+    await updateSaleWithItems("sale1", baseInput, actor, {
+      nextStatus: "posted",
+    });
+    const call = mockPrisma.sale.update.mock.calls[0]?.[0] as {
+      data: { status?: string; archived?: boolean };
+    };
+    expect(call.data.status).toBe("posted");
+    expect(call.data.archived).toBe(true);
   });
 
   it("status undefined коли nextStatus не переданий", async () => {

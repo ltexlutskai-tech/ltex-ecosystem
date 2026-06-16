@@ -79,8 +79,8 @@ export function getOrderStatusMeta(status: string): {
  * в 1С / скасувати), щоб старі замовлення лишались керованими.
  */
 const TRANSITIONS: Record<ManagerOrderStatus, ManagerOrderStatus[]> = {
-  draft: ["sent", "cancelled"],
-  sent: ["draft", "cancelled"],
+  draft: ["sent", "posted", "cancelled"],
+  sent: ["draft", "posted", "cancelled"],
   posted: [],
   cancelled: ["draft"],
 };

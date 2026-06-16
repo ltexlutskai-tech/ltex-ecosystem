@@ -122,10 +122,14 @@ export async function createSaleWithItems(
   const { totalEur, totalUah, itemRows } = buildSaleTotals(items, rateEur);
   const cashOnDelivery = input.cashOnDelivery ?? false;
 
+  // Проведення документа (кнопка «Зберегти та провести») → posted + archived.
+  const post = input.post === true;
+
   const sale = await prisma.sale.create({
     data: {
       customerId: customer.id,
-      status: "draft",
+      status: post ? "posted" : "draft",
+      archived: post,
       totalEur,
       totalUah,
       exchangeRateEur: rateEur,
@@ -182,12 +186,16 @@ export async function updateSaleWithItems(
   const { totalEur, totalUah, itemRows } = buildSaleTotals(items, rateEur);
   const cashOnDelivery = input.cashOnDelivery ?? false;
 
+  // Проведення (`posted`) → документ архівується.
+  const becomesArchived = options?.nextStatus === "posted";
+
   const sale = await prisma.$transaction(async (tx) => {
     await tx.saleItem.deleteMany({ where: { saleId } });
     return tx.sale.update({
       where: { id: saleId },
       data: {
         status: options?.nextStatus,
+        ...(becomesArchived ? { archived: true } : {}),
         totalEur,
         totalUah,
         exchangeRateEur: rateEur,
