@@ -49,9 +49,17 @@ export async function GET(
     case "sales-by-supplier":
       report = await reportSalesBySupplier(period);
       break;
-    case "debts":
-      report = await reportDebts();
+    case "debts": {
+      const thresholdRaw = parseInt(
+        url.searchParams.get("threshold") ?? "14",
+        10,
+      );
+      const threshold = Number.isNaN(thresholdRaw)
+        ? 14
+        : Math.min(3650, Math.max(0, thresholdRaw));
+      report = await reportDebts(threshold);
       break;
+    }
     default:
       return NextResponse.json(
         { error: `Невідомий звіт: ${reportId}` },

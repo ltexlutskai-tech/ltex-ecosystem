@@ -1,5 +1,6 @@
 import { prisma } from "@ltex/db";
 import { resolvePeriod, type PeriodPreset } from "@/lib/finance/owner-stats";
+import { buildOverdueDebtsReport } from "@/lib/reports/overdue-debts";
 
 /**
  * Бібліотека звітів для Analyst-кабінету (← Тиждень 5 блоку Ролі).
@@ -143,23 +144,11 @@ export async function reportSalesBySupplier(
   };
 }
 
-// ─── Звіт 3: Поточні борги клієнтів ────────────────────────────────────────
-export async function reportDebts(): Promise<ReportShape> {
-  const clients = await prisma.mgrClient.findMany({
-    where: { debt: { gt: 0 } },
-    orderBy: { debt: "desc" },
-    select: {
-      id: true,
-      name: true,
-      phonePrimary: true,
-      city: true,
-      region: true,
-      debt: true,
-      overdueDebt: true,
-    },
-  });
+// ─── Звіт 3: Прострочені борги по договорам (FIFO-старіння) ─────────────────
+export async function reportDebts(thresholdDays = 14): Promise<ReportShape> {
+  const report = await buildOverdueDebtsReport(thresholdDays);
   return {
-    title: "Прострочені борги клієнтів",
+    title: "Прострочені борги по договорам",
     period: {
       from: new Date(0),
       to: new Date(),
@@ -167,21 +156,21 @@ export async function reportDebts(): Promise<ReportShape> {
     },
     headers: [
       "#",
-      "Клієнт",
-      "Телефон",
-      "Місто",
-      "Область",
+      "Контрагент",
       "Борг €",
-      "Прострочка €",
+      "Прострочений борг €",
+      "Днів",
+      "Діяльність",
+      "Торговий агент",
     ],
-    rows: clients.map((c, idx) => [
+    rows: report.rows.map((r, idx) => [
       idx + 1,
-      c.name,
-      c.phonePrimary ?? "",
-      c.city ?? "",
-      c.region ?? "",
-      round2(Number(c.debt)),
-      round2(Number(c.overdueDebt ?? 0)),
+      r.name,
+      round2(r.debtEur),
+      round2(r.overdueEur),
+      r.daysSinceLastPurchase ?? "",
+      r.isOverdue ? "Претензійна робота!" : "",
+      r.agentName ?? "",
     ]),
   };
 }
