@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Plus } from "lucide-react";
-import { prisma } from "@ltex/db";
+import { prisma, Prisma } from "@ltex/db";
 import { getCurrentUser } from "@/lib/auth/manager-auth";
 import { getMyClientCodes1C } from "@/lib/manager/sale-ownership";
 import {
@@ -18,6 +18,29 @@ import { parsePaymentsFilterFromSearchParams } from "./_components/payments-filt
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Оплати — L-TEX Manager" };
+
+function buildOrderBy(
+  sort: string,
+  dir: "asc" | "desc",
+): Prisma.MgrCashOrderOrderByWithRelationInput {
+  switch (sort) {
+    case "code":
+      return { docNumber: dir };
+    case "type":
+      return { type: dir };
+    case "sum":
+      return { documentSumEur: dir };
+    case "client":
+      return { customer: { name: dir } };
+    case "article":
+      return { cashFlowArticleRef: { name: dir } };
+    case "account":
+      return { bankAccountRef: { name: dir } };
+    case "date":
+    default:
+      return { paidAt: dir };
+  }
+}
 
 export default async function ManagerPaymentsPage({
   searchParams,
@@ -72,12 +95,15 @@ export default async function ManagerPaymentsPage({
     archived: filter.archived,
     from: fromDate && !Number.isNaN(fromDate.getTime()) ? fromDate : undefined,
     to: toDate && !Number.isNaN(toDate.getTime()) ? toDate : undefined,
+    client: filter.client || undefined,
+    article: filter.article || undefined,
+    account: filter.account || undefined,
   });
 
   const [items, total] = await Promise.all([
     prisma.mgrCashOrder.findMany({
       where,
-      orderBy: { paidAt: "desc" },
+      orderBy: buildOrderBy(filter.sort, filter.dir),
       skip: (filter.page - 1) * filter.pageSize,
       take: filter.pageSize,
       include: cashOrderRowInclude,

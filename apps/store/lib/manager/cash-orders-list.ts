@@ -51,6 +51,12 @@ export interface BuildCashOrdersWhereParams {
   /** Період оплати (`paidAt`). */
   from?: Date;
   to?: Date;
+  /** Per-column фільтр по імені клієнта (прямий FK), LIKE. */
+  client?: string;
+  /** Per-column фільтр по статті руху коштів, LIKE. */
+  article?: string;
+  /** Per-column фільтр по банк-рахунку, LIKE. */
+  account?: string;
 }
 
 /**
@@ -103,6 +109,25 @@ export function buildCashOrdersWhere(
       or.push({ docNumber: Number.parseInt(numericRaw, 10) });
     }
     and.push({ OR: or });
+  }
+
+  // Per-column фільтри (LIKE). Клієнт матчиться лише по прямому FK `customer`
+  // (стабільний шлях для сортування/фільтрації; sale.customer не комбінується
+  // в один orderBy-ключ — лишається у глобальному пошуку вище).
+  if (p.client && p.client.trim().length > 0) {
+    where.customer = {
+      name: { contains: p.client.trim(), mode: "insensitive" },
+    };
+  }
+  if (p.article && p.article.trim().length > 0) {
+    where.cashFlowArticleRef = {
+      name: { contains: p.article.trim(), mode: "insensitive" },
+    };
+  }
+  if (p.account && p.account.trim().length > 0) {
+    where.bankAccountRef = {
+      name: { contains: p.account.trim(), mode: "insensitive" },
+    };
   }
 
   if (and.length > 0) {

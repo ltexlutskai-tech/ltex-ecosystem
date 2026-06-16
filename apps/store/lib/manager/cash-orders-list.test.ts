@@ -69,6 +69,39 @@ describe("buildCashOrdersWhere", () => {
     const or = and[0]?.OR ?? [];
     expect(or.some((c) => "docNumber" in c)).toBe(false);
   });
+
+  it("per-column client filter → customer.name contains (insensitive)", () => {
+    const w = buildCashOrdersWhere({ scope: null, client: "  Іван  " });
+    expect(w.customer).toEqual({
+      name: { contains: "Іван", mode: "insensitive" },
+    });
+  });
+
+  it("per-column article filter → cashFlowArticleRef.name contains", () => {
+    const w = buildCashOrdersWhere({ scope: null, article: "Прихід" });
+    expect(w.cashFlowArticleRef).toEqual({
+      name: { contains: "Прихід", mode: "insensitive" },
+    });
+  });
+
+  it("per-column account filter → bankAccountRef.name contains", () => {
+    const w = buildCashOrdersWhere({ scope: null, account: "ПриватБанк" });
+    expect(w.bankAccountRef).toEqual({
+      name: { contains: "ПриватБанк", mode: "insensitive" },
+    });
+  });
+
+  it("blank per-column filters are ignored", () => {
+    const w = buildCashOrdersWhere({
+      scope: null,
+      client: "   ",
+      article: "",
+      account: "  ",
+    });
+    expect(w.customer).toBeUndefined();
+    expect(w.cashFlowArticleRef).toBeUndefined();
+    expect(w.bankAccountRef).toBeUndefined();
+  });
 });
 
 describe("serializeCashOrderRow", () => {

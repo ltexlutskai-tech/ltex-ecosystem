@@ -2,7 +2,7 @@
 
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
-import { Search, X } from "lucide-react";
+import { Search, SlidersHorizontal, X } from "lucide-react";
 import { Button, Input } from "@ltex/ui";
 
 const TYPE_OPTIONS: { value: string; label: string }[] = [
@@ -20,13 +20,23 @@ export function PaymentsToolbar() {
   const [search, setSearch] = useState(searchParams.get("search") ?? "");
   const [from, setFrom] = useState(searchParams.get("from") ?? "");
   const [to, setTo] = useState(searchParams.get("to") ?? "");
+  const [client, setClient] = useState(searchParams.get("client") ?? "");
+  const [article, setArticle] = useState(searchParams.get("article") ?? "");
+  const [account, setAccount] = useState(searchParams.get("account") ?? "");
   const type = searchParams.get("type") ?? "";
   const archived = searchParams.get("archived") === "true";
+
+  // Розгорнути блок per-column фільтрів, якщо хоч один уже застосовано.
+  const hasColumnFilters = !!(client || article || account);
+  const [showFilters, setShowFilters] = useState(hasColumnFilters);
 
   useEffect(() => {
     setSearch(searchParams.get("search") ?? "");
     setFrom(searchParams.get("from") ?? "");
     setTo(searchParams.get("to") ?? "");
+    setClient(searchParams.get("client") ?? "");
+    setArticle(searchParams.get("article") ?? "");
+    setAccount(searchParams.get("account") ?? "");
   }, [searchParams]);
 
   function setParam(name: string, value: string | null) {
@@ -45,6 +55,12 @@ export function PaymentsToolbar() {
     else sp.delete("from");
     if (to) sp.set("to", to);
     else sp.delete("to");
+    if (client.trim()) sp.set("client", client.trim());
+    else sp.delete("client");
+    if (article.trim()) sp.set("article", article.trim());
+    else sp.delete("article");
+    if (account.trim()) sp.set("account", account.trim());
+    else sp.delete("account");
     sp.delete("page");
     startTransition(() => router.push(`${pathname}?${sp.toString()}`));
   }
@@ -53,6 +69,9 @@ export function PaymentsToolbar() {
     setSearch("");
     setFrom("");
     setTo("");
+    setClient("");
+    setArticle("");
+    setAccount("");
     startTransition(() => router.push(pathname));
   }
 
@@ -134,7 +153,28 @@ export function PaymentsToolbar() {
           Відображати архівні
         </label>
 
-        {(search || type || from || to || archived) && (
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => setShowFilters((v) => !v)}
+          className={hasColumnFilters ? "border-green-500 text-green-700" : ""}
+        >
+          <SlidersHorizontal className="mr-1 h-4 w-4" />
+          Фільтри
+          {hasColumnFilters
+            ? ` (${[client, article, account].filter(Boolean).length})`
+            : ""}
+        </Button>
+
+        {(search ||
+          type ||
+          from ||
+          to ||
+          client ||
+          article ||
+          account ||
+          archived) && (
           <Button
             type="button"
             variant="ghost"
@@ -147,6 +187,67 @@ export function PaymentsToolbar() {
           </Button>
         )}
       </div>
+
+      {showFilters && (
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            applyAll();
+          }}
+          className="grid gap-3 border-t pt-3 sm:grid-cols-2 lg:grid-cols-4"
+        >
+          <div>
+            <label
+              className="mb-1 block text-xs text-gray-500"
+              htmlFor="filter-client"
+            >
+              Клієнт
+            </label>
+            <Input
+              id="filter-client"
+              value={client}
+              onChange={(e) => setClient(e.target.value)}
+              placeholder="Назва клієнта…"
+              className="h-9"
+            />
+          </div>
+          <div>
+            <label
+              className="mb-1 block text-xs text-gray-500"
+              htmlFor="filter-article"
+            >
+              Стаття
+            </label>
+            <Input
+              id="filter-article"
+              value={article}
+              onChange={(e) => setArticle(e.target.value)}
+              placeholder="Стаття руху коштів…"
+              className="h-9"
+            />
+          </div>
+          <div>
+            <label
+              className="mb-1 block text-xs text-gray-500"
+              htmlFor="filter-account"
+            >
+              Рахунок
+            </label>
+            <Input
+              id="filter-account"
+              value={account}
+              onChange={(e) => setAccount(e.target.value)}
+              placeholder="Банк-рахунок…"
+              className="h-9"
+            />
+          </div>
+          <div className="flex items-end">
+            <Button type="submit" variant="outline" size="sm" className="h-9">
+              Застосувати фільтри
+            </Button>
+          </div>
+        </form>
+      )}
     </div>
   );
 }

@@ -44,6 +44,48 @@ describe("parsePaymentsFilterFromSearchParams", () => {
       parsePaymentsFilterFromSearchParams({ pageSize: "50" }).pageSize,
     ).toBe(50);
   });
+
+  it("defaults sort to 'date' and dir to 'desc'", () => {
+    const s = parsePaymentsFilterFromSearchParams({});
+    expect(s.sort).toBe("date");
+    expect(s.dir).toBe("desc");
+  });
+
+  it("parses whitelisted sort + dir, ignores unknown sort", () => {
+    const ok = parsePaymentsFilterFromSearchParams({
+      sort: "account",
+      dir: "asc",
+    });
+    expect(ok.sort).toBe("account");
+    expect(ok.dir).toBe("asc");
+    const bad = parsePaymentsFilterFromSearchParams({ sort: "haxxor" });
+    expect(bad.sort).toBe("date");
+  });
+
+  it("treats non-'asc' dir as 'desc'", () => {
+    expect(parsePaymentsFilterFromSearchParams({ dir: "sideways" }).dir).toBe(
+      "desc",
+    );
+    expect(parsePaymentsFilterFromSearchParams({ dir: "asc" }).dir).toBe("asc");
+  });
+
+  it("parses per-column filters (client/article/account)", () => {
+    const s = parsePaymentsFilterFromSearchParams({
+      client: "  Іван  ",
+      article: "Прихід",
+      account: "ПриватБанк",
+    });
+    expect(s.client).toBe("Іван");
+    expect(s.article).toBe("Прихід");
+    expect(s.account).toBe("ПриватБанк");
+  });
+
+  it("defaults per-column filters to empty strings", () => {
+    const s = parsePaymentsFilterFromSearchParams({});
+    expect(s.client).toBe("");
+    expect(s.article).toBe("");
+    expect(s.account).toBe("");
+  });
 });
 
 describe("paymentsFilterToQueryString", () => {
@@ -76,5 +118,23 @@ describe("paymentsFilterToQueryString", () => {
     expect(paymentsFilterToQueryString({ archived: true })).toContain(
       "archived=true",
     );
+  });
+
+  it("omits default sort/dir, emits non-default", () => {
+    expect(paymentsFilterToQueryString({ sort: "date", dir: "desc" })).toBe("");
+    const qs = paymentsFilterToQueryString({ sort: "account", dir: "asc" });
+    expect(qs).toContain("sort=account");
+    expect(qs).toContain("dir=asc");
+  });
+
+  it("emits per-column filters", () => {
+    const qs = paymentsFilterToQueryString({
+      client: "Іван",
+      article: "Прихід",
+      account: "ПриватБанк",
+    });
+    expect(qs).toContain("client=");
+    expect(qs).toContain("article=");
+    expect(qs).toContain("account=");
   });
 });
