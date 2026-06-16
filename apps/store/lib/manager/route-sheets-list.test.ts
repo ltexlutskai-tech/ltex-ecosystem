@@ -21,10 +21,11 @@ describe("buildRouteSheetsWhere", () => {
     expect(buildRouteSheetsWhere({ archived: true }).archived).toBeUndefined();
   });
 
-  it("builds OR over code1C / comment (route name) on search", () => {
+  it("builds OR over number1C / code1C / comment (route name) on search", () => {
     const where = buildRouteSheetsWhere({ search: "Луцьк" });
-    expect(where.OR).toHaveLength(2);
+    expect(where.OR).toHaveLength(3);
     const json = JSON.stringify(where.OR);
+    expect(json).toContain("number1C");
     expect(json).toContain("code1C");
     expect(json).toContain("comment");
   });
@@ -55,6 +56,7 @@ describe("serializeRouteSheetRow", () => {
     const raw: RawRouteSheetRow = {
       id: "rs1",
       code1C: null,
+      number1C: null,
       docNumber: 7,
       date: new Date("2026-05-20T10:00:00Z"),
       arrivalDate: null,
@@ -78,6 +80,7 @@ describe("serializeRouteSheetRow", () => {
     const raw: RawRouteSheetRow = {
       id: "rs2",
       code1C: "RS-001",
+      number1C: null,
       docNumber: 1,
       date: new Date(),
       arrivalDate: null,

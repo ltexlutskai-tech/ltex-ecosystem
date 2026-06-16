@@ -1527,11 +1527,11 @@ async function importSales(ctx: ImportContext): Promise<Recon> {
     for (const row of rows) {
       const hex = bufToHex(row["_IDRRef"]);
       // Документний code1C = hex(_IDRRef): унікальний у всій 1С-базі.
-      // НЕ беремо `_Number` — 1С нумерує щорічно з 0, отже один номер
-      // зустрічається у кожному році → upsert затирав би попередні роки.
-      // (1С `_Number` тут не пишемо — у Sale/CashOrder/RouteSheet поле
-      // `docNumber` має autoincrement, конфлікт послідовності не вартий.)
+      // code1C лишається унікальним ключем (1С нумерує `_Number` щорічно з 0 →
+      // один номер у кожному році, тому як ключ непридатний).
       const code1C = hex;
+      // Людський номер документа (1С _Number) — лише для відображення.
+      const number1C = asString(row["_Number"]);
       if (!hex || !code1C) {
         recon.skipped++;
         continue;
@@ -1594,6 +1594,7 @@ async function importSales(ctx: ImportContext): Promise<Recon> {
               where: { code1C },
               create: {
                 code1C,
+                number1C,
                 customerId: customer.id,
                 status: posted ? "posted" : "draft",
                 totalEur,
@@ -1612,6 +1613,7 @@ async function importSales(ctx: ImportContext): Promise<Recon> {
                 ...(createdAt ? { createdAt } : {}),
               },
               update: {
+                number1C,
                 customerId: customer.id,
                 status: posted ? "posted" : "draft",
                 totalEur,
@@ -1829,11 +1831,12 @@ async function importCashOrderTable(
   })) {
     for (const row of rows) {
       // Документний code1C = hex(_IDRRef): унікальний у всій 1С-базі.
-      // НЕ беремо `_Number` (map.number) — 1С нумерує щорічно з 0, отже
-      // один номер зустрічається у кожному році → upsert затирав би
-      // попередні роки (баг було помічено: 30k вхідних → 8k у БД).
+      // code1C лишається унікальним ключем (1С нумерує `_Number` щорічно з 0,
+      // тому як ключ непридатний — баг було помічено: 30k вхідних → 8k у БД).
       const hex = bufToHex(row["_IDRRef"]);
       const code1C = hex;
+      // Людський номер документа (1С _Number) — лише для відображення.
+      const number1C = asString(row[map.number]);
       if (!code1C) {
         recon.skipped++;
         continue;
@@ -1894,6 +1897,7 @@ async function importCashOrderTable(
             where: { code1C },
             create: {
               code1C,
+              number1C,
               type: map.type,
               ...(docNumber != null ? { docNumber } : {}),
               customerId,
@@ -1910,6 +1914,7 @@ async function importCashOrderTable(
               ...(paidAt ? { paidAt } : {}),
             },
             update: {
+              number1C,
               type: map.type,
               customerId,
               saleId,
@@ -1994,11 +1999,11 @@ async function importRouteSheets(ctx: ImportContext): Promise<Recon> {
     for (const row of rows) {
       const hex = bufToHex(row["_IDRRef"]);
       // Документний code1C = hex(_IDRRef): унікальний у всій 1С-базі.
-      // НЕ беремо `_Number` — 1С нумерує щорічно з 0, отже один номер
-      // зустрічається у кожному році → upsert затирав би попередні роки.
-      // (1С `_Number` тут не пишемо — у Sale/CashOrder/RouteSheet поле
-      // `docNumber` має autoincrement, конфлікт послідовності не вартий.)
+      // code1C лишається унікальним ключем (1С нумерує `_Number` щорічно з 0 →
+      // один номер у кожному році, тому як ключ непридатний).
       const code1C = hex;
+      // Людський номер документа (1С _Number) — лише для відображення.
+      const number1C = asString(row["_Number"]);
       if (!hex || !code1C) {
         recon.skipped++;
         continue;
@@ -2028,6 +2033,7 @@ async function importRouteSheets(ctx: ImportContext): Promise<Recon> {
             where: { code1C },
             create: {
               code1C,
+              number1C,
               date,
               arrivalDate,
               status: posted ? "completed" : "draft",
@@ -2040,6 +2046,7 @@ async function importRouteSheets(ctx: ImportContext): Promise<Recon> {
               exportTo1C: false,
             },
             update: {
+              number1C,
               date,
               arrivalDate,
               status: posted ? "completed" : "draft",

@@ -1,10 +1,12 @@
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { RouteSheetStatusBadge } from "./route-sheet-status-badge";
+import { formatDocNumber } from "@/lib/manager/order-number";
 
 export interface RouteSheetsRowData {
   id: string;
   code1C: string | null;
+  number1C: string | null;
   docNumber: number;
   date: string;
   arrivalDate: string | null;
@@ -16,12 +18,6 @@ export interface RouteSheetsRowData {
   /** Назва маршруту (вільний текст = `comment`). */
   routeName: string | null;
   expeditor: { id: string; fullName: string } | null;
-}
-
-/** Номер документа: code1C з central, інакше локальний docNumber «№N». */
-function formatDocNumber(r: RouteSheetsRowData): string {
-  if (r.code1C) return r.code1C;
-  return `№${r.docNumber}`;
 }
 
 export function RouteSheetsRow({ sheet }: { sheet: RouteSheetsRowData }) {

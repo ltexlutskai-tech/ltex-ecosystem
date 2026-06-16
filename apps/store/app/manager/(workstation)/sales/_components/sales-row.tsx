@@ -1,10 +1,12 @@
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { SaleStatusBadge } from "./sale-status-badge";
+import { formatDocNumber } from "@/lib/manager/order-number";
 
 export interface SalesRowData {
   id: string;
   code1C: string | null;
+  number1C: string | null;
   docNumber: number;
   status: string;
   totalEur: number;
@@ -20,12 +22,6 @@ export interface SalesRowData {
     city: string | null;
     region: string | null;
   };
-}
-
-/** Номер документа: code1C з central, інакше локальний docNumber «№N». */
-function formatDocNumber(sale: SalesRowData): string {
-  if (sale.code1C) return sale.code1C;
-  return `№${sale.docNumber}`;
 }
 
 export function SalesRow({ sale }: { sale: SalesRowData }) {

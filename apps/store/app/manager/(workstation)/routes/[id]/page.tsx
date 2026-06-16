@@ -13,6 +13,7 @@ import {
   getRouteSheetExpenses,
 } from "@/lib/manager/route-sheet-documents";
 import { getUnclosedMileageWarning } from "@/lib/manager/route-sheet-mileage";
+import { formatDocNumber } from "@/lib/manager/order-number";
 import {
   RouteSheetForm,
   type ExpeditorOption,
@@ -32,12 +33,11 @@ export async function generateMetadata({
   const { id } = await params;
   const sheet = await prisma.routeSheet.findUnique({
     where: { id },
-    select: { code1C: true, docNumber: true },
+    select: { code1C: true, number1C: true, docNumber: true },
   });
-  const num = sheet?.code1C ?? sheet?.docNumber;
   return {
-    title: num
-      ? `Маршрутний лист №${num} — L-TEX Manager`
+    title: sheet
+      ? `Маршрутний лист ${formatDocNumber(sheet)} — L-TEX Manager`
       : "Маршрутний лист — L-TEX Manager",
   };
 }
@@ -178,7 +178,7 @@ export default async function ManagerRouteSheetDetailPage({
     };
   });
 
-  const displayNumber = sheet.code1C ?? String(sheet.docNumber);
+  const displayNumber = formatDocNumber(sheet);
 
   // Етап 2: Загрузка (резолвлені рядки) + Бракує + лічильники (обчислювані).
   // Етап 3: Реалізації / Продажи / Оплати — derived із зворотних посилань.
@@ -237,7 +237,7 @@ export default async function ManagerRouteSheetDetailPage({
 
       <header>
         <h1 className="text-2xl font-bold text-gray-800">
-          Маршрутний лист №{displayNumber}
+          Маршрутний лист {displayNumber}
         </h1>
         <p className="mt-1 text-sm text-gray-500">
           Створено: {new Date(sheet.createdAt).toLocaleString("uk-UA")}

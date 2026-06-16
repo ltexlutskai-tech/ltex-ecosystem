@@ -66,12 +66,13 @@ describe("buildSalesWhere — search (client + products + docNumber)", () => {
     expect(buildSalesWhere({ scope: null, search: "   " }).OR).toBeUndefined();
   });
 
-  it("builds OR over code1C, customer (name/phone/city) and product (name/articleCode)", () => {
+  it("builds OR over number1C, code1C, customer (name/phone/city) and product (name/articleCode)", () => {
     const w = buildSalesWhere({ scope: null, search: "Іванов" });
     expect(Array.isArray(w.OR)).toBe(true);
-    expect(w.OR).toHaveLength(6);
+    expect(w.OR).toHaveLength(7);
 
     const json = JSON.stringify(w.OR);
+    expect(json).toContain('"number1C"');
     expect(json).toContain('"code1C"');
     expect(json).toContain('"name"');
     expect(json).toContain('"phone"');
@@ -81,9 +82,9 @@ describe("buildSalesWhere — search (client + products + docNumber)", () => {
     expect(json).toContain('"Іванов"');
   });
 
-  it("adds docNumber clause when search is numeric (7th OR)", () => {
+  it("adds docNumber clause when search is numeric (8th OR)", () => {
     const w = buildSalesWhere({ scope: null, search: "42" });
-    expect(w.OR).toHaveLength(7);
+    expect(w.OR).toHaveLength(8);
     expect(JSON.stringify(w.OR)).toContain('"docNumber":42');
   });
 
@@ -141,6 +142,7 @@ describe("serializeSaleRow", () => {
   const raw: RawSaleRow = {
     id: "sale1",
     code1C: null,
+    number1C: null,
     docNumber: 7,
     status: "posted",
     totalEur: 100,

@@ -75,6 +75,7 @@ describe("serializeCashOrderRow", () => {
   const base: RawCashOrderRow = {
     id: "co1",
     code1C: null,
+    number1C: null,
     docNumber: 7,
     type: "income",
     documentSumEur: 123.45,

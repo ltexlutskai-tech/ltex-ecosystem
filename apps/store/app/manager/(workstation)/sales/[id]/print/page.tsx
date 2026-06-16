@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { requireRole } from "@/lib/auth/manager-auth";
 import { prisma } from "@ltex/db";
 import { COMPANY_REQUISITES } from "@/lib/constants/company";
+import { formatDocNumber } from "@/lib/manager/order-number";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Видаткова накладна — друк | L-TEX" };
@@ -70,7 +71,7 @@ export default async function PrintSalePage({
   const totalWeightSum = sale.items.reduce((s, i) => s + i.weight, 0);
   const totalAmountSum = sale.items.reduce((s, i) => s + i.priceEur, 0);
 
-  const displayNumber = sale.code1C ?? String(sale.docNumber);
+  const displayNumber = formatDocNumber(sale);
 
   return (
     <div className="print-page">

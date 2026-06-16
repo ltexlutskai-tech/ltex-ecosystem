@@ -45,6 +45,7 @@ export async function ClientSalesHistoryTab({
   const rows: ClientSaleRowData[] = sales.map((s) => ({
     id: s.id,
     code1C: s.code1C,
+    number1C: s.number1C,
     docNumber: s.docNumber,
     status: s.status,
     totalEur: s.totalEur,
