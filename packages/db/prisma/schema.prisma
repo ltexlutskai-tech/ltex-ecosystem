@@ -2293,3 +2293,372 @@ model MgrRegionAgent {
   @@index([userId])
   @@map("mgr_region_agents")
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ФАЗА 5 — ДОКУМЕНТИ РУХУ ТОВАРУ (2026-06-17)
+// Additive: посилання на Product/Customer/Warehouse — плоскі скаляри (без FK на
+// спільні з магазином моделі). Проведення ProductReturnFromCustomer пише
+// MgrDebtMovement(amountEur<0). StockMovement — best-effort (Фаза 2; зараз нема).
+// ═══════════════════════════════════════════════════════════════════════════
+
+model ProductReturnFromCustomer {
+  id              String    @id @default(cuid())
+  code1C          String?   @unique @map("code_1c")
+  number1C        String?   @map("number_1c")
+  docNumber       String    @unique @map("doc_number")
+  docDate         DateTime  @default(now()) @map("doc_date")
+  customerId      String?   @map("customer_id")
+  customerName    String?   @map("customer_name")
+  warehouseId     String?   @map("warehouse_id")
+  saleId          String?   @map("sale_id")
+  currency        String    @default("EUR")
+  exchangeRate    Float     @default(1) @map("exchange_rate")
+  totalWeight     Float     @default(0) @map("total_weight")
+  totalQuantity   Int       @default(0) @map("total_quantity")
+  totalEur        Decimal   @default(0) @map("total_eur") @db.Decimal(12, 2)
+  status          String    @default("draft")
+  notes           String?
+  createdByUserId String?   @map("created_by_user_id")
+  postedAt        DateTime? @map("posted_at")
+  postedByUserId  String?   @map("posted_by_user_id")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  items ProductReturnFromCustomerItem[]
+
+  @@index([status])
+  @@index([customerId])
+  @@index([docDate(sort: Desc)])
+  @@map("mgr_product_returns_from_customer")
+}
+
+model ProductReturnFromCustomerItem {
+  id        String   @id @default(cuid())
+  returnId  String   @map("return_id")
+  productId String?  @map("product_id")
+  charHex   String?  @map("char_hex")
+  barcode   String?
+  weight    Float    @default(0)
+  quantity  Int      @default(1)
+  unitName  String?  @map("unit_name")
+  priceEur  Decimal  @default(0) @map("price_eur") @db.Decimal(12, 2)
+  amountEur Decimal  @default(0) @map("amount_eur") @db.Decimal(12, 2)
+  notes     String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  document ProductReturnFromCustomer @relation(fields: [returnId], references: [id], onDelete: Cascade)
+
+  @@index([returnId])
+  @@index([productId])
+  @@map("mgr_product_return_from_customer_items")
+}
+
+model WarehouseReturn {
+  id              String    @id @default(cuid())
+  code1C          String?   @unique @map("code_1c")
+  number1C        String?   @map("number_1c")
+  docNumber       String    @unique @map("doc_number")
+  docDate         DateTime  @default(now()) @map("doc_date")
+  warehouseId     String?   @map("warehouse_id")
+  status          String    @default("draft")
+  totalWeight     Float     @default(0) @map("total_weight")
+  totalQuantity   Int       @default(0) @map("total_quantity")
+  notes           String?
+  createdByUserId String?   @map("created_by_user_id")
+  postedAt        DateTime? @map("posted_at")
+  postedByUserId  String?   @map("posted_by_user_id")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  items WarehouseReturnItem[]
+
+  @@index([status])
+  @@index([docDate(sort: Desc)])
+  @@map("mgr_warehouse_returns")
+}
+
+model WarehouseReturnItem {
+  id        String   @id @default(cuid())
+  returnId  String   @map("return_id")
+  productId String?  @map("product_id")
+  charHex   String?  @map("char_hex")
+  barcode   String?
+  weight    Float    @default(0)
+  quantity  Int      @default(1)
+  notes     String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  document WarehouseReturn @relation(fields: [returnId], references: [id], onDelete: Cascade)
+
+  @@index([returnId])
+  @@map("mgr_warehouse_return_items")
+}
+
+model ReturnToSupplier {
+  id              String    @id @default(cuid())
+  code1C          String?   @unique @map("code_1c")
+  number1C        String?   @map("number_1c")
+  docNumber       String    @unique @map("doc_number")
+  docDate         DateTime  @default(now()) @map("doc_date")
+  supplierId      String?   @map("supplier_id")
+  supplierName    String?   @map("supplier_name")
+  warehouseId     String?   @map("warehouse_id")
+  currency        String    @default("EUR")
+  exchangeRate    Float     @default(1) @map("exchange_rate")
+  totalWeight     Float     @default(0) @map("total_weight")
+  totalQuantity   Int       @default(0) @map("total_quantity")
+  totalEur        Decimal   @default(0) @map("total_eur") @db.Decimal(12, 2)
+  status          String    @default("draft")
+  notes           String?
+  createdByUserId String?   @map("created_by_user_id")
+  postedAt        DateTime? @map("posted_at")
+  postedByUserId  String?   @map("posted_by_user_id")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  items ReturnToSupplierItem[]
+
+  @@index([status])
+  @@index([supplierId])
+  @@index([docDate(sort: Desc)])
+  @@map("mgr_returns_to_supplier")
+}
+
+model ReturnToSupplierItem {
+  id        String   @id @default(cuid())
+  returnId  String   @map("return_id")
+  productId String?  @map("product_id")
+  charHex   String?  @map("char_hex")
+  barcode   String?
+  weight    Float    @default(0)
+  quantity  Int      @default(1)
+  priceEur  Decimal  @default(0) @map("price_eur") @db.Decimal(12, 2)
+  amountEur Decimal  @default(0) @map("amount_eur") @db.Decimal(12, 2)
+  notes     String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  document ReturnToSupplier @relation(fields: [returnId], references: [id], onDelete: Cascade)
+
+  @@index([returnId])
+  @@map("mgr_return_to_supplier_items")
+}
+
+model Repacking {
+  id              String    @id @default(cuid())
+  code1C          String?   @unique @map("code_1c")
+  number1C        String?   @map("number_1c")
+  docNumber       String    @unique @map("doc_number")
+  docDate         DateTime  @default(now()) @map("doc_date")
+  warehouseId     String?   @map("warehouse_id")
+  status          String    @default("draft")
+  inputWeight     Float     @default(0) @map("input_weight")
+  outputWeight    Float     @default(0) @map("output_weight")
+  lossWeight      Float     @default(0) @map("loss_weight")
+  notes           String?
+  createdByUserId String?   @map("created_by_user_id")
+  postedAt        DateTime? @map("posted_at")
+  postedByUserId  String?   @map("posted_by_user_id")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  items RepackingItem[]
+
+  @@index([status])
+  @@index([docDate(sort: Desc)])
+  @@map("mgr_repackings")
+}
+
+model RepackingItem {
+  id          String   @id @default(cuid())
+  repackingId String   @map("repacking_id")
+  role        String   @default("disassembled")
+  productId   String?  @map("product_id")
+  charHex     String?  @map("char_hex")
+  barcode     String?
+  weight      Float    @default(0)
+  quantity    Int      @default(1)
+  priceEur    Decimal  @default(0) @map("price_eur") @db.Decimal(12, 2)
+  amountEur   Decimal  @default(0) @map("amount_eur") @db.Decimal(12, 2)
+  notes       String?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  document Repacking @relation(fields: [repackingId], references: [id], onDelete: Cascade)
+
+  @@index([repackingId])
+  @@index([role])
+  @@map("mgr_repacking_items")
+}
+
+model WriteOff {
+  id              String    @id @default(cuid())
+  code1C          String?   @unique @map("code_1c")
+  number1C        String?   @map("number_1c")
+  docNumber       String    @unique @map("doc_number")
+  docDate         DateTime  @default(now()) @map("doc_date")
+  warehouseId     String?   @map("warehouse_id")
+  reason          String?
+  status          String    @default("draft")
+  totalWeight     Float     @default(0) @map("total_weight")
+  totalQuantity   Int       @default(0) @map("total_quantity")
+  totalEur        Decimal   @default(0) @map("total_eur") @db.Decimal(12, 2)
+  notes           String?
+  createdByUserId String?   @map("created_by_user_id")
+  postedAt        DateTime? @map("posted_at")
+  postedByUserId  String?   @map("posted_by_user_id")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  items WriteOffItem[]
+
+  @@index([status])
+  @@index([docDate(sort: Desc)])
+  @@map("mgr_write_offs")
+}
+
+model WriteOffItem {
+  id         String   @id @default(cuid())
+  writeOffId String   @map("write_off_id")
+  productId  String?  @map("product_id")
+  charHex    String?  @map("char_hex")
+  barcode    String?
+  weight     Float    @default(0)
+  quantity   Int      @default(1)
+  priceEur   Decimal  @default(0) @map("price_eur") @db.Decimal(12, 2)
+  amountEur  Decimal  @default(0) @map("amount_eur") @db.Decimal(12, 2)
+  notes      String?
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  document WriteOff @relation(fields: [writeOffId], references: [id], onDelete: Cascade)
+
+  @@index([writeOffId])
+  @@map("mgr_write_off_items")
+}
+
+model StockAdjustment {
+  id              String    @id @default(cuid())
+  code1C          String?   @unique @map("code_1c")
+  number1C        String?   @map("number_1c")
+  docNumber       String    @unique @map("doc_number")
+  docDate         DateTime  @default(now()) @map("doc_date")
+  warehouseId     String?   @map("warehouse_id")
+  reason          String?
+  status          String    @default("draft")
+  totalWeight     Float     @default(0) @map("total_weight")
+  totalQuantity   Int       @default(0) @map("total_quantity")
+  totalEur        Decimal   @default(0) @map("total_eur") @db.Decimal(12, 2)
+  notes           String?
+  createdByUserId String?   @map("created_by_user_id")
+  postedAt        DateTime? @map("posted_at")
+  postedByUserId  String?   @map("posted_by_user_id")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  items StockAdjustmentItem[]
+
+  @@index([status])
+  @@index([docDate(sort: Desc)])
+  @@map("mgr_stock_adjustments")
+}
+
+model StockAdjustmentItem {
+  id           String   @id @default(cuid())
+  adjustmentId String   @map("adjustment_id")
+  productId    String?  @map("product_id")
+  charHex      String?  @map("char_hex")
+  barcode      String?
+  weight       Float    @default(0)
+  quantity     Int      @default(1)
+  priceEur     Decimal  @default(0) @map("price_eur") @db.Decimal(12, 2)
+  amountEur    Decimal  @default(0) @map("amount_eur") @db.Decimal(12, 2)
+  notes        String?
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  document StockAdjustment @relation(fields: [adjustmentId], references: [id], onDelete: Cascade)
+
+  @@index([adjustmentId])
+  @@map("mgr_stock_adjustment_items")
+}
+
+model Inventory {
+  id              String    @id @default(cuid())
+  code1C          String?   @unique @map("code_1c")
+  number1C        String?   @map("number_1c")
+  docNumber       String    @unique @map("doc_number")
+  docDate         DateTime  @default(now()) @map("doc_date")
+  warehouseId     String?   @map("warehouse_id")
+  status          String    @default("draft")
+  isClosed        Boolean   @default(false) @map("is_closed")
+  notes           String?
+  createdByUserId String?   @map("created_by_user_id")
+  postedAt        DateTime? @map("posted_at")
+  postedByUserId  String?   @map("posted_by_user_id")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  items InventoryItem[]
+
+  @@index([status])
+  @@index([docDate(sort: Desc)])
+  @@map("mgr_inventories")
+}
+
+model InventoryItem {
+  id            String   @id @default(cuid())
+  inventoryId   String   @map("inventory_id")
+  productId     String?  @map("product_id")
+  charHex       String?  @map("char_hex")
+  barcode       String?
+  qtyAccounting Float    @default(0) @map("qty_accounting")
+  qtyActual     Float    @default(0) @map("qty_actual")
+  qtyDifference Float    @default(0) @map("qty_difference")
+  priceEur      Decimal  @default(0) @map("price_eur") @db.Decimal(12, 2)
+  notes         String?
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  document Inventory @relation(fields: [inventoryId], references: [id], onDelete: Cascade)
+
+  @@index([inventoryId])
+  @@map("mgr_inventory_items")
+}
+
+model StockTransfer {
+  id              String    @id @default(cuid())
+  code1C          String?   @unique @map("code_1c")
+  number1C        String?   @map("number_1c")
+  docNumber       String    @unique @map("doc_number")
+  docDate         DateTime  @default(now()) @map("doc_date")
+  fromWarehouseId String?   @map("from_warehouse_id")
+  toWarehouseId   String?   @map("to_warehouse_id")
+  status          String    @default("draft")
+  totalWeight     Float     @default(0) @map("total_weight")
+  totalQuantity   Int       @default(0) @map("total_quantity")
+  notes           String?
+  createdByUserId String?   @map("created_by_user_id")
+  postedAt        DateTime? @map("posted_at")
+  postedByUserId  String?   @map("posted_by_user_id")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  items StockTransferItem[]
+
+  @@index([status])
+  @@index([docDate(sort: Desc)])
+  @@map("mgr_stock_transfers")
+}
+
+model StockTransferItem {
+  id         String   @id @default(cuid())
+  transferId String   @map("transfer_id")
+  productId  String?  @map("product_id")
+  charHex    String?  @map("char_hex")
+  barcode    String?
+  weight     Float    @default(0)
+  quantity   Int      @default(1)
+  notes      String?
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  document StockTransfer @relation(fields: [transferId], references: [id], onDelete: Cascade)
+
+  @@index([transferId])
+  @@map("mgr_stock_transfer_items")
+}

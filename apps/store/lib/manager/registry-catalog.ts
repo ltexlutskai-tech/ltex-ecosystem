@@ -48,6 +48,15 @@ export interface ReportEntry {
   href: string;
 }
 
+/** Документи руху товару (1С Documents, Фаза 5). */
+export interface DocumentEntry {
+  key: string;
+  label: string;
+  description: string;
+  href: string;
+  status: RegistryStatus;
+}
+
 /** Довідники (1С Catalogs). */
 export const DICTIONARIES: readonly DictionaryEntry[] = [
   {
@@ -314,5 +323,65 @@ export const REPORTS: readonly ReportEntry[] = [
     label: "Акт звірки взаєморозрахунків",
     description: "Дебет / кредит / сальдо по контрагенту за період.",
     href: "/manager/reports/reconciliation",
+  },
+];
+
+/** Документи руху товару (1С Documents, Фаза 5). */
+export const DOCUMENTS: readonly DocumentEntry[] = [
+  {
+    key: "product-returns",
+    label: "Повернення від покупця",
+    description: "Клієнт повертає товар (прямо коригує борг).",
+    href: "/manager/stock-documents/product-returns",
+    status: "ready",
+  },
+  {
+    key: "warehouse-returns",
+    label: "Повернення на склад",
+    description: "Повернення товару на склад.",
+    href: "/manager/stock-documents/warehouse-returns",
+    status: "ready",
+  },
+  {
+    key: "supplier-returns",
+    label: "Повернення постачальнику",
+    description: "Повернення товару постачальнику.",
+    href: "/manager/stock-documents/supplier-returns",
+    status: "ready",
+  },
+  {
+    key: "repackings",
+    label: "Перепаковка",
+    description: "Розбір / комплектація мішків з нормою втрат.",
+    href: "/manager/stock-documents/repackings",
+    status: "ready",
+  },
+  {
+    key: "write-offs",
+    label: "Списання товарів",
+    description: "Списання некондиції / нестачі.",
+    href: "/manager/stock-documents/write-offs",
+    status: "ready",
+  },
+  {
+    key: "stock-adjustments",
+    label: "Оприбуткування товарів",
+    description: "Оприбуткування надлишків на склад.",
+    href: "/manager/stock-documents/stock-adjustments",
+    status: "ready",
+  },
+  {
+    key: "inventories",
+    label: "Інвентаризація",
+    description: "Звірка облікових та фактичних залишків.",
+    href: "/manager/stock-documents/inventories",
+    status: "ready",
+  },
+  {
+    key: "stock-transfers",
+    label: "Переміщення між складами",
+    description: "Переміщення товару між складами.",
+    href: "/manager/stock-documents/stock-transfers",
+    status: "ready",
   },
 ];
