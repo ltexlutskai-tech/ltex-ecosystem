@@ -497,6 +497,98 @@ model ExchangeRate {
   @@map("exchange_rates")
 }
 
+// ─── Phase 1 (5.6) — повний паритет довідників (← 1С Catalogs) ───────────────
+// Усі додаються additively; історичний імпорт через `--entity dictionaries-full`
+// (idempotent upsert по `code1C` = hex(_IDRRef)). Patterns mirror MgrBankAccount.
+
+// Одиниці виміру (← 1С Catalog.ЕдиницыИзмерения / `_Reference52`).
+// У 1С це OWNED-довідник (кожна одиниця належить номенклатурі/класифікатору),
+// тож сюди вантажимо плоский глобальний список (кг/шт/пара) як довідник.
+model Unit {
+  id             String   @id @default(cuid())
+  code1C         String?  @unique @map("code_1c")
+  code           String?
+  name           String // _Description (кг/шт/пара)
+  fullName       String?  @map("full_name") // повна назва / класифікатор
+  coefficient    Decimal? @db.Decimal(15, 3) // _Fld5990 Коэффициент
+  classifierCode String?  @map("classifier_code") // міжнародне скорочення
+  archived       Boolean  @default(false)
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  @@map("units")
+}
+
+// Області (← 1С Catalog.Области / `_Reference6811`). Плоский довідник.
+model Region {
+  id        String   @id @default(cuid())
+  code1C    String?  @unique @map("code_1c")
+  code      String?
+  name      String // _Description
+  archived  Boolean  @default(false)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  cities Cityy[]
+
+  @@map("regions")
+}
+
+// Міста (← 1С Catalog.Города / `_Reference6810`). OWNED областю (_OwnerIDRRef).
+// (Назва моделі `Cityy` — щоб уникнути зіткнення з можливими майбутніми City-
+// FK на Customer; фізична таблиця лишається `cities`.)
+model Cityy {
+  id           String   @id @default(cuid())
+  code1C       String?  @unique @map("code_1c")
+  code         String?
+  name         String // _Description
+  regionCode1C String?  @map("region_code_1c") // hex області-власника
+  regionId     String?  @map("region_id")
+  archived     Boolean  @default(false)
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  region Region? @relation(fields: [regionId], references: [id], onDelete: SetNull)
+
+  @@index([regionId])
+  @@map("cities")
+}
+
+// Торгові агенти (← 1С Catalog.ТорговыеАгенты / `_Reference6628`).
+// Опційно зв'язується з User по hex-мапі (User.code1C === hex агента).
+model MgrTradeAgent {
+  id        String   @id @default(cuid())
+  code1C    String?  @unique @map("code_1c")
+  code      String?
+  name      String // _Description
+  userId    String?  @map("user_id")
+  archived  Boolean  @default(false)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user User? @relation("MgrTradeAgentUser", fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@map("mgr_trade_agents")
+}
+
+// Контакти Viber (← 1С Catalog.КонтактыViber). Підписники Viber-бота.
+// ⚠️ Фізична MSSQL-таблиця цього довідника відсутня в офлайн-дампі (мобільна
+// конфіга) — `_Fld`-коди уточнюються на живій MSSQL (див. importer TODO).
+model ViberContact {
+  id           String    @id @default(cuid())
+  code1C       String?   @unique @map("code_1c")
+  phone        String // Телефон
+  subscribedAt DateTime? @map("subscribed_at") // ДатаПодписки
+  clientCode1C String?   @map("client_code_1c") // hex Контрагента
+  dialogStatus String?   @map("dialog_status") // СтатусДиалога
+  archived     Boolean   @default(false)
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  @@map("viber_contacts")
+}
+
 // ─── Carts (server-side cart persistence) ───────────────────────────────────
 
 model Cart {
@@ -1000,6 +1092,7 @@ model User {
   receivingsPosted     Receiving[]              @relation("ReceivingPostedBy")
   receivingsCancelled  Receiving[]              @relation("ReceivingCancelledBy")
   ordersClosed         Order[]                  @relation("OrderClosedBy")
+  tradeAgents          MgrTradeAgent[]          @relation("MgrTradeAgentUser")
 
   @@map("users")
 }

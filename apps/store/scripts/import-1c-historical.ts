@@ -19,7 +19,8 @@
  *   --dry-run            читає 1С + резолвить зв'язки, нічого не пише
  *   --limit N            лише перші N рядків кожної сутності (пробний прогон)
  *   --entity <name>      одна сутність: customers|products|lots|barcodes|prices|
- *                        orders|sales|cashorders|routesheets|debt (дефолт = всі в порядку)
+ *                        dictionaries|dictionaries-full|orders|sales|cashorders|
+ *                        routesheets|debt (дефолт = всі в порядку)
  *   --confirm-prod       дозволити запис коли ціль = бойова база
  *   --batch N            розмір батчу запису (дефолт 500)
  *   --since YYYY-MM-DD   (опц.) лише документи з цієї дати
@@ -59,6 +60,7 @@ const ENTITY_NAMES = [
   "barcodes",
   "prices",
   "dictionaries",
+  "dictionaries-full",
   "orders",
   "sales",
   "cashorders",
@@ -466,6 +468,8 @@ interface ImportContext {
   agentUserIdByHex: Map<string, string>; // hex(1С-агент _IDRRef = User.code1C) → User.id (Фаза 2 ретро-прив'язка)
   unitNameByHex: Map<string, string>; // hex → ЕдиницаИзмерения._Description
   eurRateByDay: Map<string, number>; // "YYYY-MM-DD" → грн за 1 EUR
+  // ── Фаза 1 (5.6) — довідники-повний паритет ──
+  regionIdByHex: Map<string, string>; // hex(_Reference6811) → Region.id
 }
 
 // Чи робимо реальні записи (НЕ dry-run).
@@ -3046,6 +3050,456 @@ async function importDictionaries(ctx: ImportContext): Promise<Recon> {
   return combined;
 }
 
+// ════════════════════════════════════════════════════════════════════════════
+// 10.7 — ФАЗА 1 (5.6): закрити прогалини довідників (--entity dictionaries-full)
+// Одиниці виміру · Області · Міста · Торгові агенти · Контакти Viber.
+// Кожен мапер — ЧИСТА функція (raw row → upsert-shape) для юніт-тестів.
+// ════════════════════════════════════════════════════════════════════════════
+
+// ─── Одиниці виміру (← _Reference52 ЕдиницыИзмерения) ─────────────────────────
+// OWNED-довідник (одиниця належить номенклатурі/класифікатору). Вантажимо
+// плоский глобальний список як довідник: name(_Description), code(_Code),
+// coefficient(_Fld5990). `fullName`/`classifierCode` поки лишаємо null —
+// класифікатор у окремому довіднику (КлассификаторЕдиницИзмерения), без
+// підтвердженого _Fld на живій MSSQL (TODO).
+const UNIT_FULL_COLS = [
+  "_IDRRef",
+  "_Code", // nchar(9)
+  "_Description", // nvarchar(50) — кг/шт/пара
+  "_Fld5990", // numeric(10,3) Коэффициент
+];
+
+export interface UnitUpsert {
+  code1C: string;
+  code: string | null;
+  name: string;
+  coefficient: string | null;
+}
+
+/** Чистий мапер рядка _Reference52 → дані upsert (null коли немає _IDRRef). */
+export function mapUnitRow(row: Record<string, unknown>): UnitUpsert | null {
+  const hex = bufToHex(row["_IDRRef"]);
+  if (!hex) return null;
+  return {
+    code1C: hex,
+    code: asString(row["_Code"]),
+    name: asTrimmed(row["_Description"]) || hex,
+    coefficient: asDecimalString(row["_Fld5990"]),
+  };
+}
+
+async function importUnitsFull(ctx: ImportContext): Promise<Recon> {
+  const recon = newRecon("units-dict");
+  const sink = new ErrorSink(recon, "units-dict");
+  const { args, src, prisma } = ctx;
+
+  recon.sourceRows = await countTable(src, "_Reference52");
+  log(`units-dict: source rows = ${recon.sourceRows}`);
+
+  for await (const rows of streamTable(src, "_Reference52", UNIT_FULL_COLS, {
+    batch: args.batch,
+    limit: args.limit,
+    orderBy: ["_IDRRef"],
+  })) {
+    for (const row of rows) {
+      const data = mapUnitRow(row);
+      if (!data) {
+        recon.skipped++;
+        continue;
+      }
+      try {
+        if (willWrite(ctx)) {
+          await prisma.unit.upsert({
+            where: { code1C: data.code1C },
+            create: {
+              code1C: data.code1C,
+              code: data.code,
+              name: data.name,
+              coefficient: data.coefficient,
+            },
+            update: {
+              code: data.code,
+              name: data.name,
+              coefficient: data.coefficient,
+            },
+          });
+        }
+        recon.written++;
+      } catch (e) {
+        sink.record(data.code1C, e);
+      }
+    }
+  }
+  log(`units-dict: written ${recon.written}`);
+  return recon;
+}
+
+// ─── Області (← _Reference6811 Области) ──────────────────────────────────────
+const REGION_COLS = [
+  "_IDRRef",
+  "_Code", // nvarchar(9)
+  "_Description", // nvarchar(50)
+];
+
+export interface RegionUpsert {
+  code1C: string;
+  code: string | null;
+  name: string;
+}
+
+export function mapRegionRow(
+  row: Record<string, unknown>,
+): RegionUpsert | null {
+  const hex = bufToHex(row["_IDRRef"]);
+  if (!hex) return null;
+  return {
+    code1C: hex,
+    code: asString(row["_Code"]),
+    name: asTrimmed(row["_Description"]) || hex,
+  };
+}
+
+async function importRegions(ctx: ImportContext): Promise<Recon> {
+  const recon = newRecon("regions");
+  const sink = new ErrorSink(recon, "regions");
+  const { args, src, prisma } = ctx;
+
+  recon.sourceRows = await countTable(src, "_Reference6811");
+  log(`regions: source rows = ${recon.sourceRows}`);
+
+  for await (const rows of streamTable(src, "_Reference6811", REGION_COLS, {
+    batch: args.batch,
+    limit: args.limit,
+    orderBy: ["_IDRRef"],
+  })) {
+    for (const row of rows) {
+      const data = mapRegionRow(row);
+      if (!data) {
+        recon.skipped++;
+        continue;
+      }
+      try {
+        let id = "(pending)";
+        if (willWrite(ctx)) {
+          const created = await prisma.region.upsert({
+            where: { code1C: data.code1C },
+            create: { code1C: data.code1C, code: data.code, name: data.name },
+            update: { code: data.code, name: data.name },
+            select: { id: true },
+          });
+          id = created.id;
+        }
+        ctx.regionIdByHex.set(data.code1C, id);
+        recon.written++;
+      } catch (e) {
+        sink.record(data.code1C, e);
+      }
+    }
+  }
+  log(`regions: mapped ${ctx.regionIdByHex.size} hex→id`);
+  return recon;
+}
+
+// ─── Міста (← _Reference6810 Города, OWNED областю _OwnerIDRRef) ──────────────
+const CITY_COLS = [
+  "_IDRRef",
+  "_OwnerIDRRef", // → область-власник (_Reference6811)
+  "_Code", // nvarchar(9)
+  "_Description", // nvarchar(50)
+];
+
+export interface CityUpsert {
+  code1C: string;
+  code: string | null;
+  name: string;
+  regionCode1C: string | null;
+}
+
+export function mapCityRow(row: Record<string, unknown>): CityUpsert | null {
+  const hex = bufToHex(row["_IDRRef"]);
+  if (!hex) return null;
+  return {
+    code1C: hex,
+    code: asString(row["_Code"]),
+    name: asTrimmed(row["_Description"]) || hex,
+    regionCode1C: bufToHex(row["_OwnerIDRRef"]),
+  };
+}
+
+async function importCities(ctx: ImportContext): Promise<Recon> {
+  const recon = newRecon("cities");
+  const sink = new ErrorSink(recon, "cities");
+  const { args, src, prisma } = ctx;
+
+  recon.sourceRows = await countTable(src, "_Reference6810");
+  log(`cities: source rows = ${recon.sourceRows}`);
+
+  for await (const rows of streamTable(src, "_Reference6810", CITY_COLS, {
+    batch: args.batch,
+    limit: args.limit,
+    orderBy: ["_IDRRef"],
+  })) {
+    for (const row of rows) {
+      const data = mapCityRow(row);
+      if (!data) {
+        recon.skipped++;
+        continue;
+      }
+      // Резолв області-власника через мапу (regions імпортуються першими).
+      const regionId = data.regionCode1C
+        ? (ctx.regionIdByHex.get(data.regionCode1C) ?? null)
+        : null;
+      if (data.regionCode1C && !regionId) recon.unresolved++;
+      try {
+        if (willWrite(ctx)) {
+          await prisma.cityy.upsert({
+            where: { code1C: data.code1C },
+            create: {
+              code1C: data.code1C,
+              code: data.code,
+              name: data.name,
+              regionCode1C: data.regionCode1C,
+              regionId,
+            },
+            update: {
+              code: data.code,
+              name: data.name,
+              regionCode1C: data.regionCode1C,
+              regionId,
+            },
+          });
+        }
+        recon.written++;
+      } catch (e) {
+        sink.record(data.code1C, e);
+      }
+    }
+  }
+  log(`cities: written ${recon.written}`);
+  return recon;
+}
+
+// ─── Торгові агенти (← _Reference6628 ТорговыеАгенты) ─────────────────────────
+// `_Fld7445RRef` (Користувач) → hex збігається з User.code1C (hex 1С-агента),
+// тож резолвимо через наявну мапу ctx.agentUserIdByHex (key = hex агента, той
+// самий _IDRRef). Зв'язок userId опційний.
+const TRADE_AGENT_COLS = [
+  "_IDRRef",
+  "_Code", // nvarchar(9)
+  "_Description", // nvarchar(25) — ПІБ агента
+];
+
+export interface TradeAgentUpsert {
+  code1C: string;
+  code: string | null;
+  name: string;
+}
+
+export function mapTradeAgentRow(
+  row: Record<string, unknown>,
+): TradeAgentUpsert | null {
+  const hex = bufToHex(row["_IDRRef"]);
+  if (!hex) return null;
+  return {
+    code1C: hex,
+    code: asString(row["_Code"]),
+    name: asTrimmed(row["_Description"]) || hex,
+  };
+}
+
+async function importTradeAgents(ctx: ImportContext): Promise<Recon> {
+  const recon = newRecon("trade-agents");
+  const sink = new ErrorSink(recon, "trade-agents");
+  const { args, src, prisma } = ctx;
+
+  // User-мапа (hex 1С-агента = User.code1C) для опційного userId-лінку.
+  if (ctx.agentUserIdByHex.size === 0) {
+    await loadAgentUserIds(ctx);
+  }
+
+  recon.sourceRows = await countTable(src, "_Reference6628");
+  log(`trade-agents: source rows = ${recon.sourceRows}`);
+
+  for await (const rows of streamTable(
+    src,
+    "_Reference6628",
+    TRADE_AGENT_COLS,
+    { batch: args.batch, limit: args.limit, orderBy: ["_IDRRef"] },
+  )) {
+    for (const row of rows) {
+      const data = mapTradeAgentRow(row);
+      if (!data) {
+        recon.skipped++;
+        continue;
+      }
+      const userId = ctx.agentUserIdByHex.get(data.code1C) ?? null;
+      try {
+        if (willWrite(ctx)) {
+          await prisma.mgrTradeAgent.upsert({
+            where: { code1C: data.code1C },
+            create: {
+              code1C: data.code1C,
+              code: data.code,
+              name: data.name,
+              userId,
+            },
+            update: { code: data.code, name: data.name, userId },
+          });
+        }
+        recon.written++;
+      } catch (e) {
+        sink.record(data.code1C, e);
+      }
+    }
+  }
+  log(`trade-agents: written ${recon.written}`);
+  return recon;
+}
+
+// ─── Контакти Viber (← Catalog.КонтактыViber) ────────────────────────────────
+// ⚠️ Фізична MSSQL-таблиця цього довідника ВІДСУТНЯ в офлайн-дампі схеми
+// (мобільна конфіга; UUID 33088423-… не резолвиться у dbnames.txt). Тому
+// номер таблиці `_ReferenceNNN` та `_Fld`-коди атрибутів (Телефон/ДатаПодписки/
+// Контрагент/СтатусДиалога) ТРЕБА уточнити на живій MSSQL. Мапер написаний
+// повністю; константи нижче — placeholder-и з реальними іменами атрибутів 1С.
+//
+// TODO (на живій MSSQL): замінити VIBER_CONTACT_TABLE + VIBER_*_COL на реальні
+//   значення (резолв: UUID каталогу 33088423-70ef-4bda-9abc-2518f2d0509a →
+//   dbnames → _ReferenceNNN; атрибути за їх UUID з Catalogs/КонтактыViber.xml:
+//   Телефон abf1e488-…, ДатаПодписки 3260dec0-…, Контрагент 45d0b7e6-…,
+//   СтатусДиалога 7d8d3d1e-…). До уточнення — імпорт пропускається з warn.
+const VIBER_CONTACT_TABLE = ""; // TODO: уточнити _ReferenceNNN на живій MSSQL
+const VIBER_PHONE_COL = "_FldTODO_Phone"; // TODO: уточнити _Fld код (Телефон)
+const VIBER_SUBSCRIBED_COL = "_FldTODO_Subscribed"; // TODO: ДатаПодписки
+const VIBER_CLIENT_COL = "_FldTODO_ClientRRef"; // TODO: Контрагент (RRef)
+const VIBER_STATUS_COL = "_FldTODO_DialogStatus"; // TODO: СтатусДиалога
+
+export interface ViberContactUpsert {
+  code1C: string;
+  phone: string;
+  subscribedAt: Date | null;
+  clientCode1C: string | null;
+  dialogStatus: string | null;
+}
+
+/**
+ * Чистий мапер рядка КонтактыViber → дані upsert. Параметри `cols` дозволяють
+ * передати фактичні імена колонок (резолвлені на живій MSSQL) — за замовчанням
+ * беруться placeholder-константи. Повертає null коли немає _IDRRef або телефону.
+ */
+export function mapViberContactRow(
+  row: Record<string, unknown>,
+  cols: {
+    phone: string;
+    subscribed: string;
+    client: string;
+    status: string;
+  } = {
+    phone: VIBER_PHONE_COL,
+    subscribed: VIBER_SUBSCRIBED_COL,
+    client: VIBER_CLIENT_COL,
+    status: VIBER_STATUS_COL,
+  },
+): ViberContactUpsert | null {
+  const hex = bufToHex(row["_IDRRef"]);
+  if (!hex) return null;
+  const phone = asString(row[cols.phone]);
+  if (!phone) return null;
+  return {
+    code1C: hex,
+    phone,
+    subscribedAt: asDate(row[cols.subscribed]),
+    clientCode1C: bufToHex(row[cols.client]),
+    dialogStatus: asString(row[cols.status]),
+  };
+}
+
+async function importViberContacts(ctx: ImportContext): Promise<Recon> {
+  const recon = newRecon("viber-contacts");
+  const sink = new ErrorSink(recon, "viber-contacts");
+  const { args, src, prisma } = ctx;
+
+  if (!VIBER_CONTACT_TABLE) {
+    warn(
+      "viber-contacts: MSSQL-таблиця КонтактыViber не уточнена (відсутня в " +
+        "офлайн-дампі) — пропускаю. Уточнити _ReferenceNNN + _Fld коди на живій " +
+        "MSSQL (див. TODO у import-1c-historical.ts).",
+    );
+    return recon;
+  }
+
+  const cols = {
+    phone: VIBER_PHONE_COL,
+    subscribed: VIBER_SUBSCRIBED_COL,
+    client: VIBER_CLIENT_COL,
+    status: VIBER_STATUS_COL,
+  };
+
+  recon.sourceRows = await countTable(src, VIBER_CONTACT_TABLE);
+  log(`viber-contacts: source rows = ${recon.sourceRows}`);
+
+  for await (const rows of streamTable(
+    src,
+    VIBER_CONTACT_TABLE,
+    ["_IDRRef", cols.phone, cols.subscribed, cols.client, cols.status],
+    { batch: args.batch, limit: args.limit, orderBy: ["_IDRRef"] },
+  )) {
+    for (const row of rows) {
+      const data = mapViberContactRow(row, cols);
+      if (!data) {
+        recon.skipped++;
+        continue;
+      }
+      try {
+        if (willWrite(ctx)) {
+          await prisma.viberContact.upsert({
+            where: { code1C: data.code1C },
+            create: {
+              code1C: data.code1C,
+              phone: data.phone,
+              subscribedAt: data.subscribedAt,
+              clientCode1C: data.clientCode1C,
+              dialogStatus: data.dialogStatus,
+            },
+            update: {
+              phone: data.phone,
+              subscribedAt: data.subscribedAt,
+              clientCode1C: data.clientCode1C,
+              dialogStatus: data.dialogStatus,
+            },
+          });
+        }
+        recon.written++;
+      } catch (e) {
+        sink.record(data.code1C, e);
+      }
+    }
+  }
+  log(`viber-contacts: written ${recon.written}`);
+  return recon;
+}
+
+// ─── Раннер сутності `dictionaries-full` ─────────────────────────────────────
+// Regions ПЕРЕД cities (cities резолвлять регіон по hex з мапи).
+async function importDictionariesFull(ctx: ImportContext): Promise<Recon> {
+  const combined = newRecon("dictionaries-full");
+  const parts = [
+    await importUnitsFull(ctx),
+    await importRegions(ctx),
+    await importCities(ctx),
+    await importTradeAgents(ctx),
+    await importViberContacts(ctx),
+  ];
+  for (const p of parts) {
+    combined.sourceRows += p.sourceRows;
+    combined.written += p.written;
+    combined.skipped += p.skipped;
+    combined.errors += p.errors;
+    combined.unresolved += p.unresolved;
+  }
+  return combined;
+}
+
 // ─── 11. ВзаиморасчетыСКонтрагентами → MgrDebtMovement (opening) ─ _AccumRg5269 ─
 // Регістр накопичення «Взаиморасчеты с контрагентами». Раніше (5.4.5a) ми
 // агрегували чистий борг клієнта в одне число й писали ОДИН `opening`-рух на
@@ -3243,6 +3697,7 @@ const ENTITY_RUNNERS: Record<
   barcodes: importBarcodes,
   prices: importPrices,
   dictionaries: importDictionaries,
+  "dictionaries-full": importDictionariesFull,
   orders: importOrders,
   sales: importSales,
   cashorders: importCashOrders,
@@ -3259,6 +3714,7 @@ const DEFAULT_ORDER: EntityName[] = [
   "lots",
   "prices",
   "dictionaries",
+  "dictionaries-full",
   "orders",
   "sales",
   "cashorders",
@@ -3368,6 +3824,7 @@ async function main(): Promise<void> {
     agentUserIdByHex: new Map(),
     unitNameByHex: new Map(),
     eurRateByDay: new Map(),
+    regionIdByHex: new Map(),
   };
 
   // Дрібні довідники назв (city/region) — потрібні для Customer.
@@ -3405,7 +3862,11 @@ async function main(): Promise<void> {
   log("done.");
 }
 
-main().catch((e) => {
-  console.error(`${TAG} FATAL:`, e);
-  process.exit(1);
-});
+// Запускаємо main() лише при прямому виконанні (tsx scripts/...), НЕ під час
+// імпорту модуля у юніт-тестах (звідки беруться чисті мапери map*Row).
+if (!process.env.VITEST) {
+  main().catch((e) => {
+    console.error(`${TAG} FATAL:`, e);
+    process.exit(1);
+  });
+}
