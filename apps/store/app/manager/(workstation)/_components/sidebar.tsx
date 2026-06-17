@@ -7,6 +7,7 @@ import {
   ADMIN_REGION_AGENTS_LINK,
   ADMIN_USERS_LINK,
   CHAT_LINK,
+  FINANCE_LINKS,
   PRIMARY_LINKS,
   REGISTRY_LINK,
   REPORTS_LINK,
@@ -54,6 +55,12 @@ export function ManagerSidebar({ role }: { role: ManagerRole }) {
           label={REPORTS_LINK.label}
           icon={renderLinkIcon(REPORTS_LINK)}
         />
+      )}
+      {(role === "bookkeeper" || role === "admin" || role === "owner") && (
+        <>
+          <Separator />
+          <NavSection links={FINANCE_LINKS} />
+        </>
       )}
       <Separator />
       {role === "admin" && (

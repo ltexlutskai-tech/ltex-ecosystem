@@ -21,11 +21,13 @@
  *   --entity <name>      одна сутність: customers|products|lots|barcodes|prices|
  *                        dictionaries|dictionaries-full|rates|orders|sales|cashorders|
  *                        routesheets|debt|misc|sales-reg|cashflow-reg|stock-reg|
- *                        orders-reg (дефолт = всі, крім rates/*-reg)
+ *                        orders-reg|bankdocs|cashtransfers
+ *                        (дефолт = всі, крім rates/*-reg/bankdocs/cashtransfers)
  *                        dictionaries-full = Фаза 1: одиниці/міста/області/агенти
  *                        rates = Фаза 4: історичні курси валют
  *                        misc = Фаза 8: історія статусів клієнтів + надійність постачальників
  *                        *-reg = Фаза 2: регістри-обороти Продажі/ДДС/Залишки/Замовлення
+ *                        bankdocs/cashtransfers = Фаза 6: банк-документи/переміщення готівки
  *   --confirm-prod       дозволити запис коли ціль = бойова база
  *   --batch N            розмір батчу запису (дефолт 500)
  *   --since YYYY-MM-DD   (опц.) лише документи з цієї дати
@@ -83,6 +85,8 @@ const ENTITY_NAMES = [
   "cashflow-reg",
   "stock-reg",
   "orders-reg",
+  "bankdocs",
+  "cashtransfers",
 ] as const;
 
 type EntityName = (typeof ENTITY_NAMES)[number];
@@ -4362,6 +4366,378 @@ async function importOrderRemainderRegister(
   return recon;
 }
 
+// ─── Фаза 6: фінансові документи банк/каса ─ _Document… ──────────────────────
+//
+// Платіжні доручення вхідне/вихідне + переміщення готівки.
+//
+// ⚠️ ФІЗИЧНІ КОДИ ТАБЛИЦЬ/КОЛОНОК (_DocumentNNN / _FldNNN) НЕ зашиті — їх треба
+// декодувати проти live-MSSQL метаданих (`_Config`/`sp_help`), як було зроблено
+// для ПКО/РКО (PKO_MAP/RKO_MAP). Поки `table === null` — імпортер коректно
+// пропускає сутність із попередженням (НЕ кидає, idempotent).
+//
+// Як заповнити (на сервері з доступом до 1С MSSQL):
+//   1. Знайти номер таблиці документа у `_Config` за іменем метаданих
+//      («ПлатежноеПоручениеВходящее» / «…Исходящее» /
+//       «ВнутреннееПеремещениеНаличныхДенежныхСредств»);
+//   2. `sp_help '_DocumentNNN'` → зіставити _FldNNN з реквізитами з
+//      docs/1c-export-2026-06-02/Documents/<Док>.xml (Контрагент / СуммаДокумента /
+//      ВалютаДокумента / СчетОрганизации / СтатьяДвиженияДенежныхСредств /
+//      НазначениеПлатежа / Оплачено / ДатаОплаты);
+//   3. Підставити коди у відповідний *_MAP нижче.
+//
+// Резолв довідників (рахунок/стаття/контрагент) — через наявні ctx-мапи
+// (ensureDictMaps / ensureCustomerDict), як у importCashOrderTable.
+
+interface BankDocFieldMap {
+  /** null = коди ще не декодовані → пропустити з попередженням. */
+  table: string | null;
+  direction: "incoming" | "outgoing";
+  number: string;
+  date: string;
+  posted: string;
+  customerRRef: string; // Контрагент _Fld..._RRRef (поліморфний)
+  amount: string; // СуммаДокумента
+  currencyRRef: string | null; // ВалютаДокумента → _Reference30 (опц.)
+  bankRRef: string; // СчетОрганизации → _Reference29
+  articleRRef: string; // СтаттяДвиженняГрошовихКоштів → _Reference96
+  purpose: string | null; // НазначениеПлатежа
+  iban: string | null; // СчетКонтрагента/IBAN (опц.)
+  comment: string | null;
+}
+
+// TODO(Фаза6): декодувати коди на сервері (див. коментар вище). Поки table=null.
+const BANK_INCOMING_MAP: BankDocFieldMap = {
+  table: null, // TODO: "_DocumentNNN" (ПлатежноеПоручениеВходящее)
+  direction: "incoming",
+  number: "_Number",
+  date: "_Date_Time",
+  posted: "_Posted",
+  customerRRef: "__TODO_customer_RRRef",
+  amount: "__TODO_summa",
+  currencyRRef: null,
+  bankRRef: "__TODO_bank_RRef",
+  articleRRef: "__TODO_article_RRef",
+  purpose: null,
+  iban: null,
+  comment: null,
+};
+
+const BANK_OUTGOING_MAP: BankDocFieldMap = {
+  table: null, // TODO: "_DocumentNNN" (ПлатежноеПоручениеИсходящее)
+  direction: "outgoing",
+  number: "_Number",
+  date: "_Date_Time",
+  posted: "_Posted",
+  customerRRef: "__TODO_customer_RRRef",
+  amount: "__TODO_summa",
+  currencyRRef: null,
+  bankRRef: "__TODO_bank_RRef",
+  articleRRef: "__TODO_article_RRef",
+  purpose: null,
+  iban: null,
+  comment: null,
+};
+
+async function importBankDocs(ctx: ImportContext): Promise<Recon> {
+  const recon = newRecon("bankdocs");
+  await ensureCustomerDict(ctx);
+  await ensureDictMaps(ctx);
+  for (const map of [BANK_INCOMING_MAP, BANK_OUTGOING_MAP]) {
+    await importBankDocTable(ctx, map, recon);
+  }
+  return recon;
+}
+
+async function importBankDocTable(
+  ctx: ImportContext,
+  map: BankDocFieldMap,
+  recon: Recon,
+): Promise<void> {
+  if (!map.table) {
+    warn(
+      `bankdocs(${map.direction}): коди таблиці/колонок не декодовані — пропуск. ` +
+        `Заповніть BANK_${map.direction === "incoming" ? "INCOMING" : "OUTGOING"}_MAP (див. коментар).`,
+    );
+    return;
+  }
+
+  const sink = new ErrorSink(recon, `bankdocs(${map.direction})`);
+  const { args, src, prisma } = ctx;
+
+  const cols = [
+    "_IDRRef",
+    "_Marked",
+    map.number,
+    map.date,
+    map.posted,
+    map.customerRRef,
+    map.amount,
+    map.bankRRef,
+    map.articleRRef,
+    ...(map.currencyRRef ? [map.currencyRRef] : []),
+    ...(map.purpose ? [map.purpose] : []),
+    ...(map.iban ? [map.iban] : []),
+    ...(map.comment ? [map.comment] : []),
+  ];
+
+  const where = args.since ? `${map.date} >= @since` : undefined;
+  const params = args.since ? { since: args.since } : undefined;
+
+  const cnt = await countTable(src, map.table, where, params);
+  recon.sourceRows += cnt;
+  log(`bankdocs(${map.direction}): source rows = ${cnt}`);
+
+  for await (const rows of streamTable(src, map.table, cols, {
+    batch: args.batch,
+    limit: args.limit,
+    orderBy: ["_IDRRef"],
+    where,
+    params,
+  })) {
+    for (const row of rows) {
+      const code1C = bufToHex(row["_IDRRef"]);
+      if (!code1C) {
+        recon.skipped++;
+        continue;
+      }
+      const number1C = asString(row[map.number]);
+      // Помічені на вилучення — пропускаємо; раніше імпортовані видаляємо.
+      if (asBool(row["_Marked"])) {
+        if (willWrite(ctx)) {
+          if (map.direction === "incoming") {
+            await prisma.bankPaymentIncoming.deleteMany({ where: { code1C } });
+          } else {
+            await prisma.bankPaymentOutgoing.deleteMany({ where: { code1C } });
+          }
+        }
+        recon.skipped++;
+        continue;
+      }
+
+      const custHex = bufToHex(row[map.customerRRef]);
+      const customer = custHex ? ctx.customers.get(custHex) : null;
+      if (custHex && !customer) recon.unresolved++;
+      const customerId =
+        customer && customer.id !== "(pending)" ? customer.id : null;
+
+      const amount = asNumberOr(row[map.amount], 0);
+      const paidAt = asDate(row[map.date]);
+      const posted = asBool(row[map.posted]);
+      const purpose = map.purpose ? asString(row[map.purpose]) : null;
+      const iban = map.iban ? asString(row[map.iban]) : null;
+      const comment = map.comment ? asString(row[map.comment]) : null;
+
+      // Зведена сума EUR за історичним курсом дати (як у касі).
+      const histRate = eurRateForDate(ctx, paidAt);
+      const effRate = histRate ?? DEFAULT_HISTORICAL_RATE;
+      const amountEur = effRate > 0 ? round2(amount / effRate) : 0;
+
+      const bankAccountId = (() => {
+        const id = ctx.bankAccountByHex.get(bufToHex(row[map.bankRRef]) ?? "");
+        return id && id !== "(pending)" ? id : null;
+      })();
+      const cashFlowArticleId = (() => {
+        const id = ctx.cashFlowArticleByHex.get(
+          bufToHex(row[map.articleRRef]) ?? "",
+        );
+        return id && id !== "(pending)" ? id : null;
+      })();
+
+      const data = {
+        number1C,
+        customerId,
+        bankAccountId,
+        cashFlowArticleId,
+        amount,
+        currency: "UAH",
+        amountEur,
+        rateEur: effRate,
+        iban,
+        purpose,
+        status: posted ? "posted" : "draft",
+        archived: posted,
+        comment,
+        ...(paidAt ? { paidAt } : {}),
+      };
+
+      try {
+        if (willWrite(ctx)) {
+          if (map.direction === "incoming") {
+            await prisma.bankPaymentIncoming.upsert({
+              where: { code1C },
+              create: { code1C, ...data },
+              update: data,
+            });
+          } else {
+            await prisma.bankPaymentOutgoing.upsert({
+              where: { code1C },
+              create: { code1C, ...data },
+              update: data,
+            });
+          }
+        }
+        recon.written++;
+      } catch (e) {
+        sink.record(code1C, e);
+      }
+    }
+    log(
+      `bankdocs(${map.direction}): processed ${recon.written + recon.skipped + recon.errors}`,
+    );
+  }
+}
+
+// ─── Фаза 6: переміщення готівки / інкасація ─ _Document… ────────────────────
+
+interface CashTransferFieldMap {
+  table: string | null; // null = коди ще не декодовані
+  number: string;
+  date: string;
+  posted: string;
+  fromBankRRef: string; // Касса/СчетОтправитель → _Reference29 (null-резолв = готівка)
+  toBankRRef: string; // КассаПолучатель/СчетПолучатель → _Reference29
+  amount: string; // СуммаДокумента
+  articleRRef: string | null; // СтаттяДвиженняГрошовихКоштів
+  comment: string | null;
+}
+
+// TODO(Фаза6): декодувати коди (ВнутреннееПеремещениеНаличныхДенежныхСредств).
+const CASH_TRANSFER_MAP: CashTransferFieldMap = {
+  table: null, // TODO: "_DocumentNNN"
+  number: "_Number",
+  date: "_Date_Time",
+  posted: "_Posted",
+  fromBankRRef: "__TODO_from_RRef",
+  toBankRRef: "__TODO_to_RRef",
+  amount: "__TODO_summa",
+  articleRRef: null,
+  comment: null,
+};
+
+async function importCashTransfers(ctx: ImportContext): Promise<Recon> {
+  const recon = newRecon("cashtransfers");
+  await ensureDictMaps(ctx);
+  const map = CASH_TRANSFER_MAP;
+
+  if (!map.table) {
+    warn(
+      "cashtransfers: коди таблиці/колонок не декодовані — пропуск. " +
+        "Заповніть CASH_TRANSFER_MAP (див. коментар у importBankDocTable).",
+    );
+    return recon;
+  }
+
+  const sink = new ErrorSink(recon, "cashtransfers");
+  const { args, src, prisma } = ctx;
+
+  const cols = [
+    "_IDRRef",
+    "_Marked",
+    map.number,
+    map.date,
+    map.posted,
+    map.fromBankRRef,
+    map.toBankRRef,
+    map.amount,
+    ...(map.articleRRef ? [map.articleRRef] : []),
+    ...(map.comment ? [map.comment] : []),
+  ];
+
+  const where = args.since ? `${map.date} >= @since` : undefined;
+  const params = args.since ? { since: args.since } : undefined;
+
+  recon.sourceRows = await countTable(src, map.table, where, params);
+  log(`cashtransfers: source rows = ${recon.sourceRows}`);
+
+  for await (const rows of streamTable(src, map.table, cols, {
+    batch: args.batch,
+    limit: args.limit,
+    orderBy: ["_IDRRef"],
+    where,
+    params,
+  })) {
+    for (const row of rows) {
+      const code1C = bufToHex(row["_IDRRef"]);
+      if (!code1C) {
+        recon.skipped++;
+        continue;
+      }
+      const number1C = asString(row[map.number]);
+      if (asBool(row["_Marked"])) {
+        if (willWrite(ctx)) {
+          await prisma.cashTransfer.deleteMany({ where: { code1C } });
+        }
+        recon.skipped++;
+        continue;
+      }
+
+      const amount = asNumberOr(row[map.amount], 0);
+      const transferredAt = asDate(row[map.date]);
+      const posted = asBool(row[map.posted]);
+      const comment = map.comment ? asString(row[map.comment]) : null;
+
+      const histRate = eurRateForDate(ctx, transferredAt);
+      const effRate = histRate ?? DEFAULT_HISTORICAL_RATE;
+      const amountEur = effRate > 0 ? round2(amount / effRate) : 0;
+
+      // null рахунок = готівкова каса (немає дзеркала у MgrBankAccount).
+      const fromAccountId = (() => {
+        const id = ctx.bankAccountByHex.get(
+          bufToHex(row[map.fromBankRRef]) ?? "",
+        );
+        return id && id !== "(pending)" ? id : null;
+      })();
+      const toAccountId = (() => {
+        const id = ctx.bankAccountByHex.get(
+          bufToHex(row[map.toBankRRef]) ?? "",
+        );
+        return id && id !== "(pending)" ? id : null;
+      })();
+      const cashFlowArticleId = map.articleRRef
+        ? (() => {
+            const id = ctx.cashFlowArticleByHex.get(
+              bufToHex(row[map.articleRRef!]) ?? "",
+            );
+            return id && id !== "(pending)" ? id : null;
+          })()
+        : null;
+
+      const data = {
+        number1C,
+        fromAccountId,
+        toAccountId,
+        cashFlowArticleId,
+        amount,
+        currency: "UAH",
+        amountEur,
+        rateEur: effRate,
+        status: posted ? "posted" : "draft",
+        archived: posted,
+        comment,
+        ...(transferredAt ? { transferredAt } : {}),
+      };
+
+      try {
+        if (willWrite(ctx)) {
+          await prisma.cashTransfer.upsert({
+            where: { code1C },
+            create: { code1C, ...data },
+            update: data,
+          });
+        }
+        recon.written++;
+      } catch (e) {
+        sink.record(code1C, e);
+      }
+    }
+    log(
+      `cashtransfers: processed ${recon.written + recon.skipped + recon.errors}`,
+    );
+  }
+
+  return recon;
+}
+
 // ════════════════════════════════════════════════════════════════════════════
 // MAIN
 // ════════════════════════════════════════════════════════════════════════════
@@ -4388,6 +4764,8 @@ const ENTITY_RUNNERS: Record<
   "cashflow-reg": importCashFlowRegister,
   "stock-reg": importStockRegister,
   "orders-reg": importOrderRemainderRegister,
+  bankdocs: importBankDocs,
+  cashtransfers: importCashTransfers,
 };
 
 // Порядок за FK-залежностями (план §13).
@@ -4409,8 +4787,9 @@ const DEFAULT_ORDER: EntityName[] = [
   "routesheets",
   "debt",
   "misc",
-  // *-reg (Фаза 2) свідомо НЕ в дефолті — коди _Fld ще не звірені на живому
-  // MSSQL; запускати ізольовано `--entity sales-reg|cashflow-reg|stock-reg|orders-reg`.
+  // *-reg (Фаза 2) + bankdocs/cashtransfers (Фаза 6) свідомо НЕ в дефолті — їхні
+  // коди _Fld/_Document ще не звірені на живому MSSQL; запускати ізольовано
+  // `--entity sales-reg|cashflow-reg|stock-reg|orders-reg|bankdocs|cashtransfers`.
 ];
 
 function printReconTable(recons: Recon[], dryRun: boolean): void {
