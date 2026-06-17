@@ -20,11 +20,12 @@
  *   --limit N            лише перші N рядків кожної сутності (пробний прогон)
  *   --entity <name>      одна сутність: customers|products|lots|barcodes|prices|
  *                        dictionaries|dictionaries-full|rates|orders|sales|cashorders|
- *                        routesheets|debt|misc (дефолт = всі в порядку)
+ *                        routesheets|debt|misc|sales-reg|cashflow-reg|stock-reg|
+ *                        orders-reg (дефолт = всі, крім rates/*-reg)
  *                        dictionaries-full = Фаза 1: одиниці/міста/області/агенти
  *                        rates = Фаза 4: історичні курси валют
  *                        misc = Фаза 8: історія статусів клієнтів + надійність постачальників
- *                        (+ норми запасів / статус дня — TODO, фіз. таблиці невідомі)
+ *                        *-reg = Фаза 2: регістри-обороти Продажі/ДДС/Залишки/Замовлення
  *   --confirm-prod       дозволити запис коли ціль = бойова база
  *   --batch N            розмір батчу запису (дефолт 500)
  *   --since YYYY-MM-DD   (опц.) лише документи з цієї дати
@@ -54,6 +55,12 @@ import * as mssql from "mssql";
 import { PrismaClient } from "@ltex/db";
 
 import { recomputeDebtForClients } from "../lib/manager/debt-register";
+import {
+  buildSalesMovement,
+  buildCashFlowMovement,
+  buildStockMovement,
+  buildOrderRemainderMovement,
+} from "../lib/manager/registry-import-map";
 
 // ─── Парсинг аргументів ───────────────────────────────────────────────────────
 
@@ -72,6 +79,10 @@ const ENTITY_NAMES = [
   "routesheets",
   "debt",
   "misc",
+  "sales-reg",
+  "cashflow-reg",
+  "stock-reg",
+  "orders-reg",
 ] as const;
 
 type EntityName = (typeof ENTITY_NAMES)[number];
@@ -3895,6 +3906,463 @@ async function importMisc(ctx: ImportContext): Promise<Recon> {
 }
 
 // ════════════════════════════════════════════════════════════════════════════
+// 12. РЕГІСТРИ-ОБОРОТИ (Фаза 2, 5.6) — _AccumRg5604/5309/5788/5374
+// ════════════════════════════════════════════════════════════════════════════
+// Патерн дзеркалить importDebt: stream активних рядків регістра → мапер (з
+// registry-import-map) → батчева createMany з idempotent-ключем джерела.
+// Ідемпотентність: на старті deleteMany по всій таблиці (повне перестворення),
+// далі skipDuplicates як страховка від колізій recorder:lineNo у джерелі.
+//
+// ⚠️ Фізичні коди _FldNNNN звірені з docs/1c-mssql-schema/columns.tsv + XML
+// AccumulationRegisters, але НЕ перевірені на живому MSSQL. Якщо звірка не зійдеться
+// — уточнити мапінг колонок нижче.
+
+const REG_INSERT_BATCH = 1000;
+const REG_AS_OF_FALLBACK = new Date("2021-01-01T00:00:00Z");
+
+// Резолв clientId за hex(Контрагент) з ctx.customers (Customer.id) — для регістрів
+// беремо MgrClient через uid1C напряму, бо clientCode1C тут = hex контрагента.
+async function loadClientIdByHex(
+  ctx: ImportContext,
+): Promise<Map<string, string>> {
+  const map = new Map<string, string>();
+  try {
+    const clients = await ctx.prisma.mgrClient.findMany({
+      where: { uid1C: { not: null } },
+      select: { id: true, uid1C: true },
+    });
+    for (const c of clients) {
+      if (c.uid1C) map.set(c.uid1C, c.id);
+    }
+  } catch (e) {
+    warn(`loadClientIdByHex: ${errMsg(e)}`);
+  }
+  return map;
+}
+
+// ─── 12a. Продажи → SalesMovement ─ _AccumRg5604 ──────────────────────────────
+// Колонки (columns.tsv): _Period, _RecorderRRef, _LineNo, _Active,
+//   _Fld5605RRef=Номенклатура, _Fld5606RRef=ХарактеристикаНоменклатуры,
+//   _Fld5607_RRRef=ЗаказПокупателя(поліморф), _Fld5608RRef=ДоговорКонтрагента,
+//   _Fld5609_RRRef=ДокументПродажи(поліморф), _Fld5613RRef=Контрагент,
+//   _Fld5614=Количество, _Fld5615=Стоимость, _Fld5616=СтоимостьБезСкидок,
+//   _Fld5617=НДС, _Fld7293=Вес.
+// Продажи — оборотний регістр (без _RecordKind): усе recordKind=0 (прихід).
+const SALES_REG_TABLE = "_AccumRg5604";
+const SALES_REG_COLS = [
+  "_Period",
+  "_RecorderRRef",
+  "_LineNo",
+  "_Fld5605RRef", // Номенклатура
+  "_Fld5606RRef", // ХарактеристикаНоменклатуры (лот)
+  "_Fld5607_RRRef", // ЗаказПокупателя
+  "_Fld5609_RRRef", // ДокументПродажи
+  "_Fld5613RRef", // Контрагент
+  "_Fld5614", // Количество
+  "_Fld5615", // Стоимость
+  "_Fld5616", // СтоимостьБезСкидок
+  "_Fld7293", // Вес
+];
+
+async function importSalesRegister(ctx: ImportContext): Promise<Recon> {
+  const recon = newRecon("sales-reg");
+  const sink = new ErrorSink(recon, "sales-reg");
+  const { args, src, prisma } = ctx;
+
+  await ensureProductLotDicts(ctx);
+  const clientByHex = await loadClientIdByHex(ctx);
+
+  const activeWhere = "_Active = 0x01";
+  recon.sourceRows = await countTable(src, SALES_REG_TABLE, activeWhere);
+  log(`sales-reg: active source rows = ${recon.sourceRows}`);
+
+  if (willWrite(ctx)) {
+    const del = await prisma.salesMovement.deleteMany({});
+    log(`sales-reg: cleared ${del.count} prior rows`);
+  }
+
+  let buffer: ReturnType<typeof buildSalesMovement>[] = [];
+  const flush = async (): Promise<void> => {
+    if (buffer.length === 0 || !willWrite(ctx)) {
+      buffer = [];
+      return;
+    }
+    await prisma.salesMovement.createMany({
+      data: buffer,
+      skipDuplicates: true,
+    });
+    buffer = [];
+  };
+
+  let processed = 0;
+  for await (const rows of streamTable(src, SALES_REG_TABLE, SALES_REG_COLS, {
+    batch: args.batch,
+    limit: args.limit,
+    orderBy: ["_RecorderRRef", "_LineNo"],
+    where: activeWhere,
+  })) {
+    for (const row of rows) {
+      processed++;
+      try {
+        const recorderHex = bufToHex(row["_RecorderRRef"]) ?? "—";
+        const lineNo = asNumber(row["_LineNo"]) ?? 0;
+        const productHex = bufToHex(row["_Fld5605RRef"]);
+        const clientHex = bufToHex(row["_Fld5613RRef"]);
+        buffer.push(
+          buildSalesMovement({
+            occurredAt: asDate(row["_Period"]) ?? REG_AS_OF_FALLBACK,
+            recorderCode1C: recorderHex,
+            lineNo,
+            productCode1C: productHex,
+            productId: resolveProductId(ctx, productHex),
+            lotCode1C: bufToHex(row["_Fld5606RRef"]),
+            clientCode1C: clientHex,
+            clientId: clientHex ? (clientByHex.get(clientHex) ?? null) : null,
+            agentCode1C: null, // агента на регістрі немає — беремо з документа Sale
+            orderCode1C: bufToHex(row["_Fld5607_RRRef"]),
+            saleCode1C: bufToHex(row["_Fld5609_RRRef"]),
+            qty: asNumberOr(row["_Fld5614"], 0),
+            weightKg: asNumber(row["_Fld7293"]),
+            revenueEur: asNumberOr(row["_Fld5615"], 0),
+            revenueNoDiscountEur: asNumber(row["_Fld5616"]),
+            recordKind: 0,
+          }),
+        );
+        recon.written++;
+        if (buffer.length >= REG_INSERT_BATCH) await flush();
+      } catch (e) {
+        sink.record(`row#${processed}`, e);
+      }
+    }
+    log(`sales-reg: ${recon.written} written (${processed} processed)`);
+  }
+  await flush();
+  log(`sales-reg: done — written=${recon.written} errors=${recon.errors}`);
+  return recon;
+}
+
+// ─── 12b. ДвиженияДенежныхСредств → CashFlowMovement ─ _AccumRg5309 ───────────
+// Колонки (columns.tsv): _Period, _RecorderRRef, _LineNo, _Active,
+//   _Fld5310_RRRef=БанковскийСчетКасса(поліморф), _Fld5311RRef=ВидДенежныхСредств,
+//   _Fld5312RRef=ПриходРасход(Enum), _Fld5313RRef=СтатьяДвиженияДенежныхСредств,
+//   _Fld5318RRef=Контрагент, _Fld5322=Сумма, далі _Fld...=СуммаУпр.
+//   ПриходРасход — Enum-посилання; напрямок зчитуємо з _EnumOrder через мапу
+//   (0=Приход, 1=Расход), яку будуємо з _Enum-таблиці руху коштів.
+// ⚠️ Точний _FldNNNN для СуммаУпр та фізична таблиця Enum ПриходРасход — TODO
+// уточнити на живому MSSQL; нижче — best-effort (СуммаУпр = останній numeric 15,2).
+const CASHFLOW_REG_TABLE = "_AccumRg5309";
+const CASHFLOW_REG_COLS = [
+  "_Period",
+  "_RecorderRRef",
+  "_LineNo",
+  "_Fld5310_RRRef", // БанковскийСчетКасса
+  "_Fld5312RRef", // ПриходРасход (Enum)
+  "_Fld5313RRef", // СтатьяДвиженияДенежныхСредств
+  "_Fld5318RRef", // Контрагент
+  "_Fld5322", // Сумма (грн)
+  "_Fld5323", // СуммаУпр (EUR) — TODO: уточнити код
+];
+
+// Мапа hex(_IDRRef ПриходРасход) → 0|1. ПриходРасход у 1С — системний Enum
+// "ВидДвиженияНакопления" (Приход=0, Расход=1). Будуємо з _EnumOrder.
+async function loadCashDirectionEnum(
+  pool: mssql.ConnectionPool,
+  enumTable: string,
+): Promise<Map<string, number>> {
+  const map = new Map<string, number>();
+  try {
+    const result = await pool
+      .request()
+      .query<
+        Record<string, unknown>
+      >(`SELECT [_IDRRef], [_EnumOrder] FROM [${enumTable}]`);
+    for (const row of result.recordset ?? []) {
+      const hex = bufToHex(row["_IDRRef"]);
+      const order = asNumber(row["_EnumOrder"]);
+      if (hex && order != null) map.set(hex, order === 0 ? 0 : 1);
+    }
+  } catch (e) {
+    warn(`loadCashDirectionEnum(${enumTable}): ${errMsg(e)}`);
+  }
+  return map;
+}
+
+async function importCashFlowRegister(ctx: ImportContext): Promise<Recon> {
+  const recon = newRecon("cashflow-reg");
+  const sink = new ErrorSink(recon, "cashflow-reg");
+  const { args, src, prisma } = ctx;
+
+  const clientByHex = await loadClientIdByHex(ctx);
+  // TODO: уточнити фізичну таблицю Enum ПриходРасход на MSSQL (тут — порожня мапа
+  // → дефолт напрямок 0; знак можна вивести зі знаку Сумма як фолбек).
+  const dirEnum = new Map<string, number>();
+
+  const activeWhere = "_Active = 0x01";
+  recon.sourceRows = await countTable(src, CASHFLOW_REG_TABLE, activeWhere);
+  log(`cashflow-reg: active source rows = ${recon.sourceRows}`);
+
+  if (willWrite(ctx)) {
+    const del = await prisma.cashFlowMovement.deleteMany({});
+    log(`cashflow-reg: cleared ${del.count} prior rows`);
+  }
+
+  let buffer: ReturnType<typeof buildCashFlowMovement>[] = [];
+  const flush = async (): Promise<void> => {
+    if (buffer.length === 0 || !willWrite(ctx)) {
+      buffer = [];
+      return;
+    }
+    await prisma.cashFlowMovement.createMany({
+      data: buffer,
+      skipDuplicates: true,
+    });
+    buffer = [];
+  };
+
+  let processed = 0;
+  for await (const rows of streamTable(
+    src,
+    CASHFLOW_REG_TABLE,
+    CASHFLOW_REG_COLS,
+    {
+      batch: args.batch,
+      limit: args.limit,
+      orderBy: ["_RecorderRRef", "_LineNo"],
+      where: activeWhere,
+    },
+  )) {
+    for (const row of rows) {
+      processed++;
+      try {
+        const recorderHex = bufToHex(row["_RecorderRRef"]) ?? "—";
+        const lineNo = asNumber(row["_LineNo"]) ?? 0;
+        const dirHex = bufToHex(row["_Fld5312RRef"]);
+        const amountUah = asNumberOr(row["_Fld5322"], 0);
+        // Напрямок: спершу з Enum, фолбек — знак суми (<0 → розхід).
+        const direction =
+          (dirHex ? dirEnum.get(dirHex) : undefined) ?? (amountUah < 0 ? 1 : 0);
+        buffer.push(
+          buildCashFlowMovement({
+            occurredAt: asDate(row["_Period"]) ?? REG_AS_OF_FALLBACK,
+            recorderCode1C: recorderHex,
+            lineNo,
+            accountCode1C: bufToHex(row["_Fld5310_RRRef"]),
+            articleCode1C: bufToHex(row["_Fld5313RRef"]),
+            direction,
+            clientCode1C: bufToHex(row["_Fld5318RRef"]),
+            amountUah: Math.abs(amountUah),
+            amountUpr: asNumber(row["_Fld5323"]),
+          }),
+        );
+        recon.written++;
+        if (buffer.length >= REG_INSERT_BATCH) await flush();
+      } catch (e) {
+        sink.record(`row#${processed}`, e);
+      }
+    }
+    log(`cashflow-reg: ${recon.written} written (${processed} processed)`);
+  }
+  await flush();
+  log(`cashflow-reg: done — written=${recon.written} errors=${recon.errors}`);
+  return recon;
+}
+
+// ─── 12c. ТоварыНаСкладах → StockMovement ─ _AccumRg5788 ──────────────────────
+// Колонки: _Period, _RecorderRRef, _LineNo, _Active, _RecordKind,
+//   _Fld5789RRef=Склад, _Fld5790RRef=Номенклатура,
+//   _Fld5791RRef=ХарактеристикаНоменклатуры, _Fld5792RRef=СерияНоменклатуры,
+//   _Fld5793RRef=Качество, _Fld5794=Количество.
+// Балансовий регістр (_RecordKind). Вага у штучному регістрі відсутня — приходить
+// з окремого _AccumRg6608 (ТовариНаСкладахУВазі); тут weightKg=null
+// (TODO Фаза 2.1: JOIN вагового регістра по recorder+lineNo).
+const STOCK_REG_TABLE = "_AccumRg5788";
+const STOCK_REG_COLS = [
+  "_Period",
+  "_RecorderRRef",
+  "_LineNo",
+  "_RecordKind",
+  "_Fld5789RRef", // Склад
+  "_Fld5790RRef", // Номенклатура
+  "_Fld5791RRef", // ХарактеристикаНоменклатуры (лот)
+  "_Fld5793RRef", // Качество
+  "_Fld5794", // Количество
+];
+
+async function importStockRegister(ctx: ImportContext): Promise<Recon> {
+  const recon = newRecon("stock-reg");
+  const sink = new ErrorSink(recon, "stock-reg");
+  const { args, src, prisma } = ctx;
+
+  await ensureProductLotDicts(ctx);
+
+  const activeWhere = "_Active = 0x01";
+  recon.sourceRows = await countTable(src, STOCK_REG_TABLE, activeWhere);
+  log(`stock-reg: active source rows = ${recon.sourceRows}`);
+
+  if (willWrite(ctx)) {
+    const del = await prisma.stockMovement.deleteMany({});
+    log(`stock-reg: cleared ${del.count} prior rows`);
+  }
+
+  let buffer: ReturnType<typeof buildStockMovement>[] = [];
+  const flush = async (): Promise<void> => {
+    if (buffer.length === 0 || !willWrite(ctx)) {
+      buffer = [];
+      return;
+    }
+    await prisma.stockMovement.createMany({
+      data: buffer,
+      skipDuplicates: true,
+    });
+    buffer = [];
+  };
+
+  let processed = 0;
+  for await (const rows of streamTable(src, STOCK_REG_TABLE, STOCK_REG_COLS, {
+    batch: args.batch,
+    limit: args.limit,
+    orderBy: ["_RecorderRRef", "_LineNo"],
+    where: activeWhere,
+  })) {
+    for (const row of rows) {
+      processed++;
+      try {
+        const recorderHex = bufToHex(row["_RecorderRRef"]) ?? "—";
+        const lineNo = asNumber(row["_LineNo"]) ?? 0;
+        const productHex = bufToHex(row["_Fld5790RRef"]);
+        if (!productHex) {
+          recon.unresolved++;
+          continue;
+        }
+        buffer.push(
+          buildStockMovement({
+            occurredAt: asDate(row["_Period"]) ?? REG_AS_OF_FALLBACK,
+            recorderCode1C: recorderHex,
+            lineNo,
+            warehouseCode1C: bufToHex(row["_Fld5789RRef"]),
+            productCode1C: productHex,
+            productId: resolveProductId(ctx, productHex),
+            lotCode1C: bufToHex(row["_Fld5791RRef"]),
+            quality: bufToHex(row["_Fld5793RRef"]),
+            qty: asNumberOr(row["_Fld5794"], 0),
+            weightKg: null, // TODO: JOIN _AccumRg6608 (вага)
+            recordKind: asNumber(row["_RecordKind"]) ?? 0,
+          }),
+        );
+        recon.written++;
+        if (buffer.length >= REG_INSERT_BATCH) await flush();
+      } catch (e) {
+        sink.record(`row#${processed}`, e);
+      }
+    }
+    log(`stock-reg: ${recon.written} written (${processed} processed)`);
+  }
+  await flush();
+  log(
+    `stock-reg: done — written=${recon.written} unresolved=${recon.unresolved} errors=${recon.errors}`,
+  );
+  return recon;
+}
+
+// ─── 12d. ЗаказыПокупателей → OrderRemainderMovement ─ _AccumRg5374 ───────────
+// Колонки: _Period, _RecorderRRef, _LineNo, _Active, _RecordKind,
+//   _Fld5375RRef=ДоговорКонтрагента, _Fld5376RRef=ЗаказПокупателя,
+//   _Fld5377RRef=СтатусПартии, _Fld5378RRef=Номенклатура,
+//   _Fld5379RRef=ХарактеристикаНоменклатуры, _Fld5380=Количество.
+const ORDERS_REG_TABLE = "_AccumRg5374";
+const ORDERS_REG_COLS = [
+  "_Period",
+  "_RecorderRRef",
+  "_LineNo",
+  "_RecordKind",
+  "_Fld5376RRef", // ЗаказПокупателя
+  "_Fld5378RRef", // Номенклатура
+  "_Fld5380", // Количество
+];
+
+async function importOrderRemainderRegister(
+  ctx: ImportContext,
+): Promise<Recon> {
+  const recon = newRecon("orders-reg");
+  const sink = new ErrorSink(recon, "orders-reg");
+  const { args, src, prisma } = ctx;
+
+  await ensureProductLotDicts(ctx);
+  await ensureOrderDict(ctx);
+
+  const activeWhere = "_Active = 0x01";
+  recon.sourceRows = await countTable(src, ORDERS_REG_TABLE, activeWhere);
+  log(`orders-reg: active source rows = ${recon.sourceRows}`);
+
+  if (willWrite(ctx)) {
+    const del = await prisma.orderRemainderMovement.deleteMany({});
+    log(`orders-reg: cleared ${del.count} prior rows`);
+  }
+
+  let buffer: ReturnType<typeof buildOrderRemainderMovement>[] = [];
+  const flush = async (): Promise<void> => {
+    if (buffer.length === 0 || !willWrite(ctx)) {
+      buffer = [];
+      return;
+    }
+    await prisma.orderRemainderMovement.createMany({
+      data: buffer,
+      skipDuplicates: true,
+    });
+    buffer = [];
+  };
+
+  let processed = 0;
+  for await (const rows of streamTable(src, ORDERS_REG_TABLE, ORDERS_REG_COLS, {
+    batch: args.batch,
+    limit: args.limit,
+    orderBy: ["_RecorderRRef", "_LineNo"],
+    where: activeWhere,
+  })) {
+    for (const row of rows) {
+      processed++;
+      try {
+        const recorderHex = bufToHex(row["_RecorderRRef"]) ?? "—";
+        const lineNo = asNumber(row["_LineNo"]) ?? 0;
+        const orderHex = bufToHex(row["_Fld5376RRef"]);
+        if (!orderHex) {
+          recon.unresolved++;
+          continue;
+        }
+        const orderEntry = ctx.orders.get(orderHex);
+        const productHex = bufToHex(row["_Fld5378RRef"]);
+        buffer.push(
+          buildOrderRemainderMovement({
+            occurredAt: asDate(row["_Period"]) ?? REG_AS_OF_FALLBACK,
+            recorderCode1C: recorderHex,
+            lineNo,
+            orderCode1C: orderHex,
+            orderId:
+              orderEntry && orderEntry.id !== "(pending)"
+                ? orderEntry.id
+                : null,
+            productCode1C: productHex,
+            productId: resolveProductId(ctx, productHex),
+            qty: asNumberOr(row["_Fld5380"], 0),
+            recordKind: asNumber(row["_RecordKind"]) ?? 0,
+          }),
+        );
+        recon.written++;
+        if (buffer.length >= REG_INSERT_BATCH) await flush();
+      } catch (e) {
+        sink.record(`row#${processed}`, e);
+      }
+    }
+    log(`orders-reg: ${recon.written} written (${processed} processed)`);
+  }
+  await flush();
+  log(
+    `orders-reg: done — written=${recon.written} unresolved=${recon.unresolved} errors=${recon.errors}`,
+  );
+  return recon;
+}
+
+// ════════════════════════════════════════════════════════════════════════════
 // MAIN
 // ════════════════════════════════════════════════════════════════════════════
 
@@ -3916,6 +4384,10 @@ const ENTITY_RUNNERS: Record<
   routesheets: importRouteSheets,
   debt: importDebt,
   misc: importMisc,
+  "sales-reg": importSalesRegister,
+  "cashflow-reg": importCashFlowRegister,
+  "stock-reg": importStockRegister,
+  "orders-reg": importOrderRemainderRegister,
 };
 
 // Порядок за FK-залежностями (план §13).
@@ -3937,6 +4409,8 @@ const DEFAULT_ORDER: EntityName[] = [
   "routesheets",
   "debt",
   "misc",
+  // *-reg (Фаза 2) свідомо НЕ в дефолті — коди _Fld ще не звірені на живому
+  // MSSQL; запускати ізольовано `--entity sales-reg|cashflow-reg|stock-reg|orders-reg`.
 ];
 
 function printReconTable(recons: Recon[], dryRun: boolean): void {
