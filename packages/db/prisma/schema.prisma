@@ -494,6 +494,7 @@ model ExchangeRate {
   source       String   @default("1c")
 
   @@unique([currencyFrom, currencyTo, date])
+  @@index([currencyFrom, currencyTo, date(sort: Desc)])
   @@map("exchange_rates")
 }
 

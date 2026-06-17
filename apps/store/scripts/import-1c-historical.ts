@@ -19,7 +19,8 @@
  *   --dry-run            читає 1С + резолвить зв'язки, нічого не пише
  *   --limit N            лише перші N рядків кожної сутності (пробний прогон)
  *   --entity <name>      одна сутність: customers|products|lots|barcodes|prices|
- *                        orders|sales|cashorders|routesheets|debt (дефолт = всі в порядку)
+ *                        dictionaries|rates|orders|sales|cashorders|routesheets|debt
+ *                        (дефолт = всі в порядку)
  *   --confirm-prod       дозволити запис коли ціль = бойова база
  *   --batch N            розмір батчу запису (дефолт 500)
  *   --since YYYY-MM-DD   (опц.) лише документи з цієї дати
@@ -59,6 +60,7 @@ const ENTITY_NAMES = [
   "barcodes",
   "prices",
   "dictionaries",
+  "rates",
   "orders",
   "sales",
   "cashorders",
@@ -3243,6 +3245,7 @@ const ENTITY_RUNNERS: Record<
   barcodes: importBarcodes,
   prices: importPrices,
   dictionaries: importDictionaries,
+  rates: importRates,
   orders: importOrders,
   sales: importSales,
   cashorders: importCashOrders,
@@ -3252,6 +3255,9 @@ const ENTITY_RUNNERS: Record<
 
 // Порядок за FK-залежностями (план §13).
 // `debt` — в кінці: лише оновлює MgrClient.debt, не потребує документів.
+// `rates` свідомо НЕ у переліку: курси вже імпортує `dictionaries` (importRates
+// викликається у importDictionaries). Окремий `--entity rates` потрібен лише для
+// ізольованого реімпорту/довантаження курсів без решти довідників.
 const DEFAULT_ORDER: EntityName[] = [
   "customers",
   "products",
