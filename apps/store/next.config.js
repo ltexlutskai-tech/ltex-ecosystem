@@ -66,7 +66,7 @@ const nextConfig = {
           },
           {
             key: "X-Frame-Options",
-            value: "DENY",
+            value: "SAMEORIGIN",
           },
           {
             key: "X-XSS-Protection",
@@ -90,7 +90,7 @@ const nextConfig = {
               "img-src 'self' data: blob: https://*.supabase.co https://img.youtube.com https://i.ytimg.com",
               "font-src 'self'",
               "connect-src 'self' https://*.supabase.co",
-              "frame-src https://www.youtube.com https://youtube.com",
+              "frame-src 'self' https://www.youtube.com https://youtube.com",
               "object-src 'none'",
               "base-uri 'self'",
               "form-action 'self'",
