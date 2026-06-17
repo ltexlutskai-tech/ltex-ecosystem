@@ -4,11 +4,14 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const TABS: { href: string; label: string }[] = [
+  { href: "/manager/reports/sales-summary", label: "Підсумок продажів" },
   { href: "/manager/reports/sales-by-client", label: "Продажі по клієнтах" },
   {
     href: "/manager/reports/sales-by-supplier",
     label: "Продажі по постачальниках",
   },
+  { href: "/manager/reports/cashflow", label: "Рух коштів (ДДС)" },
+  { href: "/manager/reports/stock-balance", label: "Залишки складу" },
   { href: "/manager/reports/debts", label: "Прострочені борги" },
 ];
 

@@ -1678,6 +1678,109 @@ model MgrDebtMovement {
   @@map("mgr_debt_movements")
 }
 
+// ─── Регістри-обороти (Фаза 2, 5.6) ─────────────────────────────────────────
+// Матеріалізовані рухи 1С AccumulationRegisters. Патерн дзеркалить MgrDebtMovement:
+// окрема таблиця рухів + idempotent-ключ джерела (recorderCode1C + lineNo). Усі
+// FK-резолви (productId/clientId/lotId) — best-effort: при недоступному словнику
+// лишаємо *Code1C (hex) і резолвимо id пізніше. Виміри/ресурси кожного регістра —
+// у docs/1C_REGISTRY_INVENTORY.md (ЧАСТИНА C1).
+
+/// 1С `AccumRg Продажи` (_AccumRg5604) — обороти продажів.
+/// recordKind: 0=прихід (звичайна реалізація), 1=розхід (повернення).
+model SalesMovement {
+  id                   String   @id @default(cuid())
+  occurredAt           DateTime @map("occurred_at")
+  recorderCode1C       String   @map("recorder_code_1c") // hex(_RecorderRRef) документа-реєстратора
+  lineNo               Int      @map("line_no")
+  productCode1C        String?  @map("product_code_1c") // hex(Номенклатура)
+  productId            String?  @map("product_id")
+  lotCode1C            String?  @map("lot_code_1c") // hex(ХарактеристикаНоменклатуры)
+  clientCode1C         String?  @map("client_code_1c") // hex(Контрагент)
+  clientId             String?  @map("client_id")
+  agentCode1C          String?  @map("agent_code_1c") // hex(ТорговийАгент) — якщо є на регістрі
+  orderCode1C          String?  @map("order_code_1c") // hex(ЗаказПокупателя)
+  saleCode1C           String?  @map("sale_code_1c") // hex(ДокументПродажи)
+  qty                  Decimal  @db.Decimal(15, 3) // Количество
+  weightKg             Decimal? @map("weight_kg") @db.Decimal(15, 3) // Вес
+  revenueEur           Decimal  @map("revenue_eur") @db.Decimal(15, 2) // Стоимость
+  revenueNoDiscountEur Decimal? @map("revenue_no_discount_eur") @db.Decimal(15, 2) // СтоимостьБезСкидок
+  costEur              Decimal? @map("cost_eur") @db.Decimal(15, 2) // собівартість (Фаза 3, поки null)
+  recordKind           Int      @map("record_kind") // 0=прихід / 1=розхід
+  createdAt            DateTime @default(now()) @map("created_at")
+
+  @@unique([recorderCode1C, lineNo], name: "sales_movement_src")
+  @@index([clientCode1C, occurredAt])
+  @@index([productCode1C])
+  @@index([occurredAt])
+  @@map("sales_movements")
+}
+
+/// 1С `AccumRg ДвиженияДенежныхСредств` (_AccumRg5309) — рух коштів (ДДС).
+/// direction: 0=прихід / 1=розхід (ПриходРасход).
+model CashFlowMovement {
+  id             String   @id @default(cuid())
+  occurredAt     DateTime @map("occurred_at")
+  recorderCode1C String   @map("recorder_code_1c")
+  lineNo         Int      @map("line_no")
+  accountCode1C  String?  @map("account_code_1c") // hex(БанковскийСчетКасса)
+  articleCode1C  String?  @map("article_code_1c") // hex(СтатьяДвиженияДенежныхСредств)
+  direction      Int // 0=прихід / 1=розхід
+  clientCode1C   String?  @map("client_code_1c") // hex(Контрагент)
+  amountUah      Decimal  @map("amount_uah") @db.Decimal(15, 2) // Сумма
+  amountUpr      Decimal? @map("amount_upr") @db.Decimal(15, 2) // СуммаУпр (EUR)
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  @@unique([recorderCode1C, lineNo], name: "cash_flow_movement_src")
+  @@index([articleCode1C, occurredAt])
+  @@index([occurredAt])
+  @@map("cash_flow_movements")
+}
+
+/// 1С `AccumRg ТоварыНаСкладах` (_AccumRg5788) + вага `ТовариНаСкладахУВазі`
+/// (_AccumRg6608). Залишковий регістр: recordKind 0=прихід / 1=розхід.
+model StockMovement {
+  id             String   @id @default(cuid())
+  occurredAt     DateTime @map("occurred_at")
+  recorderCode1C String   @map("recorder_code_1c")
+  lineNo         Int      @map("line_no")
+  warehouseCode1C String? @map("warehouse_code_1c") // hex(Склад)
+  productCode1C  String   @map("product_code_1c") // hex(Номенклатура)
+  productId      String?  @map("product_id")
+  lotCode1C      String?  @map("lot_code_1c") // hex(ХарактеристикаНоменклатуры)
+  quality        String? // hex(Качество) або текст
+  qty            Decimal  @db.Decimal(15, 3) // Количество (шт)
+  weightKg       Decimal? @map("weight_kg") @db.Decimal(15, 3) // кг (з _AccumRg6608)
+  recordKind     Int      @map("record_kind") // 0=прихід / 1=розхід
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  @@unique([recorderCode1C, lineNo, productCode1C], name: "stock_movement_src")
+  @@index([productCode1C, occurredAt])
+  @@index([warehouseCode1C])
+  @@index([occurredAt])
+  @@map("stock_movements")
+}
+
+/// 1С `AccumRg ЗаказыПокупателей` (_AccumRg5374) — залишки замовлень.
+/// recordKind 0=прихід (замовлено) / 1=розхід (відвантажено/закрито).
+model OrderRemainderMovement {
+  id             String   @id @default(cuid())
+  occurredAt     DateTime @map("occurred_at")
+  recorderCode1C String   @map("recorder_code_1c")
+  lineNo         Int      @map("line_no")
+  orderCode1C    String   @map("order_code_1c") // hex(ЗаказПокупателя)
+  orderId        String?  @map("order_id")
+  productCode1C  String?  @map("product_code_1c") // hex(Номенклатура)
+  productId      String?  @map("product_id")
+  qty            Decimal  @db.Decimal(15, 3) // Количество
+  recordKind     Int      @map("record_kind")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  @@unique([recorderCode1C, lineNo, orderCode1C], name: "order_remainder_movement_src")
+  @@index([orderCode1C, occurredAt])
+  @@index([occurredAt])
+  @@map("order_remainder_movements")
+}
+
 // ─── Email DLQ (persistent retry queue, Session 70) ─────────────────────────
 
 model EmailJob {
