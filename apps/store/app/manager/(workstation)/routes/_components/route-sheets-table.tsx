@@ -6,14 +6,14 @@ export function RouteSheetsTable({ items }: { items: RouteSheetsRowData[] }) {
     <div className="overflow-x-auto rounded-lg border bg-white">
       <table className="w-full text-sm">
         <thead>
-          <tr className="border-b bg-gray-50 text-left text-gray-500">
-            <th className="px-4 py-2 font-medium">Дата</th>
-            <th className="px-4 py-2 font-medium">Номер</th>
-            <th className="px-4 py-2 font-medium">Маршрут</th>
-            <th className="px-4 py-2 font-medium">Експедитор</th>
-            <th className="px-4 py-2 font-medium">Статус</th>
-            <th className="px-4 py-2 text-right font-medium">Сума</th>
-            <th className="w-12 px-4 py-2 font-medium"></th>
+          <tr className="border-b bg-gray-50 text-left text-xs tracking-wide text-gray-500 uppercase">
+            <th className="px-2.5 py-1.5 font-medium">Дата</th>
+            <th className="px-2.5 py-1.5 font-medium">Номер</th>
+            <th className="px-2.5 py-1.5 font-medium">Маршрут</th>
+            <th className="px-2.5 py-1.5 font-medium">Експедитор</th>
+            <th className="px-2.5 py-1.5 font-medium">Статус</th>
+            <th className="px-2.5 py-1.5 text-right font-medium">Сума</th>
+            <th className="w-12 px-2.5 py-1.5 font-medium"></th>
           </tr>
         </thead>
         <tbody>

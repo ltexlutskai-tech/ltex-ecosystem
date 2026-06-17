@@ -25,13 +25,13 @@ export function ClientSalesHistoryList({
     <div className="overflow-x-auto rounded-lg border bg-white">
       <table className="w-full text-sm">
         <thead>
-          <tr className="border-b bg-gray-50 text-left text-gray-500">
-            <th className="px-4 py-2 font-medium">№</th>
-            <th className="px-4 py-2 font-medium">Дата</th>
-            <th className="px-4 py-2 font-medium">Статус</th>
-            <th className="px-4 py-2 text-center font-medium">Позицій</th>
-            <th className="px-4 py-2 text-right font-medium">Сума</th>
-            <th className="w-12 px-4 py-2 font-medium"></th>
+          <tr className="border-b bg-gray-50 text-left text-xs tracking-wide text-gray-500 uppercase">
+            <th className="px-2.5 py-1.5 font-medium">№</th>
+            <th className="px-2.5 py-1.5 font-medium">Дата</th>
+            <th className="px-2.5 py-1.5 font-medium">Статус</th>
+            <th className="px-2.5 py-1.5 text-center font-medium">Позицій</th>
+            <th className="px-2.5 py-1.5 text-right font-medium">Сума</th>
+            <th className="w-12 px-2.5 py-1.5 font-medium"></th>
           </tr>
         </thead>
         <tbody>
@@ -40,7 +40,7 @@ export function ClientSalesHistoryList({
               key={s.id}
               className="border-b last:border-b-0 hover:bg-gray-50"
             >
-              <td className="px-4 py-3 font-mono text-sm text-gray-700">
+              <td className="px-2.5 py-1.5 font-mono text-sm text-gray-700">
                 <Link
                   href={`/manager/sales/${s.id}`}
                   className="hover:text-blue-600"
@@ -48,19 +48,19 @@ export function ClientSalesHistoryList({
                   {formatDocNumber(s)}
                 </Link>
               </td>
-              <td className="px-4 py-3 text-sm text-gray-600">
+              <td className="px-2.5 py-1.5 text-sm whitespace-nowrap text-gray-600">
                 {new Date(s.createdAt).toLocaleDateString("uk-UA")}
               </td>
-              <td className="px-4 py-3">
+              <td className="px-2.5 py-1.5">
                 <SaleStatusBadge status={s.status} />
               </td>
-              <td className="px-4 py-3 text-center text-sm text-gray-700">
+              <td className="px-2.5 py-1.5 text-center text-sm whitespace-nowrap text-gray-700">
                 {s.itemCount}
               </td>
-              <td className="px-4 py-3 text-right text-sm font-medium text-gray-800">
+              <td className="px-2.5 py-1.5 text-right text-sm font-medium whitespace-nowrap text-gray-800">
                 {Math.round(s.totalUah).toLocaleString("uk-UA")} ₴
               </td>
-              <td className="px-4 py-3 text-right">
+              <td className="px-2.5 py-1.5 text-right">
                 <Link
                   href={`/manager/sales/${s.id}`}
                   className="inline-flex items-center gap-1 text-sm text-blue-600 hover:text-blue-700"

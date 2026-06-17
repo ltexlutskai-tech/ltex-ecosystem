@@ -40,14 +40,14 @@ export function PaymentsRow({
       <td
         data-col="date"
         data-value={date}
-        className="px-4 py-3 text-sm text-gray-600"
+        className="px-2.5 py-1.5 text-sm whitespace-nowrap text-gray-600"
       >
         {date}
       </td>
       <td
         data-col="code"
         data-value={formatDocNumber(order)}
-        className={`px-4 py-3 font-mono text-sm ${
+        className={`px-2.5 py-1.5 font-mono text-sm ${
           dimmed ? "text-gray-400" : "text-gray-700"
         }`}
       >
@@ -58,13 +58,13 @@ export function PaymentsRow({
           {formatDocNumber(order)}
         </Link>
       </td>
-      <td data-col="type" data-value={order.type} className="px-4 py-3">
+      <td data-col="type" data-value={order.type} className="px-2.5 py-1.5">
         <CashOrderTypeBadge type={order.type} />
       </td>
       <td
         data-col="client"
         data-value={order.customerName}
-        className={`px-4 py-3 text-sm ${
+        className={`px-2.5 py-1.5 text-sm ${
           dimmed ? "text-gray-400" : "text-gray-800"
         }`}
       >
@@ -82,14 +82,14 @@ export function PaymentsRow({
       <td
         data-col="article"
         data-value={order.cashFlowArticleName ?? ""}
-        className="px-4 py-3 text-sm text-gray-600"
+        className="px-2.5 py-1.5 text-sm text-gray-600"
       >
         {order.cashFlowArticleName ?? "—"}
       </td>
       <td
         data-col="sum"
         data-value={order.documentSumEur.toFixed(2)}
-        className={`px-4 py-3 text-right text-sm font-medium ${
+        className={`px-2.5 py-1.5 text-right text-sm font-medium whitespace-nowrap ${
           dimmed ? "text-gray-400" : "text-gray-800"
         }`}
       >
@@ -102,11 +102,11 @@ export function PaymentsRow({
       <td
         data-col="account"
         data-value={order.bankAccountName ?? ""}
-        className="px-4 py-3 text-sm text-gray-600"
+        className="px-2.5 py-1.5 text-sm text-gray-600"
       >
         {order.bankAccountName ?? "—"}
       </td>
-      <td className="px-4 py-3 text-right">
+      <td className="px-2.5 py-1.5 text-right">
         <Link
           href={`/manager/payments/${order.id}`}
           className="inline-flex items-center gap-1 text-sm text-blue-600 hover:text-blue-700"

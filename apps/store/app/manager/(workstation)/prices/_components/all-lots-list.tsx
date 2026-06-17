@@ -127,14 +127,16 @@ export function AllLotsList({ groups, rateUah, sellerName }: Props) {
             <table className="min-w-full divide-y divide-gray-200 text-sm">
               <thead className="bg-white text-left text-xs uppercase tracking-wide text-gray-500">
                 <tr>
-                  <th className="px-3 py-2">Штрихкод</th>
-                  <th className="px-3 py-2 whitespace-nowrap">Вага, кг</th>
-                  <th className="px-3 py-2 whitespace-nowrap">Менеджер</th>
-                  <th className="px-3 py-2 whitespace-nowrap">Дата відео</th>
-                  <th className="px-3 py-2">Сектор</th>
-                  <th className="px-3 py-2">Бронь</th>
-                  <th className="px-3 py-2 text-center">Ціль</th>
-                  <th className="px-3 py-2 text-center">Відкрито</th>
+                  <th className="px-2.5 py-1.5">Штрихкод</th>
+                  <th className="px-2.5 py-1.5 whitespace-nowrap">Вага, кг</th>
+                  <th className="px-2.5 py-1.5 whitespace-nowrap">Менеджер</th>
+                  <th className="px-2.5 py-1.5 whitespace-nowrap">
+                    Дата відео
+                  </th>
+                  <th className="px-2.5 py-1.5">Сектор</th>
+                  <th className="px-2.5 py-1.5">Бронь</th>
+                  <th className="px-2.5 py-1.5 text-center">Ціль</th>
+                  <th className="px-2.5 py-1.5 text-center">Відкрито</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -144,28 +146,28 @@ export function AllLotsList({ groups, rateUah, sellerName }: Props) {
                     onClick={() => setOpenLotId(lot.id)}
                     className={`cursor-pointer ${rowClass(lot)}`}
                   >
-                    <td className="px-3 py-2 font-mono text-xs text-gray-600">
+                    <td className="px-2.5 py-1.5 font-mono text-xs text-gray-600">
                       {lot.barcode}
                     </td>
-                    <td className="px-3 py-2 whitespace-nowrap text-gray-800">
+                    <td className="px-2.5 py-1.5 whitespace-nowrap text-gray-800">
                       {lot.weight.toLocaleString("uk-UA")}
                     </td>
-                    <td className="px-3 py-2 whitespace-nowrap text-gray-700">
+                    <td className="px-2.5 py-1.5 whitespace-nowrap text-gray-700">
                       {lot.reservedByName ?? "—"}
                     </td>
-                    <td className="px-3 py-2 whitespace-nowrap text-gray-700">
+                    <td className="px-2.5 py-1.5 whitespace-nowrap text-gray-700">
                       {formatDate(lot.videoDateIso)}
                     </td>
-                    <td className="px-3 py-2 text-gray-700">
+                    <td className="px-2.5 py-1.5 text-gray-700">
                       {lot.sector ?? "—"}
                     </td>
-                    <td className="px-3 py-2 text-xs">
+                    <td className="px-2.5 py-1.5 text-xs">
                       <BookingCell lot={lot} />
                     </td>
-                    <td className="px-3 py-2 text-center">
+                    <td className="px-2.5 py-1.5 text-center">
                       {lot.isTarget ? "✔" : "—"}
                     </td>
-                    <td className="px-3 py-2 text-center">
+                    <td className="px-2.5 py-1.5 text-center">
                       {lot.isOpen ? (
                         <span className="rounded bg-blue-100 px-1.5 py-0.5 text-xs text-blue-700">
                           Відкрито

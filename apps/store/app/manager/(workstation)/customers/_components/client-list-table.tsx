@@ -35,7 +35,7 @@ export function ClientListTable({ items, columnsPrefs }: Props) {
         <thead className="bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
           <tr>
             {visibleCols.map((col) => (
-              <th key={col.key} className="px-4 py-2 whitespace-nowrap">
+              <th key={col.key} className="px-2.5 py-1.5 whitespace-nowrap">
                 {COLUMN_LABELS[col.key] ?? col.key}
               </th>
             ))}
@@ -56,7 +56,7 @@ export function ClientListTable({ items, columnsPrefs }: Props) {
                 {visibleCols.map((col) => (
                   <td
                     key={col.key}
-                    className="px-4 py-2 align-top text-gray-800"
+                    className="px-2.5 py-1.5 align-top text-gray-800"
                   >
                     {renderCell(col.key, c)}
                   </td>

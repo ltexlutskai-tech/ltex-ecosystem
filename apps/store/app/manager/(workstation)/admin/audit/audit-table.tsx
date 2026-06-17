@@ -57,25 +57,25 @@ export function AuditLogTable({ result }: { result: AuditLogQueryResult }) {
         <table className="w-full text-sm">
           <thead className="bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
             <tr>
-              <th className="px-3 py-2">Час</th>
-              <th className="px-3 py-2">Користувач</th>
-              <th className="px-3 py-2">Роль</th>
-              <th className="px-3 py-2">Дія</th>
-              <th className="px-3 py-2">Ресурс</th>
-              <th className="px-3 py-2">Опис</th>
-              <th className="px-3 py-2">IP</th>
+              <th className="px-2.5 py-1.5">Час</th>
+              <th className="px-2.5 py-1.5">Користувач</th>
+              <th className="px-2.5 py-1.5">Роль</th>
+              <th className="px-2.5 py-1.5">Дія</th>
+              <th className="px-2.5 py-1.5">Ресурс</th>
+              <th className="px-2.5 py-1.5">Опис</th>
+              <th className="px-2.5 py-1.5">IP</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
             {result.items.map((it) => (
               <tr key={it.id} className={it.isOwnerAction ? "bg-amber-50" : ""}>
-                <td className="px-3 py-2 whitespace-nowrap text-gray-700">
+                <td className="px-2.5 py-1.5 whitespace-nowrap text-gray-700">
                   {formatDateTime(it.createdAt)}
                 </td>
-                <td className="px-3 py-2 text-gray-900">
+                <td className="px-2.5 py-1.5 text-gray-900">
                   {it.userEmail ?? "—"}
                 </td>
-                <td className="px-3 py-2">
+                <td className="px-2.5 py-1.5">
                   <span className="text-xs text-gray-700">
                     {ROLE_LABEL[it.userRole] ?? it.userRole}
                   </span>
@@ -85,10 +85,10 @@ export function AuditLogTable({ result }: { result: AuditLogQueryResult }) {
                     </span>
                   ) : null}
                 </td>
-                <td className="px-3 py-2 text-gray-700">
+                <td className="px-2.5 py-1.5 text-gray-700">
                   {ACTION_LABEL[it.action] ?? it.action}
                 </td>
-                <td className="px-3 py-2 text-gray-700">
+                <td className="px-2.5 py-1.5 text-gray-700">
                   <span>{RESOURCE_LABEL[it.resource] ?? it.resource}</span>
                   {it.resourceId ? (
                     <span className="ml-1 text-xs text-gray-400">
@@ -96,8 +96,10 @@ export function AuditLogTable({ result }: { result: AuditLogQueryResult }) {
                     </span>
                   ) : null}
                 </td>
-                <td className="px-3 py-2 text-gray-700">{it.summary ?? "—"}</td>
-                <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-500">
+                <td className="px-2.5 py-1.5 text-gray-700">
+                  {it.summary ?? "—"}
+                </td>
+                <td className="px-2.5 py-1.5 whitespace-nowrap text-xs text-gray-500">
                   {it.ip ?? "—"}
                 </td>
               </tr>

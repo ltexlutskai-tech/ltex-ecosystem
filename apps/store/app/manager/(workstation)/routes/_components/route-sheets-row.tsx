@@ -30,9 +30,11 @@ export function RouteSheetsRow({ sheet }: { sheet: RouteSheetsRowData }) {
         dimmed ? "bg-gray-50 text-gray-400" : ""
       }`}
     >
-      <td className="px-4 py-3 text-sm text-gray-600">{date}</td>
+      <td className="px-2.5 py-1.5 text-sm whitespace-nowrap text-gray-600">
+        {date}
+      </td>
       <td
-        className={`px-4 py-3 font-mono text-sm ${
+        className={`px-2.5 py-1.5 font-mono text-sm ${
           dimmed ? "text-gray-400" : "text-gray-700"
         }`}
       >
@@ -44,35 +46,35 @@ export function RouteSheetsRow({ sheet }: { sheet: RouteSheetsRowData }) {
         </Link>
       </td>
       <td
-        className={`px-4 py-3 text-sm ${
+        className={`px-2.5 py-1.5 text-sm ${
           dimmed ? "text-gray-400" : "text-gray-800"
         }`}
       >
         {sheet.routeName ?? "—"}
       </td>
-      <td className="px-4 py-3 text-sm text-gray-600">
+      <td className="px-2.5 py-1.5 text-sm text-gray-600">
         {sheet.expeditor?.fullName ?? "—"}
       </td>
-      <td className="px-4 py-3">
+      <td className="px-2.5 py-1.5">
         <RouteSheetStatusBadge status={sheet.status} />
       </td>
       <td
-        className={`px-4 py-3 text-right text-sm font-medium ${
+        className={`px-2.5 py-1.5 text-right text-sm font-medium whitespace-nowrap ${
           dimmed ? "text-gray-400" : "text-gray-800"
         }`}
       >
-        <div>
+        <div className="whitespace-nowrap">
           {sheet.totalEur.toLocaleString("uk-UA", {
             minimumFractionDigits: 2,
             maximumFractionDigits: 2,
           })}{" "}
           €
         </div>
-        <div className="text-xs font-normal text-gray-400">
+        <div className="text-xs font-normal whitespace-nowrap text-gray-400">
           {Math.round(sheet.totalUah).toLocaleString("uk-UA")} ₴
         </div>
       </td>
-      <td className="px-4 py-3 text-right">
+      <td className="px-2.5 py-1.5 text-right">
         <Link
           href={`/manager/routes/${sheet.id}`}
           className="inline-flex items-center gap-1 text-sm text-blue-600 hover:text-blue-700"

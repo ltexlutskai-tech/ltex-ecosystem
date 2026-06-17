@@ -82,7 +82,7 @@ export function ReportView({
             <thead className="bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
               <tr>
                 {report.headers.map((h) => (
-                  <th key={h} className="px-3 py-2">
+                  <th key={h} className="px-2.5 py-1.5 whitespace-nowrap">
                     {h}
                   </th>
                 ))}
@@ -94,8 +94,10 @@ export function ReportView({
                   {r.map((cell, ci) => (
                     <td
                       key={ci}
-                      className={`px-3 py-2 ${
-                        typeof cell === "number" ? "text-right" : ""
+                      className={`px-2.5 py-1.5 ${
+                        typeof cell === "number"
+                          ? "text-right whitespace-nowrap"
+                          : ""
                       }`}
                     >
                       {formatCell(cell)}

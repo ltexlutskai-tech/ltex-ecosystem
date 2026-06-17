@@ -108,10 +108,10 @@ export function PricesList({ items, rateUah, sellerName }: Props) {
         <table className="min-w-full divide-y divide-gray-200 text-sm">
           <thead className="bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
             <tr>
-              <th className="px-4 py-2">Товар</th>
-              <th className="px-4 py-2 whitespace-nowrap">Залишок</th>
-              <th className="px-4 py-2 whitespace-nowrap">Ціна</th>
-              <th className="px-4 py-2 whitespace-nowrap">Акція</th>
+              <th className="px-2.5 py-1.5">Товар</th>
+              <th className="px-2.5 py-1.5 whitespace-nowrap">Залишок</th>
+              <th className="px-2.5 py-1.5 whitespace-nowrap">Ціна</th>
+              <th className="px-2.5 py-1.5 whitespace-nowrap">Акція</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
@@ -124,7 +124,7 @@ export function PricesList({ items, rateUah, sellerName }: Props) {
                   openMenu(row, e.clientX, e.clientY);
                 }}
               >
-                <td className="px-4 py-2 align-top">
+                <td className="px-2.5 py-1.5 align-top">
                   <Link
                     href={`/manager/prices/${row.id}`}
                     className="font-medium text-gray-900 hover:underline"
@@ -150,13 +150,13 @@ export function PricesList({ items, rateUah, sellerName }: Props) {
                     ) : null}
                   </div>
                 </td>
-                <td className="px-4 py-2 align-top whitespace-nowrap text-gray-800">
+                <td className="px-2.5 py-1.5 align-top whitespace-nowrap text-gray-800">
                   {formatRemaining(row)}
                 </td>
-                <td className="px-4 py-2 align-top whitespace-nowrap text-gray-800">
+                <td className="px-2.5 py-1.5 align-top whitespace-nowrap text-gray-800">
                   {formatPrice(row.basePrice, row.currency)}
                 </td>
-                <td className="px-4 py-2 align-top whitespace-nowrap font-semibold text-emerald-600">
+                <td className="px-2.5 py-1.5 align-top whitespace-nowrap font-semibold text-emerald-600">
                   {formatPrice(row.salePrice, row.currency)}
                 </td>
               </tr>

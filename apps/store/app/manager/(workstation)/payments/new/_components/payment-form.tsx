@@ -392,7 +392,7 @@ export function PaymentForm({
     !isExpense && bankAccounts.some((a) => a.hiddenInApp);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* ─── Вид руху ──────────────────────────────────────────────────── */}
       <Section title="Вид руху коштів">
         <div className="inline-flex overflow-hidden rounded-md border border-gray-300">
@@ -650,7 +650,7 @@ export function PaymentForm({
       </Section>
 
       {/* ─── Підсумок ──────────────────────────────────────────────────── */}
-      <section className="rounded-lg border bg-white p-5 shadow-sm">
+      <section className="rounded-lg border bg-white p-4 shadow-sm">
         <h2 className="text-base font-semibold text-gray-800">Підсумок</h2>
         <dl className="mt-3 grid grid-cols-1 gap-3 text-sm sm:grid-cols-3">
           <SummaryTile
@@ -743,7 +743,7 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <section className="rounded-lg border bg-white p-5 shadow-sm">
+    <section className="rounded-lg border bg-white p-4 shadow-sm">
       <h2 className="text-base font-semibold text-gray-800">{title}</h2>
       <div className="mt-3">{children}</div>
     </section>

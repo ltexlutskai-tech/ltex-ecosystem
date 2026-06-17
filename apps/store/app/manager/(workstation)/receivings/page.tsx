@@ -64,10 +64,10 @@ export default async function ReceivingsListPage({
     user.role === "warehouse" || user.role === "admin" || user.role === "owner";
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       <div className="flex items-start justify-between gap-2">
         <div>
-          <h1 className="text-2xl font-semibold">Поступлення товарів</h1>
+          <h1 className="text-xl font-semibold">Поступлення товарів</h1>
           <p className="mt-1 text-sm text-gray-500">
             Документи приймання товарів від постачальників. При проведенні
             автоматично створюються лоти у Прайсі.

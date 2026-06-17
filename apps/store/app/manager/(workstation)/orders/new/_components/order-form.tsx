@@ -313,9 +313,9 @@ export function OrderForm({
   }
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       {/* ─── Секція: Контрагент ───────────────────────────────────────────── */}
-      <section className="rounded-lg border bg-white p-5 shadow-sm">
+      <section className="rounded-lg border bg-white p-4 shadow-sm">
         <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-gray-500">
           Контрагент
         </h2>
@@ -384,7 +384,7 @@ export function OrderForm({
       </section>
 
       {/* ─── Секція: Параметри замовлення ─────────────────────────────────── */}
-      <section className="rounded-lg border bg-white p-5 shadow-sm">
+      <section className="rounded-lg border bg-white p-4 shadow-sm">
         <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-gray-500">
           Параметри замовлення
         </h2>
@@ -500,7 +500,7 @@ export function OrderForm({
       </section>
 
       {/* ─── Секція: Позиції ──────────────────────────────────────────────── */}
-      <section className="rounded-lg border bg-white p-5 shadow-sm">
+      <section className="rounded-lg border bg-white p-4 shadow-sm">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-500">
             Позиції

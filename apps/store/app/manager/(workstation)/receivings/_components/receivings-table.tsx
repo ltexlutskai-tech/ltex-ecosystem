@@ -51,14 +51,14 @@ export function ReceivingsTable({
         <table className="w-full text-sm">
           <thead className="bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
             <tr>
-              <th className="px-3 py-2">№</th>
-              <th className="px-3 py-2">Дата</th>
-              <th className="px-3 py-2">Постачальник</th>
-              <th className="px-3 py-2">Склад</th>
-              <th className="px-3 py-2 text-right">Мішків</th>
-              <th className="px-3 py-2 text-right">Вага, кг</th>
-              <th className="px-3 py-2 text-right">Сума</th>
-              <th className="px-3 py-2">Статус</th>
+              <th className="px-2.5 py-1.5">№</th>
+              <th className="px-2.5 py-1.5">Дата</th>
+              <th className="px-2.5 py-1.5">Постачальник</th>
+              <th className="px-2.5 py-1.5">Склад</th>
+              <th className="px-2.5 py-1.5 text-right">Мішків</th>
+              <th className="px-2.5 py-1.5 text-right">Вага, кг</th>
+              <th className="px-2.5 py-1.5 text-right">Сума</th>
+              <th className="px-2.5 py-1.5">Статус</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
@@ -69,7 +69,7 @@ export function ReceivingsTable({
               };
               return (
                 <tr key={r.id} className="hover:bg-gray-50">
-                  <td className="px-3 py-2 font-medium">
+                  <td className="px-2.5 py-1.5 font-medium">
                     <Link
                       href={`/manager/receivings/${r.id}`}
                       className="text-emerald-700 hover:underline"
@@ -77,25 +77,25 @@ export function ReceivingsTable({
                       {r.docNumber}
                     </Link>
                   </td>
-                  <td className="px-3 py-2 whitespace-nowrap text-gray-700">
+                  <td className="px-2.5 py-1.5 whitespace-nowrap text-gray-700">
                     {formatDate(r.docDate)}
                   </td>
-                  <td className="px-3 py-2 text-gray-700">
+                  <td className="px-2.5 py-1.5 text-gray-700">
                     {r.supplier?.name ?? "—"}
                   </td>
-                  <td className="px-3 py-2 text-gray-600">
+                  <td className="px-2.5 py-1.5 text-gray-600">
                     {r.warehouse?.name ?? "—"}
                   </td>
-                  <td className="px-3 py-2 text-right text-gray-700">
+                  <td className="px-2.5 py-1.5 text-right text-gray-700">
                     {r.totalQuantity}
                   </td>
-                  <td className="px-3 py-2 text-right text-gray-700">
+                  <td className="px-2.5 py-1.5 text-right text-gray-700">
                     {r.totalWeight.toFixed(1)}
                   </td>
-                  <td className="px-3 py-2 text-right text-gray-700 whitespace-nowrap">
+                  <td className="px-2.5 py-1.5 text-right text-gray-700 whitespace-nowrap">
                     {r.totalAmount.toFixed(2)} {r.currency}
                   </td>
-                  <td className="px-3 py-2">
+                  <td className="px-2.5 py-1.5">
                     <span
                       className={`rounded-sm px-1.5 py-0.5 text-xs font-medium ${st.color}`}
                     >

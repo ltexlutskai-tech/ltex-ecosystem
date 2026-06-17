@@ -87,25 +87,27 @@ export async function ClientDebtMovementsTab({
           <table className="w-full text-sm">
             <thead className="bg-gray-50 text-left text-xs uppercase text-gray-500">
               <tr>
-                <th className="px-3 py-2 font-medium">Дата</th>
-                <th className="px-3 py-2 font-medium">Тип</th>
-                <th className="px-3 py-2 text-right font-medium">Сума</th>
-                <th className="px-3 py-2 font-medium">Примітка</th>
+                <th className="px-2.5 py-1.5 font-medium">Дата</th>
+                <th className="px-2.5 py-1.5 font-medium">Тип</th>
+                <th className="px-2.5 py-1.5 text-right font-medium">Сума</th>
+                <th className="px-2.5 py-1.5 font-medium">Примітка</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {movements.map((m) => (
                 <tr key={m.id} className="hover:bg-gray-50/60">
-                  <td className="whitespace-nowrap px-3 py-2 text-gray-700">
+                  <td className="whitespace-nowrap px-2.5 py-1.5 text-gray-700">
                     {formatDateUkr(m.occurredAt)}
                   </td>
-                  <td className="px-3 py-2 text-gray-700">
+                  <td className="px-2.5 py-1.5 text-gray-700">
                     {KIND_LABEL[m.kind] ?? m.kind}
                   </td>
-                  <td className="whitespace-nowrap px-3 py-2 text-right">
+                  <td className="whitespace-nowrap px-2.5 py-1.5 text-right">
                     <AmountCell value={Number(m.amountEur)} />
                   </td>
-                  <td className="px-3 py-2 text-gray-500">{m.note ?? "—"}</td>
+                  <td className="px-2.5 py-1.5 text-gray-500">
+                    {m.note ?? "—"}
+                  </td>
                 </tr>
               ))}
             </tbody>

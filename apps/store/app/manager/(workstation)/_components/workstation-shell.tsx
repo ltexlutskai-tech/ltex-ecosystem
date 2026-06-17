@@ -29,9 +29,10 @@ export function WorkstationShell({
     return <div className="h-screen bg-gray-50" />;
   }
 
-  // Всередині iframe — лише контент поточної сторінки (без shell).
+  // Всередині iframe — лише контент поточної сторінки (без shell),
+  // обгорнутий у центральні відступи (контент не торкається країв iframe).
   if (framed) {
-    return <>{children}</>;
+    return <div className="min-h-screen bg-gray-50 p-3 sm:p-4">{children}</div>;
   }
 
   // Top-вікно — повний shell з вкладками. {children} (server-рендер

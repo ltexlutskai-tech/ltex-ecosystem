@@ -127,10 +127,10 @@ export default async function ManagerSalesPage({
   }
 
   return (
-    <div className="mx-auto max-w-7xl space-y-4">
+    <div className="max-w-none space-y-3">
       <header className="flex items-start justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-gray-800">Реалізація</h1>
+          <h1 className="text-xl font-bold text-gray-800">Реалізація</h1>
           <p className="mt-1 text-sm text-gray-600">
             Усього: {total}
             {totalPages > 1 ? ` · сторінка ${filter.page} з ${totalPages}` : ""}
@@ -164,9 +164,9 @@ export default async function ManagerSalesPage({
 
 function renderEmpty(clientCode1C: string): React.ReactElement {
   return (
-    <div className="mx-auto max-w-7xl space-y-4">
+    <div className="max-w-none space-y-3">
       <header className="flex items-start justify-between gap-3">
-        <h1 className="text-2xl font-bold text-gray-800">Реалізація</h1>
+        <h1 className="text-xl font-bold text-gray-800">Реалізація</h1>
         <Link
           href="/manager/sales/new"
           className="inline-flex h-10 items-center justify-center rounded-md bg-green-600 px-4 text-sm font-medium text-white hover:bg-green-700"

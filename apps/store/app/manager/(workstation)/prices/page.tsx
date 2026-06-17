@@ -49,9 +49,9 @@ export default async function PricesPage({
   ]);
 
   return (
-    <div className="mx-auto max-w-7xl space-y-4">
+    <div className="max-w-none space-y-3">
       <header>
-        <h1 className="text-2xl font-bold text-gray-800">Прайс</h1>
+        <h1 className="text-xl font-bold text-gray-800">Прайс</h1>
         <p className="mt-1 text-sm text-gray-600">
           Усього: {list.total} · сторінка {list.page} з {list.totalPages}
         </p>

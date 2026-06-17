@@ -58,7 +58,7 @@ export default async function ManagerPaymentsPage({
   const header = (
     <header className="flex items-start justify-between gap-3">
       <div>
-        <h1 className="text-2xl font-bold text-gray-800">Оплати</h1>
+        <h1 className="text-xl font-bold text-gray-800">Оплати</h1>
         <p className="mt-1 text-sm text-gray-600">Каса · касові ордери</p>
       </div>
       <Link
@@ -74,7 +74,7 @@ export default async function ManagerPaymentsPage({
   // Manager без призначених клієнтів → порожній список.
   if (myCodes !== null && myCodes.length === 0) {
     return (
-      <div className="mx-auto max-w-7xl space-y-4">
+      <div className="max-w-none space-y-3">
         {header}
         <PaymentsToolbar />
         <EmptyState
@@ -115,10 +115,10 @@ export default async function ManagerPaymentsPage({
   const rows = items.map((o) => serializeCashOrderRow(o));
 
   return (
-    <div className="mx-auto max-w-7xl space-y-4">
+    <div className="max-w-none space-y-3">
       <header className="flex items-start justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-gray-800">Оплати</h1>
+          <h1 className="text-xl font-bold text-gray-800">Оплати</h1>
           <p className="mt-1 text-sm text-gray-600">
             Усього: {total}
             {totalPages > 1 ? ` · сторінка ${filter.page} з ${totalPages}` : ""}

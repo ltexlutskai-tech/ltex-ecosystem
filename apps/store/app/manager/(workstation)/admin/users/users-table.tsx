@@ -60,18 +60,18 @@ export function UsersTable({
       <table className="min-w-full divide-y divide-gray-200 text-sm">
         <thead className="bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
           <tr>
-            <th className="px-4 py-2">ПІБ</th>
-            <th className="px-4 py-2">Email</th>
-            <th className="px-4 py-2">Роль</th>
-            <th className="px-4 py-2">Статус</th>
-            <th className="px-4 py-2">Останній вхід</th>
-            <th className="px-4 py-2 text-right">Дії</th>
+            <th className="px-2.5 py-1.5">ПІБ</th>
+            <th className="px-2.5 py-1.5">Email</th>
+            <th className="px-2.5 py-1.5">Роль</th>
+            <th className="px-2.5 py-1.5">Статус</th>
+            <th className="px-2.5 py-1.5">Останній вхід</th>
+            <th className="px-2.5 py-1.5 text-right">Дії</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-100">
           {initial.map((u) => (
             <tr key={u.id} className="hover:bg-gray-50">
-              <td className="px-4 py-2 font-medium text-gray-800">
+              <td className="px-2.5 py-1.5 font-medium text-gray-800">
                 {u.fullName}
                 {u.id === currentUserId && (
                   <span className="ml-2 rounded bg-green-50 px-1.5 py-0.5 text-xs text-green-700">
@@ -79,9 +79,11 @@ export function UsersTable({
                   </span>
                 )}
               </td>
-              <td className="px-4 py-2 text-gray-600">{u.email}</td>
-              <td className="px-4 py-2 text-gray-600">{ROLE_LABELS[u.role]}</td>
-              <td className="px-4 py-2">
+              <td className="px-2.5 py-1.5 text-gray-600">{u.email}</td>
+              <td className="px-2.5 py-1.5 text-gray-600">
+                {ROLE_LABELS[u.role]}
+              </td>
+              <td className="px-2.5 py-1.5">
                 {u.isActive ? (
                   <span className="rounded bg-green-50 px-2 py-0.5 text-xs text-green-700">
                     Активний
@@ -92,10 +94,10 @@ export function UsersTable({
                   </span>
                 )}
               </td>
-              <td className="px-4 py-2 text-gray-500">
+              <td className="px-2.5 py-1.5 text-gray-500">
                 {formatDate(u.lastSeenAt)}
               </td>
-              <td className="px-4 py-2 text-right">
+              <td className="px-2.5 py-1.5 text-right">
                 <UserRowActions user={u} isSelf={u.id === currentUserId} />
               </td>
             </tr>

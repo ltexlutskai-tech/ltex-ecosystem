@@ -48,7 +48,7 @@ export function OrdersRow({
       <td
         data-col="code"
         data-value={formatOrderNumber(order)}
-        className={`px-4 py-3 font-mono text-sm ${
+        className={`px-2.5 py-1.5 font-mono text-sm ${
           dimmed ? "text-gray-400" : "text-gray-700"
         }`}
       >
@@ -62,7 +62,7 @@ export function OrdersRow({
       <td
         data-col="client"
         data-value={order.customer.name}
-        className={`px-4 py-3 text-sm ${
+        className={`px-2.5 py-1.5 text-sm ${
           dimmed ? "text-gray-400" : "text-gray-800"
         }`}
       >
@@ -76,31 +76,31 @@ export function OrdersRow({
       <td
         data-col="city"
         data-value={order.customer.city ?? ""}
-        className="px-4 py-3 text-sm text-gray-600"
+        className="px-2.5 py-1.5 text-sm text-gray-600"
       >
         {order.customer.city ?? "—"}
       </td>
       <td
         data-col="region"
         data-value={order.customer.region ?? ""}
-        className="px-4 py-3 text-sm text-gray-600"
+        className="px-2.5 py-1.5 text-sm text-gray-600"
       >
         {order.customer.region ?? "—"}
       </td>
       <td
         data-col="date"
         data-value={date}
-        className="px-4 py-3 text-sm text-gray-600"
+        className="px-2.5 py-1.5 text-sm whitespace-nowrap text-gray-600"
       >
         {date}
       </td>
-      <td data-col="status" data-value={order.status} className="px-4 py-3">
+      <td data-col="status" data-value={order.status} className="px-2.5 py-1.5">
         <OrderStatusBadge status={order.status} />
       </td>
       <td
         data-col="actual"
         data-value={order.isActual ? "Актуальний" : "Неактуальний"}
-        className="px-4 py-3 text-center"
+        className="px-2.5 py-1.5 text-center"
       >
         {order.isActual ? (
           <Check
@@ -117,43 +117,43 @@ export function OrdersRow({
       <td
         data-col="agent"
         data-value={order.agentName ?? ""}
-        className={`px-4 py-3 text-sm ${dimmed ? "text-gray-400" : "text-gray-700"}`}
+        className={`px-2.5 py-1.5 text-sm ${dimmed ? "text-gray-400" : "text-gray-700"}`}
       >
         {order.agentName ?? "—"}
       </td>
       <td
         data-col="delivery"
         data-value={deliveryLabel(order.deliveryMethod)}
-        className={`px-4 py-3 text-sm ${dimmed ? "text-gray-400" : "text-gray-600"}`}
+        className={`px-2.5 py-1.5 text-sm ${dimmed ? "text-gray-400" : "text-gray-600"}`}
       >
         {deliveryLabel(order.deliveryMethod)}
       </td>
       <td
         data-col="positions"
         data-value={String(order.itemCount)}
-        className="px-4 py-3 text-center text-sm text-gray-700"
+        className="px-2.5 py-1.5 text-center text-sm whitespace-nowrap text-gray-700"
       >
         {order.itemCount}
       </td>
       <td
         data-col="sum"
         data-value={order.totalEur.toFixed(2)}
-        className={`px-4 py-3 text-right text-sm font-medium ${
+        className={`px-2.5 py-1.5 text-right text-sm font-medium whitespace-nowrap ${
           dimmed ? "text-gray-400" : "text-gray-800"
         }`}
       >
-        <div>
+        <div className="whitespace-nowrap">
           {order.totalEur.toLocaleString("uk-UA", {
             minimumFractionDigits: 2,
             maximumFractionDigits: 2,
           })}{" "}
           €
         </div>
-        <div className="text-xs font-normal text-gray-400">
+        <div className="text-xs font-normal whitespace-nowrap text-gray-400">
           {Math.round(order.totalUah).toLocaleString("uk-UA")} ₴
         </div>
       </td>
-      <td className="px-4 py-3 text-right">
+      <td className="px-2.5 py-1.5 text-right">
         <Link
           href={`/manager/orders/${order.id}`}
           className="inline-flex items-center gap-1 text-sm text-blue-600 hover:text-blue-700"
