@@ -55,6 +55,9 @@ const REGISTER_ICONS: Record<string, IconCmp> = {
   order_balances: Package,
   cost: Coins,
   exchange_rates: Coins,
+  stock_norms: Warehouse,
+  client_status_history: Layers,
+  agent_day_log: Bell,
 };
 
 function StatusBadge({

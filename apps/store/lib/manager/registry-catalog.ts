@@ -233,6 +233,33 @@ export const REGISTERS: readonly RegisterEntry[] = [
     phase: 4,
     type: "turnover",
   },
+  {
+    key: "stock_norms",
+    label: "Норми запасів",
+    description: "Норма запасу по номенклатурі / складу (НормыЗапасов).",
+    href: "/manager/registry/stock-norms",
+    status: "ready",
+    phase: 8,
+    type: "balance",
+  },
+  {
+    key: "client_status_history",
+    label: "Історія статусів клієнтів",
+    description: "Зміни статусу контрагента в часі (ИсторияСтатусов).",
+    href: "/manager/registry/client-status-history",
+    status: "ready",
+    phase: 8,
+    type: "turnover",
+  },
+  {
+    key: "agent_day_log",
+    label: "Статус дня агента",
+    description: "Тайм-трекінг: початок / кінець робочого дня (СтатусДня).",
+    href: "/manager/registry/agent-day-log",
+    status: "ready",
+    phase: 8,
+    type: "turnover",
+  },
 ];
 
 /** Звіти (1С Reports). */
