@@ -10,6 +10,7 @@ const TABS: { href: string; label: string }[] = [
     label: "Продажі по постачальниках",
   },
   { href: "/manager/reports/debts", label: "Прострочені борги" },
+  { href: "/manager/reports/reconciliation", label: "Акт звірки" },
 ];
 
 export function ReportsNav() {

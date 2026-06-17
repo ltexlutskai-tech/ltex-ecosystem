@@ -255,4 +255,10 @@ export const REPORTS: readonly ReportEntry[] = [
     description: "Дебіторка з FIFO-старінням по клієнтах.",
     href: "/manager/reports/debts",
   },
+  {
+    key: "reconciliation",
+    label: "Акт звірки взаєморозрахунків",
+    description: "Дебет / кредит / сальдо по контрагенту за період.",
+    href: "/manager/reports/reconciliation",
+  },
 ];

@@ -11,6 +11,9 @@ import {
   Map,
   MapPin,
   MessageCircle,
+  ArrowDownToLine,
+  ArrowUpFromLine,
+  ArrowLeftRight,
   PackagePlus,
   PackageSearch,
   PieChart,
@@ -83,6 +86,27 @@ export const REGISTRY_LINK: SidebarLink = {
   label: "Довідники та регістри",
   icon: Database,
 };
+
+// ── Фаза 6 «Фінансові документи: банк/каса» (2026-06-17) ────────────────
+// Безготівкові платіжні доручення + переміщення готівки.
+// Доступ — bookkeeper | admin | owner (гейтиться у sidebar.tsx).
+export const FINANCE_LINKS: readonly SidebarLink[] = [
+  {
+    href: "/manager/bank-payments-incoming",
+    label: "Платіжки вхідні",
+    icon: ArrowDownToLine,
+  },
+  {
+    href: "/manager/bank-payments-outgoing",
+    label: "Платіжки вихідні",
+    icon: ArrowUpFromLine,
+  },
+  {
+    href: "/manager/cash-transfers",
+    label: "Переміщення готівки",
+    icon: ArrowLeftRight,
+  },
+];
 
 // ── Тиждень 5 блоку Ролі (Analyst) ──────────────────────────────────────
 export const REPORTS_LINK: SidebarLink = {

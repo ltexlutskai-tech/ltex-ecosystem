@@ -201,16 +201,18 @@ model Customer {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  orders             Order[]
-  sales              Sale[]
-  cashOrders         MgrCashOrder[]
-  cart               Cart?
-  chatMessages       ChatMessage[]
-  videoSubscriptions VideoSubscription[]
-  pushTokens         PushToken[]
-  favorites          Favorite[]
-  notifications      Notification[]
-  viewLog            ViewLog[]
+  orders               Order[]
+  sales                Sale[]
+  cashOrders           MgrCashOrder[]
+  bankPaymentsIncoming BankPaymentIncoming[]
+  bankPaymentsOutgoing BankPaymentOutgoing[]
+  cart                 Cart?
+  chatMessages         ChatMessage[]
+  videoSubscriptions   VideoSubscription[]
+  pushTokens           PushToken[]
+  favorites            Favorite[]
+  notifications        Notification[]
+  viewLog              ViewLog[]
 
   @@map("customers")
 }
@@ -406,6 +408,12 @@ model MgrCashOrder {
   routeSheetId      String?  @map("route_sheet_id") // зворотне посилання на МЛ
   comment           String?
   agentUserId       String?  @map("agent_user_id")
+  // ── Фаза 6: спосіб оплати + банк-реквізити безготівки ──
+  // paymentMethod ∈ cash | card | bank (готівка/картка/банк). Для безготівкових
+  // (card/bank) — рахунок/призначення, щоб безнал не «тонув» у касі.
+  paymentMethod     String?  @map("payment_method")
+  bankAccountIban   String?  @map("bank_account_iban") // IBAN рахунку безготівкового платежу
+  paymentPurpose    String?  @map("payment_purpose") // призначення платежу (безнал)
   paidAt            DateTime @default(now()) @map("paid_at")
   createdAt         DateTime @default(now()) @map("created_at")
   updatedAt         DateTime @updatedAt @map("updated_at")
@@ -439,7 +447,11 @@ model MgrBankAccount {
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
-  cashOrders MgrCashOrder[]
+  cashOrders           MgrCashOrder[]
+  bankPaymentsIncoming BankPaymentIncoming[]
+  bankPaymentsOutgoing BankPaymentOutgoing[]
+  cashTransfersFrom    CashTransfer[]        @relation("CashTransferFrom")
+  cashTransfersTo      CashTransfer[]        @relation("CashTransferTo")
 
   @@map("mgr_bank_accounts")
 }
@@ -457,9 +469,12 @@ model MgrCashFlowArticle {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  parent     MgrCashFlowArticle?  @relation("CashFlowArticleTree", fields: [parentId], references: [id], onDelete: SetNull)
-  children   MgrCashFlowArticle[] @relation("CashFlowArticleTree")
-  cashOrders MgrCashOrder[]
+  parent               MgrCashFlowArticle?   @relation("CashFlowArticleTree", fields: [parentId], references: [id], onDelete: SetNull)
+  children             MgrCashFlowArticle[]  @relation("CashFlowArticleTree")
+  cashOrders           MgrCashOrder[]
+  bankPaymentsIncoming BankPaymentIncoming[]
+  bankPaymentsOutgoing BankPaymentOutgoing[]
+  cashTransfers        CashTransfer[]
 
   @@map("mgr_cash_flow_articles")
 }
@@ -1676,6 +1691,111 @@ model MgrDebtMovement {
   @@unique([kind, sourceType, sourceId], name: "mgr_debt_movement_source")
   @@index([clientId, occurredAt])
   @@map("mgr_debt_movements")
+}
+
+// ─── Фаза 6: фінансові документи банк/каса ──────────────────────────────────
+// Безготівкові платіжні доручення (вхідне = надходження від клієнта, вихідне =
+// оплата постачальнику/витрата). Проведення вхідного зменшує борг клієнта через
+// `MgrDebtMovement` (best-effort). `code1C` = hex(_IDRRef) — унікальний ключ
+// імпорту. `number1C` (1С _Number) — лише для відображення.
+
+model BankPaymentIncoming {
+  id                String    @id @default(cuid())
+  code1C            String?   @unique @map("code_1c")
+  number1C          String?   @map("number_1c")
+  docNumber         Int       @default(autoincrement()) @map("doc_number")
+  customerId        String?   @map("customer_id") // Контрагент-платник
+  bankAccountId     String?   @map("bank_account_id") // рахунок L-TEX
+  cashFlowArticleId String?   @map("cash_flow_article_id") // стаття ДДС
+  amount            Float     @default(0) // сума у валюті документа
+  currency          String    @default("UAH") // UAH | EUR | USD
+  amountEur         Float     @default(0) @map("amount_eur") // зведена сума EUR
+  rateEur           Float     @default(0) @map("rate_eur") // курс-знімок (грн за €)
+  iban              String? // IBAN рахунку платника
+  purpose           String? // призначення платежу
+  status            String    @default("draft") // draft | posted | cancelled
+  archived          Boolean   @default(false)
+  comment           String?
+  paidAt            DateTime  @default(now()) @map("paid_at")
+  postedAt          DateTime? @map("posted_at")
+  createdByUserId   String?   @map("created_by_user_id")
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+
+  customer           Customer?           @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  bankAccountRef     MgrBankAccount?     @relation(fields: [bankAccountId], references: [id], onDelete: SetNull)
+  cashFlowArticleRef MgrCashFlowArticle? @relation(fields: [cashFlowArticleId], references: [id], onDelete: SetNull)
+
+  @@index([customerId])
+  @@index([archived])
+  @@index([paidAt])
+  @@map("bank_payments_incoming")
+}
+
+model BankPaymentOutgoing {
+  id                String    @id @default(cuid())
+  code1C            String?   @unique @map("code_1c")
+  number1C          String?   @map("number_1c")
+  docNumber         Int       @default(autoincrement()) @map("doc_number")
+  customerId        String?   @map("customer_id") // Контрагент-отримувач
+  bankAccountId     String?   @map("bank_account_id") // рахунок L-TEX
+  cashFlowArticleId String?   @map("cash_flow_article_id") // стаття ДДС
+  amount            Float     @default(0)
+  currency          String    @default("UAH")
+  amountEur         Float     @default(0) @map("amount_eur")
+  rateEur           Float     @default(0) @map("rate_eur")
+  iban              String? // IBAN рахунку отримувача
+  purpose           String?
+  status            String    @default("draft") // draft | posted | cancelled
+  archived          Boolean   @default(false)
+  comment           String?
+  paidAt            DateTime  @default(now()) @map("paid_at")
+  postedAt          DateTime? @map("posted_at")
+  createdByUserId   String?   @map("created_by_user_id")
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+
+  customer           Customer?           @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  bankAccountRef     MgrBankAccount?     @relation(fields: [bankAccountId], references: [id], onDelete: SetNull)
+  cashFlowArticleRef MgrCashFlowArticle? @relation(fields: [cashFlowArticleId], references: [id], onDelete: SetNull)
+
+  @@index([customerId])
+  @@index([archived])
+  @@index([paidAt])
+  @@map("bank_payments_outgoing")
+}
+
+// Переміщення готівки: каса↔каса / інкасація каса↔банк. fromAccount/toAccount —
+// банк-рахунки (або null для готівкової каси). `cashFlowArticleId` — стаття.
+
+model CashTransfer {
+  id                String    @id @default(cuid())
+  code1C            String?   @unique @map("code_1c")
+  number1C          String?   @map("number_1c")
+  docNumber         Int       @default(autoincrement()) @map("doc_number")
+  fromAccountId     String?   @map("from_account_id") // рахунок-джерело (null = готівкова каса)
+  toAccountId       String?   @map("to_account_id") // рахунок-призначення (null = готівкова каса)
+  cashFlowArticleId String?   @map("cash_flow_article_id")
+  amount            Float     @default(0)
+  currency          String    @default("UAH")
+  amountEur         Float     @default(0) @map("amount_eur")
+  rateEur           Float     @default(0) @map("rate_eur")
+  status            String    @default("draft") // draft | posted | cancelled
+  archived          Boolean   @default(false)
+  comment           String?
+  transferredAt     DateTime  @default(now()) @map("transferred_at")
+  postedAt          DateTime? @map("posted_at")
+  createdByUserId   String?   @map("created_by_user_id")
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+
+  fromAccountRef     MgrBankAccount?     @relation("CashTransferFrom", fields: [fromAccountId], references: [id], onDelete: SetNull)
+  toAccountRef       MgrBankAccount?     @relation("CashTransferTo", fields: [toAccountId], references: [id], onDelete: SetNull)
+  cashFlowArticleRef MgrCashFlowArticle? @relation(fields: [cashFlowArticleId], references: [id], onDelete: SetNull)
+
+  @@index([archived])
+  @@index([transferredAt])
+  @@map("cash_transfers")
 }
 
 // ─── Email DLQ (persistent retry queue, Session 70) ─────────────────────────
