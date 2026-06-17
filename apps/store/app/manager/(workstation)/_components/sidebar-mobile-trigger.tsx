@@ -13,6 +13,7 @@ import {
   ADMIN_USERS_LINK,
   CHAT_LINK,
   PRIMARY_LINKS,
+  REGISTRY_LINK,
   REPORTS_LINK,
   SECONDARY_LINKS,
   SETTINGS_LINK,
@@ -63,6 +64,14 @@ export function SidebarMobileTrigger({ role }: { role: ManagerRole }) {
               href={WAREHOUSE_RECEIVINGS_LINK.href}
               label={WAREHOUSE_RECEIVINGS_LINK.label}
               icon={iconFor(WAREHOUSE_RECEIVINGS_LINK)}
+              onNavigate={close}
+            />
+          )}
+          {role !== "warehouse" && role !== "expeditor" && (
+            <SidebarNavLink
+              href={REGISTRY_LINK.href}
+              label={REGISTRY_LINK.label}
+              icon={iconFor(REGISTRY_LINK)}
               onNavigate={close}
             />
           )}

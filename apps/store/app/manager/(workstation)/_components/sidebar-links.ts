@@ -3,6 +3,7 @@ import {
   BarChart3,
   Bell,
   ClipboardList,
+  Database,
   FileText,
   FolderClock,
   Gift,
@@ -76,9 +77,16 @@ export const ADMIN_REGION_AGENTS_LINK: SidebarLink = {
   icon: MapPin,
 };
 
+// ── Фаза 0 «Довідники та регістри» (2026-06-17) ─────────────────────────
+export const REGISTRY_LINK: SidebarLink = {
+  href: "/manager/registry",
+  label: "Довідники та регістри",
+  icon: Database,
+};
+
 // ── Тиждень 5 блоку Ролі (Analyst) ──────────────────────────────────────
 export const REPORTS_LINK: SidebarLink = {
-  href: "/manager/reports/sales-by-client",
+  href: "/manager/reports",
   label: "Звіти",
   icon: PieChart,
 };
