@@ -19,8 +19,11 @@
  *   --dry-run            читає 1С + резолвить зв'язки, нічого не пише
  *   --limit N            лише перші N рядків кожної сутності (пробний прогон)
  *   --entity <name>      одна сутність: customers|products|lots|barcodes|prices|
- *                        dictionaries|rates|orders|sales|cashorders|routesheets|debt
+ *                        dictionaries|rates|orders|sales|cashorders|routesheets|debt|misc
  *                        (дефолт = всі в порядку)
+ *                        rates = Фаза 4: історичні курси валют
+ *                        misc = Фаза 8: історія статусів клієнтів + надійність постачальників
+ *                        (+ норми запасів / статус дня — TODO, фіз. таблиці невідомі)
  *   --confirm-prod       дозволити запис коли ціль = бойова база
  *   --batch N            розмір батчу запису (дефолт 500)
  *   --since YYYY-MM-DD   (опц.) лише документи з цієї дати
@@ -66,6 +69,7 @@ const ENTITY_NAMES = [
   "cashorders",
   "routesheets",
   "debt",
+  "misc",
 ] as const;
 
 type EntityName = (typeof ENTITY_NAMES)[number];
@@ -3231,6 +3235,211 @@ async function importDebt(ctx: ImportContext): Promise<Recon> {
   return recon;
 }
 
+// ─── 12. ФАЗА 8 — дрібні / службові регістри (`--entity misc`) ───────────────
+//
+// Зведений раннер `misc`: переносить історичні дані тих службових регістрів, що
+// реально містять дані L-TEX і піддаються декодуванню за наявними картами:
+//   - ИсторияСтатусовКонтрагентов (_InfoRg7647)  → ClientStatusHistory
+//   - НадежностьПоставщиков        (_InfoRg4678)  → SupplierReliability
+//
+// `НормыЗапасов` та `СтатусДня` живуть у МОБІЛЬНІЙ конфізі (docs/1c-export-mobile-
+// full/), а не в центральній УТ — їхні фізичні `_InfoRg…`/`_Reference…` номери у
+// центральній MSSQL невідомі (немає у docs/1c-mssql-schema/dbnames.txt). Тому їх
+// мапери лишені як TODO-заглушки: таблиці/UI готові, дані заллються, коли user
+// підтвердить фізичні назви (або якщо реєстри з'являться у дампі центральної).
+
+const STATUS_HISTORY_COLS = [
+  "_Period",
+  "_Fld7648RRef", // Контрагент
+  "_Fld7649RRef", // СтатусКонтрагента
+  "_Fld7650RRef", // ОперативныйСтатусКонтрагента
+];
+
+const RELIABILITY_COLS = [
+  "_Period",
+  "_Fld4679RRef", // Контрагент
+  "_Fld4680RRef", // Надежность (Enum Важность)
+];
+
+interface StatusHistoryRowData {
+  clientCode1C: string;
+  statusCode1C: string | null;
+  operationalStatus: string | null;
+  changedAt: Date;
+}
+
+async function importClientStatusHistory(ctx: ImportContext): Promise<Recon> {
+  const recon = newRecon("status_history");
+  const sink = new ErrorSink(recon, "status_history");
+  const { args, src, prisma } = ctx;
+
+  recon.sourceRows = await countTable(src, "_InfoRg7647");
+  log(`status_history: source rows = ${recon.sourceRows}`);
+
+  if (willWrite(ctx)) {
+    const deleted = await prisma.clientStatusHistory.deleteMany({});
+    log(`status_history: deleted ${deleted.count} prior rows`);
+  }
+
+  let buffer: StatusHistoryRowData[] = [];
+  const flush = async (): Promise<void> => {
+    if (buffer.length === 0) return;
+    await prisma.clientStatusHistory.createMany({
+      data: buffer,
+      skipDuplicates: true,
+    });
+    buffer = [];
+  };
+
+  // _InfoRg7647 — незалежний періодичний регістр (День): без _RecorderRRef.
+  for await (const rows of streamTable(
+    src,
+    "_InfoRg7647",
+    STATUS_HISTORY_COLS,
+    {
+      batch: args.batch,
+      limit: args.limit,
+      orderBy: ["_Period", "_Fld7648RRef"],
+    },
+  )) {
+    for (const row of rows) {
+      try {
+        const clientHex = bufToHex(row["_Fld7648RRef"]);
+        const changedAt = asDate(row["_Period"]);
+        if (!clientHex || !changedAt) {
+          recon.skipped++;
+          continue;
+        }
+        buffer.push({
+          clientCode1C: clientHex,
+          statusCode1C: bufToHex(row["_Fld7649RRef"]),
+          operationalStatus: bufToHex(row["_Fld7650RRef"]),
+          changedAt,
+        });
+        recon.written++;
+        if (willWrite(ctx) && buffer.length >= 500) await flush();
+        if (!willWrite(ctx)) buffer = []; // dry-run: не накопичуємо
+      } catch (e) {
+        sink.record(bufToHex(row["_Fld7648RRef"]) ?? "?", e);
+      }
+    }
+  }
+  if (willWrite(ctx)) await flush();
+  log(`status_history: written=${recon.written} skipped=${recon.skipped}`);
+  return recon;
+}
+
+interface ReliabilityRowData {
+  supplierCode1C: string;
+  reliability: string;
+  occurredAt: Date;
+}
+
+async function importSupplierReliability(ctx: ImportContext): Promise<Recon> {
+  const recon = newRecon("reliability");
+  const sink = new ErrorSink(recon, "reliability");
+  const { args, src, prisma } = ctx;
+
+  recon.sourceRows = await countTable(src, "_InfoRg4678");
+  log(`reliability: source rows = ${recon.sourceRows}`);
+
+  if (willWrite(ctx)) {
+    const deleted = await prisma.supplierReliability.deleteMany({});
+    log(`reliability: deleted ${deleted.count} prior rows`);
+  }
+
+  let buffer: ReliabilityRowData[] = [];
+  const flush = async (): Promise<void> => {
+    if (buffer.length === 0) return;
+    await prisma.supplierReliability.createMany({
+      data: buffer,
+      skipDuplicates: true,
+    });
+    buffer = [];
+  };
+
+  for await (const rows of streamTable(src, "_InfoRg4678", RELIABILITY_COLS, {
+    batch: args.batch,
+    limit: args.limit,
+    orderBy: ["_Period", "_Fld4679RRef"],
+  })) {
+    for (const row of rows) {
+      try {
+        const supplierHex = bufToHex(row["_Fld4679RRef"]);
+        const occurredAt = asDate(row["_Period"]);
+        if (!supplierHex || !occurredAt) {
+          recon.skipped++;
+          continue;
+        }
+        // `Важность` — Enum (hex-посилання). Зберігаємо hex-код; мапу
+        // hex→low/medium/high можна навісити у звіті за потреби (// TODO).
+        buffer.push({
+          supplierCode1C: supplierHex,
+          reliability: bufToHex(row["_Fld4680RRef"]) ?? "—",
+          occurredAt,
+        });
+        recon.written++;
+        if (willWrite(ctx) && buffer.length >= 500) await flush();
+        if (!willWrite(ctx)) buffer = [];
+      } catch (e) {
+        sink.record(bufToHex(row["_Fld4679RRef"]) ?? "?", e);
+      }
+    }
+  }
+  if (willWrite(ctx)) await flush();
+  log(`reliability: written=${recon.written} skipped=${recon.skipped}`);
+  return recon;
+}
+
+// НормыЗапасов (мобільна конфіга) → StockNorm. Фізична таблиця у центральній
+// MSSQL невідома (метаданий UUID d8ce1ff8-… не зматчений у dbnames.txt). Коли
+// user підтвердить `_InfoRg<N>` + `_Fld<N>RRef` — розкоментувати streamTable за
+// зразком вище, мапа вимірів: Номенклатура / Склад? / Характеристика / ОВ /
+// ресурс Количество + _Period (set_at). Idempotent через @@unique stock_norm_key
+// (підставляти "" замість null у warehouse/char/unit-кодах перед upsert).
+async function importStockNorms(ctx: ImportContext): Promise<Recon> {
+  const recon = newRecon("stock_norms");
+  log(
+    "stock_norms: SKIPPED — фізична таблиця _InfoRg для НормыЗапасов у " +
+      "центральній MSSQL невідома (метадані лише у mobile-full). // TODO user",
+  );
+  void ctx;
+  return recon;
+}
+
+// СтатусДня (Enum, мобільна конфіга) — тайм-трекінг дня агента. У центральній УТ
+// окремого регістру немає; у мобільній це службовий регістр відомостей. Коли
+// з'явиться фізична таблиця — мапити userId через agentUserIdByHex (1С-агент →
+// User.code1C), kind ∈ {start,end}, date + at з _Period/реквізиту події.
+async function importAgentDayLog(ctx: ImportContext): Promise<Recon> {
+  const recon = newRecon("agent_day_log");
+  log(
+    "agent_day_log: SKIPPED — регістр СтатусДня лише у mobile-full; фізична " +
+      "таблиця у центральній MSSQL невідома. // TODO user",
+  );
+  void ctx;
+  return recon;
+}
+
+// Зведений раннер `misc`: усі підімпорти Фази 8; повертає сумарний Recon.
+async function importMisc(ctx: ImportContext): Promise<Recon> {
+  const combined = newRecon("misc");
+  const parts = [
+    await importClientStatusHistory(ctx),
+    await importSupplierReliability(ctx),
+    await importStockNorms(ctx),
+    await importAgentDayLog(ctx),
+  ];
+  for (const p of parts) {
+    combined.sourceRows += p.sourceRows;
+    combined.written += p.written;
+    combined.skipped += p.skipped;
+    combined.errors += p.errors;
+    combined.unresolved += p.unresolved;
+  }
+  return combined;
+}
+
 // ════════════════════════════════════════════════════════════════════════════
 // MAIN
 // ════════════════════════════════════════════════════════════════════════════
@@ -3251,6 +3460,7 @@ const ENTITY_RUNNERS: Record<
   cashorders: importCashOrders,
   routesheets: importRouteSheets,
   debt: importDebt,
+  misc: importMisc,
 };
 
 // Порядок за FK-залежностями (план §13).
@@ -3270,6 +3480,7 @@ const DEFAULT_ORDER: EntityName[] = [
   "cashorders",
   "routesheets",
   "debt",
+  "misc",
 ];
 
 function printReconTable(recons: Recon[], dryRun: boolean): void {

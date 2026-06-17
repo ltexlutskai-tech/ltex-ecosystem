@@ -55,6 +55,24 @@ describe("registry-catalog", () => {
     expect(debt?.href).toBe("/manager/registry/debt");
   });
 
+  it("Фаза 8 — нові регістри присутні, ready, з живими href", () => {
+    const phase8 = [
+      { key: "stock_norms", href: "/manager/registry/stock-norms" },
+      {
+        key: "client_status_history",
+        href: "/manager/registry/client-status-history",
+      },
+      { key: "agent_day_log", href: "/manager/registry/agent-day-log" },
+    ];
+    for (const expected of phase8) {
+      const reg = REGISTERS.find((r) => r.key === expected.key);
+      expect(reg, `register ${expected.key} present`).toBeDefined();
+      expect(reg?.status).toBe("ready");
+      expect(reg?.href).toBe(expected.href);
+      expect(reg?.phase).toBe(8);
+    }
+  });
+
   it("ready-об'єкти мають href, todo-об'єкти мають фазу", () => {
     for (const d of DICTIONARIES) {
       if (d.status === "ready") expect(d.href).not.toBeNull();

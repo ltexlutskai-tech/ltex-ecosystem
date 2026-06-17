@@ -1679,6 +1679,76 @@ model MgrDebtMovement {
   @@map("mgr_debt_movements")
 }
 
+// ─── Фаза 8 — дрібні / службові регістри (5.6+) ─────────────────────────────
+// Усі — плоскі таблиці з 1С-кодами (`*Code1C` = hex(_IDRRef)); резолв у назви —
+// best-effort через batch-lookup у UI/звітах. Без back-relations на спільні
+// моделі (Product/MgrClient/User) — щоб лишити міграцію суто адитивною.
+
+// СтатусДня (Enum СтатусДня: Початок/Кінець дня) — тайм-трекінг робочого дня
+// агента. `kind` ∈ {"start", "end"}. `userId` → User.id (наш агент); якщо
+// імпорт із 1С — резолв 1С-агента у User через code1C.
+model AgentDayLog {
+  id        String   @id @default(cuid())
+  userId    String?  @map("user_id") // наш User.id (агент); null якщо не зматчено
+  code1C    String?  @map("code_1c") // hex(1С-агента) — джерело резолву userId
+  date      DateTime @db.Date // календарний день
+  kind      String // "start" | "end"
+  at        DateTime // момент події (timestamp)
+  note      String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([userId, date])
+  @@index([date])
+  @@map("agent_day_logs")
+}
+
+// НормыЗапасов (InformationRegister) — норма запасу по номенклатурі/складу.
+// Виміри: Номенклатура (+Характеристика, +ОВ), Склад опційно. Ресурс — Количество.
+model StockNorm {
+  id              String   @id @default(cuid())
+  productCode1C   String   @map("product_code_1c") // hex(Номенклатура._IDRRef)
+  warehouseCode1C String?  @map("warehouse_code_1c") // hex(Склад) якщо є
+  charCode1C      String?  @map("char_code_1c") // hex(ХарактеристикаНоменклатуры)
+  unitCode1C      String?  @map("unit_code_1c") // hex(ЕдиницаИзмерения)
+  norm            Decimal  @db.Decimal(14, 3) // Количество (норма)
+  setAt           DateTime @map("set_at") // _Period / Дата запису норми
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@unique([productCode1C, warehouseCode1C, charCode1C, unitCode1C], name: "stock_norm_key")
+  @@index([productCode1C])
+  @@map("stock_norms")
+}
+
+// НадежностьПоставщиков (InformationRegister, периодичність День) — оцінка
+// надійності постачальника (Enum Важность). Зберігаємо як вільний текст-код.
+model SupplierReliability {
+  id             String   @id @default(cuid())
+  supplierCode1C String   @map("supplier_code_1c") // hex(Контрагент._IDRRef)
+  reliability    String // мапа з Enum Важность (low/medium/high) або hex-код
+  occurredAt     DateTime @map("occurred_at") // _Period (день)
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  @@unique([supplierCode1C, occurredAt], name: "supplier_reliability_key")
+  @@index([supplierCode1C])
+  @@map("supplier_reliabilities")
+}
+
+// ИсторияСтатусовКонтрагентов (InformationRegister, періодичність День) —
+// історія зміни статусу контрагента. СтатусКонтрагента + ОперативныйСтатус.
+model ClientStatusHistory {
+  id                String   @id @default(cuid())
+  clientCode1C      String   @map("client_code_1c") // hex(Контрагент._IDRRef)
+  statusCode1C      String?  @map("status_code_1c") // hex(СтатусыКонтрагентов)
+  operationalStatus String?  @map("operational_status") // hex/назва ОперативныйСтатус
+  changedAt         DateTime @map("changed_at") // _Period (день зміни)
+  createdAt         DateTime @default(now()) @map("created_at")
+
+  @@unique([clientCode1C, changedAt], name: "client_status_history_key")
+  @@index([clientCode1C])
+  @@map("client_status_history")
+}
+
 // ─── Email DLQ (persistent retry queue, Session 70) ─────────────────────────
 
 model EmailJob {
