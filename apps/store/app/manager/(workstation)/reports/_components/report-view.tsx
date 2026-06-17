@@ -52,12 +52,20 @@ export function ReportView({
             Період: {report.period.label}
           </p>
         </div>
-        <a
-          href={`/api/v1/manager/reports/${reportId}/csv${csvQuery ? `?${csvQuery}` : ""}`}
-          className="rounded-md bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-700"
-        >
-          📥 Завантажити Excel (CSV)
-        </a>
+        <div className="flex flex-wrap gap-2">
+          <a
+            href={`/api/v1/manager/reports/${reportId}/xlsx${csvQuery ? `?${csvQuery}` : ""}`}
+            className="rounded-md bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-700"
+          >
+            📊 Експорт XLSX
+          </a>
+          <a
+            href={`/api/v1/manager/reports/${reportId}/csv${csvQuery ? `?${csvQuery}` : ""}`}
+            className="rounded-md border border-emerald-600 px-3 py-1.5 text-sm font-medium text-emerald-700 hover:bg-emerald-50"
+          >
+            📥 CSV
+          </a>
+        </div>
       </div>
 
       {showPeriodSelector && currentPreset && (
