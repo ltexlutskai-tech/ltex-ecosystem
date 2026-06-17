@@ -80,6 +80,13 @@ const ENTITY_NAMES = [
   "cashorders",
   "routesheets",
   "debt",
+  // ── Фаза 5 — документи руху товару ──
+  "returns",
+  "repack",
+  "writeoff",
+  "stockadjust",
+  "inventory",
+  "transfer",
   "misc",
   "sales-reg",
   "cashflow-reg",
@@ -4742,6 +4749,60 @@ async function importCashTransfers(ctx: ImportContext): Promise<Recon> {
 // MAIN
 // ════════════════════════════════════════════════════════════════════════════
 
+// ─── Фаза 5 — документи руху товару (нові) ───────────────────────────────────
+// Кожен документ читається з відповідної 1С-таблиці `_Document…` по
+// code1C=hex(_IDRRef). ⚠️ Номери таблиць `_DocumentNNNN` + коди колонок для цих
+// документів ще НЕ декодовані з `_Config` — потрібен окремий крок мапування
+// (як було для Sale `_Document189`). Тому раннери — БЕЗПЕЧНІ-СТАБИ: якщо
+// STOCK_DOC_TABLE не задано → лог TODO + порожній Recon (нічого не пишуть, не
+// ламають інші сутності). Коли таблиці декодовані — заповнити STOCK_DOC_TABLE +
+// написати мапінг за патерном importSales/importCashOrders.
+// Метадані: docs/1c-export-2026-06-02/Documents/{ВозвратТоваровОтПокупателя,
+//   Возврат,ВозвратТоваровПоставщику,Перепаковка,СписаниеТоваров,
+//   ОприходованиеТоваров,ИнвентаризацияТоваровНаСкладе,ПеремещениеТоваров}.xml
+const STOCK_DOC_TABLE: Record<string, string | null> = {
+  returns: null, // ВозвратТоваровОтПокупателя → _DocumentNNNN  TODO
+  repack: null, // Перепаковка → _DocumentNNNN  TODO
+  writeoff: null, // СписаниеТоваров → _DocumentNNNN  TODO
+  stockadjust: null, // ОприходованиеТоваров → _DocumentNNNN  TODO
+  inventory: null, // ИнвентаризацияТоваровНаСкладе → _DocumentNNNN  TODO
+  transfer: null, // ПеремещениеТоваров → _DocumentNNNN  TODO
+};
+
+function makeStockDocStub(
+  entity: string,
+  legacyName: string,
+): (ctx: ImportContext) => Promise<Recon> {
+  return async (ctx: ImportContext): Promise<Recon> => {
+    const recon = newRecon(entity);
+    const table = STOCK_DOC_TABLE[entity];
+    if (!table) {
+      warn(
+        `${entity}: 1С-таблиця для «${legacyName}» ще не декодована ` +
+          `(STOCK_DOC_TABLE.${entity}=null). Пропуск. ` +
+          `Декодуйте _DocumentNNNN + коди колонок → реалізуйте мапінг.`,
+      );
+      return recon;
+    }
+    recon.sourceRows = await countTable(ctx.src, table);
+    log(`${entity}: source rows = ${recon.sourceRows} (мапінг — TODO)`);
+    return recon;
+  };
+}
+
+const importReturns = makeStockDocStub("returns", "ВозвратТоваровОтПокупателя");
+const importRepack = makeStockDocStub("repack", "Перепаковка");
+const importWriteOff = makeStockDocStub("writeoff", "СписаниеТоваров");
+const importStockAdjust = makeStockDocStub(
+  "stockadjust",
+  "ОприходованиеТоваров",
+);
+const importInventory = makeStockDocStub(
+  "inventory",
+  "ИнвентаризацияТоваровНаСкладе",
+);
+const importTransfer = makeStockDocStub("transfer", "ПеремещениеТоваров");
+
 const ENTITY_RUNNERS: Record<
   EntityName,
   (ctx: ImportContext) => Promise<Recon>
@@ -4759,6 +4820,12 @@ const ENTITY_RUNNERS: Record<
   cashorders: importCashOrders,
   routesheets: importRouteSheets,
   debt: importDebt,
+  returns: importReturns,
+  repack: importRepack,
+  writeoff: importWriteOff,
+  stockadjust: importStockAdjust,
+  inventory: importInventory,
+  transfer: importTransfer,
   misc: importMisc,
   "sales-reg": importSalesRegister,
   "cashflow-reg": importCashFlowRegister,
