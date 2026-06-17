@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/manager-auth";
 import {
   DICTIONARIES,
+  DOCUMENTS,
   REGISTERS,
   REPORTS,
 } from "@/lib/manager/registry-catalog";
@@ -32,6 +33,7 @@ export default async function RegistryHubPage() {
         dictionaries={DICTIONARIES}
         registers={REGISTERS}
         reports={REPORTS}
+        documents={DOCUMENTS}
       />
     </div>
   );

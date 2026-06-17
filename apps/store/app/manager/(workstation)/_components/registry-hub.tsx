@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import type {
   DictionaryEntry,
+  DocumentEntry,
   RegisterEntry,
   ReportEntry,
   RegistryStatus,
@@ -172,10 +173,12 @@ export function RegistryHub({
   dictionaries,
   registers,
   reports,
+  documents,
 }: {
   dictionaries: readonly DictionaryEntry[];
   registers: readonly RegisterEntry[];
   reports: readonly ReportEntry[];
+  documents?: readonly DocumentEntry[];
 }) {
   return (
     <div className="space-y-8">
@@ -211,6 +214,26 @@ export function RegistryHub({
           />
         ))}
       </Section>
+
+      {documents && documents.length > 0 && (
+        <Section
+          title="Документи руху товару"
+          icon={<FileText className="h-4 w-4 text-gray-400" />}
+          action={
+            <Link
+              href="/manager/stock-documents"
+              className="flex items-center gap-1 text-sm font-medium text-emerald-700 hover:text-emerald-800"
+            >
+              Усі документи
+              <ArrowRight className="h-3.5 w-3.5" />
+            </Link>
+          }
+        >
+          {documents.map((d) => (
+            <ObjectCard key={d.key} card={{ ...d, icon: FileText }} />
+          ))}
+        </Section>
+      )}
 
       <Section
         title="Звіти"
