@@ -162,7 +162,7 @@ export function parseCreateBody(
   }
 }
 
-interface ListItem {
+export interface ListItem {
   id: string;
   docNumber: string;
   number1C: string | null;
