@@ -14,6 +14,7 @@ const TABS: { href: string; label: string }[] = [
   { href: "/manager/reports/stock-balance", label: "Залишки складу" },
   { href: "/manager/reports/debts", label: "Прострочені борги" },
   { href: "/manager/reports/reconciliation", label: "Акт звірки" },
+  { href: "/manager/reports/margin", label: "Маржа / Прибуток" },
 ];
 
 export function ReportsNav() {

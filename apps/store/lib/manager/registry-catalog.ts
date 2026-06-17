@@ -235,9 +235,10 @@ export const REGISTERS: readonly RegisterEntry[] = [
   {
     key: "cost",
     label: "Собівартість",
-    description: "Собівартість продажів (база для маржі).",
-    href: null,
-    status: "todo",
+    description:
+      "Собівартість продажів (← 1С ПродажиСебестоимость). База звіту маржі.",
+    href: "/manager/reports/margin",
+    status: "ready",
     phase: 3,
     type: "turnover",
   },
@@ -323,6 +324,13 @@ export const REPORTS: readonly ReportEntry[] = [
     label: "Акт звірки взаєморозрахунків",
     description: "Дебет / кредит / сальдо по контрагенту за період.",
     href: "/manager/reports/reconciliation",
+  },
+  {
+    key: "margin",
+    label: "Маржа / Валовий прибуток",
+    description:
+      "Виручка − Собівартість по товарах / клієнтах / агентах / категоріях.",
+    href: "/manager/reports/margin",
   },
 ];
 

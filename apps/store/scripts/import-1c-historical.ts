@@ -92,6 +92,7 @@ const ENTITY_NAMES = [
   "cashflow-reg",
   "stock-reg",
   "orders-reg",
+  "cost-reg",
   "bankdocs",
   "cashtransfers",
 ] as const;
@@ -4745,6 +4746,162 @@ async function importCashTransfers(ctx: ImportContext): Promise<Recon> {
   return recon;
 }
 
+// ─── 12. ПродажиСебестоимость → CostMovement ─────────────── _AccumRg5634 ─────
+// Регістр оборотів «Продажи себестоимость» (Стоимость = собівартість проданого
+// товару, EUR). Це ЄДИНЕ джерело історичної собівартості — без нього неможлива
+// маржа/валовий прибуток. Декодовано з метаданих реєстру (uuid
+// 32746ef3-...) + docs/1c-mssql-schema/columns.tsv (точний збіг сигнатури:
+// 6 вимірів + Количество(15,3) + Стоимость(15,2) + СписаниеПартий(bool)).
+//
+// Колонки `_AccumRg5634` (columns.tsv):
+//   _Period       — дата руху (occurredAt; asDate знімає year-offset);
+//   _RecorderRRef — документ-реєстратор (16 байт) = hex реалізації `_Document189`
+//                   = Sale.code1C;
+//   _LineNo       — № рядка у реєстраторі (унікальність руху разом з recorder);
+//   _Active       — прапор активного руху (фільтр 0x01);
+//   _Fld5635RRef  — Номенклатура (= Product.code1C hex);
+//   _Fld5636RRef  — ХарактеристикаНоменклатуры (не використовуємо);
+//   _Fld5637_*    — ЗаказПокупателя (composite, не використовуємо тут);
+//   _Fld5638_*    — ДокументОприходования (composite, не використовуємо);
+//   _Fld5639RRef  — Подразделение;  _Fld5640RRef — Проект;
+//   _Fld5641      — Количество (15,3);
+//   _Fld5642      — Стоимость (15,2) = СОБІВАРТІСТЬ (EUR) — ресурс маржі.
+//
+// На кожен активний рядок пишемо CostMovement:
+//   recorderCode1C = hex(_RecorderRRef) = Sale.code1C,
+//   lineNo = _LineNo,
+//   productCode1C = hex(_Fld5635RRef) = Product.code1C,
+//   productId = best-effort резолв через ctx.products (nullable),
+//   qty = _Fld5641, costEur = _Fld5642, occurredAt = _Period.
+//
+// Звіт маржі (`lib/reports/margin-report.ts`) джойнить ці рухи до Sale (через
+// recorderCode1C = code1C) → Customer/agent і до Product (через productId або
+// productCode1C) → category. Так маржа рахується співставленням Виручка↔Собівартість
+// по тих самих документах реалізації.
+//
+// Ідемпотентність: createMany з upsert-семантикою через унікальний ключ
+// (recorderCode1C, lineNo). Реімпорт чисто перестворює таблицю.
+
+const COST_REG_TABLE = "_AccumRg5634";
+const COST_REG_COLS = [
+  "_Period",
+  "_RecorderRRef",
+  "_LineNo",
+  "_Fld5635RRef", // Номенклатура
+  "_Fld5641", // Количество
+  "_Fld5642", // Стоимость (собівартість EUR)
+];
+
+const COST_OPENING_AS_OF = new Date("2021-01-01T00:00:00Z");
+const COST_INSERT_BATCH = 1000;
+
+type CostMovementRow = {
+  recorderCode1C: string;
+  lineNo: number;
+  productCode1C: string | null;
+  productId: string | null;
+  qty: string;
+  costEur: string;
+  occurredAt: Date;
+};
+
+async function importCostReg(ctx: ImportContext): Promise<Recon> {
+  const recon = newRecon("cost-reg");
+  const sink = new ErrorSink(recon, "cost-reg");
+  const { args, src, prisma } = ctx;
+
+  // Резолв-словник номенклатури (для productId). Для маржі він не критичний —
+  // звіт уміє джойнити і по productCode1C — але корисний для прямих JOIN.
+  await ensureProductLotDicts(ctx);
+
+  const activeWhere = "_Active = 0x01";
+  recon.sourceRows = await countTable(src, COST_REG_TABLE, activeWhere);
+  log(`cost-reg: active source rows = ${recon.sourceRows}`);
+
+  if (willWrite(ctx)) {
+    const deleted = await prisma.costMovement.deleteMany({});
+    log(`cost-reg: deleted ${deleted.count} prior cost movements`);
+
+    let processed = 0;
+    let buffer: CostMovementRow[] = [];
+
+    const flush = async (): Promise<void> => {
+      if (buffer.length === 0) return;
+      await prisma.costMovement.createMany({
+        data: buffer,
+        skipDuplicates: true,
+      });
+      buffer = [];
+    };
+
+    for await (const rows of streamTable(src, COST_REG_TABLE, COST_REG_COLS, {
+      batch: args.batch,
+      limit: args.limit,
+      orderBy: ["_RecorderRRef", "_LineNo"],
+      where: activeWhere,
+    })) {
+      for (const row of rows) {
+        processed++;
+        try {
+          const recorderHex = bufToHex(row["_RecorderRRef"]);
+          if (!recorderHex) {
+            recon.unresolved++;
+            continue;
+          }
+          const lineNo = asNumber(row["_LineNo"]) ?? 0;
+          const productHex = bufToHex(row["_Fld5635RRef"]);
+          const product = productHex ? ctx.products.get(productHex) : null;
+          const productId =
+            product && product.id !== "(pending)" ? product.id : null;
+          const qty = asDecimalString(row["_Fld5641"]) ?? "0";
+          const costEur = asDecimalString(row["_Fld5642"]) ?? "0";
+          const occurredAt = asDate(row["_Period"]) ?? COST_OPENING_AS_OF;
+
+          buffer.push({
+            recorderCode1C: recorderHex,
+            lineNo,
+            productCode1C: productHex,
+            productId,
+            qty,
+            costEur,
+            occurredAt,
+          });
+          recon.written++;
+
+          if (buffer.length >= COST_INSERT_BATCH) await flush();
+        } catch (e) {
+          sink.record(bufToHex(row["_RecorderRRef"]) ?? `row#${processed}`, e);
+        }
+      }
+      log(
+        `cost-reg: ${recon.written} movements written (${recon.unresolved} unresolved, ${processed} rows processed)`,
+      );
+    }
+    await flush();
+  } else {
+    // dry-run: рахуємо, скільки б записали.
+    for await (const rows of streamTable(src, COST_REG_TABLE, COST_REG_COLS, {
+      batch: args.batch,
+      limit: args.limit,
+      orderBy: ["_RecorderRRef", "_LineNo"],
+      where: activeWhere,
+    })) {
+      for (const row of rows) {
+        if (!bufToHex(row["_RecorderRRef"])) {
+          recon.unresolved++;
+          continue;
+        }
+        recon.written++;
+      }
+    }
+  }
+
+  log(
+    `cost-reg: done — written=${recon.written} unresolved=${recon.unresolved} errors=${recon.errors}`,
+  );
+  return recon;
+}
+
 // ════════════════════════════════════════════════════════════════════════════
 // MAIN
 // ════════════════════════════════════════════════════════════════════════════
@@ -4831,6 +4988,7 @@ const ENTITY_RUNNERS: Record<
   "cashflow-reg": importCashFlowRegister,
   "stock-reg": importStockRegister,
   "orders-reg": importOrderRemainderRegister,
+  "cost-reg": importCostReg,
   bankdocs: importBankDocs,
   cashtransfers: importCashTransfers,
 };

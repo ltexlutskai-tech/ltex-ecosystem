@@ -23,12 +23,6 @@ const SOON: {
   phase: number;
 }[] = [
   {
-    key: "margin",
-    label: "Маржа / валовий прибуток",
-    description: "Продажі мінус собівартість у розрізі товарів.",
-    phase: 3,
-  },
-  {
     key: "cash-flow",
     label: "Рух коштів (ДДС)",
     description: "Надходження та витрати по статтях за період.",

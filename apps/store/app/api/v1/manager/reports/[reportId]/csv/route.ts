@@ -8,6 +8,11 @@ import {
   type ReportShape,
 } from "@/lib/reports/analyst-reports";
 import { buildCsv } from "@/lib/reports/csv-export";
+import {
+  reportMargin,
+  MARGIN_GROUPS,
+  type MarginGroupBy,
+} from "@/lib/reports/margin-report";
 import type { PeriodPreset } from "@/lib/finance/owner-stats";
 import { logAuditEvent } from "@/lib/audit/audit-log";
 
@@ -58,6 +63,16 @@ export async function GET(
         ? 14
         : Math.min(3650, Math.max(0, thresholdRaw));
       report = await reportDebts(threshold);
+      break;
+    }
+    case "margin": {
+      const groupRaw = url.searchParams.get("group") ?? "product";
+      const group: MarginGroupBy = MARGIN_GROUPS.includes(
+        groupRaw as MarginGroupBy,
+      )
+        ? (groupRaw as MarginGroupBy)
+        : "product";
+      report = await reportMargin(group, period);
       break;
     }
     default:

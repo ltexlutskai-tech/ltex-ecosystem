@@ -21,12 +21,19 @@ export function ReportView({
   reportId,
   currentPreset,
   showPeriodSelector = true,
+  csvExtraParams,
 }: {
   report: ReportShape;
   reportId: string;
   currentPreset?: PeriodPreset;
   showPeriodSelector?: boolean;
+  /** Додаткові query-параметри для лінку CSV (напр. `group` для маржі). */
+  csvExtraParams?: Record<string, string>;
 }) {
+  const csvQuery = new URLSearchParams({
+    ...(currentPreset ? { period: currentPreset } : {}),
+    ...(csvExtraParams ?? {}),
+  }).toString();
   return (
     <div className="space-y-4">
       <div className="text-sm">
@@ -46,7 +53,7 @@ export function ReportView({
           </p>
         </div>
         <a
-          href={`/api/v1/manager/reports/${reportId}/csv${currentPreset ? `?period=${currentPreset}` : ""}`}
+          href={`/api/v1/manager/reports/${reportId}/csv${csvQuery ? `?${csvQuery}` : ""}`}
           className="rounded-md bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-700"
         >
           📥 Завантажити Excel (CSV)

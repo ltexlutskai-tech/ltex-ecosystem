@@ -1960,6 +1960,27 @@ model OrderRemainderMovement {
   @@map("order_remainder_movements")
 }
 
+// ─── Фаза 3: собівартість продажів (ПродажиСебестоимость _AccumRg5634) ───────
+// ЄДИНЕ джерело історичної собівартості → звіт «Маржа/Валовий прибуток».
+// Джойн із виручкою по recorderCode1C (= Sale.code1C).
+model CostMovement {
+  id             String   @id @default(cuid())
+  recorderCode1C String   @map("recorder_code_1c") // hex(_IDRRef реалізації) = Sale.code1C
+  lineNo         Int      @map("line_no")
+  productCode1C  String?  @map("product_code_1c") // hex номенклатури = Product.code1C
+  productId      String?  @map("product_id") // best-effort резолв при імпорті
+  qty            Decimal  @default(0) @db.Decimal(15, 3) // Количество (кг/шт)
+  costEur        Decimal  @default(0) @map("cost_eur") @db.Decimal(15, 2) // Стоимость (собівартість, EUR)
+  occurredAt     DateTime @map("occurred_at") // _Period (рух)
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  @@unique([recorderCode1C, lineNo], name: "cost_movement_recorder_line")
+  @@index([recorderCode1C])
+  @@index([productCode1C])
+  @@index([occurredAt])
+  @@map("cost_movements")
+}
+
 // ─── Фаза 6: фінансові документи банк/каса ──────────────────────────────────
 // Безготівкові платіжні доручення (вхідне = надходження від клієнта, вихідне =
 // оплата постачальнику/витрата). Проведення вхідного зменшує борг клієнта через
