@@ -7,13 +7,21 @@ import { StockDocForm } from "../../_components/stock-doc-form";
 
 export const dynamic = "force-dynamic";
 
-export async function generateMetadata({ params }: { params: Promise<{ kind: string }> }) {
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ kind: string }>;
+}) {
   const { kind } = await params;
   if (!isStockDocKind(kind)) return { title: "Новий документ | L-TEX Manager" };
   return { title: `Новий: ${getStockDocMeta(kind).label} | L-TEX Manager` };
 }
 
-export default async function NewStockDocPage({ params }: { params: Promise<{ kind: string }> }) {
+export default async function NewStockDocPage({
+  params,
+}: {
+  params: Promise<{ kind: string }>;
+}) {
   const { kind } = await params;
   if (!isStockDocKind(kind)) notFound();
   const user = await requireRole(["manager", "admin", "owner", "warehouse"]);
@@ -22,7 +30,12 @@ export default async function NewStockDocPage({ params }: { params: Promise<{ ki
   return (
     <div className="mx-auto max-w-4xl space-y-4">
       <div className="text-sm">
-        <Link href={`/manager/stock-documents/${meta.slug}`} className="text-gray-500 hover:text-gray-800 hover:underline">← Назад до списку</Link>
+        <Link
+          href={`/manager/stock-documents/${meta.slug}`}
+          className="text-gray-500 hover:text-gray-800 hover:underline"
+        >
+          ← Назад до списку
+        </Link>
       </div>
       <h1 className="text-xl font-semibold">Новий: {meta.label}</h1>
       <StockDocForm

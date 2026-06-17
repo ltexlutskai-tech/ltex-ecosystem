@@ -51,7 +51,10 @@ interface HeaderRow {
   totalQuantity?: number;
 }
 
-function headerCommon(d: HeaderRow, fallback?: { totalWeight: number; totalQuantity: number }): Omit<StockDocView, "totalEur" | "lines"> {
+function headerCommon(
+  d: HeaderRow,
+  fallback?: { totalWeight: number; totalQuantity: number },
+): Omit<StockDocView, "totalEur" | "lines"> {
   return {
     id: d.id,
     docNumber: d.docNumber,
@@ -65,47 +68,190 @@ function headerCommon(d: HeaderRow, fallback?: { totalWeight: number; totalQuant
   };
 }
 
-export async function fetchStockDoc(kind: StockDocKind, id: string): Promise<StockDocView | null> {
+export async function fetchStockDoc(
+  kind: StockDocKind,
+  id: string,
+): Promise<StockDocView | null> {
   switch (kind) {
     case "product-returns": {
-      const d = await prisma.productReturnFromCustomer.findUnique({ where: { id }, include: { items: { orderBy: { createdAt: "asc" } } } });
+      const d = await prisma.productReturnFromCustomer.findUnique({
+        where: { id },
+        include: { items: { orderBy: { createdAt: "asc" } } },
+      });
       if (!d) return null;
-      return { ...headerCommon(d), totalEur: Number(d.totalEur), customerName: d.customerName, lines: d.items.map((it) => ({ id: it.id, productId: it.productId, barcode: it.barcode, weight: it.weight, quantity: it.quantity, priceEur: Number(it.priceEur), amountEur: Number(it.amountEur), notes: it.notes })) };
+      return {
+        ...headerCommon(d),
+        totalEur: Number(d.totalEur),
+        customerName: d.customerName,
+        lines: d.items.map((it) => ({
+          id: it.id,
+          productId: it.productId,
+          barcode: it.barcode,
+          weight: it.weight,
+          quantity: it.quantity,
+          priceEur: Number(it.priceEur),
+          amountEur: Number(it.amountEur),
+          notes: it.notes,
+        })),
+      };
     }
     case "warehouse-returns": {
-      const d = await prisma.warehouseReturn.findUnique({ where: { id }, include: { items: { orderBy: { createdAt: "asc" } } } });
+      const d = await prisma.warehouseReturn.findUnique({
+        where: { id },
+        include: { items: { orderBy: { createdAt: "asc" } } },
+      });
       if (!d) return null;
-      return { ...headerCommon(d), totalEur: null, lines: d.items.map((it) => ({ id: it.id, productId: it.productId, barcode: it.barcode, weight: it.weight, quantity: it.quantity, priceEur: 0, amountEur: 0, notes: it.notes })) };
+      return {
+        ...headerCommon(d),
+        totalEur: null,
+        lines: d.items.map((it) => ({
+          id: it.id,
+          productId: it.productId,
+          barcode: it.barcode,
+          weight: it.weight,
+          quantity: it.quantity,
+          priceEur: 0,
+          amountEur: 0,
+          notes: it.notes,
+        })),
+      };
     }
     case "supplier-returns": {
-      const d = await prisma.returnToSupplier.findUnique({ where: { id }, include: { items: { orderBy: { createdAt: "asc" } } } });
+      const d = await prisma.returnToSupplier.findUnique({
+        where: { id },
+        include: { items: { orderBy: { createdAt: "asc" } } },
+      });
       if (!d) return null;
-      return { ...headerCommon(d), totalEur: Number(d.totalEur), supplierName: d.supplierName, lines: d.items.map((it) => ({ id: it.id, productId: it.productId, barcode: it.barcode, weight: it.weight, quantity: it.quantity, priceEur: Number(it.priceEur), amountEur: Number(it.amountEur), notes: it.notes })) };
+      return {
+        ...headerCommon(d),
+        totalEur: Number(d.totalEur),
+        supplierName: d.supplierName,
+        lines: d.items.map((it) => ({
+          id: it.id,
+          productId: it.productId,
+          barcode: it.barcode,
+          weight: it.weight,
+          quantity: it.quantity,
+          priceEur: Number(it.priceEur),
+          amountEur: Number(it.amountEur),
+          notes: it.notes,
+        })),
+      };
     }
     case "repackings": {
-      const d = await prisma.repacking.findUnique({ where: { id }, include: { items: { orderBy: { createdAt: "asc" } } } });
+      const d = await prisma.repacking.findUnique({
+        where: { id },
+        include: { items: { orderBy: { createdAt: "asc" } } },
+      });
       if (!d) return null;
-      return { ...headerCommon(d, { totalWeight: 0, totalQuantity: 0 }), totalEur: null, inputWeight: d.inputWeight, outputWeight: d.outputWeight, lossWeight: d.lossWeight, lines: d.items.map((it) => ({ id: it.id, productId: it.productId, barcode: it.barcode, weight: it.weight, quantity: it.quantity, priceEur: Number(it.priceEur), amountEur: Number(it.amountEur), notes: it.notes, role: it.role })) };
+      return {
+        ...headerCommon(d, { totalWeight: 0, totalQuantity: 0 }),
+        totalEur: null,
+        inputWeight: d.inputWeight,
+        outputWeight: d.outputWeight,
+        lossWeight: d.lossWeight,
+        lines: d.items.map((it) => ({
+          id: it.id,
+          productId: it.productId,
+          barcode: it.barcode,
+          weight: it.weight,
+          quantity: it.quantity,
+          priceEur: Number(it.priceEur),
+          amountEur: Number(it.amountEur),
+          notes: it.notes,
+          role: it.role,
+        })),
+      };
     }
     case "write-offs": {
-      const d = await prisma.writeOff.findUnique({ where: { id }, include: { items: { orderBy: { createdAt: "asc" } } } });
+      const d = await prisma.writeOff.findUnique({
+        where: { id },
+        include: { items: { orderBy: { createdAt: "asc" } } },
+      });
       if (!d) return null;
-      return { ...headerCommon(d), totalEur: Number(d.totalEur), reason: d.reason, lines: d.items.map((it) => ({ id: it.id, productId: it.productId, barcode: it.barcode, weight: it.weight, quantity: it.quantity, priceEur: Number(it.priceEur), amountEur: Number(it.amountEur), notes: it.notes })) };
+      return {
+        ...headerCommon(d),
+        totalEur: Number(d.totalEur),
+        reason: d.reason,
+        lines: d.items.map((it) => ({
+          id: it.id,
+          productId: it.productId,
+          barcode: it.barcode,
+          weight: it.weight,
+          quantity: it.quantity,
+          priceEur: Number(it.priceEur),
+          amountEur: Number(it.amountEur),
+          notes: it.notes,
+        })),
+      };
     }
     case "stock-adjustments": {
-      const d = await prisma.stockAdjustment.findUnique({ where: { id }, include: { items: { orderBy: { createdAt: "asc" } } } });
+      const d = await prisma.stockAdjustment.findUnique({
+        where: { id },
+        include: { items: { orderBy: { createdAt: "asc" } } },
+      });
       if (!d) return null;
-      return { ...headerCommon(d), totalEur: Number(d.totalEur), reason: d.reason, lines: d.items.map((it) => ({ id: it.id, productId: it.productId, barcode: it.barcode, weight: it.weight, quantity: it.quantity, priceEur: Number(it.priceEur), amountEur: Number(it.amountEur), notes: it.notes })) };
+      return {
+        ...headerCommon(d),
+        totalEur: Number(d.totalEur),
+        reason: d.reason,
+        lines: d.items.map((it) => ({
+          id: it.id,
+          productId: it.productId,
+          barcode: it.barcode,
+          weight: it.weight,
+          quantity: it.quantity,
+          priceEur: Number(it.priceEur),
+          amountEur: Number(it.amountEur),
+          notes: it.notes,
+        })),
+      };
     }
     case "inventories": {
-      const d = await prisma.inventory.findUnique({ where: { id }, include: { items: { orderBy: { createdAt: "asc" } } } });
+      const d = await prisma.inventory.findUnique({
+        where: { id },
+        include: { items: { orderBy: { createdAt: "asc" } } },
+      });
       if (!d) return null;
-      return { ...headerCommon(d), totalEur: null, isClosed: d.isClosed, lines: d.items.map((it) => ({ id: it.id, productId: it.productId, barcode: it.barcode, weight: 0, quantity: it.qtyActual, priceEur: Number(it.priceEur), amountEur: 0, notes: it.notes, qtyAccounting: it.qtyAccounting, qtyActual: it.qtyActual, qtyDifference: it.qtyDifference })) };
+      return {
+        ...headerCommon(d),
+        totalEur: null,
+        isClosed: d.isClosed,
+        lines: d.items.map((it) => ({
+          id: it.id,
+          productId: it.productId,
+          barcode: it.barcode,
+          weight: 0,
+          quantity: it.qtyActual,
+          priceEur: Number(it.priceEur),
+          amountEur: 0,
+          notes: it.notes,
+          qtyAccounting: it.qtyAccounting,
+          qtyActual: it.qtyActual,
+          qtyDifference: it.qtyDifference,
+        })),
+      };
     }
     case "stock-transfers": {
-      const d = await prisma.stockTransfer.findUnique({ where: { id }, include: { items: { orderBy: { createdAt: "asc" } } } });
+      const d = await prisma.stockTransfer.findUnique({
+        where: { id },
+        include: { items: { orderBy: { createdAt: "asc" } } },
+      });
       if (!d) return null;
-      return { ...headerCommon(d), totalEur: null, lines: d.items.map((it) => ({ id: it.id, productId: it.productId, barcode: it.barcode, weight: it.weight, quantity: it.quantity, priceEur: 0, amountEur: 0, notes: it.notes })) };
+      return {
+        ...headerCommon(d),
+        totalEur: null,
+        lines: d.items.map((it) => ({
+          id: it.id,
+          productId: it.productId,
+          barcode: it.barcode,
+          weight: it.weight,
+          quantity: it.quantity,
+          priceEur: 0,
+          amountEur: 0,
+          notes: it.notes,
+        })),
+      };
     }
   }
 }

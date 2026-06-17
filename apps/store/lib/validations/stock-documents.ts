@@ -49,20 +49,28 @@ export type SupplierReturnInput = z.infer<typeof supplierReturnSchema>;
 const repackLineSchema = lineSchema.extend({
   role: z.enum(["disassembled", "assembled"]).default("disassembled"),
 });
-export const repackingSchema = baseHeader.extend({ items: z.array(repackLineSchema).default([]) });
+export const repackingSchema = baseHeader.extend({
+  items: z.array(repackLineSchema).default([]),
+});
 export type RepackingInput = z.infer<typeof repackingSchema>;
 
-export const writeOffSchema = baseHeader.extend({ reason: z.string().max(500).nullable().optional() });
+export const writeOffSchema = baseHeader.extend({
+  reason: z.string().max(500).nullable().optional(),
+});
 export type WriteOffInput = z.infer<typeof writeOffSchema>;
 
-export const stockAdjustmentSchema = baseHeader.extend({ reason: z.string().max(500).nullable().optional() });
+export const stockAdjustmentSchema = baseHeader.extend({
+  reason: z.string().max(500).nullable().optional(),
+});
 export type StockAdjustmentInput = z.infer<typeof stockAdjustmentSchema>;
 
 const inventoryLineSchema = lineSchema.extend({
   qtyAccounting: z.number().min(0).default(0),
   qtyActual: z.number().min(0).default(0),
 });
-export const inventorySchema = baseHeader.extend({ items: z.array(inventoryLineSchema).default([]) });
+export const inventorySchema = baseHeader.extend({
+  items: z.array(inventoryLineSchema).default([]),
+});
 export type InventoryInput = z.infer<typeof inventorySchema>;
 
 export const stockTransferSchema = baseHeader.extend({
