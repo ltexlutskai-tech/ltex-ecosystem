@@ -3386,22 +3386,21 @@ async function importTradeAgents(ctx: ImportContext): Promise<Recon> {
 }
 
 // ─── Контакти Viber (← Catalog.КонтактыViber) ────────────────────────────────
-// ⚠️ Фізична MSSQL-таблиця цього довідника ВІДСУТНЯ в офлайн-дампі схеми
-// (мобільна конфіга; UUID 33088423-… не резолвиться у dbnames.txt). Тому
-// номер таблиці `_ReferenceNNN` та `_Fld`-коди атрибутів (Телефон/ДатаПодписки/
-// Контрагент/СтатусДиалога) ТРЕБА уточнити на живій MSSQL. Мапер написаний
-// повністю; константи нижче — placeholder-и з реальними іменами атрибутів 1С.
-//
-// TODO (на живій MSSQL): замінити VIBER_CONTACT_TABLE + VIBER_*_COL на реальні
-//   значення (резолв: UUID каталогу 33088423-70ef-4bda-9abc-2518f2d0509a →
-//   dbnames → _ReferenceNNN; атрибути за їх UUID з Catalogs/КонтактыViber.xml:
-//   Телефон abf1e488-…, ДатаПодписки 3260dec0-…, Контрагент 45d0b7e6-…,
-//   СтатусДиалога 7d8d3d1e-…). До уточнення — імпорт пропускається з warn.
-const VIBER_CONTACT_TABLE = ""; // TODO: уточнити _ReferenceNNN на живій MSSQL
-const VIBER_PHONE_COL = "_FldTODO_Phone"; // TODO: уточнити _Fld код (Телефон)
-const VIBER_SUBSCRIBED_COL = "_FldTODO_Subscribed"; // TODO: ДатаПодписки
-const VIBER_CLIENT_COL = "_FldTODO_ClientRRef"; // TODO: Контрагент (RRef)
-const VIBER_STATUS_COL = "_FldTODO_DialogStatus"; // TODO: СтатусДиалога
+// ✅ ДЕКОДОВАНО офлайн (docs/1C_MSSQL_CODES.md). Каталог КонтактыViber у
+// ЦЕНТРАЛЬНОМУ дампі (docs/1c-export-2026-06-02/Catalogs/КонтактыViber.xml):
+//   UUID 31a8bbfa-8275-40a8-80bb-feb4f51d88d4 → _Reference7527.
+// Атрибути (XML декларація → _Fld-колонки, типи звірені з columns.tsv — HIGH):
+//   _Fld7570=Фото, _Fld7571RRef=СтатусДиалога(EnumRef→hex), _Fld7572=ДатаПодписки,
+//   _Fld7573=ДатаОтписки, _Fld7574=Телефон, _Fld7575=ФИО, _Fld7576=Подписан,
+//   _Fld7577RRef=ИсточникПривличения, _Fld7578RRef=Контрагент, _Fld7579=Идентификатор,
+//   _Fld7580=ДатаРегистрации, _Fld7581=НовоеСообщение, _Fld7597RRef=Менеджер,
+//   _Fld7639=ЗапросОбласти, _Fld7731=ОстатокСесии, _Fld7735RRef=Область.
+//   ⚠️ СтатусДиалога — посилання на Enum (зберігаємо hex; декод у текст — окремо).
+const VIBER_CONTACT_TABLE = "_Reference7527"; // КонтактыViber (HIGH)
+const VIBER_PHONE_COL = "_Fld7574"; // Телефон (HIGH)
+const VIBER_SUBSCRIBED_COL = "_Fld7572"; // ДатаПодписки (HIGH)
+const VIBER_CLIENT_COL = "_Fld7578RRef"; // Контрагент (HIGH)
+const VIBER_STATUS_COL = "_Fld7571RRef"; // СтатусДиалога (EnumRef→hex) (HIGH)
 
 export interface ViberContactUpsert {
   code1C: string;
@@ -3953,12 +3952,13 @@ async function loadClientIdByHex(
 }
 
 // ─── 12a. Продажи → SalesMovement ─ _AccumRg5604 ──────────────────────────────
-// Колонки (columns.tsv): _Period, _RecorderRRef, _LineNo, _Active,
-//   _Fld5605RRef=Номенклатура, _Fld5606RRef=ХарактеристикаНоменклатуры,
-//   _Fld5607_RRRef=ЗаказПокупателя(поліморф), _Fld5608RRef=ДоговорКонтрагента,
-//   _Fld5609_RRRef=ДокументПродажи(поліморф), _Fld5613RRef=Контрагент,
-//   _Fld5614=Количество, _Fld5615=Стоимость, _Fld5616=СтоимостьБезСкидок,
-//   _Fld5617=НДС, _Fld7293=Вес.
+// ✅ ДЕКОДОВАНО офлайн (docs/1C_MSSQL_CODES.md). UUID ada2135a-… → _AccumRg5604.
+// Виміри (XML декларація → _Fld): _Fld5605RRef=Номенклатура,
+//   _Fld5606RRef=ХарактеристикаНоменклатуры, _Fld5607_RRRef=ЗаказПокупателя(поліморф),
+//   _Fld5608RRef=ДоговорКонтрагента, _Fld5609_RRRef=ДокументПродажи(поліморф),
+//   _Fld5610RRef=Подразделение, _Fld5611RRef=Проект, _Fld5612RRef=Организация,
+//   _Fld5613RRef=Контрагент. Ресурси: _Fld5614=Количество, _Fld5615=Стоимость,
+//   _Fld5616=СтоимостьБезСкидок, _Fld5617=НДС, _Fld7293=Вес. Усе — HIGH.
 // Продажи — оборотний регістр (без _RecordKind): усе recordKind=0 (прихід).
 const SALES_REG_TABLE = "_AccumRg5604";
 const SALES_REG_COLS = [
@@ -4054,25 +4054,30 @@ async function importSalesRegister(ctx: ImportContext): Promise<Recon> {
 }
 
 // ─── 12b. ДвиженияДенежныхСредств → CashFlowMovement ─ _AccumRg5309 ───────────
-// Колонки (columns.tsv): _Period, _RecorderRRef, _LineNo, _Active,
+// ✅ ДЕКОДОВАНО офлайн (docs/1C_MSSQL_CODES.md). UUID 0a5d4601-… → _AccumRg5309.
+// Вимірювання (XML декларація → послідовні _Fld-колонки):
 //   _Fld5310_RRRef=БанковскийСчетКасса(поліморф), _Fld5311RRef=ВидДенежныхСредств,
 //   _Fld5312RRef=ПриходРасход(Enum), _Fld5313RRef=СтатьяДвиженияДенежныхСредств,
-//   _Fld5318RRef=Контрагент, _Fld5322=Сумма, далі _Fld...=СуммаУпр.
+//   _Fld5314_RRRef=ДокументДвижения(поліморф), _Fld5315_RRRef=Контрагент(поліморф),
+//   _Fld5316RRef=ДоговорКонтрагента, _Fld5317_RRRef=Сделка(поліморф),
+//   _Fld5318RRef=Проект, _Fld5319_RRRef=ДокументПланированияПлатежа(поліморф),
+//   _Fld5320_RRRef=ДокументРасчетовСКонтрагентом(поліморф), _Fld5321RRef=Организация.
+//   Ресурси: _Fld5322=Сумма (грн), _Fld5323=СуммаУпр (EUR).
+//   ⚠️ ВИПРАВЛЕНО: раніше Контрагент помилково читали з _Fld5318RRef (= Проект);
+//   правильно — поліморфний _Fld5315_RRRef. СуммаУпр=_Fld5323 — підтверджено (HIGH).
 //   ПриходРасход — Enum-посилання; напрямок зчитуємо з _EnumOrder через мапу
 //   (0=Приход, 1=Расход), яку будуємо з _Enum-таблиці руху коштів.
-// ⚠️ Точний _FldNNNN для СуммаУпр та фізична таблиця Enum ПриходРасход — TODO
-// уточнити на живому MSSQL; нижче — best-effort (СуммаУпр = останній numeric 15,2).
 const CASHFLOW_REG_TABLE = "_AccumRg5309";
 const CASHFLOW_REG_COLS = [
   "_Period",
   "_RecorderRRef",
   "_LineNo",
-  "_Fld5310_RRRef", // БанковскийСчетКасса
+  "_Fld5310_RRRef", // БанковскийСчетКасса (поліморф)
   "_Fld5312RRef", // ПриходРасход (Enum)
   "_Fld5313RRef", // СтатьяДвиженияДенежныхСредств
-  "_Fld5318RRef", // Контрагент
+  "_Fld5315_RRRef", // Контрагент (поліморф) — ВИПРАВЛЕНО (було _Fld5318RRef=Проект)
   "_Fld5322", // Сумма (грн)
-  "_Fld5323", // СуммаУпр (EUR) — TODO: уточнити код
+  "_Fld5323", // СуммаУпр (EUR) — HIGH
 ];
 
 // Мапа hex(_IDRRef ПриходРасход) → 0|1. ПриходРасход у 1С — системний Enum
@@ -4105,9 +4110,10 @@ async function importCashFlowRegister(ctx: ImportContext): Promise<Recon> {
   const { args, src, prisma } = ctx;
 
   const clientByHex = await loadClientIdByHex(ctx);
-  // TODO: уточнити фізичну таблицю Enum ПриходРасход на MSSQL (тут — порожня мапа
-  // → дефолт напрямок 0; знак можна вивести зі знаку Сумма як фолбек).
-  const dirEnum = new Map<string, number>();
+  // ✅ ДЕКОДОВАНО: Enum ПриходРасход = ВидыДвиженийПриходРасход → _Enum225
+  // (Приход=order 0, Расход=order 1). Будуємо мапу hex(_IDRRef)→0|1 з _EnumOrder.
+  // Фолбек (порожня мапа / нерезолвлений hex) — знак суми (<0 → розхід).
+  const dirEnum = await loadCashDirectionEnum(src, "_Enum225");
 
   const activeWhere = "_Active = 0x01";
   recon.sourceRows = await countTable(src, CASHFLOW_REG_TABLE, activeWhere);
@@ -4161,7 +4167,7 @@ async function importCashFlowRegister(ctx: ImportContext): Promise<Recon> {
             accountCode1C: bufToHex(row["_Fld5310_RRRef"]),
             articleCode1C: bufToHex(row["_Fld5313RRef"]),
             direction,
-            clientCode1C: bufToHex(row["_Fld5318RRef"]),
+            clientCode1C: bufToHex(row["_Fld5315_RRRef"]),
             amountUah: Math.abs(amountUah),
             amountUpr: asNumber(row["_Fld5323"]),
           }),
@@ -4180,13 +4186,15 @@ async function importCashFlowRegister(ctx: ImportContext): Promise<Recon> {
 }
 
 // ─── 12c. ТоварыНаСкладах → StockMovement ─ _AccumRg5788 ──────────────────────
-// Колонки: _Period, _RecorderRRef, _LineNo, _Active, _RecordKind,
-//   _Fld5789RRef=Склад, _Fld5790RRef=Номенклатура,
+// ✅ ДЕКОДОВАНО офлайн (docs/1C_MSSQL_CODES.md). UUID 4967cf32-… → _AccumRg5788.
+// Виміри (XML декларація): _Fld5789RRef=Склад, _Fld5790RRef=Номенклатура,
 //   _Fld5791RRef=ХарактеристикаНоменклатуры, _Fld5792RRef=СерияНоменклатуры,
-//   _Fld5793RRef=Качество, _Fld5794=Количество.
+//   _Fld5793RRef=Качество. Ресурс: _Fld5794=Количество (HIGH).
 // Балансовий регістр (_RecordKind). Вага у штучному регістрі відсутня — приходить
-// з окремого _AccumRg6608 (ТовариНаСкладахУВазі); тут weightKg=null
-// (TODO Фаза 2.1: JOIN вагового регістра по recorder+lineNo).
+// з окремого вагового регістру ТовариНаСкладахУВазі (UUID d378703b-… →
+//   _AccumRg6608: _Fld6609RRef=Склад, _Fld6610RRef=Номенклатура,
+//   _Fld6611RRef=Характеристика, _Fld6612=Количество[=вага,кг]).
+//   weightKg=null тут (TODO Фаза 2.1: JOIN _AccumRg6608 по recorder+lineNo).
 const STOCK_REG_TABLE = "_AccumRg5788";
 const STOCK_REG_COLS = [
   "_Period",
@@ -4277,10 +4285,14 @@ async function importStockRegister(ctx: ImportContext): Promise<Recon> {
 }
 
 // ─── 12d. ЗаказыПокупателей → OrderRemainderMovement ─ _AccumRg5374 ───────────
-// Колонки: _Period, _RecorderRRef, _LineNo, _Active, _RecordKind,
-//   _Fld5375RRef=ДоговорКонтрагента, _Fld5376RRef=ЗаказПокупателя,
-//   _Fld5377RRef=СтатусПартии, _Fld5378RRef=Номенклатура,
-//   _Fld5379RRef=ХарактеристикаНоменклатуры, _Fld5380=Количество.
+// ✅ ДЕКОДОВАНО офлайн (docs/1C_MSSQL_CODES.md). UUID 3c40f824-… → _AccumRg5374.
+// Виміри (XML декларація): _Fld5375RRef=ДоговорКонтрагента,
+//   _Fld5376RRef=ЗаказПокупателя, _Fld5377RRef=СтатусПартии,
+//   _Fld5378RRef=Номенклатура, _Fld5379RRef=ХарактеристикаНоменклатуры,
+//   _Fld5380=Цена(dim!), ... ресурс _Fld5387=Количество.
+//   ⚠️ УВАГА: у ЗаказыПокупателей «Количество» — це РЕСУРС _Fld5387, а _Fld5380
+//   насправді вимір «Цена». Поточний код читає _Fld5380 як qty → див. нижче
+//   виправлення колонки на _Fld5387 (HIGH).
 const ORDERS_REG_TABLE = "_AccumRg5374";
 const ORDERS_REG_COLS = [
   "_Period",
@@ -4289,7 +4301,7 @@ const ORDERS_REG_COLS = [
   "_RecordKind",
   "_Fld5376RRef", // ЗаказПокупателя
   "_Fld5378RRef", // Номенклатура
-  "_Fld5380", // Количество
+  "_Fld5387", // Количество (ресурс) — ВИПРАВЛЕНО (було _Fld5380=Цена)
 ];
 
 async function importOrderRemainderRegister(
@@ -4355,7 +4367,7 @@ async function importOrderRemainderRegister(
                 : null,
             productCode1C: productHex,
             productId: resolveProductId(ctx, productHex),
-            qty: asNumberOr(row["_Fld5380"], 0),
+            qty: asNumberOr(row["_Fld5387"], 0),
             recordKind: asNumber(row["_RecordKind"]) ?? 0,
           }),
         );
@@ -4413,37 +4425,47 @@ interface BankDocFieldMap {
   comment: string | null;
 }
 
-// TODO(Фаза6): декодувати коди на сервері (див. коментар вище). Поки table=null.
+// ✅ ДЕКОДОВАНО офлайн (docs/1C_MSSQL_CODES.md). ПлатежноеПоручениеВходящее
+// UUID e65470e0-… → _Document170; колонки звірені позиційно зі звірянням типів
+// (HIGH): Контрагент=_Fld2440RRef, СуммаДокумента=_Fld2443,
+// СчетОрганизации=_Fld2439RRef, СтатьяДвиженияДенежныхСредств=_Fld2453RRef,
+// ВалютаДокумента=_Fld2444RRef, НазначениеПлатежа=_Fld2456,
+// СчетКонтрагента=_Fld2441RRef, Комментарий=_Fld2450.
 const BANK_INCOMING_MAP: BankDocFieldMap = {
-  table: null, // TODO: "_DocumentNNN" (ПлатежноеПоручениеВходящее)
+  table: "_Document170", // ПлатежноеПоручениеВходящее (HIGH)
   direction: "incoming",
   number: "_Number",
   date: "_Date_Time",
   posted: "_Posted",
-  customerRRef: "__TODO_customer_RRRef",
-  amount: "__TODO_summa",
-  currencyRRef: null,
-  bankRRef: "__TODO_bank_RRef",
-  articleRRef: "__TODO_article_RRef",
-  purpose: null,
-  iban: null,
-  comment: null,
+  customerRRef: "_Fld2440RRef", // Контрагент (CatalogRef)
+  amount: "_Fld2443", // СуммаДокумента
+  currencyRRef: "_Fld2444RRef", // ВалютаДокумента → _Reference30
+  bankRRef: "_Fld2439RRef", // СчетОрганизации → _Reference29
+  articleRRef: "_Fld2453RRef", // СтатьяДвиженияДенежныхСредств → _Reference96
+  purpose: "_Fld2456", // НазначениеПлатежа
+  iban: "_Fld2441RRef", // СчетКонтрагента (RRef → _Reference29, не текст IBAN)
+  comment: "_Fld2450", // Комментарий
 };
 
+// ✅ ДЕКОДОВАНО: ПлатежноеПоручениеИсходящее UUID b2999d93-… → _Document171
+// (HIGH): Контрагент=_Fld2495RRef, СуммаДокумента=_Fld2506,
+// СчетОрганизации=_Fld2508RRef, СтатьяДвиженияДенежныхСредств=_Fld2505RRef,
+// ВалютаДокумента=_Fld2488RRef, НазначениеПлатежа=_Fld2496,
+// СчетКонтрагента=_Fld2507RRef, Комментарий=_Fld2494.
 const BANK_OUTGOING_MAP: BankDocFieldMap = {
-  table: null, // TODO: "_DocumentNNN" (ПлатежноеПоручениеИсходящее)
+  table: "_Document171", // ПлатежноеПоручениеИсходящее (HIGH)
   direction: "outgoing",
   number: "_Number",
   date: "_Date_Time",
   posted: "_Posted",
-  customerRRef: "__TODO_customer_RRRef",
-  amount: "__TODO_summa",
-  currencyRRef: null,
-  bankRRef: "__TODO_bank_RRef",
-  articleRRef: "__TODO_article_RRef",
-  purpose: null,
-  iban: null,
-  comment: null,
+  customerRRef: "_Fld2495RRef", // Контрагент
+  amount: "_Fld2506", // СуммаДокумента
+  currencyRRef: "_Fld2488RRef", // ВалютаДокумента → _Reference30
+  bankRRef: "_Fld2508RRef", // СчетОрганизации → _Reference29
+  articleRRef: "_Fld2505RRef", // СтатьяДвиженияДенежныхСредств → _Reference96
+  purpose: "_Fld2496", // НазначениеПлатежа
+  iban: "_Fld2507RRef", // СчетКонтрагента (RRef → _Reference29)
+  comment: "_Fld2494", // Комментарий
 };
 
 async function importBankDocs(ctx: ImportContext): Promise<Recon> {
@@ -4609,17 +4631,26 @@ interface CashTransferFieldMap {
   comment: string | null;
 }
 
-// TODO(Фаза6): декодувати коди (ВнутреннееПеремещениеНаличныхДенежныхСредств).
+// ✅ ДЕКОДОВАНО офлайн (docs/1C_MSSQL_CODES.md). ВнутреннееПеремещениеНаличных-
+// ДенежныхСредств UUID 8bc96d47-… → _Document121 (HIGH):
+//   _Fld662RRef=ОрганизацияОтправитель, _Fld663RRef=Касса(відправник),
+//   _Fld664RRef=ОрганизацияПолучатель, _Fld665RRef=КассаПолучатель,
+//   _Fld666RRef=ВалютаДокумента, _Fld667=СуммаДокумента, _Fld668=Оплачено,
+//   _Fld669RRef=СтатьяДвиженияДенежныхСредств, _Fld670RRef=Ответственный,
+//   _Fld671=Комментарий.
+//   ⚠️ from/to — це Кассы (_Reference Кассы), НЕ банк-рахунки; ctx.bankAccountByHex
+//   їх не зрезолвить → fromAccountId/toAccountId=null (трактується як готівка) —
+//   це коректно для внутрішнього переміщення готівки.
 const CASH_TRANSFER_MAP: CashTransferFieldMap = {
-  table: null, // TODO: "_DocumentNNN"
+  table: "_Document121", // ВнутреннееПеремещениеНаличныхДенежныхСредств (HIGH)
   number: "_Number",
   date: "_Date_Time",
   posted: "_Posted",
-  fromBankRRef: "__TODO_from_RRef",
-  toBankRRef: "__TODO_to_RRef",
-  amount: "__TODO_summa",
-  articleRRef: null,
-  comment: null,
+  fromBankRRef: "_Fld663RRef", // Касса (відправник)
+  toBankRRef: "_Fld665RRef", // КассаПолучатель
+  amount: "_Fld667", // СуммаДокумента
+  articleRRef: "_Fld669RRef", // СтатьяДвиженияДенежныхСредств → _Reference96
+  comment: "_Fld671", // Комментарий
 };
 
 async function importCashTransfers(ctx: ImportContext): Promise<Recon> {
@@ -4908,22 +4939,24 @@ async function importCostReg(ctx: ImportContext): Promise<Recon> {
 
 // ─── Фаза 5 — документи руху товару (нові) ───────────────────────────────────
 // Кожен документ читається з відповідної 1С-таблиці `_Document…` по
-// code1C=hex(_IDRRef). ⚠️ Номери таблиць `_DocumentNNNN` + коди колонок для цих
-// документів ще НЕ декодовані з `_Config` — потрібен окремий крок мапування
-// (як було для Sale `_Document189`). Тому раннери — БЕЗПЕЧНІ-СТАБИ: якщо
-// STOCK_DOC_TABLE не задано → лог TODO + порожній Recon (нічого не пишуть, не
-// ламають інші сутності). Коли таблиці декодовані — заповнити STOCK_DOC_TABLE +
-// написати мапінг за патерном importSales/importCashOrders.
+// code1C=hex(_IDRRef).
+// ✅ НОМЕРИ ТАБЛИЦЬ ДЕКОДОВАНО офлайн (docs/1C_MSSQL_CODES.md) — UUID кожного
+// документа з docs/1c-export-2026-06-02/Documents/<Док>.xml резолвиться через
+// dbnames.txt → _DocumentNNN (HIGH). Раннери поки лишаються СТАБАМИ: вони
+// рахують рядки джерела (countTable) і логують, але повний рядок-мапінг
+// (шапка + табличні частини Товары: Номенклатура/Характеристика/Количество/Вес)
+// ще треба реалізувати за патерном importSales/importCashOrders. Коди колонок
+// шапки/табличних частин — у docs/1C_MSSQL_CODES.md (секція «Stock-документи»).
 // Метадані: docs/1c-export-2026-06-02/Documents/{ВозвратТоваровОтПокупателя,
-//   Возврат,ВозвратТоваровПоставщику,Перепаковка,СписаниеТоваров,
+//   ВозвратТоваровПоставщику,Перепаковка,СписаниеТоваров,
 //   ОприходованиеТоваров,ИнвентаризацияТоваровНаСкладе,ПеремещениеТоваров}.xml
 const STOCK_DOC_TABLE: Record<string, string | null> = {
-  returns: null, // ВозвратТоваровОтПокупателя → _DocumentNNNN  TODO
-  repack: null, // Перепаковка → _DocumentNNNN  TODO
-  writeoff: null, // СписаниеТоваров → _DocumentNNNN  TODO
-  stockadjust: null, // ОприходованиеТоваров → _DocumentNNNN  TODO
-  inventory: null, // ИнвентаризацияТоваровНаСкладе → _DocumentNNNN  TODO
-  transfer: null, // ПеремещениеТоваров → _DocumentNNNN  TODO
+  returns: "_Document123", // ВозвратТоваровОтПокупателя (HIGH; таб.ч. Товары=VT)
+  repack: "_Document6631", // Перепаковка (HIGH; таб.ч. Распаковка/Упаковка)
+  writeoff: "_Document193", // СписаниеТоваров (HIGH; таб.ч. Товары)
+  stockadjust: "_Document156", // ОприходованиеТоваров (HIGH; таб.ч. Товары)
+  inventory: "_Document140", // ИнвентаризацияТоваровНаСкладе (HIGH; таб.ч. Товары)
+  transfer: "_Document162", // ПеремещениеТоваров (HIGH; таб.ч. Товары)
 };
 
 function makeStockDocStub(
