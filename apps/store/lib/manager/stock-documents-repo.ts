@@ -5,6 +5,7 @@ import {
   applyReturnFromCustomerDebt,
   type StockDocKind,
 } from "./stock-documents";
+import { applyStockDocumentMovements } from "./stock-movement-hooks";
 
 /**
  * Репозиторій документів руху товару (Фаза 5) — спільна CRUD-логіка 8 типів:
@@ -283,6 +284,8 @@ export async function postStockDoc(
       occurredAt: doc.docDate,
       createdByUserId: userId,
     });
+    // Товар повертається на склад → приходний рух StockMovement (best-effort).
+    applyStockDocumentMovements(kind, id);
     return { ok: true };
   }
   const delegate: SimpleDelegate = {
@@ -294,7 +297,10 @@ export async function postStockDoc(
     inventories: db.inventory,
     "stock-transfers": db.stockTransfer,
   }[kind] as unknown as SimpleDelegate;
-  return simplePost(delegate, id, postedData);
+  const result = await simplePost(delegate, id, postedData);
+  // Рух складу при успішному проведенні (best-effort, не валить проведення).
+  if (result.ok) applyStockDocumentMovements(kind, id);
+  return result;
 }
 
 interface SimpleDelegate {

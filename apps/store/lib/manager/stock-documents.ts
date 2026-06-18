@@ -8,7 +8,8 @@ import { applyDebtMovementSafe } from "./debt-register";
  *  - hook проведення → рух боргу для «Повернення від покупця».
  *
  * Проведення ProductReturnFromCustomer пише MgrDebtMovement(amountEur<0) через
- * applyReturnFromCustomerDebt. StockMovement — best-effort (Фаза 2; зараз нема).
+ * applyReturnFromCustomerDebt. Рухи складу (StockMovement, Фаза 2) пишуться у
+ * postStockDoc через applyStockDocumentMovements (stock-movement-hooks.ts).
  */
 
 export type StockDocKind =
@@ -219,7 +220,8 @@ function round2(n: number): number {
 /**
  * При проведенні «Повернення від покупця» пишемо мінус-рух боргу
  * (amountEur<0, kind=correction). Best-effort: НІКОЛИ не валить проведення.
- * TODO (Фаза 2): додати приходний StockMovement (товар повертається на склад).
+ * Приходний StockMovement (товар повертається на склад) — у postStockDoc через
+ * applyStockDocumentMovements.
  */
 export function applyReturnFromCustomerDebt(input: {
   returnId: string;
