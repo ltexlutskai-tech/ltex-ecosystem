@@ -1,29 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/manager-auth";
 import { canExport } from "@/lib/permissions/role-permissions";
-import {
-  reportDebts,
-  reportSalesByClient,
-  reportSalesBySupplier,
-  type ReportShape,
-} from "@/lib/reports/analyst-reports";
+import { resolveReport } from "@/lib/reports/resolve-report";
 import { buildCsv } from "@/lib/reports/csv-export";
-import {
-  reportMargin,
-  MARGIN_GROUPS,
-  type MarginGroupBy,
-} from "@/lib/reports/margin-report";
-import type { PeriodPreset } from "@/lib/finance/owner-stats";
 import { logAuditEvent } from "@/lib/audit/audit-log";
 
 /**
  * GET /api/v1/manager/reports/{reportId}/csv?period=...
  *
  * Завантаження CSV-файлу будь-якого зі звітів. Доступно тим ролям у яких
- * `canExport('reports')` = true (analyst, admin, owner за матрицею).
+ * `canExport('reports')` = true (analyst, admin, owner за матрицею). Той самий
+ * резолвер даних, що й XLSX-роут (`resolveReport`).
  */
-
-const VALID_PERIODS: PeriodPreset[] = ["today", "week", "month", "year", "all"];
 
 export async function GET(
   req: NextRequest,
@@ -41,45 +29,13 @@ export async function GET(
   }
   const { reportId } = await params;
   const url = new URL(req.url);
-  const periodRaw = url.searchParams.get("period") ?? "month";
-  const period: PeriodPreset = VALID_PERIODS.includes(periodRaw as PeriodPreset)
-    ? (periodRaw as PeriodPreset)
-    : "month";
 
-  let report: ReportShape;
-  switch (reportId) {
-    case "sales-by-client":
-      report = await reportSalesByClient(period);
-      break;
-    case "sales-by-supplier":
-      report = await reportSalesBySupplier(period);
-      break;
-    case "debts": {
-      const thresholdRaw = parseInt(
-        url.searchParams.get("threshold") ?? "14",
-        10,
-      );
-      const threshold = Number.isNaN(thresholdRaw)
-        ? 14
-        : Math.min(3650, Math.max(0, thresholdRaw));
-      report = await reportDebts(threshold);
-      break;
-    }
-    case "margin": {
-      const groupRaw = url.searchParams.get("group") ?? "product";
-      const group: MarginGroupBy = MARGIN_GROUPS.includes(
-        groupRaw as MarginGroupBy,
-      )
-        ? (groupRaw as MarginGroupBy)
-        : "product";
-      report = await reportMargin(group, period);
-      break;
-    }
-    default:
-      return NextResponse.json(
-        { error: `Невідомий звіт: ${reportId}` },
-        { status: 404 },
-      );
+  const report = await resolveReport(reportId, url.searchParams);
+  if (!report) {
+    return NextResponse.json(
+      { error: `Невідомий звіт: ${reportId}` },
+      { status: 404 },
+    );
   }
 
   const csv = buildCsv(report.headers, report.rows);

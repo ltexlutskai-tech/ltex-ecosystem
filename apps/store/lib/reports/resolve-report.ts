@@ -17,6 +17,12 @@ import {
   MARGIN_GROUPS,
   type MarginGroupBy,
 } from "@/lib/reports/margin-report";
+import {
+  buildSalesSummaryReport,
+  buildCashFlowReport,
+  buildStockBalanceReport,
+  buildReconciliationReportShape,
+} from "@/lib/reports/registry-report-builders";
 import type { PeriodPreset } from "@/lib/finance/owner-stats";
 
 const VALID_PERIODS: PeriodPreset[] = ["today", "week", "month", "year", "all"];
@@ -38,8 +44,11 @@ export function parseThreshold(raw: string | null): number {
 /**
  * Будує `ReportShape` за `reportId`. Повертає null для невідомого звіту.
  *
- * @param reportId  ключ звіту (`sales-by-client` | `sales-by-supplier` | `debts`)
- * @param params    URLSearchParams запиту (для period / threshold)
+ * @param reportId  ключ звіту (`sales-by-client` | `sales-by-supplier` |
+ *                  `debts` | `margin` | `sales-summary` | `cashflow` |
+ *                  `stock-balance` | `reconciliation`)
+ * @param params    URLSearchParams запиту (period / threshold / from / to /
+ *                  group / clientId — залежно від звіту)
  */
 export async function resolveReport(
   reportId: string,
@@ -59,6 +68,14 @@ export async function resolveReport(
         : "product";
       return reportMargin(group, parsePeriod(params.get("period")));
     }
+    case "sales-summary":
+      return buildSalesSummaryReport(params);
+    case "cashflow":
+      return buildCashFlowReport(params);
+    case "stock-balance":
+      return buildStockBalanceReport(params);
+    case "reconciliation":
+      return buildReconciliationReportShape(params);
     default:
       return null;
   }

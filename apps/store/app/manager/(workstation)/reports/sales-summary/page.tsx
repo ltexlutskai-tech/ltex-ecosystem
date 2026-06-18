@@ -13,6 +13,7 @@ import {
   type SalesMovementLite,
 } from "@/lib/reports/registry-reports";
 import { ReportsNav } from "../_components/reports-nav";
+import { ReportExportButtons } from "../_components/report-export-buttons";
 import { RegisterPeriodFilters } from "../../registry/_components/register-period-filters";
 import { RegisterViewer } from "../../_components/register-viewer";
 
@@ -151,18 +152,27 @@ export default async function SalesSummaryPage({
     discountEur: fmtEur(r.discountEur),
   }));
 
+  const exportQuery = new URLSearchParams({
+    ...(sp.from ? { from: sp.from } : {}),
+    ...(sp.to ? { to: sp.to } : {}),
+    group,
+  }).toString();
+
   return (
     <div className="mx-auto max-w-6xl space-y-4">
       <ReportsNav />
-      <div>
-        <h1 className="text-xl font-semibold text-gray-900">
-          Звіт: Підсумок продажів
-        </h1>
-        <p className="mt-1 text-sm text-gray-500">
-          Виручка / кг у розрізі клієнтів · товарів · агентів за період. Рухів у
-          вибірці: {movements.length}
-          {movements.length >= LIMIT ? ` (показано перші ${LIMIT})` : ""}.
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div>
+          <h1 className="text-xl font-semibold text-gray-900">
+            Звіт: Підсумок продажів
+          </h1>
+          <p className="mt-1 text-sm text-gray-500">
+            Виручка / кг у розрізі клієнтів · товарів · агентів за період. Рухів
+            у вибірці: {movements.length}
+            {movements.length >= LIMIT ? ` (показано перші ${LIMIT})` : ""}.
+          </p>
+        </div>
+        <ReportExportButtons reportId="sales-summary" query={exportQuery} />
       </div>
 
       <RegisterPeriodFilters

@@ -41,11 +41,24 @@ export interface RegisterEntry {
   type: RegisterType;
 }
 
+/** Тематична група звіту (для хабу/навігації). */
+export type ReportTheme = "sales" | "finance" | "stock" | "debt";
+
+/** Людські назви тем звітів (порядок = порядок секцій у хабі). */
+export const REPORT_THEMES: { key: ReportTheme; label: string }[] = [
+  { key: "sales", label: "Продажі" },
+  { key: "finance", label: "Фінанси" },
+  { key: "stock", label: "Склад" },
+  { key: "debt", label: "Борги" },
+];
+
 export interface ReportEntry {
   key: string;
   label: string;
   description: string;
   href: string;
+  /** Тема, до якої належить звіт (для групування у хабі). */
+  theme: ReportTheme;
 }
 
 /** Документи руху товару (1С Documents, Фаза 5). */
@@ -288,42 +301,49 @@ export const REPORTS: readonly ReportEntry[] = [
     description:
       "Виручка / кг у розрізі клієнтів · товарів · агентів за період.",
     href: "/manager/reports/sales-summary",
+    theme: "sales",
   },
   {
     key: "cashflow",
     label: "Рух коштів (ДДС)",
     description: "Прихід / розхід / сальдо по статтях руху коштів.",
     href: "/manager/reports/cashflow",
+    theme: "finance",
   },
   {
     key: "stock-balance",
     label: "Залишки складу",
     description: "Залишки шт + кг × товар / якість на дату.",
     href: "/manager/reports/stock-balance",
+    theme: "stock",
   },
   {
     key: "sales-by-client",
     label: "Продажі по клієнтах",
     description: "Виручка та кг у розрізі контрагентів за період.",
     href: "/manager/reports/sales-by-client",
+    theme: "sales",
   },
   {
     key: "sales-by-supplier",
     label: "Продажі по постачальниках",
     description: "Обсяги продажів у розрізі постачальників.",
     href: "/manager/reports/sales-by-supplier",
+    theme: "sales",
   },
   {
     key: "debts",
     label: "Прострочені борги",
     description: "Дебіторка з FIFO-старінням по клієнтах.",
     href: "/manager/reports/debts",
+    theme: "debt",
   },
   {
     key: "reconciliation",
     label: "Акт звірки взаєморозрахунків",
     description: "Дебет / кредит / сальдо по контрагенту за період.",
     href: "/manager/reports/reconciliation",
+    theme: "finance",
   },
   {
     key: "margin",
@@ -331,6 +351,7 @@ export const REPORTS: readonly ReportEntry[] = [
     description:
       "Виручка − Собівартість по товарах / клієнтах / агентах / категоріях.",
     href: "/manager/reports/margin",
+    theme: "sales",
   },
 ];
 

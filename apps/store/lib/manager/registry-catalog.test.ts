@@ -3,10 +3,13 @@ import {
   DICTIONARIES,
   REGISTERS,
   REPORTS,
+  REPORT_THEMES,
   type RegistryStatus,
+  type ReportTheme,
 } from "./registry-catalog";
 
 const VALID_STATUSES: RegistryStatus[] = ["ready", "partial", "todo"];
+const VALID_THEMES: ReportTheme[] = ["sales", "finance", "stock", "debt"];
 
 describe("registry-catalog", () => {
   it("усі href мають валідний формат (/manager/... або null)", () => {
@@ -26,6 +29,20 @@ describe("registry-catalog", () => {
     for (const r of REPORTS) {
       expect(typeof r.href).toBe("string");
       expect(r.href.startsWith("/manager/")).toBe(true);
+    }
+  });
+
+  it("кожен звіт має валідну тему", () => {
+    for (const r of REPORTS) {
+      expect(VALID_THEMES).toContain(r.theme);
+    }
+  });
+
+  it("REPORT_THEMES покриває всі теми, що використовуються у звітах", () => {
+    const themeKeys = REPORT_THEMES.map((t) => t.key);
+    expect(new Set(themeKeys).size).toBe(themeKeys.length);
+    for (const r of REPORTS) {
+      expect(themeKeys).toContain(r.theme);
     }
   });
 

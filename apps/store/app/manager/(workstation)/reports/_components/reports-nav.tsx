@@ -2,20 +2,13 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { REPORTS } from "@/lib/manager/registry-catalog";
 
-const TABS: { href: string; label: string }[] = [
-  { href: "/manager/reports/sales-summary", label: "Підсумок продажів" },
-  { href: "/manager/reports/sales-by-client", label: "Продажі по клієнтах" },
-  {
-    href: "/manager/reports/sales-by-supplier",
-    label: "Продажі по постачальниках",
-  },
-  { href: "/manager/reports/cashflow", label: "Рух коштів (ДДС)" },
-  { href: "/manager/reports/stock-balance", label: "Залишки складу" },
-  { href: "/manager/reports/debts", label: "Прострочені борги" },
-  { href: "/manager/reports/reconciliation", label: "Акт звірки" },
-  { href: "/manager/reports/margin", label: "Маржа / Прибуток" },
-];
+// Вкладки виводяться з каталогу звітів — новий звіт з'являється автоматично.
+const TABS: { href: string; label: string }[] = REPORTS.map((r) => ({
+  href: r.href,
+  label: r.label,
+}));
 
 export function ReportsNav() {
   const pathname = usePathname();

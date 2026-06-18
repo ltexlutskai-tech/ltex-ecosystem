@@ -5,6 +5,7 @@ import { requireRole } from "@/lib/auth/manager-auth";
 import { buildReconciliationReport } from "@/lib/reports/reconciliation";
 import { EmptyState } from "../../_components/empty-state";
 import { ReportsNav } from "../_components/reports-nav";
+import { ReportExportButtons } from "../_components/report-export-buttons";
 import { ReconClientPicker } from "./_components/recon-client-picker";
 
 export const dynamic = "force-dynamic";
@@ -68,6 +69,15 @@ export default async function Page({
   const fromValue = from ? from.toISOString().slice(0, 10) : "";
   const toValue = to ? to.toISOString().slice(0, 10) : "";
 
+  const exportQuery =
+    clientId && report
+      ? new URLSearchParams({
+          clientId,
+          ...(fromValue ? { from: fromValue } : {}),
+          ...(toValue ? { to: toValue } : {}),
+        }).toString()
+      : null;
+
   return (
     <div className="mx-auto max-w-5xl space-y-4">
       <div className="text-sm">
@@ -128,7 +138,15 @@ export default async function Page({
       ) : (
         <>
           <div className="rounded-md border bg-white p-4">
-            <h2 className="text-lg font-semibold">{report.clientName}</h2>
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <h2 className="text-lg font-semibold">{report.clientName}</h2>
+              {exportQuery && (
+                <ReportExportButtons
+                  reportId="reconciliation"
+                  query={exportQuery}
+                />
+              )}
+            </div>
             <p className="mt-1 text-sm text-gray-600">
               {report.from || report.to ? (
                 <>

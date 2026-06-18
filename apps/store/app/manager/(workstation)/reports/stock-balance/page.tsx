@@ -9,6 +9,7 @@ import {
   type StockMovementLite,
 } from "@/lib/reports/registry-reports";
 import { ReportsNav } from "../_components/reports-nav";
+import { ReportExportButtons } from "../_components/report-export-buttons";
 import { RegisterPeriodFilters } from "../../registry/_components/register-period-filters";
 import { RegisterViewer } from "../../_components/register-viewer";
 
@@ -100,18 +101,26 @@ export default async function StockBalancePage({
 
   const asOfLabel = asOf ? fmtDate(asOf) : "сьогодні";
 
+  const exportQuery = new URLSearchParams({
+    ...(sp.to ? { to: sp.to } : {}),
+    group,
+  }).toString();
+
   return (
     <div className="mx-auto max-w-6xl space-y-4">
       <ReportsNav />
-      <div>
-        <h1 className="text-xl font-semibold text-gray-900">
-          Звіт: Залишки складу
-        </h1>
-        <p className="mt-1 text-sm text-gray-500">
-          Залишки шт + кг × товар / якість станом на {asOfLabel}. Рухів у
-          вибірці: {movements.length}
-          {movements.length >= LIMIT ? ` (показано перші ${LIMIT})` : ""}.
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div>
+          <h1 className="text-xl font-semibold text-gray-900">
+            Звіт: Залишки складу
+          </h1>
+          <p className="mt-1 text-sm text-gray-500">
+            Залишки шт + кг × товар / якість станом на {asOfLabel}. Рухів у
+            вибірці: {movements.length}
+            {movements.length >= LIMIT ? ` (показано перші ${LIMIT})` : ""}.
+          </p>
+        </div>
+        <ReportExportButtons reportId="stock-balance" query={exportQuery} />
       </div>
 
       <RegisterPeriodFilters
