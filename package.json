@@ -14,7 +14,7 @@
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,md}\"",
     "test:e2e": "playwright test",
-    "prepare": "husky"
+    "prepare": "husky || true"
   },
   "lint-staged": {
     "*.{ts,tsx,js,jsx,json,md}": "prettier --write"

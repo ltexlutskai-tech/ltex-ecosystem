@@ -29,7 +29,10 @@ git pull origin main
 # 2. Install dependencies
 if (-not $SkipInstall) {
     Write-Host "`n[2/$TotalSteps] Installing dependencies..." -ForegroundColor Cyan
-    pnpm install --frozen-lockfile
+    # --prod=false: build-сервер потребує devDependencies (prisma/tsx/typescript/
+    # turbo/next-build). Без цього прапорця повний реінстал під NODE_ENV=production
+    # пропускає devDeps → build/prisma/tsx падають.
+    pnpm install --frozen-lockfile --prod=false
 } else {
     Write-Host "`n[2/$TotalSteps] Skipping install (--SkipInstall)" -ForegroundColor Yellow
 }
