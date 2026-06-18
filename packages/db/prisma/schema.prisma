@@ -311,6 +311,10 @@ model OrderItem {
   // ── 5.4.0 — паритет з 1С (ЦенаПродажиВес / ПроцентСкидкиНаценки) ──
   unitPriceEur    Float?  @map("unit_price_eur")
   discountPercent Float?  @map("discount_percent")
+  // ── 5.6 — одиниця виміру (довідник Unit). Поки лише схема для майбутнього
+  //          імпорту; UI не використовує. ──
+  unitCode1C      String? @map("unit_code_1c")
+  unitId          String? @map("unit_id")
 
   order   Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
   lot     Lot?    @relation(fields: [lotId], references: [id])
@@ -489,6 +493,10 @@ model SaleItem {
   weight     Float
   quantity   Int     @default(1)
   priceEur   Float   @map("price_eur") // line total = pricePerKg*weight*quantity
+  // ── 5.6 — одиниця виміру (довідник Unit). Поки лише схема для майбутнього
+  //          імпорту; UI не використовує. ──
+  unitCode1C String? @map("unit_code_1c")
+  unitId     String? @map("unit_id")
 
   sale    Sale    @relation(fields: [saleId], references: [id], onDelete: Cascade)
   product Product @relation(fields: [productId], references: [id])
