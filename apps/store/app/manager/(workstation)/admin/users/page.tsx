@@ -28,16 +28,32 @@ export default async function ManagerUsersPage() {
     },
   });
 
-  const initial = users.map((u) => ({
-    id: u.id,
-    email: u.email,
-    fullName: u.fullName,
-    role: u.role,
-    isActive: u.isActive,
-    lastSeenAt: u.lastSeenAt?.toISOString() ?? null,
-    telegramLinked: u.telegramChatId !== null,
-    createdAt: u.createdAt.toISOString(),
-  }));
+  // Batch-lookup дзеркала 1С-агентів (MgrTradeAgent) по userId.
+  const tradeAgents = await prisma.mgrTradeAgent.findMany({
+    where: { userId: { in: users.map((u) => u.id) } },
+    select: { userId: true, name: true, code1C: true },
+  });
+  const agentByUserId = new Map(
+    tradeAgents
+      .filter((a): a is typeof a & { userId: string } => a.userId !== null)
+      .map((a) => [a.userId, { name: a.name, code1C: a.code1C }]),
+  );
+
+  const initial = users.map((u) => {
+    const agent = agentByUserId.get(u.id);
+    return {
+      id: u.id,
+      email: u.email,
+      fullName: u.fullName,
+      role: u.role,
+      isActive: u.isActive,
+      lastSeenAt: u.lastSeenAt?.toISOString() ?? null,
+      telegramLinked: u.telegramChatId !== null,
+      createdAt: u.createdAt.toISOString(),
+      tradeAgentName: agent?.name ?? null,
+      tradeAgentCode1C: agent?.code1C ?? null,
+    };
+  });
 
   return (
     <div className="mx-auto max-w-5xl space-y-4">

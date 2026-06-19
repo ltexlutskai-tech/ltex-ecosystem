@@ -22,6 +22,8 @@ export interface ManagerUserRow {
   lastSeenAt: string | null;
   telegramLinked: boolean;
   createdAt: string;
+  tradeAgentName: string | null;
+  tradeAgentCode1C: string | null;
 }
 
 const ROLE_LABELS: Record<Role, string> = {
@@ -63,6 +65,7 @@ export function UsersTable({
             <th className="px-2.5 py-1.5">ПІБ</th>
             <th className="px-2.5 py-1.5">Email</th>
             <th className="px-2.5 py-1.5">Роль</th>
+            <th className="px-2.5 py-1.5">Торговий агент (1С)</th>
             <th className="px-2.5 py-1.5">Статус</th>
             <th className="px-2.5 py-1.5">Останній вхід</th>
             <th className="px-2.5 py-1.5 text-right">Дії</th>
@@ -82,6 +85,20 @@ export function UsersTable({
               <td className="px-2.5 py-1.5 text-gray-600">{u.email}</td>
               <td className="px-2.5 py-1.5 text-gray-600">
                 {ROLE_LABELS[u.role]}
+              </td>
+              <td className="px-2.5 py-1.5 text-gray-600">
+                {u.tradeAgentName ? (
+                  <span>
+                    {u.tradeAgentName}
+                    {u.tradeAgentCode1C && (
+                      <span className="ml-1 font-mono text-xs text-gray-400">
+                        {u.tradeAgentCode1C}
+                      </span>
+                    )}
+                  </span>
+                ) : (
+                  <span className="text-gray-400">—</span>
+                )}
               </td>
               <td className="px-2.5 py-1.5">
                 {u.isActive ? (
@@ -104,7 +121,7 @@ export function UsersTable({
           ))}
           {initial.length === 0 && (
             <tr>
-              <td colSpan={6} className="px-4 py-8 text-center text-gray-400">
+              <td colSpan={7} className="px-4 py-8 text-center text-gray-400">
                 Немає користувачів.
               </td>
             </tr>

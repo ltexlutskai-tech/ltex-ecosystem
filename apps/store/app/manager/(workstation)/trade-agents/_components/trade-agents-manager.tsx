@@ -13,6 +13,7 @@ interface UserRef {
 export interface TradeAgentItem {
   id: string;
   code: string | null;
+  code1C: string | null;
   name: string;
   userId: string | null;
   archived: boolean;
@@ -37,6 +38,11 @@ export function TradeAgentsManager({
   const [busy, setBusy] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
+  const [onlyUnlinked, setOnlyUnlinked] = useState(false);
+
+  const visible = onlyUnlinked
+    ? initial.filter((a) => a.userId === null)
+    : initial;
 
   async function call(url: string, method: string, body: unknown) {
     setBusy(true);
@@ -109,24 +115,35 @@ export function TradeAgentsManager({
         </Button>
       </div>
 
+      <label className="flex items-center gap-2 text-sm text-gray-600">
+        <input
+          type="checkbox"
+          checked={onlyUnlinked}
+          onChange={(e) => setOnlyUnlinked(e.target.checked)}
+          className="h-4 w-4 rounded border-gray-300"
+        />
+        Лише без користувача
+      </label>
+
       <div className="overflow-x-auto rounded-lg border bg-white">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b bg-gray-50 text-left text-gray-500">
               <th className="px-4 py-2 font-medium">ПІБ</th>
+              <th className="px-4 py-2 font-medium">Код 1С</th>
               <th className="px-4 py-2 font-medium">Користувач</th>
               <th className="px-4 py-2 text-right font-medium">Дії</th>
             </tr>
           </thead>
           <tbody>
-            {initial.length === 0 && (
+            {visible.length === 0 && (
               <tr>
-                <td colSpan={3} className="px-4 py-8 text-center text-gray-400">
+                <td colSpan={4} className="px-4 py-8 text-center text-gray-400">
                   Немає агентів.
                 </td>
               </tr>
             )}
-            {initial.map((a) => (
+            {visible.map((a) => (
               <tr
                 key={a.id}
                 className={`border-b last:border-b-0 ${
@@ -142,6 +159,15 @@ export function TradeAgentsManager({
                     />
                   ) : (
                     a.name
+                  )}
+                </td>
+                <td className="px-4 py-2">
+                  {a.code1C ? (
+                    <span className="rounded bg-gray-100 px-1.5 py-0.5 font-mono text-xs text-gray-600">
+                      {a.code1C}
+                    </span>
+                  ) : (
+                    <span className="text-gray-400">—</span>
                   )}
                 </td>
                 <td className="px-4 py-2 text-gray-600">

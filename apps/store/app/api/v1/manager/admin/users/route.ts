@@ -87,6 +87,19 @@ export async function POST(req: NextRequest) {
     },
   });
 
+  // Авто-лінк дзеркала 1С-агента (MgrTradeAgent) до нового User за code1C.
+  // Best-effort — не ламає основну операцію створення.
+  if (user.code1C) {
+    try {
+      await prisma.mgrTradeAgent.updateMany({
+        where: { code1C: user.code1C, userId: null },
+        data: { userId: user.id },
+      });
+    } catch {
+      // ignore — лінк необов'язковий
+    }
+  }
+
   const plainResetToken = randomBytes(32).toString("base64url");
   const tokenHash = sha256(plainResetToken);
   const expiresAt = new Date(Date.now() + INVITE_TTL_MS);

@@ -89,9 +89,10 @@ export const DICTIONARIES: readonly DictionaryEntry[] = [
   {
     key: "price_types",
     label: "Типи цін",
-    description: "Опт / акція та інші типи цін номенклатури.",
-    href: null,
-    status: "partial",
+    description:
+      "Довідкова характеристика клієнта; не впливає на ціни документів (опт/акція — з прайсу).",
+    href: "/manager/price-types",
+    status: "ready",
   },
   {
     key: "cash_flow_articles",
