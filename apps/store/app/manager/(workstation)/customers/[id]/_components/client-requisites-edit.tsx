@@ -240,11 +240,28 @@ export function ClientRequisitesEdit({
             onChange={(v) => setField("statusGeneralId", v)}
             options={dictionaries.statuses}
           />
-          <EditSelectRow
+          <ReadonlyRow
             label="Оперативний статус"
-            value={values.statusOperationalId}
-            onChange={(v) => setField("statusOperationalId", v)}
-            options={dictionaries.statuses}
+            value={
+              <span className="inline-flex items-center gap-1.5">
+                {client.statusOperational ? (
+                  <span
+                    className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium text-white"
+                    style={{
+                      backgroundColor: client.statusOperational.colorHex,
+                    }}
+                  >
+                    {client.statusOperational.label}
+                  </span>
+                ) : (
+                  <span className="text-gray-400">—</span>
+                )}
+                <span className="inline-flex items-center rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-gray-500">
+                  авто
+                </span>
+              </span>
+            }
+            hint="Обчислюється автоматично за продажами цього місяця"
           />
 
           <EditSelectRow
