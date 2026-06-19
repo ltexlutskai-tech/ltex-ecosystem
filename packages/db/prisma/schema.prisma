@@ -12,13 +12,20 @@ datasource db {
 // ─── Categories (self-relation: category → subcategory) ─────────────────────
 
 model Category {
-  id        String   @id @default(cuid())
-  slug      String   @unique
-  name      String
-  parentId  String?  @map("parent_id")
-  position  Int      @default(0)
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  id             String   @id @default(cuid())
+  slug           String   @unique
+  // hex(_IDRRef) групи 1С-Номенклатури (_Reference76, _Folder=0). Звʼязок для
+  // переносу дерева категорій з 1С (сесія 5.7). NULL для курованих/Excel-категорій.
+  code1C         String?  @unique @map("code_1c")
+  name           String
+  parentId       String?  @map("parent_id")
+  position       Int      @default(0)
+  // Deny-list ролей: товари у цій категорії (та її піддереві) приховані для цих
+  // ролей у прайсі/картці/вітрині (серверний фільтр). Порожній = видно всім.
+  // admin/owner завжди bypass. Правила user задасть пізніше — зараз каркас.
+  hiddenForRoles String[] @default([]) @map("hidden_for_roles")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
 
   parent   Category?  @relation("CategoryTree", fields: [parentId], references: [id])
   children Category[] @relation("CategoryTree")

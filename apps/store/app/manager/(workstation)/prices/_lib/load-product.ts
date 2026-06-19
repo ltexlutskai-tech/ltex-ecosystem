@@ -70,6 +70,10 @@ export interface ProductCardVM {
   slug: string;
   description: string;
   categoryName: string | null;
+  /** Id категорії товару (для каркаса доступів). */
+  categoryId: string | null;
+  /** Повний шлях категорії (корінь→…→категорія), напр. ["Одяг", "Жіночий", "Сукні"]. */
+  categoryPath: string[];
   videoUrl: string | null;
   priceUnit: string;
   /** Коефіцієнт «одиниць у кг» для toggle «у штуках» (Float, може бути null). */
@@ -120,7 +124,29 @@ export async function loadProductCard(
       quality: true,
       season: true,
       country: true,
-      category: { select: { name: true } },
+      categoryId: true,
+      // Шлях категорії (до 5 рівнів вгору — 1С-дерева неглибокі).
+      category: {
+        select: {
+          name: true,
+          parent: {
+            select: {
+              name: true,
+              parent: {
+                select: {
+                  name: true,
+                  parent: {
+                    select: {
+                      name: true,
+                      parent: { select: { name: true } },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
       images: {
         orderBy: { position: "asc" },
         select: { url: true, alt: true },
@@ -218,6 +244,9 @@ export async function loadProductCard(
     };
   });
 
+  // Повний шлях категорії: розгортаємо ланцюг parent → корінь, тоді reverse.
+  const categoryPath = buildCategoryPath(product.category);
+
   return {
     id: product.id,
     articleCode: product.articleCode,
@@ -225,6 +254,8 @@ export async function loadProductCard(
     slug: product.slug,
     description: product.description,
     categoryName: product.category?.name ?? null,
+    categoryId: product.categoryId,
+    categoryPath,
     videoUrl: product.videoUrl,
     priceUnit: product.priceUnit,
     unitsPerKg: product.unitsPerKgMin,
@@ -247,4 +278,28 @@ export async function loadProductCard(
     totalLotsCount: product.lots.length,
     claims,
   };
+}
+
+/** Вкладена категорія з ланцюгом батьків (як selected у loadProductCard). */
+interface NestedCategory {
+  name: string;
+  parent?: NestedCategory | null;
+}
+
+/**
+ * Розгортає шлях категорії корінь→…→категорія. Чиста функція.
+ * Захищено від занадто глибоких/циклічних дерев (cap 10).
+ */
+export function buildCategoryPath(
+  category: NestedCategory | null | undefined,
+): string[] {
+  const chain: string[] = [];
+  let node: NestedCategory | null | undefined = category;
+  let guard = 0;
+  while (node && guard < 10) {
+    chain.push(node.name);
+    node = node.parent;
+    guard++;
+  }
+  return chain.reverse(); // корінь → лист
 }

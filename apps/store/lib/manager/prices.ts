@@ -24,7 +24,22 @@ export type SortDir = "asc" | "desc";
 export interface BuildPricesWhereParams {
   /** Пошук по `name` + `articleCode` (insensitive). */
   q?: string;
+  /**
+   * Обрана категорія. Якщо передано `categorySubtreeIds` — фільтр по всьому
+   * піддереву; інакше — точна відповідність `categoryId`.
+   */
   categoryId?: string;
+  /**
+   * Піддерево обраної категорії (категорія + усі нащадки). Має пріоритет над
+   * `categoryId`. Обчислюється у завантажувачі через `collectCategorySubtreeIds`.
+   */
+  categorySubtreeIds?: string[];
+  /**
+   * Каркас доступів за групами (5.7): id категорій, прихованих для ролі
+   * переглядача (deny-list зі спадковістю). Товари у цих категоріях не
+   * показуються. admin/owner → не передавати (bypass). Зараз скрізь порожній.
+   */
+  hiddenCategoryIds?: string[];
   /** Період приходу (по `Lot.arrivalDate` ?? `Lot.createdAt`). */
   arrivalFrom?: Date;
   arrivalTo?: Date;
@@ -72,8 +87,16 @@ export function buildPricesWhere(
     });
   }
 
-  if (p.categoryId) {
+  // Категорія: піддерево (категорія + нащадки) має пріоритет; інакше точний id.
+  if (p.categorySubtreeIds && p.categorySubtreeIds.length > 0) {
+    and.push({ categoryId: { in: p.categorySubtreeIds } });
+  } else if (p.categoryId) {
     and.push({ categoryId: p.categoryId });
+  }
+
+  // Каркас доступів (5.7): виключаємо товари з прихованих для ролі категорій.
+  if (p.hiddenCategoryIds && p.hiddenCategoryIds.length > 0) {
+    and.push({ categoryId: { notIn: p.hiddenCategoryIds } });
   }
 
   // Період приходу: лот, у якого (arrivalDate ?? createdAt) у діапазоні.

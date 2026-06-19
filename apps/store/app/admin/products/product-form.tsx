@@ -20,8 +20,41 @@ interface ProductFormProps {
   categories: Category[];
 }
 
+/**
+ * Розгортає категорії у порядку дерева (батько перед нащадками) з глибиною —
+ * для ієрархічного select з відступами. Сироти трактуються як корені.
+ */
+function buildCategoryOptions(
+  categories: Category[],
+): { id: string; name: string; depth: number }[] {
+  const ids = new Set(categories.map((c) => c.id));
+  const byParent = new Map<string, Category[]>();
+  for (const c of categories) {
+    const key = c.parentId && ids.has(c.parentId) ? c.parentId : "__root__";
+    const arr = byParent.get(key);
+    if (arr) arr.push(c);
+    else byParent.set(key, [c]);
+  }
+  for (const arr of byParent.values()) {
+    arr.sort((a, b) => a.name.localeCompare(b.name, "uk"));
+  }
+  const out: { id: string; name: string; depth: number }[] = [];
+  const visited = new Set<string>();
+  const walk = (key: string, depth: number): void => {
+    for (const c of byParent.get(key) ?? []) {
+      if (visited.has(c.id)) continue;
+      visited.add(c.id);
+      out.push({ id: c.id, name: c.name, depth });
+      walk(c.id, depth + 1);
+    }
+  };
+  walk("__root__", 0);
+  return out;
+}
+
 export function ProductForm({ product, categories }: ProductFormProps) {
   const action = product ? updateProduct.bind(null, product.id) : createProduct;
+  const categoryOptions = buildCategoryOptions(categories);
 
   return (
     <form
@@ -97,8 +130,9 @@ export function ProductForm({ product, categories }: ProductFormProps) {
           className={selectClass}
         >
           <option value="">Виберіть...</option>
-          {categories.map((c) => (
+          {categoryOptions.map((c) => (
             <option key={c.id} value={c.id}>
+              {c.depth > 0 ? `${"  ".repeat(c.depth)}` : ""}
               {c.name}
             </option>
           ))}

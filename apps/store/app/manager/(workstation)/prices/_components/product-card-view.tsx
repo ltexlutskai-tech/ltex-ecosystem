@@ -81,7 +81,13 @@ export function ProductCardView({
             <h1 className="text-xl font-bold text-gray-900">{product.name}</h1>
             <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-gray-500">
               {product.articleCode && <span>Арт. {product.articleCode}</span>}
-              {product.categoryName && <span>· {product.categoryName}</span>}
+              {product.categoryPath.length > 0 ? (
+                <span title={product.categoryPath.join(" / ")}>
+                  · {product.categoryPath.join(" / ")}
+                </span>
+              ) : (
+                product.categoryName && <span>· {product.categoryName}</span>
+              )}
             </div>
           </div>
 

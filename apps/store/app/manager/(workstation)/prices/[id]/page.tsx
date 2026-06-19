@@ -4,6 +4,7 @@ import { getCurrentUser } from "@/lib/auth/manager-auth";
 import { getCurrentRate } from "@/lib/exchange-rate";
 import { buildProductShareText } from "@/lib/manager/share-message";
 import { loadProductCard } from "../_lib/load-product";
+import { loadCategoryNodes, resolveCategoryAccess } from "../_lib/load-prices";
 import { ProductCardView } from "../_components/product-card-view";
 
 export const dynamic = "force-dynamic";
@@ -18,11 +19,25 @@ export default async function ProductCardPage({
   if (!user) redirect("/manager/login");
 
   const { id } = await params;
-  const [product, rateUah] = await Promise.all([
+  const [product, rateUah, categoryNodes] = await Promise.all([
     loadProductCard(id, user.id),
     getCurrentRate(),
+    loadCategoryNodes(),
   ]);
   if (!product) notFound();
+
+  // Каркас доступів за групами (5.7): якщо категорія товару прихована для ролі
+  // переглядача — товар недоступний (серверний фільтр, admin/owner bypass).
+  const { hiddenCategoryIds } = resolveCategoryAccess(categoryNodes, {
+    role: user.role,
+  });
+  if (
+    product.categoryId &&
+    hiddenCategoryIds &&
+    hiddenCategoryIds.includes(product.categoryId)
+  ) {
+    notFound();
+  }
 
   // Рекламний текст товара будуємо на сервері (курс EUR — server-side).
   const productShareText = buildProductShareText({

@@ -18,7 +18,10 @@
  * ─── ПРАПОРЦІ ─────────────────────────────────────────────────────────────────
  *   --dry-run            читає 1С + резолвить зв'язки, нічого не пише
  *   --limit N            лише перші N рядків кожної сутності (пробний прогон)
- *   --entity <name>      одна сутність: customers|products|lots|barcodes|prices|
+ *   --recategorize       (лише з --entity products|без --entity) переносить товари
+ *                        з запасної «Імпортовано з 1С» у 1С-групу за _ParentIDRRef.
+ *                        Без прапора categoryId існуючих товарів не змінюється.
+ *   --entity <name>      одна сутність: customers|categories|products|lots|barcodes|prices|
  *                        dictionaries|dictionaries-full|rates|orders|sales|cashorders|
  *                        routesheets|debt|misc|sales-reg|cashflow-reg|stock-reg|
  *                        orders-reg|bankdocs|cashtransfers
@@ -68,6 +71,7 @@ import {
 
 const ENTITY_NAMES = [
   "customers",
+  "categories",
   "products",
   "lots",
   "barcodes",
@@ -106,6 +110,9 @@ interface CliArgs {
   confirmProd: boolean;
   batch: number;
   since: Date | null;
+  // Сесія 5.7: переносити товари з запасної «Імпортовано з 1С» у відповідну
+  // 1С-групу (за _ParentIDRRef). Без прапора update НЕ чіпає categoryId.
+  recategorize: boolean;
 }
 
 function parseArgs(argv: string[]): CliArgs {
@@ -116,6 +123,7 @@ function parseArgs(argv: string[]): CliArgs {
     confirmProd: false,
     batch: 500,
     since: null,
+    recategorize: false,
   };
 
   for (let i = 0; i < argv.length; i++) {
@@ -126,6 +134,9 @@ function parseArgs(argv: string[]): CliArgs {
         break;
       case "--confirm-prod":
         args.confirmProd = true;
+        break;
+      case "--recategorize":
+        args.recategorize = true;
         break;
       case "--limit": {
         const v = argv[++i];
@@ -499,6 +510,9 @@ interface ImportContext {
   eurRateByDay: Map<string, number>; // "YYYY-MM-DD" → грн за 1 EUR
   // ── Фаза 1 (5.6) — довідники-повний паритет ──
   regionIdByHex: Map<string, string>; // hex(_Reference6811) → Region.id
+  // ── Сесія 5.7 — дерево категорій з 1С (групи Номенклатури _Reference76) ──
+  categoryHexToId: Map<string, string>; // hex(групи _IDRRef) → Category.id
+  categoryParentHex: Map<string, string>; // hex(групи) → hex(батька-групи)
 }
 
 // Чи робимо реальні записи (НЕ dry-run).
@@ -796,10 +810,128 @@ async function ensureImportCategoryId(
   return created.id;
 }
 
+// ─── 2a. Дерево категорій з 1С (групи Номенклатури) ─ _Reference76 ───────────
+// 1С-Номенклатура — ієрархічний довідник: `_Folder=0` ПАПКА (= група/категорія),
+// `_Folder=1` ЕЛЕМЕНТ (= товар, ІНВЕРСНА логіка). Папки утворюють дерево через
+// `_ParentIDRRef` (binary16, посилання на батьківську папку; корінь = 16 нулів).
+//
+// 2-фазний прохід (патерн як MgrCashFlowArticle, але тут ОБОВʼЯЗКОВО лінкуємо
+// ієрархію 2-ю фазою, бо порядок _IDRRef не гарантує parent-before-child):
+//   • Фаза A — стрім усіх папок, upsert Category по code1C=hex(_IDRRef) (name,
+//     унікальний slug, parentId=null), будуємо categoryHexToId + categoryParentHex.
+//   • Фаза B — простав parentId за categoryParentHex (hex батька → Category.id).
+//
+// Окреме 1С-дерево (рішення user): НЕ зливаємо з курованим веб-каталогом —
+// 1С-категорії мають власний code1C; куровані/Excel-категорії лишаються code1C=null.
+
+const CATEGORY_COLS = [
+  "_IDRRef",
+  "_Folder", // 0 = папка/група, 1 = елемент/товар
+  "_ParentIDRRef", // hex батька-групи (корінь = нулі → null)
+  "_Code",
+  "_Description",
+];
+
+async function importCategories(ctx: ImportContext): Promise<Recon> {
+  const recon = newRecon("categories");
+  const sink = new ErrorSink(recon, "categories");
+  const { args, src, prisma } = ctx;
+
+  recon.sourceRows = await countTable(src, "_Reference76");
+  log(`categories: source rows (Номенклатура total) = ${recon.sourceRows}`);
+
+  // Набір уже зайнятих slug-ів (товари + категорії спільно унікальні? — ні,
+  // Category.slug унікальний лише серед категорій). Тягнемо наявні Category-slug.
+  const usedSlugs = new Set<string>();
+  if (willWrite(ctx)) {
+    const all = await prisma.category.findMany({ select: { slug: true } });
+    for (const c of all) usedSlugs.add(c.slug);
+  }
+
+  // ── Фаза A — папки → Category (parentId=null), зібрати мапи ──
+  for await (const rows of streamTable(src, "_Reference76", CATEGORY_COLS, {
+    batch: args.batch,
+    limit: args.limit,
+    orderBy: ["_IDRRef"],
+  })) {
+    for (const row of rows) {
+      // Папки: _Folder=0 (ІНВЕРСНА логіка 1С). Елементи (товари) пропускаємо.
+      if (asBool(row["_Folder"])) {
+        recon.skipped++;
+        continue;
+      }
+      const hex = bufToHex(row["_IDRRef"]);
+      if (!hex) {
+        recon.skipped++;
+        continue;
+      }
+      const code = asString(row["_Code"]);
+      const name = asTrimmed(row["_Description"]) || code || hex;
+      const parentHex = bufToHex(row["_ParentIDRRef"]);
+      if (parentHex) ctx.categoryParentHex.set(hex, parentHex);
+
+      try {
+        let id = "(pending)";
+        if (willWrite(ctx)) {
+          // Спершу шукаємо за code1C — щоб не плодити дублі при реімпорті.
+          const existing = await prisma.category.findUnique({
+            where: { code1C: hex },
+            select: { id: true },
+          });
+          if (existing) {
+            await prisma.category.update({
+              where: { id: existing.id },
+              data: { name },
+              select: { id: true },
+            });
+            id = existing.id;
+          } else {
+            const slug = makeUniqueSlug(name, hex, usedSlugs);
+            const created = await prisma.category.create({
+              data: { code1C: hex, name, slug, parentId: null },
+              select: { id: true },
+            });
+            id = created.id;
+          }
+        }
+        ctx.categoryHexToId.set(hex, id);
+        recon.written++;
+      } catch (e) {
+        sink.record(code ?? hex, e);
+      }
+    }
+  }
+  log(`categories: phase A mapped ${ctx.categoryHexToId.size} folder→id`);
+
+  // ── Фаза B — простав parentId за hex батька ──
+  if (willWrite(ctx)) {
+    let linked = 0;
+    for (const [hex, parentHex] of ctx.categoryParentHex) {
+      const id = ctx.categoryHexToId.get(hex);
+      const parentId = ctx.categoryHexToId.get(parentHex);
+      if (!id || !parentId) continue; // корінь або батько поза вибіркою
+      try {
+        await prisma.category.update({
+          where: { id },
+          data: { parentId },
+          select: { id: true },
+        });
+        linked++;
+      } catch (e) {
+        sink.record(hex, e);
+      }
+    }
+    log(`categories: phase B linked ${linked} parent edges`);
+  }
+
+  return recon;
+}
+
 const PRODUCT_COLS = [
   "_IDRRef",
   "_Marked",
   "_Folder",
+  "_ParentIDRRef", // Група-власник (1С-категорія) — резолв у categoryId (5.7)
   "_Code",
   "_Description",
   "_Fld6255", // Артикул
@@ -818,6 +950,21 @@ function parseAverageWeight(v: unknown): number | null {
   return m ? Number(m[0]) : null;
 }
 
+// Для ізольованого `--entity products` (без попереднього `categories`) карта
+// categoryHexToId порожня — підтягуємо її з нашої БД за вже імпортованими
+// 1С-категоріями (Category.code1C). No-op коли карта вже заповнена або dry-run.
+async function ensureCategoryHexMap(ctx: ImportContext): Promise<void> {
+  if (ctx.categoryHexToId.size > 0 || !willWrite(ctx)) return;
+  const cats = await ctx.prisma.category.findMany({
+    where: { code1C: { not: null } },
+    select: { id: true, code1C: true },
+  });
+  for (const c of cats) {
+    if (c.code1C) ctx.categoryHexToId.set(c.code1C, c.id);
+  }
+  log(`products: loaded ${ctx.categoryHexToId.size} 1С-categories from DB`);
+}
+
 async function importProducts(ctx: ImportContext): Promise<Recon> {
   const recon = newRecon("products");
   const sink = new ErrorSink(recon, "products");
@@ -827,6 +974,7 @@ async function importProducts(ctx: ImportContext): Promise<Recon> {
   log(`products: source rows = ${recon.sourceRows}`);
 
   const importCategoryId = await ensureImportCategoryId(ctx);
+  await ensureCategoryHexMap(ctx);
   const usedSlugs = new Set<string>();
   if (willWrite(ctx)) {
     const all = await prisma.product.findMany({ select: { slug: true } });
@@ -859,16 +1007,30 @@ async function importProducts(ctx: ImportContext): Promise<Recon> {
       const description = asTrimmed(row["_Fld6283"]);
       const isPiece = asBool(row["_Fld7696"]) || !asBool(row["_Fld6257"]);
       const priceUnit = isPiece ? "piece" : "kg";
+      // 1С-група товару → наша Category (за code1C=hex).
+      const parentHex = bufToHex(row["_ParentIDRRef"]);
+      const groupCategoryId = parentHex
+        ? ctx.categoryHexToId.get(parentHex)
+        : undefined;
 
       try {
         let prodId = "(pending)";
         if (willWrite(ctx) && importCategoryId) {
+          // Fallback — запасна «Імпортовано з 1С», якщо групи нема у мапі.
+          const resolvedCategoryId = groupCategoryId ?? importCategoryId;
           const existing = await prisma.product.findUnique({
             where: { code1C },
-            select: { id: true },
+            select: { id: true, category: { select: { slug: true } } },
           });
           if (existing) {
             // Існуючий товар магазину — оновлюємо лише безпечні поля.
+            // categoryId переносимо ЛИШЕ під --recategorize і ЛИШЕ для
+            // «осиротілих» (поточна категорія = imported-1c) — щоб не зачепити
+            // ручні/Excel-товари. resolvedCategoryId має відрізнятись від поточної.
+            const recategorize =
+              args.recategorize &&
+              existing.category?.slug === "imported-1c" &&
+              resolvedCategoryId !== importCategoryId;
             await prisma.product.update({
               where: { id: existing.id },
               data: {
@@ -877,6 +1039,7 @@ async function importProducts(ctx: ImportContext): Promise<Recon> {
                 videoUrl,
                 averageWeight: averageWeight ?? undefined,
                 description: description || undefined,
+                ...(recategorize ? { categoryId: resolvedCategoryId } : {}),
               },
             });
             prodId = existing.id;
@@ -888,7 +1051,7 @@ async function importProducts(ctx: ImportContext): Promise<Recon> {
                 articleCode,
                 name,
                 slug,
-                categoryId: importCategoryId,
+                categoryId: resolvedCategoryId,
                 description,
                 quality: "mix",
                 country: "germany",
@@ -4998,6 +5161,7 @@ const ENTITY_RUNNERS: Record<
   (ctx: ImportContext) => Promise<Recon>
 > = {
   customers: importCustomers,
+  categories: importCategories,
   products: importProducts,
   lots: importLots,
   barcodes: importBarcodes,
@@ -5033,6 +5197,7 @@ const ENTITY_RUNNERS: Record<
 // ізольованого реімпорту/довантаження курсів без решти довідників.
 const DEFAULT_ORDER: EntityName[] = [
   "customers",
+  "categories",
   "products",
   "barcodes",
   "lots",
@@ -5153,6 +5318,8 @@ async function main(): Promise<void> {
     unitNameByHex: new Map(),
     eurRateByDay: new Map(),
     regionIdByHex: new Map(),
+    categoryHexToId: new Map(),
+    categoryParentHex: new Map(),
   };
 
   // Дрібні довідники назв (city/region) — потрібні для Customer.
