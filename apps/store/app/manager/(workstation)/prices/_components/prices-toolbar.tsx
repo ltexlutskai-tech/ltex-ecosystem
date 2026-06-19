@@ -16,6 +16,13 @@ import {
 interface CategoryOption {
   id: string;
   name: string;
+  /** Глибина у дереві (0 = корінь) — для відступів у select. */
+  depth?: number;
+}
+
+/** Префікс-відступ для ієрархічного select (·· на кожен рівень). */
+function indent(depth: number | undefined): string {
+  return depth && depth > 0 ? `${"  ".repeat(depth)}` : "";
 }
 
 interface Props {
@@ -242,6 +249,7 @@ function PriceFiltersSheet({
               <option value="">Усі категорії</option>
               {categories.map((c) => (
                 <option key={c.id} value={c.id}>
+                  {indent(c.depth)}
                   {c.name}
                 </option>
               ))}

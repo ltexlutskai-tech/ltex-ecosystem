@@ -5,7 +5,12 @@ import type { PriceSort, SortDir } from "@/lib/manager/prices";
 import { PricesToolbar } from "./_components/prices-toolbar";
 import { PricesList } from "./_components/prices-list";
 import { PricesPagination } from "./_components/prices-pagination";
-import { loadCategoriesForFilter, loadPrices } from "./_lib/load-prices";
+import {
+  loadCategoriesForFilter,
+  loadCategoryNodes,
+  loadPrices,
+  resolveCategoryAccess,
+} from "./_lib/load-prices";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Прайс — L-TEX Manager" };
@@ -25,28 +30,39 @@ export default async function PricesPage({
     pickString(sp.sort) === "arrival" ? "arrival" : "name";
   const dir: SortDir = pickString(sp.dir) === "desc" ? "desc" : "asc";
 
-  const [categories, list, rateUah] = await Promise.all([
+  const categoryId = pickString(sp.categoryId);
+  const [categories, categoryNodes, rateUah] = await Promise.all([
     loadCategoriesForFilter(),
-    loadPrices({
-      q: pickString(sp.q),
-      categoryId: pickString(sp.categoryId),
-      arrivalFrom: pickDate(sp.arrivalFrom),
-      arrivalTo: pickDate(sp.arrivalTo),
-      priceFrom: pickNumber(sp.priceFrom),
-      priceTo: pickNumber(sp.priceTo),
-      inStock: pickBool(sp.inStock),
-      target: pickBool(sp.target),
-      onSale: pickBool(sp.onSale),
-      isNew: pickBool(sp.isNew),
-      hasVideo: pickBool(sp.hasVideo),
-      noVideo: pickBool(sp.noVideo),
-      sort,
-      dir,
-      page,
-      pageSize,
-    }),
+    loadCategoryNodes(),
     getCurrentRate(),
   ]);
+
+  // Піддерево обраної категорії + приховані для ролі (каркас доступів 5.7).
+  const { categorySubtreeIds, hiddenCategoryIds } = resolveCategoryAccess(
+    categoryNodes,
+    { categoryId, role: user.role },
+  );
+
+  const list = await loadPrices({
+    q: pickString(sp.q),
+    categoryId,
+    categorySubtreeIds,
+    hiddenCategoryIds,
+    arrivalFrom: pickDate(sp.arrivalFrom),
+    arrivalTo: pickDate(sp.arrivalTo),
+    priceFrom: pickNumber(sp.priceFrom),
+    priceTo: pickNumber(sp.priceTo),
+    inStock: pickBool(sp.inStock),
+    target: pickBool(sp.target),
+    onSale: pickBool(sp.onSale),
+    isNew: pickBool(sp.isNew),
+    hasVideo: pickBool(sp.hasVideo),
+    noVideo: pickBool(sp.noVideo),
+    sort,
+    dir,
+    page,
+    pageSize,
+  });
 
   return (
     <div className="max-w-none space-y-3">
