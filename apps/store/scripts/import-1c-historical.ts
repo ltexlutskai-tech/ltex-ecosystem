@@ -194,7 +194,15 @@ function warn(msg: string): void {
   console.warn(`${TAG} WARN: ${msg}`);
 }
 function errMsg(e: unknown): string {
-  return e instanceof Error ? e.message.split("\n")[0]! : String(e);
+  if (!(e instanceof Error)) return String(e);
+  // Prisma-помилки часто мають порожній перший рядок — беремо перший НЕпорожній
+  // (+ назву помилки), інакше WARN був би порожній і діагностика неможлива.
+  const firstNonEmpty =
+    e.message
+      .split("\n")
+      .map((l) => l.trim())
+      .find((l) => l.length > 0) ?? "";
+  return `${e.name}: ${firstNonEmpty}`.trim();
 }
 
 // ─── Конфіг джерела MSSQL з LEGACY_1C_DB_URL ──────────────────────────────────
@@ -261,11 +269,11 @@ function bufToHex(v: unknown): string | null {
 
 function asString(v: unknown): string | null {
   if (v == null) return null;
-  if (typeof v === "string") {
-    const t = v.trim();
-    return t.length ? t : null;
-  }
-  return String(v);
+  // Захист: прибираємо null-байти (U+0000) — Postgres TEXT їх не приймає
+  // (бінарні значення/буфери, помилково прочитані як рядок, інакше валять запис).
+  const raw = typeof v === "string" ? v : String(v);
+  const t = raw.replace(/\x00/g, "").trim();
+  return t.length ? t : null;
 }
 
 function asTrimmed(v: unknown): string {
@@ -4597,7 +4605,7 @@ interface BankDocFieldMap {
   bankRRef: string; // СчетОрганизации → _Reference29
   articleRRef: string; // СтаттяДвиженняГрошовихКоштів → _Reference96
   purpose: string | null; // НазначениеПлатежа
-  iban: string | null; // СчетКонтрагента/IBAN (опц.)
+  iban?: string; // НЕ мапимо RRef сюди (див. BANK_*_MAP) — лишається null у записі
   comment: string | null;
 }
 
@@ -4619,7 +4627,9 @@ const BANK_INCOMING_MAP: BankDocFieldMap = {
   bankRRef: "_Fld2439RRef", // СчетОрганизации → _Reference29
   articleRRef: "_Fld2453RRef", // СтатьяДвиженияДенежныхСредств → _Reference96
   purpose: "_Fld2456", // НазначениеПлатежа
-  iban: "_Fld2441RRef", // СчетКонтрагента (RRef → _Reference29, не текст IBAN)
+  // iban НЕ мапимо: _Fld2441RRef — це RRef (СчетКонтрагента), а не текст IBAN;
+  // asString на 16-байтному буфері дає рядок із null-байтами, які Postgres TEXT
+  // не приймає → падали ВСІ рядки. Лишаємо iban=null.
   comment: "_Fld2450", // Комментарий
 };
 
@@ -4640,7 +4650,7 @@ const BANK_OUTGOING_MAP: BankDocFieldMap = {
   bankRRef: "_Fld2508RRef", // СчетОрганизации → _Reference29
   articleRRef: "_Fld2505RRef", // СтатьяДвиженияДенежныхСредств → _Reference96
   purpose: "_Fld2496", // НазначениеПлатежа
-  iban: "_Fld2507RRef", // СчетКонтрагента (RRef → _Reference29)
+  // iban НЕ мапимо: _Fld2507RRef — RRef (СчетКонтрагента), не текст IBAN (див. incoming).
   comment: "_Fld2494", // Комментарий
 };
 
