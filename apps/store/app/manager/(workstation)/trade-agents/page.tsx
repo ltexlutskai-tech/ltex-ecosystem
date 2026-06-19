@@ -16,6 +16,7 @@ export default async function TradeAgentsPage() {
       select: {
         id: true,
         code: true,
+        code1C: true,
         name: true,
         userId: true,
         archived: true,

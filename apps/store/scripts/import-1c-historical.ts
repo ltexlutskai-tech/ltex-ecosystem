@@ -639,6 +639,7 @@ const CUSTOMER_COLS = [
   "_Fld6058", // РасписаниеРаботыСтрокой
   "_Fld6044RRef", // ГоловнойКонтрагент (self-ref head client)
   "_Fld6060RRef", // ЮрФизЛицо (EnumRef)
+  "_Fld6889RRef", // ТорговийАгент (агент клієнта → User.code1C)
 ];
 
 async function importCustomers(ctx: ImportContext): Promise<Recon> {
@@ -650,6 +651,10 @@ async function importCustomers(ctx: ImportContext): Promise<Recon> {
   // якщо customers не входив до блоку дрібних довідників у main() (напр. cold run).
   if (ctx.legalTypeByHex.size === 0) {
     ctx.legalTypeByHex = await loadLegalTypeEnum(src);
+  }
+  // Карта 1С-агент(hex)→User.id для прив'язки клієнта до менеджера (_Fld6889RRef).
+  if (ctx.agentUserIdByHex.size === 0) {
+    await loadAgentUserIds(ctx);
   }
 
   recon.sourceRows = await countTable(src, "_Reference66");
@@ -733,6 +738,10 @@ async function importCustomers(ctx: ImportContext): Promise<Recon> {
                 return h ? (ctx.customers.get(h)?.code1C ?? null) : null;
               })(),
               legalType,
+              agentUserId: (() => {
+                const h = bufToHex(row["_Fld6889RRef"]);
+                return h ? (ctx.agentUserIdByHex.get(h) ?? null) : null;
+              })(),
             },
             update: {
               uid1C: hex,
@@ -761,6 +770,10 @@ async function importCustomers(ctx: ImportContext): Promise<Recon> {
                 return h ? (ctx.customers.get(h)?.code1C ?? null) : null;
               })(),
               legalType,
+              agentUserId: (() => {
+                const h = bufToHex(row["_Fld6889RRef"]);
+                return h ? (ctx.agentUserIdByHex.get(h) ?? null) : null;
+              })(),
             },
           });
         }

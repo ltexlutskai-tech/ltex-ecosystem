@@ -175,6 +175,20 @@ export async function PATCH(
       { status: 404 },
     );
   }
+
+  // Авто-лінк дзеркала 1С-агента (MgrTradeAgent) до User за code1C.
+  // Best-effort — не ламає основну операцію редагування.
+  if (updated.code1C) {
+    try {
+      await prisma.mgrTradeAgent.updateMany({
+        where: { code1C: updated.code1C, userId: null },
+        data: { userId: updated.id },
+      });
+    } catch {
+      // ignore — лінк необов'язковий
+    }
+  }
+
   return NextResponse.json({
     user: {
       ...updated,
