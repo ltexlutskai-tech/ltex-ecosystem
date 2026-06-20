@@ -95,6 +95,7 @@ export default async function SalesRegisterPage({
         clientId: true,
         orderCode1C: true,
         saleCode1C: true,
+        recorderCode1C: true,
       },
     }),
   ]);
@@ -112,8 +113,14 @@ export default async function SalesRegisterPage({
   const orderCodes = [
     ...new Set(movements.map((m) => m.orderCode1C).filter(Boolean)),
   ] as string[];
+  // Документ продажу = реєстратор (Реалізація). Шукаємо і за saleCode1C
+  // (ДокументПродажи), і за recorderCode1C — що знайдеться.
   const saleCodes = [
-    ...new Set(movements.map((m) => m.saleCode1C).filter(Boolean)),
+    ...new Set(
+      movements
+        .flatMap((m) => [m.saleCode1C, m.recorderCode1C])
+        .filter(Boolean),
+    ),
   ] as string[];
 
   const [clients, productsByCode, productsById, orders, sales] =
@@ -139,13 +146,13 @@ export default async function SalesRegisterPage({
       orderCodes.length
         ? prisma.order.findMany({
             where: { code1C: { in: orderCodes } },
-            select: { code1C: true, number1C: true },
+            select: { id: true, code1C: true, number1C: true },
           })
         : Promise.resolve([]),
       saleCodes.length
         ? prisma.sale.findMany({
             where: { code1C: { in: saleCodes } },
-            select: { code1C: true, number1C: true },
+            select: { id: true, code1C: true, number1C: true },
           })
         : Promise.resolve([]),
     ]);
@@ -154,31 +161,47 @@ export default async function SalesRegisterPage({
     productsByCode.map((p) => [p.code1C ?? "", p.name] as const),
   );
   const productNameById = new Map(productsById.map((p) => [p.id, p.name]));
-  const orderNo = new Map(orders.map((o) => [o.code1C ?? "", o.number1C]));
-  const saleNo = new Map(sales.map((s) => [s.code1C ?? "", s.number1C]));
+  const orderByCode = new Map(orders.map((o) => [o.code1C ?? "", o]));
+  const saleByCode = new Map(sales.map((s) => [s.code1C ?? "", s]));
 
   // Короткий хвіст hex, коли документ не знайдено (щоб не було порожньо).
   const short = (h: string | null) => (h ? `…${h.slice(-6)}` : "—");
 
-  const rows = movements.map((m) => ({
-    id: m.id,
-    occurredAt: fmtDateTime(m.occurredAt),
-    clientName: (m.clientId && clientName.get(m.clientId)) || "—",
-    productName:
-      (m.productId && productNameById.get(m.productId)) ||
-      (m.productCode1C && productNameByCode.get(m.productCode1C)) ||
-      "—",
-    orderNo:
-      (m.orderCode1C && (orderNo.get(m.orderCode1C) ?? short(m.orderCode1C))) ||
-      "—",
-    saleNo:
-      (m.saleCode1C && (saleNo.get(m.saleCode1C) ?? short(m.saleCode1C))) ||
-      "—",
-    qty: fmtKg(toNum(m.qty)),
-    weightKg: m.weightKg == null ? "—" : fmtKg(toNum(m.weightKg)),
-    revenueEur: fmtEur(toNum(m.revenueEur)),
-    kindLabel: m.recordKind === 1 ? "Повернення" : "Продаж",
-  }));
+  const rows = movements.map((m) => {
+    const order = m.orderCode1C ? orderByCode.get(m.orderCode1C) : undefined;
+    const sale =
+      (m.saleCode1C && saleByCode.get(m.saleCode1C)) ||
+      (m.recorderCode1C && saleByCode.get(m.recorderCode1C)) ||
+      undefined;
+    return {
+      id: m.id,
+      occurredAt: fmtDateTime(m.occurredAt),
+      clientName: (m.clientId && clientName.get(m.clientId)) || "—",
+      productName:
+        (m.productId && productNameById.get(m.productId)) ||
+        (m.productCode1C && productNameByCode.get(m.productCode1C)) ||
+        "—",
+      // Клікабельне посилання на документ, якщо знайдено; інакше короткий код / «—».
+      orderNo: order
+        ? {
+            text: order.number1C ?? short(m.orderCode1C),
+            href: `/manager/orders/${order.id}`,
+          }
+        : m.orderCode1C
+          ? short(m.orderCode1C)
+          : "—",
+      saleNo: sale
+        ? {
+            text: sale.number1C ?? short(m.saleCode1C ?? m.recorderCode1C),
+            href: `/manager/sales/${sale.id}`,
+          }
+        : short(m.saleCode1C ?? m.recorderCode1C),
+      qty: fmtKg(toNum(m.qty)),
+      weightKg: m.weightKg == null ? "—" : fmtKg(toNum(m.weightKg)),
+      revenueEur: fmtEur(toNum(m.revenueEur)),
+      kindLabel: m.recordKind === 1 ? "Повернення" : "Продаж",
+    };
+  });
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 

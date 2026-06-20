@@ -1,8 +1,24 @@
 "use client";
 
 import { type ReactNode } from "react";
+import Link from "next/link";
 import { Download } from "lucide-react";
 import { Button } from "@ltex/ui";
+
+/** Клітинка-посилання: рендериться як `<Link>`, у CSV йде `text`. */
+export interface LinkCell {
+  text: string;
+  href: string;
+}
+
+function isLinkCell(v: unknown): v is LinkCell {
+  return (
+    typeof v === "object" &&
+    v !== null &&
+    typeof (v as LinkCell).href === "string" &&
+    typeof (v as LinkCell).text === "string"
+  );
+}
 
 export interface RegisterColumn {
   /** Ключ поля у рядку. */
@@ -109,7 +125,21 @@ export function RegisterViewer({
                         c.align,
                       )} ${c.nowrap ? "whitespace-nowrap" : ""}`}
                     >
-                      {c.render ? c.render(row) : cellText(c, row)}
+                      {c.render
+                        ? c.render(row)
+                        : isLinkCell(row[c.key])
+                          ? (() => {
+                              const lc = row[c.key] as LinkCell;
+                              return (
+                                <Link
+                                  href={lc.href}
+                                  className="font-mono text-blue-600 hover:text-blue-700 hover:underline"
+                                >
+                                  {lc.text}
+                                </Link>
+                              );
+                            })()
+                          : cellText(c, row)}
                     </td>
                   ))}
                 </tr>
@@ -134,6 +164,7 @@ function alignClass(align?: "left" | "right" | "center"): string {
 function cellText(c: RegisterColumn, row: Record<string, unknown>): string {
   const v = row[c.key];
   if (v === null || v === undefined) return "";
+  if (isLinkCell(v)) return v.text;
   return String(v);
 }
 
