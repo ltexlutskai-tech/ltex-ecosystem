@@ -28,6 +28,8 @@ const COLUMNS = [
   { key: "occurredAt", label: "Дата", nowrap: true },
   { key: "directionLabel", label: "Вид", nowrap: true },
   { key: "articleName", label: "Стаття" },
+  { key: "accountName", label: "Рахунок / Каса" },
+  { key: "docNo", label: "Документ", nowrap: true },
   { key: "amountUah", label: "Сума, ₴", align: "right" as const, nowrap: true },
   { key: "amountUpr", label: "Сума, €", align: "right" as const, nowrap: true },
 ];
@@ -68,6 +70,8 @@ export default async function CashFlowRegisterPage({
         occurredAt: true,
         direction: true,
         articleCode1C: true,
+        accountCode1C: true,
+        recorderCode1C: true,
         amountUah: true,
         amountUpr: true,
       },
@@ -77,15 +81,75 @@ export default async function CashFlowRegisterPage({
   const articleCodes = [
     ...new Set(movements.map((m) => m.articleCode1C).filter(Boolean)),
   ] as string[];
-  const articles = articleCodes.length
-    ? await prisma.mgrCashFlowArticle.findMany({
-        where: { code1C: { in: articleCodes } },
-        select: { code1C: true, name: true },
-      })
-    : [];
+  const accountCodes = [
+    ...new Set(movements.map((m) => m.accountCode1C).filter(Boolean)),
+  ] as string[];
+  const recorderCodes = [
+    ...new Set(movements.map((m) => m.recorderCode1C).filter(Boolean)),
+  ] as string[];
+
+  // Документ-реєстратор може бути касовим ордером АБО банк-платіжкою.
+  const [articles, accounts, cashOrders, bankIn, bankOut] = await Promise.all([
+    articleCodes.length
+      ? prisma.mgrCashFlowArticle.findMany({
+          where: { code1C: { in: articleCodes } },
+          select: { code1C: true, name: true },
+        })
+      : Promise.resolve([]),
+    accountCodes.length
+      ? prisma.mgrBankAccount.findMany({
+          where: { code1C: { in: accountCodes } },
+          select: { code1C: true, name: true },
+        })
+      : Promise.resolve([]),
+    recorderCodes.length
+      ? prisma.mgrCashOrder.findMany({
+          where: { code1C: { in: recorderCodes } },
+          select: { id: true, code1C: true, number1C: true },
+        })
+      : Promise.resolve([]),
+    recorderCodes.length
+      ? prisma.bankPaymentIncoming.findMany({
+          where: { code1C: { in: recorderCodes } },
+          select: { id: true, code1C: true, number1C: true },
+        })
+      : Promise.resolve([]),
+    recorderCodes.length
+      ? prisma.bankPaymentOutgoing.findMany({
+          where: { code1C: { in: recorderCodes } },
+          select: { id: true, code1C: true, number1C: true },
+        })
+      : Promise.resolve([]),
+  ]);
+
   const articleName = new Map(
     articles.map((a) => [a.code1C ?? "", a.name] as const),
   );
+  const accountName = new Map(
+    accounts.map((a) => [a.code1C ?? "", a.name] as const),
+  );
+  // Мапа реєстратор → клікабельне посилання на документ.
+  const docByCode = new Map<string, { text: string; href: string }>();
+  for (const o of cashOrders)
+    if (o.code1C)
+      docByCode.set(o.code1C, {
+        text: o.number1C ?? "ПКО/РКО",
+        href: `/manager/payments/${o.id}`,
+      });
+  for (const b of bankIn)
+    if (b.code1C)
+      docByCode.set(b.code1C, {
+        text: b.number1C ?? "Платіжка вх.",
+        href: `/manager/bank-payments-incoming/${b.id}`,
+      });
+  for (const b of bankOut)
+    if (b.code1C)
+      docByCode.set(b.code1C, {
+        text: b.number1C ?? "Платіжка вих.",
+        href: `/manager/bank-payments-outgoing/${b.id}`,
+      });
+
+  const short = (h: string | null) => (h ? `…${h.slice(-6)}` : "—");
 
   const rows = movements.map((m) => ({
     id: m.id,
@@ -93,6 +157,12 @@ export default async function CashFlowRegisterPage({
     directionLabel: m.direction === 1 ? "Розхід" : "Прихід",
     articleName:
       (m.articleCode1C && articleName.get(m.articleCode1C)) || "Без статті",
+    accountName:
+      (m.accountCode1C && accountName.get(m.accountCode1C)) ||
+      short(m.accountCode1C),
+    docNo:
+      (m.recorderCode1C && docByCode.get(m.recorderCode1C)) ||
+      short(m.recorderCode1C),
     amountUah: toNum(m.amountUah).toFixed(2),
     amountUpr: m.amountUpr == null ? "—" : fmtEur(toNum(m.amountUpr)),
   }));
