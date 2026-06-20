@@ -29,6 +29,8 @@ const COLUMNS = [
   { key: "occurredAt", label: "Дата", nowrap: true },
   { key: "clientName", label: "Клієнт" },
   { key: "productName", label: "Товар" },
+  { key: "orderNo", label: "Замовлення", nowrap: true },
+  { key: "saleNo", label: "Документ продажу", nowrap: true },
   { key: "qty", label: "К-сть", align: "right" as const, nowrap: true },
   { key: "weightKg", label: "Вага, кг", align: "right" as const, nowrap: true },
   {
@@ -89,42 +91,89 @@ export default async function SalesRegisterPage({
         revenueEur: true,
         recordKind: true,
         productCode1C: true,
+        productId: true,
         clientId: true,
+        orderCode1C: true,
+        saleCode1C: true,
       },
     }),
   ]);
 
-  // Резолв назв клієнтів/товарів батчем.
+  // Резолв назв батчем: клієнт, товар (по id АБО code1C), замовлення, документ продажу.
   const clientIds = [
     ...new Set(movements.map((m) => m.clientId).filter(Boolean)),
   ] as string[];
   const productCodes = [
     ...new Set(movements.map((m) => m.productCode1C).filter(Boolean)),
   ] as string[];
-  const [clients, products] = await Promise.all([
-    clientIds.length
-      ? prisma.mgrClient.findMany({
-          where: { id: { in: clientIds } },
-          select: { id: true, name: true },
-        })
-      : Promise.resolve([]),
-    productCodes.length
-      ? prisma.product.findMany({
-          where: { code1C: { in: productCodes } },
-          select: { code1C: true, name: true },
-        })
-      : Promise.resolve([]),
-  ]);
+  const productIds = [
+    ...new Set(movements.map((m) => m.productId).filter(Boolean)),
+  ] as string[];
+  const orderCodes = [
+    ...new Set(movements.map((m) => m.orderCode1C).filter(Boolean)),
+  ] as string[];
+  const saleCodes = [
+    ...new Set(movements.map((m) => m.saleCode1C).filter(Boolean)),
+  ] as string[];
+
+  const [clients, productsByCode, productsById, orders, sales] =
+    await Promise.all([
+      clientIds.length
+        ? prisma.mgrClient.findMany({
+            where: { id: { in: clientIds } },
+            select: { id: true, name: true },
+          })
+        : Promise.resolve([]),
+      productCodes.length
+        ? prisma.product.findMany({
+            where: { code1C: { in: productCodes } },
+            select: { code1C: true, name: true },
+          })
+        : Promise.resolve([]),
+      productIds.length
+        ? prisma.product.findMany({
+            where: { id: { in: productIds } },
+            select: { id: true, name: true },
+          })
+        : Promise.resolve([]),
+      orderCodes.length
+        ? prisma.order.findMany({
+            where: { code1C: { in: orderCodes } },
+            select: { code1C: true, number1C: true },
+          })
+        : Promise.resolve([]),
+      saleCodes.length
+        ? prisma.sale.findMany({
+            where: { code1C: { in: saleCodes } },
+            select: { code1C: true, number1C: true },
+          })
+        : Promise.resolve([]),
+    ]);
   const clientName = new Map(clients.map((c) => [c.id, c.name]));
-  const productName = new Map(
-    products.map((p) => [p.code1C ?? "", p.name] as const),
+  const productNameByCode = new Map(
+    productsByCode.map((p) => [p.code1C ?? "", p.name] as const),
   );
+  const productNameById = new Map(productsById.map((p) => [p.id, p.name]));
+  const orderNo = new Map(orders.map((o) => [o.code1C ?? "", o.number1C]));
+  const saleNo = new Map(sales.map((s) => [s.code1C ?? "", s.number1C]));
+
+  // Короткий хвіст hex, коли документ не знайдено (щоб не було порожньо).
+  const short = (h: string | null) => (h ? `…${h.slice(-6)}` : "—");
 
   const rows = movements.map((m) => ({
     id: m.id,
     occurredAt: fmtDateTime(m.occurredAt),
     clientName: (m.clientId && clientName.get(m.clientId)) || "—",
-    productName: (m.productCode1C && productName.get(m.productCode1C)) || "—",
+    productName:
+      (m.productId && productNameById.get(m.productId)) ||
+      (m.productCode1C && productNameByCode.get(m.productCode1C)) ||
+      "—",
+    orderNo:
+      (m.orderCode1C && (orderNo.get(m.orderCode1C) ?? short(m.orderCode1C))) ||
+      "—",
+    saleNo:
+      (m.saleCode1C && (saleNo.get(m.saleCode1C) ?? short(m.saleCode1C))) ||
+      "—",
     qty: fmtKg(toNum(m.qty)),
     weightKg: m.weightKg == null ? "—" : fmtKg(toNum(m.weightKg)),
     revenueEur: fmtEur(toNum(m.revenueEur)),
