@@ -65,25 +65,29 @@ export default async function OrderRemainderRegisterPage({
       select: {
         id: true,
         occurredAt: true,
-        orderId: true,
         orderCode1C: true,
         productCode1C: true,
+        productId: true,
         qty: true,
         recordKind: true,
       },
     }),
   ]);
 
-  const orderIds = [
-    ...new Set(movements.map((m) => m.orderId).filter(Boolean)),
+  // Резолв назв батчем: замовлення (по code1C), товар (по id АБО code1C).
+  const orderCodes = [
+    ...new Set(movements.map((m) => m.orderCode1C).filter(Boolean)),
   ] as string[];
   const productCodes = [
     ...new Set(movements.map((m) => m.productCode1C).filter(Boolean)),
   ] as string[];
-  const [orders, products] = await Promise.all([
-    orderIds.length
+  const productIds = [
+    ...new Set(movements.map((m) => m.productId).filter(Boolean)),
+  ] as string[];
+  const [orders, productsByCode, productsById] = await Promise.all([
+    orderCodes.length
       ? prisma.order.findMany({
-          where: { id: { in: orderIds } },
+          where: { code1C: { in: orderCodes } },
           select: { id: true, number1C: true, code1C: true },
         })
       : Promise.resolve([]),
@@ -93,23 +97,40 @@ export default async function OrderRemainderRegisterPage({
           select: { code1C: true, name: true },
         })
       : Promise.resolve([]),
+    productIds.length
+      ? prisma.product.findMany({
+          where: { id: { in: productIds } },
+          select: { id: true, name: true },
+        })
+      : Promise.resolve([]),
   ]);
-  const orderById = new Map(orders.map((o) => [o.id, o]));
-  const productName = new Map(
-    products.map((p) => [p.code1C ?? "", p.name] as const),
+  const orderByCode = new Map(orders.map((o) => [o.code1C ?? "", o]));
+  const productNameByCode = new Map(
+    productsByCode.map((p) => [p.code1C ?? "", p.name] as const),
   );
+  const productNameById = new Map(productsById.map((p) => [p.id, p.name]));
+
+  // Короткий хвіст hex, коли документ не знайдено (щоб не було порожньо).
+  const short = (h: string | null) => (h ? `…${h.slice(-6)}` : "—");
 
   const rows = movements.map((m) => {
-    const order = m.orderId ? orderById.get(m.orderId) : undefined;
+    const order = m.orderCode1C ? orderByCode.get(m.orderCode1C) : undefined;
     return {
       id: m.id,
       occurredAt: fmtDateTime(m.occurredAt),
+      // Клікабельне посилання на замовлення, якщо знайдено; інакше короткий код.
       orderLabel: order
-        ? formatDocNumber({ number1C: order.number1C, code1C: order.code1C })
-        : m.orderCode1C.slice(0, 8),
+        ? {
+            text: formatDocNumber({
+              number1C: order.number1C,
+              code1C: order.code1C,
+            }),
+            href: `/manager/orders/${order.id}`,
+          }
+        : short(m.orderCode1C),
       productName:
-        (m.productCode1C && productName.get(m.productCode1C)) ||
-        m.productCode1C ||
+        (m.productId && productNameById.get(m.productId)) ||
+        (m.productCode1C && productNameByCode.get(m.productCode1C)) ||
         "—",
       qty: fmtKg(toNum(m.qty)),
       kindLabel: m.recordKind === 1 ? "Закрито" : "Замовлено",
