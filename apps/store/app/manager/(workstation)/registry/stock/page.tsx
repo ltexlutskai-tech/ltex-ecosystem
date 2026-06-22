@@ -27,9 +27,7 @@ const ALLOWED = [
 const COLUMNS = [
   { key: "occurredAt", label: "Дата", nowrap: true },
   { key: "docNo", label: "Документ", nowrap: true },
-  { key: "warehouseName", label: "Склад" },
   { key: "productName", label: "Товар" },
-  { key: "qualityName", label: "Якість", nowrap: true },
   { key: "qty", label: "К-сть", align: "right" as const, nowrap: true },
   { key: "weightKg", label: "Вага, кг", align: "right" as const, nowrap: true },
   { key: "kindLabel", label: "Рух", nowrap: true },
@@ -91,8 +89,6 @@ export default async function StockRegisterPage({
         occurredAt: true,
         productCode1C: true,
         productId: true,
-        warehouseCode1C: true,
-        quality: true,
         qty: true,
         weightKg: true,
         recordKind: true,
@@ -108,116 +104,86 @@ export default async function StockRegisterPage({
   const productIds = [
     ...new Set(movements.map((m) => m.productId).filter(Boolean)),
   ] as string[];
-  const warehouseCodes = [
-    ...new Set(movements.map((m) => m.warehouseCode1C).filter(Boolean)),
-  ] as string[];
-  const qualityCodes = [
-    ...new Set(movements.map((m) => m.quality).filter(Boolean)),
-  ] as string[];
   const recorderCodes = [
     ...new Set(movements.map((m) => m.recorderCode1C).filter(Boolean)),
   ] as string[];
 
   // Документ-реєстратор: реалізація (Sale) АБО один з 8 складських документів.
-  const [
-    productsByCode,
-    productsById,
-    warehouses,
-    qualities,
-    sales,
-    ...stockDocLists
-  ] = await Promise.all([
-    productCodes.length
-      ? prisma.product.findMany({
-          where: { code1C: { in: productCodes } },
-          select: { code1C: true, name: true },
-        })
-      : Promise.resolve([]),
-    productIds.length
-      ? prisma.product.findMany({
-          where: { id: { in: productIds } },
-          select: { id: true, name: true },
-        })
-      : Promise.resolve([]),
-    warehouseCodes.length
-      ? prisma.warehouse.findMany({
-          where: { code1C: { in: warehouseCodes } },
-          select: { code1C: true, name: true },
-        })
-      : Promise.resolve([]),
-    qualityCodes.length
-      ? prisma.quality.findMany({
-          where: { code1C: { in: qualityCodes } },
-          select: { code1C: true, name: true },
-        })
-      : Promise.resolve([]),
-    recorderCodes.length
-      ? prisma.sale.findMany({
-          where: { code1C: { in: recorderCodes } },
-          select: { id: true, code1C: true, number1C: true },
-        })
-      : Promise.resolve([]),
-    // 8 складських документів — у тому ж порядку, що STOCK_DOC_SLUGS.
-    recorderCodes.length
-      ? prisma.productReturnFromCustomer.findMany({
-          where: { code1C: { in: recorderCodes } },
-          select: { id: true, code1C: true, number1C: true },
-        })
-      : Promise.resolve([]),
-    recorderCodes.length
-      ? prisma.warehouseReturn.findMany({
-          where: { code1C: { in: recorderCodes } },
-          select: { id: true, code1C: true, number1C: true },
-        })
-      : Promise.resolve([]),
-    recorderCodes.length
-      ? prisma.returnToSupplier.findMany({
-          where: { code1C: { in: recorderCodes } },
-          select: { id: true, code1C: true, number1C: true },
-        })
-      : Promise.resolve([]),
-    recorderCodes.length
-      ? prisma.repacking.findMany({
-          where: { code1C: { in: recorderCodes } },
-          select: { id: true, code1C: true, number1C: true },
-        })
-      : Promise.resolve([]),
-    recorderCodes.length
-      ? prisma.writeOff.findMany({
-          where: { code1C: { in: recorderCodes } },
-          select: { id: true, code1C: true, number1C: true },
-        })
-      : Promise.resolve([]),
-    recorderCodes.length
-      ? prisma.stockAdjustment.findMany({
-          where: { code1C: { in: recorderCodes } },
-          select: { id: true, code1C: true, number1C: true },
-        })
-      : Promise.resolve([]),
-    recorderCodes.length
-      ? prisma.inventory.findMany({
-          where: { code1C: { in: recorderCodes } },
-          select: { id: true, code1C: true, number1C: true },
-        })
-      : Promise.resolve([]),
-    recorderCodes.length
-      ? prisma.stockTransfer.findMany({
-          where: { code1C: { in: recorderCodes } },
-          select: { id: true, code1C: true, number1C: true },
-        })
-      : Promise.resolve([]),
-  ]);
+  const [productsByCode, productsById, sales, ...stockDocLists] =
+    await Promise.all([
+      productCodes.length
+        ? prisma.product.findMany({
+            where: { code1C: { in: productCodes } },
+            select: { code1C: true, name: true },
+          })
+        : Promise.resolve([]),
+      productIds.length
+        ? prisma.product.findMany({
+            where: { id: { in: productIds } },
+            select: { id: true, name: true },
+          })
+        : Promise.resolve([]),
+      recorderCodes.length
+        ? prisma.sale.findMany({
+            where: { code1C: { in: recorderCodes } },
+            select: { id: true, code1C: true, number1C: true },
+          })
+        : Promise.resolve([]),
+      // 8 складських документів — у тому ж порядку, що STOCK_DOC_SLUGS.
+      recorderCodes.length
+        ? prisma.productReturnFromCustomer.findMany({
+            where: { code1C: { in: recorderCodes } },
+            select: { id: true, code1C: true, number1C: true },
+          })
+        : Promise.resolve([]),
+      recorderCodes.length
+        ? prisma.warehouseReturn.findMany({
+            where: { code1C: { in: recorderCodes } },
+            select: { id: true, code1C: true, number1C: true },
+          })
+        : Promise.resolve([]),
+      recorderCodes.length
+        ? prisma.returnToSupplier.findMany({
+            where: { code1C: { in: recorderCodes } },
+            select: { id: true, code1C: true, number1C: true },
+          })
+        : Promise.resolve([]),
+      recorderCodes.length
+        ? prisma.repacking.findMany({
+            where: { code1C: { in: recorderCodes } },
+            select: { id: true, code1C: true, number1C: true },
+          })
+        : Promise.resolve([]),
+      recorderCodes.length
+        ? prisma.writeOff.findMany({
+            where: { code1C: { in: recorderCodes } },
+            select: { id: true, code1C: true, number1C: true },
+          })
+        : Promise.resolve([]),
+      recorderCodes.length
+        ? prisma.stockAdjustment.findMany({
+            where: { code1C: { in: recorderCodes } },
+            select: { id: true, code1C: true, number1C: true },
+          })
+        : Promise.resolve([]),
+      recorderCodes.length
+        ? prisma.inventory.findMany({
+            where: { code1C: { in: recorderCodes } },
+            select: { id: true, code1C: true, number1C: true },
+          })
+        : Promise.resolve([]),
+      recorderCodes.length
+        ? prisma.stockTransfer.findMany({
+            where: { code1C: { in: recorderCodes } },
+            select: { id: true, code1C: true, number1C: true },
+          })
+        : Promise.resolve([]),
+    ]);
 
   const productNameByCode = new Map(
     productsByCode.map((p) => [p.code1C ?? "", p.name] as const),
   );
   const productNameById = new Map(productsById.map((p) => [p.id, p.name]));
-  const warehouseName = new Map(
-    warehouses.map((w) => [w.code1C ?? "", w.name] as const),
-  );
-  const qualityName = new Map(
-    qualities.map((q) => [q.code1C ?? "", q.name] as const),
-  );
 
   // Реєстратор → клікабельне посилання на документ.
   const docByCode = new Map<string, { text: string; href: string }>();
@@ -246,14 +212,10 @@ export default async function StockRegisterPage({
     docNo:
       (m.recorderCode1C && docByCode.get(m.recorderCode1C)) ||
       short(m.recorderCode1C),
-    warehouseName:
-      (m.warehouseCode1C && warehouseName.get(m.warehouseCode1C)) ||
-      short(m.warehouseCode1C),
     productName:
       (m.productId && productNameById.get(m.productId)) ||
       (m.productCode1C && productNameByCode.get(m.productCode1C)) ||
       short(m.productCode1C),
-    qualityName: (m.quality && qualityName.get(m.quality)) || short(m.quality),
     qty: fmtKg(toNum(m.qty)),
     weightKg: m.weightKg == null ? "—" : fmtKg(toNum(m.weightKg)),
     kindLabel: m.recordKind === 1 ? "Розхід" : "Прихід",
