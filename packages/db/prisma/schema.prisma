@@ -585,6 +585,23 @@ model Cityy {
   @@map("cities")
 }
 
+// Якість товару (← 1С Catalog.Качество / `_Reference59`). Мінімальний довідник
+// (Новий / Сток / 1-й сорт …) для резолву hex(Качество) у регістрі залишків.
+model Quality {
+  id        String   @id @default(cuid())
+  code1C    String?  @unique @map("code_1c")
+  code      String?
+  name      String // _Description
+  archived  Boolean  @default(false)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("qualities")
+}
+
+// Склади (← 1С Catalog.Склады / `_Reference95`). Існуюча модель Warehouse —
+// заповнюється імпортером (upsert по code1C).
+
 // Торгові агенти (← 1С Catalog.ТорговыеАгенты / `_Reference6628`).
 // Опційно зв'язується з User по hex-мапі (User.code1C === hex агента).
 model MgrTradeAgent {

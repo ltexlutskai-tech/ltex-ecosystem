@@ -3691,6 +3691,152 @@ async function importViberContacts(ctx: ImportContext): Promise<Recon> {
   return recon;
 }
 
+// ─── Склади (← _Reference95 Склады) ──────────────────────────────────────────
+// ✅ ДЕКОДОВАНО: Catalog.Склады uuid=c99983ef → dbnames "Reference",95.
+// Колонки (docs/1c-mssql-schema/columns.tsv): _IDRRef, _Code(nchar 9),
+// _Description(nvarchar 50). Ієрархічний (_ParentIDRRef/_Folder) — папки
+// пропускаємо (_Folder=0x01). Лягає у наявну модель Warehouse (upsert по code1C).
+const WAREHOUSE_COLS = [
+  "_IDRRef",
+  "_Folder", // 0x01 = група/папка → пропускаємо
+  "_Code", // nchar(9)
+  "_Description", // nvarchar(50)
+];
+
+export interface WarehouseUpsert {
+  code1C: string;
+  code: string | null;
+  name: string;
+}
+
+/** Чистий мапер рядка _Reference95 → дані upsert (null коли папка/без _IDRRef). */
+export function mapWarehouseRow(
+  row: Record<string, unknown>,
+): WarehouseUpsert | null {
+  const hex = bufToHex(row["_IDRRef"]);
+  if (!hex) return null;
+  // _Folder binary(1): 0x01 = група (папка), пропускаємо.
+  const folder = row["_Folder"];
+  if (folder instanceof Buffer && folder.length > 0 && folder[0] === 1) {
+    return null;
+  }
+  return {
+    code1C: hex,
+    code: asString(row["_Code"]),
+    name: asTrimmed(row["_Description"]) || hex,
+  };
+}
+
+async function importWarehouses(ctx: ImportContext): Promise<Recon> {
+  const recon = newRecon("warehouses");
+  const sink = new ErrorSink(recon, "warehouses");
+  const { args, src, prisma } = ctx;
+
+  recon.sourceRows = await countTable(src, "_Reference95");
+  log(`warehouses: source rows = ${recon.sourceRows}`);
+
+  for await (const rows of streamTable(src, "_Reference95", WAREHOUSE_COLS, {
+    batch: args.batch,
+    limit: args.limit,
+    orderBy: ["_IDRRef"],
+  })) {
+    for (const row of rows) {
+      const data = mapWarehouseRow(row);
+      if (!data) {
+        recon.skipped++;
+        continue;
+      }
+      try {
+        if (willWrite(ctx)) {
+          await prisma.warehouse.upsert({
+            where: { code1C: data.code1C },
+            create: {
+              code1C: data.code1C,
+              name: data.name,
+            },
+            update: { name: data.name },
+          });
+        }
+        recon.written++;
+      } catch (e) {
+        sink.record(data.code1C, e);
+      }
+    }
+  }
+  log(`warehouses: written ${recon.written}`);
+  return recon;
+}
+
+// ─── Якість (← _Reference59 Качество) ────────────────────────────────────────
+// ✅ ДЕКОДОВАНО: Catalog.Качество uuid=8a9969c7 → dbnames "Reference",59.
+// Колонки: _IDRRef, _Code(nchar 9), _Description(nvarchar 40). Невеликий довідник
+// (Новий / Сток / 1-й сорт …) → модель Quality (upsert по code1C).
+const QUALITY_COLS = [
+  "_IDRRef",
+  "_Code", // nchar(9)
+  "_Description", // nvarchar(40)
+];
+
+export interface QualityUpsert {
+  code1C: string;
+  code: string | null;
+  name: string;
+}
+
+/** Чистий мапер рядка _Reference59 → дані upsert (null коли немає _IDRRef). */
+export function mapQualityRow(
+  row: Record<string, unknown>,
+): QualityUpsert | null {
+  const hex = bufToHex(row["_IDRRef"]);
+  if (!hex) return null;
+  return {
+    code1C: hex,
+    code: asString(row["_Code"]),
+    name: asTrimmed(row["_Description"]) || hex,
+  };
+}
+
+async function importQualities(ctx: ImportContext): Promise<Recon> {
+  const recon = newRecon("qualities");
+  const sink = new ErrorSink(recon, "qualities");
+  const { args, src, prisma } = ctx;
+
+  recon.sourceRows = await countTable(src, "_Reference59");
+  log(`qualities: source rows = ${recon.sourceRows}`);
+
+  for await (const rows of streamTable(src, "_Reference59", QUALITY_COLS, {
+    batch: args.batch,
+    limit: args.limit,
+    orderBy: ["_IDRRef"],
+  })) {
+    for (const row of rows) {
+      const data = mapQualityRow(row);
+      if (!data) {
+        recon.skipped++;
+        continue;
+      }
+      try {
+        if (willWrite(ctx)) {
+          await prisma.quality.upsert({
+            where: { code1C: data.code1C },
+            create: {
+              code1C: data.code1C,
+              code: data.code,
+              name: data.name,
+            },
+            update: { code: data.code, name: data.name },
+          });
+        }
+        recon.written++;
+      } catch (e) {
+        sink.record(data.code1C, e);
+      }
+    }
+  }
+  log(`qualities: written ${recon.written}`);
+  return recon;
+}
+
 // ─── Раннер сутності `dictionaries-full` ─────────────────────────────────────
 // Regions ПЕРЕД cities (cities резолвлять регіон по hex з мапи).
 async function importDictionariesFull(ctx: ImportContext): Promise<Recon> {
@@ -3701,6 +3847,8 @@ async function importDictionariesFull(ctx: ImportContext): Promise<Recon> {
     await importCities(ctx),
     await importTradeAgents(ctx),
     await importViberContacts(ctx),
+    await importWarehouses(ctx),
+    await importQualities(ctx),
   ];
   for (const p of parts) {
     combined.sourceRows += p.sourceRows;
@@ -4392,6 +4540,64 @@ const STOCK_REG_COLS = [
   "_Fld5794", // Количество
 ];
 
+// ─── Ваговий регістр ТовариНаСкладахУВазі (_AccumRg6608, uuid d378703b) ───────
+// Виміри: _Fld6609RRef=Склад, _Fld6610RRef=Номенклатура, _Fld6611RRef=Характеристика.
+// Ресурс: _Fld6612=Количество (= вага, кг). Має _RecorderRRef + _LineNo.
+// Будуємо мапу (recorderHex|productHex|charHex|warehouseHex) → Σвага для підстановки
+// у штучний регістр (де _Fld5794=Количество[шт], а ваги немає).
+const WEIGHT_REG_TABLE = "_AccumRg6608";
+const WEIGHT_REG_COLS = [
+  "_RecorderRRef",
+  "_Fld6609RRef", // Склад
+  "_Fld6610RRef", // Номенклатура
+  "_Fld6611RRef", // Характеристика
+  "_Fld6612", // вага, кг
+];
+
+function weightKey(
+  recorderHex: string,
+  productHex: string | null,
+  charHex: string | null,
+  warehouseHex: string | null,
+): string {
+  return `${recorderHex}|${productHex ?? ""}|${charHex ?? ""}|${warehouseHex ?? ""}`;
+}
+
+/**
+ * Завантажує мапу ваги з _AccumRg6608: (recorder|product|char|warehouse) → Σвага.
+ * Сума на випадок кількох рядків з однаковим ключем у межах документа.
+ */
+async function loadStockWeightMap(
+  ctx: ImportContext,
+): Promise<Map<string, number>> {
+  const { args, src } = ctx;
+  const map = new Map<string, number>();
+  let rowsSeen = 0;
+  for await (const rows of streamTable(src, WEIGHT_REG_TABLE, WEIGHT_REG_COLS, {
+    batch: args.batch,
+    limit: args.limit,
+    orderBy: ["_RecorderRRef", "_LineNo"],
+    where: "_Active = 0x01",
+  })) {
+    for (const row of rows) {
+      rowsSeen++;
+      const recorderHex = bufToHex(row["_RecorderRRef"]);
+      if (!recorderHex) continue;
+      const w = asNumber(row["_Fld6612"]);
+      if (w == null || w === 0) continue;
+      const key = weightKey(
+        recorderHex,
+        bufToHex(row["_Fld6610RRef"]),
+        bufToHex(row["_Fld6611RRef"]),
+        bufToHex(row["_Fld6609RRef"]),
+      );
+      map.set(key, (map.get(key) ?? 0) + Math.abs(w));
+    }
+  }
+  log(`stock-reg: weight map loaded — ${map.size} keys (${rowsSeen} rows)`);
+  return map;
+}
+
 async function importStockRegister(ctx: ImportContext): Promise<Recon> {
   const recon = newRecon("stock-reg");
   const sink = new ErrorSink(recon, "stock-reg");
@@ -4402,6 +4608,19 @@ async function importStockRegister(ctx: ImportContext): Promise<Recon> {
   const activeWhere = "_Active = 0x01";
   recon.sourceRows = await countTable(src, STOCK_REG_TABLE, activeWhere);
   log(`stock-reg: active source rows = ${recon.sourceRows}`);
+
+  // Прелоад ваги з окремого вагового регістру (_AccumRg6608). Best-effort:
+  // якщо таблиці немає — лишаємо weightKg=null (не валимо імпорт стоку).
+  let weightMap = new Map<string, number>();
+  try {
+    weightMap = await loadStockWeightMap(ctx);
+  } catch (e) {
+    warn(
+      `stock-reg: ваговий регістр _AccumRg6608 недоступний — weightKg=null (${
+        e instanceof Error ? e.message : String(e)
+      })`,
+    );
+  }
 
   if (willWrite(ctx)) {
     const del = await prisma.stockMovement.deleteMany({});
@@ -4438,18 +4657,23 @@ async function importStockRegister(ctx: ImportContext): Promise<Recon> {
           recon.unresolved++;
           continue;
         }
+        const charHex = bufToHex(row["_Fld5791RRef"]);
+        const warehouseHex = bufToHex(row["_Fld5789RRef"]);
+        // Підстановка ваги з вагового регістру по (recorder|product|char|warehouse).
+        const wKey = weightKey(recorderHex, productHex, charHex, warehouseHex);
+        const weightKg = weightMap.get(wKey) ?? null;
         buffer.push(
           buildStockMovement({
             occurredAt: asDate(row["_Period"]) ?? REG_AS_OF_FALLBACK,
             recorderCode1C: recorderHex,
             lineNo,
-            warehouseCode1C: bufToHex(row["_Fld5789RRef"]),
+            warehouseCode1C: warehouseHex,
             productCode1C: productHex,
             productId: resolveProductId(ctx, productHex),
-            lotCode1C: bufToHex(row["_Fld5791RRef"]),
+            lotCode1C: charHex,
             quality: bufToHex(row["_Fld5793RRef"]),
             qty: asNumberOr(row["_Fld5794"], 0),
-            weightKg: null, // TODO: JOIN _AccumRg6608 (вага)
+            weightKg,
             recordKind: asNumber(row["_RecordKind"]) ?? 0,
           }),
         );
