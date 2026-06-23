@@ -8,7 +8,7 @@
  * з `registry-reports.ts` і повертають `{ headers, rows, title, period }`.
  *
  * Параметри передаються через query (як для margin `?group=`):
- *   sales-summary  — `?from&to&group=client|product|agent`
+ *   sales-summary  — гнучкий: `?from&to&groups=<csv dims>&ind=<csv>&f_<dim>=…`
  *   cashflow       — `?from&to`
  *   stock-balance  — `?to&group=product|quality`  (залишок на дату)
  *   reconciliation — `?clientId&from&to`
@@ -21,21 +21,20 @@ import {
 } from "@/lib/manager/registry-view";
 import type { ReportShape } from "@/lib/reports/analyst-reports";
 import {
-  summarizeSales,
-  totalSales,
   summarizeCashFlow,
   totalCashFlow,
   summarizeStockBalance,
   totalStock,
-  type SalesGroupBy,
-  type SalesMovementLite,
   type CashFlowMovementLite,
   type StockGroupBy,
   type StockMovementLite,
 } from "@/lib/reports/registry-reports";
+import {
+  buildSalesFlexReport,
+  flattenToReportShape,
+} from "@/lib/reports/sales-flex";
 import { buildReconciliationReport } from "@/lib/reports/reconciliation";
 
-const SALES_LIMIT = 5000;
 const CASHFLOW_LIMIT = 20000;
 const STOCK_LIMIT = 50000;
 
@@ -45,121 +44,26 @@ function freePeriod(label: string): ReportShape["period"] {
   return { from: now, to: now, label };
 }
 
-function parseSalesGroup(raw: string | null): SalesGroupBy {
-  return raw === "product" || raw === "agent" ? raw : "client";
-}
-
 function parseStockGroup(raw: string | null): StockGroupBy {
   return raw === "quality" ? "quality" : "product";
 }
 
-// ─── sales-summary ──────────────────────────────────────────────────────────
+// ─── sales-summary (гнучкий звіт) ────────────────────────────────────────────
+// Делегує гнучкому білдеру (sales-flex) і сплющує дерево у плоский ReportShape
+// для CSV/XLSX. Параметри: ?from&to&groups=client,product&ind=qty,...&f_<dim>=…
 export async function buildSalesSummaryReport(
   params: URLSearchParams,
 ): Promise<ReportShape> {
-  const group = parseSalesGroup(params.get("group"));
-  const where: Prisma.SalesMovementWhereInput = {};
-  const occurredAt = buildOccurredAtFilter(
-    params.get("from") ?? undefined,
-    params.get("to") ?? undefined,
-  );
-  if (occurredAt) where.occurredAt = occurredAt;
-
-  const movements = await prisma.salesMovement.findMany({
-    where,
-    take: SALES_LIMIT,
-    select: {
-      clientCode1C: true,
-      clientId: true,
-      productCode1C: true,
-      agentCode1C: true,
-      qty: true,
-      weightKg: true,
-      revenueEur: true,
-      revenueNoDiscountEur: true,
-      recordKind: true,
-    },
-  });
-
-  const clientIds = [
-    ...new Set(movements.map((m) => m.clientId).filter(Boolean)),
-  ] as string[];
-  const productCodes = [
-    ...new Set(movements.map((m) => m.productCode1C).filter(Boolean)),
-  ] as string[];
-  const agentCodes = [
-    ...new Set(movements.map((m) => m.agentCode1C).filter(Boolean)),
-  ] as string[];
-  const [clients, products, agents] = await Promise.all([
-    clientIds.length
-      ? prisma.mgrClient.findMany({
-          where: { id: { in: clientIds } },
-          select: { id: true, name: true },
-        })
-      : Promise.resolve([]),
-    productCodes.length
-      ? prisma.product.findMany({
-          where: { code1C: { in: productCodes } },
-          select: { code1C: true, name: true },
-        })
-      : Promise.resolve([]),
-    agentCodes.length
-      ? prisma.user.findMany({
-          where: { code1C: { in: agentCodes } },
-          select: { code1C: true, fullName: true },
-        })
-      : Promise.resolve([]),
-  ]);
-  const clientName = new Map(clients.map((c) => [c.id, c.name]));
-  const productName = new Map(
-    products.map((p) => [p.code1C ?? "", p.name] as const),
-  );
-  const agentName = new Map(
-    agents.map((a) => [a.code1C ?? "", a.fullName] as const),
-  );
-
-  const lite: SalesMovementLite[] = movements.map((m) => ({
-    clientCode1C: m.clientCode1C,
-    clientName: m.clientId ? (clientName.get(m.clientId) ?? null) : null,
-    productCode1C: m.productCode1C,
-    productName: m.productCode1C
-      ? (productName.get(m.productCode1C) ?? null)
-      : null,
-    agentCode1C: m.agentCode1C,
-    agentName: m.agentCode1C ? (agentName.get(m.agentCode1C) ?? null) : null,
-    qty: Number(m.qty),
-    weightKg: m.weightKg == null ? null : Number(m.weightKg),
-    revenueEur: Number(m.revenueEur),
-    revenueNoDiscountEur:
-      m.revenueNoDiscountEur == null ? null : Number(m.revenueNoDiscountEur),
-    recordKind: m.recordKind,
-  }));
-
-  const summary = summarizeSales(lite, group);
-  const grand = totalSales(summary);
-
-  const headers = ["Назва", "К-сть", "Вага, кг", "Виручка €", "Знижки €"];
-  const rows: ReportShape["rows"] = summary.map((r) => [
-    r.label,
-    r.qty,
-    r.weightKg,
-    r.revenueEur,
-    r.discountEur,
-  ]);
-  rows.push([
-    grand.label,
-    grand.qty,
-    grand.weightKg,
-    grand.revenueEur,
-    grand.discountEur,
-  ]);
-
-  return {
-    title: "Підсумок продажів",
-    period: freePeriod("За обраний період"),
-    headers,
-    rows,
-  };
+  const result = await buildSalesFlexReport(params);
+  if (result.tooLarge) {
+    return {
+      title: "Підсумок продажів",
+      period: freePeriod("За обраний період"),
+      headers: ["Групування"],
+      rows: [["Оберіть період — забагато даних для експорту."]],
+    };
+  }
+  return flattenToReportShape(result);
 }
 
 // ─── cashflow ───────────────────────────────────────────────────────────────

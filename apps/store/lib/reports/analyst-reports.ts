@@ -5,12 +5,14 @@ import { buildOverdueDebtsReport } from "@/lib/reports/overdue-debts";
 /**
  * Бібліотека звітів для Analyst-кабінету (← Тиждень 5 блоку Ролі).
  *
- * Реалізовано 3 базові звіти (плюсуємо за вимогами user далі):
- *   1. Продажі по клієнтах — groupBy customerId, агрегати + ранжування
- *   2. Продажі по постачальниках — JOIN SaleItem×Lot.supplierId (працює
+ * Реалізовані звіти:
+ *   1. Продажі по постачальниках — JOIN SaleItem×Lot.supplierId (працює
  *      тільки для лотів з нашого Поступлення — legacy lots без supplier
  *      відображаються у «—»)
- *   3. Прострочені борги — клієнти з MgrClient.debt > 0
+ *   2. Прострочені борги — клієнти з MgrClient.debt > 0
+ *
+ * Примітка: «Продажі по клієнтах» прибрано — його замінює гнучкий звіт
+ * «Підсумок продажів» (`sales-summary`, групування «По клієнтах»).
  *
  * Усі звіти повертають shape:
  *   { headers: string[], rows: (string|number|Date)[][] }
@@ -25,50 +27,7 @@ export interface ReportShape {
   rows: (string | number | Date | null)[][];
 }
 
-// ─── Звіт 1: Продажі по клієнтах ───────────────────────────────────────────
-export async function reportSalesByClient(
-  preset: PeriodPreset = "month",
-): Promise<ReportShape> {
-  const period = resolvePeriod(preset);
-  const agg = await prisma.sale.groupBy({
-    by: ["customerId"],
-    where: {
-      status: "posted",
-      createdAt: { gte: period.from, lte: period.to },
-    },
-    _sum: { totalEur: true, totalUah: true },
-    _count: { _all: true },
-    orderBy: { _sum: { totalEur: "desc" } },
-  });
-  const ids = agg.map((a) => a.customerId);
-  const customers =
-    ids.length > 0
-      ? await prisma.customer.findMany({
-          where: { id: { in: ids } },
-          select: { id: true, name: true, phone: true },
-        })
-      : [];
-  const byId = new Map(customers.map((c) => [c.id, c]));
-
-  return {
-    title: "Продажі по клієнтах",
-    period,
-    headers: ["#", "Клієнт", "Телефон", "Реалізацій", "Виручка €", "Виручка ₴"],
-    rows: agg.map((a, idx) => {
-      const c = byId.get(a.customerId);
-      return [
-        idx + 1,
-        c?.name ?? "—",
-        c?.phone ?? "",
-        a._count._all,
-        round2(a._sum.totalEur ?? 0),
-        round2(a._sum.totalUah ?? 0),
-      ];
-    }),
-  };
-}
-
-// ─── Звіт 2: Продажі по постачальниках (через лоти) ────────────────────────
+// ─── Звіт 1: Продажі по постачальниках (через лоти) ────────────────────────
 export async function reportSalesBySupplier(
   preset: PeriodPreset = "month",
 ): Promise<ReportShape> {
@@ -144,7 +103,7 @@ export async function reportSalesBySupplier(
   };
 }
 
-// ─── Звіт 3: Прострочені борги по договорам (FIFO-старіння) ─────────────────
+// ─── Звіт 2: Прострочені борги по договорам (FIFO-старіння) ─────────────────
 export async function reportDebts(thresholdDays = 14): Promise<ReportShape> {
   const report = await buildOverdueDebtsReport(thresholdDays);
   return {
