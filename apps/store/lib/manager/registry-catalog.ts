@@ -319,13 +319,6 @@ export const REPORTS: readonly ReportEntry[] = [
     theme: "stock",
   },
   {
-    key: "sales-by-client",
-    label: "Продажі по клієнтах",
-    description: "Виручка та кг у розрізі контрагентів за період.",
-    href: "/manager/reports/sales-by-client",
-    theme: "sales",
-  },
-  {
     key: "sales-by-supplier",
     label: "Продажі по постачальниках",
     description: "Обсяги продажів у розрізі постачальників.",

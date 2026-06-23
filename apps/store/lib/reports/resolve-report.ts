@@ -8,7 +8,6 @@
 
 import {
   reportDebts,
-  reportSalesByClient,
   reportSalesBySupplier,
   type ReportShape,
 } from "@/lib/reports/analyst-reports";
@@ -44,9 +43,9 @@ export function parseThreshold(raw: string | null): number {
 /**
  * Будує `ReportShape` за `reportId`. Повертає null для невідомого звіту.
  *
- * @param reportId  ключ звіту (`sales-by-client` | `sales-by-supplier` |
- *                  `debts` | `margin` | `sales-summary` | `cashflow` |
- *                  `stock-balance` | `reconciliation`)
+ * @param reportId  ключ звіту (`sales-by-supplier` | `debts` | `margin` |
+ *                  `sales-summary` | `cashflow` | `stock-balance` |
+ *                  `reconciliation`)
  * @param params    URLSearchParams запиту (period / threshold / from / to /
  *                  group / clientId — залежно від звіту)
  */
@@ -55,8 +54,6 @@ export async function resolveReport(
   params: URLSearchParams,
 ): Promise<ReportShape | null> {
   switch (reportId) {
-    case "sales-by-client":
-      return reportSalesByClient(parsePeriod(params.get("period")));
     case "sales-by-supplier":
       return reportSalesBySupplier(parsePeriod(params.get("period")));
     case "debts":

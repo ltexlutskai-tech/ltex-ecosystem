@@ -86,9 +86,9 @@ export function AnalystDashboard({
         <h2 className="mb-3 text-sm font-medium">Доступні звіти</h2>
         <div className="grid gap-2 sm:grid-cols-2">
           <ReportTile
-            href={`/manager/reports/sales-by-client?period=${currentPreset}`}
-            title="Продажі по клієнтах"
-            desc="Рейтинг клієнтів за виручкою у періоді"
+            href="/manager/reports/sales-summary?groups=client"
+            title="Підсумок продажів"
+            desc="Гнучкий звіт: виручка / кг у розрізі клієнтів, товарів, агентів"
           />
           <ReportTile
             href={`/manager/reports/sales-by-supplier?period=${currentPreset}`}
