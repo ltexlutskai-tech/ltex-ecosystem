@@ -88,24 +88,4 @@ describe("mgrClientPatchSchema", () => {
     const parsed = mgrClientPatchSchema.safeParse({ name: "" });
     expect(parsed.success).toBe(false);
   });
-
-  it("accepts a valid integer debtTermDays", () => {
-    const parsed = mgrClientPatchSchema.safeParse({ debtTermDays: 30 });
-    expect(parsed.success).toBe(true);
-  });
-
-  it("accepts null for debtTermDays (use global default)", () => {
-    const parsed = mgrClientPatchSchema.safeParse({ debtTermDays: null });
-    expect(parsed.success).toBe(true);
-  });
-
-  it("rejects negative debtTermDays", () => {
-    const parsed = mgrClientPatchSchema.safeParse({ debtTermDays: -1 });
-    expect(parsed.success).toBe(false);
-  });
-
-  it("rejects non-integer debtTermDays", () => {
-    const parsed = mgrClientPatchSchema.safeParse({ debtTermDays: 14.5 });
-    expect(parsed.success).toBe(false);
-  });
 });

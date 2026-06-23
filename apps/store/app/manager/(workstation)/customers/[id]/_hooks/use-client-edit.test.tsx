@@ -20,7 +20,6 @@ function baseClient(overrides: Partial<ClientDetail> = {}): ClientDetail {
     geolocation: null,
     websiteUrl: null,
     monthlyVolume: "100",
-    debtTermDays: null,
     licenseExpiresAt: null,
     isOwn: false,
     debt: "0",

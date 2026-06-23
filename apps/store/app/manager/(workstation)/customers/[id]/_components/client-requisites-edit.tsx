@@ -339,22 +339,6 @@ export function ClientRequisitesEdit({
             step={0.01}
             suffix="кг"
           />
-          <EditNumberRow
-            label="Відстрочка боргу, днів (індивідуальна)"
-            value={values.debtTermDays}
-            onChange={(v) =>
-              setField("debtTermDays", v == null ? null : Math.trunc(v))
-            }
-            min={0}
-            step={1}
-            suffix="дн."
-          />
-          <div className="flex items-start gap-2 text-sm">
-            <dt className="w-44 shrink-0" />
-            <dd className="min-w-0 flex-1 text-xs text-gray-500">
-              Порожньо = використовується значення зі звіту «Прострочені борги».
-            </dd>
-          </div>
 
           <EditSelectRow
             label="Канал пошуку"

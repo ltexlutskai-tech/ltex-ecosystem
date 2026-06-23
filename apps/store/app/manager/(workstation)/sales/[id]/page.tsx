@@ -23,6 +23,7 @@ import {
   PaymentsPanel,
   type CashOrderView,
 } from "./_components/payments-panel";
+import { SaleDebtTerm } from "./_components/sale-debt-term";
 
 export const dynamic = "force-dynamic";
 
@@ -274,6 +275,12 @@ export default async function ManagerSaleDetailPage({
           </Link>
         </div>
       </header>
+
+      <SaleDebtTerm
+        saleId={sale.id}
+        cashOnDelivery={sale.cashOnDelivery}
+        initialDebtTermDays={sale.debtTermDays}
+      />
 
       {editable ? (
         <SaleForm

@@ -168,8 +168,6 @@ export async function PATCH(
         ? null
         : new Prisma.Decimal(data.monthlyVolume);
   }
-  if (data.debtTermDays !== undefined)
-    updateData.debtTermDays = data.debtTermDays;
   if (data.licenseExpiresAt !== undefined) {
     updateData.licenseExpiresAt =
       data.licenseExpiresAt && data.licenseExpiresAt.length > 0
@@ -269,7 +267,6 @@ function serializeMgrClient(client: LoadedMgrClient) {
     monthlyVolume: client.monthlyVolume
       ? client.monthlyVolume.toString()
       : null,
-    debtTermDays: client.debtTermDays,
     licenseExpiresAt: client.licenseExpiresAt,
     isOwn: client.isOwn,
     email: client.email,

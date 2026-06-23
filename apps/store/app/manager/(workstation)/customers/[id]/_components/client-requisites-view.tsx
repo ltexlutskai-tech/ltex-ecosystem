@@ -248,14 +248,6 @@ export function ClientRequisitesView({
             label="Обсяг за місяць"
             value={client.monthlyVolume ? `${client.monthlyVolume} кг` : "—"}
           />
-          <Row
-            label="Відстрочка боргу, днів"
-            value={
-              client.debtTermDays != null
-                ? `${client.debtTermDays}`
-                : "за замовчуванням"
-            }
-          />
 
           <Row
             label="Канал пошуку"

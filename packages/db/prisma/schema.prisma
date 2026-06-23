@@ -351,6 +351,9 @@ model Sale {
   deliveryMethod      String?  @map("delivery_method") // delivery|post|pickup
   novaPoshtaBranch    String?  @map("nova_poshta_branch")
   cashOnDelivery      Boolean  @default(false) @map("cash_on_delivery")
+  // Per-document debt deferral («днів до закриття»). null = глобальний дефолт зі
+  // звіту. Наложка (cashOnDelivery=true) ігнорує це поле (без відстрочки).
+  debtTermDays        Int?     @map("debt_term_days")
   codAmountUah        Float?   @map("cod_amount_uah")
   assignedAgentUserId String?  @map("assigned_agent_user_id")
   onTradeAgent        Boolean  @default(true) @map("on_trade_agent")
@@ -1491,7 +1494,6 @@ model MgrClient {
   geolocation      String?
   websiteUrl       String?   @map("website_url")
   monthlyVolume    Decimal?  @map("monthly_volume") @db.Decimal(10, 2)
-  debtTermDays     Int?      @map("debt_term_days")
   licenseExpiresAt DateTime? @map("license_expires_at")
   isOwn            Boolean   @default(false) @map("is_own")
   notDirectInput   Boolean   @default(false) @map("not_direct_input")
