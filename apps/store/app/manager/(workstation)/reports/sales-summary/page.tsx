@@ -1,55 +1,22 @@
 import { notFound } from "next/navigation";
-import { prisma, Prisma } from "@ltex/db";
 import { requireRole } from "@/lib/auth/manager-auth";
 import {
-  buildOccurredAtFilter,
-  fmtEur,
-  fmtKg,
-} from "@/lib/manager/registry-view";
-import {
-  summarizeSales,
-  totalSales,
-  type SalesGroupBy,
-  type SalesMovementLite,
-} from "@/lib/reports/registry-reports";
+  buildSalesFlexReport,
+  DIMENSIONS,
+  INDICATORS,
+} from "@/lib/reports/sales-flex";
 import { ReportsNav } from "../_components/reports-nav";
 import { ReportExportButtons } from "../_components/report-export-buttons";
-import { RegisterPeriodFilters } from "../../registry/_components/register-period-filters";
-import { RegisterViewer } from "../../_components/register-viewer";
+import { SalesFlexConfig } from "./_components/sales-flex-config";
+import { SalesFlexTree } from "./_components/sales-flex-tree";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Звіт: Підсумок продажів | L-TEX" };
 
-const GROUP_OPTIONS: { value: SalesGroupBy; label: string }[] = [
-  { value: "client", label: "По клієнтах" },
-  { value: "product", label: "По товарах" },
-  { value: "agent", label: "По агентах" },
-];
-
-const COLUMNS = [
-  { key: "label", label: "Назва" },
-  { key: "qty", label: "К-сть", align: "right" as const, nowrap: true },
-  { key: "weightKg", label: "Вага, кг", align: "right" as const, nowrap: true },
-  {
-    key: "revenueEur",
-    label: "Виручка, €",
-    align: "right" as const,
-    nowrap: true,
-  },
-  {
-    key: "discountEur",
-    label: "Знижки, €",
-    align: "right" as const,
-    nowrap: true,
-  },
-];
-
-const LIMIT = 5000;
-
 export default async function SalesSummaryPage({
   searchParams,
 }: {
-  searchParams: Promise<{ from?: string; to?: string; group?: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const user = await requireRole([
     "analyst",
@@ -61,102 +28,22 @@ export default async function SalesSummaryPage({
   if (!user) notFound();
 
   const sp = await searchParams;
-  const group: SalesGroupBy = GROUP_OPTIONS.some((g) => g.value === sp.group)
-    ? (sp.group as SalesGroupBy)
-    : "client";
+  // Збираємо плоский URLSearchParams лише зі string-значень.
+  const params = new URLSearchParams();
+  for (const [k, v] of Object.entries(sp)) {
+    if (typeof v === "string") params.set(k, v);
+  }
 
-  const where: Prisma.SalesMovementWhereInput = {};
-  const occurredAt = buildOccurredAtFilter(sp.from, sp.to);
-  if (occurredAt) where.occurredAt = occurredAt;
+  const result = await buildSalesFlexReport(params);
 
-  const movements = await prisma.salesMovement.findMany({
-    where,
-    take: LIMIT,
-    select: {
-      clientCode1C: true,
-      clientId: true,
-      productCode1C: true,
-      agentCode1C: true,
-      qty: true,
-      weightKg: true,
-      revenueEur: true,
-      revenueNoDiscountEur: true,
-      recordKind: true,
-    },
-  });
+  const dimensions = DIMENSIONS.map((d) => ({ key: d.key, label: d.label }));
+  const indicators = INDICATORS.map((i) => ({ key: i.key, label: i.label }));
 
-  // Резолв назв для груп.
-  const clientIds = [
-    ...new Set(movements.map((m) => m.clientId).filter(Boolean)),
-  ] as string[];
-  const productCodes = [
-    ...new Set(movements.map((m) => m.productCode1C).filter(Boolean)),
-  ] as string[];
-  const agentCodes = [
-    ...new Set(movements.map((m) => m.agentCode1C).filter(Boolean)),
-  ] as string[];
-  const [clients, products, agents] = await Promise.all([
-    clientIds.length
-      ? prisma.mgrClient.findMany({
-          where: { id: { in: clientIds } },
-          select: { id: true, name: true },
-        })
-      : Promise.resolve([]),
-    productCodes.length
-      ? prisma.product.findMany({
-          where: { code1C: { in: productCodes } },
-          select: { code1C: true, name: true },
-        })
-      : Promise.resolve([]),
-    agentCodes.length
-      ? prisma.user.findMany({
-          where: { code1C: { in: agentCodes } },
-          select: { code1C: true, fullName: true },
-        })
-      : Promise.resolve([]),
-  ]);
-  const clientName = new Map(clients.map((c) => [c.id, c.name]));
-  const productName = new Map(
-    products.map((p) => [p.code1C ?? "", p.name] as const),
-  );
-  const agentName = new Map(
-    agents.map((a) => [a.code1C ?? "", a.fullName] as const),
-  );
-
-  const lite: SalesMovementLite[] = movements.map((m) => ({
-    clientCode1C: m.clientCode1C,
-    clientName: m.clientId ? (clientName.get(m.clientId) ?? null) : null,
-    productCode1C: m.productCode1C,
-    productName: m.productCode1C
-      ? (productName.get(m.productCode1C) ?? null)
-      : null,
-    agentCode1C: m.agentCode1C,
-    agentName: m.agentCode1C ? (agentName.get(m.agentCode1C) ?? null) : null,
-    qty: Number(m.qty),
-    weightKg: m.weightKg == null ? null : Number(m.weightKg),
-    revenueEur: Number(m.revenueEur),
-    revenueNoDiscountEur:
-      m.revenueNoDiscountEur == null ? null : Number(m.revenueNoDiscountEur),
-    recordKind: m.recordKind,
-  }));
-
-  const summary = summarizeSales(lite, group);
-  const grand = totalSales(summary);
-
-  const rows = summary.map((r) => ({
-    id: r.key,
-    label: r.label,
-    qty: fmtKg(r.qty),
-    weightKg: fmtKg(r.weightKg),
-    revenueEur: fmtEur(r.revenueEur),
-    discountEur: fmtEur(r.discountEur),
-  }));
-
-  const exportQuery = new URLSearchParams({
-    ...(sp.from ? { from: sp.from } : {}),
-    ...(sp.to ? { to: sp.to } : {}),
-    group,
-  }).toString();
+  const initialFilters: Record<string, string> = {};
+  for (const d of DIMENSIONS) {
+    const v = params.get(`f_${d.key}`);
+    if (v) initialFilters[d.key] = v;
+  }
 
   return (
     <div className="mx-auto max-w-6xl space-y-4">
@@ -167,49 +54,45 @@ export default async function SalesSummaryPage({
             Звіт: Підсумок продажів
           </h1>
           <p className="mt-1 text-sm text-gray-500">
-            Виручка / кг у розрізі клієнтів · товарів · агентів за період. Рухів
-            у вибірці: {movements.length}
-            {movements.length >= LIMIT ? ` (показано перші ${LIMIT})` : ""}.
+            Гнучкий звіт продажів з довільним групуванням, показниками та
+            відборами.{" "}
+            {result.tooLarge
+              ? "Оберіть період — забагато даних."
+              : `Рухів у вибірці: ${result.rowCount}.`}
           </p>
         </div>
-        <ReportExportButtons reportId="sales-summary" query={exportQuery} />
+        <ReportExportButtons
+          reportId="sales-summary"
+          query={params.toString()}
+        />
       </div>
 
-      <RegisterPeriodFilters
-        initial={{ from: sp.from ?? "", to: sp.to ?? "", group }}
-        extra={[
-          {
-            key: "group",
-            label: "Групування",
-            options: GROUP_OPTIONS.map((g) => ({
-              value: g.value,
-              label: g.label,
-            })),
-          },
-        ]}
+      <SalesFlexConfig
+        dimensions={dimensions}
+        indicators={indicators}
+        initial={{
+          from: params.get("from") ?? "",
+          to: params.get("to") ?? "",
+          groups: result.groups,
+          indicators: result.indicators,
+          totals: result.showTotals,
+          filters: initialFilters,
+        }}
       />
 
-      <RegisterViewer
-        columns={COLUMNS}
-        rows={rows}
-        csvFilename="sales-summary"
-        emptyMessage="За обраним періодом продажів немає."
-        summary={
-          rows.length > 0 ? (
-            <div className="flex flex-wrap gap-6 rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm">
-              <span>
-                Разом виручка: <strong>{fmtEur(grand.revenueEur)} €</strong>
-              </span>
-              <span>
-                Разом вага: <strong>{fmtKg(grand.weightKg)} кг</strong>
-              </span>
-              <span>
-                Знижки: <strong>{fmtEur(grand.discountEur)} €</strong>
-              </span>
-            </div>
-          ) : null
-        }
-      />
+      {result.tooLarge ? (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-6 text-center text-sm text-amber-800">
+          Забагато рухів ({result.rowCount.toLocaleString("uk-UA")}) для звіту
+          без періоду. Оберіть період «з / по» та натисніть «Сформувати».
+        </div>
+      ) : (
+        <SalesFlexTree
+          tree={result.tree}
+          indicators={result.indicatorDefs}
+          grand={result.grand}
+          showTotals={result.showTotals}
+        />
+      )}
     </div>
   );
 }
