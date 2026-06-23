@@ -28,15 +28,6 @@ export const mgrClientPatchSchema = z
     geolocation: z.string().max(100).nullable().optional(),
     viberContact: z.string().max(50).nullable().optional(),
     monthlyVolume: z.number().nonnegative().nullable().optional(),
-    // Per-client debt deferral term (OUR OWN, NOT imported from 1C).
-    // null = використовується глобальний дефолт зі звіту.
-    debtTermDays: z
-      .number()
-      .int()
-      .nonnegative()
-      .max(3650)
-      .nullable()
-      .optional(),
     licenseExpiresAt: dateField,
     hasNewMessage: z.boolean().optional(),
     isViberLinked: z.boolean().optional(),

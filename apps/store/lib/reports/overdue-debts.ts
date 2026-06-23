@@ -9,11 +9,13 @@ import { formatDocNumber } from "@/lib/manager/order-number";
  * (FIFO). Документ прострочений, коли вік його непогашеного залишку перевищує
  * допустиме число днів заборгованості (термін відстрочки клієнта).
  *
- * Поточна реалізація використовує ОДИН ГЛОБАЛЬНИЙ термін (`thresholdDays` з
- * поля «Поріг прострочки, днів», дефолт 14) для всіх клієнтів.
+ * Відстрочка («днів до закриття») задається ПО КОЖНОМУ документу реалізації
+ * (`Sale.debtTermDays`). Якщо документ її не має — застосовується глобальний
+ * дефолт `thresholdDays` (поле «Відстрочка за замовчуванням, днів», дефолт 14).
  *
- * TODO Phase 2: per-client ДопустимоеЧислоДнейЗадолженности — імпортувати
- * термін відстрочки кожного контрагента й застосовувати замість глобального.
+ * Документи-наложки (`Sale.cashOnDelivery=true`) НЕ мають відстрочки і повністю
+ * виключені з прострочки — їхній непогашений залишок показується окремо як
+ * «Борг по наложці».
  *
  * Рухи дебіторки (`MgrDebtMovement`) мають реальні 1С-дати (`occurredAt`).
  * Алгоритм гарантує, що Σ непогашених залишків == max(0, загальний борг), тобто
@@ -167,8 +169,14 @@ export interface OverdueDoc {
   remaining: number;
   /** Вік документа у днях. */
   days: number;
-  /** На скільки днів прострочено. */
+  /** На скільки днів прострочено (0 для наложок — вони ніколи не прострочені). */
   daysOverdue: number;
+  /** Документ-наложка (cashOnDelivery) — виключений з прострочки. */
+  isCod: boolean;
+  /** Власна відстрочка документа (`Sale.debtTermDays`); null = за замовчуванням. */
+  docTermDays: number | null;
+  /** Застосований термін відстрочки (docTermDays ?? thresholdDays). */
+  effectiveTermDays: number;
 }
 
 export interface OverdueDebtRow {
@@ -176,13 +184,12 @@ export interface OverdueDebtRow {
   name: string;
   agentName: string | null;
   debtEur: number;
+  /** Σ прострочених залишків (лише не-наложкові документи). */
   overdueEur: number;
+  /** Σ непогашених залишків документів-наложок (борг по наложці), €. */
+  codDebtEur: number;
   /** Макс. днів прострочки серед прострочених документів (0, якщо немає). */
   oldestOverdueDays: number;
-  /** Індивідуальна відстрочка клієнта (наше поле); null = за замовчуванням. */
-  individualTermDays: number | null;
-  /** Застосований термін (individualTermDays ?? thresholdDays). */
-  effectiveTermDays: number;
   isOverdue: boolean;
   /** "" | "Організувати проплату!" | "Претензійна робота!" */
   activity: string;
@@ -194,6 +201,73 @@ export interface OverdueDebtsReport {
   rows: OverdueDebtRow[];
   totalDebtEur: number;
   totalOverdueEur: number;
+}
+
+/** Вхід для застосування per-document терміну відстрочки. */
+export interface OpenDocLite {
+  /** Вік документа у днях. */
+  days: number;
+  /** Непогашений залишок, €. */
+  remaining: number;
+  /** Наложка? (cashOnDelivery) */
+  isCod: boolean;
+  /** Власна відстрочка документа (`Sale.debtTermDays`); null = за замовчуванням. */
+  docTermDays: number | null;
+}
+
+export interface DocTermsResult {
+  /** Σ прострочених залишків (лише не-наложки). */
+  overdueEur: number;
+  /** Σ залишків наложок. */
+  codDebtEur: number;
+  /** Макс. днів прострочки серед прострочених не-наложкових документів. */
+  oldestOverdueDays: number;
+  /** Прострочка по кожному документу (того ж порядку, що й вхід). */
+  perDoc: Array<{
+    daysOverdue: number;
+    effectiveTermDays: number;
+  }>;
+}
+
+/**
+ * Застосовує per-document термін відстрочки до відкритих документів.
+ *
+ *   - наложка (isCod) → виключена з прострочки, її залишок іде у codDebtEur;
+ *   - інакше → effectiveTermDays = docTermDays ?? thresholdDays;
+ *     daysOverdue = max(0, days − effectiveTermDays); якщо > 0 → у overdueEur.
+ *
+ * Гарантія: overdueEur ≤ Σ залишків не-наложкових документів.
+ */
+export function applyDocTerms(
+  docs: OpenDocLite[],
+  thresholdDays: number,
+): DocTermsResult {
+  let overdueEur = 0;
+  let codDebtEur = 0;
+  let oldestOverdueDays = 0;
+  const perDoc: DocTermsResult["perDoc"] = [];
+
+  for (const d of docs) {
+    if (d.isCod) {
+      codDebtEur += d.remaining;
+      perDoc.push({ daysOverdue: 0, effectiveTermDays: 0 });
+      continue;
+    }
+    const effectiveTermDays = d.docTermDays ?? thresholdDays;
+    const daysOverdue = Math.max(0, d.days - effectiveTermDays);
+    if (daysOverdue > 0) {
+      overdueEur += d.remaining;
+      if (daysOverdue > oldestOverdueDays) oldestOverdueDays = daysOverdue;
+    }
+    perDoc.push({ daysOverdue, effectiveTermDays });
+  }
+
+  return {
+    overdueEur: round2(overdueEur),
+    codDebtEur: round2(codDebtEur),
+    oldestOverdueDays,
+    perDoc,
+  };
 }
 
 // TODO: точний поріг лейблів уточнити з 1С (30 — припущення).
@@ -227,7 +301,6 @@ export async function buildOverdueDebtsReport(
       id: true,
       name: true,
       debt: true,
-      debtTermDays: true,
       agent: { select: { fullName: true } },
     },
   });
@@ -277,6 +350,8 @@ export async function buildOverdueDebtsReport(
             number1C: true,
             docNumber: true,
             totalEur: true,
+            cashOnDelivery: true,
+            debtTermDays: true,
           },
         })
       : [];
@@ -288,6 +363,8 @@ export async function buildOverdueDebtsReport(
       docNumber: number | null;
       totalEur: number;
       code1C: string | null;
+      cashOnDelivery: boolean;
+      debtTermDays: number | null;
     }
   >();
   for (const s of sales) {
@@ -298,6 +375,8 @@ export async function buildOverdueDebtsReport(
         docNumber: s.docNumber,
         totalEur: Number(s.totalEur),
         code1C: s.code1C,
+        cashOnDelivery: s.cashOnDelivery,
+        debtTermDays: s.debtTermDays,
       });
     }
   }
@@ -305,12 +384,14 @@ export async function buildOverdueDebtsReport(
   const now = new Date();
   const rows: OverdueDebtRow[] = debtorClients.map((c) => {
     const movs = byClient.get(c.id) ?? [];
-    // Ефективний термін: індивідуальна відстрочка клієнта (наше поле), або
-    // глобальний дефолт зі звіту, якщо індивідуальна не задана.
-    const termDays = c.debtTermDays ?? thresholdDays;
-    const computation = computeOverdue(movs, termDays, now);
+    // FIFO повертає відкриті документи з віком (`days`). Термін відстрочки
+    // застосовуємо ПО КОЖНОМУ документу нижче (per-doc `Sale.debtTermDays`),
+    // тому тут термін, переданий у computeOverdue, не впливає на результат —
+    // ми перераховуємо прострочку власноруч.
+    const computation = computeOverdue(movs, thresholdDays, now);
 
-    const docs: OverdueDoc[] = computation.open.map((entry) => {
+    // Резолвимо кожен відкритий документ у Sale, щоб дізнатись наложку/термін.
+    const resolved = computation.open.map((entry) => {
       const sale = entry.recorderHex
         ? saleByHex.get(entry.recorderHex)
         : undefined;
@@ -323,33 +404,57 @@ export async function buildOverdueDebtsReport(
         : entry.recorderHex
           ? `…${entry.recorderHex.slice(-6)}`
           : "—";
+      // Документи без зрезолвленої Реалізації (вхідні залишки тощо) — не-наложкові,
+      // з глобальною відстрочкою, без власного терміну.
       return {
-        recorderHex: entry.recorderHex,
+        entry,
+        sale,
         label,
-        saleId: sale?.id ?? null,
-        date: entry.date,
-        docTotalEur: sale ? round2(sale.totalEur) : null,
-        remaining: entry.remaining,
-        days: entry.days,
-        daysOverdue: entry.daysOverdue,
+        isCod: sale?.cashOnDelivery === true,
+        docTermDays: sale?.debtTermDays ?? null,
       };
     });
 
-    const oldestOverdueDays = docs.reduce(
-      (max, d) => (d.daysOverdue > 0 ? Math.max(max, d.daysOverdue) : max),
-      0,
+    const terms = applyDocTerms(
+      resolved.map((r) => ({
+        days: r.entry.days,
+        remaining: r.entry.remaining,
+        isCod: r.isCod,
+        docTermDays: r.docTermDays,
+      })),
+      thresholdDays,
     );
-    const isOverdue = computation.overdueEur > 0;
+
+    const docs: OverdueDoc[] = resolved.map((r, i) => {
+      const t = terms.perDoc[i] ?? { daysOverdue: 0, effectiveTermDays: 0 };
+      return {
+        recorderHex: r.entry.recorderHex,
+        label: r.label,
+        saleId: r.sale?.id ?? null,
+        date: r.entry.date,
+        docTotalEur: r.sale ? round2(r.sale.totalEur) : null,
+        remaining: r.entry.remaining,
+        days: r.entry.days,
+        daysOverdue: t.daysOverdue,
+        isCod: r.isCod,
+        docTermDays: r.docTermDays,
+        effectiveTermDays: t.effectiveTermDays,
+      };
+    });
+
+    const overdueEur = terms.overdueEur;
+    const codDebtEur = terms.codDebtEur;
+    const oldestOverdueDays = terms.oldestOverdueDays;
+    const isOverdue = overdueEur > 0;
 
     return {
       clientId: c.id,
       name: c.name,
       agentName: c.agent?.fullName ?? null,
       debtEur: round2(Number(c.debt)),
-      overdueEur: computation.overdueEur,
+      overdueEur,
+      codDebtEur,
       oldestOverdueDays,
-      individualTermDays: c.debtTermDays,
-      effectiveTermDays: termDays,
       isOverdue,
       activity: activityLabel(isOverdue, oldestOverdueDays),
       docs,

@@ -70,7 +70,6 @@ export async function loadClientDetail(
     monthlyVolume: client.monthlyVolume
       ? client.monthlyVolume.toString()
       : null,
-    debtTermDays: client.debtTermDays,
     licenseExpiresAt: client.licenseExpiresAt?.toISOString() ?? null,
     isOwn: client.isOwn,
     email: client.email,

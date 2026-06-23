@@ -21,8 +21,8 @@ type SortKey =
   | "name"
   | "debtEur"
   | "overdueEur"
+  | "codDebtEur"
   | "oldestOverdueDays"
-  | "individualTermDays"
   | "activity"
   | "agentName";
 type SortDir = "asc" | "desc";
@@ -112,19 +112,12 @@ export function OverdueDebtsTable({ rows }: { rows: OverdueDebtRow[] }) {
         case "overdueEur":
           cmp = a.overdueEur - b.overdueEur;
           break;
+        case "codDebtEur":
+          cmp = a.codDebtEur - b.codDebtEur;
+          break;
         case "oldestOverdueDays":
           cmp = a.oldestOverdueDays - b.oldestOverdueDays;
           break;
-        case "individualTermDays": {
-          // null сортується останнім (незалежно від напрямку).
-          const av = a.individualTermDays;
-          const bv = b.individualTermDays;
-          if (av == null && bv == null) cmp = 0;
-          else if (av == null) return 1;
-          else if (bv == null) return -1;
-          else cmp = av - bv;
-          break;
-        }
         case "activity":
           cmp = a.activity.localeCompare(b.activity, "uk");
           break;
@@ -231,16 +224,16 @@ export function OverdueDebtsTable({ rows }: { rows: OverdueDebtRow[] }) {
                 onSort={toggleSort}
               />
               <SortHeader
-                label="Днів"
-                col="oldestOverdueDays"
+                label="Борг по наложці €"
+                col="codDebtEur"
                 align="right"
                 sortKey={sortKey}
                 sortDir={sortDir}
                 onSort={toggleSort}
               />
               <SortHeader
-                label="Відстрочка, дн."
-                col="individualTermDays"
+                label="Днів"
+                col="oldestOverdueDays"
                 align="right"
                 sortKey={sortKey}
                 sortDir={sortDir}
@@ -335,10 +328,10 @@ function FragmentRow({
           )}
         </td>
         <td className="px-3 py-2 text-right tabular-nums">
-          {r.oldestOverdueDays > 0 ? r.oldestOverdueDays : ""}
+          {r.codDebtEur > 0 ? eur(r.codDebtEur) : "—"}
         </td>
         <td className="px-3 py-2 text-right tabular-nums">
-          {r.individualTermDays != null ? r.individualTermDays : "—"}
+          {r.oldestOverdueDays > 0 ? r.oldestOverdueDays : ""}
         </td>
         <td className="px-3 py-2">
           {r.activity && (
@@ -360,6 +353,7 @@ function FragmentRow({
                     <th className="px-2 py-1.5 text-right">
                       Борг по накладній €
                     </th>
+                    <th className="px-2 py-1.5 text-right">Відстрочка (дн.)</th>
                     <th className="px-2 py-1.5 text-right">Днів</th>
                     <th className="px-2 py-1.5 text-right">Прострочено днів</th>
                   </tr>
@@ -368,19 +362,32 @@ function FragmentRow({
                   {openDocs.map((d, i) => (
                     <tr
                       key={`${d.recorderHex ?? "x"}-${i}`}
-                      className={d.daysOverdue > 0 ? "bg-red-50" : ""}
+                      className={
+                        d.isCod
+                          ? "bg-amber-50"
+                          : d.daysOverdue > 0
+                            ? "bg-red-50"
+                            : ""
+                      }
                     >
                       <td className="px-2 py-1.5">
-                        {d.saleId ? (
-                          <Link
-                            href={`/manager/sales/${d.saleId}`}
-                            className="text-emerald-700 hover:underline"
-                          >
-                            {d.label}
-                          </Link>
-                        ) : (
-                          <span className="text-gray-600">{d.label}</span>
-                        )}
+                        <span className="inline-flex items-center gap-1.5">
+                          {d.saleId ? (
+                            <Link
+                              href={`/manager/sales/${d.saleId}`}
+                              className="text-emerald-700 hover:underline"
+                            >
+                              {d.label}
+                            </Link>
+                          ) : (
+                            <span className="text-gray-600">{d.label}</span>
+                          )}
+                          {d.isCod && (
+                            <span className="rounded bg-amber-200 px-1 py-0.5 text-[10px] font-medium uppercase text-amber-800">
+                              наложка
+                            </span>
+                          )}
+                        </span>
                       </td>
                       <td className="px-2 py-1.5">{fmtDate(d.date)}</td>
                       <td className="px-2 py-1.5 text-right tabular-nums">
@@ -388,6 +395,13 @@ function FragmentRow({
                       </td>
                       <td className="px-2 py-1.5 text-right tabular-nums">
                         {eur(d.remaining)}
+                      </td>
+                      <td className="px-2 py-1.5 text-right tabular-nums text-gray-600">
+                        {d.isCod
+                          ? "—"
+                          : d.docTermDays == null
+                            ? `${d.effectiveTermDays} (дефолт)`
+                            : d.effectiveTermDays}
                       </td>
                       <td className="px-2 py-1.5 text-right tabular-nums">
                         {d.days}
@@ -397,7 +411,11 @@ function FragmentRow({
                           d.daysOverdue > 0 ? "font-medium text-red-700" : ""
                         }`}
                       >
-                        {d.daysOverdue > 0 ? d.daysOverdue : "—"}
+                        {d.isCod
+                          ? "—"
+                          : d.daysOverdue > 0
+                            ? d.daysOverdue
+                            : "—"}
                       </td>
                     </tr>
                   ))}
