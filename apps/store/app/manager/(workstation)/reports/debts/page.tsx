@@ -4,6 +4,7 @@ import { requireRole } from "@/lib/auth/manager-auth";
 import { buildOverdueDebtsReport } from "@/lib/reports/overdue-debts";
 import { EmptyState } from "../../_components/empty-state";
 import { ReportsNav } from "../_components/reports-nav";
+import { OverdueDebtsTable } from "./_components/overdue-debts-table";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Прострочені борги | L-TEX" };
@@ -108,57 +109,10 @@ export default async function Page({
       {report.rows.length === 0 ? (
         <EmptyState
           message="Боржників немає"
-          hint="Жоден контрагент не має боргу > 0."
+          hint="Жоден покупець не має боргу > 0."
         />
       ) : (
-        <div className="overflow-x-auto rounded-md border bg-white">
-          <table className="w-full text-sm">
-            <thead className="bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
-              <tr>
-                <th className="px-3 py-2">Контрагент</th>
-                <th className="px-3 py-2 text-right">Борг €</th>
-                <th className="px-3 py-2 text-right">Прострочений борг €</th>
-                <th className="px-3 py-2 text-right">Днів</th>
-                <th className="px-3 py-2">Діяльність</th>
-                <th className="px-3 py-2">Торговий агент</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {report.rows.map((r) => (
-                <tr
-                  key={r.clientId}
-                  className={r.isOverdue ? "bg-red-50" : "hover:bg-gray-50"}
-                >
-                  <td className="px-3 py-2">
-                    <Link
-                      href={`/manager/customers/${r.clientId}`}
-                      className="text-emerald-700 hover:underline"
-                    >
-                      {r.name}
-                    </Link>
-                  </td>
-                  <td className="px-3 py-2 text-right tabular-nums">
-                    {eur(r.debtEur)}
-                  </td>
-                  <td className="px-3 py-2 text-right tabular-nums">
-                    {eur(r.overdueEur)}
-                  </td>
-                  <td className="px-3 py-2 text-right tabular-nums">
-                    {r.daysSinceLastPurchase ?? ""}
-                  </td>
-                  <td className="px-3 py-2">
-                    {r.isOverdue && (
-                      <span className="font-medium text-red-700">
-                        Претензійна робота!
-                      </span>
-                    )}
-                  </td>
-                  <td className="px-3 py-2">{r.agentName ?? ""}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <OverdueDebtsTable rows={report.rows} />
       )}
     </div>
   );
