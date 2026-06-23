@@ -93,9 +93,46 @@ export function SalesTable({ items }: { items: SalesRowData[] }) {
       label: "Оновити",
       onSelect: () => router.refresh(),
     });
-    // нові пункти додаються тут (Провести / Видалити тощо)
+    // Видалення документа реалізації (ownership перевіряє сервер).
+    const saleId = ctx.href.split("/").pop();
+    if (saleId) {
+      items.push({ type: "separator" });
+      items.push({
+        type: "action",
+        danger: true,
+        label: "Видалити",
+        onSelect: () => {
+          void deleteSale(saleId);
+        },
+      });
+    }
     return items;
   };
+
+  async function deleteSale(saleId: string) {
+    if (
+      !window.confirm(
+        "Видалити цю реалізацію? Дію не можна скасувати. Якщо документ проведено, борг клієнта буде перераховано.",
+      )
+    ) {
+      return;
+    }
+    try {
+      const res = await fetch(`/api/v1/manager/sales/${saleId}`, {
+        method: "DELETE",
+      });
+      if (res.ok) {
+        router.refresh();
+      } else {
+        const data = (await res.json().catch(() => null)) as {
+          error?: string;
+        } | null;
+        window.alert(data?.error ?? "Не вдалося видалити реалізацію");
+      }
+    } catch {
+      window.alert("Помилка мережі під час видалення");
+    }
+  }
 
   const { rowHandlers, menu } = useListContextMenu(buildItems);
 

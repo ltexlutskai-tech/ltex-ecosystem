@@ -10,7 +10,14 @@ import { createPortal } from "react-dom";
  * Архітектура розширювана: нові пункти описуються конфігом у `buildItems`.
  */
 export type ContextMenuItem =
-  | { type: "action"; label: string; onSelect: () => void; disabled?: boolean }
+  | {
+      type: "action";
+      label: string;
+      onSelect: () => void;
+      disabled?: boolean;
+      /** Деструктивна дія (напр. «Видалити») — червоний стиль. */
+      danger?: boolean;
+    }
   | { type: "separator" };
 
 interface Props {
@@ -123,7 +130,9 @@ export function ListContextMenu({
             className={`block w-full px-3 py-2 text-left ${
               item.disabled
                 ? "cursor-default text-gray-300"
-                : "text-gray-700 hover:bg-gray-100"
+                : item.danger
+                  ? "text-red-600 hover:bg-red-50"
+                  : "text-gray-700 hover:bg-gray-100"
             }`}
           >
             {item.label}

@@ -8,6 +8,10 @@ import {
 } from "@/lib/manager/sale-status";
 import { updateSaleSchema } from "@/lib/validations/manager-sale";
 import { updateSaleWithItems } from "@/lib/manager/sale-create";
+import {
+  recomputeDebtForClients,
+  resolveClientIdByCustomer,
+} from "@/lib/manager/debt-register";
 
 export async function GET(
   req: NextRequest,
@@ -205,6 +209,90 @@ export async function PATCH(
     });
     return NextResponse.json(
       { error: "Помилка оновлення реалізації" },
+      { status: 500 },
+    );
+  }
+}
+
+/**
+ * Видалення документа реалізації (з контекстного меню списку).
+ *
+ * Ownership — як у GET/PATCH (`canViewSale`): менеджер видаляє лише свої, admin —
+ * будь-яку. Працює і для проведених (`posted`) документів, бо саме на них «висить»
+ * борг, який треба прибрати.
+ *
+ * Реверс сліду документа в одній транзакції:
+ *   - рух боргу проведеної реалізації (`sourceType="sale"`, `sourceId=saleId`)
+ *     видаляється → далі `MgrClient.debt` перераховується;
+ *   - `SaleItem` видаляються каскадом (`onDelete: Cascade`);
+ *   - `MgrCashOrder.saleId` обнуляється автоматично (`onDelete: SetNull`) — оплати
+ *     зберігаються, лише відв'язуються від видаленої реалізації.
+ */
+export async function DELETE(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  const user = await getCurrentUser(req);
+  if (!user) {
+    return NextResponse.json({ error: "Не авторизовано" }, { status: 401 });
+  }
+
+  const { id } = await params;
+
+  const ok = await canViewSale(user, id);
+  if (!ok) {
+    return NextResponse.json(
+      { error: "Реалізацію не знайдено" },
+      { status: 404 },
+    );
+  }
+
+  const existing = await prisma.sale.findUnique({
+    where: { id },
+    select: { id: true, customerId: true },
+  });
+  if (!existing) {
+    return NextResponse.json(
+      { error: "Реалізацію не знайдено" },
+      { status: 404 },
+    );
+  }
+
+  try {
+    // Клієнти, чий борг треба перерахувати після видалення рухів реалізації.
+    const debtMovements = await prisma.mgrDebtMovement.findMany({
+      where: { sourceType: "sale", sourceId: id },
+      select: { clientId: true },
+    });
+    const affectedClientIds = new Set(debtMovements.map((m) => m.clientId));
+
+    await prisma.$transaction(async (tx) => {
+      await tx.mgrDebtMovement.deleteMany({
+        where: { sourceType: "sale", sourceId: id },
+      });
+      await tx.sale.delete({ where: { id } });
+    });
+
+    // Резерв: якщо рухів не було (чернетка), все одно перерахуємо клієнта-власника.
+    if (affectedClientIds.size === 0) {
+      const clientId = await resolveClientIdByCustomer(
+        prisma,
+        existing.customerId,
+      );
+      if (clientId) affectedClientIds.add(clientId);
+    }
+    if (affectedClientIds.size > 0) {
+      await recomputeDebtForClients(prisma, [...affectedClientIds]);
+    }
+
+    return NextResponse.json({ ok: true });
+  } catch (err) {
+    console.error("[L-TEX] Sale delete failed", {
+      saleId: id,
+      error: err instanceof Error ? err.message : String(err),
+    });
+    return NextResponse.json(
+      { error: "Помилка видалення реалізації" },
       { status: 500 },
     );
   }
