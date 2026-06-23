@@ -2,7 +2,9 @@ import { describe, it, expect } from "vitest";
 import {
   computeOverdue,
   computeOverdueEur,
+  applyDocTerms,
   type DebtMovementLite,
+  type OpenDocLite,
 } from "./overdue-debts";
 
 const NOW = new Date("2026-06-16T12:00:00Z");
@@ -142,5 +144,80 @@ describe("computeOverdue — carry-forward кредиту (виправленн�
     expect(res.oldestOpenDays).toBe(50);
     // лише старий (50 днів) прострочений; 10-денний — ні.
     expect(res.overdueEur).toBe(100);
+  });
+});
+
+describe("applyDocTerms — per-document відстрочка + наложка", () => {
+  function doc(o: Partial<OpenDocLite>): OpenDocLite {
+    return {
+      days: 30,
+      remaining: 100,
+      isCod: false,
+      docTermDays: null,
+      ...o,
+    };
+  }
+
+  it("наложка виключена з прострочки → іде у codDebtEur, не у overdue", () => {
+    const res = applyDocTerms(
+      [doc({ days: 90, remaining: 200, isCod: true })],
+      14,
+    );
+    expect(res.overdueEur).toBe(0);
+    expect(res.codDebtEur).toBe(200);
+    expect(res.oldestOverdueDays).toBe(0);
+    expect(res.perDoc[0]?.daysOverdue).toBe(0);
+  });
+
+  it("не-наложка без власного терміну → глобальний дефолт", () => {
+    // 30 днів, дефолт 14 → прострочено 16.
+    const res = applyDocTerms([doc({ days: 30, docTermDays: null })], 14);
+    expect(res.overdueEur).toBe(100);
+    expect(res.perDoc[0]?.effectiveTermDays).toBe(14);
+    expect(res.perDoc[0]?.daysOverdue).toBe(16);
+  });
+
+  it("власний термін документа міняє прострочку", () => {
+    // 30-денний документ: term=14 → прострочено; term=45 → ще ні.
+    const overdue = applyDocTerms([doc({ days: 30, docTermDays: 14 })], 14);
+    expect(overdue.overdueEur).toBe(100);
+    expect(overdue.perDoc[0]?.daysOverdue).toBe(16);
+
+    const notYet = applyDocTerms([doc({ days: 30, docTermDays: 45 })], 14);
+    expect(notYet.overdueEur).toBe(0);
+    expect(notYet.perDoc[0]?.effectiveTermDays).toBe(45);
+    expect(notYet.perDoc[0]?.daysOverdue).toBe(0);
+  });
+
+  it("власний термін перекриває глобальний дефолт (90-денний документ, term=120)", () => {
+    const res = applyDocTerms([doc({ days: 90, docTermDays: 120 })], 14);
+    expect(res.overdueEur).toBe(0);
+  });
+
+  it("мікс: наложка + прострочена + свіжа", () => {
+    const res = applyDocTerms(
+      [
+        doc({ days: 90, remaining: 300, isCod: true }), // наложка
+        doc({ days: 40, remaining: 100, docTermDays: null }), // прострочена
+        doc({ days: 5, remaining: 50, docTermDays: null }), // свіжа
+      ],
+      14,
+    );
+    expect(res.codDebtEur).toBe(300);
+    expect(res.overdueEur).toBe(100);
+    expect(res.oldestOverdueDays).toBe(26); // 40 − 14
+  });
+
+  it("ГАРАНТІЯ: overdueEur ≤ Σ залишків не-наложкових документів", () => {
+    const docs: OpenDocLite[] = [
+      doc({ days: 90, remaining: 200, isCod: true }),
+      doc({ days: 40, remaining: 100 }),
+      doc({ days: 50, remaining: 80, docTermDays: 60 }),
+    ];
+    const res = applyDocTerms(docs, 14);
+    const nonCodSum = docs
+      .filter((d) => !d.isCod)
+      .reduce((s, d) => s + d.remaining, 0);
+    expect(res.overdueEur).toBeLessThanOrEqual(nonCodSum + 0.001);
   });
 });
