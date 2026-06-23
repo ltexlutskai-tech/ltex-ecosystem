@@ -22,6 +22,7 @@ type SortKey =
   | "debtEur"
   | "overdueEur"
   | "oldestOverdueDays"
+  | "individualTermDays"
   | "activity"
   | "agentName";
 type SortDir = "asc" | "desc";
@@ -114,6 +115,16 @@ export function OverdueDebtsTable({ rows }: { rows: OverdueDebtRow[] }) {
         case "oldestOverdueDays":
           cmp = a.oldestOverdueDays - b.oldestOverdueDays;
           break;
+        case "individualTermDays": {
+          // null сортується останнім (незалежно від напрямку).
+          const av = a.individualTermDays;
+          const bv = b.individualTermDays;
+          if (av == null && bv == null) cmp = 0;
+          else if (av == null) return 1;
+          else if (bv == null) return -1;
+          else cmp = av - bv;
+          break;
+        }
         case "activity":
           cmp = a.activity.localeCompare(b.activity, "uk");
           break;
@@ -228,6 +239,14 @@ export function OverdueDebtsTable({ rows }: { rows: OverdueDebtRow[] }) {
                 onSort={toggleSort}
               />
               <SortHeader
+                label="Відстрочка, дн."
+                col="individualTermDays"
+                align="right"
+                sortKey={sortKey}
+                sortDir={sortDir}
+                onSort={toggleSort}
+              />
+              <SortHeader
                 label="Діяльність"
                 col="activity"
                 sortKey={sortKey}
@@ -259,7 +278,7 @@ export function OverdueDebtsTable({ rows }: { rows: OverdueDebtRow[] }) {
             })}
             {sorted.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-3 py-6 text-center text-gray-400">
+                <td colSpan={7} className="px-3 py-6 text-center text-gray-400">
                   Нічого не знайдено за фільтрами.
                 </td>
               </tr>
@@ -318,6 +337,9 @@ function FragmentRow({
         <td className="px-3 py-2 text-right tabular-nums">
           {r.oldestOverdueDays > 0 ? r.oldestOverdueDays : ""}
         </td>
+        <td className="px-3 py-2 text-right tabular-nums">
+          {r.individualTermDays != null ? r.individualTermDays : "—"}
+        </td>
         <td className="px-3 py-2">
           {r.activity && (
             <span className="font-medium text-red-700">{r.activity}</span>
@@ -327,7 +349,7 @@ function FragmentRow({
       </tr>
       {isOpen && openDocs.length > 0 && (
         <tr>
-          <td colSpan={6} className="bg-gray-50 px-3 py-3">
+          <td colSpan={7} className="bg-gray-50 px-3 py-3">
             <div className="overflow-x-auto rounded-md border bg-white">
               <table className="w-full text-xs">
                 <thead className="bg-gray-100 text-left uppercase tracking-wide text-gray-500">
