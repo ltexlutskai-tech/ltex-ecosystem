@@ -179,6 +179,10 @@ export interface OverdueDebtRow {
   overdueEur: number;
   /** Макс. днів прострочки серед прострочених документів (0, якщо немає). */
   oldestOverdueDays: number;
+  /** Індивідуальна відстрочка клієнта (наше поле); null = за замовчуванням. */
+  individualTermDays: number | null;
+  /** Застосований термін (individualTermDays ?? thresholdDays). */
+  effectiveTermDays: number;
   isOverdue: boolean;
   /** "" | "Організувати проплату!" | "Претензійна робота!" */
   activity: string;
@@ -223,6 +227,7 @@ export async function buildOverdueDebtsReport(
       id: true,
       name: true,
       debt: true,
+      debtTermDays: true,
       agent: { select: { fullName: true } },
     },
   });
@@ -300,7 +305,10 @@ export async function buildOverdueDebtsReport(
   const now = new Date();
   const rows: OverdueDebtRow[] = debtorClients.map((c) => {
     const movs = byClient.get(c.id) ?? [];
-    const computation = computeOverdue(movs, thresholdDays, now);
+    // Ефективний термін: індивідуальна відстрочка клієнта (наше поле), або
+    // глобальний дефолт зі звіту, якщо індивідуальна не задана.
+    const termDays = c.debtTermDays ?? thresholdDays;
+    const computation = computeOverdue(movs, termDays, now);
 
     const docs: OverdueDoc[] = computation.open.map((entry) => {
       const sale = entry.recorderHex
@@ -340,6 +348,8 @@ export async function buildOverdueDebtsReport(
       debtEur: round2(Number(c.debt)),
       overdueEur: computation.overdueEur,
       oldestOverdueDays,
+      individualTermDays: c.debtTermDays,
+      effectiveTermDays: termDays,
       isOverdue,
       activity: activityLabel(isOverdue, oldestOverdueDays),
       docs,

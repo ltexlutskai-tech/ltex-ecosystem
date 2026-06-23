@@ -118,6 +118,7 @@ export interface ClientDetail {
   geolocation: string | null;
   websiteUrl: string | null;
   monthlyVolume: string | null;
+  debtTermDays: number | null;
   licenseExpiresAt: string | null;
   isOwn: boolean;
   email: string | null;

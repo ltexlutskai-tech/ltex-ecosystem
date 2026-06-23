@@ -73,7 +73,9 @@ export default async function Page({
         className="flex flex-wrap items-end gap-3 rounded-md border bg-white p-3"
       >
         <label className="flex flex-col gap-1 text-sm">
-          <span className="text-gray-600">Поріг прострочки, днів</span>
+          <span className="text-gray-600">
+            Відстрочка за замовчуванням, днів
+          </span>
           <input
             name="threshold"
             type="number"
@@ -82,6 +84,9 @@ export default async function Page({
             defaultValue={threshold}
             className="w-32 rounded-md border border-gray-300 px-2 py-1.5 text-sm"
           />
+          <span className="text-xs text-gray-400">
+            застосовується до клієнтів без індивідуальної відстрочки
+          </span>
         </label>
         <button
           type="submit"
