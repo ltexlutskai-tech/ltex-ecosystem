@@ -64,6 +64,13 @@ describe("computeOverdueEur", () => {
     expect(computeOverdueEur([mv(15, 100)], 14, NOW)).toBe(100);
     expect(computeOverdueEur([mv(14, 100)], 14, NOW)).toBe(0);
   });
+
+  it("індивідуальна відстрочка клієнта міняє межу прострочки", () => {
+    // 25-денний борг: при глобальному терміні 14 — прострочений,
+    // при індивідуальній відстрочці 30 — ще ні.
+    expect(computeOverdueEur([mv(25, 100)], 14, NOW)).toBe(100);
+    expect(computeOverdueEur([mv(25, 100)], 30, NOW)).toBe(0);
+  });
 });
 
 describe("computeOverdue — carry-forward кредиту (виправлення бага)", () => {

@@ -1491,6 +1491,7 @@ model MgrClient {
   geolocation      String?
   websiteUrl       String?   @map("website_url")
   monthlyVolume    Decimal?  @map("monthly_volume") @db.Decimal(10, 2)
+  debtTermDays     Int?      @map("debt_term_days")
   licenseExpiresAt DateTime? @map("license_expires_at")
   isOwn            Boolean   @default(false) @map("is_own")
   notDirectInput   Boolean   @default(false) @map("not_direct_input")

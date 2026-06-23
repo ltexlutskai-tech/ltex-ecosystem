@@ -24,6 +24,7 @@ export interface EditableClientFields {
   workingHours: string | null;
   parentCode1C: string | null;
   monthlyVolume: number | null;
+  debtTermDays: number | null;
   licenseExpiresAt: string | null;
   hasNewMessage: boolean;
   isViberLinked: boolean;
@@ -68,6 +69,7 @@ export function extractEditableFields(
       client.monthlyVolume == null || client.monthlyVolume === ""
         ? null
         : Number(client.monthlyVolume),
+    debtTermDays: client.debtTermDays,
     licenseExpiresAt: client.licenseExpiresAt,
     hasNewMessage: client.hasNewMessage,
     isViberLinked: client.isViberLinked,
