@@ -168,8 +168,8 @@ export async function reportDebts(thresholdDays = 14): Promise<ReportShape> {
       r.name,
       round2(r.debtEur),
       round2(r.overdueEur),
-      r.daysSinceLastPurchase ?? "",
-      r.isOverdue ? "Претензійна робота!" : "",
+      r.oldestOverdueDays,
+      r.activity,
       r.agentName ?? "",
     ]),
   };
