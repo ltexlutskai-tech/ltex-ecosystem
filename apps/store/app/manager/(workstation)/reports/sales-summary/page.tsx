@@ -7,8 +7,8 @@ import {
 } from "@/lib/reports/sales-flex";
 import { ReportsNav } from "../_components/reports-nav";
 import { ReportExportButtons } from "../_components/report-export-buttons";
-import { SalesFlexConfig } from "./_components/sales-flex-config";
-import { SalesFlexTree } from "./_components/sales-flex-tree";
+import { FlexConfig } from "../_components/flex-config";
+import { FlexTree } from "../_components/flex-tree";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Звіт: Підсумок продажів | L-TEX" };
@@ -67,7 +67,7 @@ export default async function SalesSummaryPage({
         />
       </div>
 
-      <SalesFlexConfig
+      <FlexConfig
         dimensions={dimensions}
         indicators={indicators}
         initial={{
@@ -86,7 +86,7 @@ export default async function SalesSummaryPage({
           без періоду. Оберіть період «з / по» та натисніть «Сформувати».
         </div>
       ) : (
-        <SalesFlexTree
+        <FlexTree
           tree={result.tree}
           indicators={result.indicatorDefs}
           grand={result.grand}
