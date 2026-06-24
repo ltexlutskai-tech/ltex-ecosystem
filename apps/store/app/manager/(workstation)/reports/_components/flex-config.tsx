@@ -4,25 +4,28 @@ import { useState } from "react";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { Button, Input } from "@ltex/ui";
 
-/** Опис виміру/показника для UI (label з реєстру sales-flex). */
+/** Опис виміру/показника для UI (label з реєстру конкретного звіту). */
 export interface OptionDef {
   key: string;
   label: string;
 }
 
 /**
- * Панель налаштувань гнучкого звіту «Продажі» (аналог 1С «Настройки»).
- * Стан → URL-параметри (GET) при «Сформувати».
+ * Панель налаштувань гнучкого звіту (аналог 1С «Настройки»). Report-agnostic:
+ * список вимірів і показників передається через props, тож той самий компонент
+ * обслуговує і «Підсумок продажів», і «Маржа / Валовий прибуток».
  *
+ * Стан → URL-параметри (GET) при «Сформувати»:
  *   groups — упорядкований CSV вимірів (рівні дерева)
  *   ind    — CSV показників
  *   f_<dim>— текстовий відбір (contains) по виміру
  *   totals — 1/0 загальні підсумки
  */
-export function SalesFlexConfig({
+export function FlexConfig({
   dimensions,
   indicators,
   initial,
+  commonFilters = ["region", "agent", "client", "product"],
 }: {
   dimensions: OptionDef[];
   indicators: OptionDef[];
@@ -34,6 +37,8 @@ export function SalesFlexConfig({
     totals: boolean;
     filters: Record<string, string>;
   };
+  /** Виміри-кандидати для блоку «Відбори» додатково до обраних груп. */
+  commonFilters?: string[];
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -50,13 +55,14 @@ export function SalesFlexConfig({
   const [addKey, setAddKey] = useState("");
 
   const dimLabel = new Map(dimensions.map((d) => [d.key, d.label]));
+  const dimKeys = new Set(dimensions.map((d) => d.key));
   const available = dimensions.filter((d) => !groups.includes(d.key));
 
-  // Виміри для блоку «Відбори»: усі обрані групи + кілька поширених.
-  const COMMON_FILTERS = ["region", "agent", "client", "product"];
+  // Виміри для блоку «Відбори»: усі обрані групи + кілька поширених
+  // (лише ті, що справді існують у цьому звіті).
   const filterKeys = [
     ...groups,
-    ...COMMON_FILTERS.filter((k) => !groups.includes(k)),
+    ...commonFilters.filter((k) => dimKeys.has(k) && !groups.includes(k)),
   ];
 
   function moveGroup(i: number, dir: -1 | 1) {

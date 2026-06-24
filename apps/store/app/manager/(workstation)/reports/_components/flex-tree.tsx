@@ -3,21 +3,43 @@
 import { useState } from "react";
 import type { TreeNode } from "@/lib/reports/sales-flex";
 
+/**
+ * Колонка-показник для гнучкого дерева звітів (спільна для всіх flex-звітів).
+ *
+ * - `money` / `qty` / `weight` — підсумовуються деревом (значення з `node.values`).
+ * - `percent` (з `derive`) — ОБЧИСЛЮЄТЬСЯ з агрегованих значень вузла, а не
+ *   сумується (напр. «Маржа %» = валовий / виручка × 100). Рендериться як
+ *   `XX.XX %`, або «—» коли `derive` повертає null.
+ */
 export interface IndicatorCol {
   key: string;
   label: string;
-  kind: "money" | "qty" | "weight";
+  kind: "money" | "qty" | "weight" | "percent";
+  /**
+   * Для `kind:"percent"` (або будь-якої похідної колонки) — обчислює значення
+   * з агрегованих `values` вузла. Повертає null → рендериться «—».
+   */
+  derive?: (values: Record<string, number>) => number | null;
 }
 
 /** Форматування значення показника за типом. */
-function fmt(kind: IndicatorCol["kind"], n: number): string {
-  if (kind === "money") {
+function fmt(col: IndicatorCol, values: Record<string, number>): string {
+  if (col.kind === "percent" || col.derive) {
+    const v = col.derive ? col.derive(values) : (values[col.key] ?? null);
+    if (v == null) return "—";
+    return `${v.toLocaleString("uk-UA", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    })} %`;
+  }
+  const n = values[col.key] ?? 0;
+  if (col.kind === "money") {
     return `${n.toLocaleString("uk-UA", {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     })} €`;
   }
-  if (kind === "weight") {
+  if (col.kind === "weight") {
     return `${n.toLocaleString("uk-UA", {
       minimumFractionDigits: 3,
       maximumFractionDigits: 3,
@@ -26,11 +48,26 @@ function fmt(kind: IndicatorCol["kind"], n: number): string {
   return n.toLocaleString("uk-UA", { maximumFractionDigits: 3 });
 }
 
+/** Чи показувати значення червоним (від'ємне). Для percent — за derive-результатом. */
+function isNegative(
+  col: IndicatorCol,
+  values: Record<string, number>,
+): boolean {
+  if (col.kind === "percent" || col.derive) {
+    const v = col.derive ? col.derive(values) : (values[col.key] ?? null);
+    return v != null && v < 0;
+  }
+  return (values[col.key] ?? 0) < 0;
+}
+
 /**
  * Дерево підсумків з розгортанням/згортанням вузлів. Верхній рівень
  * розгорнутий за замовчуванням; нижчі — згорнуті (клік по chevron).
+ *
+ * Report-agnostic: набір колонок передається через `indicators`. Похідні
+ * (percent) колонки обчислюються per-node, не сумуються.
  */
-export function SalesFlexTree({
+export function FlexTree({
   tree,
   indicators,
   grand,
@@ -83,19 +120,16 @@ export function SalesFlexTree({
             <span className="truncate">{node.label}</span>
           </span>
         </td>
-        {indicators.map((col) => {
-          const v = node.values[col.key] ?? 0;
-          return (
-            <td
-              key={col.key}
-              className={`whitespace-nowrap px-3 py-1.5 text-right text-sm tabular-nums ${
-                v < 0 ? "text-red-600" : "text-gray-800"
-              }`}
-            >
-              {fmt(col.kind, v)}
-            </td>
-          );
-        })}
+        {indicators.map((col) => (
+          <td
+            key={col.key}
+            className={`whitespace-nowrap px-3 py-1.5 text-right text-sm tabular-nums ${
+              isNegative(col, node.values) ? "text-red-600" : "text-gray-800"
+            }`}
+          >
+            {fmt(col, node.values)}
+          </td>
+        ))}
       </tr>,
     );
     if (hasChildren && isOpen) {
@@ -139,19 +173,16 @@ export function SalesFlexTree({
           {showTotals && rows.length > 0 && (
             <tr className="border-t-2 border-gray-300 bg-emerald-50 font-semibold">
               <td className="px-3 py-2 text-sm text-gray-900">Разом</td>
-              {indicators.map((col) => {
-                const v = grand[col.key] ?? 0;
-                return (
-                  <td
-                    key={col.key}
-                    className={`whitespace-nowrap px-3 py-2 text-right text-sm tabular-nums ${
-                      v < 0 ? "text-red-600" : "text-gray-900"
-                    }`}
-                  >
-                    {fmt(col.kind, v)}
-                  </td>
-                );
-              })}
+              {indicators.map((col) => (
+                <td
+                  key={col.key}
+                  className={`whitespace-nowrap px-3 py-2 text-right text-sm tabular-nums ${
+                    isNegative(col, grand) ? "text-red-600" : "text-gray-900"
+                  }`}
+                >
+                  {fmt(col, grand)}
+                </td>
+              ))}
             </tr>
           )}
         </tbody>
