@@ -12,10 +12,9 @@ import {
   type ReportShape,
 } from "@/lib/reports/analyst-reports";
 import {
-  reportMargin,
-  MARGIN_GROUPS,
-  type MarginGroupBy,
-} from "@/lib/reports/margin-report";
+  buildMarginFlexReport,
+  flattenMarginToReportShape,
+} from "@/lib/reports/margin-flex";
 import {
   buildSalesSummaryReport,
   buildCashFlowReport,
@@ -59,11 +58,20 @@ export async function resolveReport(
     case "debts":
       return reportDebts(parseThreshold(params.get("threshold")));
     case "margin": {
-      const raw = params.get("group") ?? "product";
-      const group: MarginGroupBy = MARGIN_GROUPS.includes(raw as MarginGroupBy)
-        ? (raw as MarginGroupBy)
-        : "product";
-      return reportMargin(group, parsePeriod(params.get("period")));
+      const result = await buildMarginFlexReport(params);
+      if (result.tooLarge) {
+        return {
+          title: "Маржа / Валовий прибуток",
+          period: {
+            from: new Date(),
+            to: new Date(),
+            label: "За обраний період",
+          },
+          headers: ["Групування"],
+          rows: [["Оберіть період — забагато даних для експорту."]],
+        };
+      }
+      return flattenMarginToReportShape(result);
     }
     case "sales-summary":
       return buildSalesSummaryReport(params);
