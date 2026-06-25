@@ -2,7 +2,6 @@ import { notFound } from "next/navigation";
 import { requireRole } from "@/lib/auth/manager-auth";
 import {
   buildMarginFlexReport,
-  deriveMarginPct,
   MARGIN_DIMENSIONS,
   MARGIN_INDICATORS,
 } from "@/lib/reports/margin-flex";
@@ -65,6 +64,8 @@ export default async function Page({
   }));
 
   // Колонки дерева: похідна «Маржа %» рахується з агрегатів вузла (НЕ сума).
+  // Передаємо серіалізовані ключі num/den (НЕ функцію — інакше Server→Client
+  // серіалізація падає «Functions cannot be passed to Client Components»).
   const treeIndicators: IndicatorCol[] = (result?.indicatorDefs ?? []).map(
     (d) =>
       d.kind === "percent"
@@ -72,7 +73,7 @@ export default async function Page({
             key: d.key,
             label: d.label,
             kind: "percent",
-            derive: deriveMarginPct,
+            percent: { num: "grossEur", den: "revenueEur" },
           }
         : { key: d.key, label: d.label, kind: "money" },
   );

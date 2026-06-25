@@ -7,25 +7,38 @@ import type { TreeNode } from "@/lib/reports/sales-flex";
  * Колонка-показник для гнучкого дерева звітів (спільна для всіх flex-звітів).
  *
  * - `money` / `qty` / `weight` — підсумовуються деревом (значення з `node.values`).
- * - `percent` (з `derive`) — ОБЧИСЛЮЄТЬСЯ з агрегованих значень вузла, а не
- *   сумується (напр. «Маржа %» = валовий / виручка × 100). Рендериться як
- *   `XX.XX %`, або «—» коли `derive` повертає null.
+ * - `percent` — ОБЧИСЛЮЄТЬСЯ з агрегованих значень вузла (num/den × 100), а не
+ *   сумується (напр. «Маржа %» = grossEur / revenueEur × 100). Рендериться як
+ *   `XX.XX %`, або «—» коли знаменник 0. `percent` — серіалізовані ключі
+ *   (не функція), бо колонки передаються із Server- у Client-компонент.
  */
 export interface IndicatorCol {
   key: string;
   label: string;
   kind: "money" | "qty" | "weight" | "percent";
   /**
-   * Для `kind:"percent"` (або будь-якої похідної колонки) — обчислює значення
-   * з агрегованих `values` вузла. Повертає null → рендериться «—».
+   * Для `kind:"percent"` — ключі чисельника/знаменника у `node.values`;
+   * значення = num / den × 100 (null коли den = 0).
    */
-  derive?: (values: Record<string, number>) => number | null;
+  percent?: { num: string; den: string };
+}
+
+/** Значення відсоткової колонки з агрегатів вузла (null коли знаменник 0). */
+function percentValue(
+  col: IndicatorCol,
+  values: Record<string, number>,
+): number | null {
+  if (!col.percent) return values[col.key] ?? null;
+  const den = values[col.percent.den] ?? 0;
+  if (den === 0) return null;
+  const num = values[col.percent.num] ?? 0;
+  return Math.round((num / den) * 100 * 100) / 100;
 }
 
 /** Форматування значення показника за типом. */
 function fmt(col: IndicatorCol, values: Record<string, number>): string {
-  if (col.kind === "percent" || col.derive) {
-    const v = col.derive ? col.derive(values) : (values[col.key] ?? null);
+  if (col.kind === "percent") {
+    const v = percentValue(col, values);
     if (v == null) return "—";
     return `${v.toLocaleString("uk-UA", {
       minimumFractionDigits: 2,
@@ -48,13 +61,13 @@ function fmt(col: IndicatorCol, values: Record<string, number>): string {
   return n.toLocaleString("uk-UA", { maximumFractionDigits: 3 });
 }
 
-/** Чи показувати значення червоним (від'ємне). Для percent — за derive-результатом. */
+/** Чи показувати значення червоним (від'ємне). Для percent — за обчисленим значенням. */
 function isNegative(
   col: IndicatorCol,
   values: Record<string, number>,
 ): boolean {
-  if (col.kind === "percent" || col.derive) {
-    const v = col.derive ? col.derive(values) : (values[col.key] ?? null);
+  if (col.kind === "percent") {
+    const v = percentValue(col, values);
     return v != null && v < 0;
   }
   return (values[col.key] ?? 0) < 0;
