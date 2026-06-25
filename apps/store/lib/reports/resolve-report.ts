@@ -16,8 +16,11 @@ import {
   flattenMarginToReportShape,
 } from "@/lib/reports/margin-flex";
 import {
+  buildCashflowFlexReport,
+  flattenToReportShape as flattenCashflowToReportShape,
+} from "@/lib/reports/cashflow-flex";
+import {
   buildSalesSummaryReport,
-  buildCashFlowReport,
   buildStockBalanceReport,
   buildReconciliationReportShape,
 } from "@/lib/reports/registry-report-builders";
@@ -75,8 +78,22 @@ export async function resolveReport(
     }
     case "sales-summary":
       return buildSalesSummaryReport(params);
-    case "cashflow":
-      return buildCashFlowReport(params);
+    case "cashflow": {
+      const result = await buildCashflowFlexReport(params);
+      if (result.tooLarge) {
+        return {
+          title: "Рух коштів (ДДС)",
+          period: {
+            from: new Date(),
+            to: new Date(),
+            label: "За обраний період",
+          },
+          headers: ["Групування"],
+          rows: [["Оберіть період — забагато даних для експорту."]],
+        };
+      }
+      return flattenCashflowToReportShape(result);
+    }
     case "stock-balance":
       return buildStockBalanceReport(params);
     case "reconciliation":
