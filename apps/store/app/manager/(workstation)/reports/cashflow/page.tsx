@@ -1,47 +1,22 @@
 import { notFound } from "next/navigation";
-import { prisma, Prisma } from "@ltex/db";
 import { requireRole } from "@/lib/auth/manager-auth";
-import { buildOccurredAtFilter } from "@/lib/manager/registry-view";
 import {
-  summarizeCashFlow,
-  totalCashFlow,
-  type CashFlowMovementLite,
-} from "@/lib/reports/registry-reports";
+  buildCashflowFlexReport,
+  DIMENSIONS,
+  INDICATORS,
+} from "@/lib/reports/cashflow-flex";
 import { ReportsNav } from "../_components/reports-nav";
 import { ReportExportButtons } from "../_components/report-export-buttons";
-import { RegisterPeriodFilters } from "../../registry/_components/register-period-filters";
-import { RegisterViewer } from "../../_components/register-viewer";
+import { FlexConfig } from "../_components/flex-config";
+import { FlexTree, type IndicatorCol } from "../_components/flex-tree";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Звіт: Рух коштів (ДДС) | L-TEX" };
 
-const COLUMNS = [
-  { key: "label", label: "Стаття" },
-  {
-    key: "inflowUah",
-    label: "Прихід, ₴",
-    align: "right" as const,
-    nowrap: true,
-  },
-  {
-    key: "outflowUah",
-    label: "Розхід, ₴",
-    align: "right" as const,
-    nowrap: true,
-  },
-  { key: "netUah", label: "Сальдо, ₴", align: "right" as const, nowrap: true },
-];
-
-const LIMIT = 20000;
-
-function uah(n: number): string {
-  return n.toFixed(2);
-}
-
 export default async function CashFlowReportPage({
   searchParams,
 }: {
-  searchParams: Promise<{ from?: string; to?: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const user = await requireRole([
     "analyst",
@@ -53,59 +28,55 @@ export default async function CashFlowReportPage({
   if (!user) notFound();
 
   const sp = await searchParams;
-  const where: Prisma.CashFlowMovementWhereInput = {};
-  const occurredAt = buildOccurredAtFilter(sp.from, sp.to);
-  if (occurredAt) where.occurredAt = occurredAt;
+  // Збираємо плоский URLSearchParams лише зі string-значень.
+  const params = new URLSearchParams();
+  for (const [k, v] of Object.entries(sp)) {
+    if (typeof v === "string") params.set(k, v);
+  }
 
-  const movements = await prisma.cashFlowMovement.findMany({
-    where,
-    take: LIMIT,
-    select: {
-      articleCode1C: true,
-      direction: true,
-      amountUah: true,
-      amountUpr: true,
-    },
-  });
+  // Легкий старт: важку агрегацію рахуємо ЛИШЕ після «Сформувати» (прапор `go`
+  // або наявні параметри звіту), а не на кожне відкриття сторінки.
+  const submitted =
+    params.has("go") ||
+    params.has("from") ||
+    params.has("to") ||
+    params.has("groups");
 
-  const articleCodes = [
-    ...new Set(movements.map((m) => m.articleCode1C).filter(Boolean)),
-  ] as string[];
-  const articles = articleCodes.length
-    ? await prisma.mgrCashFlowArticle.findMany({
-        where: { code1C: { in: articleCodes } },
-        select: { code1C: true, name: true },
-      })
-    : [];
-  const articleName = new Map(
-    articles.map((a) => [a.code1C ?? "", a.name] as const),
+  let result: Awaited<ReturnType<typeof buildCashflowFlexReport>> | null = null;
+  let errored = false;
+  if (submitted) {
+    try {
+      result = await buildCashflowFlexReport(params);
+    } catch (e) {
+      errored = true;
+      console.error("[L-TEX] Звіт руху коштів не сформовано", {
+        error: e instanceof Error ? e.message : String(e),
+      });
+    }
+  }
+
+  const dimensions = DIMENSIONS.map((d) => ({ key: d.key, label: d.label }));
+  const indicators = INDICATORS.map((i) => ({ key: i.key, label: i.label }));
+
+  // Усі ДДС-показники — грошові (summable), без похідних (percent) колонок.
+  const treeIndicators: IndicatorCol[] = (result?.indicatorDefs ?? []).map(
+    (d) => ({ key: d.key, label: d.label, kind: "money" }),
   );
 
-  const lite: CashFlowMovementLite[] = movements.map((m) => ({
-    articleCode1C: m.articleCode1C,
-    articleName: m.articleCode1C
-      ? (articleName.get(m.articleCode1C) ?? null)
-      : null,
-    direction: m.direction,
-    amountUah: Number(m.amountUah),
-    amountUpr: m.amountUpr == null ? null : Number(m.amountUpr),
-  }));
-
-  const summary = summarizeCashFlow(lite);
-  const grand = totalCashFlow(summary);
-
-  const rows = summary.map((r) => ({
-    id: r.key,
-    label: r.label,
-    inflowUah: uah(r.inflowUah),
-    outflowUah: uah(r.outflowUah),
-    netUah: uah(r.netUah),
-  }));
-
-  const exportQuery = new URLSearchParams({
-    ...(sp.from ? { from: sp.from } : {}),
-    ...(sp.to ? { to: sp.to } : {}),
-  }).toString();
+  const initialFilters: Record<string, string> = {};
+  for (const d of DIMENSIONS) {
+    const v = params.get(`f_${d.key}`);
+    if (v) initialFilters[d.key] = v;
+  }
+  const cfgGroups = params.get("groups")?.split(",").filter(Boolean) ?? [
+    "article",
+  ];
+  const cfgInd = params.get("ind")?.split(",").filter(Boolean) ?? [
+    "inflowUah",
+    "outflowUah",
+    "netUah",
+  ];
+  const cfgTotals = params.get("totals") !== "0";
 
   return (
     <div className="mx-auto max-w-6xl space-y-4">
@@ -116,46 +87,59 @@ export default async function CashFlowReportPage({
             Звіт: Рух коштів (ДДС)
           </h1>
           <p className="mt-1 text-sm text-gray-500">
-            Прихід / розхід / сальдо по статтях руху коштів за період. Рухів у
-            вибірці: {movements.length}
-            {movements.length >= LIMIT ? ` (показано перші ${LIMIT})` : ""}.
+            Гнучкий звіт надходжень/витрат з довільним групуванням, показниками
+            та відборами.{" "}
+            {!submitted
+              ? "Налаштуйте параметри та натисніть «Сформувати»."
+              : errored
+                ? "Помилка формування."
+                : result?.tooLarge
+                  ? "Оберіть період — забагато даних."
+                  : `Рухів у вибірці: ${result?.rowCount ?? 0}.`}
           </p>
         </div>
-        <ReportExportButtons reportId="cashflow" query={exportQuery} />
+        <ReportExportButtons reportId="cashflow" query={params.toString()} />
       </div>
 
-      <RegisterPeriodFilters
-        initial={{ from: sp.from ?? "", to: sp.to ?? "" }}
+      <FlexConfig
+        dimensions={dimensions}
+        indicators={indicators}
+        commonFilters={["article", "account", "client", "direction"]}
+        initial={{
+          from: params.get("from") ?? "",
+          to: params.get("to") ?? "",
+          groups: cfgGroups,
+          indicators: cfgInd,
+          totals: cfgTotals,
+          filters: initialFilters,
+        }}
       />
 
-      <RegisterViewer
-        columns={COLUMNS}
-        rows={rows}
-        csvFilename="cashflow-report"
-        emptyMessage="За обраним періодом руху коштів немає."
-        summary={
-          rows.length > 0 ? (
-            <div className="flex flex-wrap gap-6 rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm">
-              <span>
-                Прихід: <strong>{uah(grand.inflowUah)} ₴</strong>
-              </span>
-              <span>
-                Розхід: <strong>{uah(grand.outflowUah)} ₴</strong>
-              </span>
-              <span>
-                Сальдо:{" "}
-                <strong
-                  className={
-                    grand.netUah >= 0 ? "text-emerald-700" : "text-red-600"
-                  }
-                >
-                  {uah(grand.netUah)} ₴
-                </strong>
-              </span>
-            </div>
-          ) : null
-        }
-      />
+      {!submitted ? (
+        <div className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-6 text-center text-sm text-gray-500">
+          Оберіть період, групування та показники зліва й натисніть
+          «Сформувати».
+        </div>
+      ) : errored ? (
+        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-6 text-center text-sm text-red-700">
+          Не вдалося сформувати звіт (можливо, забагато даних). Звузьте період
+          або відбори й спробуйте ще раз.
+        </div>
+      ) : result?.tooLarge ? (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-6 text-center text-sm text-amber-800">
+          Забагато рухів ({result.rowCount.toLocaleString("uk-UA")}) для звіту
+          без періоду. Оберіть період «з / по» та натисніть «Сформувати».
+        </div>
+      ) : (
+        result && (
+          <FlexTree
+            tree={result.tree}
+            indicators={treeIndicators}
+            grand={result.grand}
+            showTotals={result.showTotals}
+          />
+        )
+      )}
     </div>
   );
 }
