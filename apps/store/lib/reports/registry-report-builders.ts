@@ -9,9 +9,11 @@
  *
  * Параметри передаються через query (як для margin `?group=`):
  *   sales-summary  — гнучкий: `?from&to&groups=<csv dims>&ind=<csv>&f_<dim>=…`
- *   cashflow       — `?from&to`
  *   stock-balance  — `?to&group=product|quality`  (залишок на дату)
  *   reconciliation — `?clientId&from&to`
+ *
+ * Примітка: `cashflow` тепер гнучкий звіт (`cashflow-flex.ts`) і викликається
+ * напряму з `resolve-report.ts` (тут більше НЕ обгортається).
  */
 
 import { prisma, Prisma } from "@ltex/db";
@@ -21,11 +23,8 @@ import {
 } from "@/lib/manager/registry-view";
 import type { ReportShape } from "@/lib/reports/analyst-reports";
 import {
-  summarizeCashFlow,
-  totalCashFlow,
   summarizeStockBalance,
   totalStock,
-  type CashFlowMovementLite,
   type StockGroupBy,
   type StockMovementLite,
 } from "@/lib/reports/registry-reports";
@@ -35,7 +34,6 @@ import {
 } from "@/lib/reports/sales-flex";
 import { buildReconciliationReport } from "@/lib/reports/reconciliation";
 
-const CASHFLOW_LIMIT = 20000;
 const STOCK_LIMIT = 50000;
 
 /** Період-заглушка для звітів з власною фільтрацією дат (не використовується роутами). */
@@ -64,71 +62,6 @@ export async function buildSalesSummaryReport(
     };
   }
   return flattenToReportShape(result);
-}
-
-// ─── cashflow ───────────────────────────────────────────────────────────────
-export async function buildCashFlowReport(
-  params: URLSearchParams,
-): Promise<ReportShape> {
-  const where: Prisma.CashFlowMovementWhereInput = {};
-  const occurredAt = buildOccurredAtFilter(
-    params.get("from") ?? undefined,
-    params.get("to") ?? undefined,
-  );
-  if (occurredAt) where.occurredAt = occurredAt;
-
-  const movements = await prisma.cashFlowMovement.findMany({
-    where,
-    take: CASHFLOW_LIMIT,
-    select: {
-      articleCode1C: true,
-      direction: true,
-      amountUah: true,
-      amountUpr: true,
-    },
-  });
-
-  const articleCodes = [
-    ...new Set(movements.map((m) => m.articleCode1C).filter(Boolean)),
-  ] as string[];
-  const articles = articleCodes.length
-    ? await prisma.mgrCashFlowArticle.findMany({
-        where: { code1C: { in: articleCodes } },
-        select: { code1C: true, name: true },
-      })
-    : [];
-  const articleName = new Map(
-    articles.map((a) => [a.code1C ?? "", a.name] as const),
-  );
-
-  const lite: CashFlowMovementLite[] = movements.map((m) => ({
-    articleCode1C: m.articleCode1C,
-    articleName: m.articleCode1C
-      ? (articleName.get(m.articleCode1C) ?? null)
-      : null,
-    direction: m.direction,
-    amountUah: Number(m.amountUah),
-    amountUpr: m.amountUpr == null ? null : Number(m.amountUpr),
-  }));
-
-  const summary = summarizeCashFlow(lite);
-  const grand = totalCashFlow(summary);
-
-  const headers = ["Стаття", "Прихід, ₴", "Розхід, ₴", "Сальдо, ₴"];
-  const rows: ReportShape["rows"] = summary.map((r) => [
-    r.label,
-    r.inflowUah,
-    r.outflowUah,
-    r.netUah,
-  ]);
-  rows.push([grand.label, grand.inflowUah, grand.outflowUah, grand.netUah]);
-
-  return {
-    title: "Рух коштів (ДДС)",
-    period: freePeriod("За обраний період"),
-    headers,
-    rows,
-  };
 }
 
 // ─── stock-balance ──────────────────────────────────────────────────────────
