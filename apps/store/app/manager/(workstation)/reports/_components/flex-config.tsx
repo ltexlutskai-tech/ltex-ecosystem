@@ -27,6 +27,8 @@ export function FlexConfig({
   initial,
   commonFilters = ["region", "agent", "client", "product"],
   hideFrom = false,
+  attrOptions,
+  initialAttrs = [],
 }: {
   dimensions: OptionDef[];
   indicators: OptionDef[];
@@ -45,6 +47,14 @@ export function FlexConfig({
    * Для звітів з балансовою семантикою (залишок на дату), де `from` не має сенсу.
    */
   hideFrom?: boolean;
+  /**
+   * Довідкові колонки товару (стиль 1С «Остатки товаров»). Коли передано —
+   * показується блок «Колонки» з чекбоксами; вибір серіалізується у URL-параметр
+   * `cols` (CSV). Інші звіти не передають → блок прихований, поведінка незмінна.
+   */
+  attrOptions?: OptionDef[];
+  /** Початково обрані атрибутні колонки (ключі). */
+  initialAttrs?: string[];
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -60,6 +70,7 @@ export function FlexConfig({
     initial.filters,
   );
   const [addKey, setAddKey] = useState("");
+  const [attrs, setAttrs] = useState<string[]>(initialAttrs);
 
   const dimLabel = new Map(dimensions.map((d) => [d.key, d.label]));
   const dimKeys = new Set(dimensions.map((d) => d.key));
@@ -95,6 +106,10 @@ export function FlexConfig({
     setInd(on ? [...ind, key] : ind.filter((k) => k !== key));
   }
 
+  function toggleAttr(key: string, on: boolean) {
+    setAttrs((prev) => (on ? [...prev, key] : prev.filter((k) => k !== key)));
+  }
+
   function setFilter(key: string, value: string) {
     setFilters((f) => ({ ...f, [key]: value }));
   }
@@ -107,6 +122,7 @@ export function FlexConfig({
     sp.delete("groups");
     sp.delete("ind");
     sp.delete("totals");
+    sp.delete("cols");
     for (const d of dimensions) sp.delete(`f_${d.key}`);
 
     if (!hideFrom && from.trim()) sp.set("from", from.trim());
@@ -114,6 +130,7 @@ export function FlexConfig({
     if (groups.length) sp.set("groups", groups.join(","));
     if (ind.length) sp.set("ind", ind.join(","));
     if (!totals) sp.set("totals", "0");
+    if (attrOptions && attrs.length) sp.set("cols", attrs.join(","));
     for (const [k, v] of Object.entries(filters)) {
       if (v.trim()) sp.set(`f_${k}`, v.trim());
     }
@@ -253,6 +270,31 @@ export function FlexConfig({
           </ul>
         </div>
       </div>
+
+      {/* Колонки товару (стиль 1С «Остатки товаров») — лише коли передано attrOptions */}
+      {attrOptions && attrOptions.length > 0 && (
+        <div>
+          <h3 className="mb-2 text-sm font-medium text-gray-800">Колонки</h3>
+          <ul className="grid gap-1 rounded-md border bg-white p-2 sm:grid-cols-2 md:grid-cols-3">
+            {attrOptions.map((c) => (
+              <li key={c.key} className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  id={`col-${c.key}`}
+                  checked={attrs.includes(c.key)}
+                  onChange={(e) => toggleAttr(c.key, e.target.checked)}
+                />
+                <label htmlFor={`col-${c.key}`} className="text-gray-800">
+                  {c.label}
+                </label>
+              </li>
+            ))}
+          </ul>
+          <p className="mt-1 text-xs text-gray-400">
+            Довідкові колонки показуються лише на рядках одного товару.
+          </p>
+        </div>
+      )}
 
       {/* Відбори */}
       <div>
