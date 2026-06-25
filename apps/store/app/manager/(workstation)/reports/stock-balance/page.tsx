@@ -1,38 +1,22 @@
 import { notFound } from "next/navigation";
-import { prisma, Prisma } from "@ltex/db";
 import { requireRole } from "@/lib/auth/manager-auth";
-import { parseDateParam, fmtKg, fmtDate } from "@/lib/manager/registry-view";
 import {
-  summarizeStockBalance,
-  totalStock,
-  type StockGroupBy,
-  type StockMovementLite,
-} from "@/lib/reports/registry-reports";
+  buildStockFlexReport,
+  DIMENSIONS,
+  INDICATORS,
+} from "@/lib/reports/stock-flex";
 import { ReportsNav } from "../_components/reports-nav";
 import { ReportExportButtons } from "../_components/report-export-buttons";
-import { RegisterPeriodFilters } from "../../registry/_components/register-period-filters";
-import { RegisterViewer } from "../../_components/register-viewer";
+import { FlexConfig } from "../_components/flex-config";
+import { FlexTree, type IndicatorCol } from "../_components/flex-tree";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Звіт: Залишки складу | L-TEX" };
 
-const GROUP_OPTIONS: { value: StockGroupBy; label: string }[] = [
-  { value: "product", label: "По товарах" },
-  { value: "quality", label: "По якості" },
-];
-
-const COLUMNS = [
-  { key: "label", label: "Назва" },
-  { key: "qty", label: "К-сть, шт", align: "right" as const, nowrap: true },
-  { key: "weightKg", label: "Вага, кг", align: "right" as const, nowrap: true },
-];
-
-const LIMIT = 50000;
-
-export default async function StockBalancePage({
+export default async function StockBalanceReportPage({
   searchParams,
 }: {
-  searchParams: Promise<{ to?: string; group?: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const user = await requireRole([
     "analyst",
@@ -44,67 +28,54 @@ export default async function StockBalancePage({
   if (!user) notFound();
 
   const sp = await searchParams;
-  const group: StockGroupBy = GROUP_OPTIONS.some((g) => g.value === sp.group)
-    ? (sp.group as StockGroupBy)
-    : "product";
-
-  // Залишок на дату = усі рухи до кінця дня `to` (за замовчуванням — на сьогодні).
-  const asOf = parseDateParam(sp.to);
-  const where: Prisma.StockMovementWhereInput = {};
-  if (asOf) {
-    const end = new Date(asOf);
-    end.setHours(23, 59, 59, 999);
-    where.occurredAt = { lte: end };
+  // Збираємо плоский URLSearchParams лише зі string-значень.
+  const params = new URLSearchParams();
+  for (const [k, v] of Object.entries(sp)) {
+    if (typeof v === "string") params.set(k, v);
   }
 
-  const movements = await prisma.stockMovement.findMany({
-    where,
-    take: LIMIT,
-    select: {
-      productCode1C: true,
-      quality: true,
-      qty: true,
-      weightKg: true,
-      recordKind: true,
-    },
-  });
+  // Легкий старт: важку агрегацію рахуємо ЛИШЕ після «Сформувати» (прапор `go`
+  // або наявні параметри звіту), а не на кожне відкриття сторінки.
+  // Балансовий звіт: `from` ігнорується, тому в гейті — `to`/`groups`/`go`.
+  const submitted =
+    params.has("go") || params.has("to") || params.has("groups");
 
-  const productCodes = [...new Set(movements.map((m) => m.productCode1C))];
-  const products = productCodes.length
-    ? await prisma.product.findMany({
-        where: { code1C: { in: productCodes } },
-        select: { code1C: true, name: true },
-      })
-    : [];
-  const productName = new Map(
-    products.map((p) => [p.code1C ?? "", p.name] as const),
+  let result: Awaited<ReturnType<typeof buildStockFlexReport>> | null = null;
+  let errored = false;
+  if (submitted) {
+    try {
+      result = await buildStockFlexReport(params);
+    } catch (e) {
+      errored = true;
+      console.error("[L-TEX] Звіт залишків складу не сформовано", {
+        error: e instanceof Error ? e.message : String(e),
+      });
+    }
+  }
+
+  const dimensions = DIMENSIONS.map((d) => ({ key: d.key, label: d.label }));
+  const indicators = INDICATORS.map((i) => ({ key: i.key, label: i.label }));
+
+  // Усі показники залишків — qty/weight (summable), без percent.
+  const treeIndicators: IndicatorCol[] = (result?.indicatorDefs ?? []).map(
+    (d) => ({ key: d.key, label: d.label, kind: d.kind }),
   );
 
-  const lite: StockMovementLite[] = movements.map((m) => ({
-    productCode1C: m.productCode1C,
-    productName: productName.get(m.productCode1C) ?? null,
-    quality: m.quality,
-    qty: Number(m.qty),
-    weightKg: m.weightKg == null ? null : Number(m.weightKg),
-    recordKind: m.recordKind,
-  }));
+  const initialFilters: Record<string, string> = {};
+  for (const d of DIMENSIONS) {
+    const v = params.get(`f_${d.key}`);
+    if (v) initialFilters[d.key] = v;
+  }
+  const cfgGroups = params.get("groups")?.split(",").filter(Boolean) ?? [
+    "category",
+  ];
+  const cfgInd = params.get("ind")?.split(",").filter(Boolean) ?? [
+    "qtyBalance",
+    "weightBalanceKg",
+  ];
+  const cfgTotals = params.get("totals") !== "0";
 
-  const summary = summarizeStockBalance(lite, group);
-  const grand = totalStock(summary);
-
-  const rows = summary.map((r) => ({
-    id: r.key,
-    label: r.label,
-    qty: fmtKg(r.qty),
-    weightKg: fmtKg(r.weightKg),
-  }));
-
-  const asOfLabel = asOf ? fmtDate(asOf) : "сьогодні";
-
-  const exportQuery = new URLSearchParams({
-    ...(sp.to ? { to: sp.to } : {}),
-    group,
-  }).toString();
+  const asOfLabel = params.get("to") || "сьогодні";
 
   return (
     <div className="mx-auto max-w-6xl space-y-4">
@@ -115,46 +86,69 @@ export default async function StockBalancePage({
             Звіт: Залишки складу
           </h1>
           <p className="mt-1 text-sm text-gray-500">
-            Залишки шт + кг × товар / якість станом на {asOfLabel}. Рухів у
-            вибірці: {movements.length}
-            {movements.length >= LIMIT ? ` (показано перші ${LIMIT})` : ""}.
+            Гнучкий звіт залишків (к-сть + вага) станом на дату «по», з
+            довільним групуванням та відборами.{" "}
+            {!submitted
+              ? "Налаштуйте параметри та натисніть «Сформувати»."
+              : errored
+                ? "Помилка формування."
+                : result?.tooLarge
+                  ? "Оберіть дату «станом на» — забагато даних."
+                  : `Залишок станом на ${asOfLabel}. Рухів у вибірці: ${
+                      result?.rowCount ?? 0
+                    }.`}
+          </p>
+          <p className="mt-1 text-xs text-amber-700">
+            Історія складських документів (повернення/перепаковки/списання) ще
+            переноситься — залишки за минулі дати можуть бути неповними.
           </p>
         </div>
-        <ReportExportButtons reportId="stock-balance" query={exportQuery} />
+        <ReportExportButtons
+          reportId="stock-balance"
+          query={params.toString()}
+        />
       </div>
 
-      <RegisterPeriodFilters
-        initial={{ to: sp.to ?? "", group }}
-        extra={[
-          {
-            key: "group",
-            label: "Групування",
-            options: GROUP_OPTIONS.map((g) => ({
-              value: g.value,
-              label: g.label,
-            })),
-          },
-        ]}
+      <FlexConfig
+        dimensions={dimensions}
+        indicators={indicators}
+        hideFrom
+        commonFilters={["category", "product", "warehouse", "quality"]}
+        initial={{
+          from: "",
+          to: params.get("to") ?? "",
+          groups: cfgGroups,
+          indicators: cfgInd,
+          totals: cfgTotals,
+          filters: initialFilters,
+        }}
       />
 
-      <RegisterViewer
-        columns={COLUMNS}
-        rows={rows}
-        csvFilename="stock-balance"
-        emptyMessage="Залишків на обрану дату немає."
-        summary={
-          rows.length > 0 ? (
-            <div className="flex flex-wrap gap-6 rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm">
-              <span>
-                Разом шт: <strong>{fmtKg(grand.qty)}</strong>
-              </span>
-              <span>
-                Разом кг: <strong>{fmtKg(grand.weightKg)} кг</strong>
-              </span>
-            </div>
-          ) : null
-        }
-      />
+      {!submitted ? (
+        <div className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-6 text-center text-sm text-gray-500">
+          Оберіть дату «станом на», групування та показники зліва й натисніть
+          «Сформувати».
+        </div>
+      ) : errored ? (
+        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-6 text-center text-sm text-red-700">
+          Не вдалося сформувати звіт (можливо, забагато даних). Оберіть дату
+          «станом на» або звузьте відбори й спробуйте ще раз.
+        </div>
+      ) : result?.tooLarge ? (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-6 text-center text-sm text-amber-800">
+          Забагато рухів ({result.rowCount.toLocaleString("uk-UA")}) для звіту
+          без дати. Оберіть дату «станом на» та натисніть «Сформувати».
+        </div>
+      ) : (
+        result && (
+          <FlexTree
+            tree={result.tree}
+            indicators={treeIndicators}
+            grand={result.grand}
+            showTotals={result.showTotals}
+          />
+        )
+      )}
     </div>
   );
 }

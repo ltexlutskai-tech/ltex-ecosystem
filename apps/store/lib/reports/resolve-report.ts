@@ -21,9 +21,12 @@ import {
 } from "@/lib/reports/cashflow-flex";
 import {
   buildSalesSummaryReport,
-  buildStockBalanceReport,
   buildReconciliationReportShape,
 } from "@/lib/reports/registry-report-builders";
+import {
+  buildStockFlexReport,
+  flattenToReportShape as flattenStockToReportShape,
+} from "@/lib/reports/stock-flex";
 import type { PeriodPreset } from "@/lib/finance/owner-stats";
 
 const VALID_PERIODS: PeriodPreset[] = ["today", "week", "month", "year", "all"];
@@ -94,8 +97,22 @@ export async function resolveReport(
       }
       return flattenCashflowToReportShape(result);
     }
-    case "stock-balance":
-      return buildStockBalanceReport(params);
+    case "stock-balance": {
+      const result = await buildStockFlexReport(params);
+      if (result.tooLarge) {
+        return {
+          title: "Залишки складу",
+          period: {
+            from: new Date(),
+            to: new Date(),
+            label: "Станом на дату",
+          },
+          headers: ["Групування"],
+          rows: [["Оберіть дату «станом на» — забагато даних для експорту."]],
+        };
+      }
+      return flattenStockToReportShape(result);
+    }
     case "reconciliation":
       return buildReconciliationReportShape(params);
     default:
