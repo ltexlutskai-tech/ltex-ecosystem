@@ -15,6 +15,7 @@ import {
   type IndicatorCol,
   type AttrCol,
 } from "../_components/flex-tree";
+import type { FilterOp } from "@/lib/reports/flex-filters";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Звіт: Залишки складу | L-TEX" };
@@ -76,9 +77,15 @@ export default async function StockBalanceReportPage({
   }));
 
   const initialFilters: Record<string, string> = {};
+  const initialFilterOps: Record<string, FilterOp> = {};
   for (const d of DIMENSIONS) {
     const v = params.get(`f_${d.key}`);
-    if (v) initialFilters[d.key] = v;
+    const op = params.get(`fop_${d.key}`);
+    if (v != null) initialFilters[d.key] = v;
+    if (op) {
+      initialFilterOps[d.key] = op as FilterOp;
+      if (!(d.key in initialFilters)) initialFilters[d.key] = "";
+    }
   }
   const cfgGroups = params.get("groups")?.split(",").filter(Boolean) ?? [
     "category",
@@ -138,6 +145,7 @@ export default async function StockBalanceReportPage({
         ]}
         attrOptions={attrOptions}
         initialAttrs={cfgAttrs}
+        filterOptions={result?.filterOptions ?? {}}
         initial={{
           from: "",
           to: params.get("to") ?? "",
@@ -145,6 +153,7 @@ export default async function StockBalanceReportPage({
           indicators: cfgInd,
           totals: cfgTotals,
           filters: initialFilters,
+          filterOps: initialFilterOps,
         }}
       />
 
