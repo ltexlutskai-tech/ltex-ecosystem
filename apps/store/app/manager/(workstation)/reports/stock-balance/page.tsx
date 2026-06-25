@@ -4,11 +4,17 @@ import {
   buildStockFlexReport,
   DIMENSIONS,
   INDICATORS,
+  ATTR_COLUMNS,
+  DEFAULT_ATTRS,
 } from "@/lib/reports/stock-flex";
 import { ReportsNav } from "../_components/reports-nav";
 import { ReportExportButtons } from "../_components/report-export-buttons";
 import { FlexConfig } from "../_components/flex-config";
-import { FlexTree, type IndicatorCol } from "../_components/flex-tree";
+import {
+  FlexTree,
+  type IndicatorCol,
+  type AttrCol,
+} from "../_components/flex-tree";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Звіт: Залишки складу | L-TEX" };
@@ -55,11 +61,19 @@ export default async function StockBalanceReportPage({
 
   const dimensions = DIMENSIONS.map((d) => ({ key: d.key, label: d.label }));
   const indicators = INDICATORS.map((i) => ({ key: i.key, label: i.label }));
+  const attrOptions = ATTR_COLUMNS.map((c) => ({ key: c.key, label: c.label }));
 
   // Усі показники залишків — qty/weight (summable), без percent.
   const treeIndicators: IndicatorCol[] = (result?.indicatorDefs ?? []).map(
     (d) => ({ key: d.key, label: d.label, kind: d.kind }),
   );
+
+  // Довідкові колонки товару (1С «Остатки товаров») — на product-leaf рядках.
+  const treeAttrCols: AttrCol[] = (result?.attrColDefs ?? []).map((d) => ({
+    key: d.key,
+    label: d.label,
+    kind: d.kind,
+  }));
 
   const initialFilters: Record<string, string> = {};
   for (const d of DIMENSIONS) {
@@ -73,6 +87,8 @@ export default async function StockBalanceReportPage({
     "qtyBalance",
     "weightBalanceKg",
   ];
+  const cfgAttrs =
+    params.get("cols")?.split(",").filter(Boolean) ?? DEFAULT_ATTRS;
   const cfgTotals = params.get("totals") !== "0";
 
   const asOfLabel = params.get("to") || "сьогодні";
@@ -113,7 +129,15 @@ export default async function StockBalanceReportPage({
         dimensions={dimensions}
         indicators={indicators}
         hideFrom
-        commonFilters={["category", "product", "warehouse", "quality"]}
+        commonFilters={[
+          "category",
+          "article",
+          "product",
+          "warehouse",
+          "quality",
+        ]}
+        attrOptions={attrOptions}
+        initialAttrs={cfgAttrs}
         initial={{
           from: "",
           to: params.get("to") ?? "",
@@ -144,6 +168,7 @@ export default async function StockBalanceReportPage({
           <FlexTree
             tree={result.tree}
             indicators={treeIndicators}
+            attrColumns={treeAttrCols}
             grand={result.grand}
             showTotals={result.showTotals}
           />

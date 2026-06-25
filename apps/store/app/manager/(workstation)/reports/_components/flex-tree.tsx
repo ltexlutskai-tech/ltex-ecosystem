@@ -23,6 +23,39 @@ export interface IndicatorCol {
   percent?: { num: string; den: string };
 }
 
+/**
+ * Атрибутна (довідкова) колонка для product-leaf рядків (стиль 1С «Остатки
+ * товаров»). На відміну від `IndicatorCol`, НЕ сумується деревом — значення
+ * береться з `node.attrs[key]` і показується лише на вузлах, що відповідають
+ * одному товару (де `attrs` заповнено).
+ */
+export interface AttrCol {
+  key: string;
+  label: string;
+  kind: "text" | "money" | "qty";
+}
+
+/** Форматування значення атрибутної колонки (порожньо, коли значення відсутнє). */
+function fmtAttr(col: AttrCol, attrs?: Record<string, string | number | null>) {
+  if (!attrs || !(col.key in attrs)) return "";
+  const v = attrs[col.key];
+  if (v == null) return "";
+  if (col.kind === "money") {
+    const n = typeof v === "number" ? v : Number(v);
+    if (Number.isNaN(n)) return "";
+    return `${n.toLocaleString("uk-UA", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    })} €`;
+  }
+  if (col.kind === "qty") {
+    const n = typeof v === "number" ? v : Number(v);
+    if (Number.isNaN(n)) return "";
+    return n.toLocaleString("uk-UA", { maximumFractionDigits: 3 });
+  }
+  return String(v);
+}
+
 /** Значення відсоткової колонки з агрегатів вузла (null коли знаменник 0). */
 function percentValue(
   col: IndicatorCol,
@@ -85,11 +118,18 @@ export function FlexTree({
   indicators,
   grand,
   showTotals,
+  attrColumns = [],
 }: {
   tree: TreeNode[];
   indicators: IndicatorCol[];
   grand: Record<string, number>;
   showTotals: boolean;
+  /**
+   * Довідкові колонки товару (стиль 1С «Остатки товаров»). Показуються лише на
+   * product-leaf рядках (де заповнено `node.attrs`). За замовчуванням порожньо —
+   * інші звіти (sales/margin/cashflow) їх не передають.
+   */
+  attrColumns?: AttrCol[];
 }) {
   // Розгорнуті ключі вузлів. Дефолт — усі вузли рівня 0.
   const [expanded, setExpanded] = useState<Set<string>>(
@@ -143,6 +183,16 @@ export function FlexTree({
             {fmt(col, node.values)}
           </td>
         ))}
+        {attrColumns.map((col) => (
+          <td
+            key={col.key}
+            className={`whitespace-nowrap px-3 py-1.5 text-sm text-gray-600 ${
+              col.kind === "text" ? "text-left" : "text-right tabular-nums"
+            }`}
+          >
+            {fmtAttr(col, node.attrs)}
+          </td>
+        ))}
       </tr>,
     );
     if (hasChildren && isOpen) {
@@ -168,13 +218,23 @@ export function FlexTree({
                 {col.label}
               </th>
             ))}
+            {attrColumns.map((col) => (
+              <th
+                key={col.key}
+                className={`whitespace-nowrap px-3 py-2 text-xs font-semibold uppercase tracking-wide text-gray-500 ${
+                  col.kind === "text" ? "text-left" : "text-right"
+                }`}
+              >
+                {col.label}
+              </th>
+            ))}
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-100">
           {rows.length === 0 ? (
             <tr>
               <td
-                colSpan={1 + indicators.length}
+                colSpan={1 + indicators.length + attrColumns.length}
                 className="px-3 py-6 text-center text-sm text-gray-400"
               >
                 За обраними параметрами даних немає.
@@ -195,6 +255,9 @@ export function FlexTree({
                 >
                   {fmt(col, grand)}
                 </td>
+              ))}
+              {attrColumns.map((col) => (
+                <td key={col.key} className="px-3 py-2" />
               ))}
             </tr>
           )}
