@@ -9,6 +9,7 @@ import { ReportsNav } from "../_components/reports-nav";
 import { ReportExportButtons } from "../_components/report-export-buttons";
 import { FlexConfig } from "../_components/flex-config";
 import { FlexTree, type IndicatorCol } from "../_components/flex-tree";
+import type { FilterOp } from "@/lib/reports/flex-filters";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Маржа / Валовий прибуток | L-TEX" };
@@ -79,9 +80,15 @@ export default async function Page({
   );
 
   const initialFilters: Record<string, string> = {};
+  const initialFilterOps: Record<string, FilterOp> = {};
   for (const d of MARGIN_DIMENSIONS) {
     const v = params.get(`f_${d.key}`);
-    if (v) initialFilters[d.key] = v;
+    const op = params.get(`fop_${d.key}`);
+    if (v != null) initialFilters[d.key] = v;
+    if (op) {
+      initialFilterOps[d.key] = op as FilterOp;
+      if (!(d.key in initialFilters)) initialFilters[d.key] = "";
+    }
   }
   const cfgGroups = params.get("groups")?.split(",").filter(Boolean) ?? [
     "product",
@@ -120,6 +127,7 @@ export default async function Page({
         dimensions={dimensions}
         indicators={indicators}
         commonFilters={["category", "agent", "client", "product"]}
+        filterOptions={result?.filterOptions ?? {}}
         initial={{
           from: params.get("from") ?? "",
           to: params.get("to") ?? "",
@@ -127,6 +135,7 @@ export default async function Page({
           indicators: cfgInd,
           totals: cfgTotals,
           filters: initialFilters,
+          filterOps: initialFilterOps,
         }}
       />
 

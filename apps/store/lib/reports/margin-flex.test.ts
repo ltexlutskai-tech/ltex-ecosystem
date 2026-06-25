@@ -182,6 +182,7 @@ describe("flattenMarginToReportShape", () => {
       showTotals: true,
       rowCount: rows.length,
       tooLarge: false,
+      filterOptions: {},
     };
   }
 

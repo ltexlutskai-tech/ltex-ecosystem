@@ -9,6 +9,7 @@ import { ReportsNav } from "../_components/reports-nav";
 import { ReportExportButtons } from "../_components/report-export-buttons";
 import { FlexConfig } from "../_components/flex-config";
 import { FlexTree } from "../_components/flex-tree";
+import type { FilterOp } from "@/lib/reports/flex-filters";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Звіт: Підсумок продажів | L-TEX" };
@@ -59,9 +60,16 @@ export default async function SalesSummaryPage({
   const indicators = INDICATORS.map((i) => ({ key: i.key, label: i.label }));
 
   const initialFilters: Record<string, string> = {};
+  const initialFilterOps: Record<string, FilterOp> = {};
   for (const d of DIMENSIONS) {
     const v = params.get(`f_${d.key}`);
-    if (v) initialFilters[d.key] = v;
+    const op = params.get(`fop_${d.key}`);
+    if (v != null) initialFilters[d.key] = v;
+    // filled/empty не мають значення, але мають op → теж створюють рядок.
+    if (op) {
+      initialFilterOps[d.key] = op as FilterOp;
+      if (!(d.key in initialFilters)) initialFilters[d.key] = "";
+    }
   }
   const cfgGroups = params.get("groups")?.split(",").filter(Boolean) ?? [
     "client",
@@ -102,6 +110,7 @@ export default async function SalesSummaryPage({
       <FlexConfig
         dimensions={dimensions}
         indicators={indicators}
+        filterOptions={result?.filterOptions ?? {}}
         initial={{
           from: params.get("from") ?? "",
           to: params.get("to") ?? "",
@@ -109,6 +118,7 @@ export default async function SalesSummaryPage({
           indicators: cfgInd,
           totals: cfgTotals,
           filters: initialFilters,
+          filterOps: initialFilterOps,
         }}
       />
 

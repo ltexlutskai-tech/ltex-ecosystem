@@ -31,6 +31,11 @@ import {
   type NormalizedRow,
   type TreeNode,
 } from "@/lib/reports/sales-flex";
+import {
+  parseFilters,
+  applyRowFilters,
+  collectFilterOptions,
+} from "@/lib/reports/flex-filters";
 import type { ReportShape } from "@/lib/reports/analyst-reports";
 
 const MONTH_NAMES = [
@@ -215,7 +220,13 @@ export interface MarginFlexResult {
   showTotals: boolean;
   rowCount: number;
   tooLarge: boolean;
+  /** Відсортовані distinct-значення на вимір (для combobox-відборів). */
+  filterOptions: Record<string, string[]>;
 }
+
+/** Усі ключі вимірів — фільтрабельні. */
+const FILTERABLE_DIMS = MARGIN_DIMENSIONS.map((d) => d.key);
+const getRowLabel = (r: NormalizedRow, dim: string) => r.dims[dim]?.label ?? "";
 
 /**
  * Async-білдер: читає виручку (SaleItem) і собівартість (CostMovement) за період,
@@ -230,12 +241,8 @@ export async function buildMarginFlexReport(
   const from = params.get("from") ?? undefined;
   const to = params.get("to") ?? undefined;
 
-  // Відбори: f_<dimKey> = contains (case-insensitive) на резолвленому label.
-  const filters: { dimKey: string; needle: string }[] = [];
-  for (const dim of MARGIN_DIMENSIONS) {
-    const v = params.get(`f_${dim.key}`);
-    if (v && v.trim()) filters.push({ dimKey: dim.key, needle: v.trim() });
-  }
+  // Відбори у стилі 1С: f_<dim> (значення) + fop_<dim> (вид порівняння).
+  const filters = parseFilters(params, FILTERABLE_DIMS);
 
   const indicatorDefs = indicators.map((k) => {
     const d = MARGIN_INDICATOR_BY_KEY.get(k)!;
@@ -252,6 +259,7 @@ export async function buildMarginFlexReport(
     showTotals,
     rowCount: 0,
     tooLarge: false,
+    filterOptions: {},
   };
 
   const occurredAt = buildOccurredAtFilter(from, to);
@@ -494,7 +502,7 @@ export async function buildMarginFlexReport(
   }
 
   // ─── Нормалізація → рядки ───
-  let rows: NormalizedRow[] = [...byKey.values()].map((e) => {
+  const allRows: NormalizedRow[] = [...byKey.values()].map((e) => {
     const dims: NormalizedRow["dims"] = {};
     for (const dim of MARGIN_DIMENSIONS) dims[dim.key] = dim.resolve(e.ctx);
     const revenueEur = e.revenueEur;
@@ -509,22 +517,22 @@ export async function buildMarginFlexReport(
     };
   });
 
+  // Значення відборів — з УСІХ рядків ДО застосування фільтрів.
+  const filterOptions = collectFilterOptions(
+    allRows,
+    FILTERABLE_DIMS,
+    getRowLabel,
+  );
+
   // Відбори по резолвлених підписах.
-  if (filters.length) {
-    rows = rows.filter((r) =>
-      filters.every((f) => {
-        const label = r.dims[f.dimKey]?.label ?? "";
-        return label.toLowerCase().includes(f.needle.toLowerCase());
-      }),
-    );
-  }
+  const rows = applyRowFilters(allRows, filters, getRowLabel);
 
   // Завжди агрегуємо три базові показники (щоб marginPct рахувалась на вузлі).
   const sumKeys = [...BASE_SUM_INDICATORS];
   const tree = buildSalesTree(rows, groups, sumKeys);
   const grand = grandTotal(rows, sumKeys);
 
-  return { ...baseResult, tree, grand, rowCount: rows.length };
+  return { ...baseResult, tree, grand, rowCount: rows.length, filterOptions };
 }
 
 // ─── Flat-shape для CSV/XLSX ────────────────────────────────────────────────

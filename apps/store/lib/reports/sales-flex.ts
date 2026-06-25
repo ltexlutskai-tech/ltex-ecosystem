@@ -20,6 +20,11 @@
 import { prisma, Prisma } from "@ltex/db";
 import { buildOccurredAtFilter } from "@/lib/manager/registry-view";
 import { formatOrderNumber, formatDocNumber } from "@/lib/manager/order-number";
+import {
+  parseFilters,
+  applyRowFilters,
+  collectFilterOptions,
+} from "@/lib/reports/flex-filters";
 import type { ReportShape } from "@/lib/reports/analyst-reports";
 
 // ─── Сирий рух (lite-зріз для білдера) ──────────────────────────────────────
@@ -432,7 +437,13 @@ export interface SalesFlexResult {
   showTotals: boolean;
   rowCount: number;
   tooLarge: boolean;
+  /** Відсортовані distinct-значення на вимір (для combobox-відборів). */
+  filterOptions: Record<string, string[]>;
 }
+
+/** Усі ключі вимірів — фільтрабельні. */
+const FILTERABLE_DIMS = DIMENSIONS.map((d) => d.key);
+const getRowLabel = (r: NormalizedRow, dim: string) => r.dims[dim]?.label ?? "";
 
 /**
  * Async-білдер: читає рухи з Prisma (БЕЗ ліміту), резолвить довідники у мапи,
@@ -447,12 +458,8 @@ export async function buildSalesFlexReport(
   const from = params.get("from") ?? undefined;
   const to = params.get("to") ?? undefined;
 
-  // Відбори: f_<dimKey> = contains (case-insensitive) на резолвленому label.
-  const filters: { dimKey: string; needle: string }[] = [];
-  for (const dim of DIMENSIONS) {
-    const v = params.get(`f_${dim.key}`);
-    if (v && v.trim()) filters.push({ dimKey: dim.key, needle: v.trim() });
-  }
+  // Відбори у стилі 1С: f_<dim> (значення) + fop_<dim> (вид порівняння).
+  const filters = parseFilters(params, FILTERABLE_DIMS);
 
   const where: Prisma.SalesMovementWhereInput = {};
   const occurredAt = buildOccurredAtFilter(from, to);
@@ -471,6 +478,7 @@ export async function buildSalesFlexReport(
     showTotals,
     rowCount: 0,
     tooLarge: false,
+    filterOptions: {},
   };
 
   // Захист від «усе за весь час» без періоду.
@@ -519,22 +527,22 @@ export async function buildSalesFlexReport(
 
   const maps = await resolveMaps(lite);
 
-  let rows = lite.map((m) => normalizeRow(m, maps, indicators));
+  const allRows = lite.map((m) => normalizeRow(m, maps, indicators));
+
+  // Значення відборів — з УСІХ рядків ДО застосування фільтрів.
+  const filterOptions = collectFilterOptions(
+    allRows,
+    FILTERABLE_DIMS,
+    getRowLabel,
+  );
 
   // Відбори по резолвлених підписах.
-  if (filters.length) {
-    rows = rows.filter((r) =>
-      filters.every((f) => {
-        const label = r.dims[f.dimKey]?.label ?? "";
-        return label.toLowerCase().includes(f.needle.toLowerCase());
-      }),
-    );
-  }
+  const rows = applyRowFilters(allRows, filters, getRowLabel);
 
   const tree = buildSalesTree(rows, groups, indicators);
   const grand = grandTotal(rows, indicators);
 
-  return { ...baseResult, tree, grand, rowCount: rows.length };
+  return { ...baseResult, tree, grand, rowCount: rows.length, filterOptions };
 }
 
 /** Батч-резолв усіх довідників, на які посилаються рухи. */
