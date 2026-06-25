@@ -340,6 +340,14 @@ export const REPORTS: readonly ReportEntry[] = [
     theme: "finance",
   },
   {
+    key: "doc-counts",
+    label: "Кількості документів",
+    description:
+      "К-сть замовлень / реалізацій / касових ордерів / маршрутів за період + клієнтів.",
+    href: "/manager/reports/doc-counts",
+    theme: "finance",
+  },
+  {
     key: "margin",
     label: "Маржа / Валовий прибуток",
     description:
