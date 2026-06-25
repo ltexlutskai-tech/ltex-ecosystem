@@ -2802,13 +2802,15 @@ async function ensureDictMaps(ctx: ImportContext): Promise<void> {
 // `--entity dictionaries` не залежить від інших сутностей.
 
 // ─── 10.1 СтатьиДвиженияДенежныхСредств → MgrCashFlowArticle ─ _Reference96 ───
-// Ієрархічний довідник (_Folder/_ParentIDRRef). parentId на цьому проході
-// лишаємо null (follow-up: 2-й прохід для зв'язування ієрархії за hex батька).
+// Ієрархічний довідник (_Folder/_ParentIDRRef). 2-фазний прохід: спершу upsert
+// усіх (папки + елементи) з code1C/code/name, потім лінкуємо parentId за hex
+// батька (папки-категорії статей: Затрати / ЗП / Рух коштів → підпапки → стаття).
 
 const CASH_FLOW_ARTICLE_COLS = [
   "_IDRRef",
   "_Code", // nchar(9)
   "_Description", // nvarchar(100)
+  "_ParentIDRRef", // hex батька-папки (корінь = нулі → null)
 ];
 
 async function importCashFlowArticles(ctx: ImportContext): Promise<Recon> {
@@ -2818,6 +2820,9 @@ async function importCashFlowArticles(ctx: ImportContext): Promise<Recon> {
 
   recon.sourceRows = await countTable(src, "_Reference96");
   log(`cashflowarticles: source rows = ${recon.sourceRows}`);
+
+  // hex статті → hex батька (для 2-ї фази лінкування ієрархії).
+  const parentHexByHex = new Map<string, string>();
 
   for await (const rows of streamTable(
     src,
@@ -2837,12 +2842,13 @@ async function importCashFlowArticles(ctx: ImportContext): Promise<Recon> {
       }
       const code = asString(row["_Code"]);
       const name = asTrimmed(row["_Description"]) || hex;
+      const parentHex = bufToHex(row["_ParentIDRRef"]);
+      if (parentHex) parentHexByHex.set(hex, parentHex);
       try {
         let id = "(pending)";
         if (willWrite(ctx)) {
           const created = await prisma.mgrCashFlowArticle.upsert({
             where: { code1C: hex },
-            // parentId лишаємо null цього проходу (ієрархія — follow-up).
             create: { code1C: hex, code, name },
             update: { code, name },
             select: { id: true },
@@ -2856,6 +2862,27 @@ async function importCashFlowArticles(ctx: ImportContext): Promise<Recon> {
       }
     }
   }
+
+  // Фаза 2: лінкуємо ієрархію parentId за hex батька.
+  if (willWrite(ctx)) {
+    let linked = 0;
+    for (const [hex, parentHex] of parentHexByHex) {
+      const id = ctx.cashFlowArticleByHex.get(hex);
+      const parentId = ctx.cashFlowArticleByHex.get(parentHex);
+      if (!id || !parentId || id === parentId) continue;
+      try {
+        await prisma.mgrCashFlowArticle.update({
+          where: { id },
+          data: { parentId },
+        });
+        linked++;
+      } catch (e) {
+        sink.record(hex, e);
+      }
+    }
+    log(`cashflowarticles: linked ${linked} parent relations`);
+  }
+
   log(`cashflowarticles: mapped ${ctx.cashFlowArticleByHex.size} hex→id`);
   return recon;
 }
