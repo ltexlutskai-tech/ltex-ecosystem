@@ -34,7 +34,26 @@ export default async function SalesSummaryPage({
     if (typeof v === "string") params.set(k, v);
   }
 
-  const result = await buildSalesFlexReport(params);
+  // Легкий старт: важку агрегацію рахуємо ЛИШЕ після «Сформувати» (прапор `go`
+  // або наявні параметри звіту), а не на кожне відкриття сторінки.
+  const submitted =
+    params.has("go") ||
+    params.has("from") ||
+    params.has("to") ||
+    params.has("groups");
+
+  let result: Awaited<ReturnType<typeof buildSalesFlexReport>> | null = null;
+  let errored = false;
+  if (submitted) {
+    try {
+      result = await buildSalesFlexReport(params);
+    } catch (e) {
+      errored = true;
+      console.error("[L-TEX] Звіт продажів не сформовано", {
+        error: e instanceof Error ? e.message : String(e),
+      });
+    }
+  }
 
   const dimensions = DIMENSIONS.map((d) => ({ key: d.key, label: d.label }));
   const indicators = INDICATORS.map((i) => ({ key: i.key, label: i.label }));
@@ -44,6 +63,15 @@ export default async function SalesSummaryPage({
     const v = params.get(`f_${d.key}`);
     if (v) initialFilters[d.key] = v;
   }
+  const cfgGroups = params.get("groups")?.split(",").filter(Boolean) ?? [
+    "client",
+  ];
+  const cfgInd = params.get("ind")?.split(",").filter(Boolean) ?? [
+    "qty",
+    "weightKg",
+    "revenueEur",
+  ];
+  const cfgTotals = params.get("totals") !== "0";
 
   return (
     <div className="mx-auto max-w-6xl space-y-4">
@@ -56,9 +84,13 @@ export default async function SalesSummaryPage({
           <p className="mt-1 text-sm text-gray-500">
             Гнучкий звіт продажів з довільним групуванням, показниками та
             відборами.{" "}
-            {result.tooLarge
-              ? "Оберіть період — забагато даних."
-              : `Рухів у вибірці: ${result.rowCount}.`}
+            {!submitted
+              ? "Налаштуйте параметри та натисніть «Сформувати»."
+              : errored
+                ? "Помилка формування."
+                : result?.tooLarge
+                  ? "Оберіть період — забагато даних."
+                  : `Рухів у вибірці: ${result?.rowCount ?? 0}.`}
           </p>
         </div>
         <ReportExportButtons
@@ -73,25 +105,37 @@ export default async function SalesSummaryPage({
         initial={{
           from: params.get("from") ?? "",
           to: params.get("to") ?? "",
-          groups: result.groups,
-          indicators: result.indicators,
-          totals: result.showTotals,
+          groups: cfgGroups,
+          indicators: cfgInd,
+          totals: cfgTotals,
           filters: initialFilters,
         }}
       />
 
-      {result.tooLarge ? (
+      {!submitted ? (
+        <div className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-6 text-center text-sm text-gray-500">
+          Оберіть період, групування та показники зліва й натисніть
+          «Сформувати».
+        </div>
+      ) : errored ? (
+        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-6 text-center text-sm text-red-700">
+          Не вдалося сформувати звіт (можливо, забагато даних). Звузьте період
+          або відбори й спробуйте ще раз.
+        </div>
+      ) : result?.tooLarge ? (
         <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-6 text-center text-sm text-amber-800">
           Забагато рухів ({result.rowCount.toLocaleString("uk-UA")}) для звіту
           без періоду. Оберіть період «з / по» та натисніть «Сформувати».
         </div>
       ) : (
-        <FlexTree
-          tree={result.tree}
-          indicators={result.indicatorDefs}
-          grand={result.grand}
-          showTotals={result.showTotals}
-        />
+        result && (
+          <FlexTree
+            tree={result.tree}
+            indicators={result.indicatorDefs}
+            grand={result.grand}
+            showTotals={result.showTotals}
+          />
+        )
       )}
     </div>
   );

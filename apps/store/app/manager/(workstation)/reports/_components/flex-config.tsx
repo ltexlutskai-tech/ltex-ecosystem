@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { Button, Input } from "@ltex/ui";
 
@@ -43,6 +43,7 @@ export function FlexConfig({
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const [isPending, startTransition] = useTransition();
 
   const [from, setFrom] = useState(initial.from);
   const [to, setTo] = useState(initial.to);
@@ -110,11 +111,13 @@ export function FlexConfig({
     for (const [k, v] of Object.entries(filters)) {
       if (v.trim()) sp.set(`f_${k}`, v.trim());
     }
-    router.push(`${pathname}?${sp.toString()}`);
+    // Прапорець «сформовано» — сторінка рахує звіт лише після цього (легкий старт).
+    sp.set("go", "1");
+    startTransition(() => router.push(`${pathname}?${sp.toString()}`));
   }
 
   function reset() {
-    router.push(pathname);
+    startTransition(() => router.push(pathname));
   }
 
   return (
@@ -273,15 +276,28 @@ export function FlexConfig({
           />
           Загальні підсумки
         </label>
-        <div className="ml-auto flex gap-2">
-          <Button type="button" size="sm" onClick={submit} className="h-8">
-            Сформувати
+        <div className="ml-auto flex items-center gap-2">
+          {isPending && (
+            <span className="flex items-center gap-1.5 text-sm text-gray-500">
+              <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-gray-300 border-t-emerald-600" />
+              Формування…
+            </span>
+          )}
+          <Button
+            type="button"
+            size="sm"
+            onClick={submit}
+            disabled={isPending}
+            className="h-8"
+          >
+            {isPending ? "Формування…" : "Сформувати"}
           </Button>
           <Button
             type="button"
             size="sm"
             variant="outline"
             onClick={reset}
+            disabled={isPending}
             className="h-8"
           >
             Скинути
