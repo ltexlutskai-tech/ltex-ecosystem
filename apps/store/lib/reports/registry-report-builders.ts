@@ -9,41 +9,25 @@
  *
  * Параметри передаються через query (як для margin `?group=`):
  *   sales-summary  — гнучкий: `?from&to&groups=<csv dims>&ind=<csv>&f_<dim>=…`
- *   stock-balance  — `?to&group=product|quality`  (залишок на дату)
  *   reconciliation — `?clientId&from&to`
  *
- * Примітка: `cashflow` тепер гнучкий звіт (`cashflow-flex.ts`) і викликається
- * напряму з `resolve-report.ts` (тут більше НЕ обгортається).
+ * Примітка: `cashflow` і `stock-balance` тепер гнучкі звіти
+ * (`cashflow-flex.ts` / `stock-flex.ts`) і викликаються напряму з
+ * `resolve-report.ts` (тут більше НЕ обгортаються).
  */
 
-import { prisma, Prisma } from "@ltex/db";
-import {
-  buildOccurredAtFilter,
-  parseDateParam,
-} from "@/lib/manager/registry-view";
+import { parseDateParam } from "@/lib/manager/registry-view";
 import type { ReportShape } from "@/lib/reports/analyst-reports";
-import {
-  summarizeStockBalance,
-  totalStock,
-  type StockGroupBy,
-  type StockMovementLite,
-} from "@/lib/reports/registry-reports";
 import {
   buildSalesFlexReport,
   flattenToReportShape,
 } from "@/lib/reports/sales-flex";
 import { buildReconciliationReport } from "@/lib/reports/reconciliation";
 
-const STOCK_LIMIT = 50000;
-
 /** Період-заглушка для звітів з власною фільтрацією дат (не використовується роутами). */
 function freePeriod(label: string): ReportShape["period"] {
   const now = new Date();
   return { from: now, to: now, label };
-}
-
-function parseStockGroup(raw: string | null): StockGroupBy {
-  return raw === "quality" ? "quality" : "product";
 }
 
 // ─── sales-summary (гнучкий звіт) ────────────────────────────────────────────
@@ -62,70 +46,6 @@ export async function buildSalesSummaryReport(
     };
   }
   return flattenToReportShape(result);
-}
-
-// ─── stock-balance ──────────────────────────────────────────────────────────
-export async function buildStockBalanceReport(
-  params: URLSearchParams,
-): Promise<ReportShape> {
-  const group = parseStockGroup(params.get("group"));
-  const asOf = parseDateParam(params.get("to") ?? undefined);
-  const where: Prisma.StockMovementWhereInput = {};
-  if (asOf) {
-    const end = new Date(asOf);
-    end.setHours(23, 59, 59, 999);
-    where.occurredAt = { lte: end };
-  }
-
-  const movements = await prisma.stockMovement.findMany({
-    where,
-    take: STOCK_LIMIT,
-    select: {
-      productCode1C: true,
-      quality: true,
-      qty: true,
-      weightKg: true,
-      recordKind: true,
-    },
-  });
-
-  const productCodes = [...new Set(movements.map((m) => m.productCode1C))];
-  const products = productCodes.length
-    ? await prisma.product.findMany({
-        where: { code1C: { in: productCodes } },
-        select: { code1C: true, name: true },
-      })
-    : [];
-  const productName = new Map(
-    products.map((p) => [p.code1C ?? "", p.name] as const),
-  );
-
-  const lite: StockMovementLite[] = movements.map((m) => ({
-    productCode1C: m.productCode1C,
-    productName: productName.get(m.productCode1C) ?? null,
-    quality: m.quality,
-    qty: Number(m.qty),
-    weightKg: m.weightKg == null ? null : Number(m.weightKg),
-    recordKind: m.recordKind,
-  }));
-
-  const summary = summarizeStockBalance(lite, group);
-  const grand = totalStock(summary);
-
-  const headers = ["Назва", "К-сть, шт", "Вага, кг"];
-  const rows: ReportShape["rows"] = summary.map((r) => [
-    r.label,
-    r.qty,
-    r.weightKg,
-  ]);
-  rows.push([grand.label, grand.qty, grand.weightKg]);
-
-  return {
-    title: "Залишки складу",
-    period: freePeriod("Станом на дату"),
-    headers,
-    rows,
-  };
 }
 
 // ─── reconciliation ─────────────────────────────────────────────────────────
