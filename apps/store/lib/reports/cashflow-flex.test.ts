@@ -21,6 +21,8 @@ import {
 function emptyMaps(): CashFlowMaps {
   return {
     articleNameByCode: new Map(),
+    articleParentByCode: new Map(),
+    articleRootByCode: new Map(),
     accountNameByCode: new Map(),
     clientNameByCode: new Map(),
   };
@@ -257,6 +259,8 @@ describe("registries", () => {
   it("exposes expected dimension keys", () => {
     expect(DIMENSIONS.map((d) => d.key)).toEqual([
       "article",
+      "articleRoot",
+      "articleGroup",
       "account",
       "client",
       "direction",

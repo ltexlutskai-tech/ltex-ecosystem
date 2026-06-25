@@ -104,7 +104,14 @@ export default async function CashFlowReportPage({
       <FlexConfig
         dimensions={dimensions}
         indicators={indicators}
-        commonFilters={["article", "account", "client", "direction"]}
+        commonFilters={[
+          "articleRoot",
+          "articleGroup",
+          "article",
+          "account",
+          "client",
+          "direction",
+        ]}
         initial={{
           from: params.get("from") ?? "",
           to: params.get("to") ?? "",

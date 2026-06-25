@@ -44,6 +44,10 @@ export interface FlexCashFlowMovement {
 export interface CashFlowMaps {
   /** articleCode1C → назва статті. */
   articleNameByCode: Map<string, string>;
+  /** articleCode1C → назва безпосередньої папки-категорії (підкатегорія). */
+  articleParentByCode: Map<string, string>;
+  /** articleCode1C → назва кореневої папки-категорії (верхній рівень). */
+  articleRootByCode: Map<string, string>;
   /** accountCode1C → назва рахунку/каси. */
   accountNameByCode: Map<string, string>;
   /** clientCode1C (uid1C) → назва контрагента. */
@@ -90,6 +94,28 @@ export const DIMENSIONS: readonly DimensionDef[] = [
         ? maps.articleNameByCode.get(m.articleCode1C)
         : null;
       return { id: m.articleCode1C ?? "—", label: name ?? "Без статті" };
+    },
+  },
+  {
+    key: "articleRoot",
+    label: "Категорія статті",
+    resolve(m, maps) {
+      const root = m.articleCode1C
+        ? maps.articleRootByCode.get(m.articleCode1C)
+        : null;
+      const label = root ?? "Без категорії";
+      return { id: label, label };
+    },
+  },
+  {
+    key: "articleGroup",
+    label: "Підкатегорія статті",
+    resolve(m, maps) {
+      const parent = m.articleCode1C
+        ? maps.articleParentByCode.get(m.articleCode1C)
+        : null;
+      const label = parent ?? "Без категорії";
+      return { id: label, label };
     },
   },
   {
@@ -372,9 +398,6 @@ export async function buildCashflowFlexReport(
 async function resolveMaps(
   movements: FlexCashFlowMovement[],
 ): Promise<CashFlowMaps> {
-  const articleCodes = [
-    ...new Set(movements.map((m) => m.articleCode1C).filter(Boolean)),
-  ] as string[];
   const accountCodes = [
     ...new Set(movements.map((m) => m.accountCode1C).filter(Boolean)),
   ] as string[];
@@ -382,13 +405,12 @@ async function resolveMaps(
     ...new Set(movements.map((m) => m.clientCode1C).filter(Boolean)),
   ] as string[];
 
-  const [articles, accounts, clients] = await Promise.all([
-    articleCodes.length
-      ? prisma.mgrCashFlowArticle.findMany({
-          where: { code1C: { in: articleCodes } },
-          select: { code1C: true, name: true },
-        })
-      : Promise.resolve([]),
+  const [allArticles, accounts, clients] = await Promise.all([
+    // Весь довідник статей (з parentId) — для назв + ієрархії категорій.
+    // Довідник малий (десятки-сотні рядків), тож тягнемо повністю.
+    prisma.mgrCashFlowArticle.findMany({
+      select: { id: true, code1C: true, name: true, parentId: true },
+    }),
     accountCodes.length
       ? prisma.mgrBankAccount.findMany({
           where: { code1C: { in: accountCodes } },
@@ -403,10 +425,33 @@ async function resolveMaps(
       : Promise.resolve([]),
   ]);
 
+  const articleById = new Map(allArticles.map((a) => [a.id, a]));
+  const articleNameByCode = new Map<string, string>();
+  const articleParentByCode = new Map<string, string>();
+  const articleRootByCode = new Map<string, string>();
+  for (const a of allArticles) {
+    if (!a.code1C) continue;
+    articleNameByCode.set(a.code1C, a.name);
+    // Безпосередня папка-категорія.
+    const parent = a.parentId ? articleById.get(a.parentId) : undefined;
+    articleParentByCode.set(a.code1C, parent?.name ?? "Без категорії");
+    // Коренева папка (підіймаємось до верху; захист від циклів).
+    let cur = parent;
+    const seen = new Set<string>();
+    while (cur?.parentId && !seen.has(cur.id)) {
+      seen.add(cur.id);
+      cur = articleById.get(cur.parentId);
+    }
+    articleRootByCode.set(
+      a.code1C,
+      cur?.name ?? parent?.name ?? "Без категорії",
+    );
+  }
+
   return {
-    articleNameByCode: new Map(
-      articles.map((a) => [a.code1C ?? "", a.name] as const),
-    ),
+    articleNameByCode,
+    articleParentByCode,
+    articleRootByCode,
     accountNameByCode: new Map(
       accounts.map((a) => [a.code1C ?? "", a.name] as const),
     ),
