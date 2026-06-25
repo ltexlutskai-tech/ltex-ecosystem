@@ -279,6 +279,13 @@ export interface TreeNode {
   level: number;
   values: Record<string, number>;
   children: TreeNode[];
+  /**
+   * Атрибути товару (артикул/опис/ціни тощо) — заповнюються ЛИШЕ для вузлів,
+   * піддерево яких відповідає одному товару (product-leaf). НЕ сумуються; це
+   * довідкові колонки у стилі 1С «Остатки товаров». Опційне — інші звіти не
+   * заповнюють.
+   */
+  attrs?: Record<string, string | number | null>;
 }
 
 /**
