@@ -26,6 +26,7 @@ export function FlexConfig({
   indicators,
   initial,
   commonFilters = ["region", "agent", "client", "product"],
+  hideFrom = false,
 }: {
   dimensions: OptionDef[];
   indicators: OptionDef[];
@@ -39,6 +40,11 @@ export function FlexConfig({
   };
   /** Виміри-кандидати для блоку «Відбори» додатково до обраних груп. */
   commonFilters?: string[];
+  /**
+   * Приховати поле «Період з» і перейменувати «по» → «Станом на».
+   * Для звітів з балансовою семантикою (залишок на дату), де `from` не має сенсу.
+   */
+  hideFrom?: boolean;
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -103,7 +109,7 @@ export function FlexConfig({
     sp.delete("totals");
     for (const d of dimensions) sp.delete(`f_${d.key}`);
 
-    if (from.trim()) sp.set("from", from.trim());
+    if (!hideFrom && from.trim()) sp.set("from", from.trim());
     if (to.trim()) sp.set("to", to.trim());
     if (groups.length) sp.set("groups", groups.join(","));
     if (ind.length) sp.set("ind", ind.join(","));
@@ -124,17 +130,21 @@ export function FlexConfig({
     <div className="space-y-4 rounded-lg border border-gray-200 bg-white p-4">
       {/* Період */}
       <div className="flex flex-wrap items-end gap-2">
+        {!hideFrom && (
+          <label className="flex flex-col gap-0.5">
+            <span className="text-xs text-gray-500">Період з</span>
+            <Input
+              type="date"
+              value={from}
+              onChange={(e) => setFrom(e.target.value)}
+              className="h-8 w-36 text-sm"
+            />
+          </label>
+        )}
         <label className="flex flex-col gap-0.5">
-          <span className="text-xs text-gray-500">Період з</span>
-          <Input
-            type="date"
-            value={from}
-            onChange={(e) => setFrom(e.target.value)}
-            className="h-8 w-36 text-sm"
-          />
-        </label>
-        <label className="flex flex-col gap-0.5">
-          <span className="text-xs text-gray-500">по</span>
+          <span className="text-xs text-gray-500">
+            {hideFrom ? "Станом на" : "по"}
+          </span>
           <Input
             type="date"
             value={to}
