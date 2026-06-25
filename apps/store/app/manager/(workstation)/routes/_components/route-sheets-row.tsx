@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { RouteSheetStatusBadge } from "./route-sheet-status-badge";
 import { formatDocNumber } from "@/lib/manager/order-number";
+import type { RowHandlers } from "../../_components/use-list-context-menu";
 
 export interface RouteSheetsRowData {
   id: string;
@@ -20,12 +21,19 @@ export interface RouteSheetsRowData {
   expeditor: { id: string; fullName: string } | null;
 }
 
-export function RouteSheetsRow({ sheet }: { sheet: RouteSheetsRowData }) {
+export function RouteSheetsRow({
+  sheet,
+  rowHandlers,
+}: {
+  sheet: RouteSheetsRowData;
+  rowHandlers?: RowHandlers;
+}) {
   const date = new Date(sheet.date).toLocaleDateString("uk-UA");
   const dimmed = sheet.archived;
 
   return (
     <tr
+      {...rowHandlers}
       className={`border-b last:border-b-0 hover:bg-gray-50 ${
         dimmed ? "bg-gray-50 text-gray-400" : ""
       }`}

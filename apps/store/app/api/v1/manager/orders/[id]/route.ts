@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { Prisma, prisma } from "@ltex/db";
 import { getCurrentUser } from "@/lib/auth/manager-auth";
+import { canDeleteManagerDoc } from "@/lib/manager/doc-delete-permission";
 import { canViewOrder } from "@/lib/manager/order-ownership";
 import { isOrderLocked, isTransitionAllowed } from "@/lib/manager/order-status";
 import { updateOrderSchema } from "@/lib/validations/manager-order";
@@ -230,6 +232,71 @@ export async function PATCH(
     });
     return NextResponse.json(
       { error: "Помилка оновлення замовлення" },
+      { status: 500 },
+    );
+  }
+}
+
+/**
+ * Видалення замовлення (з контекстного меню списку).
+ *
+ * Ownership — як у GET/PATCH (`canViewOrder`): менеджер видаляє лише свої, admin —
+ * будь-яке. Працює і для проведених (`posted`/`archived`) замовлень.
+ *
+ * Реверс сліду документа:
+ *   - `OrderItem` / `Shipment` / `Payment` видаляються каскадом (`onDelete: Cascade`);
+ *   - `Sale.orderId` обнуляється автоматично (`onDelete: SetNull`) — реалізації-
+ *     підстави зберігаються, лише відв'язуються.
+ *   - Замовлення НЕ пишуть рухів боргу, тому перерахунок боргу не потрібен.
+ */
+export async function DELETE(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  const user = await getCurrentUser(req);
+  if (!user) {
+    return NextResponse.json({ error: "Не авторизовано" }, { status: 401 });
+  }
+
+  if (!canDeleteManagerDoc(user.role)) {
+    return NextResponse.json(
+      { error: "Недостатньо прав для видалення" },
+      { status: 403 },
+    );
+  }
+
+  const { id } = await params;
+
+  const ok = await canViewOrder(user, id);
+  if (!ok) {
+    return NextResponse.json(
+      { error: "Замовлення не знайдено" },
+      { status: 404 },
+    );
+  }
+
+  const existing = await prisma.order.findUnique({
+    where: { id },
+    select: { id: true },
+  });
+  if (!existing) {
+    return NextResponse.json(
+      { error: "Замовлення не знайдено" },
+      { status: 404 },
+    );
+  }
+
+  try {
+    await prisma.order.delete({ where: { id } });
+    revalidatePath("/manager/orders");
+    return NextResponse.json({ ok: true });
+  } catch (err) {
+    console.error("[L-TEX] Order delete failed", {
+      orderId: id,
+      error: err instanceof Error ? err.message : String(err),
+    });
+    return NextResponse.json(
+      { error: "Помилка видалення замовлення" },
       { status: 500 },
     );
   }
