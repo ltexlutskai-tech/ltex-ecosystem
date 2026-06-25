@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { prisma } from "@ltex/db";
 import { getCurrentUser } from "@/lib/auth/manager-auth";
+import { canDeleteManagerDoc } from "@/lib/manager/doc-delete-permission";
 import {
   canTransition,
   isRouteSheetLocked,
@@ -351,4 +353,79 @@ export async function PATCH(
     totalUah: sheet.totalUah,
     updatedAt: sheet.updatedAt.toISOString(),
   });
+}
+
+/**
+ * Видалення маршрутного листа (з контекстного меню списку).
+ *
+ * Маршрутні листи спільні (не прив'язані до клієнта), як GET/PATCH — без
+ * per-client ownership; обмежуємо лише роллю (`canDeleteManagerDoc`).
+ *
+ * Реверс сліду документа в одній транзакції:
+ *   - ВСІ власні дочірні таблиці МЛ (orders/items/loading/sales/saleItems/
+ *     payments/tasks/expenses) видаляються каскадом (`onDelete: Cascade`);
+ *   - РЕАЛЬНІ документи Sale / MgrCashOrder / Order НЕ видаляються — вони
+ *     посилаються на МЛ через плоский скаляр `routeSheetId` (без FK), тож просто
+ *     обнуляємо це посилання, щоб не лишилось «висячих» зв'язків.
+ */
+export async function DELETE(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  const user = await getCurrentUser(req);
+  if (!user) {
+    return NextResponse.json({ error: "Не авторизовано" }, { status: 401 });
+  }
+
+  if (!canDeleteManagerDoc(user.role)) {
+    return NextResponse.json(
+      { error: "Недостатньо прав для видалення" },
+      { status: 403 },
+    );
+  }
+
+  const { id } = await params;
+
+  const existing = await prisma.routeSheet.findUnique({
+    where: { id },
+    select: { id: true },
+  });
+  if (!existing) {
+    return NextResponse.json(
+      { error: "Маршрутний лист не знайдено" },
+      { status: 404 },
+    );
+  }
+
+  try {
+    await prisma.$transaction(async (tx) => {
+      // Відв'язуємо реальні документи (routeSheetId — плоский скаляр, не FK).
+      await tx.sale.updateMany({
+        where: { routeSheetId: id },
+        data: { routeSheetId: null },
+      });
+      await tx.mgrCashOrder.updateMany({
+        where: { routeSheetId: id },
+        data: { routeSheetId: null },
+      });
+      await tx.order.updateMany({
+        where: { routeSheetId: id },
+        data: { routeSheetId: null },
+      });
+      // Власні дочірні таблиці МЛ зникають каскадом разом з шапкою.
+      await tx.routeSheet.delete({ where: { id } });
+    });
+
+    revalidatePath("/manager/routes");
+    return NextResponse.json({ ok: true });
+  } catch (err) {
+    console.error("[L-TEX] Route sheet delete failed", {
+      routeSheetId: id,
+      error: err instanceof Error ? err.message : String(err),
+    });
+    return NextResponse.json(
+      { error: "Помилка видалення маршрутного листа" },
+      { status: 500 },
+    );
+  }
 }

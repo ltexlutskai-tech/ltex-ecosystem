@@ -16,8 +16,10 @@ const {
   enqueueRouteSheetCreateMock,
 } = vi.hoisted(() => ({
   mockPrisma: {
-    routeSheet: { findUnique: vi.fn(), update: vi.fn() },
+    routeSheet: { findUnique: vi.fn(), update: vi.fn(), delete: vi.fn() },
     order: { findMany: vi.fn(), updateMany: vi.fn() },
+    sale: { updateMany: vi.fn() },
+    mgrCashOrder: { updateMany: vi.fn() },
     customer: { findMany: vi.fn() },
     product: { findMany: vi.fn() },
     lot: { findMany: vi.fn(), updateMany: vi.fn() },
@@ -60,8 +62,15 @@ vi.mock("@/lib/sync/enqueue", () => ({
   enqueueRouteSheetCreate: (...args: unknown[]) =>
     enqueueRouteSheetCreateMock(...args),
 }));
+vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 
-import { GET, PATCH } from "./route";
+import { GET, PATCH, DELETE } from "./route";
+
+function delReq(): NextRequest {
+  return new NextRequest("http://localhost/api/v1/manager/route-sheets/rs1", {
+    method: "DELETE",
+  });
+}
 
 const MANAGER = {
   id: "u1",
@@ -74,6 +83,8 @@ const MANAGER = {
   notifyChannels: [],
   lastSeenAt: null,
 };
+
+const ADMIN = { ...MANAGER, id: "admin1", role: "admin" as const };
 
 const params = Promise.resolve({ id: "rs1" });
 
@@ -133,6 +144,9 @@ beforeEach(() => {
   mockPrisma.routeSheetOrder.findMany.mockResolvedValue([]);
   mockPrisma.lot.updateMany.mockResolvedValue({ count: 0 });
   mockPrisma.order.updateMany.mockResolvedValue({ count: 0 });
+  mockPrisma.sale.updateMany.mockResolvedValue({ count: 0 });
+  mockPrisma.mgrCashOrder.updateMany.mockResolvedValue({ count: 0 });
+  mockPrisma.routeSheet.delete.mockResolvedValue({ id: "rs1" });
   loadingRowsMock.mockResolvedValue([]);
   shortageMock.mockResolvedValue([]);
   countersMock.mockResolvedValue({
@@ -455,5 +469,54 @@ describe("PATCH /api/v1/manager/route-sheets/[id]", () => {
     const res = await PATCH(patchReq({ status: "draft" }), { params });
     expect(res.status).toBe(200);
     expect(enqueueRouteSheetCreateMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("DELETE /api/v1/manager/route-sheets/[id]", () => {
+  it("returns 401 when not authed", async () => {
+    getCurrentUserMock.mockResolvedValueOnce(null);
+    const res = await DELETE(delReq(), { params });
+    expect(res.status).toBe(401);
+  });
+
+  it("returns 403 when role cannot delete (warehouse)", async () => {
+    getCurrentUserMock.mockResolvedValueOnce({
+      ...MANAGER,
+      role: "warehouse" as const,
+    });
+    const res = await DELETE(delReq(), { params });
+    expect(res.status).toBe(403);
+    expect(mockPrisma.routeSheet.delete).not.toHaveBeenCalled();
+  });
+
+  it("returns 404 when route sheet missing", async () => {
+    mockPrisma.routeSheet.findUnique.mockResolvedValueOnce(null);
+    const res = await DELETE(delReq(), { params });
+    expect(res.status).toBe(404);
+  });
+
+  it("deletes sheet + unlinks real Sale/CashOrder/Order (children cascade)", async () => {
+    getCurrentUserMock.mockResolvedValueOnce(ADMIN);
+    mockPrisma.routeSheet.findUnique.mockResolvedValueOnce({ id: "rs1" });
+    const res = await DELETE(delReq(), { params });
+    expect(res.status).toBe(200);
+    const json = (await res.json()) as { ok: boolean };
+    expect(json.ok).toBe(true);
+    // Реальні документи відв'язано (routeSheetId=null), не видалено.
+    expect(mockPrisma.sale.updateMany).toHaveBeenCalledWith({
+      where: { routeSheetId: "rs1" },
+      data: { routeSheetId: null },
+    });
+    expect(mockPrisma.mgrCashOrder.updateMany).toHaveBeenCalledWith({
+      where: { routeSheetId: "rs1" },
+      data: { routeSheetId: null },
+    });
+    expect(mockPrisma.order.updateMany).toHaveBeenCalledWith({
+      where: { routeSheetId: "rs1" },
+      data: { routeSheetId: null },
+    });
+    expect(mockPrisma.routeSheet.delete).toHaveBeenCalledWith({
+      where: { id: "rs1" },
+    });
   });
 });
