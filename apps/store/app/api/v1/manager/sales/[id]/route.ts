@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { Prisma, prisma } from "@ltex/db";
 import { getCurrentUser } from "@/lib/auth/manager-auth";
+import { canDeleteManagerDoc } from "@/lib/manager/doc-delete-permission";
 import { canViewSale } from "@/lib/manager/sale-ownership";
 import {
   isSaleLocked,
@@ -237,6 +239,13 @@ export async function DELETE(
     return NextResponse.json({ error: "Не авторизовано" }, { status: 401 });
   }
 
+  if (!canDeleteManagerDoc(user.role)) {
+    return NextResponse.json(
+      { error: "Недостатньо прав для видалення" },
+      { status: 403 },
+    );
+  }
+
   const { id } = await params;
 
   const ok = await canViewSale(user, id);
@@ -285,6 +294,7 @@ export async function DELETE(
       await recomputeDebtForClients(prisma, [...affectedClientIds]);
     }
 
+    revalidatePath("/manager/sales");
     return NextResponse.json({ ok: true });
   } catch (err) {
     console.error("[L-TEX] Sale delete failed", {

@@ -20,14 +20,23 @@ const {
   }
   return {
     mockPrisma: {
-      sale: { findUnique: vi.fn() },
+      sale: { findUnique: vi.fn(), delete: vi.fn() },
+      mgrDebtMovement: { findMany: vi.fn(), deleteMany: vi.fn() },
+      $transaction: vi.fn(),
     },
     getCurrentUserMock: vi.fn(),
     canViewSaleMock: vi.fn(),
     updateSaleWithItemsMock: vi.fn(),
+    recomputeDebtMock: vi.fn(),
+    resolveClientIdMock: vi.fn(),
     FakePrismaError,
   };
 });
+
+const { recomputeDebtMock, resolveClientIdMock } = vi.hoisted(() => ({
+  recomputeDebtMock: vi.fn(),
+  resolveClientIdMock: vi.fn(),
+}));
 
 vi.mock("@ltex/db", () => ({
   prisma: mockPrisma,
@@ -44,8 +53,20 @@ vi.mock("@/lib/manager/sale-ownership", () => ({
 vi.mock("@/lib/manager/sale-create", () => ({
   updateSaleWithItems: (...args: unknown[]) => updateSaleWithItemsMock(...args),
 }));
+vi.mock("@/lib/manager/debt-register", () => ({
+  recomputeDebtForClients: (...args: unknown[]) => recomputeDebtMock(...args),
+  resolveClientIdByCustomer: (...args: unknown[]) =>
+    resolveClientIdMock(...args),
+}));
+vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 
-import { GET, PATCH } from "./route";
+import { GET, PATCH, DELETE } from "./route";
+
+function delReq(): NextRequest {
+  return new NextRequest("http://localhost/api/v1/manager/sales/sale1", {
+    method: "DELETE",
+  });
+}
 
 const MANAGER = {
   id: "u1",
@@ -344,5 +365,104 @@ describe("PATCH /api/v1/manager/sales/[id]", () => {
       params: Promise.resolve({ id: "sale1" }),
     });
     expect(res.status).toBe(200);
+  });
+});
+
+describe("DELETE /api/v1/manager/sales/[id]", () => {
+  // $transaction отримує callback → виконуємо його з mockPrisma як tx.
+  function wireTx() {
+    mockPrisma.$transaction.mockImplementation(
+      async (cb: (tx: typeof mockPrisma) => Promise<unknown>) => cb(mockPrisma),
+    );
+  }
+
+  it("returns 401 when not authed", async () => {
+    getCurrentUserMock.mockResolvedValueOnce(null);
+    const res = await DELETE(delReq(), {
+      params: Promise.resolve({ id: "sale1" }),
+    });
+    expect(res.status).toBe(401);
+  });
+
+  it("returns 403 when role cannot delete (warehouse)", async () => {
+    getCurrentUserMock.mockResolvedValueOnce({
+      ...MANAGER,
+      role: "warehouse" as const,
+    });
+    const res = await DELETE(delReq(), {
+      params: Promise.resolve({ id: "sale1" }),
+    });
+    expect(res.status).toBe(403);
+    expect(mockPrisma.sale.delete).not.toHaveBeenCalled();
+  });
+
+  it("returns 404 when manager has no permission", async () => {
+    canViewSaleMock.mockResolvedValueOnce(false);
+    const res = await DELETE(delReq(), {
+      params: Promise.resolve({ id: "sale1" }),
+    });
+    expect(res.status).toBe(404);
+    expect(mockPrisma.sale.delete).not.toHaveBeenCalled();
+  });
+
+  it("deletes a draft sale (no debt movements) + recomputes owner debt", async () => {
+    mockPrisma.sale.findUnique.mockResolvedValueOnce({
+      id: "sale1",
+      customerId: "c1",
+    });
+    mockPrisma.mgrDebtMovement.findMany.mockResolvedValueOnce([]); // чернетка — рухів нема
+    mockPrisma.mgrDebtMovement.deleteMany.mockResolvedValue({ count: 0 });
+    mockPrisma.sale.delete.mockResolvedValue({ id: "sale1" });
+    resolveClientIdMock.mockResolvedValueOnce("client1");
+    recomputeDebtMock.mockResolvedValue(1);
+    wireTx();
+
+    const res = await DELETE(delReq(), {
+      params: Promise.resolve({ id: "sale1" }),
+    });
+    expect(res.status).toBe(200);
+    const json = (await res.json()) as { ok: boolean };
+    expect(json.ok).toBe(true);
+    expect(mockPrisma.sale.delete).toHaveBeenCalledWith({
+      where: { id: "sale1" },
+    });
+    expect(recomputeDebtMock).toHaveBeenCalledWith(mockPrisma, ["client1"]);
+  });
+
+  it("deletes a posted sale + removes its debt movement + recomputes", async () => {
+    mockPrisma.sale.findUnique.mockResolvedValueOnce({
+      id: "sale1",
+      customerId: "c1",
+    });
+    // Проведена реалізація має рух боргу.
+    mockPrisma.mgrDebtMovement.findMany.mockResolvedValueOnce([
+      { clientId: "client1" },
+    ]);
+    mockPrisma.mgrDebtMovement.deleteMany.mockResolvedValue({ count: 1 });
+    mockPrisma.sale.delete.mockResolvedValue({ id: "sale1" });
+    recomputeDebtMock.mockResolvedValue(1);
+    wireTx();
+
+    const res = await DELETE(delReq(), {
+      params: Promise.resolve({ id: "sale1" }),
+    });
+    expect(res.status).toBe(200);
+    expect(mockPrisma.mgrDebtMovement.deleteMany).toHaveBeenCalledWith({
+      where: { sourceType: "sale", sourceId: "sale1" },
+    });
+    expect(mockPrisma.sale.delete).toHaveBeenCalledWith({
+      where: { id: "sale1" },
+    });
+    expect(recomputeDebtMock).toHaveBeenCalledWith(mockPrisma, ["client1"]);
+    // resolveClientIdByCustomer не потрібен, бо рух уже дав клієнта.
+    expect(resolveClientIdMock).not.toHaveBeenCalled();
+  });
+
+  it("returns 404 when sale missing", async () => {
+    mockPrisma.sale.findUnique.mockResolvedValueOnce(null);
+    const res = await DELETE(delReq(), {
+      params: Promise.resolve({ id: "sale1" }),
+    });
+    expect(res.status).toBe(404);
   });
 });

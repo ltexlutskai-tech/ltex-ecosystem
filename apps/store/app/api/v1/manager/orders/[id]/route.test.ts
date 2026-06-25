@@ -20,7 +20,7 @@ const {
   }
   return {
     mockPrisma: {
-      order: { findUnique: vi.fn() },
+      order: { findUnique: vi.fn(), delete: vi.fn() },
     },
     getCurrentUserMock: vi.fn(),
     canViewOrderMock: vi.fn(),
@@ -45,8 +45,15 @@ vi.mock("@/lib/manager/order-create", () => ({
   updateOrderWithItems: (...args: unknown[]) =>
     updateOrderWithItemsMock(...args),
 }));
+vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 
-import { GET, PATCH } from "./route";
+import { GET, PATCH, DELETE } from "./route";
+
+function delReq(): NextRequest {
+  return new NextRequest("http://localhost/api/v1/manager/orders/ord1", {
+    method: "DELETE",
+  });
+}
 
 const MANAGER = {
   id: "u1",
@@ -406,6 +413,70 @@ describe("PATCH /api/v1/manager/orders/[id]", () => {
     });
     updateOrderWithItemsMock.mockResolvedValueOnce(fakeUpdatedOrder("sent"));
     const res = await PATCH(patchReq(VALID_PATCH_BODY), {
+      params: Promise.resolve({ id: "ord1" }),
+    });
+    expect(res.status).toBe(200);
+  });
+});
+
+describe("DELETE /api/v1/manager/orders/[id]", () => {
+  it("returns 401 when not authed", async () => {
+    getCurrentUserMock.mockResolvedValueOnce(null);
+    const res = await DELETE(delReq(), {
+      params: Promise.resolve({ id: "ord1" }),
+    });
+    expect(res.status).toBe(401);
+  });
+
+  it("returns 403 when role cannot delete (analyst)", async () => {
+    getCurrentUserMock.mockResolvedValueOnce({
+      ...MANAGER,
+      role: "analyst" as const,
+    });
+    const res = await DELETE(delReq(), {
+      params: Promise.resolve({ id: "ord1" }),
+    });
+    expect(res.status).toBe(403);
+    expect(mockPrisma.order.delete).not.toHaveBeenCalled();
+  });
+
+  it("returns 404 when manager has no permission", async () => {
+    canViewOrderMock.mockResolvedValueOnce(false);
+    const res = await DELETE(delReq(), {
+      params: Promise.resolve({ id: "ord1" }),
+    });
+    expect(res.status).toBe(404);
+    expect(mockPrisma.order.delete).not.toHaveBeenCalled();
+  });
+
+  it("deletes order on success (items cascade, no debt)", async () => {
+    mockPrisma.order.findUnique.mockResolvedValueOnce({ id: "ord1" });
+    mockPrisma.order.delete.mockResolvedValueOnce({ id: "ord1" });
+    const res = await DELETE(delReq(), {
+      params: Promise.resolve({ id: "ord1" }),
+    });
+    expect(res.status).toBe(200);
+    const json = (await res.json()) as { ok: boolean };
+    expect(json.ok).toBe(true);
+    expect(mockPrisma.order.delete).toHaveBeenCalledWith({
+      where: { id: "ord1" },
+    });
+  });
+
+  it("returns 404 when order missing", async () => {
+    mockPrisma.order.findUnique.mockResolvedValueOnce(null);
+    const res = await DELETE(delReq(), {
+      params: Promise.resolve({ id: "ord1" }),
+    });
+    expect(res.status).toBe(404);
+  });
+
+  it("admin can delete any order (ownership bypassed)", async () => {
+    getCurrentUserMock.mockResolvedValueOnce(ADMIN);
+    canViewOrderMock.mockResolvedValueOnce(true);
+    mockPrisma.order.findUnique.mockResolvedValueOnce({ id: "ord1" });
+    mockPrisma.order.delete.mockResolvedValueOnce({ id: "ord1" });
+    const res = await DELETE(delReq(), {
       params: Promise.resolve({ id: "ord1" }),
     });
     expect(res.status).toBe(200);

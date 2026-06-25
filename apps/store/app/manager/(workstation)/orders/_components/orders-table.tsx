@@ -92,9 +92,46 @@ export function OrdersTable({ items }: { items: OrdersRowData[] }) {
       label: "Оновити",
       onSelect: () => router.refresh(),
     });
-    // нові пункти додаються тут (Провести / Видалити тощо)
+    // Видалення замовлення (ownership/права перевіряє сервер).
+    const orderId = ctx.href.split("/").pop();
+    if (orderId) {
+      items.push({ type: "separator" });
+      items.push({
+        type: "action",
+        danger: true,
+        label: "Видалити",
+        onSelect: () => {
+          void deleteOrder(orderId);
+        },
+      });
+    }
     return items;
   };
+
+  async function deleteOrder(orderId: string) {
+    if (
+      !window.confirm(
+        "Видалити це замовлення? Дію не можна скасувати. Позиції замовлення буде видалено, реалізації-підстави — відв'язано.",
+      )
+    ) {
+      return;
+    }
+    try {
+      const res = await fetch(`/api/v1/manager/orders/${orderId}`, {
+        method: "DELETE",
+      });
+      if (res.ok) {
+        router.refresh();
+      } else {
+        const data = (await res.json().catch(() => null)) as {
+          error?: string;
+        } | null;
+        window.alert(data?.error ?? "Не вдалося видалити замовлення");
+      }
+    } catch {
+      window.alert("Помилка мережі під час видалення");
+    }
+  }
 
   const { rowHandlers, menu } = useListContextMenu(buildItems);
 

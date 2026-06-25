@@ -88,9 +88,47 @@ export function PaymentsTable({ items }: { items: PaymentsRowData[] }) {
       label: "Оновити",
       onSelect: () => router.refresh(),
     });
-    // нові пункти додаються тут (Провести / Видалити тощо)
+    // Видалення касового ордера (ownership/права перевіряє сервер). `ctx.href`
+    // = /manager/payments/<id>, де <id> = id касового ордера.
+    const cashOrderId = ctx.href.split("/").pop();
+    if (cashOrderId) {
+      items.push({ type: "separator" });
+      items.push({
+        type: "action",
+        danger: true,
+        label: "Видалити",
+        onSelect: () => {
+          void deleteCashOrder(cashOrderId);
+        },
+      });
+    }
     return items;
   };
+
+  async function deleteCashOrder(cashOrderId: string) {
+    if (
+      !window.confirm(
+        "Видалити цей касовий ордер? Дію не можна скасувати. Борг клієнта буде перераховано, парний ордер-здача видалено.",
+      )
+    ) {
+      return;
+    }
+    try {
+      const res = await fetch(`/api/v1/manager/cash-orders/${cashOrderId}`, {
+        method: "DELETE",
+      });
+      if (res.ok) {
+        router.refresh();
+      } else {
+        const data = (await res.json().catch(() => null)) as {
+          error?: string;
+        } | null;
+        window.alert(data?.error ?? "Не вдалося видалити оплату");
+      }
+    } catch {
+      window.alert("Помилка мережі під час видалення");
+    }
+  }
 
   const { rowHandlers, menu } = useListContextMenu(buildItems);
 
