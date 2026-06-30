@@ -521,6 +521,8 @@ interface ImportContext {
   // ── Сесія 5.7 — дерево категорій з 1С (групи Номенклатури _Reference76) ──
   categoryHexToId: Map<string, string>; // hex(групи _IDRRef) → Category.id
   categoryParentHex: Map<string, string>; // hex(групи) → hex(батька-групи)
+  // ── Фаза 5 — стокові документи: hex(_Reference95) → Warehouse.id ──
+  warehouseIdByHex: Map<string, string>;
 }
 
 // Чи робимо реальні записи (НЕ dry-run).
@@ -5374,61 +5376,997 @@ async function importCostReg(ctx: ImportContext): Promise<Recon> {
 // MAIN
 // ════════════════════════════════════════════════════════════════════════════
 
-// ─── Фаза 5 — документи руху товару (нові) ───────────────────────────────────
-// Кожен документ читається з відповідної 1С-таблиці `_Document…` по
-// code1C=hex(_IDRRef).
-// ✅ НОМЕРИ ТАБЛИЦЬ ДЕКОДОВАНО офлайн (docs/1C_MSSQL_CODES.md) — UUID кожного
-// документа з docs/1c-export-2026-06-02/Documents/<Док>.xml резолвиться через
-// dbnames.txt → _DocumentNNN (HIGH). Раннери поки лишаються СТАБАМИ: вони
-// рахують рядки джерела (countTable) і логують, але повний рядок-мапінг
-// (шапка + табличні частини Товары: Номенклатура/Характеристика/Количество/Вес)
-// ще треба реалізувати за патерном importSales/importCashOrders. Коди колонок
-// шапки/табличних частин — у docs/1C_MSSQL_CODES.md (секція «Stock-документи»).
-// Метадані: docs/1c-export-2026-06-02/Documents/{ВозвратТоваровОтПокупателя,
-//   ВозвратТоваровПоставщику,Перепаковка,СписаниеТоваров,
-//   ОприходованиеТоваров,ИнвентаризацияТоваровНаСкладе,ПеремещениеТоваров}.xml
-const STOCK_DOC_TABLE: Record<string, string | null> = {
-  returns: "_Document123", // ВозвратТоваровОтПокупателя (HIGH; таб.ч. Товары=VT)
-  repack: "_Document6631", // Перепаковка (HIGH; таб.ч. Распаковка/Упаковка)
-  writeoff: "_Document193", // СписаниеТоваров (HIGH; таб.ч. Товары)
-  stockadjust: "_Document156", // ОприходованиеТоваров (HIGH; таб.ч. Товары)
-  inventory: "_Document140", // ИнвентаризацияТоваровНаСкладе (HIGH; таб.ч. Товары)
-  transfer: "_Document162", // ПеремещениеТоваров (HIGH; таб.ч. Товары)
-};
+// ════════════════════════════════════════════════════════════════════════════
+// Фаза 5 — документи руху товару (історичний імпорт у таблиці документів)
+// ════════════════════════════════════════════════════════════════════════════
+// Кожен документ читається з відповідної 1С-таблиці `_Document…` (шапка) + однієї
+// чи двох табличних частин (VT). Idempotent upsert по code1C=hex(_IDRRef);
+// рядки замінюються (deleteMany child → recreate). _Marked=0x01 → пропуск +
+// видалення раніше імпортованого. На --dry-run рахуємо рядки, але НЕ пишемо.
+//
+// ⚠️ КРИТИЧНО: ЦІ ІМПОРТЕРИ НЕ ПИШУТЬ StockMovement. Баланси беруться з регістру
+//   _AccumRg5788 (`--entity stock-reg`). Подвоєння регістру зіпсувало б залишки.
+//   Тут лише наповнюємо моделі документів — історія для списків/карток.
+//
+// Коди колонок звірені офлайн з docs/1c-mssql-schema/columns.tsv +
+//   docs/STOCK_DOCS_IMPORT_MAP.md. Кілька _Fld (особливо Якість/Сума/Контрагент-
+//   поліморф) — best-guess; серверний `--dry-run` має показати розбіжності.
+//
+// Якість (Reference59) у рядках 1С є, але моделі *Item НЕ мають поля quality —
+//   тому quality свідомо НЕ переноситься (лише productId + charHex(=Характеристика)
+//   + barcode з lotBarcodeByCharHex). Одиниці виміру так само не зберігаються
+//   (поле unitName є лише у ProductReturnFromCustomerItem; решта моделей — без).
 
-function makeStockDocStub(
-  entity: string,
-  legacyName: string,
-): (ctx: ImportContext) => Promise<Recon> {
-  return async (ctx: ImportContext): Promise<Recon> => {
-    const recon = newRecon(entity);
-    const table = STOCK_DOC_TABLE[entity];
-    if (!table) {
-      warn(
-        `${entity}: 1С-таблиця для «${legacyName}» ще не декодована ` +
-          `(STOCK_DOC_TABLE.${entity}=null). Пропуск. ` +
-          `Декодуйте _DocumentNNNN + коди колонок → реалізуйте мапінг.`,
-      );
-      return recon;
+// Довідник 1С-таблиць документів (для довідки; кожен імпортер звертається
+// до своєї таблиці безпосередньо):
+//   returns     → _Document123      (VT _Document123_VT729)
+//   repack      → _Document6631     (Распаковка _VT6685 + Упаковка _VT6702)
+//   writeoff    → _Document193      (VT _Document193_VT3696)
+//   stockadjust → _Document156      (VT _Document156_VT1944)
+//   inventory   → _Document140      (VT _Document140_VT1405)
+//   transfer    → _Document162      (VT _Document162_VT2221)
+
+// hex(_Reference95 _IDRRef) → Warehouse.id. Склади імпортовані через
+// `dictionaries-full` (Warehouse.code1C = hex). Будуємо мапу один раз per ctx.
+async function ensureWarehouseDict(ctx: ImportContext): Promise<void> {
+  if (ctx.warehouseIdByHex.size > 0) return;
+  try {
+    const rows = await ctx.prisma.warehouse.findMany({
+      select: { id: true, code1C: true },
+    });
+    for (const w of rows) {
+      if (w.code1C) ctx.warehouseIdByHex.set(w.code1C, w.id);
     }
-    recon.sourceRows = await countTable(ctx.src, table);
-    log(`${entity}: source rows = ${recon.sourceRows} (мапінг — TODO)`);
-    return recon;
-  };
+    if (ctx.warehouseIdByHex.size === 0) {
+      warn(
+        "ensureWarehouseDict: жодного складу у цільовій базі — " +
+          "warehouseId лишиться null. Спершу імпортуйте `--entity dictionaries-full`.",
+      );
+    }
+  } catch (e) {
+    warn(`ensureWarehouseDict: ${errMsg(e)} — warehouseId=null`);
+  }
 }
 
-const importReturns = makeStockDocStub("returns", "ВозвратТоваровОтПокупателя");
-const importRepack = makeStockDocStub("repack", "Перепаковка");
-const importWriteOff = makeStockDocStub("writeoff", "СписаниеТоваров");
-const importStockAdjust = makeStockDocStub(
-  "stockadjust",
-  "ОприходованиеТоваров",
-);
-const importInventory = makeStockDocStub(
-  "inventory",
-  "ИнвентаризацияТоваровНаСкладе",
-);
-const importTransfer = makeStockDocStub("transfer", "ПеремещениеТоваров");
+function resolveWarehouseId(
+  ctx: ImportContext,
+  hex: string | null,
+): string | null {
+  if (!hex) return null;
+  return ctx.warehouseIdByHex.get(hex) ?? null;
+}
+
+// Один резолвлений рядок таб.частини стокового документа.
+interface StockDocItem {
+  productId: string | null;
+  charHex: string | null;
+  barcode: string | null;
+  weight: number;
+  quantity: number;
+  priceEur: number; // Ціна за одиницю (€)
+  amountEur: number; // Сума рядка (€)
+  // лише для інвентаризації:
+  qtyAccounting: number;
+  qtyActual: number;
+}
+
+// Конфіг колонок однієї табличної частини (VT).
+interface StockVtConfig {
+  table: string; // напр. "_Document123_VT729"
+  ownerCol: string; // FK на шапку, напр. "_Document123_IDRRef"
+  lineNoCol: string; // напр. "_LineNo730"
+  productRRef: string; // Номенклатура
+  charRRef: string | null; // Характеристика (лот)
+  qtyCol: string | null; // Количество
+  weightCol: string | null; // Вес (null → 0)
+  priceCol: string | null; // Цена
+  amountCol: string | null; // Сумма
+  // інвентаризація: облік/факт:
+  qtyAccountingCol: string | null;
+  qtyActualCol: string | null;
+}
+
+// Стрімить одну VT-таблицю у Map<headerHex, StockDocItem[]> (упорядковано _LineNo).
+async function loadStockVtMap(
+  ctx: ImportContext,
+  vt: StockVtConfig,
+): Promise<Map<string, StockDocItem[]>> {
+  const out = new Map<string, StockDocItem[]>();
+  const cols = [
+    vt.ownerCol,
+    vt.lineNoCol,
+    vt.productRRef,
+    ...(vt.charRRef ? [vt.charRRef] : []),
+    ...(vt.qtyCol ? [vt.qtyCol] : []),
+    ...(vt.weightCol ? [vt.weightCol] : []),
+    ...(vt.priceCol ? [vt.priceCol] : []),
+    ...(vt.amountCol ? [vt.amountCol] : []),
+    ...(vt.qtyAccountingCol ? [vt.qtyAccountingCol] : []),
+    ...(vt.qtyActualCol ? [vt.qtyActualCol] : []),
+  ];
+  for await (const rows of streamTable(ctx.src, vt.table, cols, {
+    batch: 5000,
+    limit: null,
+    orderBy: [vt.ownerCol, vt.lineNoCol],
+  })) {
+    for (const row of rows) {
+      const ownerHex = bufToHex(row[vt.ownerCol]);
+      if (!ownerHex) continue;
+      const productHex = bufToHex(row[vt.productRRef]);
+      const charHex = vt.charRRef ? bufToHex(row[vt.charRRef]) : null;
+      const barcode =
+        charHex != null ? (ctx.lotBarcodeByCharHex.get(charHex) ?? null) : null;
+      const qty = vt.qtyCol ? asNumberOr(row[vt.qtyCol], 0) : 0;
+      const item: StockDocItem = {
+        productId: resolveProductId(ctx, productHex),
+        charHex,
+        barcode,
+        weight: vt.weightCol ? asNumberOr(row[vt.weightCol], 0) : 0,
+        quantity: Math.round(qty) || (qty > 0 ? 1 : 0),
+        priceEur: vt.priceCol ? asNumberOr(row[vt.priceCol], 0) : 0,
+        amountEur: vt.amountCol ? asNumberOr(row[vt.amountCol], 0) : 0,
+        qtyAccounting: vt.qtyAccountingCol
+          ? asNumberOr(row[vt.qtyAccountingCol], 0)
+          : 0,
+        qtyActual: vt.qtyActualCol ? asNumberOr(row[vt.qtyActualCol], 0) : 0,
+      };
+      const arr = out.get(ownerHex);
+      if (arr) arr.push(item);
+      else out.set(ownerHex, [item]);
+    }
+  }
+  return out;
+}
+
+// ─── 1. returns — ВозвратТоваровОтПокупателя → _Document123 / _Document123_VT729 ─
+// Шапка: Контрагент(поліморф) _Fld706_RRRef, Коментар _Fld717.
+// Рядки: Номенклатура _Fld731RRef, Кількість _Fld732, Характеристика _Fld741RRef,
+//   Ціна _Fld736, Сума _Fld738. (Склад у шапці відсутній → warehouseId=null.)
+const RETURNS_HEADER_COLS = [
+  "_IDRRef",
+  "_Number",
+  "_Date_Time",
+  "_Posted",
+  "_Marked",
+  "_Fld706_RRRef", // Контрагент (поліморф, читаємо RRRef-частину)
+  "_Fld717", // Коментар
+];
+
+async function importReturns(ctx: ImportContext): Promise<Recon> {
+  const recon = newRecon("returns");
+  const sink = new ErrorSink(recon, "returns");
+  const { args, src, prisma } = ctx;
+
+  await ensureProductLotDicts(ctx);
+  await ensureCustomerDict(ctx);
+
+  recon.sourceRows = await countTable(src, "_Document123");
+  log(`returns: source rows = ${recon.sourceRows}`);
+
+  let itemsByDoc: Map<string, StockDocItem[]>;
+  try {
+    itemsByDoc = await loadStockVtMap(ctx, {
+      table: "_Document123_VT729",
+      ownerCol: "_Document123_IDRRef",
+      lineNoCol: "_LineNo730",
+      productRRef: "_Fld731RRef",
+      charRRef: "_Fld741RRef",
+      qtyCol: "_Fld732",
+      weightCol: null, // returns VT не має окремої колонки ваги (best-guess: 0)
+      priceCol: "_Fld736",
+      amountCol: "_Fld738",
+      qtyAccountingCol: null,
+      qtyActualCol: null,
+    });
+  } catch (e) {
+    warn(`returns: VT _Document123_VT729 недоступна (${errMsg(e)}) — пропуск.`);
+    return recon;
+  }
+
+  for await (const rows of streamTable(
+    src,
+    "_Document123",
+    RETURNS_HEADER_COLS,
+    { batch: args.batch, limit: args.limit, orderBy: ["_IDRRef"] },
+  )) {
+    for (const row of rows) {
+      const hex = bufToHex(row["_IDRRef"]);
+      if (!hex) {
+        recon.skipped++;
+        continue;
+      }
+      const code1C = hex;
+      if (asBool(row["_Marked"])) {
+        if (willWrite(ctx)) {
+          await prisma.productReturnFromCustomer.deleteMany({
+            where: { code1C },
+          });
+        }
+        recon.skipped++;
+        continue;
+      }
+      const custHex = bufToHex(row["_Fld706_RRRef"]);
+      const customer = custHex ? ctx.customers.get(custHex) : null;
+      const customerId =
+        customer && customer.id !== "(pending)" ? customer.id : null;
+      if (custHex && !customerId) recon.unresolved++;
+
+      const items = itemsByDoc.get(hex) ?? [];
+      const totalWeight = items.reduce((s, it) => s + it.weight, 0);
+      const totalQuantity = items.reduce((s, it) => s + it.quantity, 0);
+      const totalEur = round2(items.reduce((s, it) => s + it.amountEur, 0));
+      const posted = asBool(row["_Posted"]);
+      const docDate = asDate(row["_Date_Time"]);
+
+      try {
+        if (willWrite(ctx)) {
+          await prisma.$transaction(async (tx) => {
+            const doc = await tx.productReturnFromCustomer.upsert({
+              where: { code1C },
+              create: {
+                code1C,
+                number1C: asString(row["_Number"]),
+                docNumber: hex,
+                ...(docDate ? { docDate } : {}),
+                customerId,
+                status: posted ? "posted" : "draft",
+                totalWeight,
+                totalQuantity,
+                totalEur,
+                notes: asString(row["_Fld717"]),
+                ...(docDate ? { createdAt: docDate } : {}),
+              },
+              update: {
+                number1C: asString(row["_Number"]),
+                ...(docDate ? { docDate } : {}),
+                customerId,
+                status: posted ? "posted" : "draft",
+                totalWeight,
+                totalQuantity,
+                totalEur,
+                notes: asString(row["_Fld717"]),
+              },
+              select: { id: true },
+            });
+            await tx.productReturnFromCustomerItem.deleteMany({
+              where: { returnId: doc.id },
+            });
+            if (items.length > 0) {
+              await tx.productReturnFromCustomerItem.createMany({
+                data: items.map((it) => ({
+                  returnId: doc.id,
+                  productId: it.productId,
+                  charHex: it.charHex,
+                  barcode: it.barcode,
+                  weight: it.weight,
+                  quantity: it.quantity,
+                  priceEur: it.priceEur,
+                  amountEur: it.amountEur,
+                })),
+              });
+            }
+          });
+        }
+        recon.written++;
+      } catch (e) {
+        sink.record(code1C, e);
+      }
+    }
+    log(`returns: processed ${recon.written + recon.skipped + recon.errors}`);
+  }
+  return recon;
+}
+
+// ─── 2. repack — Перепаковка → _Document6631 (Распаковка _VT6685 + Упаковка _VT6702) ─
+// Шапка: Склад _Fld6679RRef, Коментар _Fld6684.
+// Распаковка (спожито) → role "disassembled"; Упаковка (вироблено) → role "packed".
+// inputWeight=Σ(Распаковка.вага); outputWeight=Σ(Упаковка.вага); lossWeight=in−out.
+const REPACK_HEADER_COLS = [
+  "_IDRRef",
+  "_Number",
+  "_Date_Time",
+  "_Posted",
+  "_Marked",
+  "_Fld6679RRef", // Склад
+  "_Fld6684", // Коментар
+];
+
+async function importRepack(ctx: ImportContext): Promise<Recon> {
+  const recon = newRecon("repack");
+  const sink = new ErrorSink(recon, "repack");
+  const { args, src, prisma } = ctx;
+
+  await ensureProductLotDicts(ctx);
+  await ensureWarehouseDict(ctx);
+
+  recon.sourceRows = await countTable(src, "_Document6631");
+  log(`repack: source rows = ${recon.sourceRows}`);
+
+  let disByDoc: Map<string, StockDocItem[]>;
+  let packByDoc: Map<string, StockDocItem[]>;
+  try {
+    disByDoc = await loadStockVtMap(ctx, {
+      table: "_Document6631_VT6685", // Распаковка
+      ownerCol: "_Document6631_IDRRef",
+      lineNoCol: "_LineNo6686",
+      productRRef: "_Fld6687RRef",
+      charRRef: "_Fld6696RRef",
+      qtyCol: "_Fld6692",
+      weightCol: "_Fld6693",
+      priceCol: "_Fld6695",
+      amountCol: "_Fld6699",
+      qtyAccountingCol: null,
+      qtyActualCol: null,
+    });
+    packByDoc = await loadStockVtMap(ctx, {
+      table: "_Document6631_VT6702", // Упаковка
+      ownerCol: "_Document6631_IDRRef",
+      lineNoCol: "_LineNo6703",
+      productRRef: "_Fld6704RRef",
+      charRRef: "_Fld6713RRef",
+      qtyCol: "_Fld6709",
+      weightCol: "_Fld6710",
+      priceCol: "_Fld6712",
+      amountCol: "_Fld6716",
+      qtyAccountingCol: null,
+      qtyActualCol: null,
+    });
+  } catch (e) {
+    warn(`repack: VT-таблиці недоступні (${errMsg(e)}) — пропуск.`);
+    return recon;
+  }
+
+  for await (const rows of streamTable(
+    src,
+    "_Document6631",
+    REPACK_HEADER_COLS,
+    {
+      batch: args.batch,
+      limit: args.limit,
+      orderBy: ["_IDRRef"],
+    },
+  )) {
+    for (const row of rows) {
+      const hex = bufToHex(row["_IDRRef"]);
+      if (!hex) {
+        recon.skipped++;
+        continue;
+      }
+      const code1C = hex;
+      if (asBool(row["_Marked"])) {
+        if (willWrite(ctx)) {
+          await prisma.repacking.deleteMany({ where: { code1C } });
+        }
+        recon.skipped++;
+        continue;
+      }
+      const dis = disByDoc.get(hex) ?? [];
+      const pack = packByDoc.get(hex) ?? [];
+      const inputWeight = dis.reduce((s, it) => s + it.weight, 0);
+      const outputWeight = pack.reduce((s, it) => s + it.weight, 0);
+      const lossWeight = round2(inputWeight - outputWeight);
+      const posted = asBool(row["_Posted"]);
+      const docDate = asDate(row["_Date_Time"]);
+      const warehouseId = resolveWarehouseId(
+        ctx,
+        bufToHex(row["_Fld6679RRef"]),
+      );
+
+      try {
+        if (willWrite(ctx)) {
+          await prisma.$transaction(async (tx) => {
+            const doc = await tx.repacking.upsert({
+              where: { code1C },
+              create: {
+                code1C,
+                number1C: asString(row["_Number"]),
+                docNumber: hex,
+                ...(docDate ? { docDate } : {}),
+                warehouseId,
+                status: posted ? "posted" : "draft",
+                inputWeight,
+                outputWeight,
+                lossWeight,
+                notes: asString(row["_Fld6684"]),
+                ...(docDate ? { createdAt: docDate } : {}),
+              },
+              update: {
+                number1C: asString(row["_Number"]),
+                ...(docDate ? { docDate } : {}),
+                warehouseId,
+                status: posted ? "posted" : "draft",
+                inputWeight,
+                outputWeight,
+                lossWeight,
+                notes: asString(row["_Fld6684"]),
+              },
+              select: { id: true },
+            });
+            await tx.repackingItem.deleteMany({
+              where: { repackingId: doc.id },
+            });
+            const data = [
+              ...dis.map((it) => ({
+                repackingId: doc.id,
+                role: "disassembled",
+                productId: it.productId,
+                charHex: it.charHex,
+                barcode: it.barcode,
+                weight: it.weight,
+                quantity: it.quantity,
+                priceEur: it.priceEur,
+                amountEur: it.amountEur,
+              })),
+              ...pack.map((it) => ({
+                repackingId: doc.id,
+                role: "packed",
+                productId: it.productId,
+                charHex: it.charHex,
+                barcode: it.barcode,
+                weight: it.weight,
+                quantity: it.quantity,
+                priceEur: it.priceEur,
+                amountEur: it.amountEur,
+              })),
+            ];
+            if (data.length > 0) {
+              await tx.repackingItem.createMany({ data });
+            }
+          });
+        }
+        recon.written++;
+      } catch (e) {
+        sink.record(code1C, e);
+      }
+    }
+    log(`repack: processed ${recon.written + recon.skipped + recon.errors}`);
+  }
+  return recon;
+}
+
+// ─── 3. writeoff — СписаниеТоваров → _Document193 / _Document193_VT3696 ────────
+// Шапка: Склад _Fld3683RRef, Коментар _Fld3688.
+// Рядки: Номенклатура _Fld3705RRef, Кількість _Fld3702, Характеристика _Fld3708RRef,
+//   Ціна _Fld3709, Сума _Fld3707.
+const WRITEOFF_HEADER_COLS = [
+  "_IDRRef",
+  "_Number",
+  "_Date_Time",
+  "_Posted",
+  "_Marked",
+  "_Fld3683RRef", // Склад
+  "_Fld3688", // Коментар
+];
+
+async function importWriteOff(ctx: ImportContext): Promise<Recon> {
+  const recon = newRecon("writeoff");
+  const sink = new ErrorSink(recon, "writeoff");
+  const { args, src, prisma } = ctx;
+
+  await ensureProductLotDicts(ctx);
+  await ensureWarehouseDict(ctx);
+
+  recon.sourceRows = await countTable(src, "_Document193");
+  log(`writeoff: source rows = ${recon.sourceRows}`);
+
+  let itemsByDoc: Map<string, StockDocItem[]>;
+  try {
+    itemsByDoc = await loadStockVtMap(ctx, {
+      table: "_Document193_VT3696",
+      ownerCol: "_Document193_IDRRef",
+      lineNoCol: "_LineNo3697",
+      productRRef: "_Fld3705RRef",
+      charRRef: "_Fld3708RRef",
+      qtyCol: "_Fld3702",
+      weightCol: null,
+      priceCol: "_Fld3709",
+      amountCol: "_Fld3707",
+      qtyAccountingCol: null,
+      qtyActualCol: null,
+    });
+  } catch (e) {
+    warn(
+      `writeoff: VT _Document193_VT3696 недоступна (${errMsg(e)}) — пропуск.`,
+    );
+    return recon;
+  }
+
+  for await (const rows of streamTable(
+    src,
+    "_Document193",
+    WRITEOFF_HEADER_COLS,
+    { batch: args.batch, limit: args.limit, orderBy: ["_IDRRef"] },
+  )) {
+    for (const row of rows) {
+      const hex = bufToHex(row["_IDRRef"]);
+      if (!hex) {
+        recon.skipped++;
+        continue;
+      }
+      const code1C = hex;
+      if (asBool(row["_Marked"])) {
+        if (willWrite(ctx)) {
+          await prisma.writeOff.deleteMany({ where: { code1C } });
+        }
+        recon.skipped++;
+        continue;
+      }
+      const items = itemsByDoc.get(hex) ?? [];
+      const totalWeight = items.reduce((s, it) => s + it.weight, 0);
+      const totalQuantity = items.reduce((s, it) => s + it.quantity, 0);
+      const totalEur = round2(items.reduce((s, it) => s + it.amountEur, 0));
+      const posted = asBool(row["_Posted"]);
+      const docDate = asDate(row["_Date_Time"]);
+      const warehouseId = resolveWarehouseId(
+        ctx,
+        bufToHex(row["_Fld3683RRef"]),
+      );
+
+      try {
+        if (willWrite(ctx)) {
+          await prisma.$transaction(async (tx) => {
+            const doc = await tx.writeOff.upsert({
+              where: { code1C },
+              create: {
+                code1C,
+                number1C: asString(row["_Number"]),
+                docNumber: hex,
+                ...(docDate ? { docDate } : {}),
+                warehouseId,
+                status: posted ? "posted" : "draft",
+                totalWeight,
+                totalQuantity,
+                totalEur,
+                notes: asString(row["_Fld3688"]),
+                ...(docDate ? { createdAt: docDate } : {}),
+              },
+              update: {
+                number1C: asString(row["_Number"]),
+                ...(docDate ? { docDate } : {}),
+                warehouseId,
+                status: posted ? "posted" : "draft",
+                totalWeight,
+                totalQuantity,
+                totalEur,
+                notes: asString(row["_Fld3688"]),
+              },
+              select: { id: true },
+            });
+            await tx.writeOffItem.deleteMany({ where: { writeOffId: doc.id } });
+            if (items.length > 0) {
+              await tx.writeOffItem.createMany({
+                data: items.map((it) => ({
+                  writeOffId: doc.id,
+                  productId: it.productId,
+                  charHex: it.charHex,
+                  barcode: it.barcode,
+                  weight: it.weight,
+                  quantity: it.quantity,
+                  priceEur: it.priceEur,
+                  amountEur: it.amountEur,
+                })),
+              });
+            }
+          });
+        }
+        recon.written++;
+      } catch (e) {
+        sink.record(code1C, e);
+      }
+    }
+    log(`writeoff: processed ${recon.written + recon.skipped + recon.errors}`);
+  }
+  return recon;
+}
+
+// ─── 4. stockadjust — ОприходованиеТоваров → _Document156 / _Document156_VT1944 ─
+// Шапка: Склад _Fld1927RRef, Коментар _Fld1933 (СумаДок _Fld1932 — у шапці, але
+//   модель StockAdjustment рахує totalEur з рядків).
+// Рядки: Номенклатура _Fld1952RRef, Кількість _Fld1949, Характеристика _Fld1956RRef,
+//   Ціна _Fld1957, Сума _Fld1955.
+const STOCKADJUST_HEADER_COLS = [
+  "_IDRRef",
+  "_Number",
+  "_Date_Time",
+  "_Posted",
+  "_Marked",
+  "_Fld1927RRef", // Склад
+  "_Fld1933", // Коментар
+];
+
+async function importStockAdjust(ctx: ImportContext): Promise<Recon> {
+  const recon = newRecon("stockadjust");
+  const sink = new ErrorSink(recon, "stockadjust");
+  const { args, src, prisma } = ctx;
+
+  await ensureProductLotDicts(ctx);
+  await ensureWarehouseDict(ctx);
+
+  recon.sourceRows = await countTable(src, "_Document156");
+  log(`stockadjust: source rows = ${recon.sourceRows}`);
+
+  let itemsByDoc: Map<string, StockDocItem[]>;
+  try {
+    itemsByDoc = await loadStockVtMap(ctx, {
+      table: "_Document156_VT1944",
+      ownerCol: "_Document156_IDRRef",
+      lineNoCol: "_LineNo1945",
+      productRRef: "_Fld1952RRef",
+      charRRef: "_Fld1956RRef",
+      qtyCol: "_Fld1949",
+      weightCol: null,
+      priceCol: "_Fld1957",
+      amountCol: "_Fld1955",
+      qtyAccountingCol: null,
+      qtyActualCol: null,
+    });
+  } catch (e) {
+    warn(
+      `stockadjust: VT _Document156_VT1944 недоступна (${errMsg(e)}) — пропуск.`,
+    );
+    return recon;
+  }
+
+  for await (const rows of streamTable(
+    src,
+    "_Document156",
+    STOCKADJUST_HEADER_COLS,
+    { batch: args.batch, limit: args.limit, orderBy: ["_IDRRef"] },
+  )) {
+    for (const row of rows) {
+      const hex = bufToHex(row["_IDRRef"]);
+      if (!hex) {
+        recon.skipped++;
+        continue;
+      }
+      const code1C = hex;
+      if (asBool(row["_Marked"])) {
+        if (willWrite(ctx)) {
+          await prisma.stockAdjustment.deleteMany({ where: { code1C } });
+        }
+        recon.skipped++;
+        continue;
+      }
+      const items = itemsByDoc.get(hex) ?? [];
+      const totalWeight = items.reduce((s, it) => s + it.weight, 0);
+      const totalQuantity = items.reduce((s, it) => s + it.quantity, 0);
+      const totalEur = round2(items.reduce((s, it) => s + it.amountEur, 0));
+      const posted = asBool(row["_Posted"]);
+      const docDate = asDate(row["_Date_Time"]);
+      const warehouseId = resolveWarehouseId(
+        ctx,
+        bufToHex(row["_Fld1927RRef"]),
+      );
+
+      try {
+        if (willWrite(ctx)) {
+          await prisma.$transaction(async (tx) => {
+            const doc = await tx.stockAdjustment.upsert({
+              where: { code1C },
+              create: {
+                code1C,
+                number1C: asString(row["_Number"]),
+                docNumber: hex,
+                ...(docDate ? { docDate } : {}),
+                warehouseId,
+                status: posted ? "posted" : "draft",
+                totalWeight,
+                totalQuantity,
+                totalEur,
+                notes: asString(row["_Fld1933"]),
+                ...(docDate ? { createdAt: docDate } : {}),
+              },
+              update: {
+                number1C: asString(row["_Number"]),
+                ...(docDate ? { docDate } : {}),
+                warehouseId,
+                status: posted ? "posted" : "draft",
+                totalWeight,
+                totalQuantity,
+                totalEur,
+                notes: asString(row["_Fld1933"]),
+              },
+              select: { id: true },
+            });
+            await tx.stockAdjustmentItem.deleteMany({
+              where: { adjustmentId: doc.id },
+            });
+            if (items.length > 0) {
+              await tx.stockAdjustmentItem.createMany({
+                data: items.map((it) => ({
+                  adjustmentId: doc.id,
+                  productId: it.productId,
+                  charHex: it.charHex,
+                  barcode: it.barcode,
+                  weight: it.weight,
+                  quantity: it.quantity,
+                  priceEur: it.priceEur,
+                  amountEur: it.amountEur,
+                })),
+              });
+            }
+          });
+        }
+        recon.written++;
+      } catch (e) {
+        sink.record(code1C, e);
+      }
+    }
+    log(
+      `stockadjust: processed ${recon.written + recon.skipped + recon.errors}`,
+    );
+  }
+  return recon;
+}
+
+// ─── 5. inventory — ИнвентаризацияТоваровНаСкладе → _Document140 / _Document140_VT1405 ─
+// Шапка: Коментар _Fld1395, Склад _Fld1396RRef.
+// Рядки: Номенклатура _Fld1413RRef, Кількість(облік) _Fld1409, Кількість(факт) _Fld1410,
+//   Характеристика _Fld1416RRef, Ціна _Fld1417. qtyDifference=факт−облік.
+const INVENTORY_HEADER_COLS = [
+  "_IDRRef",
+  "_Number",
+  "_Date_Time",
+  "_Posted",
+  "_Marked",
+  "_Fld1395", // Коментар
+  "_Fld1396RRef", // Склад
+];
+
+async function importInventory(ctx: ImportContext): Promise<Recon> {
+  const recon = newRecon("inventory");
+  const sink = new ErrorSink(recon, "inventory");
+  const { args, src, prisma } = ctx;
+
+  await ensureProductLotDicts(ctx);
+  await ensureWarehouseDict(ctx);
+
+  recon.sourceRows = await countTable(src, "_Document140");
+  log(`inventory: source rows = ${recon.sourceRows}`);
+
+  let itemsByDoc: Map<string, StockDocItem[]>;
+  try {
+    itemsByDoc = await loadStockVtMap(ctx, {
+      table: "_Document140_VT1405",
+      ownerCol: "_Document140_IDRRef",
+      lineNoCol: "_LineNo1406",
+      productRRef: "_Fld1413RRef",
+      charRRef: "_Fld1416RRef",
+      qtyCol: null,
+      weightCol: null,
+      priceCol: "_Fld1417",
+      amountCol: null,
+      qtyAccountingCol: "_Fld1409", // Кількість облікова (expected)
+      qtyActualCol: "_Fld1410", // Кількість фактична (counted)
+    });
+  } catch (e) {
+    warn(
+      `inventory: VT _Document140_VT1405 недоступна (${errMsg(e)}) — пропуск.`,
+    );
+    return recon;
+  }
+
+  for await (const rows of streamTable(
+    src,
+    "_Document140",
+    INVENTORY_HEADER_COLS,
+    { batch: args.batch, limit: args.limit, orderBy: ["_IDRRef"] },
+  )) {
+    for (const row of rows) {
+      const hex = bufToHex(row["_IDRRef"]);
+      if (!hex) {
+        recon.skipped++;
+        continue;
+      }
+      const code1C = hex;
+      if (asBool(row["_Marked"])) {
+        if (willWrite(ctx)) {
+          await prisma.inventory.deleteMany({ where: { code1C } });
+        }
+        recon.skipped++;
+        continue;
+      }
+      const items = itemsByDoc.get(hex) ?? [];
+      const posted = asBool(row["_Posted"]);
+      const docDate = asDate(row["_Date_Time"]);
+      const warehouseId = resolveWarehouseId(
+        ctx,
+        bufToHex(row["_Fld1396RRef"]),
+      );
+
+      try {
+        if (willWrite(ctx)) {
+          await prisma.$transaction(async (tx) => {
+            const doc = await tx.inventory.upsert({
+              where: { code1C },
+              create: {
+                code1C,
+                number1C: asString(row["_Number"]),
+                docNumber: hex,
+                ...(docDate ? { docDate } : {}),
+                warehouseId,
+                status: posted ? "posted" : "draft",
+                isClosed: posted,
+                notes: asString(row["_Fld1395"]),
+                ...(docDate ? { createdAt: docDate } : {}),
+              },
+              update: {
+                number1C: asString(row["_Number"]),
+                ...(docDate ? { docDate } : {}),
+                warehouseId,
+                status: posted ? "posted" : "draft",
+                isClosed: posted,
+                notes: asString(row["_Fld1395"]),
+              },
+              select: { id: true },
+            });
+            await tx.inventoryItem.deleteMany({
+              where: { inventoryId: doc.id },
+            });
+            if (items.length > 0) {
+              await tx.inventoryItem.createMany({
+                data: items.map((it) => ({
+                  inventoryId: doc.id,
+                  productId: it.productId,
+                  charHex: it.charHex,
+                  barcode: it.barcode,
+                  qtyAccounting: it.qtyAccounting,
+                  qtyActual: it.qtyActual,
+                  qtyDifference: round2(it.qtyActual - it.qtyAccounting),
+                  priceEur: it.priceEur,
+                })),
+              });
+            }
+          });
+        }
+        recon.written++;
+      } catch (e) {
+        sink.record(code1C, e);
+      }
+    }
+    log(`inventory: processed ${recon.written + recon.skipped + recon.errors}`);
+  }
+  return recon;
+}
+
+// ─── 6. transfer — ПеремещениеТоваров → _Document162 / _Document162_VT2221 ─────
+// Шапка: Склад-відправник _Fld2211RRef, Склад-отримувач _Fld2213RRef, Коментар _Fld2212.
+// Рядки: Номенклатура _Fld2223RRef, Кількість _Fld2228, Характеристика _Fld2230RRef.
+//   (StockTransferItem не має priceEur/amountEur → ціну не зберігаємо.)
+const TRANSFER_HEADER_COLS = [
+  "_IDRRef",
+  "_Number",
+  "_Date_Time",
+  "_Posted",
+  "_Marked",
+  "_Fld2211RRef", // Склад-відправник
+  "_Fld2213RRef", // Склад-отримувач
+  "_Fld2212", // Коментар
+];
+
+async function importTransfer(ctx: ImportContext): Promise<Recon> {
+  const recon = newRecon("transfer");
+  const sink = new ErrorSink(recon, "transfer");
+  const { args, src, prisma } = ctx;
+
+  await ensureProductLotDicts(ctx);
+  await ensureWarehouseDict(ctx);
+
+  recon.sourceRows = await countTable(src, "_Document162");
+  log(`transfer: source rows = ${recon.sourceRows}`);
+
+  let itemsByDoc: Map<string, StockDocItem[]>;
+  try {
+    itemsByDoc = await loadStockVtMap(ctx, {
+      table: "_Document162_VT2221",
+      ownerCol: "_Document162_IDRRef",
+      lineNoCol: "_LineNo2222",
+      productRRef: "_Fld2223RRef",
+      charRRef: "_Fld2230RRef",
+      qtyCol: "_Fld2228",
+      weightCol: null,
+      priceCol: null,
+      amountCol: null,
+      qtyAccountingCol: null,
+      qtyActualCol: null,
+    });
+  } catch (e) {
+    warn(
+      `transfer: VT _Document162_VT2221 недоступна (${errMsg(e)}) — пропуск.`,
+    );
+    return recon;
+  }
+
+  for await (const rows of streamTable(
+    src,
+    "_Document162",
+    TRANSFER_HEADER_COLS,
+    { batch: args.batch, limit: args.limit, orderBy: ["_IDRRef"] },
+  )) {
+    for (const row of rows) {
+      const hex = bufToHex(row["_IDRRef"]);
+      if (!hex) {
+        recon.skipped++;
+        continue;
+      }
+      const code1C = hex;
+      if (asBool(row["_Marked"])) {
+        if (willWrite(ctx)) {
+          await prisma.stockTransfer.deleteMany({ where: { code1C } });
+        }
+        recon.skipped++;
+        continue;
+      }
+      const items = itemsByDoc.get(hex) ?? [];
+      const totalWeight = items.reduce((s, it) => s + it.weight, 0);
+      const totalQuantity = items.reduce((s, it) => s + it.quantity, 0);
+      const posted = asBool(row["_Posted"]);
+      const docDate = asDate(row["_Date_Time"]);
+      const fromWarehouseId = resolveWarehouseId(
+        ctx,
+        bufToHex(row["_Fld2211RRef"]),
+      );
+      const toWarehouseId = resolveWarehouseId(
+        ctx,
+        bufToHex(row["_Fld2213RRef"]),
+      );
+
+      try {
+        if (willWrite(ctx)) {
+          await prisma.$transaction(async (tx) => {
+            const doc = await tx.stockTransfer.upsert({
+              where: { code1C },
+              create: {
+                code1C,
+                number1C: asString(row["_Number"]),
+                docNumber: hex,
+                ...(docDate ? { docDate } : {}),
+                fromWarehouseId,
+                toWarehouseId,
+                status: posted ? "posted" : "draft",
+                totalWeight,
+                totalQuantity,
+                notes: asString(row["_Fld2212"]),
+                ...(docDate ? { createdAt: docDate } : {}),
+              },
+              update: {
+                number1C: asString(row["_Number"]),
+                ...(docDate ? { docDate } : {}),
+                fromWarehouseId,
+                toWarehouseId,
+                status: posted ? "posted" : "draft",
+                totalWeight,
+                totalQuantity,
+                notes: asString(row["_Fld2212"]),
+              },
+              select: { id: true },
+            });
+            await tx.stockTransferItem.deleteMany({
+              where: { transferId: doc.id },
+            });
+            if (items.length > 0) {
+              await tx.stockTransferItem.createMany({
+                data: items.map((it) => ({
+                  transferId: doc.id,
+                  productId: it.productId,
+                  charHex: it.charHex,
+                  barcode: it.barcode,
+                  weight: it.weight,
+                  quantity: it.quantity,
+                })),
+              });
+            }
+          });
+        }
+        recon.written++;
+      } catch (e) {
+        sink.record(code1C, e);
+      }
+    }
+    log(`transfer: processed ${recon.written + recon.skipped + recon.errors}`);
+  }
+  return recon;
+}
 
 const ENTITY_RUNNERS: Record<
   EntityName,
@@ -5594,6 +6532,7 @@ async function main(): Promise<void> {
     regionIdByHex: new Map(),
     categoryHexToId: new Map(),
     categoryParentHex: new Map(),
+    warehouseIdByHex: new Map(),
   };
 
   // Дрібні довідники назв (city/region) — потрібні для Customer.
