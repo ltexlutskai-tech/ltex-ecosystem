@@ -5519,7 +5519,11 @@ async function loadStockVtMap(
 }
 
 // ─── 1. returns — ВозвратТоваровОтПокупателя → _Document123 / _Document123_VT729 ─
-// Шапка: Контрагент(поліморф) _Fld706_RRRef, Коментар _Fld717.
+// Шапка (декодовано з ВозвратТоваровОтПокупателя.xml + columns.tsv, порядок реквізитів):
+//   Организация _Fld705RRef, СкладОрдер _Fld706_* (поліморф), ТипЦен _Fld707RRef,
+//   ВалютаДокумента _Fld708RRef, СуммаДокумента _Fld711, **Контрагент _Fld712RRef**,
+//   ДоговорКонтрагента _Fld713RRef, Сделка _Fld714_* (поліморф), Коментар _Fld717.
+//   ⚠️ _Fld706 — це СкладОрдер (поліморф), НЕ контрагент; клієнт = _Fld712RRef (plain ref).
 // Рядки: Номенклатура _Fld731RRef, Кількість _Fld732, Характеристика _Fld741RRef,
 //   Ціна _Fld736, Сума _Fld738. (Склад у шапці відсутній → warehouseId=null.)
 const RETURNS_HEADER_COLS = [
@@ -5528,7 +5532,7 @@ const RETURNS_HEADER_COLS = [
   "_Date_Time",
   "_Posted",
   "_Marked",
-  "_Fld706_RRRef", // Контрагент (поліморф, читаємо RRRef-частину)
+  "_Fld712RRef", // Контрагент (plain ref на _Reference66)
   "_Fld717", // Коментар
 ];
 
@@ -5585,7 +5589,7 @@ async function importReturns(ctx: ImportContext): Promise<Recon> {
         recon.skipped++;
         continue;
       }
-      const custHex = bufToHex(row["_Fld706_RRRef"]);
+      const custHex = bufToHex(row["_Fld712RRef"]);
       const customer = custHex ? ctx.customers.get(custHex) : null;
       const customerId =
         customer && customer.id !== "(pending)" ? customer.id : null;
@@ -6230,7 +6234,11 @@ async function importInventory(ctx: ImportContext): Promise<Recon> {
 }
 
 // ─── 6. transfer — ПеремещениеТоваров → _Document162 / _Document162_VT2221 ─────
-// Шапка: Склад-відправник _Fld2211RRef, Склад-отримувач _Fld2213RRef, Коментар _Fld2212.
+// Шапка (декодовано з ПеремещениеТоваров.xml + columns.tsv, anchor: Комментарий=ntext _Fld2212):
+//   ВидОперации _Fld2210RRef, ВнутреннийЗаказ _Fld2211RRef, Комментарий _Fld2212,
+//   Организация _Fld2213RRef, Ответственный _Fld2214RRef, Подразделение _Fld2218RRef,
+//   **СкладОтправитель _Fld2219RRef, СкладПолучатель _Fld2220RRef**.
+//   ⚠️ Виправлено: _Fld2211/_Fld2213 були НЕ склади (ВнутреннийЗаказ/Организация).
 // Рядки: Номенклатура _Fld2223RRef, Кількість _Fld2228, Характеристика _Fld2230RRef.
 //   (StockTransferItem не має priceEur/amountEur → ціну не зберігаємо.)
 const TRANSFER_HEADER_COLS = [
@@ -6239,8 +6247,8 @@ const TRANSFER_HEADER_COLS = [
   "_Date_Time",
   "_Posted",
   "_Marked",
-  "_Fld2211RRef", // Склад-відправник
-  "_Fld2213RRef", // Склад-отримувач
+  "_Fld2219RRef", // Склад-відправник (СкладОтправитель)
+  "_Fld2220RRef", // Склад-отримувач (СкладПолучатель)
   "_Fld2212", // Коментар
 ];
 
@@ -6304,11 +6312,11 @@ async function importTransfer(ctx: ImportContext): Promise<Recon> {
       const docDate = asDate(row["_Date_Time"]);
       const fromWarehouseId = resolveWarehouseId(
         ctx,
-        bufToHex(row["_Fld2211RRef"]),
+        bufToHex(row["_Fld2219RRef"]),
       );
       const toWarehouseId = resolveWarehouseId(
         ctx,
-        bufToHex(row["_Fld2213RRef"]),
+        bufToHex(row["_Fld2220RRef"]),
       );
 
       try {
