@@ -354,7 +354,9 @@ export function attachProductAttrs(
 // ─── Парс параметрів ────────────────────────────────────────────────────────
 
 export const DEFAULT_GROUPS = ["category"];
-export const DEFAULT_INDICATORS = ["qtyBalance", "weightBalanceKg"];
+// Дефолт — лише К-сть. «Вага, кг» опційна: ваговий регістр _AccumRg6608 фіксує
+// переважно вибуття (розхід), тож ваговий БАЛАНС ненадійний — вмикати свідомо.
+export const DEFAULT_INDICATORS = ["qtyBalance"];
 const MAX_GROUPS = 5;
 /** Захист: без дати «станом на» і коли рухів > цього порогу — звіт не будуємо. */
 const HARD_CAP = 200000;
@@ -488,8 +490,20 @@ export async function buildStockFlexReport(
 
   const maps = await resolveMaps(lite);
 
+  // Виключаємо НЕ-каталожні товари (яких немає у довіднику Product) — це службові/
+  // витратні позиції 1С (напр. паливо), що мають лише розхід і засмічують баланс
+  // великим мінусом. `?showUnknown=1` повертає їх у звіт.
+  const showUnknown = params.get("showUnknown") === "1";
+  const liteCat = showUnknown
+    ? lite
+    : lite.filter(
+        (m) =>
+          (m.productId && maps.productNameById.has(m.productId)) ||
+          (m.productCode1C && maps.productNameByCode.has(m.productCode1C)),
+      );
+
   // Зберігаємо productKey синхронно з рядками (для post-pass атрибутів).
-  const pairedAll = lite.map((m) => ({
+  const pairedAll = liteCat.map((m) => ({
     row: normalizeRow(m, maps, indicators),
     productKey: productKeyOf(m),
   }));

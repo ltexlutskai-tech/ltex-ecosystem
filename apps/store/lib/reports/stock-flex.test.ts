@@ -75,9 +75,9 @@ const ALL_IND = ["qtyBalance", "weightBalanceKg"];
 // ─── defaults ────────────────────────────────────────────────────────────────
 
 describe("stock-flex defaults", () => {
-  it("default groups = category, indicators = qty + weight", () => {
+  it("default groups = category, indicators = qty (вага опційна)", () => {
     expect(DEFAULT_GROUPS).toEqual(["category"]);
-    expect(DEFAULT_INDICATORS).toEqual(["qtyBalance", "weightBalanceKg"]);
+    expect(DEFAULT_INDICATORS).toEqual(["qtyBalance"]);
   });
 });
 
