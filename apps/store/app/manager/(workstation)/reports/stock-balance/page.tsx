@@ -92,7 +92,6 @@ export default async function StockBalanceReportPage({
   ];
   const cfgInd = params.get("ind")?.split(",").filter(Boolean) ?? [
     "qtyBalance",
-    "weightBalanceKg",
   ];
   const cfgAttrs =
     params.get("cols")?.split(",").filter(Boolean) ?? DEFAULT_ATTRS;
@@ -122,8 +121,18 @@ export default async function StockBalanceReportPage({
                     }.`}
           </p>
           <p className="mt-1 text-xs text-amber-700">
-            Історія складських документів (повернення/перепаковки/списання) ще
-            переноситься — залишки за минулі дати можуть бути неповними.
+            Показано лише каталожні товари; службові/витратні позиції (напр.
+            паливо) приховано —{" "}
+            <a
+              href={`?${new URLSearchParams({ ...Object.fromEntries(params), showUnknown: "1", go: "1" }).toString()}`}
+              className="underline"
+            >
+              показати всі
+            </a>
+            . «Вага, кг» — опційний показник (ваговий регістр фіксує переважно
+            вибуття, тож ваговий баланс неповний). Історія складських документів
+            (повернення/перепаковки/списання) ще переноситься — залишки за
+            минулі дати можуть бути неповними.
           </p>
         </div>
         <ReportExportButtons
