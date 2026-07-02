@@ -154,7 +154,10 @@ LinkCell (`{text,href}`) у `RegisterViewer` — для клікабельних
 ### 0. Деплой сесії 5.8 (код готовий, чекає на сервер) — [U]
 
 - [ ] `git pull` → `prisma migrate deploy` (`20260701_fix_warehouse_code1c_unique` + `20260702_cashflow_currency`)
-- [ ] реімпорт `--entity cashflow-reg` (валюта ДДС) + `--entity dictionaries` (папки статей ДДС)
+- [ ] **⚠️ `prisma generate`** — ОБОВʼЯЗКОВО після migrate з новим полем, ПЕРЕД реімпортом.
+      Інакше застарілий клієнт не знає `currency_code` → `PrismaClientValidationError` на кожному
+      рядку `cashflow-reg` (лічильник «written» оманливий, реально 0; старі рядки вже очищені → ДДС порожній).
+- [ ] реімпорт `--entity cashflow-reg` (валюта ДДС) + `--entity dictionaries` (папки статей ДДС + назви кас)
 - [ ] `deploy.ps1 -SkipInstall` → `pm2 save`
 - [ ] перевірити на живому: (а) ДДС колонки ₴/€/$ + «упр. €»; (б) Залишки складу «Найменування»; (в) «Видалити» в усіх блоках питає підтвердження і реально видаляє.
 
