@@ -178,13 +178,14 @@ LinkCell (`{text,href}`) у `RegisterViewer` — для клікабельних
       (`1C_MSSQL_CODES.md`), але ще НЕ в `DEFAULT_ORDER` і не звірені на живому MSSQL. Прогнати
       `--entity bankdocs --dry-run` + `--entity cashtransfers --dry-run` → звірка → запис. Живлять
       звіт **Акт звірки** + документи банк/каса. **[C]** — за потреби доробити коди після dry-run.
-- [x] **Каси у ДДС показують код**, а не назву — ✅ **[C зроблено 5.9]** `importCashRegisters`
-      (`_Reference56` → `MgrBankAccount`, пропуск папок `_Folder=0`) викликається у `--entity dictionaries`,
-      реєструє у `bankAccountByHex` → ДДС резолвить назву каси. **[U]** реімпорт `--entity dictionaries`.
-- [x] **Вага складу (Фаза 2.1)** — ✅ **[C зроблено]** `stock-reg` джойнить ваговий регістр
-      `_AccumRg6608` (`loadStockWeightMap`, ключ recorder|product|char|warehouse, `_Active=0x01`,
-      ресурс `_Fld6612` numeric(10,2)) → `weightKg` проставляється, fallback null. **[U]** реімпорт
-      `--entity stock-reg`. Нюанс: ваговий регістр фіксує переважно вибуття → баланс може лишатись неповним.
+- [x] **Каси у ДДС показують код**, а не назву — ✅ **[C+U ЗАЛИТО НА ПРОД 2026-07-02]** `importCashRegisters`
+      (`_Reference56` → `MgrBankAccount`, пропуск папок `_Folder=0`) у `--entity dictionaries`
+      (реімпортовано). ДДС резолвить назву каси.
+- [x] **Вага складу (Фаза 2.1)** — ✅ **[C+U ЗАЛИТО НА ПРОД 2026-07-02]** `stock-reg` джойнить ваговий
+      регістр `_AccumRg6608` (`loadStockWeightMap`, `_Active=0x01`, ресурс `_Fld6612`). Реімпорт:
+      **stock-reg 336 548 записів, weight map 110 295 ключів** + перелінк складських документів
+      (repack 3768/writeoff 722/stockadjust 16/inventory 68). Нюанс: регістр фіксує переважно вибуття →
+      ваговий баланс може лишатись неповним (кількісний — коректний).
 - [ ] **misc** (норми запасів / статуси дня) — переглядач `status:"todo/partial"`; якщо потрібні у
       звірці — **[C]** домапити, інакше лишити поза продакшн-scope.
 
