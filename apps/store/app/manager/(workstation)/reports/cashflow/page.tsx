@@ -59,9 +59,14 @@ export default async function CashFlowReportPage({
   const dimensions = DIMENSIONS.map((d) => ({ key: d.key, label: d.label }));
   const indicators = INDICATORS.map((i) => ({ key: i.key, label: i.label }));
 
-  // Усі ДДС-показники — грошові (summable), без похідних (percent) колонок.
+  // Усі ДДС-показники — грошові (summable) з валютою колонки (₴/€/$).
   const treeIndicators: IndicatorCol[] = (result?.indicatorDefs ?? []).map(
-    (d) => ({ key: d.key, label: d.label, kind: "money" }),
+    (d) => ({
+      key: d.key,
+      label: d.label,
+      kind: "money",
+      currency: d.currency,
+    }),
   );
 
   const initialFilters: Record<string, string> = {};
@@ -79,9 +84,10 @@ export default async function CashFlowReportPage({
     "article",
   ];
   const cfgInd = params.get("ind")?.split(",").filter(Boolean) ?? [
-    "inflowUah",
-    "outflowUah",
     "netUah",
+    "netEurAcc",
+    "netUsdAcc",
+    "netUpr",
   ];
   const cfgTotals = params.get("totals") !== "0";
 
@@ -95,7 +101,9 @@ export default async function CashFlowReportPage({
           </h1>
           <p className="mt-1 text-sm text-gray-500">
             Гнучкий звіт надходжень/витрат з довільним групуванням, показниками
-            та відборами.{" "}
+            та відборами. Суми показані окремими колонками за валютою рахунку (₴
+            / € / $), а «упр. €» — управлінський облік (СуммаУпр) у валюті
+            управління євро.{" "}
             {!submitted
               ? "Налаштуйте параметри та натисніть «Сформувати»."
               : errored

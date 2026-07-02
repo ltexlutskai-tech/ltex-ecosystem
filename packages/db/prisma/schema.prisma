@@ -1940,8 +1940,11 @@ model CashFlowMovement {
   articleCode1C  String?  @map("article_code_1c") // hex(СтатьяДвиженияДенежныхСредств)
   direction      Int // 0=прихід / 1=розхід
   clientCode1C   String?  @map("client_code_1c") // hex(Контрагент)
-  amountUah      Decimal  @map("amount_uah") @db.Decimal(15, 2) // Сумма
-  amountUpr      Decimal? @map("amount_upr") @db.Decimal(15, 2) // СуммаУпр (EUR)
+  amountUah      Decimal  @map("amount_uah") @db.Decimal(15, 2) // Сумма (у валюті рахунку/каси)
+  amountUpr      Decimal? @map("amount_upr") @db.Decimal(15, 2) // СуммаУпр (EUR, управл. облік)
+  // Валюта рахунку/каси руху: "UAH" | "EUR" | "USD" (null/UAH коли невідомо).
+  // Резолвиться імпортером: БанковскийСчетКасса → ВалютаДенежныхСредств.
+  currencyCode   String?  @map("currency_code")
   createdAt      DateTime @default(now()) @map("created_at")
 
   @@unique([recorderCode1C, lineNo], name: "cash_flow_movement_src")

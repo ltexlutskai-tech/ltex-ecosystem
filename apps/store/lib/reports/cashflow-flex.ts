@@ -41,8 +41,9 @@ export interface FlexCashFlowMovement {
   accountCode1C: string | null;
   clientCode1C: string | null;
   direction: number; // 0=Прихід / 1=Розхід
-  amountUah: number;
-  amountUpr: number | null; // СуммаУпр (EUR)
+  amountUah: number; // Сумма (у валюті рахунку/каси)
+  amountUpr: number | null; // СуммаУпр (EUR, управл. облік)
+  currencyCode: "UAH" | "EUR" | "USD"; // валюта рахунку/каси (default UAH)
 }
 
 /** Резолвлені довідники (мапи code1C → людська назва). */
@@ -180,57 +181,97 @@ const DIMENSION_BY_KEY = new Map(DIMENSIONS.map((d) => [d.key, d]));
 // ─── Реєстр показників ──────────────────────────────────────────────────────
 
 export type IndicatorKind = "money";
+export type IndicatorCurrency = "uah" | "eur" | "usd";
 
 export interface IndicatorDef {
   key: string;
   label: string;
   kind: IndicatorKind;
+  /** Валюта колонки — керує символом ₴/€/$ у дереві. */
+  currency: IndicatorCurrency;
   /** Значення показника для одного руху (за напрямом руху, БЕЗ знаку зверху). */
   value(m: FlexCashFlowMovement): number;
 }
 
-/** Сума € руху (СуммаУпр), 0 коли відсутня. */
+/** Сума € руху (СуммаУпр — управл. облік), 0 коли відсутня. */
 function eur(m: FlexCashFlowMovement): number {
   return m.amountUpr ?? 0;
 }
 
+/**
+ * Показники ДДС розкладені за валютою рахунку/каси:
+ *   • грн / євро / долар — Сумма руху (`amountUah`) у ВЛАСНІЙ валюті рахунку
+ *     (гейт по `currencyCode`), тож колонки не змішують валюти;
+ *   • управлінський облік € — СуммаУпр (`amountUpr`), єдина валюта управління,
+ *     сумується по ВСІХ рухах незалежно від валюти рахунку.
+ * Кожна валюта має трійку Прихід / Розхід / Сальдо.
+ */
+const ACC_CURRENCIES: {
+  code: "UAH" | "EUR" | "USD";
+  cur: IndicatorCurrency;
+  sym: string;
+  suffix: string;
+}[] = [
+  { code: "UAH", cur: "uah", sym: "₴", suffix: "Uah" },
+  { code: "EUR", cur: "eur", sym: "€", suffix: "EurAcc" },
+  { code: "USD", cur: "usd", sym: "$", suffix: "UsdAcc" },
+];
+
+/** Сумма руху, якщо його валюта = задана (інакше 0). */
+function amt(m: FlexCashFlowMovement, code: "UAH" | "EUR" | "USD"): number {
+  return m.currencyCode === code ? m.amountUah : 0;
+}
+
+const CURRENCY_INDICATORS: IndicatorDef[] = ACC_CURRENCIES.flatMap((c) => [
+  {
+    key: `inflow${c.suffix}`,
+    label: `Прихід, ${c.sym}`,
+    kind: "money" as const,
+    currency: c.cur,
+    value: (m: FlexCashFlowMovement) =>
+      m.direction === 0 ? amt(m, c.code) : 0,
+  },
+  {
+    key: `outflow${c.suffix}`,
+    label: `Розхід, ${c.sym}`,
+    kind: "money" as const,
+    currency: c.cur,
+    value: (m: FlexCashFlowMovement) =>
+      m.direction === 1 ? amt(m, c.code) : 0,
+  },
+  {
+    key: `net${c.suffix}`,
+    label: `Сальдо, ${c.sym}`,
+    kind: "money" as const,
+    currency: c.cur,
+    value: (m: FlexCashFlowMovement) =>
+      (m.direction === 0 ? amt(m, c.code) : 0) -
+      (m.direction === 1 ? amt(m, c.code) : 0),
+  },
+]);
+
 export const INDICATORS: readonly IndicatorDef[] = [
+  ...CURRENCY_INDICATORS,
+  // Управлінський облік (€) — СуммаУпр по всіх рухах.
   {
-    key: "inflowUah",
-    label: "Прихід, ₴",
+    key: "inflowUpr",
+    label: "Прихід, упр. €",
     kind: "money",
-    value: (m) => (m.direction === 0 ? m.amountUah : 0),
-  },
-  {
-    key: "outflowUah",
-    label: "Розхід, ₴",
-    kind: "money",
-    value: (m) => (m.direction === 1 ? m.amountUah : 0),
-  },
-  {
-    key: "netUah",
-    label: "Сальдо, ₴",
-    kind: "money",
-    value: (m) =>
-      (m.direction === 0 ? m.amountUah : 0) -
-      (m.direction === 1 ? m.amountUah : 0),
-  },
-  {
-    key: "inflowEur",
-    label: "Прихід, €",
-    kind: "money",
+    currency: "eur",
     value: (m) => (m.direction === 0 ? eur(m) : 0),
   },
   {
-    key: "outflowEur",
-    label: "Розхід, €",
+    key: "outflowUpr",
+    label: "Розхід, упр. €",
     kind: "money",
+    currency: "eur",
     value: (m) => (m.direction === 1 ? eur(m) : 0),
   },
   {
-    key: "netEur",
-    label: "Сальдо, €",
+    key: "netUpr",
+    label: "Сальдо, упр. €",
     kind: "money",
+    currency: "eur",
     value: (m) =>
       (m.direction === 0 ? eur(m) : 0) - (m.direction === 1 ? eur(m) : 0),
   },
@@ -269,7 +310,13 @@ export function roundIndicator(_key: string, n: number): number {
 // ─── Парс параметрів ────────────────────────────────────────────────────────
 
 export const DEFAULT_GROUPS = ["article"];
-export const DEFAULT_INDICATORS = ["inflowUah", "outflowUah", "netUah"];
+// Легкий старт: Сальдо по кожній валюті + управлінський підсумок €.
+export const DEFAULT_INDICATORS = [
+  "netUah",
+  "netEurAcc",
+  "netUsdAcc",
+  "netUpr",
+];
 const MAX_GROUPS = 5;
 /** Захист: без періоду і коли рухів > цього порогу — звіт не будуємо. */
 const HARD_CAP = 200000;
@@ -301,7 +348,12 @@ export interface CashflowFlexResult {
   groups: string[];
   indicators: string[];
   groupLabels: string[];
-  indicatorDefs: { key: string; label: string; kind: IndicatorKind }[];
+  indicatorDefs: {
+    key: string;
+    label: string;
+    kind: IndicatorKind;
+    currency: IndicatorCurrency;
+  }[];
   tree: TreeNode[];
   grand: Record<string, number>;
   showTotals: boolean;
@@ -341,7 +393,7 @@ export async function buildCashflowFlexReport(
     groupLabels: groups.map((k) => DIMENSION_BY_KEY.get(k)?.label ?? k),
     indicatorDefs: indicators.map((k) => {
       const d = INDICATOR_BY_KEY.get(k)!;
-      return { key: d.key, label: d.label, kind: d.kind };
+      return { key: d.key, label: d.label, kind: d.kind, currency: d.currency };
     }),
     tree: [],
     grand: Object.fromEntries(indicators.map((k) => [k, 0])),
@@ -369,6 +421,7 @@ export async function buildCashflowFlexReport(
       direction: true,
       amountUah: true,
       amountUpr: true,
+      currencyCode: true,
     },
   });
 
@@ -380,6 +433,10 @@ export async function buildCashflowFlexReport(
     direction: m.direction,
     amountUah: Number(m.amountUah),
     amountUpr: m.amountUpr == null ? null : Number(m.amountUpr),
+    currencyCode:
+      m.currencyCode === "EUR" || m.currencyCode === "USD"
+        ? m.currencyCode
+        : "UAH",
   }));
 
   const maps = await resolveMaps(lite);

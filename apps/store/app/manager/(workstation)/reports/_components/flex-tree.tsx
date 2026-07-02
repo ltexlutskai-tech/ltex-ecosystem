@@ -17,10 +17,20 @@ export interface IndicatorCol {
   label: string;
   kind: "money" | "qty" | "weight" | "percent";
   /**
+   * Валюта грошової колонки (`kind:"money"`). Керує символом: ₴ / € / $.
+   * За замовчуванням `eur` (звіти Продажі/Маржа — усі в €).
+   */
+  currency?: "uah" | "eur" | "usd";
+  /**
    * Для `kind:"percent"` — ключі чисельника/знаменника у `node.values`;
    * значення = num / den × 100 (null коли den = 0).
    */
   percent?: { num: string; den: string };
+}
+
+/** Символ валюти грошової колонки. */
+function currencySymbol(c: IndicatorCol["currency"]): string {
+  return c === "uah" ? "₴" : c === "usd" ? "$" : "€";
 }
 
 /**
@@ -83,7 +93,7 @@ function fmt(col: IndicatorCol, values: Record<string, number>): string {
     return `${n.toLocaleString("uk-UA", {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
-    })} €`;
+    })} ${currencySymbol(col.currency)}`;
   }
   if (col.kind === "weight") {
     return `${n.toLocaleString("uk-UA", {

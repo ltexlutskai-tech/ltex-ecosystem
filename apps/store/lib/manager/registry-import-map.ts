@@ -106,10 +106,12 @@ export interface CashFlowMovementInput {
   /** ПриходРасход: 0=прихід / 1=розхід. */
   direction: number;
   clientCode1C: string | null;
-  /** Сумма (грн). */
+  /** Сумма (у валюті рахунку/каси). */
   amountUah: number;
-  /** СуммаУпр (EUR). */
+  /** СуммаУпр (EUR, управл. облік). */
   amountUpr: number | null;
+  /** Валюта рахунку/каси: "UAH" | "EUR" | "USD" (null = невідомо → UAH у звіті). */
+  currencyCode?: string | null;
 }
 
 export interface CashFlowMovementRecord {
@@ -122,6 +124,7 @@ export interface CashFlowMovementRecord {
   clientCode1C: string | null;
   amountUah: number;
   amountUpr: number | null;
+  currencyCode: string | null;
 }
 
 export function buildCashFlowMovement(
@@ -137,6 +140,7 @@ export function buildCashFlowMovement(
     clientCode1C: input.clientCode1C,
     amountUah: round2(input.amountUah),
     amountUpr: input.amountUpr == null ? null : round2(input.amountUpr),
+    currencyCode: input.currencyCode ?? null,
   };
 }
 

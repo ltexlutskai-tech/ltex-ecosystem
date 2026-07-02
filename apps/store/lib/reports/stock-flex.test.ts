@@ -39,6 +39,7 @@ function emptyMaps(): StockMaps {
 function attrs(p: Partial<ProductAttrs>): ProductAttrs {
   return {
     article: null,
+    name: null,
     description: null,
     category: null,
     saleEur: null,
@@ -314,7 +315,7 @@ describe("attr columns", () => {
   });
 
   it("дефолтні колонки — легкий набір", () => {
-    expect(DEFAULT_ATTRS).toEqual(["article", "category", "saleEur"]);
+    expect(DEFAULT_ATTRS).toEqual(["article", "name", "category", "saleEur"]);
   });
 });
 

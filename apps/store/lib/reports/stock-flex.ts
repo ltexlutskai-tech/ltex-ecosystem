@@ -50,6 +50,7 @@ export interface FlexStockMovement {
 /** Атрибути товару для довідкових колонок (стиль 1С «Остатки товаров»). */
 export interface ProductAttrs {
   article: string | null;
+  name: string | null;
   description: string | null;
   category: string | null;
   saleEur: number | null;
@@ -217,6 +218,7 @@ export interface AttrColumnDef {
  */
 export const ATTR_COLUMNS: readonly AttrColumnDef[] = [
   { key: "article", label: "Артикул", kind: "text", value: (a) => a.article },
+  { key: "name", label: "Найменування", kind: "text", value: (a) => a.name },
   {
     key: "description",
     label: "Опис",
@@ -252,7 +254,7 @@ export const ATTR_COLUMNS: readonly AttrColumnDef[] = [
 const ATTR_BY_KEY = new Map(ATTR_COLUMNS.map((c) => [c.key, c]));
 
 /** Дефолтні довідкові колонки (легкий набір). */
-export const DEFAULT_ATTRS = ["article", "category", "saleEur"];
+export const DEFAULT_ATTRS = ["article", "name", "category", "saleEur"];
 
 /** Валідні ключі колонок (CSV) → упорядкований унікальний список. */
 function parseAttrCols(raw: string | null): string[] {
@@ -691,6 +693,7 @@ async function resolveMaps(movements: FlexStockMovement[]): Promise<StockMaps> {
   for (const p of [...productById.values(), ...productByCode.values()]) {
     const attrs: ProductAttrs = {
       article: p.articleCode ?? null,
+      name: p.name ?? null,
       description: p.description?.trim() ? p.description : null,
       category: p.category?.name ?? null,
       saleEur: saleByProductId.get(p.id) ?? null,

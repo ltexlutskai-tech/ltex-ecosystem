@@ -4465,12 +4465,92 @@ async function loadCashDirectionEnum(
   return map;
 }
 
+/**
+ * Мапа hex(БанковскийСчетКасса) → валюта ("UAH"|"EUR"|"USD").
+ * Рахунок руху коштів поліморфний: банк-рахунок (`_Reference29`, валюта
+ * `_Fld5873RRef`) АБО каса (`_Reference56` Кассы, валюта `_Fld6004RRef`).
+ * Обидва посилаються на довідник валют `_Reference30` → classifyCurrency.
+ * null (не EUR/USD) → "UAH".
+ */
+async function loadAccountCurrencyByHex(
+  src: mssql.ConnectionPool,
+): Promise<Map<string, "UAH" | "EUR" | "USD">> {
+  const out = new Map<string, "UAH" | "EUR" | "USD">();
+
+  // Довідник валют: hex → "EUR"|"USD"|null(UAH).
+  const currencyByHex = new Map<string, "EUR" | "USD" | null>();
+  try {
+    for await (const rows of streamTable(src, "_Reference30", CURRENCY_COLS, {
+      batch: 2000,
+      limit: null,
+      orderBy: ["_IDRRef"],
+    })) {
+      for (const row of rows) {
+        const hex = bufToHex(row["_IDRRef"]);
+        if (hex)
+          currencyByHex.set(
+            hex,
+            classifyCurrency(
+              asString(row["_Code"]),
+              asString(row["_Description"]),
+            ),
+          );
+      }
+    }
+  } catch (e) {
+    warn(`loadAccountCurrencyByHex: валюти (_Reference30) — ${errMsg(e)}`);
+  }
+
+  const resolve = (curHex: string | null): "UAH" | "EUR" | "USD" =>
+    (curHex ? currencyByHex.get(curHex) : null) ?? "UAH";
+
+  // Банк-рахунки (_Reference29, валюта _Fld5873RRef).
+  try {
+    for await (const rows of streamTable(
+      src,
+      "_Reference29",
+      ["_IDRRef", "_Fld5873RRef"],
+      { batch: 2000, limit: null, orderBy: ["_IDRRef"] },
+    )) {
+      for (const row of rows) {
+        const hex = bufToHex(row["_IDRRef"]);
+        if (hex) out.set(hex, resolve(bufToHex(row["_Fld5873RRef"])));
+      }
+    }
+  } catch (e) {
+    warn(
+      `loadAccountCurrencyByHex: банк-рахунки (_Reference29) — ${errMsg(e)}`,
+    );
+  }
+
+  // Каси (_Reference56 Кассы, валюта _Fld6004RRef).
+  try {
+    for await (const rows of streamTable(
+      src,
+      "_Reference56",
+      ["_IDRRef", "_Fld6004RRef"],
+      { batch: 2000, limit: null, orderBy: ["_IDRRef"] },
+    )) {
+      for (const row of rows) {
+        const hex = bufToHex(row["_IDRRef"]);
+        if (hex) out.set(hex, resolve(bufToHex(row["_Fld6004RRef"])));
+      }
+    }
+  } catch (e) {
+    warn(`loadAccountCurrencyByHex: каси (_Reference56) — ${errMsg(e)}`);
+  }
+
+  return out;
+}
+
 async function importCashFlowRegister(ctx: ImportContext): Promise<Recon> {
   const recon = newRecon("cashflow-reg");
   const sink = new ErrorSink(recon, "cashflow-reg");
   const { args, src, prisma } = ctx;
 
   const clientByHex = await loadClientIdByHex(ctx);
+  const accountCurrencyByHex = await loadAccountCurrencyByHex(src);
+  log(`cashflow-reg: account currencies mapped = ${accountCurrencyByHex.size}`);
   // ✅ ДЕКОДОВАНО: Enum ПриходРасход = ВидыДвиженийПриходРасход → _Enum225
   // (Приход=order 0, Расход=order 1). Будуємо мапу hex(_IDRRef)→0|1 з _EnumOrder.
   // Фолбек (порожня мапа / нерезолвлений hex) — знак суми (<0 → розхід).
@@ -4520,17 +4600,19 @@ async function importCashFlowRegister(ctx: ImportContext): Promise<Recon> {
         // Напрямок: спершу з Enum, фолбек — знак суми (<0 → розхід).
         const direction =
           (dirHex ? dirEnum.get(dirHex) : undefined) ?? (amountUah < 0 ? 1 : 0);
+        const accHex = bufToHex(row["_Fld5310_RRRef"]);
         buffer.push(
           buildCashFlowMovement({
             occurredAt: asDate(row["_Period"]) ?? REG_AS_OF_FALLBACK,
             recorderCode1C: recorderHex,
             lineNo,
-            accountCode1C: bufToHex(row["_Fld5310_RRRef"]),
+            accountCode1C: accHex,
             articleCode1C: bufToHex(row["_Fld5313RRef"]),
             direction,
             clientCode1C: bufToHex(row["_Fld5315_RRRef"]),
             amountUah: Math.abs(amountUah),
             amountUpr: asNumber(row["_Fld5323"]),
+            currencyCode: (accHex && accountCurrencyByHex.get(accHex)) || "UAH",
           }),
         );
         recon.written++;

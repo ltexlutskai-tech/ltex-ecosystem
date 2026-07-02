@@ -37,6 +37,7 @@ function mv(p: Partial<FlexCashFlowMovement>): FlexCashFlowMovement {
     direction: 0,
     amountUah: 100,
     amountUpr: 10,
+    currencyCode: "UAH",
     ...p,
   };
 }
@@ -50,13 +51,14 @@ function findNode(nodes: TreeNode[], label: string): TreeNode | undefined {
   return undefined;
 }
 
+// Показники: трійка ₴ (гейт по валюті) + управлінський € (amountUpr).
 const ALL_IND = [
   "inflowUah",
   "outflowUah",
   "netUah",
-  "inflowEur",
-  "outflowEur",
-  "netEur",
+  "inflowUpr",
+  "outflowUpr",
+  "netUpr",
 ];
 
 // ─── normalizeRow: inflow/outflow split by direction ─────────────────────────
@@ -71,9 +73,9 @@ describe("normalizeRow", () => {
     expect(r.values.inflowUah).toBe(100);
     expect(r.values.outflowUah).toBe(0);
     expect(r.values.netUah).toBe(100);
-    expect(r.values.inflowEur).toBe(8);
-    expect(r.values.outflowEur).toBe(0);
-    expect(r.values.netEur).toBe(8);
+    expect(r.values.inflowUpr).toBe(8);
+    expect(r.values.outflowUpr).toBe(0);
+    expect(r.values.netUpr).toBe(8);
   });
 
   it("outflow goes to outflow* and net negative for direction 1 (Розхід)", () => {
@@ -85,27 +87,58 @@ describe("normalizeRow", () => {
     expect(r.values.inflowUah).toBe(0);
     expect(r.values.outflowUah).toBe(70);
     expect(r.values.netUah).toBe(-70);
-    expect(r.values.inflowEur).toBe(0);
-    expect(r.values.outflowEur).toBe(5);
-    expect(r.values.netEur).toBe(-5);
+    expect(r.values.inflowUpr).toBe(0);
+    expect(r.values.outflowUpr).toBe(5);
+    expect(r.values.netUpr).toBe(-5);
   });
 
-  it("EUR uses amountUpr; null → 0", () => {
+  it("управлінський € uses amountUpr; null → 0", () => {
     const inflow = normalizeRow(
       mv({ direction: 0, amountUpr: null }),
       emptyMaps(),
-      ["inflowEur", "netEur"],
+      ["inflowUpr", "netUpr"],
     );
-    expect(inflow.values.inflowEur).toBe(0);
-    expect(inflow.values.netEur).toBe(0);
+    expect(inflow.values.inflowUpr).toBe(0);
+    expect(inflow.values.netUpr).toBe(0);
 
     const outflow = normalizeRow(
       mv({ direction: 1, amountUpr: null }),
       emptyMaps(),
-      ["outflowEur", "netEur"],
+      ["outflowUpr", "netUpr"],
     );
-    expect(outflow.values.outflowEur).toBe(0);
-    expect(outflow.values.netEur).toBe(0);
+    expect(outflow.values.outflowUpr).toBe(0);
+    expect(outflow.values.netUpr).toBe(0);
+  });
+
+  it("Сумма гейтиться по валюті рахунку (₴/€/$ у різних колонках)", () => {
+    // UAH-рахунок → лише колонка ₴.
+    const uah = normalizeRow(
+      mv({ direction: 0, amountUah: 100, currencyCode: "UAH" }),
+      emptyMaps(),
+      ["inflowUah", "inflowEurAcc", "inflowUsdAcc"],
+    );
+    expect(uah.values.inflowUah).toBe(100);
+    expect(uah.values.inflowEurAcc).toBe(0);
+    expect(uah.values.inflowUsdAcc).toBe(0);
+
+    // EUR-рахунок → лише колонка €.
+    const eur = normalizeRow(
+      mv({ direction: 0, amountUah: 50, currencyCode: "EUR" }),
+      emptyMaps(),
+      ["inflowUah", "inflowEurAcc", "inflowUsdAcc"],
+    );
+    expect(eur.values.inflowUah).toBe(0);
+    expect(eur.values.inflowEurAcc).toBe(50);
+    expect(eur.values.inflowUsdAcc).toBe(0);
+
+    // USD-рахунок → лише колонка $.
+    const usd = normalizeRow(
+      mv({ direction: 0, amountUah: 20, currencyCode: "USD" }),
+      emptyMaps(),
+      ["inflowUah", "inflowEurAcc", "inflowUsdAcc"],
+    );
+    expect(usd.values.inflowUsdAcc).toBe(20);
+    expect(usd.values.inflowUah).toBe(0);
   });
 
   it("resolves article / account / client labels, fallbacks otherwise", () => {
@@ -230,10 +263,10 @@ describe("cashflow tree aggregation", () => {
     );
     expect(client.values.netUah).toBe(childNetSum);
     expect(client.values.netUah).toBe(120);
-    expect(client.values.netEur).toBe(13);
+    expect(client.values.netUpr).toBe(13);
   });
 
-  it("EUR null contributes 0 across the tree", () => {
+  it("управлінський € null contributes 0 across the tree", () => {
     const rows: NormalizedRow[] = [
       normalizeRow(
         mv({ direction: 0, amountUah: 100, amountUpr: null }),
@@ -248,8 +281,8 @@ describe("cashflow tree aggregation", () => {
     ];
     const g = grandTotal(rows, ALL_IND);
     expect(g.inflowUah).toBe(150);
-    expect(g.inflowEur).toBe(4);
-    expect(g.netEur).toBe(4);
+    expect(g.inflowUpr).toBe(4);
+    expect(g.netUpr).toBe(4);
   });
 });
 
@@ -269,25 +302,36 @@ describe("registries", () => {
     ]);
   });
 
-  it("exposes expected money indicator keys (all summable)", () => {
+  it("exposes per-currency + управлінський money indicator keys", () => {
     expect(INDICATORS.map((i) => i.key)).toEqual([
       "inflowUah",
       "outflowUah",
       "netUah",
-      "inflowEur",
-      "outflowEur",
-      "netEur",
+      "inflowEurAcc",
+      "outflowEurAcc",
+      "netEurAcc",
+      "inflowUsdAcc",
+      "outflowUsdAcc",
+      "netUsdAcc",
+      "inflowUpr",
+      "outflowUpr",
+      "netUpr",
     ]);
     expect(INDICATORS.every((i) => i.kind === "money")).toBe(true);
   });
 
-  it("default config: group by article, inflow/outflow/net ₴", () => {
+  it("default config: group by article, Сальдо ₴/€/$ + управлінський €", () => {
     expect(DEFAULT_GROUPS).toEqual(["article"]);
-    expect(DEFAULT_INDICATORS).toEqual(["inflowUah", "outflowUah", "netUah"]);
+    expect(DEFAULT_INDICATORS).toEqual([
+      "netUah",
+      "netEurAcc",
+      "netUsdAcc",
+      "netUpr",
+    ]);
   });
 
   it("roundIndicator rounds money to 2dp", () => {
     expect(roundIndicator("netUah", 0.1 + 0.2)).toBe(0.3);
-    expect(roundIndicator("inflowEur", 1.005)).toBe(1.01);
+    expect(roundIndicator("inflowUpr", 1.005)).toBe(1.01);
   });
 });
