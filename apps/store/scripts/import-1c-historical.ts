@@ -3791,11 +3791,14 @@ async function importViberContacts(ctx: ImportContext): Promise<Recon> {
 // ─── Склади (← _Reference95 Склады) ──────────────────────────────────────────
 // ✅ ДЕКОДОВАНО: Catalog.Склады uuid=c99983ef → dbnames "Reference",95.
 // Колонки (docs/1c-mssql-schema/columns.tsv): _IDRRef, _Code(nchar 9),
-// _Description(nvarchar 50). Ієрархічний (_ParentIDRRef/_Folder) — папки
-// пропускаємо (_Folder=0x01). Лягає у наявну модель Warehouse (upsert по code1C).
+// _Description(nvarchar 50). Ієрархічний (_ParentIDRRef/_Folder).
+// ⚠️ ВИПРАВЛЕНО: `_Folder` у 1С ІНВЕРСНА (як у Номенклатурі/Кассах/Містах):
+//   1 = ЕЛЕМЕНТ (реальний склад), 0 = ГРУПА/папка → пропускаємо ПАПКИ (_Folder=0).
+//   Раніше логіка була дзеркальна (skip _Folder=1) → імпортувалась 1 папка
+//   замість реальних складів, тож warehouseId складських документів не резолвився.
 const WAREHOUSE_COLS = [
   "_IDRRef",
-  "_Folder", // 0x01 = група/папка → пропускаємо
+  "_Folder", // 1 = склад (елемент), 0 = папка (група) → пропускаємо папки
   "_Code", // nchar(9)
   "_Description", // nvarchar(50)
 ];
@@ -3812,9 +3815,8 @@ export function mapWarehouseRow(
 ): WarehouseUpsert | null {
   const hex = bufToHex(row["_IDRRef"]);
   if (!hex) return null;
-  // _Folder binary(1): 0x01 = група (папка), пропускаємо.
-  const folder = row["_Folder"];
-  if (folder instanceof Buffer && folder.length > 0 && folder[0] === 1) {
+  // _Folder (ІНВЕРСНА логіка 1С): 0 = група (папка) → пропускаємо; 1 = елемент.
+  if (!asBool(row["_Folder"])) {
     return null;
   }
   return {
