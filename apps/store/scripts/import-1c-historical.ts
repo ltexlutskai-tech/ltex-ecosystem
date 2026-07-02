@@ -2942,6 +2942,73 @@ async function importBankAccounts(ctx: ImportContext): Promise<Recon> {
   return recon;
 }
 
+// ─── 10.2b Кассы → MgrBankAccount ─ _Reference56 ─────────────────────────────
+// Каси (готівкові «рахунки») лежать в окремому довіднику _Reference56, але у
+// звіті/переглядачі ДДС резолвляться з тієї ж мапи `mgrBankAccount` по code1C
+// (cashflow-flex.ts::resolveMaps). Тому вантажимо їх у ту саму модель
+// MgrBankAccount (без зміни схеми) — тоді назва каси показується замість hex.
+// `_Folder` (ІНВЕРСНА логіка 1С!): 1 = елемент (каса), 0 = група/папка → папки
+// пропускаємо.
+const CASH_REGISTER_COLS = [
+  "_IDRRef",
+  "_Folder", // 1 = каса (елемент), 0 = папка (група)
+  "_Description", // назва каси (nvarchar50)
+];
+
+async function importCashRegisters(ctx: ImportContext): Promise<Recon> {
+  const recon = newRecon("cashregisters");
+  const sink = new ErrorSink(recon, "cashregisters");
+  const { args, src, prisma } = ctx;
+
+  recon.sourceRows = await countTable(src, "_Reference56");
+  log(`cashregisters: source rows = ${recon.sourceRows}`);
+
+  for await (const rows of streamTable(
+    src,
+    "_Reference56",
+    CASH_REGISTER_COLS,
+    {
+      batch: args.batch,
+      limit: args.limit,
+      orderBy: ["_IDRRef"],
+    },
+  )) {
+    for (const row of rows) {
+      const hex = bufToHex(row["_IDRRef"]);
+      if (!hex) {
+        recon.skipped++;
+        continue;
+      }
+      // Папки (групи) пропускаємо: _Folder=0 → група (ІНВЕРСНА логіка 1С).
+      if (!asBool(row["_Folder"])) {
+        recon.skipped++;
+        continue;
+      }
+      const name = asTrimmed(row["_Description"]) || hex;
+      try {
+        let id = "(pending)";
+        if (willWrite(ctx)) {
+          const created = await prisma.mgrBankAccount.upsert({
+            where: { code1C: hex },
+            create: { code1C: hex, name },
+            update: { name },
+            select: { id: true },
+          });
+          id = created.id;
+        }
+        ctx.bankAccountByHex.set(hex, id);
+        recon.written++;
+      } catch (e) {
+        sink.record(hex, e);
+      }
+    }
+  }
+  log(
+    `cashregisters: mapped ${ctx.bankAccountByHex.size} hex→id (разом з банк-рахунками)`,
+  );
+  return recon;
+}
+
 // ─── 10.2a ТипыЦенНоменклатуры → MgrPriceType ─ _Reference105 ─────────────────
 // Цей довідник наповнює таблицю `mgr_price_types` (dropdow «Тип цін» у формі
 // замовлення). Invariant: MgrPriceType.code === Price.priceType. Upserting by
@@ -3277,6 +3344,7 @@ async function importDictionaries(ctx: ImportContext): Promise<Recon> {
     await importPriceTypes(ctx),
     await importCashFlowArticles(ctx),
     await importBankAccounts(ctx),
+    await importCashRegisters(ctx),
     await importRoutes(ctx),
     await loadAgentNames(ctx),
     await loadUnitNames(ctx),
@@ -4637,7 +4705,8 @@ async function importCashFlowRegister(ctx: ImportContext): Promise<Recon> {
 // з окремого вагового регістру ТовариНаСкладахУВазі (UUID d378703b-… →
 //   _AccumRg6608: _Fld6609RRef=Склад, _Fld6610RRef=Номенклатура,
 //   _Fld6611RRef=Характеристика, _Fld6612=Количество[=вага,кг]).
-//   weightKg=null тут (TODO Фаза 2.1: JOIN _AccumRg6608 по recorder+lineNo).
+//   ✅ JOIN реалізовано нижче (loadStockWeightMap → weightKey по
+//   recorder|product|char|warehouse); weightKg проставляється з мапи, fallback null.
 const STOCK_REG_TABLE = "_AccumRg5788";
 const STOCK_REG_COLS = [
   "_Period",
