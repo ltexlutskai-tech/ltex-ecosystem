@@ -151,7 +151,7 @@ LinkCell (`{text,href}`) у `RegisterViewer` — для клікабельних
 
 Легенда: **[U]** робить user (сервер/1С/деплой) · **[C]** роблю я (код) · **[U+C]** разом.
 
-### 0. Деплой сесії 5.8 (код готовий, чекає на сервер) — [U]
+### 0. Деплой сесії 5.8 — ✅ ЗРОБЛЕНО (2026-07-02): migrate+generate+cashflow-reg(50856)+deploy. ⚠️ лишилось повторити `--entity dictionaries` (назви кас). — [U]
 
 - [ ] `git pull` → `prisma migrate deploy` (`20260701_fix_warehouse_code1c_unique` + `20260702_cashflow_currency`)
 - [ ] **⚠️ `prisma generate`** — ОБОВʼЯЗКОВО після migrate з новим полем, ПЕРЕД реімпортом.
