@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Printer } from "lucide-react";
 import { prisma } from "@ltex/db";
 import { getCurrentUser } from "@/lib/auth/manager-auth";
 import {
@@ -235,13 +235,22 @@ export default async function ManagerRouteSheetDetailPage({
         Назад до списку
       </Link>
 
-      <header>
-        <h1 className="text-2xl font-bold text-gray-800">
-          Маршрутний лист {displayNumber}
-        </h1>
-        <p className="mt-1 text-sm text-gray-500">
-          Створено: {new Date(sheet.createdAt).toLocaleString("uk-UA")}
-        </p>
+      <header className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-800">
+            Маршрутний лист {displayNumber}
+          </h1>
+          <p className="mt-1 text-sm text-gray-500">
+            Створено: {new Date(sheet.createdAt).toLocaleString("uk-UA")}
+          </p>
+        </div>
+        <Link
+          href={`/manager/routes/${id}/print`}
+          className="inline-flex items-center gap-1.5 rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+        >
+          <Printer className="h-4 w-4" />
+          Друк
+        </Link>
       </header>
 
       <RouteSheetForm initial={initial} expeditors={expeditors} />
