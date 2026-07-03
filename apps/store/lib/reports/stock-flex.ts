@@ -467,27 +467,30 @@ export async function buildStockFlexReport(
     }
   }
 
-  const movements = await prisma.stockMovement.findMany({
+  // ⚡ Продуктивність: агрегуємо баланс у SQL (GROUP BY по вимірних ключах +
+  // recordKind), а не тягнемо всі сотні тисяч рухів у Node. Кожен рядок нижче —
+  // уже згорнутий залишок для (товар · склад · якість · прихід/розхід); їх на
+  // порядки менше, ніж рухів. Знак прихід/розхід далі накладає сам показник.
+  const grouped = await prisma.stockMovement.groupBy({
+    by: [
+      "productCode1C",
+      "productId",
+      "warehouseCode1C",
+      "quality",
+      "recordKind",
+    ],
     where,
-    select: {
-      productCode1C: true,
-      productId: true,
-      warehouseCode1C: true,
-      quality: true,
-      qty: true,
-      weightKg: true,
-      recordKind: true,
-    },
+    _sum: { qty: true, weightKg: true },
   });
 
-  const lite: FlexStockMovement[] = movements.map((m) => ({
-    productCode1C: m.productCode1C,
-    productId: m.productId,
-    warehouseCode1C: m.warehouseCode1C,
-    quality: m.quality,
-    qty: Number(m.qty),
-    weightKg: m.weightKg == null ? null : Number(m.weightKg),
-    recordKind: m.recordKind,
+  const lite: FlexStockMovement[] = grouped.map((g) => ({
+    productCode1C: g.productCode1C,
+    productId: g.productId,
+    warehouseCode1C: g.warehouseCode1C,
+    quality: g.quality,
+    qty: Number(g._sum.qty ?? 0),
+    weightKg: g._sum.weightKg == null ? null : Number(g._sum.weightKg),
+    recordKind: g.recordKind,
   }));
 
   const maps = await resolveMaps(lite);

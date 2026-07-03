@@ -116,7 +116,7 @@ export default async function StockBalanceReportPage({
                 ? "Помилка формування."
                 : result?.tooLarge
                   ? "Оберіть дату «станом на» — забагато даних."
-                  : `Залишок станом на ${asOfLabel}. Рухів у вибірці: ${
+                  : `Залишок станом на ${asOfLabel}. Позицій балансу: ${
                       result?.rowCount ?? 0
                     }.`}
           </p>
