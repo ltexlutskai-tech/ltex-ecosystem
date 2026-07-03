@@ -51,9 +51,14 @@ const nextConfig = {
         hostname: "new.ltex.com.ua",
         pathname: "/media/**",
       },
-      // *.supabase.co removed after the non-1C product chistka (Task B,
-      // session 6.2) — старі Supabase-фото прибрані разом із не-1С товарами,
-      // усі актуальні фото тепер самохостяться (/media/*, Task A).
+      // ⚠️ ЛИШАЄТЬСЯ до заміни фото: пост-звіт Задачі B показав ~2069 фото
+      // 1С-товарів (keep1C) досі на Supabase-URL — чистка не-1С їх НЕ прибирає.
+      // Видаляти *.supabase.co можна лише коли пост-звіт покаже 0/0
+      // (після перезаливки фото на /media/*).
+      {
+        protocol: "https",
+        hostname: "*.supabase.co",
+      },
       {
         protocol: "https",
         hostname: "i.ytimg.com",
@@ -93,9 +98,9 @@ const nextConfig = {
               "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
               "style-src 'self' 'unsafe-inline'",
               // https://new.ltex.com.ua → self-hosted /media/* (Task A).
-              // *.supabase.co прибрано у Задачі B (сесія 6.2) — старих
-              // Supabase-фото більше немає після чистки не-1С товарів.
-              "img-src 'self' data: blob: https://new.ltex.com.ua https://img.youtube.com https://i.ytimg.com",
+              // ⚠️ *.supabase.co ЛИШАЄТЬСЯ: ~2069 фото 1С-товарів досі на
+              // Supabase-URL (пост-звіт Задачі B). Прибирати лише при 0/0.
+              "img-src 'self' data: blob: https://new.ltex.com.ua https://*.supabase.co https://img.youtube.com https://i.ytimg.com",
               "font-src 'self'",
               "connect-src 'self' https://*.supabase.co",
               "frame-src 'self' https://www.youtube.com https://youtube.com",

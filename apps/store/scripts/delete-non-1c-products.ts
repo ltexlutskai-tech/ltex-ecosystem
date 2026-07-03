@@ -138,6 +138,12 @@ const WHERE_HIDE_RECEIVING_ONLY: Prisma.ProductWhereInput = {
 
 // ─── CLI ──────────────────────────────────────────────────────────────────────
 
+// Prisma interactive-tx має дефолтний timeout 5000мс — каскадне видалення
+// ~100 товарів (lots+barcodes+images+…) його перевищує (перший прогін упав
+// P2028 на 5699мс). Тому щедрий timeout + менший батч.
+const TX_TIMEOUT_MS = 120_000;
+const TX_MAX_WAIT_MS = 20_000;
+
 interface CliArgs {
   apply: boolean;
   confirmProd: boolean;
@@ -145,7 +151,7 @@ interface CliArgs {
 }
 
 function parseArgs(argv: string[]): CliArgs {
-  const args: CliArgs = { apply: false, confirmProd: false, batch: 200 };
+  const args: CliArgs = { apply: false, confirmProd: false, batch: 50 };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     switch (a) {
@@ -418,24 +424,28 @@ async function runDeleteFull(
   let done = 0;
   for (const batch of batches) {
     await purgeMediaForProducts(prisma, batch);
-    await prisma.$transaction(async (tx) => {
-      // Lot (Restrict на Product) — barcodes cascade; lotId-посилання SetNull.
-      const lots = await tx.lot.deleteMany({
-        where: { productId: { in: batch } },
-      });
-      // CartItem (Restrict на Product).
-      const cart = await tx.cartItem.deleteMany({
-        where: { productId: { in: batch } },
-      });
-      // Product — cascades: images/prices/favorites/featured/viewLog/
-      // videoSubscriptions/purchasePrices.
-      const prod = await tx.product.deleteMany({
-        where: { id: { in: batch } },
-      });
-      acc.lots += lots.count;
-      acc.cartItems += cart.count;
-      acc.products += prod.count;
-    });
+    await prisma.$transaction(
+      async (tx) => {
+        // Lot (Restrict на Product) — barcodes cascade; lotId-посилання SetNull.
+        const lots = await tx.lot.deleteMany({
+          where: { productId: { in: batch } },
+        });
+        // CartItem (Restrict на Product).
+        const cart = await tx.cartItem.deleteMany({
+          where: { productId: { in: batch } },
+        });
+        // Product — cascades: images/prices/favorites/featured/viewLog/
+        // videoSubscriptions/purchasePrices.
+        const prod = await tx.product.deleteMany({
+          where: { id: { in: batch } },
+        });
+        acc.lots += lots.count;
+        acc.cartItems += cart.count;
+        acc.products += prod.count;
+      },
+      // Каскадне видалення сотні товарів довше за дефолтні 5с interactive-tx.
+      { timeout: TX_TIMEOUT_MS, maxWait: TX_MAX_WAIT_MS },
+    );
     done += batch.length;
     console.log(`${TAG}   … ${done}/${ids.length}`);
   }
@@ -456,39 +466,43 @@ async function runHideHistory(
   let done = 0;
   for (const batch of batches) {
     await purgeMediaForProducts(prisma, batch);
-    await prisma.$transaction(async (tx) => {
-      const images = await tx.productImage.deleteMany({
-        where: { productId: { in: batch } },
-      });
-      const prices = await tx.price.deleteMany({
-        where: { productId: { in: batch } },
-      });
-      // Lot — barcodes cascade; OrderItem/SaleItem.lotId → SetNull (історія ціла).
-      const lots = await tx.lot.deleteMany({
-        where: { productId: { in: batch } },
-      });
-      const cart = await tx.cartItem.deleteMany({
-        where: { productId: { in: batch } },
-      });
-      const favs = await tx.favorite.deleteMany({
-        where: { productId: { in: batch } },
-      });
-      const feat = await tx.featuredProduct.deleteMany({
-        where: { productId: { in: batch } },
-      });
-      // Ховаємо з вітрини (базовий фільтр каталогу — where { inStock:true }).
-      const hiddenProducts = await tx.product.updateMany({
-        where: { id: { in: batch } },
-        data: { inStock: false },
-      });
-      acc.products += hiddenProducts.count;
-      acc.images += images.count;
-      acc.prices += prices.count;
-      acc.lots += lots.count;
-      acc.cartItems += cart.count;
-      acc.favorites += favs.count;
-      acc.featured += feat.count;
-    });
+    await prisma.$transaction(
+      async (tx) => {
+        const images = await tx.productImage.deleteMany({
+          where: { productId: { in: batch } },
+        });
+        const prices = await tx.price.deleteMany({
+          where: { productId: { in: batch } },
+        });
+        // Lot — barcodes cascade; OrderItem/SaleItem.lotId → SetNull (історія ціла).
+        const lots = await tx.lot.deleteMany({
+          where: { productId: { in: batch } },
+        });
+        const cart = await tx.cartItem.deleteMany({
+          where: { productId: { in: batch } },
+        });
+        const favs = await tx.favorite.deleteMany({
+          where: { productId: { in: batch } },
+        });
+        const feat = await tx.featuredProduct.deleteMany({
+          where: { productId: { in: batch } },
+        });
+        // Ховаємо з вітрини (базовий фільтр каталогу — where { inStock:true }).
+        const hiddenProducts = await tx.product.updateMany({
+          where: { id: { in: batch } },
+          data: { inStock: false },
+        });
+        acc.products += hiddenProducts.count;
+        acc.images += images.count;
+        acc.prices += prices.count;
+        acc.lots += lots.count;
+        acc.cartItems += cart.count;
+        acc.favorites += favs.count;
+        acc.featured += feat.count;
+      },
+      // Каскадне видалення сотні товарів довше за дефолтні 5с interactive-tx.
+      { timeout: TX_TIMEOUT_MS, maxWait: TX_MAX_WAIT_MS },
+    );
     done += batch.length;
     console.log(`${TAG}   … ${done}/${ids.length}`);
   }
