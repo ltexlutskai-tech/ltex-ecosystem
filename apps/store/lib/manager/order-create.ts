@@ -1,6 +1,5 @@
 import { Prisma, prisma } from "@ltex/db";
 import { getCurrentRate } from "@/lib/exchange-rate";
-import { enqueueOrderCreate } from "@/lib/sync/enqueue";
 import {
   buildOrderEventBody,
   recordClientEventSafe,
@@ -130,8 +129,6 @@ export async function createOrderWithItems(
       })
     : await prisma.order.create({ data: createData, include: ORDER_INCLUDE });
 
-  enqueueOrderSyncSafe(order);
-
   // Авто-запис історії клієнта (Фаза 4) — fire-and-forget, не блокує відповідь.
   recordClientEventSafe({
     customerId: order.customerId,
@@ -152,8 +149,6 @@ export async function createOrderWithItems(
  * складний diff — як у формі 1С при перепроведенні документа. Зміна статусу
  * (якщо передана) застосовується у тій самій транзакції; валідність переходу
  * перевіряє caller (endpoint) до виклику.
- *
- * Після успіху — fire-and-forget enqueue до 1С (best-effort, як create).
  */
 export async function updateOrderWithItems(
   orderId: string,
@@ -200,39 +195,5 @@ export async function updateOrderWithItems(
     });
   });
 
-  enqueueOrderSyncSafe(order);
-
   return order;
-}
-
-type OrderWithSyncRelations = Prisma.OrderGetPayload<{
-  include: typeof ORDER_INCLUDE;
-}>;
-
-/** Fire-and-forget enqueue до 1С — однаково для create й update. */
-function enqueueOrderSyncSafe(order: OrderWithSyncRelations): void {
-  enqueueOrderCreate({
-    id: order.id,
-    code1C: order.code1C,
-    status: order.status,
-    totalEur: order.totalEur,
-    totalUah: order.totalUah,
-    exchangeRate: order.exchangeRate,
-    notes: order.notes,
-    customer: { code1C: order.customer.code1C },
-    items: order.items.map((i) => ({
-      productId: i.productId,
-      lotId: i.lotId,
-      priceEur: i.priceEur,
-      weight: i.weight,
-      quantity: i.quantity,
-      product: i.product ? { code1C: i.product.code1C } : null,
-      lot: i.lot ? { barcode: i.lot.barcode } : null,
-    })),
-  }).catch((e: unknown) => {
-    console.warn("[L-TEX] Failed to enqueue order sync", {
-      orderId: order.id,
-      error: e instanceof Error ? e.message : String(e),
-    });
-  });
 }

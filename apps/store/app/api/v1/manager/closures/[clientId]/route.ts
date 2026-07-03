@@ -3,7 +3,19 @@ import { prisma } from "@ltex/db";
 import { getCurrentUser } from "@/lib/auth/manager-auth";
 import { getMyClientCodes1C } from "@/lib/manager/order-ownership";
 import { formatOrderNumber } from "@/lib/manager/order-number";
-import type { ClosuresListItem } from "@/lib/manager/closures-sync";
+
+/** Рядок огляду «незакрите замовлення × позиція» для блоку Закриття. */
+interface ClosuresListItem {
+  orderUid: string;
+  orderNumber: string;
+  orderDate: string;
+  productUid: string;
+  productName: string;
+  quantity: number;
+  sum: number;
+  sold: number;
+  status: string;
+}
 
 /**
  * Закриття старих замовлень — GET (локальні дані).

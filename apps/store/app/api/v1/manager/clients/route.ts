@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { Prisma, prisma } from "@ltex/db";
 import { getCurrentUser } from "@/lib/auth/manager-auth";
 import { ownershipWhere } from "@/lib/manager/client-visibility";
-import { enqueueClientUpdate } from "@/lib/sync/enqueue";
 import { listQuerySchema } from "@/lib/validations/manager-clients";
 import { mgrClientCreateSchema } from "@/lib/validations/mgr-client";
 
@@ -385,14 +384,6 @@ export async function POST(req: NextRequest) {
           });
         });
     }
-
-    // М3.5 — best-effort sync до 1С (mock або real залежно від SYNC_MOCK_MODE).
-    enqueueClientUpdate(created, "create").catch((e: unknown) => {
-      console.warn("[L-TEX] Failed to enqueue new-client sync", {
-        clientId: created.id,
-        error: e instanceof Error ? e.message : String(e),
-      });
-    });
 
     return NextResponse.json({ id: created.id }, { status: 201 });
   } catch (err) {

@@ -1,29 +1,23 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-const { mockPrisma, getCurrentRateMock, enqueueSaleCreateMock } = vi.hoisted(
-  () => {
-    const tx = {
-      saleItem: { deleteMany: vi.fn() },
-      sale: { update: vi.fn() },
-    };
-    return {
-      mockPrisma: {
-        sale: { create: vi.fn(), update: tx.sale.update },
-        saleItem: tx.saleItem,
-        $transaction: vi.fn(async (cb: (t: typeof tx) => unknown) => cb(tx)),
-      },
-      getCurrentRateMock: vi.fn(),
-      enqueueSaleCreateMock: vi.fn(),
-    };
-  },
-);
+const { mockPrisma, getCurrentRateMock } = vi.hoisted(() => {
+  const tx = {
+    saleItem: { deleteMany: vi.fn() },
+    sale: { update: vi.fn() },
+  };
+  return {
+    mockPrisma: {
+      sale: { create: vi.fn(), update: tx.sale.update },
+      saleItem: tx.saleItem,
+      $transaction: vi.fn(async (cb: (t: typeof tx) => unknown) => cb(tx)),
+    },
+    getCurrentRateMock: vi.fn(),
+  };
+});
 
 vi.mock("@ltex/db", () => ({ prisma: mockPrisma }));
 vi.mock("@/lib/exchange-rate", () => ({
   getCurrentRate: getCurrentRateMock,
-}));
-vi.mock("@/lib/sync/enqueue", () => ({
-  enqueueSaleCreate: enqueueSaleCreateMock,
 }));
 
 import {
@@ -62,7 +56,6 @@ const baseInput = {
 beforeEach(() => {
   vi.clearAllMocks();
   getCurrentRateMock.mockResolvedValue(43);
-  enqueueSaleCreateMock.mockResolvedValue({ id: "job1" });
 });
 
 function fakeSale(): unknown {
@@ -298,42 +291,16 @@ describe("updateSaleWithItems", () => {
   });
 });
 
-describe("fire-and-forget enqueue до 1С (Етап 5)", () => {
-  it("create викликає enqueueSaleCreate з мапленою реалізацією", async () => {
+describe("persist повертає реалізацію", () => {
+  it("create повертає створену реалізацію", async () => {
     mockPrisma.sale.create.mockResolvedValueOnce(fakeSale());
-    await createSaleWithItems(baseInput, baseCustomer, actor);
-    expect(enqueueSaleCreateMock).toHaveBeenCalledOnce();
-    const arg = enqueueSaleCreateMock.mock.calls[0]?.[0] as {
-      id: string;
-      docNumber: number;
-      customer: { code1C: string | null; name: string };
-      items: Array<{ productId: string; lot: { barcode: string } | null }>;
-    };
-    expect(arg.id).toBe("sale1");
-    expect(arg.docNumber).toBe(1);
-    expect(arg.customer.code1C).toBe("000001");
-    expect(arg.items[0]?.lot?.barcode).toBe("B1");
-  });
-
-  it("update викликає enqueueSaleCreate", async () => {
-    mockPrisma.sale.update.mockResolvedValueOnce(fakeSale());
-    await updateSaleWithItems("sale1", baseInput, actor);
-    expect(enqueueSaleCreateMock).toHaveBeenCalledOnce();
-    const arg = enqueueSaleCreateMock.mock.calls[0]?.[0] as { id: string };
-    expect(arg.id).toBe("sale1");
-  });
-
-  it("кинутий enqueue НЕ ламає create (best-effort)", async () => {
-    mockPrisma.sale.create.mockResolvedValueOnce(fakeSale());
-    enqueueSaleCreateMock.mockRejectedValueOnce(new Error("queue down"));
     await expect(
       createSaleWithItems(baseInput, baseCustomer, actor),
     ).resolves.toBeDefined();
   });
 
-  it("кинутий enqueue НЕ ламає update (best-effort)", async () => {
+  it("update повертає оновлену реалізацію", async () => {
     mockPrisma.sale.update.mockResolvedValueOnce(fakeSale());
-    enqueueSaleCreateMock.mockRejectedValueOnce(new Error("queue down"));
     await expect(
       updateSaleWithItems("sale1", baseInput, actor),
     ).resolves.toBeDefined();

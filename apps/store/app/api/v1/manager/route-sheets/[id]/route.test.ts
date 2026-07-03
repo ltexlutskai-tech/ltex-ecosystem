@@ -13,7 +13,6 @@ const {
   documentsMock,
   expensesMock,
   mileageWarningMock,
-  enqueueRouteSheetCreateMock,
 } = vi.hoisted(() => ({
   mockPrisma: {
     routeSheet: { findUnique: vi.fn(), update: vi.fn(), delete: vi.fn() },
@@ -36,7 +35,6 @@ const {
   documentsMock: vi.fn(),
   expensesMock: vi.fn(),
   mileageWarningMock: vi.fn(),
-  enqueueRouteSheetCreateMock: vi.fn(),
 }));
 
 vi.mock("@ltex/db", () => ({ prisma: mockPrisma }));
@@ -57,10 +55,6 @@ vi.mock("@/lib/manager/route-sheet-documents", () => ({
 vi.mock("@/lib/manager/route-sheet-mileage", () => ({
   getUnclosedMileageWarning: (...args: unknown[]) =>
     mileageWarningMock(...args),
-}));
-vi.mock("@/lib/sync/enqueue", () => ({
-  enqueueRouteSheetCreate: (...args: unknown[]) =>
-    enqueueRouteSheetCreateMock(...args),
 }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 
@@ -158,7 +152,6 @@ beforeEach(() => {
   documentsMock.mockResolvedValue({ sales: [], saleItems: [], payments: [] });
   expensesMock.mockResolvedValue([]);
   mileageWarningMock.mockResolvedValue(null);
-  enqueueRouteSheetCreateMock.mockResolvedValue({ id: "j-rsh" });
 });
 
 describe("GET /api/v1/manager/route-sheets/[id]", () => {
@@ -417,58 +410,6 @@ describe("PATCH /api/v1/manager/route-sheets/[id]", () => {
     };
     expect(data.data.mileageStartKm).toBe(100);
     expect(data.data.mileageEndKm).toBe(150);
-  });
-
-  it("enqueues route-sheet sync on transition draft → dispatched (Stage 5)", async () => {
-    mockPrisma.routeSheet.findUnique.mockResolvedValueOnce({
-      id: "rs1",
-      status: "draft",
-    });
-    mockPrisma.routeSheet.update.mockResolvedValueOnce(
-      fakeSheet({ status: "dispatched" }),
-    );
-    const res = await PATCH(patchReq({ status: "dispatched" }), { params });
-    expect(res.status).toBe(200);
-    expect(enqueueRouteSheetCreateMock).toHaveBeenCalledWith("rs1");
-  });
-
-  it("enqueues route-sheet sync on transition dispatched → completed (Stage 5)", async () => {
-    mockPrisma.routeSheet.findUnique.mockResolvedValueOnce({
-      id: "rs1",
-      status: "dispatched",
-    });
-    mockPrisma.routeSheet.update.mockResolvedValueOnce(
-      fakeSheet({ status: "completed" }),
-    );
-    const res = await PATCH(patchReq({ status: "completed" }), { params });
-    expect(res.status).toBe(200);
-    expect(enqueueRouteSheetCreateMock).toHaveBeenCalledWith("rs1");
-  });
-
-  it("does NOT enqueue when editing header without status change (Stage 5)", async () => {
-    mockPrisma.routeSheet.findUnique.mockResolvedValueOnce({
-      id: "rs1",
-      status: "draft",
-    });
-    mockPrisma.routeSheet.update.mockResolvedValueOnce(
-      fakeSheet({ comment: "оновлено" }),
-    );
-    const res = await PATCH(patchReq({ comment: "оновлено" }), { params });
-    expect(res.status).toBe(200);
-    expect(enqueueRouteSheetCreateMock).not.toHaveBeenCalled();
-  });
-
-  it("does NOT enqueue on transition back dispatched → draft (Stage 5)", async () => {
-    mockPrisma.routeSheet.findUnique.mockResolvedValueOnce({
-      id: "rs1",
-      status: "dispatched",
-    });
-    mockPrisma.routeSheet.update.mockResolvedValueOnce(
-      fakeSheet({ status: "draft" }),
-    );
-    const res = await PATCH(patchReq({ status: "draft" }), { params });
-    expect(res.status).toBe(200);
-    expect(enqueueRouteSheetCreateMock).not.toHaveBeenCalled();
   });
 });
 

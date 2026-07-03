@@ -16,17 +16,9 @@ export default async function WorkstationLayout({
   const user = await getCurrentUser();
   if (!user) redirect("/manager/login");
 
-  const lastSyncAt = new Date().toISOString();
-
   return (
     <WorkstationShell
-      header={
-        <ManagerHeader
-          fullName={user.fullName}
-          role={user.role}
-          lastSyncAt={lastSyncAt}
-        />
-      }
+      header={<ManagerHeader fullName={user.fullName} role={user.role} />}
       sidebar={<ManagerSidebar role={user.role} />}
     >
       {children}

@@ -33,28 +33,5 @@ module.exports = {
       min_uptime: "30s",
       max_restarts: 50,
     },
-    {
-      // M1.5: HTTP-proxy між Next.js і 1С SOAP. Mock-режим за замовчуванням —
-      // справжній 1С handshake вмикається коли env SYNC_MOCK_MODE=false +
-      // ONEC_SOAP_URL/PASSWORD задані. Див. docs/M1.5_SYNC_ARCHITECTURE.md.
-      name: "ltex-manager-sync",
-      cwd: "E:\\ltex-ecosystem\\services\\manager-sync",
-      script: "node_modules\\tsx\\dist\\cli.mjs",
-      args: "src/index.ts",
-      env: {
-        NODE_ENV: "production",
-      },
-      exec_mode: "fork",
-      instances: 1,
-      autorestart: true,
-      max_memory_restart: "256M",
-      error_file: "E:\\ltex-logs\\manager-sync-error.log",
-      out_file: "E:\\ltex-logs\\manager-sync-out.log",
-      log_date_format: "YYYY-MM-DD HH:mm:ss Z",
-      kill_timeout: 5000,
-      restart_delay: 5000,
-      min_uptime: "30s",
-      max_restarts: 50,
-    },
   ],
 };

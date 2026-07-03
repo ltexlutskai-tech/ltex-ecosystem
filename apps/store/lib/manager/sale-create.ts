@@ -1,6 +1,5 @@
 import { Prisma, prisma } from "@ltex/db";
 import { getCurrentRate } from "@/lib/exchange-rate";
-import { enqueueSaleCreate } from "@/lib/sync/enqueue";
 import {
   buildSaleEventBody,
   recordClientEventSafe,
@@ -20,10 +19,7 @@ import type {
  *    (заповнюються при скані ШК; при підборі через прайс — `lotId` null);
  *  - totals = `totalEur = Σ priceEur`, `totalUah = round(totalEur × курсEUR)`;
  *  - `codAmountUah` (сума післяплати) обчислюється коли `cashOnDelivery`
- *    (оплати з'являться у Етапі 4, тож зараз paid = 0 → COD = round(totalUah));
- *  - **Етап 5:** після persist — fire-and-forget enqueue до 1С
- *    (`СтворитиРеалізацію`), best-effort як Order/PATCH-client. Транспорт
- *    замокано (`SYNC_MOCK_MODE`); реальний BSL — у docs/1C_SYNC_MODULES_SPEC.md §3.4.
+ *    (оплати з'являться у Етапі 4, тож зараз paid = 0 → COD = round(totalUah)).
  */
 
 export interface CreateSaleCustomer {
@@ -151,8 +147,6 @@ export async function createSaleWithItems(
     include: SALE_INCLUDE,
   });
 
-  enqueueSaleSyncSafe(sale);
-
   // Авто-запис історії клієнта (Фаза 4) — fire-and-forget, не блокує відповідь.
   recordClientEventSafe({
     customerId: sale.customerId,
@@ -187,8 +181,6 @@ export async function createSaleWithItems(
  * Items замінюються повністю (deleteMany + create), щоб не вести складний diff.
  * Зміна статусу (якщо передана) застосовується у тій самій транзакції;
  * валідність переходу перевіряє caller (endpoint) до виклику.
- *
- * Після успіху — fire-and-forget enqueue до 1С (best-effort, як create).
  */
 export async function updateSaleWithItems(
   saleId: string,
@@ -232,8 +224,6 @@ export async function updateSaleWithItems(
     });
   });
 
-  enqueueSaleSyncSafe(sale);
-
   // 5.4.5b: рух боргу при переході у `posted` (проведення з картки реалізації).
   // Ідемпотентно за sourceType+sourceId — повторне проведення лише оновить суму.
   if (becomesArchived) {
@@ -250,46 +240,4 @@ export async function updateSaleWithItems(
   }
 
   return sale;
-}
-
-type SaleWithSyncRelations = Prisma.SaleGetPayload<{
-  include: typeof SALE_INCLUDE;
-}>;
-
-/** Fire-and-forget enqueue до 1С — однаково для create й update. */
-function enqueueSaleSyncSafe(sale: SaleWithSyncRelations): void {
-  enqueueSaleCreate({
-    id: sale.id,
-    code1C: sale.code1C,
-    docNumber: sale.docNumber,
-    totalEur: sale.totalEur,
-    totalUah: sale.totalUah,
-    exchangeRateEur: sale.exchangeRateEur,
-    exchangeRateUsd: sale.exchangeRateUsd,
-    priceTypeId: sale.priceTypeId,
-    deliveryMethod: sale.deliveryMethod,
-    novaPoshtaBranch: sale.novaPoshtaBranch,
-    cashOnDelivery: sale.cashOnDelivery,
-    codAmountUah: sale.codAmountUah,
-    assignedAgentUserId: sale.assignedAgentUserId,
-    onTradeAgent: sale.onTradeAgent,
-    expressWaybill: sale.expressWaybill,
-    notes: sale.notes,
-    customer: { code1C: sale.customer.code1C, name: sale.customer.name },
-    items: sale.items.map((i) => ({
-      productId: i.productId,
-      lotId: i.lotId,
-      pricePerKg: i.pricePerKg,
-      weight: i.weight,
-      quantity: i.quantity,
-      priceEur: i.priceEur,
-      product: i.product ? { code1C: i.product.code1C } : null,
-      lot: i.lot ? { barcode: i.lot.barcode } : null,
-    })),
-  }).catch((e: unknown) => {
-    console.warn("[L-TEX] Failed to enqueue sale sync", {
-      saleId: sale.id,
-      error: e instanceof Error ? e.message : String(e),
-    });
-  });
 }

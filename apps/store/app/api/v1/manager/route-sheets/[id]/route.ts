@@ -22,7 +22,6 @@ import {
   releaseRouteSheetReservations,
 } from "@/lib/manager/route-sheet-actions";
 import { updateRouteSheetSchema } from "@/lib/validations/manager-route-sheet";
-import { enqueueRouteSheetCreate } from "@/lib/sync/enqueue";
 
 /**
  * GET — повний маршрутний лист: шапка + Заказы + Товари (Етап 1) + Загрузка +
@@ -321,19 +320,6 @@ export async function PATCH(
     }
     return updated;
   });
-
-  // Sync-каркас (Етап 5): значущий момент синку — відправка у виїзд / завершення
-  // дня (не створення чернетки). Ставимо МЛ у чергу `mgr_sync_jobs` лише на
-  // переході статусу у `dispatched`/`completed`. Fire-and-forget — ніколи не
-  // блокує і не валить відповідь (sync — best-effort).
-  if (triggersSideEffects) {
-    void enqueueRouteSheetCreate(id).catch((e: unknown) => {
-      console.warn("[L-TEX] enqueueRouteSheetCreate failed", {
-        routeSheetId: id,
-        error: e instanceof Error ? e.message : String(e),
-      });
-    });
-  }
 
   return NextResponse.json({
     id: sheet.id,

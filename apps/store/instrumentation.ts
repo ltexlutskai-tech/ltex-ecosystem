@@ -22,14 +22,6 @@ export function validateProductionSecrets(
     );
   }
 
-  const syncKey = env.SYNC_API_KEY;
-  if (!syncKey || syncKey.length < 32) {
-    throw new Error(
-      "SYNC_API_KEY must be at least 32 characters. " +
-        "Generate with: openssl rand -hex 32",
-    );
-  }
-
   const customerAuthSecret = env.CUSTOMER_AUTH_SECRET;
   if (!customerAuthSecret || customerAuthSecret.length < 32) {
     throw new Error(
@@ -65,7 +57,6 @@ export function register() {
     { key: "TELEGRAM_CHAT_ID", feature: "Telegram order notifications" },
     { key: "VIBER_AUTH_TOKEN", feature: "Viber bot / notifications" },
     { key: "NOVA_POSHTA_API_KEY", feature: "Nova Poshta shipment tracking" },
-    { key: "SYNC_API_KEY", feature: "1C sync API authentication" },
     { key: "NEXT_PUBLIC_SITE_URL", feature: "Canonical URLs & OG meta" },
   ];
 

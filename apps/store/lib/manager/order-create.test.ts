@@ -1,38 +1,30 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-const {
-  mockPrisma,
-  getCurrentRateMock,
-  enqueueOrderCreateMock,
-  recordClientEventSafeMock,
-} = vi.hoisted(() => {
-  const tx = {
-    orderItem: { deleteMany: vi.fn() },
-    order: { update: vi.fn(), create: vi.fn(), updateMany: vi.fn() },
-  };
-  return {
-    mockPrisma: {
-      order: {
-        create: vi.fn(),
-        update: tx.order.update,
-        updateMany: tx.order.updateMany,
+const { mockPrisma, getCurrentRateMock, recordClientEventSafeMock } =
+  vi.hoisted(() => {
+    const tx = {
+      orderItem: { deleteMany: vi.fn() },
+      order: { update: vi.fn(), create: vi.fn(), updateMany: vi.fn() },
+    };
+    return {
+      mockPrisma: {
+        order: {
+          create: vi.fn(),
+          update: tx.order.update,
+          updateMany: tx.order.updateMany,
+        },
+        orderItem: tx.orderItem,
+        $transaction: vi.fn(async (cb: (t: typeof tx) => unknown) => cb(tx)),
+        _tx: tx,
       },
-      orderItem: tx.orderItem,
-      $transaction: vi.fn(async (cb: (t: typeof tx) => unknown) => cb(tx)),
-      _tx: tx,
-    },
-    getCurrentRateMock: vi.fn(),
-    enqueueOrderCreateMock: vi.fn(),
-    recordClientEventSafeMock: vi.fn(),
-  };
-});
+      getCurrentRateMock: vi.fn(),
+      recordClientEventSafeMock: vi.fn(),
+    };
+  });
 
 vi.mock("@ltex/db", () => ({ prisma: mockPrisma }));
 vi.mock("@/lib/exchange-rate", () => ({
   getCurrentRate: getCurrentRateMock,
-}));
-vi.mock("@/lib/sync/enqueue", () => ({
-  enqueueOrderCreate: enqueueOrderCreateMock,
 }));
 vi.mock("@/lib/manager/client-timeline", async () => {
   const actual =
@@ -62,7 +54,6 @@ const baseInput = {
 beforeEach(() => {
   vi.clearAllMocks();
   getCurrentRateMock.mockResolvedValue(43);
-  enqueueOrderCreateMock.mockResolvedValue({ id: "j1" });
 });
 
 function fakeOrder(): unknown {
@@ -141,26 +132,6 @@ describe("createOrderWithItems", () => {
     };
     expect(call.data.items.create[0]?.lotId).toBe("l1");
     expect(call.data.items.create[1]?.lotId).toBeNull();
-  });
-
-  it("calls enqueueOrderCreate fire-and-forget після create", async () => {
-    mockPrisma.order.create.mockResolvedValueOnce(fakeOrder());
-    await createOrderWithItems(baseInput, baseCustomer, actor);
-    expect(enqueueOrderCreateMock).toHaveBeenCalledOnce();
-    const args = enqueueOrderCreateMock.mock.calls[0]?.[0] as {
-      id: string;
-      customer: { code1C: string };
-    };
-    expect(args.id).toBe("ord1");
-    expect(args.customer.code1C).toBe("000001");
-  });
-
-  it("не падає коли enqueue throws — caller все одно отримує order", async () => {
-    mockPrisma.order.create.mockResolvedValueOnce(fakeOrder());
-    enqueueOrderCreateMock.mockRejectedValueOnce(new Error("queue down"));
-    const order = await createOrderWithItems(baseInput, baseCustomer, actor);
-    expect(order).toBeDefined();
-    expect((order as { id: string }).id).toBe("ord1");
   });
 
   it("пише авто-запис історії клієнта (kind=order) після create", async () => {
@@ -422,15 +393,8 @@ describe("updateOrderWithItems", () => {
     expect(call.data.isActual).toBeUndefined();
   });
 
-  it("викликає enqueueOrderCreate fire-and-forget після update", async () => {
+  it("не падає та повертає order після update", async () => {
     mockPrisma.order.update.mockResolvedValueOnce(fakeUpdatedOrder());
-    await updateOrderWithItems("ord1", baseInput, actor);
-    expect(enqueueOrderCreateMock).toHaveBeenCalledOnce();
-  });
-
-  it("не падає коли enqueue throws — caller отримує order", async () => {
-    mockPrisma.order.update.mockResolvedValueOnce(fakeUpdatedOrder());
-    enqueueOrderCreateMock.mockRejectedValueOnce(new Error("queue down"));
     const order = await updateOrderWithItems("ord1", baseInput, actor);
     expect((order as { id: string }).id).toBe("ord1");
   });

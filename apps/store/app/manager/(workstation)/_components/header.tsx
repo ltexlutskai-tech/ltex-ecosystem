@@ -4,17 +4,14 @@ import { HeaderBarcode } from "./header-barcode";
 import { HeaderNotificationsBell } from "./header-notifications-bell";
 import { HeaderProfileMenu } from "./header-profile-menu";
 import { HeaderSearch } from "./header-search";
-import { HeaderSyncIndicator } from "./header-sync-indicator";
 import { SidebarMobileTrigger } from "./sidebar-mobile-trigger";
 
 export function ManagerHeader({
   fullName,
   role,
-  lastSyncAt,
 }: {
   fullName: string;
   role: ManagerRole;
-  lastSyncAt: string | null;
 }) {
   return (
     <header className="flex h-14 shrink-0 items-center gap-3 border-b bg-white px-3 lg:px-6">
@@ -29,7 +26,6 @@ export function ManagerHeader({
         <HeaderSearch />
         <HeaderBarcode />
       </div>
-      <HeaderSyncIndicator initialLastSyncAt={lastSyncAt} />
       <HeaderNotificationsBell />
       <HeaderProfileMenu fullName={fullName} role={role} />
     </header>

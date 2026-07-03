@@ -18,9 +18,6 @@ import {
   Boxes,
   Users,
   FolderTree,
-  ArrowLeftRight,
-  RefreshCw,
-  FileText,
   LogOut,
   Menu,
   Image,
@@ -48,10 +45,7 @@ const navItems = [
   { href: "/admin/banners", label: "Банери", icon: Image },
   { href: "/admin/featured", label: "Топ товарів", icon: Star },
   { href: "/admin/promo", label: "Гаряча пропозиція", icon: Megaphone },
-  { href: "/admin/rates", label: "Курси валют", icon: ArrowLeftRight },
   { href: "/admin/emails", label: "Черга email", icon: Mail, emailBadge: true },
-  { href: "/admin/sync-log", label: "Журнал синхр.", icon: FileText },
-  { href: "/admin/sync-jobs", label: "Черга sync 1С", icon: FileText },
 ];
 
 function NavContent() {
@@ -85,26 +79,6 @@ function NavContent() {
           );
         })}
       </ul>
-
-      <div className="mt-6 border-t pt-4">
-        <p className="mb-2 px-3 text-xs font-semibold uppercase text-gray-400">
-          1C Синхронізація
-        </p>
-        <ul className="space-y-1">
-          {[
-            { label: "Синхр. товари" },
-            { label: "Синхр. лоти" },
-            { label: "Синхр. курси" },
-          ].map((item) => (
-            <li key={item.label}>
-              <span className="flex items-center gap-3 rounded-md px-3 py-2 text-sm text-gray-500">
-                <RefreshCw className="h-4 w-4" />
-                {item.label}
-              </span>
-            </li>
-          ))}
-        </ul>
-      </div>
     </>
   );
 }

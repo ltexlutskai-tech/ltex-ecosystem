@@ -6,7 +6,6 @@ import {
   maskClientForForeign,
 } from "@/lib/manager/client-visibility";
 import { canEditClient } from "@/lib/permissions/mgr-client-edit";
-import { enqueueClientUpdate } from "@/lib/sync/enqueue";
 import { mgrClientPatchSchema } from "@/lib/validations/mgr-client";
 
 const clientInclude = {
@@ -196,14 +195,6 @@ export async function PATCH(
       where: { id },
       data: updateData,
       include: clientInclude,
-    });
-
-    // M1.5: enqueue write-back до 1С — best-effort, не блокує response.
-    enqueueClientUpdate(updated, "update").catch((e: unknown) => {
-      console.warn("[L-TEX] Failed to enqueue client sync", {
-        clientId: updated.id,
-        error: e instanceof Error ? e.message : String(e),
-      });
     });
 
     return NextResponse.json({ client: serializeMgrClient(updated) });

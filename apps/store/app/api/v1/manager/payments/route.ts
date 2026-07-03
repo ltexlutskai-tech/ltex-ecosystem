@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { Prisma, prisma } from "@ltex/db";
 import { getCurrentUser } from "@/lib/auth/manager-auth";
 import { getMyClientCodes1C } from "@/lib/manager/order-ownership";
-import { enqueuePaymentCreate } from "@/lib/sync/enqueue";
 import { createPaymentSchema } from "@/lib/validations/manager-payment";
 
 /**
@@ -10,10 +9,8 @@ import { createPaymentSchema } from "@/lib/validations/manager-payment";
  *
  * Ownership: через `Order.customer.code1C` → manager бачить тільки свої.
  *
- * Status default `"completed"` — менеджер створює factual payment record;
- * 1С підтвердить чи rejectне через sync. Refund/cancel — поза scope.
- *
- * Після успіху — fire-and-forget enqueue до 1С (best-effort).
+ * Status default `"completed"` — менеджер створює factual payment record.
+ * Refund/cancel — поза scope.
  */
 export async function POST(req: NextRequest) {
   const user = await getCurrentUser(req);
@@ -79,22 +76,6 @@ export async function POST(req: NextRequest) {
       { status: 500 },
     );
   }
-
-  enqueuePaymentCreate({
-    id: payment.id,
-    orderId: payment.orderId,
-    method: payment.method,
-    amount: payment.amount,
-    currency: payment.currency,
-    externalId: payment.externalId,
-    paidAt: payment.paidAt,
-    order: { code1C: order.code1C },
-  }).catch((e: unknown) => {
-    console.warn("[L-TEX] Failed to enqueue payment sync", {
-      paymentId: payment.id,
-      error: e instanceof Error ? e.message : String(e),
-    });
-  });
 
   return NextResponse.json(
     {

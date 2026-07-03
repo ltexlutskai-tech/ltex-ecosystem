@@ -58,28 +58,6 @@ describe("validateProductionSecrets", () => {
     ).toThrow(/MOBILE_JWT_SECRET/);
   });
 
-  it("throws when SYNC_API_KEY is missing in production", () => {
-    expect(() =>
-      validateProductionSecrets({
-        NODE_ENV: "production",
-        MOBILE_JWT_SECRET: VALID_SECRET,
-        SYNC_API_KEY: undefined,
-        CUSTOMER_AUTH_SECRET: VALID_SECRET,
-      } as NodeJS.ProcessEnv),
-    ).toThrow(/SYNC_API_KEY/);
-  });
-
-  it("throws when SYNC_API_KEY is too short in production", () => {
-    expect(() =>
-      validateProductionSecrets({
-        NODE_ENV: "production",
-        MOBILE_JWT_SECRET: VALID_SECRET,
-        SYNC_API_KEY: SHORT_SECRET,
-        CUSTOMER_AUTH_SECRET: VALID_SECRET,
-      } as NodeJS.ProcessEnv),
-    ).toThrow(/SYNC_API_KEY/);
-  });
-
   it("throws when CUSTOMER_AUTH_SECRET is missing in production", () => {
     expect(() =>
       validateProductionSecrets({

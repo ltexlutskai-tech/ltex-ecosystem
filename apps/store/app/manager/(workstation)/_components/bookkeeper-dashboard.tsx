@@ -77,10 +77,10 @@ export function BookkeeperDashboard({
         <div className="mb-2 flex items-center justify-between">
           <h2 className="text-sm font-medium">Поточні курси</h2>
           <Link
-            href="/admin/rates"
+            href="/manager/registry/rates"
             className="text-xs text-emerald-700 hover:underline"
           >
-            Редагувати →
+            Переглянути →
           </Link>
         </div>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">

@@ -4,12 +4,7 @@ import { NextRequest } from "next/server";
 const VALID_SECRET = "a".repeat(48);
 process.env.MANAGER_JWT_SECRET = VALID_SECRET;
 
-const {
-  mockPrisma,
-  getCurrentUserMock,
-  enqueuePaymentCreateMock,
-  FakePrismaError,
-} = vi.hoisted(() => {
+const { mockPrisma, getCurrentUserMock, FakePrismaError } = vi.hoisted(() => {
   class FakePrismaError extends Error {
     code: string;
     constructor(code: string, message = "fake") {
@@ -24,7 +19,6 @@ const {
       payment: { create: vi.fn() },
     },
     getCurrentUserMock: vi.fn(),
-    enqueuePaymentCreateMock: vi.fn(),
     FakePrismaError,
   };
 });
@@ -38,11 +32,6 @@ vi.mock("@/lib/auth/manager-auth", () => ({
   MANAGER_ACCESS_COOKIE: "ltex_mgr_access",
   MANAGER_REFRESH_COOKIE: "ltex_mgr_refresh",
 }));
-vi.mock("@/lib/sync/enqueue", () => ({
-  enqueuePaymentCreate: (...args: unknown[]) =>
-    enqueuePaymentCreateMock(...args),
-}));
-
 import { POST } from "./route";
 
 const MANAGER = {
@@ -69,7 +58,6 @@ function req(body: unknown): NextRequest {
 beforeEach(() => {
   vi.clearAllMocks();
   getCurrentUserMock.mockResolvedValue(MANAGER);
-  enqueuePaymentCreateMock.mockResolvedValue({ id: "j1" });
 });
 
 const validBody = {
@@ -137,7 +125,7 @@ describe("POST /api/v1/manager/payments", () => {
     expect(mockPrisma.mgrClient.findMany).not.toHaveBeenCalled();
   });
 
-  it("manager успішно створює payment + enqueue called", async () => {
+  it("manager успішно створює payment", async () => {
     mockPrisma.order.findUnique.mockResolvedValueOnce(fakeOrder());
     mockPrisma.mgrClient.findMany.mockResolvedValueOnce([{ code1C: "000001" }]);
     mockPrisma.payment.create.mockResolvedValueOnce(fakePayment());
@@ -145,11 +133,6 @@ describe("POST /api/v1/manager/payments", () => {
     expect(res.status).toBe(201);
     const json = (await res.json()) as { id: string };
     expect(json.id).toBe("pay1");
-    expect(enqueuePaymentCreateMock).toHaveBeenCalledOnce();
-    const args = enqueuePaymentCreateMock.mock.calls[0]?.[0] as {
-      order: { code1C: string };
-    };
-    expect(args.order.code1C).toBe("L-2026-0123");
   });
 
   it("returns 400 на Prisma FK error", async () => {
