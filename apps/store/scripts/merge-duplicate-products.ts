@@ -88,6 +88,19 @@ export interface MergeCandidate {
  *   1) найбільше вільних лотів (freeLots), 2) inStock=true, 3) новіший createdAt,
  *   4) тай-брейкер за id (детермінізм). Порожній масив → кидає.
  */
+/**
+ * Чи виглядає code1C як «історичний» (повний 1С-код з нулями зліва,
+ * напр. `00000001358`). Живий каталог має короткі коди (`1358`) — при
+ * рівності вільних лотів/inStock канонічним має лишатись КОРОТКИЙ
+ * (нормальна назва/категорія), а не запис-двійник з «Різне»/«Акції».
+ * Підтверджено dry-run-ом 2026-07-03: 491 група, скрізь пара
+ * короткий↔падений; без цього тай-брейка 2 «мертві» групи
+ * (L.MIX Sleepwear M, Livarno 50*36) обирали survivor-ом падений запис.
+ */
+function isPaddedCode(code1C: string | null): boolean {
+  return !!code1C && /^0{3,}\d+$/.test(code1C);
+}
+
 export function pickSurvivor(candidates: MergeCandidate[]): MergeCandidate {
   if (candidates.length === 0) {
     throw new Error("pickSurvivor: порожня група");
@@ -95,6 +108,10 @@ export function pickSurvivor(candidates: MergeCandidate[]): MergeCandidate {
   const sorted = [...candidates].sort((a, b) => {
     if (b.freeLots !== a.freeLots) return b.freeLots - a.freeLots;
     if (a.inStock !== b.inStock) return a.inStock ? -1 : 1;
+    // Короткий (непадений) code1C — канонічний запис живого каталогу.
+    const aPad = isPaddedCode(a.code1C);
+    const bPad = isPaddedCode(b.code1C);
+    if (aPad !== bPad) return aPad ? 1 : -1;
     const t = b.createdAt.getTime() - a.createdAt.getTime();
     if (t !== 0) return t;
     return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
