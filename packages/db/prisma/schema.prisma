@@ -78,6 +78,7 @@ model Product {
   favorites          Favorite[]
   featuredEntry      FeaturedProduct?
   viewLog            ViewLog[]
+  mergesAsTarget     ProductMerge[]      @relation("ProductMergeTarget")
 
   @@index([categoryId])
   @@index([quality])
@@ -2720,4 +2721,26 @@ model StockTransferItem {
 
   @@index([transferId])
   @@map("mgr_stock_transfer_items")
+}
+
+// ─── Журнал злиттів дублікатів номенклатури (Сесія 7.1) ─────────────────────
+// 1С-номенклатура містить дублікати одного артикула (старий запис з історією +
+// новий актуальний, різні code1C). Скрипт `merge-duplicate-products.ts` зливає
+// історію на актуальний (survivor) і видаляє старий Product. Цей запис —
+// (а) журнал, (б) мапа для імпортера: майбутні реімпорти по старому code1C
+// НЕ відтворюють видалений товар, а маршрутизуються на survivor.
+model ProductMerge {
+  id              String   @id @default(cuid())
+  // hex(_IDRRef) старого (видаленого) 1С-товару — унікальний ключ мапи.
+  oldCode1C       String   @unique @map("old_code_1c")
+  // Товар-survivor, на який перенесено історію.
+  targetProductId String   @map("target_product_id")
+  // Назва старого товару на момент злиття (для аудиту).
+  oldName         String   @map("old_name")
+  mergedAt        DateTime @default(now()) @map("merged_at")
+
+  target Product @relation("ProductMergeTarget", fields: [targetProductId], references: [id], onDelete: Restrict)
+
+  @@index([targetProductId])
+  @@map("product_merges")
 }

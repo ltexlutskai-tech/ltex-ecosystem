@@ -523,6 +523,10 @@ interface ImportContext {
   categoryParentHex: Map<string, string>; // hex(групи) → hex(батька-групи)
   // ── Фаза 5 — стокові документи: hex(_Reference95) → Warehouse.id ──
   warehouseIdByHex: Map<string, string>;
+  // ── Сесія 7.1 — мапа злиттів дублікатів: hex старого товару → survivor id ──
+  // Заповнюється з таблиці ProductMerge на старті. Реімпорт по старому code1C
+  // НЕ відтворює видалений товар, а маршрутизує посилання на survivor.
+  mergedCode1C: Map<string, string>;
 }
 
 // Чи робимо реальні записи (НЕ dry-run).
@@ -627,6 +631,22 @@ async function loadExistingByCode1C(
     }
   } catch (e) {
     warn(`loadExistingByCode1C(${model}): ${errMsg(e)}`);
+  }
+  return out;
+}
+
+// Сесія 7.1 — мапа злиттів дублікатів: hex(старого code1C) → survivor Product.id.
+async function loadProductMergeMap(
+  prisma: PrismaClient,
+): Promise<Map<string, string>> {
+  const out = new Map<string, string>();
+  try {
+    const rows = await prisma.productMerge.findMany({
+      select: { oldCode1C: true, targetProductId: true },
+    });
+    for (const r of rows) out.set(r.oldCode1C, r.targetProductId);
+  } catch (e) {
+    warn(`loadProductMergeMap: ${errMsg(e)}`);
   }
   return out;
 }
@@ -995,6 +1015,8 @@ async function importProducts(ctx: ImportContext): Promise<Recon> {
 
   recon.sourceRows = await countTable(src, "_Reference76");
   log(`products: source rows = ${recon.sourceRows}`);
+  // Скільки 1С-товарів пропущено як злиті дублікати (Сесія 7.1).
+  let mergedSkipped = 0;
 
   const importCategoryId = await ensureImportCategoryId(ctx);
   await ensureCategoryHexMap(ctx);
@@ -1020,6 +1042,17 @@ async function importProducts(ctx: ImportContext): Promise<Recon> {
       }
       if (!code1C) {
         recon.skipped++;
+        continue;
+      }
+
+      // Сесія 7.1 — злитий дублікат: НЕ відтворюємо старий Product (інакше upsert
+      // resurrect-ить видалений запис). Реєструємо alias hex → survivor id, щоб
+      // усі подальші резолви (лоти/ціни/рухи) вели на survivor.
+      const mergedTargetId = hex ? ctx.mergedCode1C.get(hex) : undefined;
+      if (hex && mergedTargetId) {
+        ctx.products.set(hex, { id: mergedTargetId, code1C });
+        recon.skipped++;
+        mergedSkipped++;
         continue;
       }
 
@@ -1096,6 +1129,10 @@ async function importProducts(ctx: ImportContext): Promise<Recon> {
       }
     }
     log(`products: processed ${recon.written + recon.skipped + recon.errors}`);
+  }
+
+  if (mergedSkipped > 0) {
+    log(`products: пропущено ${mergedSkipped} злитих дублікатів (Сесія 7.1)`);
   }
 
   return recon;
@@ -1354,7 +1391,10 @@ async function buildProductDictFromSource(ctx: ImportContext): Promise<void> {
       const hex = bufToHex(row["_IDRRef"]);
       const code1C = asString(row["_Code"]);
       if (!hex || !code1C) continue;
-      const id = existing.get(code1C) ?? "(pending)";
+      // Сесія 7.1 — злитий дублікат: alias hex → survivor id (старого Product
+      // у ЦІЛЬОВІЙ базі вже нема, existing.get дав би "(pending)").
+      const mergedId = ctx.mergedCode1C.get(hex);
+      const id = mergedId ?? existing.get(code1C) ?? "(pending)";
       ctx.products.set(hex, { id, code1C });
     }
   }
@@ -2326,13 +2366,28 @@ function resolveCustomerId(
   const e = ctx.customers.get(hex);
   return e && e.id !== "(pending)" ? e.id : null;
 }
+/**
+ * Чистий резолв товару по hex з урахуванням мапи злиттів (Сесія 7.1).
+ * Спершу дивимось у мапу злиттів (старий code1C → survivor id), інакше — у
+ * словник товарів. Експортовано для юніт-тесту.
+ */
+export function resolveMergedProductId(
+  hex: string | null,
+  products: Map<string, { id: string; code1C: string | null }>,
+  merged: Map<string, string>,
+): string | null {
+  if (!hex) return null;
+  const target = merged.get(hex);
+  if (target) return target;
+  const e = products.get(hex);
+  return e && e.id !== "(pending)" ? e.id : null;
+}
+
 function resolveProductId(
   ctx: ImportContext,
   hex: string | null,
 ): string | null {
-  if (!hex) return null;
-  const e = ctx.products.get(hex);
-  return e && e.id !== "(pending)" ? e.id : null;
+  return resolveMergedProductId(hex, ctx.products, ctx.mergedCode1C);
 }
 function resolveLotId(
   ctx: ImportContext,
@@ -6694,7 +6749,14 @@ async function main(): Promise<void> {
     categoryHexToId: new Map(),
     categoryParentHex: new Map(),
     warehouseIdByHex: new Map(),
+    mergedCode1C: new Map(),
   };
+
+  // ── Сесія 7.1 — мапа злиттів дублікатів (діє для всіх entity) ──
+  ctx.mergedCode1C = await loadProductMergeMap(prisma);
+  if (ctx.mergedCode1C.size > 0) {
+    log(`product-merge: ${ctx.mergedCode1C.size} злитих code1C → survivor`);
+  }
 
   // Дрібні довідники назв (city/region) — потрібні для Customer.
   const entities = args.entity ? [args.entity] : DEFAULT_ORDER;

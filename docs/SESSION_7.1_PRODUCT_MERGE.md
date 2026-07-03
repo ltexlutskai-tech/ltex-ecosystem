@@ -55,5 +55,35 @@
 
 ## Прогін (user)
 
-1. pg_dump. 2. Dry-run → переглянути список груп/survivor-ів → 3. `--apply --confirm-prod`.
-2. Перевірити пари 37047/37062/58058 у CRM. Реімпорти після цього безпечні (мапа поважається).
+Реалізовано: модель `ProductMerge` + міграція `20260703_product_merge`, скрипт
+`apps/store/scripts/merge-duplicate-products.ts`, обізнаність імпортера
+(`import-1c-historical.ts`: мапа `mergedCode1C`, skip у `--entity products`,
+резолв через `resolveMergedProductId`).
+
+1. **Міграція + клієнт (сервер):**
+   ```
+   git pull
+   pnpm --filter @ltex/db exec prisma migrate deploy   # 20260703_product_merge
+   pnpm --filter @ltex/db exec prisma generate
+   ```
+2. **pg_dump** свіжий бекап.
+3. **Dry-run** (за замовчуванням, лише звіт — список груп + survivor):
+   ```
+   # DATABASE_URL з apps/store/.env
+   pnpm --filter @ltex/store exec tsx scripts/merge-duplicate-products.ts
+   # одна група для перевірки:
+   pnpm --filter @ltex/store exec tsx scripts/merge-duplicate-products.ts --only 37047
+   ```
+4. Переглянути список груп/survivor-ів → якщо ок:
+   ```
+   pnpm --filter @ltex/store exec tsx scripts/merge-duplicate-products.ts --apply --confirm-prod
+   ```
+5. Перевірити пари 37047/37062/58058 у CRM. Реімпорти після цього безпечні
+   (мапа поважається: старий code1C skip-ається, посилання ведуть на survivor).
+
+**Ризик, який варто передивитись перед apply:** survivor обирається евристикою
+(найбільше вільних лотів → inStock → новіший). Якщо у dry-run survivor виглядає
+не тим товаром (напр. актуальний має 0 вільних лотів у момент прогону) — злиття
+все одно коректне (історія переноситься на нього), але назва/категорія survivor-а
+стануть канонічними. За потреби змінити survivor вручну — поки що лише через
+редагування даних (флага override немає; `--only` дозволяє ізолювати групу).

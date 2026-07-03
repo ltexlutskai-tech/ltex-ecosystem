@@ -5,6 +5,7 @@ import {
   mapCityRow,
   mapTradeAgentRow,
   mapViberContactRow,
+  resolveMergedProductId,
 } from "./import-1c-historical";
 
 // Синтетичні 1С-рядки (MSSQL). binary(16) _IDRRef передаємо як hex-рядок
@@ -118,5 +119,41 @@ describe("import dictionaries-full — pure mappers", () => {
       { phone: "phone", subscribed: "sub", client: "client", status: "status" },
     );
     expect(r).toBeNull();
+  });
+});
+
+// ─── Сесія 7.1 — резолв товару з мапою злиттів дублікатів ────────────────────
+
+describe("resolveMergedProductId — резолв з урахуванням злиттів", () => {
+  const products = new Map<string, { id: string; code1C: string | null }>([
+    ["oldhex", { id: "(pending)", code1C: "OLD" }],
+    ["curhex", { id: "prod_survivor", code1C: "CUR" }],
+    ["freshhex", { id: "prod_fresh", code1C: "FRESH" }],
+  ]);
+  const merged = new Map<string, string>([["oldhex", "prod_survivor"]]);
+
+  it("null hex → null", () => {
+    expect(resolveMergedProductId(null, products, merged)).toBeNull();
+  });
+
+  it("злитий старий hex → survivor id (навіть якщо у словнику (pending))", () => {
+    expect(resolveMergedProductId("oldhex", products, merged)).toBe(
+      "prod_survivor",
+    );
+  });
+
+  it("звичайний hex → id зі словника", () => {
+    expect(resolveMergedProductId("freshhex", products, merged)).toBe(
+      "prod_fresh",
+    );
+  });
+
+  it("(pending) без злиття → null", () => {
+    const p = new Map([["h", { id: "(pending)", code1C: "X" }]]);
+    expect(resolveMergedProductId("h", p, new Map())).toBeNull();
+  });
+
+  it("невідомий hex → null", () => {
+    expect(resolveMergedProductId("nope", products, merged)).toBeNull();
   });
 });
