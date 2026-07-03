@@ -3,11 +3,13 @@
 import { useRouter } from "next/navigation";
 import { RouteSheetsRow, type RouteSheetsRowData } from "./route-sheets-row";
 import { useListContextMenu } from "../../_components/use-list-context-menu";
+import { useDocDelete } from "../../_components/use-doc-delete";
 import type { ContextMenuItem } from "../../_components/list-context-menu";
 import type { MenuContext } from "../../_components/use-list-context-menu";
 
 export function RouteSheetsTable({ items }: { items: RouteSheetsRowData[] }) {
   const router = useRouter();
+  const { requestDelete, dialog: deleteDialog } = useDocDelete();
 
   const buildItems = (
     ctx: MenuContext,
@@ -41,38 +43,16 @@ export function RouteSheetsTable({ items }: { items: RouteSheetsRowData[] }) {
         type: "action",
         danger: true,
         label: "Видалити",
-        onSelect: () => {
-          void deleteRouteSheet(sheetId);
-        },
+        onSelect: () =>
+          requestDelete({
+            endpoint: `/api/v1/manager/route-sheets/${sheetId}`,
+            message:
+              "Видалити цей маршрутний лист? Дію не можна скасувати. Реалізації та оплати маршруту буде відв'язано (не видалено).",
+          }),
       });
     }
     return menuItems;
   };
-
-  async function deleteRouteSheet(sheetId: string) {
-    if (
-      !window.confirm(
-        "Видалити цей маршрутний лист? Дію не можна скасувати. Реалізації та оплати маршруту буде відв'язано (не видалено).",
-      )
-    ) {
-      return;
-    }
-    try {
-      const res = await fetch(`/api/v1/manager/route-sheets/${sheetId}`, {
-        method: "DELETE",
-      });
-      if (res.ok) {
-        router.refresh();
-      } else {
-        const data = (await res.json().catch(() => null)) as {
-          error?: string;
-        } | null;
-        window.alert(data?.error ?? "Не вдалося видалити маршрутний лист");
-      }
-    } catch {
-      window.alert("Помилка мережі під час видалення");
-    }
-  }
 
   const { rowHandlers, menu } = useListContextMenu(buildItems);
 
@@ -102,6 +82,7 @@ export function RouteSheetsTable({ items }: { items: RouteSheetsRowData[] }) {
         </tbody>
       </table>
       {menu}
+      {deleteDialog}
     </div>
   );
 }

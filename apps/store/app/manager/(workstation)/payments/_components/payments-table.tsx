@@ -4,6 +4,7 @@ import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { PaymentsRow, type PaymentsRowData } from "./payments-row";
 import { SortableHeader } from "../../_components/sortable-header";
 import { useListContextMenu } from "../../_components/use-list-context-menu";
+import { useDocDelete } from "../../_components/use-doc-delete";
 import type { ContextMenuItem } from "../../_components/list-context-menu";
 import type { MenuContext } from "../../_components/use-list-context-menu";
 
@@ -25,6 +26,7 @@ export function PaymentsTable({ items }: { items: PaymentsRowData[] }) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const { requestDelete, dialog: deleteDialog } = useDocDelete();
 
   function setSort(key: string, dir: "asc" | "desc") {
     const p = new URLSearchParams(searchParams);
@@ -97,38 +99,16 @@ export function PaymentsTable({ items }: { items: PaymentsRowData[] }) {
         type: "action",
         danger: true,
         label: "Видалити",
-        onSelect: () => {
-          void deleteCashOrder(cashOrderId);
-        },
+        onSelect: () =>
+          requestDelete({
+            endpoint: `/api/v1/manager/cash-orders/${cashOrderId}`,
+            message:
+              "Видалити цей касовий ордер? Дію не можна скасувати. Борг клієнта буде перераховано, парний ордер-здача видалено.",
+          }),
       });
     }
     return items;
   };
-
-  async function deleteCashOrder(cashOrderId: string) {
-    if (
-      !window.confirm(
-        "Видалити цей касовий ордер? Дію не можна скасувати. Борг клієнта буде перераховано, парний ордер-здача видалено.",
-      )
-    ) {
-      return;
-    }
-    try {
-      const res = await fetch(`/api/v1/manager/cash-orders/${cashOrderId}`, {
-        method: "DELETE",
-      });
-      if (res.ok) {
-        router.refresh();
-      } else {
-        const data = (await res.json().catch(() => null)) as {
-          error?: string;
-        } | null;
-        window.alert(data?.error ?? "Не вдалося видалити оплату");
-      }
-    } catch {
-      window.alert("Помилка мережі під час видалення");
-    }
-  }
 
   const { rowHandlers, menu } = useListContextMenu(buildItems);
 
@@ -173,6 +153,7 @@ export function PaymentsTable({ items }: { items: PaymentsRowData[] }) {
         </tbody>
       </table>
       {menu}
+      {deleteDialog}
     </div>
   );
 }

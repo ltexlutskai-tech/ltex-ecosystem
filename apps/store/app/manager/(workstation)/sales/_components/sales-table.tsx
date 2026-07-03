@@ -4,6 +4,7 @@ import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { SalesRow, type SalesRowData } from "./sales-row";
 import { SortableHeader } from "../../_components/sortable-header";
 import { useListContextMenu } from "../../_components/use-list-context-menu";
+import { useDocDelete } from "../../_components/use-doc-delete";
 import type { ContextMenuItem } from "../../_components/list-context-menu";
 import type { MenuContext } from "../../_components/use-list-context-menu";
 
@@ -30,6 +31,7 @@ export function SalesTable({ items }: { items: SalesRowData[] }) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const { requestDelete, dialog: deleteDialog } = useDocDelete();
 
   function setSort(key: string, dir: "asc" | "desc") {
     const p = new URLSearchParams(searchParams);
@@ -101,38 +103,16 @@ export function SalesTable({ items }: { items: SalesRowData[] }) {
         type: "action",
         danger: true,
         label: "Видалити",
-        onSelect: () => {
-          void deleteSale(saleId);
-        },
+        onSelect: () =>
+          requestDelete({
+            endpoint: `/api/v1/manager/sales/${saleId}`,
+            message:
+              "Видалити цю реалізацію? Дію не можна скасувати. Якщо документ проведено, борг клієнта буде перераховано.",
+          }),
       });
     }
     return items;
   };
-
-  async function deleteSale(saleId: string) {
-    if (
-      !window.confirm(
-        "Видалити цю реалізацію? Дію не можна скасувати. Якщо документ проведено, борг клієнта буде перераховано.",
-      )
-    ) {
-      return;
-    }
-    try {
-      const res = await fetch(`/api/v1/manager/sales/${saleId}`, {
-        method: "DELETE",
-      });
-      if (res.ok) {
-        router.refresh();
-      } else {
-        const data = (await res.json().catch(() => null)) as {
-          error?: string;
-        } | null;
-        window.alert(data?.error ?? "Не вдалося видалити реалізацію");
-      }
-    } catch {
-      window.alert("Помилка мережі під час видалення");
-    }
-  }
 
   const { rowHandlers, menu } = useListContextMenu(buildItems);
 
@@ -198,6 +178,7 @@ export function SalesTable({ items }: { items: SalesRowData[] }) {
         </tbody>
       </table>
       {menu}
+      {deleteDialog}
     </div>
   );
 }

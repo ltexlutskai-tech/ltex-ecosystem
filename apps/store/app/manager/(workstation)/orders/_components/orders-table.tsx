@@ -4,6 +4,7 @@ import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { OrdersRow, type OrdersRowData } from "./orders-row";
 import { SortableHeader } from "../../_components/sortable-header";
 import { useListContextMenu } from "../../_components/use-list-context-menu";
+import { useDocDelete } from "../../_components/use-doc-delete";
 import type { ContextMenuItem } from "../../_components/list-context-menu";
 import type { MenuContext } from "../../_components/use-list-context-menu";
 
@@ -29,6 +30,7 @@ export function OrdersTable({ items }: { items: OrdersRowData[] }) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const { requestDelete, dialog: deleteDialog } = useDocDelete();
 
   function setSort(key: string, dir: "asc" | "desc") {
     const p = new URLSearchParams(searchParams);
@@ -100,38 +102,16 @@ export function OrdersTable({ items }: { items: OrdersRowData[] }) {
         type: "action",
         danger: true,
         label: "Видалити",
-        onSelect: () => {
-          void deleteOrder(orderId);
-        },
+        onSelect: () =>
+          requestDelete({
+            endpoint: `/api/v1/manager/orders/${orderId}`,
+            message:
+              "Видалити це замовлення? Дію не можна скасувати. Позиції замовлення буде видалено, реалізації-підстави — відв'язано.",
+          }),
       });
     }
     return items;
   };
-
-  async function deleteOrder(orderId: string) {
-    if (
-      !window.confirm(
-        "Видалити це замовлення? Дію не можна скасувати. Позиції замовлення буде видалено, реалізації-підстави — відв'язано.",
-      )
-    ) {
-      return;
-    }
-    try {
-      const res = await fetch(`/api/v1/manager/orders/${orderId}`, {
-        method: "DELETE",
-      });
-      if (res.ok) {
-        router.refresh();
-      } else {
-        const data = (await res.json().catch(() => null)) as {
-          error?: string;
-        } | null;
-        window.alert(data?.error ?? "Не вдалося видалити замовлення");
-      }
-    } catch {
-      window.alert("Помилка мережі під час видалення");
-    }
-  }
 
   const { rowHandlers, menu } = useListContextMenu(buildItems);
 
@@ -194,6 +174,7 @@ export function OrdersTable({ items }: { items: OrdersRowData[] }) {
         </tbody>
       </table>
       {menu}
+      {deleteDialog}
     </div>
   );
 }
