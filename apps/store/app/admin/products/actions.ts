@@ -4,7 +4,7 @@ import { prisma } from "@ltex/db";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import sharp from "sharp";
-import { createServiceRoleClient } from "@/lib/supabase/admin";
+import { saveMediaFile, deleteMediaByUrl } from "@/lib/media/storage";
 import { requireAdmin } from "@/lib/admin-auth";
 import { validateImageFile, InvalidImageError } from "@/lib/validate-image";
 
@@ -152,19 +152,11 @@ export async function uploadProductImage(
     .webp({ quality: 82 })
     .toBuffer();
 
-  const supabase = createServiceRoleClient();
-
-  const fileName = `${productId}/${Date.now()}.webp`;
-
-  const { error } = await supabase.storage
-    .from("product-images")
-    .upload(fileName, optimized, { contentType: "image/webp" });
-
-  if (error) throw new Error(`Upload failed: ${error.message}`);
-
-  const {
-    data: { publicUrl },
-  } = supabase.storage.from("product-images").getPublicUrl(fileName);
+  // Save to the server's disk (self-hosted media) and store the public URL.
+  const publicUrl = await saveMediaFile(
+    `product-images/${productId}/${Date.now()}.webp`,
+    optimized,
+  );
 
   const imageCount = await prisma.productImage.count({
     where: { productId },
@@ -190,12 +182,10 @@ export async function deleteProductImage(imageId: string, productId: string) {
   });
 
   if (image) {
-    // Extract path from URL to delete from storage
-    const urlParts = image.url.split("/product-images/");
-    if (urlParts[1]) {
-      const supabase = createServiceRoleClient();
-      await supabase.storage.from("product-images").remove([urlParts[1]]);
-    }
+    // Best-effort delete from local disk. Legacy Supabase URLs are ignored by
+    // deleteMediaByUrl (they don't contain our /media/ marker) — the DB row is
+    // still removed so the stale image disappears from the gallery.
+    await deleteMediaByUrl(image.url);
 
     await prisma.productImage.delete({ where: { id: imageId } });
   }

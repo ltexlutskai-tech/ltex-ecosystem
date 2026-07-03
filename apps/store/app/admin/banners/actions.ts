@@ -3,10 +3,9 @@
 import { prisma } from "@ltex/db";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { randomBytes } from "crypto";
 import sharp from "sharp";
 import { z } from "zod";
-import { createServiceRoleClient } from "@/lib/supabase/admin";
+import { saveMediaFile } from "@/lib/media/storage";
 import { requireAdmin } from "@/lib/admin-auth";
 import { validateImageFile, InvalidImageError } from "@/lib/validate-image";
 
@@ -87,22 +86,11 @@ export async function uploadBannerImage(
     .webp({ quality: 85 })
     .toBuffer();
 
-  const supabase = createServiceRoleClient();
-
-  const id = randomBytes(12).toString("hex");
-  const fileName = `banners/${id}.webp`;
-
-  const { error } = await supabase.storage
-    .from("product-images")
-    .upload(fileName, optimized, { contentType: "image/webp" });
-
-  if (error) {
-    throw new Error(`Upload failed: ${error.message}`);
-  }
-
-  const {
-    data: { publicUrl },
-  } = supabase.storage.from("product-images").getPublicUrl(fileName);
+  // Save to the server's disk (self-hosted media) and return the public URL.
+  const publicUrl = await saveMediaFile(
+    `banners/${Date.now()}.webp`,
+    optimized,
+  );
 
   return { url: publicUrl };
 }

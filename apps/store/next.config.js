@@ -44,6 +44,15 @@ const nextConfig = {
   transpilePackages: ["@ltex/ui", "@ltex/shared", "@ltex/db"],
   images: {
     remotePatterns: [
+      // Self-hosted media (product photos + banners saved to server disk,
+      // served from /media/...). Task A (session 6.0).
+      {
+        protocol: "https",
+        hostname: "new.ltex.com.ua",
+        pathname: "/media/**",
+      },
+      // TODO: drop *.supabase.co after the non-1C product chistka (Task B) —
+      // existing images still use Supabase URLs until then.
       {
         protocol: "https",
         hostname: "*.supabase.co",
@@ -87,7 +96,9 @@ const nextConfig = {
               "default-src 'self'",
               "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
               "style-src 'self' 'unsafe-inline'",
-              "img-src 'self' data: blob: https://*.supabase.co https://img.youtube.com https://i.ytimg.com",
+              // https://new.ltex.com.ua → self-hosted /media/* (Task A).
+              // https://*.supabase.co → legacy images; drop after Task B chistka.
+              "img-src 'self' data: blob: https://new.ltex.com.ua https://*.supabase.co https://img.youtube.com https://i.ytimg.com",
               "font-src 'self'",
               "connect-src 'self' https://*.supabase.co",
               "frame-src 'self' https://www.youtube.com https://youtube.com",
