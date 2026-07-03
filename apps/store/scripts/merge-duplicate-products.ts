@@ -722,11 +722,13 @@ async function main(): Promise<void> {
     const skipped: SkippedGroup[] = [];
 
     if (!args.apply) {
+      // Нульову таблицю лічильників у dry-run НЕ друкуємо — вона стосується
+      // лише реального запису й лише збиває з пантелику (список груп вище —
+      // це і є результат dry-run).
       console.log(
-        `${TAG} DRY-RUN завершено — жодного запису. Для реального запису: ` +
-          `--apply --confirm-prod`,
+        `${TAG} DRY-RUN завершено — жодного запису. Груп-дублікатів знайдено: ` +
+          `${groups.length} (список вище). Для реального запису: --apply --confirm-prod`,
       );
-      printSummary(tally, skipped, false);
       return;
     }
 
