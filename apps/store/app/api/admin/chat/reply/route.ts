@@ -1,24 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@ltex/db";
 import { adminChatReplySchema } from "@/lib/validations";
-import { createClient } from "@/lib/supabase/server";
+import { requireAdmin } from "@/lib/admin-auth";
 import { sendPushNotification } from "@/lib/push";
 
 /**
  * POST /api/admin/chat/reply
  *
  * Admin-only endpoint for manager replies to a customer chat.
- * Authenticates via Supabase session (admin login). Sender is forced to
- * "manager" server-side; the client cannot choose it.
+ * Authenticates via the manager JWT admin session (session 6.1). Sender is
+ * forced to "manager" server-side; the client cannot choose it.
  *
  * Body: { customerId, text, imageUrl? }
  */
 export async function POST(request: NextRequest) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
+  try {
+    await requireAdmin();
+  } catch {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -50,7 +48,7 @@ export async function POST(request: NextRequest) {
   const message = await prisma.chatMessage.create({
     data: {
       customerId,
-      sender: "manager", // always server-side; trusted Supabase session
+      sender: "manager", // always server-side; trusted admin session
       text: text.trim(),
       imageUrl: imageUrl ?? null,
     },

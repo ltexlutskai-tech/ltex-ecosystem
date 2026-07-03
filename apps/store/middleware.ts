@@ -1,4 +1,4 @@
-import { updateSession } from "@/lib/supabase/middleware";
+import { adminGuard } from "@/middleware-admin";
 import { managerGuard } from "@/middleware-manager";
 import { NextResponse, type NextRequest } from "next/server";
 
@@ -15,7 +15,7 @@ export async function middleware(request: NextRequest) {
     return managerGuard(request);
   }
   if (path.startsWith("/admin")) {
-    return updateSession(request);
+    return adminGuard(request);
   }
   return NextResponse.next();
 }

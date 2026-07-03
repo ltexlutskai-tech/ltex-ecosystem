@@ -22,6 +22,27 @@ export type ManagerRole =
   | "expeditor"
   | "bookkeeper";
 
+// Усі валідні ролі токена. Раніше verifyAccessToken приймав лише
+// manager/senior_manager/admin — токени owner/warehouse/… не проходили
+// верифікацію (латентний баг після розширення ролей 2026-06-03).
+export const VALID_ROLES: ReadonlySet<ManagerRole> = new Set<ManagerRole>([
+  "manager",
+  "senior_manager",
+  "admin",
+  "owner",
+  "supervisor",
+  "analyst",
+  "warehouse",
+  "expeditor",
+  "bookkeeper",
+]);
+
+// Ролі з доступом до адмін-панелі (/admin/*).
+export const ADMIN_ROLES: ReadonlySet<ManagerRole> = new Set<ManagerRole>([
+  "admin",
+  "owner",
+]);
+
 export interface AccessTokenPayload {
   sub: string; // userId
   role: ManagerRole;
@@ -94,11 +115,7 @@ export function verifyAccessToken(token: string): AccessTokenPayload | null {
     if (typeof payload.exp !== "number") return null;
     if (payload.exp * 1000 < Date.now()) return null;
     if (typeof payload.sub !== "string" || !payload.sub) return null;
-    if (
-      payload.role !== "manager" &&
-      payload.role !== "senior_manager" &&
-      payload.role !== "admin"
-    ) {
+    if (!VALID_ROLES.has(payload.role)) {
       return null;
     }
     return payload;

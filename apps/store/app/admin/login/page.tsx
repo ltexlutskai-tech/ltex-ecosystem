@@ -1,37 +1,76 @@
 "use client";
 
-import { useState } from "react";
-import { createClient } from "@/lib/supabase/client";
-import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 import { Button } from "@ltex/ui";
 import { Input } from "@ltex/ui";
+
+const ADMIN_ROLES = new Set(["admin", "owner"]);
 
 export default function AdminLoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const router = useRouter();
+
+  useEffect(() => {
+    // ?forbidden=1 — the middleware bounced a signed-in non-admin here.
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("forbidden") === "1") {
+      setError("Цей акаунт не має прав адміністратора.");
+    }
+  }, []);
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
     setLoading(true);
 
-    const supabase = createClient();
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
+    try {
+      const res = await fetch("/api/v1/manager/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
 
-    if (error) {
-      setError(error.message);
+      if (!res.ok) {
+        if (res.status === 401) {
+          setError("Невірний email або пароль");
+        } else {
+          const data = (await res.json().catch(() => null)) as {
+            error?: string;
+          } | null;
+          setError(data?.error ?? "Помилка входу. Спробуйте ще раз.");
+        }
+        setLoading(false);
+        return;
+      }
+
+      // Логін ставить cookie для будь-якого активного user — перевіряємо роль.
+      const meRes = await fetch("/api/v1/manager/auth/me", {
+        cache: "no-store",
+      });
+      const meData = meRes.ok
+        ? ((await meRes.json().catch(() => null)) as {
+            user?: { role?: string };
+          } | null)
+        : null;
+      const role = meData?.user?.role;
+
+      if (!role || !ADMIN_ROLES.has(role)) {
+        // Не адмін — прибираємо сесію і не пускаємо.
+        await fetch("/api/v1/manager/auth/logout", { method: "POST" }).catch(
+          () => undefined,
+        );
+        setError("Немає прав адміністратора");
+        setLoading(false);
+        return;
+      }
+
+      window.location.href = "/admin";
+    } catch {
+      setError("Помилка мережі. Спробуйте ще раз.");
       setLoading(false);
-      return;
     }
-
-    router.push("/admin");
-    router.refresh();
   }
 
   return (
