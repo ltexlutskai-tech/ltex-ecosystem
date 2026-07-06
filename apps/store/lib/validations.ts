@@ -4,6 +4,10 @@ export const orderCustomerSchema = z.object({
   name: z.string().min(1, "Ім'я обов'язкове").max(200),
   phone: z.string().min(10, "Невірний номер телефону").max(20),
   telegram: z.string().max(100).optional(),
+  // Область (slug з UA_REGIONS) — для маршрутизації нового клієнта на агента
+  // через мапу MgrRegionAgent (7.2 Блок 1). Необов'язкова.
+  region: z.string().max(50).optional(),
+  city: z.string().max(200).optional(),
 });
 
 export const orderItemSchema = z.object({

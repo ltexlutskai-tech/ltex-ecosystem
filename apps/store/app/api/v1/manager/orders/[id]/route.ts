@@ -7,6 +7,7 @@ import { canViewOrder } from "@/lib/manager/order-ownership";
 import { isOrderLocked, isTransitionAllowed } from "@/lib/manager/order-status";
 import { updateOrderSchema } from "@/lib/validations/manager-order";
 import { updateOrderWithItems } from "@/lib/manager/order-create";
+import { completeSiteOrderReminders } from "@/lib/manager/site-order-reminders";
 
 export async function GET(
   req: NextRequest,
@@ -192,6 +193,11 @@ export async function PATCH(
       { userId: user.id },
       { nextStatus },
     );
+    // Сайтове замовлення оброблене (проведене/скасоване) → закриваємо
+    // авто-нагадування «обробити сайтове замовлення» (7.2 Блок 1).
+    if (nextStatus === "posted" || nextStatus === "cancelled") {
+      await completeSiteOrderReminders(id);
+    }
     return NextResponse.json({
       id: order.id,
       code1C: order.code1C,

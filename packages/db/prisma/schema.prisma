@@ -250,6 +250,9 @@ model Order {
   cashOnDelivery      Boolean @default(false) @map("cash_on_delivery")
   assignedAgentUserId String? @map("assigned_agent_user_id")
   exportTo1C          Boolean @default(true) @map("export_to_1c")
+  // Джерело замовлення: "manager" (заведене вручну) | "site" (з кошика сайту,
+  // 7.2 Блок 1) | "1c" (історичний імпорт). Дефолт — manager.
+  source              String  @default("manager")
   // Проведено в 1С (ставиться на етапі обмінів) + актуальність.
   archived            Boolean @default(false)
   isActual            Boolean @default(true) @map("is_actual")
@@ -281,9 +284,11 @@ model Order {
   shipments   Shipment[]
   payments    Payment[]
   sales       Sale[]            @relation("SaleOrder")
+  reminders   MgrReminder[]     @relation("OrderReminders")
 
   @@index([customerId])
   @@index([status])
+  @@index([source])
   @@index([routeSheetId])
   @@index([closedAt])
   @@index([lastReminderAt])
@@ -1724,6 +1729,7 @@ enum MgrReminderSource {
   auto_video
   auto_bron
   auto_receiving_review
+  auto_site_order
 
   @@map("mgr_reminder_source")
 }
@@ -1744,16 +1750,19 @@ model MgrReminder {
   lotId             String?           @map("lot_id")
   productId         String?           @map("product_id")
   receivingId       String?           @map("receiving_id")
+  orderId           String?           @map("order_id")
   createdAt         DateTime          @default(now()) @map("created_at")
   updatedAt         DateTime          @updatedAt @map("updated_at")
 
   client    MgrClient?        @relation(fields: [clientId], references: [id], onDelete: Cascade)
   owner     User              @relation("UserReminders", fields: [ownerUserId], references: [id], onDelete: Cascade)
   receiving Receiving?        @relation(fields: [receivingId], references: [id], onDelete: SetNull)
+  order     Order?            @relation("OrderReminders", fields: [orderId], references: [id], onDelete: SetNull)
   items     MgrReminderItem[]
 
   @@index([clientId, remindAt])
   @@index([ownerUserId, completedAt, remindAt])
+  @@index([orderId])
   @@map("mgr_reminders")
 }
 

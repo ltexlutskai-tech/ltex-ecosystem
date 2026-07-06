@@ -9,6 +9,7 @@ import { Trash2, ShoppingCart } from "lucide-react";
 import Link from "next/link";
 import { getDictionary } from "@/lib/i18n";
 import { eurToUah, formatUah } from "@/lib/exchange-rate";
+import { UA_REGIONS } from "@/lib/constants/regions";
 
 const dict = getDictionary();
 
@@ -22,6 +23,7 @@ export function CartClient({ rate }: CartClientProps) {
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
   const [customerTelegram, setCustomerTelegram] = useState("");
+  const [customerRegion, setCustomerRegion] = useState("");
   const [notes, setNotes] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [orderResult, setOrderResult] = useState<{
@@ -48,6 +50,7 @@ export function CartClient({ rate }: CartClientProps) {
             name: customerName,
             phone: customerPhone,
             telegram: customerTelegram || undefined,
+            region: customerRegion || undefined,
           },
           items: items.map((i) => ({
             ...(i.lotId ? { lotId: i.lotId } : {}),
@@ -269,6 +272,26 @@ export function CartClient({ rate }: CartClientProps) {
                   className="w-full rounded-md border px-3 py-2 text-sm"
                   placeholder="@username"
                 />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium">
+                  Область
+                </label>
+                <select
+                  value={customerRegion}
+                  onChange={(e) => setCustomerRegion(e.target.value)}
+                  className="w-full rounded-md border bg-white px-3 py-2 text-sm"
+                >
+                  <option value="">Оберіть область…</option>
+                  {UA_REGIONS.map((r) => (
+                    <option key={r.slug} value={r.slug}>
+                      {r.label}
+                    </option>
+                  ))}
+                </select>
+                <p className="mt-1 text-xs text-gray-400">
+                  Допоможе одразу підключити вашого менеджера
+                </p>
               </div>
               <div>
                 <label className="mb-1 block text-sm font-medium">

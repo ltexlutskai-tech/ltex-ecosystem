@@ -1,16 +1,41 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-// Mock prisma
-const mockPrisma = {
-  lot: { findMany: vi.fn() },
-  customer: { findFirst: vi.fn(), create: vi.fn() },
-  exchangeRate: { findFirst: vi.fn() },
-  order: { create: vi.fn() },
-  $transaction: vi.fn(),
-};
+// Hoisted mock holders (referenced inside vi.mock factories, which are hoisted
+// above const declarations — vi.hoisted keeps them in sync).
+const h = vi.hoisted(() => {
+  const txOrderCreate = vi.fn();
+  const txLotUpdateMany = vi.fn();
+  return {
+    txOrderCreate,
+    txLotUpdateMany,
+    mockMatchClientByPhone: vi.fn(),
+    mockCreateSiteOrderReminders: vi.fn().mockResolvedValue(undefined),
+    mockPrisma: {
+      lot: { findMany: vi.fn(), updateMany: vi.fn() },
+      customer: { findFirst: vi.fn(), create: vi.fn() },
+      exchangeRate: { findFirst: vi.fn() },
+      mgrRegionAgent: { findUnique: vi.fn() },
+      product: { findMany: vi.fn() },
+      order: { create: vi.fn() },
+      $transaction: vi.fn(async (cb: (tx: unknown) => unknown) =>
+        cb({
+          order: { create: txOrderCreate },
+          lot: { updateMany: txLotUpdateMany },
+        }),
+      ),
+    },
+  };
+});
+const {
+  txOrderCreate,
+  txLotUpdateMany,
+  mockMatchClientByPhone,
+  mockCreateSiteOrderReminders,
+  mockPrisma,
+} = h;
 
 vi.mock("@ltex/db", () => ({
-  prisma: mockPrisma,
+  prisma: h.mockPrisma,
 }));
 
 // Mock rate limit
@@ -24,7 +49,27 @@ vi.mock("@/lib/notifications", () => ({
   notifyNewOrder: vi.fn().mockResolvedValue(undefined),
 }));
 
+// Mock email (avoid loading nodemailer on import)
+vi.mock("@/lib/email", () => ({
+  sendOrderConfirmationEmail: vi.fn().mockResolvedValue(undefined),
+}));
+
+// Mock Block-1 collaborators
+vi.mock("@/lib/chat/phone-match", () => ({
+  matchClientByPhone: (...a: unknown[]) => h.mockMatchClientByPhone(...a),
+}));
+vi.mock("@/lib/manager/site-order-reminders", () => ({
+  createSiteOrderReminders: (...a: unknown[]) =>
+    h.mockCreateSiteOrderReminders(...a),
+}));
+
+import type { NextRequest } from "next/server";
 import { orderSchema } from "@/lib/validations";
+import { POST } from "./route";
+
+function makeRequest(body: unknown): NextRequest {
+  return { json: async () => body } as unknown as NextRequest;
+}
 
 const validOrder = {
   customer: {
@@ -172,6 +217,74 @@ describe("Order API", () => {
       if (result.success) {
         expect(result.data.items).toHaveLength(3);
       }
+    });
+  });
+
+  describe("POST — site order routing (7.2 Block 1)", () => {
+    beforeEach(() => {
+      mockPrisma.customer.findFirst.mockResolvedValue(null);
+      mockPrisma.customer.create.mockResolvedValue({
+        id: "cust-1",
+        email: null,
+      });
+      mockPrisma.exchangeRate.findFirst.mockResolvedValue({ rate: 42 });
+      // free-check → barcode-fetch
+      mockPrisma.lot.findMany
+        .mockResolvedValueOnce([{ id: "lot-1", status: "free" }])
+        .mockResolvedValueOnce([{ barcode: "L-123" }]);
+      txOrderCreate.mockResolvedValue({ id: "order-abc123" });
+    });
+
+    it("uprecognized client → routes to their agent, draft+site, reserves lot, barcode in notes", async () => {
+      mockMatchClientByPhone.mockResolvedValue({ agentUserId: "agent-9" });
+
+      const res = await POST(makeRequest(validOrder));
+      expect(res.status).toBe(201);
+
+      const data = txOrderCreate.mock.calls[0]![0].data;
+      expect(data.status).toBe("draft");
+      expect(data.source).toBe("site");
+      expect(data.assignedAgentUserId).toBe("agent-9");
+      expect(data.notes).toContain("L-123");
+      expect(txLotUpdateMany).toHaveBeenCalled();
+      expect(mockCreateSiteOrderReminders).toHaveBeenCalledWith(
+        expect.objectContaining({ assignedAgentUserId: "agent-9" }),
+      );
+    });
+
+    it("new client with region → routes via MgrRegionAgent map", async () => {
+      mockMatchClientByPhone.mockResolvedValue(null);
+      mockPrisma.mgrRegionAgent.findUnique.mockResolvedValue({
+        userId: "agent-region",
+      });
+
+      const res = await POST(
+        makeRequest({
+          ...validOrder,
+          customer: { ...validOrder.customer, region: "volynska" },
+        }),
+      );
+      expect(res.status).toBe(201);
+      expect(mockPrisma.mgrRegionAgent.findUnique).toHaveBeenCalledWith({
+        where: { region: "volynska" },
+        select: { userId: true },
+      });
+      expect(txOrderCreate.mock.calls[0]![0].data.assignedAgentUserId).toBe(
+        "agent-region",
+      );
+    });
+
+    it("no phone match, no region → unassigned (null), reminder still fires", async () => {
+      mockMatchClientByPhone.mockResolvedValue(null);
+
+      const res = await POST(makeRequest(validOrder));
+      expect(res.status).toBe(201);
+      expect(
+        txOrderCreate.mock.calls[0]![0].data.assignedAgentUserId,
+      ).toBeNull();
+      expect(mockCreateSiteOrderReminders).toHaveBeenCalledWith(
+        expect.objectContaining({ assignedAgentUserId: null }),
+      );
     });
   });
 

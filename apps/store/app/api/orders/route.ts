@@ -8,6 +8,8 @@ import {
   type OrderEmailLineItem,
 } from "@/lib/email";
 import { rateLimit, getClientIp } from "@/lib/rate-limit";
+import { matchClientByPhone } from "@/lib/chat/phone-match";
+import { createSiteOrderReminders } from "@/lib/manager/site-order-reminders";
 
 export async function POST(request: NextRequest) {
   // Rate limit: 5 orders per minute per IP
@@ -74,6 +76,40 @@ export async function POST(request: NextRequest) {
     });
   }
 
+  // ─── Маршрутизація на менеджера (7.2 Блок 1, рішення 1A) ──────────────────
+  // 1) упізнаний клієнт (телефон збігся з MgrClient) → його торговий агент;
+  // 2) інакше, якщо вказано область → мапа MgrRegionAgent (регіон→агент);
+  // 3) інакше — без агента (нагадування впаде на admin/owner).
+  let assignedAgentUserId: string | null = null;
+  const phoneMatch = await matchClientByPhone(customer.phone);
+  if (phoneMatch?.agentUserId) {
+    assignedAgentUserId = phoneMatch.agentUserId;
+  } else if (customer.region) {
+    const regionAgent = await prisma.mgrRegionAgent.findUnique({
+      where: { region: customer.region },
+      select: { userId: true },
+    });
+    assignedAgentUserId = regionAgent?.userId ?? null;
+  }
+
+  // ─── Штрихкоди конкретних лотів для складу (рішення 2, гібрид) ────────────
+  // Клієнт обрав конкретні лоти → дублюємо їхні штрихкоди у коментар, щоб на
+  // складі чітко знали що відвантажувати (окрім того, лоти бронюються нижче).
+  let warehouseNote = "";
+  if (lotIds.length > 0) {
+    const lotBarcodes = await prisma.lot.findMany({
+      where: { id: { in: lotIds } },
+      select: { barcode: true },
+    });
+    const codes = lotBarcodes.map((l) => l.barcode).filter(Boolean);
+    if (codes.length > 0) {
+      warehouseNote = `Склад — відвантажити лоти: ${codes.join(", ")}`;
+    }
+  }
+  const orderNotes = [warehouseNote, notes?.trim()]
+    .filter((s): s is string => Boolean(s))
+    .join("\n");
+
   const totalEur = items.reduce((sum, i) => sum + i.priceEur, 0);
 
   // Get latest EUR → UAH rate
@@ -89,11 +125,13 @@ export async function POST(request: NextRequest) {
       const ord = await tx.order.create({
         data: {
           customerId: dbCustomer.id,
-          status: "pending",
+          status: "draft",
+          source: "site",
+          assignedAgentUserId,
           totalEur,
           totalUah,
           exchangeRate: rate,
-          notes: notes ?? null,
+          notes: orderNotes || null,
           items: {
             create: items.map((i) => ({
               lotId: i.lotId ?? null,
@@ -125,6 +163,14 @@ export async function POST(request: NextRequest) {
       totalUah,
       itemCount: items.length,
       totalWeight,
+    }).catch(() => {});
+
+    // Нагадування менеджеру «обробити сайтове замовлення» (7.2 Блок 1, 3A).
+    createSiteOrderReminders({
+      orderId: order.id,
+      orderLabel: `№${order.id.slice(-6).toUpperCase()}`,
+      customerName: customer.name,
+      assignedAgentUserId,
     }).catch(() => {});
 
     // Send confirmation email to customer (if email provided)
