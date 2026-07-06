@@ -213,10 +213,18 @@ export default async function ManagerOrderDetailPage({
 
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-gray-800">
+          <h1 className="flex items-center gap-2 text-2xl font-bold text-gray-800">
             {order.code1C || order.number1C
               ? `Замовлення №${orderNumber}`
               : "Замовлення"}
+            {order.source === "site" && (
+              <span
+                className="inline-flex items-center rounded bg-blue-100 px-2 py-0.5 text-xs font-semibold tracking-wide text-blue-700"
+                title="Замовлення з сайту"
+              >
+                Сайт
+              </span>
+            )}
           </h1>
           <p className="mt-1 text-sm text-gray-500">Створено: {date}</p>
         </div>

@@ -21,11 +21,16 @@ export type OrderSortKey = (typeof ORDER_SORT_KEYS)[number];
 export const ORDER_ACTUALITY_VALUES = ["actual", "inactive", "all"] as const;
 export type OrderActualityValue = (typeof ORDER_ACTUALITY_VALUES)[number];
 
+export const ORDER_SOURCE_VALUES = ["", "site", "manual"] as const;
+export type OrderSourceValue = (typeof ORDER_SOURCE_VALUES)[number];
+
 export interface OrdersFilterState {
   search: string;
   status: OrderStatus | "";
   /** Актуальність документа. Дефолт «actual» — лише актуальні. */
   actuality: OrderActualityValue;
+  /** Джерело замовлення. Дефолт "" — усі. */
+  source: OrderSourceValue;
   from: string;
   to: string;
   clientCode1C: string;
@@ -46,6 +51,7 @@ export interface OrdersFilterState {
 const ORDER_STATUS_SET = new Set<string>(ORDER_STATUS_LIST);
 const ORDER_SORT_KEY_SET = new Set<string>(ORDER_SORT_KEYS);
 const ORDER_ACTUALITY_SET = new Set<string>(ORDER_ACTUALITY_VALUES);
+const ORDER_SOURCE_SET = new Set<string>(ORDER_SOURCE_VALUES);
 
 function pickString(
   v: string | string[] | undefined,
@@ -70,6 +76,11 @@ export function parseOrdersFilterFromSearchParams(
   const actuality: OrderActualityValue = ORDER_ACTUALITY_SET.has(actualityRaw)
     ? (actualityRaw as OrderActualityValue)
     : "actual";
+
+  const sourceRaw = pickString(sp.source) ?? "";
+  const source: OrderSourceValue = ORDER_SOURCE_SET.has(sourceRaw)
+    ? (sourceRaw as OrderSourceValue)
+    : "";
 
   const from = pickString(sp.from) ?? "";
   const to = pickString(sp.to) ?? "";
@@ -100,6 +111,7 @@ export function parseOrdersFilterFromSearchParams(
     search,
     status,
     actuality,
+    source,
     from,
     to,
     clientCode1C,
@@ -123,6 +135,7 @@ export function ordersFilterToQueryString(
   if (state.actuality && state.actuality !== "actual") {
     sp.set("actuality", state.actuality);
   }
+  if (state.source) sp.set("source", state.source);
   if (state.from) sp.set("from", state.from);
   if (state.to) sp.set("to", state.to);
   if (state.clientCode1C) sp.set("clientCode1C", state.clientCode1C);

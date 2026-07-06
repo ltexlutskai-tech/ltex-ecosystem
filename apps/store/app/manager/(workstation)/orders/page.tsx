@@ -84,6 +84,7 @@ export default async function ManagerOrdersPage({
     clientName: filter.clientName || undefined,
     city: filter.city || undefined,
     agent: filter.agent || undefined,
+    source: filter.source,
   });
 
   const [items, total] = await Promise.all([

@@ -25,6 +25,7 @@ export function OrdersToolbar() {
   const [agent, setAgent] = useState(searchParams.get("agent") ?? "");
   const status = searchParams.get("status") ?? "";
   const actuality = searchParams.get("actuality") ?? "actual";
+  const source = searchParams.get("source") ?? "";
   const clientCode1C = searchParams.get("clientCode1C") ?? "";
   const showArchived = searchParams.get("showArchived") === "true";
 
@@ -132,6 +133,17 @@ export function OrdersToolbar() {
           <option value="all">Усі</option>
         </select>
 
+        <select
+          value={source}
+          onChange={(e) => setParam("source", e.target.value || null)}
+          className="h-9 rounded-md border border-gray-300 bg-white px-2 text-sm text-gray-700"
+          aria-label="Фільтр за джерелом"
+        >
+          <option value="">Усі джерела</option>
+          <option value="site">Сайт</option>
+          <option value="manual">Ручні</option>
+        </select>
+
         <div className="flex items-center gap-1">
           <label className="text-xs text-gray-500" htmlFor="from-date">
             З
@@ -189,6 +201,7 @@ export function OrdersToolbar() {
         {(search ||
           status ||
           actuality !== "actual" ||
+          source ||
           from ||
           to ||
           clientCode1C ||

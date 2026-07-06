@@ -72,9 +72,17 @@ export interface BuildOrdersWhereParams {
   city?: string;
   /** Точковий фільтр по агенту (текст → `agentName contains`). */
   agent?: string;
+  /**
+   * Джерело замовлення (7.2 Блок 1):
+   *  • `"site"`   — лише замовлення з кошика сайту (`source = "site"`);
+   *  • `"manual"` — лише НЕ-сайтові (`source ≠ "site"`: ручні + 1С-імпорт);
+   *  • інакше     — без обмеження.
+   */
+  source?: OrderSourceFilter;
 }
 
 export type OrderActuality = "actual" | "inactive" | "all";
+export type OrderSourceFilter = "site" | "manual" | "";
 
 /**
  * Будує `where` для `prisma.order.findMany` / `.count`. Чиста функція — без I/O.
@@ -107,6 +115,13 @@ export function buildOrdersWhere(
   // Per-column фільтр по агенту (текст, LIKE на `agentName`).
   if (p.agent && p.agent.trim().length > 0) {
     where.agentName = { contains: p.agent.trim(), mode: "insensitive" };
+  }
+
+  // Джерело замовлення (сайт / ручні).
+  if (p.source === "site") {
+    where.source = "site";
+  } else if (p.source === "manual") {
+    where.source = { not: "site" };
   }
 
   // Архів: за замовчуванням приховуємо проведені (archived = true).
@@ -171,6 +186,7 @@ export interface RawOrderRow {
   totalUah: number;
   archived: boolean;
   isActual: boolean;
+  source: string;
   agentName: string | null;
   deliveryMethod: string | null;
   createdAt: Date;
@@ -192,6 +208,8 @@ export interface OrderListItem {
   totalUah: number;
   archived: boolean;
   isActual: boolean;
+  /** Джерело: "site" (з кошика сайту) | "manager" | "1c". */
+  source: string;
   /** Торговий агент: `Order.agentName` (історичний 1С-імпорт). */
   agentName: string | null;
   /** Спосіб доставки: `Order.deliveryMethod` (code → label у UI). */
@@ -227,6 +245,7 @@ export function serializeOrderRow(o: RawOrderRow): OrderListItem {
     totalUah: o.totalUah,
     archived: o.archived,
     isActual: o.isActual,
+    source: o.source,
     agentName: o.agentName,
     deliveryMethod: o.deliveryMethod,
     itemCount: o._count.items,

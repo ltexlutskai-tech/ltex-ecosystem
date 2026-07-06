@@ -88,7 +88,7 @@ export function NotificationBell() {
             </div>
             <div className="py-1">
               <Link
-                href="/admin/orders?status=pending"
+                href="/manager/orders?source=site"
                 onClick={() => setShowDropdown(false)}
                 className="flex items-center justify-between px-4 py-2 text-sm hover:bg-gray-50"
               >
@@ -100,7 +100,7 @@ export function NotificationBell() {
                 )}
               </Link>
               <Link
-                href="/admin/orders"
+                href="/manager/chat"
                 onClick={() => setShowDropdown(false)}
                 className="flex items-center justify-between px-4 py-2 text-sm hover:bg-gray-50"
               >

@@ -77,6 +77,22 @@ describe("buildOrdersWhere — actuality filter", () => {
   });
 });
 
+describe("buildOrdersWhere — source filter (7.2 Block 1)", () => {
+  it("no source → no constraint", () => {
+    expect(buildOrdersWhere({ customerCodes: null }).source).toBeUndefined();
+  });
+
+  it("site → source = 'site'", () => {
+    const w = buildOrdersWhere({ customerCodes: null, source: "site" });
+    expect(w.source).toBe("site");
+  });
+
+  it("manual → source ≠ 'site'", () => {
+    const w = buildOrdersWhere({ customerCodes: null, source: "manual" });
+    expect(w.source).toEqual({ not: "site" });
+  });
+});
+
 describe("buildOrdersWhere — per-column filters", () => {
   it("clientName → customer.name contains", () => {
     const w = buildOrdersWhere({ customerCodes: null, clientName: "Іван" });
@@ -206,6 +222,7 @@ describe("serializeOrderRow", () => {
     totalUah: 4300,
     archived: true,
     isActual: false,
+    source: "manager",
     agentName: "Петренко П.",
     deliveryMethod: "post",
     createdAt: new Date("2026-05-10T10:00:00Z"),

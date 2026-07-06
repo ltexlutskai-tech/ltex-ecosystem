@@ -13,7 +13,6 @@ import {
 } from "@ltex/ui";
 import {
   LayoutDashboard,
-  ShoppingCart,
   Package,
   Boxes,
   Users,
@@ -27,17 +26,10 @@ import {
 } from "lucide-react";
 import { signOut } from "@/app/admin/actions";
 import { NotificationBell } from "./notification-bell";
-import { OrdersBadge } from "./orders-badge";
 import { EmailQueueBadge } from "./email-queue-badge";
 
 const navItems = [
   { href: "/admin", label: "Дашборд", icon: LayoutDashboard },
-  {
-    href: "/admin/orders",
-    label: "Замовлення",
-    icon: ShoppingCart,
-    badge: true,
-  },
   { href: "/admin/products", label: "Товари", icon: Package },
   { href: "/admin/lots", label: "Лоти", icon: Boxes },
   { href: "/admin/customers", label: "Клієнти", icon: Users },
@@ -72,7 +64,6 @@ function NavContent() {
               >
                 <item.icon className="h-4 w-4" />
                 <span className="flex-1">{item.label}</span>
-                {item.badge && <OrdersBadge />}
                 {item.emailBadge && <EmailQueueBadge />}
               </Link>
             </li>

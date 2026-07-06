@@ -50,8 +50,19 @@ unassigned + draft+site + бронь + штрихкод-у-коментарі). 
 `/manager/admin/region-agents` (інакше нові клієнти йдуть у fallback на
 admin/owner).
 
+## Round-2 (зроблено)
+
+- **Бейдж «Сайт»** у списку менеджерських замовлень (`orders-row`) + на картці
+  замовлення (`[id]/page.tsx`), коли `source="site"`.
+- **Фільтр «Джерело»** (Усі / Сайт / Ручні) у тулбарі списку: `buildOrdersWhere`
+  += `source` (`site` → `source="site"`; `manual` → `source ≠ "site"`),
+  прокинуто через filter-state + GET `/api/v1/manager/orders` + page.tsx.
+- **Прибрано вкладку «Замовлення» з адмінки сайту** (все керування — у CRM):
+  видалено `app/admin/orders/*` + `components/admin/orders-badge.tsx`, прибрано
+  пункт із `components/admin/sidebar.tsx`; дзвіночок (`notification-bell`) і
+  Telegram/Viber-сповіщення (`lib/notifications.ts`) тепер лінкують на
+  `/manager/orders?source=site`. Дашборд-аналітика замовлень (read-only) лишена.
+
 ## Відкрито (наступні кроки плану 7.0)
 
-- Показ `source=site` у списку менеджерських замовлень (бейдж «Сайт») + фільтр —
-  можна додати round-2.
 - Блок 2 (клієнти), Блок 3 (товари/фото в системі), Блок 4 (дашборд візитів).

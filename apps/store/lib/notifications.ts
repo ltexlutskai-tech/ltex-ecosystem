@@ -53,7 +53,7 @@ async function sendTelegramNotification(
     `*Вага:* ${order.totalWeight.toFixed(1)} кг`,
     `*Сума:* €${order.totalEur.toFixed(2)} / ${order.totalUah.toFixed(2)} ₴`,
     ``,
-    `[Переглянути в адмінці](${process.env.NEXT_PUBLIC_SITE_URL ?? "https://ltex.com.ua"}/admin/orders)`,
+    `[Переглянути в CRM](${process.env.NEXT_PUBLIC_SITE_URL ?? "https://ltex.com.ua"}/manager/orders?source=site)`,
   ].join("\n");
 
   try {
@@ -94,7 +94,7 @@ async function sendViberNotification(order: OrderNotification): Promise<void> {
     `Вага: ${order.totalWeight.toFixed(1)} кг`,
     `Сума: €${order.totalEur.toFixed(2)} / ${order.totalUah.toFixed(2)} ₴`,
     ``,
-    `Переглянути: ${siteUrl}/admin/orders`,
+    `Переглянути: ${siteUrl}/manager/orders?source=site`,
   ].join("\n");
 
   try {

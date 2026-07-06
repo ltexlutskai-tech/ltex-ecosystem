@@ -48,6 +48,9 @@ export async function GET(req: NextRequest) {
   const to = parseDate(url.searchParams.get("to"));
   const clientCode1C = url.searchParams.get("clientCode1C")?.trim() ?? "";
   const showArchived = url.searchParams.get("showArchived") === "true";
+  const sourceRaw = url.searchParams.get("source")?.trim() ?? "";
+  const source: "site" | "manual" | "" =
+    sourceRaw === "site" || sourceRaw === "manual" ? sourceRaw : "";
   const page = parseInteger(url.searchParams.get("page"), 1, 1, 9_999);
   const pageSize = parseInteger(url.searchParams.get("pageSize"), 20, 10, 100);
 
@@ -72,6 +75,7 @@ export async function GET(req: NextRequest) {
     from,
     to,
     showArchived,
+    source,
   });
 
   const [items, total] = await Promise.all([

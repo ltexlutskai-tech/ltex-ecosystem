@@ -14,6 +14,7 @@ export interface OrdersRowData {
   totalUah: number;
   archived: boolean;
   isActual: boolean;
+  source: string;
   agentName: string | null;
   deliveryMethod: string | null;
   itemCount: number;
@@ -58,6 +59,14 @@ export function OrdersRow({
         >
           {formatOrderNumber(order)}
         </Link>
+        {order.source === "site" && (
+          <span
+            className="ml-1.5 inline-flex items-center rounded bg-blue-100 px-1.5 py-0.5 align-middle text-[10px] font-semibold tracking-wide text-blue-700"
+            title="Замовлення з сайту"
+          >
+            Сайт
+          </span>
+        )}
       </td>
       <td
         data-col="client"
