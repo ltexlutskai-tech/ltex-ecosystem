@@ -69,22 +69,12 @@ export default async function ManagerCategoriesPage() {
     }
   }
 
-  // Опції батька для форми: усі категорії з повним шляхом (ТИП → Сезон → …).
-  function pathLabel(node: CatNode): string {
-    const parts: string[] = [node.name];
-    let p = node.parentId;
-    let guard = 0;
-    while (p && nodes.has(p) && guard < 10) {
-      const parent = nodes.get(p)!;
-      parts.unshift(parent.name);
-      p = parent.parentId;
-      guard += 1;
-    }
-    return parts.join(" → ");
-  }
-  const parentOptions = [...nodes.values()]
-    .map((n) => ({ id: n.id, label: pathLabel(n) }))
-    .sort((a, b) => a.label.localeCompare(b.label, "uk"));
+  // Вузли для каскадного вибору батька (рівень за рівнем).
+  const cascaderNodes = rows.map((r) => ({
+    id: r.id,
+    name: r.name,
+    parentId: r.parentId,
+  }));
 
   return (
     <div className="space-y-5">
@@ -102,7 +92,7 @@ export default async function ManagerCategoriesPage() {
           <h2 className="mb-3 text-sm font-semibold text-gray-800">
             Додати категорію
           </h2>
-          <CategoryForm parents={parentOptions} />
+          <CategoryForm nodes={cascaderNodes} />
         </div>
       )}
 

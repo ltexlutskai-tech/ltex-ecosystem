@@ -59,22 +59,12 @@ export default async function ProductCardPage({
       ])
     : [[], []];
 
-  // Опції категорії з повним шляхом (Тип → Сезон → Категорія → …).
-  const catById = new Map(categoryRows.map((c) => [c.id, c]));
-  const categoryOptions = categoryRows
-    .map((c) => {
-      const parts: string[] = [c.name];
-      let p = c.parentId;
-      let guard = 0;
-      while (p && catById.has(p) && guard < 10) {
-        const parent = catById.get(p)!;
-        parts.unshift(parent.name);
-        p = parent.parentId;
-        guard += 1;
-      }
-      return { id: c.id, label: parts.join(" → ") };
-    })
-    .sort((a, b) => a.label.localeCompare(b.label, "uk"));
+  // Вузли для каскадного вибору категорії (рівень за рівнем).
+  const categoryTreeNodes = categoryRows.map((c) => ({
+    id: c.id,
+    name: c.name,
+    parentId: c.parentId,
+  }));
 
   // Рекламний текст товара будуємо на сервері (курс EUR — server-side).
   const productShareText = buildProductShareText({
@@ -109,7 +99,7 @@ export default async function ProductCardPage({
         <ProductCategoryEditor
           productId={product.id}
           currentCategoryId={product.categoryId}
-          categories={categoryOptions}
+          categories={categoryTreeNodes}
         />
       )}
       {canManage && (

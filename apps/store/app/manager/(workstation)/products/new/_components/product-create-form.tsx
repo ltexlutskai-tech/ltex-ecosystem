@@ -9,11 +9,10 @@ import {
   COUNTRY_LABELS,
 } from "@ltex/shared";
 import { createManagerProduct, type CreateProductState } from "../actions";
-
-interface CategoryOption {
-  id: string;
-  label: string;
-}
+import {
+  CategoryCascader,
+  type CascaderNode,
+} from "../../../_components/category-cascader";
 
 const inputCls =
   "w-full rounded-md border border-input bg-background px-3 py-2 text-sm";
@@ -21,7 +20,7 @@ const inputCls =
 export function ProductCreateForm({
   categories,
 }: {
-  categories: CategoryOption[];
+  categories: CascaderNode[];
 }) {
   const [state, formAction, pending] = useActionState<
     CreateProductState,
@@ -39,23 +38,9 @@ export function ProductCreateForm({
           <label className="mb-1 block text-sm font-medium">Артикул *</label>
           <Input name="articleCode" required placeholder="Напр. 1235" />
         </div>
-        <div>
+        <div className="sm:col-span-2">
           <label className="mb-1 block text-sm font-medium">Категорія *</label>
-          <select
-            name="categoryId"
-            required
-            defaultValue=""
-            className={inputCls}
-          >
-            <option value="" disabled>
-              Оберіть категорію…
-            </option>
-            {categories.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.label}
-              </option>
-            ))}
-          </select>
+          <CategoryCascader nodes={categories} name="categoryId" />
         </div>
         <div>
           <label className="mb-1 block text-sm font-medium">Одиниця *</label>

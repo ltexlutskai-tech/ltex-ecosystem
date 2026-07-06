@@ -2,13 +2,12 @@
 
 import { Button, Input } from "@ltex/ui";
 import { createManagerCategory } from "../actions";
+import {
+  CategoryCascader,
+  type CascaderNode,
+} from "../../_components/category-cascader";
 
-interface ParentOption {
-  id: string;
-  label: string;
-}
-
-export function CategoryForm({ parents }: { parents: ParentOption[] }) {
+export function CategoryForm({ nodes }: { nodes: CascaderNode[] }) {
   return (
     <form action={createManagerCategory} className="flex flex-col gap-3">
       <div>
@@ -34,22 +33,10 @@ export function CategoryForm({ parents }: { parents: ParentOption[] }) {
         />
       </div>
       <div>
-        <label htmlFor="cat-parent" className="mb-1 block text-sm font-medium">
+        <label className="mb-1 block text-sm font-medium">
           Батьківська категорія
         </label>
-        <select
-          id="cat-parent"
-          name="parentId"
-          defaultValue=""
-          className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-        >
-          <option value="">Коренева (без батька)</option>
-          {parents.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.label}
-            </option>
-          ))}
-        </select>
+        <CategoryCascader nodes={nodes} name="parentId" allowRoot />
       </div>
       <Button type="submit">Додати</Button>
     </form>

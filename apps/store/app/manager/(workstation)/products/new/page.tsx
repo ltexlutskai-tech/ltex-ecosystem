@@ -13,16 +13,10 @@ export default async function NewProductPage() {
   if (!user) redirect("/manager/login");
   if (!canManageCatalog(user.role)) redirect("/manager/prices");
 
-  const cats = await prisma.category.findMany({
-    orderBy: [{ position: "asc" }],
-    select: { id: true, name: true, parent: { select: { name: true } } },
+  const categories = await prisma.category.findMany({
+    orderBy: [{ position: "asc" }, { name: "asc" }],
+    select: { id: true, name: true, parentId: true },
   });
-  const categories = cats
-    .map((c) => ({
-      id: c.id,
-      label: c.parent ? `${c.parent.name} → ${c.name}` : c.name,
-    }))
-    .sort((a, b) => a.label.localeCompare(b.label, "uk"));
 
   return (
     <div className="mx-auto max-w-3xl space-y-4">
