@@ -1,5 +1,7 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/manager-auth";
+import { canManageCatalog } from "@/lib/manager/catalog-permissions";
 import { getCurrentRate } from "@/lib/exchange-rate";
 import type { PriceSort, SortDir } from "@/lib/manager/prices";
 import { PricesToolbar } from "./_components/prices-toolbar";
@@ -66,11 +68,21 @@ export default async function PricesPage({
 
   return (
     <div className="max-w-none space-y-3">
-      <header>
-        <h1 className="text-xl font-bold text-gray-800">Прайс</h1>
-        <p className="mt-1 text-sm text-gray-600">
-          Усього: {list.total} · сторінка {list.page} з {list.totalPages}
-        </p>
+      <header className="flex items-start justify-between gap-3">
+        <div>
+          <h1 className="text-xl font-bold text-gray-800">Прайс</h1>
+          <p className="mt-1 text-sm text-gray-600">
+            Усього: {list.total} · сторінка {list.page} з {list.totalPages}
+          </p>
+        </div>
+        {canManageCatalog(user.role) && (
+          <Link
+            href="/manager/products/new"
+            className="rounded-md bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700"
+          >
+            + Створити товар
+          </Link>
+        )}
       </header>
       <PricesToolbar categories={categories} totalCount={list.total} />
       <PricesList

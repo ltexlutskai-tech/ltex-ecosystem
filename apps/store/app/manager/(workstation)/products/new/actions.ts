@@ -1,0 +1,105 @@
+"use server";
+
+import { prisma } from "@ltex/db";
+import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
+import { generateSlug } from "@ltex/shared";
+import { getCurrentUser } from "@/lib/auth/manager-auth";
+import { canManageCatalog } from "@/lib/manager/catalog-permissions";
+
+export interface CreateProductState {
+  error?: string;
+}
+
+async function uniqueSlug(base: string): Promise<string> {
+  const root = base || "tovar";
+  let slug = root;
+  let n = 2;
+  while (
+    await prisma.product.findUnique({ where: { slug }, select: { id: true } })
+  ) {
+    slug = `${root}-${n}`;
+    n += 1;
+    if (n > 100) {
+      slug = `${root}-${base.length}-${n}`;
+      break;
+    }
+  }
+  return slug;
+}
+
+/**
+ * Створення товару з CRM (7.2 Блок 3.3). Гейт — роль каталогу. Обовʼязкові
+ * поля (рішення user): назва, артикул, категорія, одиниця, ціна, опис, стать,
+ * розміри. Quality + country потрібні схемою Product (теж у формі). Створює
+ * товар + продажну ціну (wholesale €), редіректить у картку (де є фото).
+ */
+export async function createManagerProduct(
+  _prev: CreateProductState | null,
+  formData: FormData,
+): Promise<CreateProductState> {
+  const user = await getCurrentUser();
+  if (!user || !canManageCatalog(user.role)) {
+    return { error: "Немає прав керувати каталогом" };
+  }
+
+  const name = ((formData.get("name") as string) ?? "").trim();
+  const articleCode = ((formData.get("articleCode") as string) ?? "").trim();
+  const categoryId = (formData.get("categoryId") as string) ?? "";
+  const quality = (formData.get("quality") as string) ?? "";
+  const country = (formData.get("country") as string) ?? "";
+  const priceUnit = (formData.get("priceUnit") as string) || "kg";
+  const description = ((formData.get("description") as string) ?? "").trim();
+  const gender = ((formData.get("gender") as string) || "").trim() || null;
+  const sizes = ((formData.get("sizes") as string) || "").trim() || null;
+  const price = Number.parseFloat((formData.get("price") as string) ?? "");
+
+  if (!name) return { error: "Назва обовʼязкова" };
+  if (!articleCode) return { error: "Артикул обовʼязковий" };
+  if (!categoryId) return { error: "Оберіть категорію" };
+  if (!quality) return { error: "Оберіть якість" };
+  if (!country) return { error: "Оберіть країну" };
+  if (!description) return { error: "Опис обовʼязковий" };
+  if (!gender) return { error: "Вкажіть стать" };
+  if (!sizes) return { error: "Вкажіть розміри" };
+  if (!Number.isFinite(price) || price <= 0) {
+    return { error: "Вкажіть коректну ціну (€)" };
+  }
+
+  const slug = await uniqueSlug(generateSlug(name));
+
+  let productId: string;
+  try {
+    const product = await prisma.product.create({
+      data: {
+        name,
+        slug,
+        articleCode,
+        categoryId,
+        quality,
+        country,
+        priceUnit,
+        description,
+        gender,
+        sizes,
+        inStock: true,
+      },
+      select: { id: true },
+    });
+    productId = product.id;
+    await prisma.price.create({
+      data: {
+        productId,
+        priceType: "wholesale",
+        currency: "EUR",
+        amount: price,
+      },
+    });
+  } catch {
+    return { error: "Не вдалося створити товар (перевірте категорію/артикул)" };
+  }
+
+  revalidatePath("/manager/prices");
+  revalidatePath("/catalog", "layout");
+  redirect(`/manager/prices/${productId}`);
+}
