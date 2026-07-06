@@ -4,6 +4,7 @@ import { prisma } from "@ltex/db";
 import { rateLimit, getClientIp } from "@/lib/rate-limit";
 import { setCustomerCookie } from "@/lib/customer-auth";
 import { notifyNewLead } from "@/lib/notifications";
+import { createSiteLead } from "@/lib/manager/site-lead";
 
 const schema = z.object({
   phone: z.string().min(8).max(32),
@@ -99,6 +100,8 @@ export async function POST(request: NextRequest) {
         city,
         source: "web",
       }).catch(() => {});
+      // CRM-лід (не повноцінний клієнт) — окрема вкладка в «Клієнтах».
+      createSiteLead({ name, phone, city }).catch(() => {});
     }
 
     // NOTE: Guest cart merge intentionally NOT supported here. The cart

@@ -1705,6 +1705,29 @@ model MgrClientBankAccount {
 // скаляри lotId/productId для майбутніх авто-дій (без relations, як у Маршрутному
 // листі). Тип «Для товарів» (isProductReminder + items[]) — каркас на пізніший
 // етап; у Етапі 1 завжди false/порожній.
+// ─── Ліди з сайту (7.2 Блок 2 доповнення) ──────────────────────────────────
+// Реєстрація на сайті створює ЛІД (не повноцінного клієнта). Менеджер бачить
+// їх окремою вкладкою в «Клієнтах» і після контакту / при замовленні конвертує
+// у MgrClient (повноцінна картка).
+model MgrLead {
+  id                String   @id @default(cuid())
+  name              String
+  phone             String?
+  city              String?
+  region            String?
+  source            String   @default("site")
+  // new | contacted | converted | rejected
+  status            String   @default("new")
+  note              String?  @db.Text
+  convertedClientId String?  @map("converted_client_id")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  @@index([status, createdAt])
+  @@index([phone])
+  @@map("mgr_leads")
+}
+
 enum MgrReminderPeriod {
   none
   daily

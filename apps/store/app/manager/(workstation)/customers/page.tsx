@@ -79,6 +79,10 @@ export default async function CustomersPage({
     loadViewPrefs(user.id, "clients_filters"),
   ]);
 
+  const leadsCount = await prisma.mgrLead.count({
+    where: { status: { in: ["new", "contacted"] } },
+  });
+
   return (
     <div className="max-w-none space-y-3">
       <header className="flex items-center justify-between">
@@ -88,12 +92,25 @@ export default async function CustomersPage({
             Усього: {list.total} · сторінка {list.page} з {list.totalPages}
           </p>
         </div>
-        <Link
-          href="/manager/customers/new"
-          className="rounded-md bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700"
-        >
-          + Створити клієнта
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link
+            href="/manager/customers/leads"
+            className="inline-flex items-center gap-1.5 rounded-md border px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+          >
+            Ліди з сайту
+            {leadsCount > 0 && (
+              <span className="rounded-full bg-red-500 px-1.5 text-xs font-bold text-white">
+                {leadsCount > 99 ? "99+" : leadsCount}
+              </span>
+            )}
+          </Link>
+          <Link
+            href="/manager/customers/new"
+            className="rounded-md bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700"
+          >
+            + Створити клієнта
+          </Link>
+        </div>
       </header>
       <ClientListToolbar
         dictionaries={dictionaries}

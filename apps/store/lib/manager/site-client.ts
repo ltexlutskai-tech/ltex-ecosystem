@@ -2,6 +2,7 @@ import { prisma } from "@ltex/db";
 import { normalizePhone } from "@ltex/shared";
 import { matchClientByPhone } from "@/lib/chat/phone-match";
 import { getRegionLabel, isValidRegionSlug } from "@/lib/constants/regions";
+import { markLeadsConverted } from "@/lib/manager/site-lead";
 
 /**
  * Resolve-or-create CRM-клієнта для покупця з сайту (← 7.2 Блок 2).
@@ -74,6 +75,7 @@ export async function resolveOrCreateSiteClient(opts: {
           });
         }
       }
+      await markLeadsConverted(opts.phone, match.clientId);
       return { clientId: match.clientId, agentUserId, created: false };
     }
 
@@ -99,6 +101,7 @@ export async function resolveOrCreateSiteClient(opts: {
       },
     });
 
+    await markLeadsConverted(opts.phone, client.id);
     return { clientId: client.id, agentUserId, created: true };
   } catch {
     return { clientId: null, agentUserId: null, created: false };
