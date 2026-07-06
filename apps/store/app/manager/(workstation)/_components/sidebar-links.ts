@@ -6,6 +6,7 @@ import {
   Database,
   FileText,
   FolderClock,
+  FolderTree,
   Gift,
   Home,
   Map,
@@ -48,6 +49,7 @@ export const SECONDARY_LINKS: readonly SidebarLink[] = [
     icon: Gift,
   },
   { href: "/manager/prices", label: "Прайс", icon: BarChart3 },
+  { href: "/manager/categories", label: "Категорії", icon: FolderTree },
   {
     href: "/manager/message-templates",
     label: "Шаблони повідомлень",
