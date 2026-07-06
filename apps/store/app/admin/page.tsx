@@ -21,6 +21,7 @@ import {
   PeriodFilter,
 } from "@/components/admin/charts";
 import { getAdminStats, type Period } from "@/lib/admin-stats";
+import { getSiteStats } from "@/lib/site-stats";
 import { AutoRefresh } from "@/components/admin/auto-refresh";
 
 const BAR_COLORS: Record<string, string> = {
@@ -87,7 +88,10 @@ export default async function AdminDashboard({
     ? (params.period as Period)
     : "30d";
 
-  const stats = await getAdminStats(period);
+  const [stats, site] = await Promise.all([
+    getAdminStats(period),
+    getSiteStats(),
+  ]);
 
   const cards = [
     {
@@ -134,6 +138,52 @@ export default async function AdminDashboard({
         <h1 className="text-2xl font-bold">Дашборд</h1>
         <PeriodFilter currentPeriod={period} />
       </div>
+
+      <section className="rounded-lg border bg-white p-5">
+        <h2 className="mb-3 text-lg font-semibold">Сайт</h2>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <SiteTile
+            label="Візити сьогодні"
+            value={site.visitsToday}
+            sub={`${site.uniquesToday} унікальних`}
+          />
+          <SiteTile
+            label="Візити за 7 днів"
+            value={site.visits7d}
+            sub={`${site.uniques7d} унікальних`}
+          />
+          <SiteTile
+            label="Замовлення з сайту (30 дн.)"
+            value={site.siteOrders30dCount}
+            sub={`€${site.siteOrders30dSumEur.toFixed(2)}`}
+          />
+          <SiteTile
+            label="Активні ліди"
+            value={site.activeLeads}
+            sub="з реєстрацій на сайті"
+          />
+        </div>
+        {site.topViewed.length > 0 && (
+          <div className="mt-4">
+            <h3 className="mb-2 text-sm font-medium text-gray-500">
+              Топ переглядів (30 днів)
+            </h3>
+            <ol className="space-y-1 text-sm">
+              {site.topViewed.map((t, i) => (
+                <li
+                  key={t.productId}
+                  className="flex justify-between border-b py-1 last:border-b-0"
+                >
+                  <span className="truncate pr-2">
+                    {i + 1}. {t.name}
+                  </span>
+                  <span className="shrink-0 text-gray-500">{t.views}</span>
+                </li>
+              ))}
+            </ol>
+          </div>
+        )}
+      </section>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {cards.map((card) => (
@@ -300,6 +350,26 @@ export default async function AdminDashboard({
           )}
         </CardContent>
       </Card>
+    </div>
+  );
+}
+
+function SiteTile({
+  label,
+  value,
+  sub,
+}: {
+  label: string;
+  value: number;
+  sub?: string;
+}) {
+  return (
+    <div className="rounded-lg border bg-gray-50 p-4">
+      <div className="text-xs font-medium text-gray-500">{label}</div>
+      <div className="mt-1 text-2xl font-bold text-gray-800">
+        {value.toLocaleString("uk-UA")}
+      </div>
+      {sub && <div className="mt-0.5 text-xs text-gray-400">{sub}</div>}
     </div>
   );
 }

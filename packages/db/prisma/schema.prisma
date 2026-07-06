@@ -1733,6 +1733,25 @@ model MgrLead {
   @@map("mgr_leads")
 }
 
+// ─── Лічильник візитів сайту (7.2 Блок 4) ──────────────────────────────────
+// Легкий, без кукі/персональних даних: агрегати по днях.
+model SiteVisitDay {
+  day       DateTime @id @db.Date
+  pageviews Int      @default(0)
+
+  @@map("site_visit_days")
+}
+
+// Один рядок на (день, хеш відвідувача) → кількість = унікальні за день.
+// visitor_hash = sha256(ip + user-agent + день + сіль) — без PII.
+model SiteVisitor {
+  day         DateTime @db.Date
+  visitorHash String   @map("visitor_hash")
+
+  @@id([day, visitorHash])
+  @@map("site_visitors")
+}
+
 enum MgrReminderPeriod {
   none
   daily

@@ -9,6 +9,7 @@ import {
   type QualityLevel,
   type Country,
 } from "@ltex/shared";
+import { getHiddenCategoryIds } from "@/lib/catalog-visibility";
 import { Breadcrumbs } from "@/components/store/breadcrumbs";
 import { Pagination } from "@/components/store/pagination";
 import { LotCard } from "@/components/store/lot-card";
@@ -303,6 +304,11 @@ export default async function LotsPage({
   }
   if (typeof unitWeightMax === "number") {
     productWhere.unitWeightMin = { lte: unitWeightMax };
+  }
+  // Приховані категорії (7.2) — не показуємо їхні лоти.
+  const hiddenCategoryIds = await getHiddenCategoryIds();
+  if (hiddenCategoryIds.length > 0) {
+    productWhere.NOT = { categoryId: { in: hiddenCategoryIds } };
   }
   if (Object.keys(productWhere).length > 0) {
     where.product = productWhere;
