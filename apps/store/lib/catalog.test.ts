@@ -15,6 +15,11 @@ vi.mock("./customer-auth", () => ({
   getCurrentCustomer: () => mockGetCurrentCustomer(),
 }));
 
+// Приховані категорії (7.2) — за замовчуванням порожньо (стара поведінка).
+vi.mock("./catalog-visibility", () => ({
+  getHiddenCategoryIds: vi.fn().mockResolvedValue([]),
+}));
+
 import { getCatalogProducts, autocompleteSearch } from "./catalog";
 import { prisma } from "@ltex/db";
 

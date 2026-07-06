@@ -9,6 +9,7 @@ import { loadProductCard } from "../_lib/load-product";
 import { loadCategoryNodes, resolveCategoryAccess } from "../_lib/load-prices";
 import { ProductCardView } from "../_components/product-card-view";
 import { ProductPhotoManager } from "./_components/product-photo-manager";
+import { ProductCategoryEditor } from "./_components/product-category-editor";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Картка товару — L-TEX Manager" };
@@ -42,15 +43,38 @@ export default async function ProductCardPage({
     notFound();
   }
 
-  // Керування фото (7.2 Блок 3) — лише ролям каталогу (admin/owner/warehouse).
+  // Керування фото + категорією (7.2) — лише ролям каталогу.
   const canManage = canManageCatalog(user.role);
-  const managerImages = canManage
-    ? await prisma.productImage.findMany({
-        where: { productId: product.id },
-        orderBy: { position: "asc" },
-        select: { id: true, url: true },
-      })
-    : [];
+  const [managerImages, categoryRows] = canManage
+    ? await Promise.all([
+        prisma.productImage.findMany({
+          where: { productId: product.id },
+          orderBy: { position: "asc" },
+          select: { id: true, url: true },
+        }),
+        prisma.category.findMany({
+          orderBy: [{ position: "asc" }, { name: "asc" }],
+          select: { id: true, name: true, parentId: true },
+        }),
+      ])
+    : [[], []];
+
+  // Опції категорії з повним шляхом (Тип → Сезон → Категорія → …).
+  const catById = new Map(categoryRows.map((c) => [c.id, c]));
+  const categoryOptions = categoryRows
+    .map((c) => {
+      const parts: string[] = [c.name];
+      let p = c.parentId;
+      let guard = 0;
+      while (p && catById.has(p) && guard < 10) {
+        const parent = catById.get(p)!;
+        parts.unshift(parent.name);
+        p = parent.parentId;
+        guard += 1;
+      }
+      return { id: c.id, label: parts.join(" → ") };
+    })
+    .sort((a, b) => a.label.localeCompare(b.label, "uk"));
 
   // Рекламний текст товара будуємо на сервері (курс EUR — server-side).
   const productShareText = buildProductShareText({
@@ -81,6 +105,13 @@ export default async function ProductCardPage({
         sellerName={user.fullName}
         isAdmin={user.role === "admin"}
       />
+      {canManage && (
+        <ProductCategoryEditor
+          productId={product.id}
+          currentCategoryId={product.categoryId}
+          categories={categoryOptions}
+        />
+      )}
       {canManage && (
         <ProductPhotoManager productId={product.id} images={managerImages} />
       )}

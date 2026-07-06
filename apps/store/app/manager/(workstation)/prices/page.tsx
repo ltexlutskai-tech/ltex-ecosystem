@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/manager-auth";
 import { canManageCatalog } from "@/lib/manager/catalog-permissions";
+import { getHiddenCategoryIds } from "@/lib/catalog-visibility";
 import { getCurrentRate } from "@/lib/exchange-rate";
 import type { PriceSort, SortDir } from "@/lib/manager/prices";
 import { PricesToolbar } from "./_components/prices-toolbar";
@@ -45,11 +46,20 @@ export default async function PricesPage({
     { categoryId, role: user.role },
   );
 
+  // Приховані з каталогу категорії (7.2): ховаємо від торгових агентів, але
+  // НЕ від ролей каталогу (admin/owner/warehouse — щоб змінити категорію).
+  const catalogHidden = canManageCatalog(user.role)
+    ? []
+    : await getHiddenCategoryIds();
+  const mergedHidden = Array.from(
+    new Set([...(hiddenCategoryIds ?? []), ...catalogHidden]),
+  );
+
   const list = await loadPrices({
     q: pickString(sp.q),
     categoryId,
     categorySubtreeIds,
-    hiddenCategoryIds,
+    hiddenCategoryIds: mergedHidden.length > 0 ? mergedHidden : undefined,
     arrivalFrom: pickDate(sp.arrivalFrom),
     arrivalTo: pickDate(sp.arrivalTo),
     priceFrom: pickNumber(sp.priceFrom),

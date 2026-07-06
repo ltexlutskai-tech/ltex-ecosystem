@@ -7,6 +7,7 @@ import {
 } from "@ltex/db";
 import { OVERSIZE_SLUG } from "@ltex/shared";
 import { getCurrentCustomer } from "./customer-auth";
+import { getHiddenCategoryIds } from "./catalog-visibility";
 
 /**
  * Strip wholesale prices for unauthenticated visitors. Server-side
@@ -193,6 +194,15 @@ export async function getCatalogProducts(
     ];
   }
 
+  // Приховані категорії (7.2): товари з цих категорій не показуємо на сайті.
+  const hiddenCategoryIds = await getHiddenCategoryIds();
+  if (hiddenCategoryIds.length > 0) {
+    where.AND = [
+      ...((where.AND as Prisma.ProductWhereInput[]) ?? []),
+      { categoryId: { notIn: hiddenCategoryIds } },
+    ];
+  }
+
   if (inStockOnly) {
     where.lots = { some: { status: { in: ["free", "on_sale"] } } };
   }
@@ -308,6 +318,18 @@ async function fullTextSearch(
     queryParams.push(categoryId);
     paramIdx++;
   }
+
+  // Приховані категорії (7.2) — виключаємо з пошуку теж.
+  const hiddenCategoryIds = await getHiddenCategoryIds();
+  if (hiddenCategoryIds.length > 0) {
+    const placeholders = hiddenCategoryIds
+      .map((_, i) => `$${paramIdx + i}`)
+      .join(", ");
+    filterConditions.push(`p.category_id NOT IN (${placeholders})`);
+    queryParams.push(...hiddenCategoryIds);
+    paramIdx += hiddenCategoryIds.length;
+  }
+
   const qualityValue = parseMultiValue(quality);
   if (qualityValue) {
     if (Array.isArray(qualityValue)) {

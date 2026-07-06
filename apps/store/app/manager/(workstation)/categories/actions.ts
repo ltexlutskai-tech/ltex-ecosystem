@@ -51,6 +51,18 @@ export async function createManagerCategory(formData: FormData): Promise<void> {
   revalidateCategoryPaths();
 }
 
+export async function setCategoryHidden(
+  id: string,
+  hidden: boolean,
+): Promise<void> {
+  await assertCatalogManager();
+  await prisma.category.update({
+    where: { id },
+    data: { hiddenFromCatalog: hidden },
+  });
+  revalidateCategoryPaths();
+}
+
 export async function deleteManagerCategory(id: string): Promise<void> {
   await assertCatalogManager();
 

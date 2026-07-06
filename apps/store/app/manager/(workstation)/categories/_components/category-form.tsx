@@ -5,7 +5,7 @@ import { createManagerCategory } from "../actions";
 
 interface ParentOption {
   id: string;
-  name: string;
+  label: string;
 }
 
 export function CategoryForm({ parents }: { parents: ParentOption[] }) {
@@ -46,7 +46,7 @@ export function CategoryForm({ parents }: { parents: ParentOption[] }) {
           <option value="">Коренева (без батька)</option>
           {parents.map((c) => (
             <option key={c.id} value={c.id}>
-              {c.name}
+              {c.label}
             </option>
           ))}
         </select>

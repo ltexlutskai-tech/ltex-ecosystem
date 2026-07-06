@@ -24,6 +24,9 @@ model Category {
   // ролей у прайсі/картці/вітрині (серверний фільтр). Порожній = видно всім.
   // admin/owner завжди bypass. Правила user задасть пізніше — зараз каркас.
   hiddenForRoles String[] @default([]) @map("hidden_for_roles")
+  // Приховати категорію (та її піддерево) з сайту й від торгових агентів
+  // (7.2). Товари лишаються в системі; змінити категорію → знову видимі.
+  hiddenFromCatalog Boolean @default(false) @map("hidden_from_catalog")
   createdAt      DateTime @default(now()) @map("created_at")
   updatedAt      DateTime @updatedAt @map("updated_at")
 
