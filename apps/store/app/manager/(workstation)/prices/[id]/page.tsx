@@ -1,11 +1,14 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
+import { prisma } from "@ltex/db";
 import { getCurrentUser } from "@/lib/auth/manager-auth";
 import { getCurrentRate } from "@/lib/exchange-rate";
 import { buildProductShareText } from "@/lib/manager/share-message";
+import { canManageCatalog } from "@/lib/manager/catalog-permissions";
 import { loadProductCard } from "../_lib/load-product";
 import { loadCategoryNodes, resolveCategoryAccess } from "../_lib/load-prices";
 import { ProductCardView } from "../_components/product-card-view";
+import { ProductPhotoManager } from "./_components/product-photo-manager";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Картка товару — L-TEX Manager" };
@@ -39,6 +42,16 @@ export default async function ProductCardPage({
     notFound();
   }
 
+  // Керування фото (7.2 Блок 3) — лише ролям каталогу (admin/owner/warehouse).
+  const canManage = canManageCatalog(user.role);
+  const managerImages = canManage
+    ? await prisma.productImage.findMany({
+        where: { productId: product.id },
+        orderBy: { position: "asc" },
+        select: { id: true, url: true },
+      })
+    : [];
+
   // Рекламний текст товара будуємо на сервері (курс EUR — server-side).
   const productShareText = buildProductShareText({
     name: product.name,
@@ -68,6 +81,9 @@ export default async function ProductCardPage({
         sellerName={user.fullName}
         isAdmin={user.role === "admin"}
       />
+      {canManage && (
+        <ProductPhotoManager productId={product.id} images={managerImages} />
+      )}
     </div>
   );
 }
