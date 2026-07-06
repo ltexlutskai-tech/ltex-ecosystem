@@ -98,6 +98,16 @@ export function ProductCreateForm({
           <label className="mb-1 block text-sm font-medium">Розміри *</label>
           <Input name="sizes" required placeholder="Напр. S–XXL" />
         </div>
+        <div>
+          <label className="mb-1 block text-sm font-medium">Виробник</label>
+          <Input name="producer" placeholder="Напр. VIVE / SOEX / Канада" />
+        </div>
+        <div>
+          <label className="mb-1 block text-sm font-medium">
+            Посилання на YouTube
+          </label>
+          <Input name="videoUrl" placeholder="https://youtu.be/…" />
+        </div>
       </div>
 
       <div>
@@ -121,7 +131,9 @@ export function ProductCreateForm({
         {pending ? "Створення…" : "Створити товар"}
       </Button>
       <p className="text-xs text-gray-400">
-        Після створення відкриється картка товару — там можна додати фото.
+        Код товару (формат 1С) і дата створення присвоюються автоматично. Після
+        створення відкриється картка товару — там можна додати фото. Посилання
+        на сторінку товару й лоти формуються автоматично.
       </p>
     </form>
   );

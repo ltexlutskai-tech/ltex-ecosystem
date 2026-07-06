@@ -55,6 +55,8 @@ model Product {
   priceUnit     String   @default("kg") @map("price_unit")
   averageWeight Float?   @map("average_weight")
   videoUrl      String?  @map("video_url")
+  // Виробник (← 1С «Производитель»: VIVE, SOEX, Канада…). 7.2.
+  producer      String?
   inStock       Boolean  @default(true) @map("in_stock")
   gender        String?
   sizes         String?

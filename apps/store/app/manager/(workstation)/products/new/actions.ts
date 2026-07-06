@@ -29,6 +29,21 @@ async function uniqueSlug(base: string): Promise<string> {
 }
 
 /**
+ * Наступний код товару у форматі 1С (`_Code`): найбільший числовий `code_1c`
+ * серед товарів + 1, доповнений нулями до 11 знаків (як у 1С). Продовжує
+ * нумерацію після останнього коду, що прийшов з 1С.
+ */
+async function nextProductCode1C(): Promise<string> {
+  const rows = await prisma.$queryRaw<{ max: bigint | null }[]>`
+    SELECT MAX(CAST(code_1c AS BIGINT)) AS max
+    FROM products
+    WHERE code_1c ~ '^[0-9]+$'
+  `;
+  const max = rows[0]?.max ? Number(rows[0].max) : 0;
+  return String(max + 1).padStart(11, "0");
+}
+
+/**
  * Створення товару з CRM (7.2 Блок 3.3). Гейт — роль каталогу. Обовʼязкові
  * поля (рішення user): назва, артикул, категорія, одиниця, ціна, опис, стать,
  * розміри. Quality + country потрібні схемою Product (теж у формі). Створює
@@ -52,6 +67,8 @@ export async function createManagerProduct(
   const description = ((formData.get("description") as string) ?? "").trim();
   const gender = ((formData.get("gender") as string) || "").trim() || null;
   const sizes = ((formData.get("sizes") as string) || "").trim() || null;
+  const producer = ((formData.get("producer") as string) || "").trim() || null;
+  const videoUrl = ((formData.get("videoUrl") as string) || "").trim() || null;
   const price = Number.parseFloat((formData.get("price") as string) ?? "");
 
   if (!name) return { error: "Назва обовʼязкова" };
@@ -67,6 +84,7 @@ export async function createManagerProduct(
   }
 
   const slug = await uniqueSlug(generateSlug(name));
+  const code1C = await nextProductCode1C();
 
   let productId: string;
   try {
@@ -74,6 +92,7 @@ export async function createManagerProduct(
       data: {
         name,
         slug,
+        code1C,
         articleCode,
         categoryId,
         quality,
@@ -82,6 +101,8 @@ export async function createManagerProduct(
         description,
         gender,
         sizes,
+        producer,
+        videoUrl,
         inStock: true,
       },
       select: { id: true },
