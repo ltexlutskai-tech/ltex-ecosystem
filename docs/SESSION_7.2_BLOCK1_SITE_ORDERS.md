@@ -97,15 +97,20 @@ CRM-картці (order-tab матчить по code1C) — замовлення
   (`canManageCatalog` = admin/owner/warehouse); `prices/[id]/photo-actions.ts`
   (upload/delete/reorder — дзеркало адмін-обробників, sharp+`/media`, гейт роллю);
   `ProductPhotoManager` у картці товару. Без міграцій.
-- **3.2 Категорії CRUD у CRM** — TODO (порт `/admin/categories` → `/manager/...`).
-- **3.3 Створення товару з CRM** — TODO. **Рішення user по полях форми:** обовʼязкові
-  назва + артикул + категорія + одиниця (кг/шт) + **ціна + опис + стать + розміри**
-  (`gender`/`sizes` — існуючі поля Product зі S59).
-- **3.4 Прибрати вкладки «Товари / Лоти / Категорії» з адмінки** — TODO, робити
-  ПІСЛЯ 3.2–3.3 (це заміна) + після live-перевірки user.
+- **3.2 Категорії CRUD у CRM ✅:** `/manager/categories` + `categories/actions.ts`
+  (createManagerCategory/deleteManagerCategory, гейт canManageCatalog, 1С-категорії
+  не видаляються, guard товари/підкатегорії, unique slug); сайдбар «Категорії».
+- **3.3 Створення товару з CRM ✅:** `/manager/products/new` + `createManagerProduct`
+  (useActionState, обовʼязкові назва/артикул/категорія/одиниця/ціна/опис/стать/
+  розміри + quality/country, auto-slug, Product+Price(wholesale €), редірект у
+  картку); кнопка «+ Створити товар» на Прайсі для ролей каталогу.
+- **3.4 Прибрано вкладки «Товари / Лоти / Категорії» з адмінки ✅:** видалено
+  `app/admin/{products,lots,categories}` + пункти сайдбару. Адмінка тепер лише
+  вітринний контент: Дашборд, Банери, Топ товарів, Гаряча пропозиція, Черга email.
 
-**Статус:** user обрав паузу (варіант B) — деплой + live-тест Блоків 1–3.1, далі
-3.2→3.3→3.4.
+**Ліди з сайту ✅** (доповнення Блоку 2): модель MgrLead + вкладка
+`/manager/customers/leads` (реєстрація → лід; конвертація вручну або при
+замовленні). Міграція `20260707_mgr_leads`.
 
 ## Відкрито (наступні кроки плану 7.0)
 

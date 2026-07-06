@@ -13,9 +13,6 @@ import {
 } from "@ltex/ui";
 import {
   LayoutDashboard,
-  Package,
-  Boxes,
-  FolderTree,
   LogOut,
   Menu,
   Image,
@@ -29,9 +26,6 @@ import { EmailQueueBadge } from "./email-queue-badge";
 
 const navItems = [
   { href: "/admin", label: "Дашборд", icon: LayoutDashboard },
-  { href: "/admin/products", label: "Товари", icon: Package },
-  { href: "/admin/lots", label: "Лоти", icon: Boxes },
-  { href: "/admin/categories", label: "Категорії", icon: FolderTree },
   { href: "/admin/banners", label: "Банери", icon: Image },
   { href: "/admin/featured", label: "Топ товарів", icon: Star },
   { href: "/admin/promo", label: "Гаряча пропозиція", icon: Megaphone },
