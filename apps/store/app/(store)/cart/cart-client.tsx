@@ -15,13 +15,20 @@ const dict = getDictionary();
 
 interface CartClientProps {
   rate: number;
+  /** Префіл з кабінету покупця (getCurrentCustomer), якщо залогінений. */
+  initialName?: string;
+  initialPhone?: string;
 }
 
-export function CartClient({ rate }: CartClientProps) {
+export function CartClient({
+  rate,
+  initialName = "",
+  initialPhone = "",
+}: CartClientProps) {
   const { items, removeItem, clearCart, totalWeight, totalEur, itemCount } =
     useCart();
-  const [customerName, setCustomerName] = useState("");
-  const [customerPhone, setCustomerPhone] = useState("");
+  const [customerName, setCustomerName] = useState(initialName);
+  const [customerPhone, setCustomerPhone] = useState(initialPhone);
   const [customerTelegram, setCustomerTelegram] = useState("");
   const [customerRegion, setCustomerRegion] = useState("");
   const [notes, setNotes] = useState("");

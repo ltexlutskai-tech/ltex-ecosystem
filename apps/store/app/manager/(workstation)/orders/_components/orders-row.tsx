@@ -16,6 +16,7 @@ export interface OrdersRowData {
   isActual: boolean;
   source: string;
   agentName: string | null;
+  assignedAgentName: string | null;
   deliveryMethod: string | null;
   itemCount: number;
   createdAt: Date;
@@ -125,10 +126,10 @@ export function OrdersRow({
       </td>
       <td
         data-col="agent"
-        data-value={order.agentName ?? ""}
+        data-value={order.agentName ?? order.assignedAgentName ?? ""}
         className={`px-2.5 py-1.5 text-sm ${dimmed ? "text-gray-400" : "text-gray-700"}`}
       >
-        {order.agentName ?? "—"}
+        {order.agentName ?? order.assignedAgentName ?? "—"}
       </td>
       <td
         data-col="delivery"

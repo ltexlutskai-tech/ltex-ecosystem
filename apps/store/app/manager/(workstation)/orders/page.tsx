@@ -105,8 +105,8 @@ export default async function ManagerOrdersPage({
 
   const rows = items.map((o) => serializeOrderRow(o));
 
-  // Область клієнта — окремий batch-lookup (Customer не має region; беремо з
-  // MgrClient за спільним ключем code1C).
+  // Область клієнта — batch-lookup з MgrClient (Customer не має region).
+  // За code1C, а для сайтових клієнтів без code1C — за телефоном (7.2 фікс).
   const codes = Array.from(
     new Set(
       rows
@@ -114,18 +114,57 @@ export default async function ManagerOrdersPage({
         .filter((c): c is string => c != null && c.length > 0),
     ),
   );
-  if (codes.length > 0) {
+  const phones = Array.from(
+    new Set(
+      rows
+        .filter((r) => !r.customer.code1C)
+        .map((r) => r.customer.phone)
+        .filter((p): p is string => p != null && p.length > 0),
+    ),
+  );
+  if (codes.length > 0 || phones.length > 0) {
     const mgrRows = await prisma.mgrClient.findMany({
-      where: { code1C: { in: codes } },
-      select: { code1C: true, region: true },
+      where: {
+        OR: [
+          ...(codes.length > 0 ? [{ code1C: { in: codes } }] : []),
+          ...(phones.length > 0 ? [{ phonePrimary: { in: phones } }] : []),
+        ],
+      },
+      select: { code1C: true, phonePrimary: true, region: true },
     });
-    const regionByCode = new Map<string, string | null>(
-      mgrRows.map((m) => [m.code1C as string, m.region]),
-    );
+    const regionByCode = new Map<string, string | null>();
+    const regionByPhone = new Map<string, string | null>();
+    for (const m of mgrRows) {
+      if (m.code1C) regionByCode.set(m.code1C, m.region);
+      if (m.phonePrimary) regionByPhone.set(m.phonePrimary, m.region);
+    }
     for (const r of rows) {
       r.customer.region = r.customer.code1C
         ? (regionByCode.get(r.customer.code1C) ?? null)
-        : null;
+        : r.customer.phone
+          ? (regionByPhone.get(r.customer.phone) ?? null)
+          : null;
+    }
+  }
+
+  // Імʼя призначеного агента — для сайтових замовлень (agentName порожній).
+  const agentIds = Array.from(
+    new Set(
+      rows
+        .filter((r) => !r.agentName && r.assignedAgentUserId)
+        .map((r) => r.assignedAgentUserId as string),
+    ),
+  );
+  if (agentIds.length > 0) {
+    const users = await prisma.user.findMany({
+      where: { id: { in: agentIds } },
+      select: { id: true, fullName: true },
+    });
+    const nameById = new Map(users.map((u) => [u.id, u.fullName]));
+    for (const r of rows) {
+      if (!r.agentName && r.assignedAgentUserId) {
+        r.assignedAgentName = nameById.get(r.assignedAgentUserId) ?? null;
+      }
     }
   }
 

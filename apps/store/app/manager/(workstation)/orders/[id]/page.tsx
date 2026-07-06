@@ -117,12 +117,20 @@ export default async function ManagerOrderDetailPage({
   const locked = isOrderLocked(order.status) || !!order.closedAt;
 
   // Допоміжні дані для форми (тільки коли редагуємо).
+  // Резолв MgrClient (для деталей + лінка на картку): за code1C, а для сайтових
+  // клієнтів без code1C — за основним телефоном (7.2 фікс навігації).
+  const mgrWhere = order.customer.code1C
+    ? { code1C: order.customer.code1C }
+    : order.customer.phone
+      ? { phonePrimary: order.customer.phone }
+      : null;
   const [exchangeRate, mgr] = await Promise.all([
     getCurrentRate(),
-    order.customer.code1C
-      ? prisma.mgrClient.findUnique({
-          where: { code1C: order.customer.code1C },
+    mgrWhere
+      ? prisma.mgrClient.findFirst({
+          where: mgrWhere,
           select: {
+            id: true,
             debt: true,
             phonePrimary: true,
             street: true,
@@ -131,6 +139,7 @@ export default async function ManagerOrderDetailPage({
         })
       : Promise.resolve(null),
   ]);
+  const mgrClientId = mgr?.id ?? null;
 
   const mgrAddress = mgr
     ? [mgr.street, mgr.house].filter(Boolean).join(", ") || null
@@ -271,6 +280,7 @@ export default async function ManagerOrderDetailPage({
           initialOrder={initialOrder}
           initialClientId={order.customer.id}
           initialClient={clientSummary}
+          mgrClientId={mgrClientId}
           exchangeRate={exchangeRate}
           deliveryMethods={deliveryMethods}
           currentUserId={user.id}

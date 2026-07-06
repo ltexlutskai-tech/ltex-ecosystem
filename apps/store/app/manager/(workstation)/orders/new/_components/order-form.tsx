@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { MessageSquare, ListPlus } from "lucide-react";
 import {
@@ -41,6 +42,8 @@ export interface OrderFormProps {
   initialOrder?: OrderEditInitial | null;
   initialClientId?: string | null;
   initialClient?: ClientPickerItem | null;
+  /** MgrClient.id для лінка «Відкрити картку клієнта» (edit-режим). */
+  mgrClientId?: string | null;
   exchangeRate: number;
   deliveryMethods: OrderDeliveryOption[];
   currentUserId: string;
@@ -81,6 +84,7 @@ export function OrderForm({
   initialOrder,
   initialClientId,
   initialClient,
+  mgrClientId,
   exchangeRate,
   deliveryMethods,
   currentUserName,
@@ -332,7 +336,17 @@ export function OrderForm({
                   {clientSummary?.code1C ? `· ${clientSummary.code1C}` : ""}
                 </div>
               </div>
-              <span className="text-xs text-gray-400">не змінюється</span>
+              <div className="flex flex-col items-end gap-1">
+                {mgrClientId && (
+                  <Link
+                    href={`/manager/customers/${mgrClientId}`}
+                    className="text-xs font-medium text-blue-600 hover:text-blue-700"
+                  >
+                    Відкрити картку клієнта →
+                  </Link>
+                )}
+                <span className="text-xs text-gray-400">не змінюється</span>
+              </div>
             </div>
           </div>
         ) : (

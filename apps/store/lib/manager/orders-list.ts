@@ -213,6 +213,7 @@ export interface RawOrderRow {
   isActual: boolean;
   source: string;
   agentName: string | null;
+  assignedAgentUserId: string | null;
   deliveryMethod: string | null;
   createdAt: Date;
   customer: {
@@ -220,6 +221,7 @@ export interface RawOrderRow {
     name: string;
     code1C: string | null;
     city: string | null;
+    phone: string | null;
   };
   _count: { items: number };
 }
@@ -237,6 +239,10 @@ export interface OrderListItem {
   source: string;
   /** Торговий агент: `Order.agentName` (історичний 1С-імпорт). */
   agentName: string | null;
+  /** Призначений агент (User.id) — для сайтових замовлень без agentName. */
+  assignedAgentUserId: string | null;
+  /** Імʼя призначеного агента (batch-lookup у page.tsx за assignedAgentUserId). */
+  assignedAgentName: string | null;
   /** Спосіб доставки: `Order.deliveryMethod` (code → label у UI). */
   deliveryMethod: string | null;
   itemCount: number;
@@ -246,7 +252,8 @@ export interface OrderListItem {
     name: string;
     code1C: string | null;
     city: string | null;
-    /** Область клієнта (з MgrClient.region за code1C; batch-lookup у page.tsx). */
+    phone: string | null;
+    /** Область клієнта (MgrClient.region за code1C або телефоном; batch у page). */
     region: string | null;
   };
 }
@@ -254,7 +261,7 @@ export interface OrderListItem {
 /** Prisma include для рядка списку — узгоджено з RawOrderRow. */
 export const orderRowInclude = {
   customer: {
-    select: { id: true, name: true, code1C: true, city: true },
+    select: { id: true, name: true, code1C: true, city: true, phone: true },
   },
   _count: { select: { items: true } },
 } satisfies Prisma.OrderInclude;
@@ -272,6 +279,9 @@ export function serializeOrderRow(o: RawOrderRow): OrderListItem {
     isActual: o.isActual,
     source: o.source,
     agentName: o.agentName,
+    assignedAgentUserId: o.assignedAgentUserId,
+    // Імʼя призначеного агента підставляється у page.tsx (batch-lookup).
+    assignedAgentName: null,
     deliveryMethod: o.deliveryMethod,
     itemCount: o._count.items,
     createdAt: o.createdAt,
@@ -280,7 +290,8 @@ export function serializeOrderRow(o: RawOrderRow): OrderListItem {
       name: o.customer.name,
       code1C: o.customer.code1C,
       city: o.customer.city,
-      // Область підставляється у page.tsx через batch-lookup за code1C.
+      phone: o.customer.phone,
+      // Область підставляється у page.tsx (batch-lookup за code1C або телефоном).
       region: null,
     },
   };

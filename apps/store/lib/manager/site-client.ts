@@ -30,29 +30,55 @@ export async function resolveOrCreateSiteClient(opts: {
   regionSlug?: string;
 }): Promise<SiteClientResult> {
   try {
-    const match = await matchClientByPhone(opts.phone);
-    if (match) {
-      return {
-        clientId: match.clientId,
-        agentUserId: match.agentUserId,
-        created: false,
-      };
-    }
-
-    const normalized = normalizePhone(opts.phone);
     const regionSlug =
       opts.regionSlug && isValidRegionSlug(opts.regionSlug)
         ? opts.regionSlug
         : null;
 
-    let agentUserId: string | null = null;
-    if (regionSlug) {
+    // Агент за мапою область→агент (спільно для нового й наявного клієнта).
+    async function regionAgentId(): Promise<string | null> {
+      if (!regionSlug) return null;
       const ra = await prisma.mgrRegionAgent.findUnique({
         where: { region: regionSlug },
         select: { userId: true },
       });
-      agentUserId = ra?.userId ?? null;
+      return ra?.userId ?? null;
     }
+
+    const match = await matchClientByPhone(opts.phone);
+    if (match) {
+      // Наявний клієнт: бекфіл області (якщо порожня) та агента (якщо не
+      // призначений) з даних, які покупець вказав на сайті. Це закриває кейс
+      // «клієнт вже є, але без агента/області» — раніше вони ігнорувались.
+      let agentUserId = match.agentUserId;
+      if (regionSlug) {
+        const existing = await prisma.mgrClient.findUnique({
+          where: { id: match.clientId },
+          select: { region: true, agentUserId: true },
+        });
+        const updates: { region?: string; agentUserId?: string } = {};
+        if (!existing?.region) {
+          updates.region = getRegionLabel(regionSlug) ?? regionSlug;
+        }
+        if (!existing?.agentUserId) {
+          const rid = await regionAgentId();
+          if (rid) {
+            updates.agentUserId = rid;
+            agentUserId = rid;
+          }
+        }
+        if (Object.keys(updates).length > 0) {
+          await prisma.mgrClient.update({
+            where: { id: match.clientId },
+            data: updates,
+          });
+        }
+      }
+      return { clientId: match.clientId, agentUserId, created: false };
+    }
+
+    const normalized = normalizePhone(opts.phone);
+    const agentUserId = await regionAgentId();
 
     const client = await prisma.mgrClient.create({
       data: {

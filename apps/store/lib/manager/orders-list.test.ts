@@ -256,6 +256,7 @@ describe("serializeOrderRow", () => {
     isActual: false,
     source: "manager",
     agentName: "Петренко П.",
+    assignedAgentUserId: null,
     deliveryMethod: "post",
     createdAt: new Date("2026-05-10T10:00:00Z"),
     customer: {
@@ -263,6 +264,7 @@ describe("serializeOrderRow", () => {
       name: "Test Customer",
       code1C: "000001",
       city: "Луцьк",
+      phone: "+380501112233",
     },
     _count: { items: 3 },
   };
