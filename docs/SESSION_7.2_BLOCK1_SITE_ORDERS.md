@@ -63,6 +63,32 @@ admin/owner).
   Telegram/Viber-сповіщення (`lib/notifications.ts`) тепер лінкують на
   `/manager/orders?source=site`. Дашборд-аналітика замовлень (read-only) лишена.
 
+## Блок 2 — клієнти з сайту → довідник CRM (зроблено)
+
+Рішення user: 1 так (авто-створення), 2 так (видимість за агентом), 3 так
+(прибрати вкладку «Клієнти» з адмінки).
+
+- **`lib/manager/site-client.ts`** (новий): `resolveOrCreateSiteClient` —
+  телефон збігся → наявний MgrClient; інакше створює MgrClient (агент за мапою
+  область→агент) + запис у таймлайн «зареєстрований із сайту». Best-effort.
+- **`app/api/orders/route.ts`:** чекаут кличе `resolveOrCreateSiteClient` (замість
+  inline phone-match+region) → `Order.assignedAgentUserId`.
+- **Фікс видимості (`buildOrdersWhere` + `viewerUserId`):** для менеджера скоуп
+  тепер `OR(власний code1C, assignedAgentUserId === viewer)` через `where.AND`
+  (без viewerUserId — стара поведінка). Прокинуто в GET-роут і page.tsx; знято
+  short-circuit «0 клієнтів → порожньо» (менеджер може бути агентом сайтових
+  замовлень без code1C). `canViewOrder` теж поважає `assignedAgentUserId`.
+- **Прибрано вкладку «Клієнти» з адмінки:** видалено `app/admin/customers/*` +
+  пункт сайдбару.
+- Тести: +viewerUserId-скоуп (buildOrdersWhere) + оновлено 2 GET-тести під
+  AND/OR-скоуп + Block-1 route-тести переведено на мок `resolveOrCreateSiteClient`.
+  917 pass по зачепленій площі; typecheck + prettier чисті. Нових міграцій НЕМАЄ.
+
+**Відомий хвіст:** сайтовий клієнт без `code1C` не показує свої замовлення на
+CRM-картці (order-tab матчить по code1C) — замовлення видно у глобальному списку
+за агентом. Лінк MgrClient↔Order для site-клієнтів — окремий follow-up.
+
 ## Відкрито (наступні кроки плану 7.0)
 
-- Блок 2 (клієнти), Блок 3 (товари/фото в системі), Блок 4 (дашборд візитів).
+- Блок 3 (товари/категорії/фото в системі — потребує рішення по ролях),
+  Блок 4 (дашборд візитів).

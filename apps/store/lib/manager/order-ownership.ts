@@ -55,10 +55,19 @@ export async function canViewOrder(
 
   const order = await prisma.order.findUnique({
     where: { id: orderId },
-    select: { customer: { select: { code1C: true } } },
+    select: {
+      assignedAgentUserId: true,
+      customer: { select: { code1C: true } },
+    },
   });
-  if (!order?.customer?.code1C) return false;
+  if (!order) return false;
 
+  // 7.2 Блок 2: призначений агент бачить замовлення (сайтові — без code1C).
+  if (order.assignedAgentUserId && order.assignedAgentUserId === user.id) {
+    return true;
+  }
+
+  if (!order.customer?.code1C) return false;
   const myCodes = await getMyClientCodes1C(user);
   if (myCodes === null) return true;
   return myCodes.includes(order.customer.code1C);

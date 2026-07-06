@@ -60,11 +60,13 @@ export default async function ManagerOrdersPage({
 
   const myCodes = await getMyClientCodes1C(user);
 
-  // Manager scope з 0 клієнтами / або filter по чужому клієнту → empty
+  // Filter по чужому клієнту → empty (не послаблюємо ownership).
+  // 7.2 Блок 2: 0 клієнтів більше НЕ короткозамикаємо — менеджер може бачити
+  // сайтові замовлення, де він призначений агент (через viewerUserId scope).
   if (
     myCodes !== null &&
-    (myCodes.length === 0 ||
-      (filter.clientCode1C && !myCodes.includes(filter.clientCode1C)))
+    filter.clientCode1C &&
+    !myCodes.includes(filter.clientCode1C)
   ) {
     return renderEmpty(filter.clientCode1C);
   }
@@ -74,6 +76,7 @@ export default async function ManagerOrdersPage({
 
   const where = buildOrdersWhere({
     customerCodes: myCodes,
+    viewerUserId: user.id,
     clientCode1C: filter.clientCode1C || undefined,
     q: filter.search,
     status: filter.status,

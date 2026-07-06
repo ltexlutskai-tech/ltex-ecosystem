@@ -46,6 +46,38 @@ describe("buildOrdersWhere — ownership scope", () => {
     const w = buildOrdersWhere({ customerCodes: null, clientCode1C: "000009" });
     expect(w.customer).toEqual({ code1C: "000009" });
   });
+
+  it("manager + viewerUserId → OR(own code1C, assigned agent) via AND (7.2 Block 2)", () => {
+    const w = buildOrdersWhere({
+      customerCodes: ["000001"],
+      viewerUserId: "u1",
+    });
+    expect(w.customer).toBeUndefined();
+    expect(w.AND).toEqual([
+      {
+        OR: [
+          { customer: { code1C: { in: ["000001"] } } },
+          { assignedAgentUserId: "u1" },
+        ],
+      },
+    ]);
+  });
+
+  it("viewerUserId ignored for admin (null codes)", () => {
+    const w = buildOrdersWhere({ customerCodes: null, viewerUserId: "u1" });
+    expect(w.AND).toBeUndefined();
+    expect(w.customer).toBeUndefined();
+  });
+
+  it("viewerUserId + deeplink → single code1C, no agent OR", () => {
+    const w = buildOrdersWhere({
+      customerCodes: ["000001"],
+      viewerUserId: "u1",
+      clientCode1C: "000001",
+    });
+    expect(w.AND).toBeUndefined();
+    expect(w.customer).toEqual({ code1C: "000001" });
+  });
 });
 
 describe("buildOrdersWhere — archived filter", () => {

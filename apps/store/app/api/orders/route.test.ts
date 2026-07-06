@@ -8,7 +8,7 @@ const h = vi.hoisted(() => {
   return {
     txOrderCreate,
     txLotUpdateMany,
-    mockMatchClientByPhone: vi.fn(),
+    mockResolveOrCreateSiteClient: vi.fn(),
     mockCreateSiteOrderReminders: vi.fn().mockResolvedValue(undefined),
     mockPrisma: {
       lot: { findMany: vi.fn(), updateMany: vi.fn() },
@@ -29,7 +29,7 @@ const h = vi.hoisted(() => {
 const {
   txOrderCreate,
   txLotUpdateMany,
-  mockMatchClientByPhone,
+  mockResolveOrCreateSiteClient,
   mockCreateSiteOrderReminders,
   mockPrisma,
 } = h;
@@ -54,9 +54,10 @@ vi.mock("@/lib/email", () => ({
   sendOrderConfirmationEmail: vi.fn().mockResolvedValue(undefined),
 }));
 
-// Mock Block-1 collaborators
-vi.mock("@/lib/chat/phone-match", () => ({
-  matchClientByPhone: (...a: unknown[]) => h.mockMatchClientByPhone(...a),
+// Mock Block-1/2 collaborators
+vi.mock("@/lib/manager/site-client", () => ({
+  resolveOrCreateSiteClient: (...a: unknown[]) =>
+    h.mockResolveOrCreateSiteClient(...a),
 }));
 vi.mock("@/lib/manager/site-order-reminders", () => ({
   createSiteOrderReminders: (...a: unknown[]) =>
@@ -235,8 +236,12 @@ describe("Order API", () => {
       txOrderCreate.mockResolvedValue({ id: "order-abc123" });
     });
 
-    it("uprecognized client → routes to their agent, draft+site, reserves lot, barcode in notes", async () => {
-      mockMatchClientByPhone.mockResolvedValue({ agentUserId: "agent-9" });
+    it("recognized client → routes to their agent, draft+site, reserves lot, barcode in notes", async () => {
+      mockResolveOrCreateSiteClient.mockResolvedValue({
+        clientId: "cl-1",
+        agentUserId: "agent-9",
+        created: false,
+      });
 
       const res = await POST(makeRequest(validOrder));
       expect(res.status).toBe(201);
@@ -252,10 +257,11 @@ describe("Order API", () => {
       );
     });
 
-    it("new client with region → routes via MgrRegionAgent map", async () => {
-      mockMatchClientByPhone.mockResolvedValue(null);
-      mockPrisma.mgrRegionAgent.findUnique.mockResolvedValue({
-        userId: "agent-region",
+    it("new client with region → resolveOrCreateSiteClient called with regionSlug", async () => {
+      mockResolveOrCreateSiteClient.mockResolvedValue({
+        clientId: "cl-new",
+        agentUserId: "agent-region",
+        created: true,
       });
 
       const res = await POST(
@@ -265,17 +271,20 @@ describe("Order API", () => {
         }),
       );
       expect(res.status).toBe(201);
-      expect(mockPrisma.mgrRegionAgent.findUnique).toHaveBeenCalledWith({
-        where: { region: "volynska" },
-        select: { userId: true },
-      });
+      expect(mockResolveOrCreateSiteClient).toHaveBeenCalledWith(
+        expect.objectContaining({ regionSlug: "volynska" }),
+      );
       expect(txOrderCreate.mock.calls[0]![0].data.assignedAgentUserId).toBe(
         "agent-region",
       );
     });
 
-    it("no phone match, no region → unassigned (null), reminder still fires", async () => {
-      mockMatchClientByPhone.mockResolvedValue(null);
+    it("no agent resolved → unassigned (null), reminder still fires", async () => {
+      mockResolveOrCreateSiteClient.mockResolvedValue({
+        clientId: "cl-x",
+        agentUserId: null,
+        created: true,
+      });
 
       const res = await POST(makeRequest(validOrder));
       expect(res.status).toBe(201);

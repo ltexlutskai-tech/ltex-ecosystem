@@ -121,17 +121,28 @@ describe("GET /api/v1/manager/orders", () => {
     expect(res.status).toBe(401);
   });
 
-  it("returns empty list immediately when manager has 0 clients", async () => {
+  it("manager with 0 clients still queries by agent-scope (7.2 Block 2)", async () => {
+    // Раніше короткозамикали на порожньо; тепер менеджер може бачити сайтові
+    // замовлення, де він призначений агент → запит виконується.
     mockPrisma.mgrClient.findMany.mockResolvedValueOnce([]);
+    mockPrisma.order.findMany.mockResolvedValueOnce([]);
+    mockPrisma.order.count.mockResolvedValueOnce(0);
+
     const res = await GET(req());
     expect(res.status).toBe(200);
     const json = (await res.json()) as { items: unknown[]; total: number };
     expect(json.items).toEqual([]);
-    expect(json.total).toBe(0);
-    expect(mockPrisma.order.findMany).not.toHaveBeenCalled();
+    expect(mockPrisma.order.findMany).toHaveBeenCalled();
+
+    const args = mockPrisma.order.findMany.mock.calls[0]?.[0] as {
+      where: { AND?: Array<{ OR?: Array<Record<string, unknown>> }> };
+    };
+    // Скоуп OR(code1C in [], assignedAgentUserId === viewer) через AND.
+    const scopeOr = args.where.AND?.[0]?.OR;
+    expect(JSON.stringify(scopeOr)).toContain("assignedAgentUserId");
   });
 
-  it("returns orders scoped to manager's clients", async () => {
+  it("returns orders scoped to manager (OR own code1C / assigned agent)", async () => {
     mockPrisma.mgrClient.findMany.mockResolvedValueOnce([
       { code1C: "000001" },
       { code1C: "000002" },
@@ -151,12 +162,18 @@ describe("GET /api/v1/manager/orders", () => {
     expect(json.total).toBe(1);
 
     const findManyArgs = mockPrisma.order.findMany.mock.calls[0]?.[0] as {
-      where: { customer?: { code1C?: { in?: string[] } } };
+      where: {
+        AND?: Array<{
+          OR?: Array<{
+            customer?: { code1C?: { in?: string[] } };
+            assignedAgentUserId?: string;
+          }>;
+        }>;
+      };
     };
-    expect(findManyArgs.where.customer?.code1C?.in).toEqual([
-      "000001",
-      "000002",
-    ]);
+    const scopeOr = findManyArgs.where.AND?.[0]?.OR ?? [];
+    expect(scopeOr[0]?.customer?.code1C?.in).toEqual(["000001", "000002"]);
+    expect(scopeOr[1]?.assignedAgentUserId).toBeDefined();
   });
 
   it("admin sees all orders without scope", async () => {

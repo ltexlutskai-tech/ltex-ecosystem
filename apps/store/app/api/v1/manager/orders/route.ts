@@ -54,13 +54,11 @@ export async function GET(req: NextRequest) {
   const page = parseInteger(url.searchParams.get("page"), 1, 1, 9_999);
   const pageSize = parseInteger(url.searchParams.get("pageSize"), 20, 10, 100);
 
-  // Visibility scope (manager → тільки свої клієнти)
+  // Visibility scope (manager → свої клієнти по code1C АБО призначений агент).
+  // 7.2 Блок 2: НЕ короткозамикаємо на 0 клієнтів — менеджер може бути
+  // призначеним агентом сайтових замовлень (клієнт без code1C).
   const myCodes = await getMyClientCodes1C(user);
   if (myCodes !== null) {
-    // Manager без жодного призначеного клієнта → нічого не видно.
-    if (myCodes.length === 0) {
-      return NextResponse.json({ items: [], total: 0, page, pageSize });
-    }
     // Deeplink по чужому клієнту → нічого не видно (не послаблюємо ownership).
     if (clientCode1C && !myCodes.includes(clientCode1C)) {
       return NextResponse.json({ items: [], total: 0, page, pageSize });
@@ -69,6 +67,7 @@ export async function GET(req: NextRequest) {
 
   const where = buildOrdersWhere({
     customerCodes: myCodes,
+    viewerUserId: user.id,
     clientCode1C: clientCode1C || undefined,
     q: search,
     status,

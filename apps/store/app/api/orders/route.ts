@@ -8,7 +8,7 @@ import {
   type OrderEmailLineItem,
 } from "@/lib/email";
 import { rateLimit, getClientIp } from "@/lib/rate-limit";
-import { matchClientByPhone } from "@/lib/chat/phone-match";
+import { resolveOrCreateSiteClient } from "@/lib/manager/site-client";
 import { createSiteOrderReminders } from "@/lib/manager/site-order-reminders";
 
 export async function POST(request: NextRequest) {
@@ -76,21 +76,17 @@ export async function POST(request: NextRequest) {
     });
   }
 
-  // ─── Маршрутизація на менеджера (7.2 Блок 1, рішення 1A) ──────────────────
-  // 1) упізнаний клієнт (телефон збігся з MgrClient) → його торговий агент;
-  // 2) інакше, якщо вказано область → мапа MgrRegionAgent (регіон→агент);
-  // 3) інакше — без агента (нагадування впаде на admin/owner).
-  let assignedAgentUserId: string | null = null;
-  const phoneMatch = await matchClientByPhone(customer.phone);
-  if (phoneMatch?.agentUserId) {
-    assignedAgentUserId = phoneMatch.agentUserId;
-  } else if (customer.region) {
-    const regionAgent = await prisma.mgrRegionAgent.findUnique({
-      where: { region: customer.region },
-      select: { userId: true },
-    });
-    assignedAgentUserId = regionAgent?.userId ?? null;
-  }
+  // ─── CRM-клієнт + маршрутизація на менеджера (7.2 Блок 1+2) ───────────────
+  // resolve-or-create MgrClient (довідник CRM): упізнаний за телефоном → його
+  // агент; новий → створюємо MgrClient (агент за мапою область→агент) + запис
+  // у таймлайн. Повертає agentUserId → `Order.assignedAgentUserId` (за ним
+  // менеджер бачить сайтове замовлення, навіть без code1C).
+  const siteClient = await resolveOrCreateSiteClient({
+    name: customer.name,
+    phone: customer.phone,
+    regionSlug: customer.region,
+  });
+  const assignedAgentUserId = siteClient.agentUserId;
 
   // ─── Штрихкоди конкретних лотів для складу (рішення 2, гібрид) ────────────
   // Клієнт обрав конкретні лоти → дублюємо їхні штрихкоди у коментар, щоб на

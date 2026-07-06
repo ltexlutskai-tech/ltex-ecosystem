@@ -43,6 +43,14 @@ export interface BuildOrdersWhereParams {
    */
   customerCodes: string[] | null;
   /**
+   * ID менеджера-переглядача (7.2 Блок 2). Коли переданий разом зі скоупом
+   * (`customerCodes !== null`), видимість розширюється: менеджер бачить не лише
+   * замовлення своїх клієнтів (по code1C), а й ті, де він — призначений агент
+   * (`assignedAgentUserId`). Потрібно для сайтових клієнтів без code1C.
+   * Не впливає на admin/analyst (`customerCodes === null`).
+   */
+  viewerUserId?: string;
+  /**
    * Додатковий точковий фільтр по конкретному клієнту (deeplink з картки).
    * Має бути в межах `customerCodes` (перевіряється у викликачі).
    */
@@ -92,10 +100,23 @@ export function buildOrdersWhere(
 ): Prisma.OrderWhereInput {
   const where: Prisma.OrderWhereInput = {};
   const customerWhere: Prisma.CustomerWhereInput = {};
+  const andTerms: Prisma.OrderWhereInput[] = [];
 
   // Скоуп видимості (manager → лише свої клієнти).
+  // 7.2 Блок 2: якщо переданий viewerUserId і це НЕ deeplink по клієнту —
+  // розширюємо скоуп до OR(власний code1C, призначений агент) через AND-терм,
+  // щоб менеджер бачив і сайтові замовлення (клієнт без code1C).
   if (p.customerCodes !== null) {
-    customerWhere.code1C = { in: p.customerCodes };
+    if (p.viewerUserId && !p.clientCode1C) {
+      andTerms.push({
+        OR: [
+          { customer: { code1C: { in: p.customerCodes } } },
+          { assignedAgentUserId: p.viewerUserId },
+        ],
+      });
+    } else {
+      customerWhere.code1C = { in: p.customerCodes };
+    }
   }
   // Точковий клієнт (deeplink) — override `in` на конкретний code1C.
   if (p.clientCode1C) {
@@ -170,6 +191,10 @@ export function buildOrdersWhere(
       ...(p.from ? { gte: p.from } : {}),
       ...(p.to ? { lte: p.to } : {}),
     };
+  }
+
+  if (andTerms.length > 0) {
+    where.AND = andTerms;
   }
 
   return where;
