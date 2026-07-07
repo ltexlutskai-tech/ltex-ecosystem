@@ -142,13 +142,20 @@ describe("createOrderSchema", () => {
     expect(result.success).toBe(true);
   });
 
-  it("відхиляє невалідний deliveryMethod", () => {
-    const result = createOrderSchema.safeParse({
+  it("приймає код доставки з довідника (7.3) та відхиляє задовгий", () => {
+    const ok = createOrderSchema.safeParse({
       customerId: "c1",
       items: [{ productId: "p1", weight: 10, priceEur: 0 }],
-      deliveryMethod: "teleport",
+      deliveryMethod: "nova-poshta",
     });
-    expect(result.success).toBe(false);
+    expect(ok.success).toBe(true);
+
+    const tooLong = createOrderSchema.safeParse({
+      customerId: "c1",
+      items: [{ productId: "p1", weight: 10, priceEur: 0 }],
+      deliveryMethod: "x".repeat(51),
+    });
+    expect(tooLong.success).toBe(false);
   });
 });
 

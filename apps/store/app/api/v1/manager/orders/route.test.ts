@@ -479,8 +479,9 @@ describe("POST /api/v1/manager/orders", () => {
   });
 
   it("відхиляє невалідний deliveryMethod (400)", async () => {
+    // 7.3: коди беруться з довідника (довільний рядок ≤50); задовгий — 400.
     const res = await POST(
-      postReq({ ...validBody, deliveryMethod: "teleport" }),
+      postReq({ ...validBody, deliveryMethod: "x".repeat(51) }),
     );
     expect(res.status).toBe(400);
   });

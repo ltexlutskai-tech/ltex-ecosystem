@@ -8,9 +8,9 @@ import { canViewOrder } from "@/lib/manager/order-ownership";
 import { canEditOrder, isOrderLocked } from "@/lib/manager/order-status";
 import { formatOrderNumber } from "@/lib/manager/order-number";
 import {
-  ORDER_DELIVERY_METHODS,
-  orderDeliveryLabel,
-} from "@/lib/manager/order-delivery";
+  getDeliveryMethodOptions,
+  getDeliveryLabelResolver,
+} from "@/lib/manager/delivery-methods";
 import { OrderForm } from "../new/_components/order-form";
 import { OrderCloseButton } from "./_components/order-close-button";
 import type {
@@ -145,10 +145,11 @@ export default async function ManagerOrderDetailPage({
     ? [mgr.street, mgr.house].filter(Boolean).join(", ") || null
     : null;
 
-  const deliveryMethods = ORDER_DELIVERY_METHODS.map((d) => ({
-    code: d.code,
-    label: d.label,
-  }));
+  // Способи доставки — з редагованого довідника (7.3).
+  const [deliveryMethods, deliveryLabelOf] = await Promise.all([
+    getDeliveryMethodOptions(),
+    getDeliveryLabelResolver(),
+  ]);
 
   const clientSummary: ClientPickerItem = {
     id: order.customer.id,
@@ -289,7 +290,7 @@ export default async function ManagerOrderDetailPage({
       ) : (
         <ReadOnlyOrder
           order={order}
-          deliveryLabel={orderDeliveryLabel(order.deliveryMethod)}
+          deliveryLabel={deliveryLabelOf(order.deliveryMethod)}
           locked={locked}
           soldMap={soldMap}
         />

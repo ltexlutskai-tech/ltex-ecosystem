@@ -2,7 +2,6 @@ import Link from "next/link";
 import { ArrowRight, Check, Minus } from "lucide-react";
 import { SaleStatusBadge } from "./sale-status-badge";
 import { formatDocNumber } from "@/lib/manager/order-number";
-import { deliveryLabel } from "@/lib/manager/order-delivery";
 import type { RowHandlers } from "../../_components/use-list-context-menu";
 
 export interface SalesRowData {
@@ -17,6 +16,8 @@ export interface SalesRowData {
   isActual: boolean;
   agentName: string | null;
   deliveryMethod: string | null;
+  /** Лейбл способу доставки — резолвиться на сервері (довідник, 7.3). */
+  deliveryLabel: string;
   expressWaybill: string | null;
   itemCount: number;
   createdAt: Date;
@@ -125,10 +126,10 @@ export function SalesRow({
       </td>
       <td
         data-col="delivery"
-        data-value={deliveryLabel(sale.deliveryMethod)}
+        data-value={sale.deliveryLabel}
         className={`px-2.5 py-1.5 text-sm ${dimmed ? "text-gray-400" : "text-gray-600"}`}
       >
-        {deliveryLabel(sale.deliveryMethod)}
+        {sale.deliveryLabel}
       </td>
       <td
         data-col="waybill"

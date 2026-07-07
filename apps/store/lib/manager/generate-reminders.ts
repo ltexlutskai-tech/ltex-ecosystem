@@ -1,4 +1,5 @@
 import { prisma } from "@ltex/db";
+import { getDeliveryLikeCodes } from "./delivery-methods";
 
 /**
  * Авто-генеровані нагадування (блок «Нагадування», Етап 4).
@@ -260,6 +261,10 @@ export async function detectOverdueOrders(
   });
   if (orders.length === 0) return { remindersCreated: 0, escalated: 0 };
 
+  // Коди «доставки» (легасі delivery + записи довідника з «достав» у назві) —
+  // для них інтервал 7 днів; пошта/самовивіз/решта → 3 дні (7.3).
+  const deliveryLikeCodes = await getDeliveryLikeCodes();
+
   // Знаходимо supervisor-ів один раз для ескалацій
   const supervisors = await prisma.user.findMany({
     where: {
@@ -275,7 +280,8 @@ export async function detectOverdueOrders(
   for (const o of orders) {
     if (!o.assignedAgentUserId) continue;
     // Інтервал нагадувань залежить від типу доставки
-    const intervalDays = o.deliveryMethod === "delivery" ? 7 : 3; // post|pickup → 3, delivery → 7
+    const intervalDays =
+      o.deliveryMethod && deliveryLikeCodes.has(o.deliveryMethod) ? 7 : 3;
     const lastBase = o.lastReminderAt ?? o.createdAt;
     const sinceLast = now.getTime() - lastBase.getTime();
     const shouldRemind = sinceLast >= intervalDays * DAY_MS;

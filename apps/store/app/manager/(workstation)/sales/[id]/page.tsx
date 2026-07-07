@@ -7,9 +7,9 @@ import { getCurrentRate } from "@/lib/exchange-rate";
 import { canViewSale } from "@/lib/manager/sale-ownership";
 import { canEditSale, isSaleLocked } from "@/lib/manager/sale-status";
 import {
-  ORDER_DELIVERY_METHODS,
-  orderDeliveryLabel,
-} from "@/lib/manager/order-delivery";
+  getDeliveryMethodOptions,
+  getDeliveryLabelResolver,
+} from "@/lib/manager/delivery-methods";
 import { formatDocNumber, formatOrderNumber } from "@/lib/manager/order-number";
 import { SaleForm } from "../new/_components/sale-form";
 import type {
@@ -149,10 +149,11 @@ export default async function ManagerSaleDetailPage({
     ? [mgr.street, mgr.house].filter(Boolean).join(", ") || null
     : null;
 
-  const deliveryMethods = ORDER_DELIVERY_METHODS.map((d) => ({
-    code: d.code,
-    label: d.label,
-  }));
+  // Способи доставки — з редагованого довідника (7.3).
+  const [deliveryMethods, deliveryLabelOf] = await Promise.all([
+    getDeliveryMethodOptions(),
+    getDeliveryLabelResolver(),
+  ]);
 
   const clientSummary: ClientPickerItem = {
     id: sale.customer.id,
@@ -299,7 +300,7 @@ export default async function ManagerSaleDetailPage({
       ) : (
         <ReadOnlySale
           sale={sale}
-          deliveryLabel={orderDeliveryLabel(sale.deliveryMethod)}
+          deliveryLabel={deliveryLabelOf(sale.deliveryMethod)}
           locked={locked}
         />
       )}

@@ -9,6 +9,7 @@ import {
   orderRowInclude,
   serializeOrderRow,
 } from "@/lib/manager/orders-list";
+import { getDeliveryLabelResolver } from "@/lib/manager/delivery-methods";
 import { EmptyState } from "../_components/empty-state";
 import { ListPagination } from "../customers/_components/list-pagination";
 import { OrdersTable } from "./_components/orders-table";
@@ -103,7 +104,12 @@ export default async function ManagerOrdersPage({
 
   const totalPages = Math.max(1, Math.ceil(total / filter.pageSize));
 
-  const rows = items.map((o) => serializeOrderRow(o));
+  // Лейбл способу доставки — з довідника (7.3), резолвиться на сервері.
+  const deliveryLabelOf = await getDeliveryLabelResolver();
+  const rows = items.map((o) => ({
+    ...serializeOrderRow(o),
+    deliveryLabel: deliveryLabelOf(o.deliveryMethod),
+  }));
 
   // Область клієнта — batch-lookup з MgrClient (Customer не має region).
   // За code1C, а для сайтових клієнтів без code1C — за телефоном (7.2 фікс).

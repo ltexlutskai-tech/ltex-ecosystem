@@ -1,5 +1,4 @@
 import { z } from "zod";
-import { ORDER_DELIVERY_CODES } from "@/lib/manager/order-delivery";
 import { MANAGER_ORDER_STATUSES } from "@/lib/manager/order-status";
 
 /**
@@ -30,11 +29,8 @@ export const createOrderSchema = z.object({
   // ─── Manager order fields (← 1С Document.Заказ, Етап 1) ──────────────────
   /** Тип цін — `MgrPriceType.id` (рядки перераховуються за ним у UI). */
   priceTypeId: z.string().min(1).nullable().optional(),
-  /** Спосіб доставки — delivery|post|pickup. */
-  deliveryMethod: z
-    .enum(ORDER_DELIVERY_CODES as [string, ...string[]])
-    .nullable()
-    .optional(),
+  /** Спосіб доставки — код запису довідника «Способи доставки» (7.3). */
+  deliveryMethod: z.string().max(50).nullable().optional(),
   /** Наложка (післяплата). */
   cashOnDelivery: z.boolean().optional().default(false),
   /** Торговий агент, кому зараховано продаж (`User.id`); дефолт — поточний. */
@@ -73,10 +69,7 @@ export const updateOrderSchema = z.object({
 
   // ─── Manager order fields (← 1С Document.Заказ, Етап 1) ──────────────────
   priceTypeId: z.string().min(1).nullable().optional(),
-  deliveryMethod: z
-    .enum(ORDER_DELIVERY_CODES as [string, ...string[]])
-    .nullable()
-    .optional(),
+  deliveryMethod: z.string().max(50).nullable().optional(),
   cashOnDelivery: z.boolean().optional().default(false),
   assignedAgentUserId: z.string().min(1).nullable().optional(),
   /** Deprecated — див. createOrderSchema. Лишено опційним для back-compat. */

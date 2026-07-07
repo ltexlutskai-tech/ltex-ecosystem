@@ -9,6 +9,7 @@ import {
   saleRowInclude,
   serializeSaleRow,
 } from "@/lib/manager/sales-list";
+import { getDeliveryLabelResolver } from "@/lib/manager/delivery-methods";
 import { EmptyState } from "../_components/empty-state";
 import { ListPagination } from "../customers/_components/list-pagination";
 import { SalesTable } from "./_components/sales-table";
@@ -100,7 +101,12 @@ export default async function ManagerSalesPage({
 
   const totalPages = Math.max(1, Math.ceil(total / filter.pageSize));
 
-  const rows = items.map((s) => serializeSaleRow(s));
+  // Лейбл способу доставки — з довідника (7.3), резолвиться на сервері.
+  const deliveryLabelOf = await getDeliveryLabelResolver();
+  const rows = items.map((s) => ({
+    ...serializeSaleRow(s),
+    deliveryLabel: deliveryLabelOf(s.deliveryMethod),
+  }));
 
   // Область клієнта — окремий batch-lookup (Customer не має region; беремо з
   // MgrClient за спільним ключем code1C).

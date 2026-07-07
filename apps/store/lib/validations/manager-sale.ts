@@ -1,5 +1,4 @@
 import { z } from "zod";
-import { ORDER_DELIVERY_CODES } from "@/lib/manager/order-delivery";
 import { MANAGER_SALE_STATUSES } from "@/lib/manager/sale-status";
 
 /**
@@ -44,11 +43,8 @@ export const createSaleSchema = z.object({
   // ─── Manager sale fields (← 1С Document.РеализацияТоваровУслуг) ───────────
   /** Тип цін — `MgrPriceType.id` (рядки перераховуються за ним у UI). */
   priceTypeId: z.string().min(1).nullable().optional(),
-  /** Спосіб доставки — delivery|post|pickup. */
-  deliveryMethod: z
-    .enum(ORDER_DELIVERY_CODES as [string, ...string[]])
-    .nullable()
-    .optional(),
+  /** Спосіб доставки — код запису довідника «Способи доставки» (7.3). */
+  deliveryMethod: z.string().max(50).nullable().optional(),
   /** № відділення Нової Пошти. */
   novaPoshtaBranch: z.string().max(20).nullable().optional(),
   /** Наложка (післяплата). */
@@ -93,10 +89,7 @@ export const updateSaleSchema = z.object({
 
   // ─── Manager sale fields ──────────────────────────────────────────────────
   priceTypeId: z.string().min(1).nullable().optional(),
-  deliveryMethod: z
-    .enum(ORDER_DELIVERY_CODES as [string, ...string[]])
-    .nullable()
-    .optional(),
+  deliveryMethod: z.string().max(50).nullable().optional(),
   novaPoshtaBranch: z.string().max(20).nullable().optional(),
   cashOnDelivery: z.boolean().optional().default(false),
   assignedAgentUserId: z.string().min(1).nullable().optional(),

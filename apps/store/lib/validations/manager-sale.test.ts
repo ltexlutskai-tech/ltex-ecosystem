@@ -129,13 +129,20 @@ describe("createSaleSchema", () => {
     expect(result.exportTo1C).toBe(true);
   });
 
-  it("відхиляє невалідний deliveryMethod", () => {
-    const result = createSaleSchema.safeParse({
+  it("приймає код доставки з довідника (7.3) та відхиляє задовгий", () => {
+    const ok = createSaleSchema.safeParse({
       customerId: "c1",
       items: [minimalItem],
-      deliveryMethod: "teleport",
+      deliveryMethod: "nova-poshta",
     });
-    expect(result.success).toBe(false);
+    expect(ok.success).toBe(true);
+
+    const tooLong = createSaleSchema.safeParse({
+      customerId: "c1",
+      items: [minimalItem],
+      deliveryMethod: "x".repeat(51),
+    });
+    expect(tooLong.success).toBe(false);
   });
 
   it("приймає deliveryMethod null", () => {

@@ -4,7 +4,7 @@ import { ArrowLeft } from "lucide-react";
 import { prisma } from "@ltex/db";
 import { getCurrentUser } from "@/lib/auth/manager-auth";
 import { getCurrentRate } from "@/lib/exchange-rate";
-import { ORDER_DELIVERY_METHODS } from "@/lib/manager/order-delivery";
+import { getDeliveryMethodOptions } from "@/lib/manager/delivery-methods";
 import { SaleForm } from "./_components/sale-form";
 import type { ClientPickerItem } from "./_components/sale-types";
 
@@ -107,10 +107,8 @@ export default async function NewSalePage({
     }),
   ]);
 
-  const deliveryMethods = ORDER_DELIVERY_METHODS.map((d) => ({
-    code: d.code,
-    label: d.label,
-  }));
+  // Способи доставки — з редагованого довідника (7.3).
+  const deliveryMethods = await getDeliveryMethodOptions();
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">
