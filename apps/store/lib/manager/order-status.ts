@@ -99,20 +99,26 @@ export function isManagerOrderStatus(
 }
 
 /**
- * Замовлення «проведене» (заблоковане для будь-яких змін — шапка/товари/статус).
- * Тільки `posted`.
+ * Замовлення «проведене» (`posted`). Само по собі проведення НЕ блокує
+ * редагування (7.3) — блокує лише зняте «Актуальне» (див. `canEditOrder`).
  */
 export function isOrderLocked(status: string): boolean {
   return status === "posted";
 }
 
 /**
- * Чи можна редагувати шапку/товари замовлення у цьому статусі.
- * Заблоковані: `posted` (проведено в 1С) та `cancelled` (скасоване —
- * лише перегляд, поки не повернуть у чернетку).
+ * Чи можна редагувати шапку/товари замовлення.
+ *
+ * 7.3 (рішення user): проведене (`posted`) замовлення редагується, але ЛИШЕ
+ * поки воно «Актуальне». Знято «Актуальне» — read-only (поверніть актуальність,
+ * щоб редагувати). Скасоване (`cancelled`) — завжди лише перегляд.
+ *
+ * @param isActual — прапор `Order.isActual`. Для чернетки/legacy не впливає.
  */
-export function canEditOrder(status: string): boolean {
-  return !isOrderLocked(status) && status !== "cancelled";
+export function canEditOrder(status: string, isActual = true): boolean {
+  if (status === "cancelled") return false;
+  if (isOrderLocked(status)) return isActual === true;
+  return true;
 }
 
 /**

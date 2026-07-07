@@ -5,7 +5,16 @@ import { Prisma, prisma } from "@ltex/db";
 import { getCurrentUser } from "@/lib/auth/manager-auth";
 import { canDeleteManagerDoc } from "@/lib/manager/doc-delete-permission";
 import { canViewOrder } from "@/lib/manager/order-ownership";
-import { isOrderLocked, isTransitionAllowed } from "@/lib/manager/order-status";
+import {
+  canEditOrder,
+  isOrderLocked,
+  isTransitionAllowed,
+} from "@/lib/manager/order-status";
+import {
+  findOtherActiveOrder,
+  canForceActive,
+} from "@/lib/manager/order-active-guard";
+import { formatOrderNumber } from "@/lib/manager/order-number";
 import { updateOrderSchema } from "@/lib/validations/manager-order";
 import { updateOrderWithItems } from "@/lib/manager/order-create";
 import { completeSiteOrderReminders } from "@/lib/manager/site-order-reminders";
@@ -107,6 +116,8 @@ export async function PATCH(
       updatedAt: true,
       closedAt: true,
       archived: true,
+      isActual: true,
+      customerId: true,
     },
   });
   if (!existing) {
@@ -126,39 +137,81 @@ export async function PATCH(
 
   const body = await req.json().catch(() => null);
 
-  // Проведене замовлення (`posted`) заблоковане для змін шапки/товарів.
-  // Виняток (7.3, як у 1С): перемикання «Актуальне» — окремим запитом
-  // `{ isActual: boolean }` (актуальність проведеного замовлення керована).
-  if (isOrderLocked(existing.status)) {
-    const actualOnly = z
-      .object({ isActual: z.boolean() })
-      .strict()
-      .safeParse(body);
-    if (!actualOnly.success) {
-      return NextResponse.json(
-        {
-          error:
-            "Замовлення проведено — редагування заборонено (можна лише змінити «Актуальне»)",
-        },
-        { status: 409 },
-      );
+  // ─── Вузьке перемикання «Актуальне» (7.3) ────────────────────────────────
+  // Тіло рівно `{ isActual: boolean }` (кнопка-перемикач на картці/у списку).
+  // Обробляється окремо від повного редагування — працює й для проведених.
+  const actualOnly = z
+    .object({ isActual: z.boolean() })
+    .strict()
+    .safeParse(body);
+  if (actualOnly.success) {
+    const next = actualOnly.data.isActual;
+    if (next === true) {
+      if (existing.archived) {
+        return NextResponse.json(
+          { error: "Архівне замовлення не може бути актуальним" },
+          { status: 400 },
+        );
+      }
+      // Guard «одне активне на клієнта»: не можна мати 2 актуальні.
+      const other = await findOtherActiveOrder(existing.customerId, id);
+      const force = req.nextUrl.searchParams.get("force") === "true";
+      if (other && !force) {
+        return NextResponse.json(
+          {
+            code: "active_order_exists",
+            existingOrderId: other.id,
+            existingOrderNumber: formatOrderNumber(other),
+          },
+          { status: 409 },
+        );
+      }
+      if (other && force && !canForceActive(user.role)) {
+        return NextResponse.json(
+          {
+            error:
+              "Лише адмін/власник може мати два активні замовлення на клієнта",
+          },
+          { status: 403 },
+        );
+      }
+      const updated = await prisma.$transaction(async (tx) => {
+        if (other && force) {
+          await tx.order.update({
+            where: { id: other.id },
+            data: { isActual: false },
+          });
+        }
+        return tx.order.update({
+          where: { id },
+          data: { isActual: true, version: { increment: 1 } },
+          select: { id: true, status: true, isActual: true, version: true },
+        });
+      });
+      revalidatePath("/manager/orders");
+      return NextResponse.json(updated);
     }
-    if (actualOnly.data.isActual === true && existing.archived) {
-      return NextResponse.json(
-        { error: "Архівне замовлення не може бути актуальним" },
-        { status: 400 },
-      );
-    }
+    // Зняти «Актуальне» — завжди дозволено.
     const updated = await prisma.order.update({
       where: { id },
-      data: {
-        isActual: actualOnly.data.isActual,
-        version: { increment: 1 },
-      },
+      data: { isActual: false, version: { increment: 1 } },
       select: { id: true, status: true, isActual: true, version: true },
     });
     revalidatePath("/manager/orders");
     return NextResponse.json(updated);
+  }
+
+  // ─── Повне редагування (форма) ───────────────────────────────────────────
+  // Проведене редагується лише поки «Актуальне»; скасоване — ні (7.3).
+  if (!canEditOrder(existing.status, existing.isActual)) {
+    return NextResponse.json(
+      {
+        error: isOrderLocked(existing.status)
+          ? "Замовлення проведено і не актуальне — поверніть «Актуальне», щоб редагувати"
+          : "Скасоване замовлення не редагується",
+      },
+      { status: 409 },
+    );
   }
 
   const parsed = updateOrderSchema.safeParse(body);

@@ -20,6 +20,9 @@ export function ClientPicker({
   const [open, setOpen] = useState(false);
   const [results, setResults] = useState<ClientPickerItem[]>([]);
   const [loading, setLoading] = useState(false);
+  // Режим списку (7.3): «Мої клієнти» за замовчуванням / «Всі клієнти».
+  const [onlyMine, setOnlyMine] = useState(true);
+  const [viewerIsAdmin, setViewerIsAdmin] = useState(false);
   const [selected, setSelected] = useState<ClientPickerItem | null>(
     initialSummary ?? null,
   );
@@ -27,7 +30,14 @@ export function ClientPicker({
   const abortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
-    if (!open || debouncedQuery.length < 2) {
+    if (!open) {
+      setResults([]);
+      return;
+    }
+    // «Мої клієнти» показуємо одразу (навіть без запиту); у режимі «Всі»
+    // для пошуку потрібно ≥2 символи (щоб не тягнути весь довідник).
+    const q = debouncedQuery.trim();
+    if (!onlyMine && q.length < 2) {
       setResults([]);
       return;
     }
@@ -35,13 +45,20 @@ export function ClientPicker({
     const controller = new AbortController();
     abortRef.current = controller;
     setLoading(true);
-    fetch(
-      `/api/v1/manager/clients/search-all?q=${encodeURIComponent(debouncedQuery)}&pageSize=20`,
-      { signal: controller.signal },
-    )
+    const params = new URLSearchParams({ pageSize: "30" });
+    if (q.length >= 2) params.set("q", q);
+    if (onlyMine) params.set("onlyMine", "true");
+    fetch(`/api/v1/manager/clients/search-all?${params.toString()}`, {
+      signal: controller.signal,
+    })
       .then((r) => r.json())
-      .then((json: { items: ClientPickerItem[] }) => {
+      .then((json: { items: ClientPickerItem[]; viewerIsAdmin?: boolean }) => {
         setResults(json.items ?? []);
+        if (typeof json.viewerIsAdmin === "boolean") {
+          setViewerIsAdmin(json.viewerIsAdmin);
+          // Admin не має «своїх» → одразу перемикаємо на «Всі».
+          if (json.viewerIsAdmin && onlyMine) setOnlyMine(false);
+        }
       })
       .catch((e: unknown) => {
         if ((e as { name?: string }).name !== "AbortError") {
@@ -50,7 +67,7 @@ export function ClientPicker({
       })
       .finally(() => setLoading(false));
     return () => controller.abort();
-  }, [debouncedQuery, open]);
+  }, [debouncedQuery, open, onlyMine]);
 
   function selectItem(item: ClientPickerItem): void {
     setSelected(item);
@@ -111,6 +128,39 @@ export function ClientPicker({
   return (
     <div className="space-y-2">
       <label className="text-sm font-medium text-gray-700">Клієнт</label>
+      {/* Перемикач «Мої / Всі клієнти» (7.3). Для admin — прихований. */}
+      {!viewerIsAdmin && (
+        <div className="inline-flex overflow-hidden rounded-md border text-xs">
+          <button
+            type="button"
+            onClick={() => {
+              setOnlyMine(true);
+              setOpen(true);
+            }}
+            className={
+              onlyMine
+                ? "bg-green-600 px-3 py-1 font-medium text-white"
+                : "px-3 py-1 text-gray-600 hover:bg-gray-100"
+            }
+          >
+            Мої клієнти
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setOnlyMine(false);
+              setOpen(true);
+            }}
+            className={
+              !onlyMine
+                ? "bg-green-600 px-3 py-1 font-medium text-white"
+                : "px-3 py-1 text-gray-600 hover:bg-gray-100"
+            }
+          >
+            Всі клієнти
+          </button>
+        </div>
+      )}
       <div className="relative">
         <Search className="pointer-events-none absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
         <Input
@@ -122,7 +172,11 @@ export function ClientPicker({
             setQuery(e.target.value);
             setOpen(true);
           }}
-          placeholder="Шукати клієнта за іменем, ТТ, кодом або містом…"
+          placeholder={
+            onlyMine
+              ? "Мої клієнти — почніть вводити для пошуку…"
+              : "Шукати клієнта за іменем, ТТ, кодом або містом…"
+          }
           className="pl-8"
         />
         {query && (
@@ -139,10 +193,22 @@ export function ClientPicker({
       {open && (
         <div className="max-h-80 overflow-y-auto rounded-lg border bg-white shadow-sm">
           {loading && <div className="p-3 text-sm text-gray-500">Пошук…</div>}
-          {!loading && results.length === 0 && debouncedQuery.length >= 2 && (
-            <div className="p-3 text-sm text-gray-500">Нічого не знайдено</div>
+          {!loading && results.length === 0 && onlyMine && (
+            <div className="p-3 text-sm text-gray-500">
+              {debouncedQuery.trim().length >= 2
+                ? "Серед ваших клієнтів нічого не знайдено. Перемкніть на «Всі клієнти»."
+                : "У вас поки немає клієнтів. Перемкніть на «Всі клієнти»."}
+            </div>
           )}
-          {!loading && debouncedQuery.length < 2 && (
+          {!loading &&
+            results.length === 0 &&
+            !onlyMine &&
+            debouncedQuery.trim().length >= 2 && (
+              <div className="p-3 text-sm text-gray-500">
+                Нічого не знайдено
+              </div>
+            )}
+          {!loading && !onlyMine && debouncedQuery.trim().length < 2 && (
             <div className="p-3 text-xs text-gray-400">
               Введіть мінімум 2 символи
             </div>

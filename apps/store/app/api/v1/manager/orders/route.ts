@@ -11,6 +11,11 @@ import {
 import { createOrderSchema } from "@/lib/validations/manager-order";
 import { createOrderWithItems } from "@/lib/manager/order-create";
 import {
+  findOtherActiveOrder,
+  canForceActive,
+} from "@/lib/manager/order-active-guard";
+import { formatOrderNumber } from "@/lib/manager/order-number";
+import {
   resolveCustomerForOrder,
   ResolveCustomerError,
 } from "@/lib/manager/resolve-customer";
@@ -147,31 +152,21 @@ export async function POST(req: NextRequest) {
   const force =
     url.searchParams.get("force") === "true" || input.force === true;
 
-  const existingActive = await prisma.order.findFirst({
-    where: {
-      customerId: customer.id,
-      isActual: true,
-      archived: false,
-      closedAt: null,
-    },
-    select: { id: true, code1C: true },
-  });
+  const existingActive = await findOtherActiveOrder(customer.id);
 
   if (existingActive && !force) {
     return NextResponse.json(
       {
         code: "active_order_exists",
         existingOrderId: existingActive.id,
-        existingOrderNumber:
-          existingActive.code1C ?? `№${existingActive.id.slice(0, 8)}`,
+        existingOrderNumber: formatOrderNumber(existingActive),
       },
       { status: 409 },
     );
   }
 
   // Force дозволено лише привілейованим ролям.
-  const CAN_FORCE_ROLES = ["admin", "owner", "senior_manager"] as const;
-  const canForce = (CAN_FORCE_ROLES as readonly string[]).includes(user.role);
+  const canForce = canForceActive(user.role);
   if (existingActive && force && !canForce) {
     return NextResponse.json(
       { error: "Лише адмін/власник може створити друге активне замовлення" },

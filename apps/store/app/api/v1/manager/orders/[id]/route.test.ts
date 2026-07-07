@@ -9,6 +9,7 @@ const {
   getCurrentUserMock,
   canViewOrderMock,
   updateOrderWithItemsMock,
+  findOtherActiveOrderMock,
   FakePrismaError,
 } = vi.hoisted(() => {
   class FakePrismaError extends Error {
@@ -18,13 +19,22 @@ const {
       this.code = code;
     }
   }
+  const orderUpdate = vi.fn();
   return {
     mockPrisma: {
-      order: { findUnique: vi.fn(), delete: vi.fn() },
+      order: {
+        findUnique: vi.fn(),
+        delete: vi.fn(),
+        update: orderUpdate,
+      },
+      $transaction: vi.fn(async (cb: (tx: unknown) => unknown) =>
+        cb({ order: { update: orderUpdate } }),
+      ),
     },
     getCurrentUserMock: vi.fn(),
     canViewOrderMock: vi.fn(),
     updateOrderWithItemsMock: vi.fn(),
+    findOtherActiveOrderMock: vi.fn(),
     FakePrismaError,
   };
 });
@@ -45,6 +55,16 @@ vi.mock("@/lib/manager/order-create", () => ({
   updateOrderWithItems: (...args: unknown[]) =>
     updateOrderWithItemsMock(...args),
 }));
+vi.mock("@/lib/manager/order-active-guard", async () => {
+  const actual = await vi.importActual<
+    typeof import("@/lib/manager/order-active-guard")
+  >("@/lib/manager/order-active-guard");
+  return {
+    ...actual,
+    findOtherActiveOrder: (...args: unknown[]) =>
+      findOtherActiveOrderMock(...args),
+  };
+});
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 
 import { GET, PATCH, DELETE } from "./route";
@@ -208,16 +228,31 @@ describe("PATCH /api/v1/manager/orders/[id]", () => {
     expect(res.status).toBe(404);
   });
 
-  it("returns 409 when order is posted (locked in 1C)", async () => {
+  it("returns 409 коли проведене замовлення НЕ актуальне (7.3)", async () => {
     mockPrisma.order.findUnique.mockResolvedValueOnce({
       id: "ord1",
       status: "posted",
+      isActual: false,
     });
     const res = await PATCH(patchReq(VALID_PATCH_BODY), {
       params: Promise.resolve({ id: "ord1" }),
     });
     expect(res.status).toBe(409);
     expect(updateOrderWithItemsMock).not.toHaveBeenCalled();
+  });
+
+  it("дозволяє редагувати проведене замовлення поки воно «Актуальне» (7.3)", async () => {
+    mockPrisma.order.findUnique.mockResolvedValueOnce({
+      id: "ord1",
+      status: "posted",
+      isActual: true,
+    });
+    updateOrderWithItemsMock.mockResolvedValueOnce(fakeUpdatedOrder());
+    const res = await PATCH(patchReq(VALID_PATCH_BODY), {
+      params: Promise.resolve({ id: "ord1" }),
+    });
+    expect(res.status).toBe(200);
+    expect(updateOrderWithItemsMock).toHaveBeenCalledOnce();
   });
 
   it("returns 400 on invalid body (empty items)", async () => {
@@ -388,6 +423,74 @@ describe("PATCH /api/v1/manager/orders/[id]", () => {
     });
     expect(res.status).toBe(400);
     expect(updateOrderWithItemsMock).not.toHaveBeenCalled();
+  });
+
+  // ─── Вузьке перемикання «Актуальне» (7.3) ────────────────────────────────
+  it("toggle {isActual:true} → 200 коли у клієнта немає інших активних", async () => {
+    mockPrisma.order.findUnique.mockResolvedValueOnce({
+      id: "ord1",
+      status: "posted",
+      archived: false,
+      closedAt: null,
+      isActual: false,
+      customerId: "cust1",
+    });
+    findOtherActiveOrderMock.mockResolvedValueOnce(null);
+    mockPrisma.order.update.mockResolvedValueOnce({
+      id: "ord1",
+      status: "posted",
+      isActual: true,
+      version: 2,
+    });
+    const res = await PATCH(patchReq({ isActual: true }), {
+      params: Promise.resolve({ id: "ord1" }),
+    });
+    expect(res.status).toBe(200);
+    expect(updateOrderWithItemsMock).not.toHaveBeenCalled();
+  });
+
+  it("toggle {isActual:true} → 409 коли у клієнта вже є активне замовлення", async () => {
+    mockPrisma.order.findUnique.mockResolvedValueOnce({
+      id: "ord1",
+      status: "posted",
+      archived: false,
+      closedAt: null,
+      isActual: false,
+      customerId: "cust1",
+    });
+    findOtherActiveOrderMock.mockResolvedValueOnce({
+      id: "ord2",
+      code1C: null,
+      number1C: "L0000000777",
+    });
+    const res = await PATCH(patchReq({ isActual: true }), {
+      params: Promise.resolve({ id: "ord1" }),
+    });
+    expect(res.status).toBe(409);
+    const json = (await res.json()) as { code: string };
+    expect(json.code).toBe("active_order_exists");
+  });
+
+  it("toggle {isActual:false} → 200 (зняти актуальність завжди можна)", async () => {
+    mockPrisma.order.findUnique.mockResolvedValueOnce({
+      id: "ord1",
+      status: "posted",
+      archived: false,
+      closedAt: null,
+      isActual: true,
+      customerId: "cust1",
+    });
+    mockPrisma.order.update.mockResolvedValueOnce({
+      id: "ord1",
+      status: "posted",
+      isActual: false,
+      version: 2,
+    });
+    const res = await PATCH(patchReq({ isActual: false }), {
+      params: Promise.resolve({ id: "ord1" }),
+    });
+    expect(res.status).toBe(200);
+    expect(findOtherActiveOrderMock).not.toHaveBeenCalled();
   });
 
   it("returns 400 on FK violation (Prisma P2003)", async () => {

@@ -115,7 +115,10 @@ export default async function ManagerOrderDetailPage({
       })
     : null;
 
-  const editable = canEditOrder(order.status) && !order.closedAt;
+  // 7.3: проведене замовлення редагується лише поки «Актуальне».
+  const editable =
+    canEditOrder(order.status, order.isActual) && !order.closedAt;
+  // «Заблоковане для форми» — проведене (незалежно від актуальності), закрите.
   const locked = isOrderLocked(order.status) || !!order.closedAt;
 
   // Допоміжні дані для форми (тільки коли редагуємо).

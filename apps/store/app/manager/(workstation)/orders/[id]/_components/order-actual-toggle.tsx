@@ -33,7 +33,18 @@ export function OrderActualToggle({
       if (!res.ok) {
         const body = (await res.json().catch(() => ({}))) as {
           error?: string;
+          code?: string;
+          existingOrderNumber?: string;
         };
+        // Guard «одне активне на клієнта» — інше замовлення вже актуальне.
+        if (body.code === "active_order_exists") {
+          setError(
+            `У клієнта вже є активне замовлення ${
+              body.existingOrderNumber ?? ""
+            }. Спершу зніміть з нього «Актуальне».`,
+          );
+          return;
+        }
         setError(body.error ?? `Помилка ${res.status}`);
         return;
       }

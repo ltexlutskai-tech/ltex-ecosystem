@@ -105,15 +105,11 @@ export async function POST(
         version: { increment: 1 },
       },
     });
-    // Закрити прив'язані auto-нагадування (якщо є)
+    // Закрити прив'язані до цього замовлення авто-нагадування (сайтове
+    // замовлення / «реалізація закрила замовлення» тощо) — далі не потрібні.
     await tx.mgrReminder.updateMany({
-      where: {
-        completedAt: null,
-        // Якщо у вас будуть нагадування з orderId — додамо умову. Поки не маємо
-        // прямого FK у MgrReminder.orderId, нагадування пов'язані лише через
-        // body-текст. Розширити пізніше при додаванні MgrReminder.orderId.
-      },
-      data: {},
+      where: { orderId: id, completedAt: null },
+      data: { completedAt: new Date() },
     });
   });
 

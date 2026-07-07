@@ -26,8 +26,11 @@ export async function GET(req: NextRequest) {
 
   const url = new URL(req.url);
   const q = url.searchParams.get("q")?.trim() ?? "";
+  const onlyMine = url.searchParams.get("onlyMine") === "true";
   const page = clampInt(url.searchParams.get("page"), 1, 1, 9_999);
   const pageSize = clampInt(url.searchParams.get("pageSize"), 20, 5, 50);
+
+  const ownedIds = await getOwnedClientIds(user);
 
   const where: Prisma.MgrClientWhereInput = {};
   if (q.length > 0) {
@@ -40,8 +43,11 @@ export async function GET(req: NextRequest) {
       { phones: { some: { phone: { contains: q } } } },
     ];
   }
-
-  const ownedIds = await getOwnedClientIds(user);
+  // «Мої клієнти» (7.3): фільтр по власних. Для admin (ownedIds=null) поняття
+  // «свої» немає — режим ігнорується, повертаємо всіх.
+  if (onlyMine && ownedIds !== null) {
+    where.id = { in: [...ownedIds] };
+  }
 
   const [total, rows] = await Promise.all([
     prisma.mgrClient.count({ where }),
@@ -94,6 +100,8 @@ export async function GET(req: NextRequest) {
     page,
     pageSize,
     totalPages: Math.max(1, Math.ceil(total / pageSize)),
+    // Admin не має поняття «свої» → пікер ховає перемикач «Мої/Всі».
+    viewerIsAdmin: ownedIds === null,
   });
 }
 

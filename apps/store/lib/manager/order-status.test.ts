@@ -55,9 +55,11 @@ describe("isManagerOrderStatus", () => {
 });
 
 describe("isOrderLocked / canEditOrder", () => {
-  it("posted is locked and not editable", () => {
+  it("posted редагується лише поки «Актуальне» (7.3)", () => {
     expect(isOrderLocked("posted")).toBe(true);
-    expect(canEditOrder("posted")).toBe(false);
+    // posted + актуальне → редагується; posted + неактуальне → ні.
+    expect(canEditOrder("posted", true)).toBe(true);
+    expect(canEditOrder("posted", false)).toBe(false);
   });
   it("cancelled is not locked but not editable", () => {
     expect(isOrderLocked("cancelled")).toBe(false);

@@ -5,6 +5,7 @@ import {
   recordClientEventSafe,
 } from "@/lib/manager/client-timeline";
 import { applyDebtMovementSafe } from "@/lib/manager/debt-register";
+import { notifyOrdersClosedBySale } from "@/lib/manager/sale-order-close";
 import type {
   CreateSaleInputRaw,
   SaleItemInput,
@@ -169,6 +170,15 @@ export async function createSaleWithItems(
       note: "Реалізація проведена",
       createdByUserId: actor.userId,
     });
+    // 7.3: нагадування менеджеру, якщо реалізація могла закрити замовлення.
+    void notifyOrdersClosedBySale({
+      saleId: sale.id,
+      saleNumber1C: sale.number1C,
+      saleCode1C: sale.code1C,
+      saleDocNumber: sale.docNumber,
+      customerId: sale.customerId,
+      actorUserId: actor.userId,
+    });
   }
 
   return sale;
@@ -236,6 +246,15 @@ export async function updateSaleWithItems(
       occurredAt: sale.createdAt ?? new Date(),
       note: "Реалізація проведена",
       createdByUserId: _actor.userId,
+    });
+    // 7.3: нагадування менеджеру, якщо реалізація могла закрити замовлення.
+    void notifyOrdersClosedBySale({
+      saleId: sale.id,
+      saleNumber1C: sale.number1C,
+      saleCode1C: sale.code1C,
+      saleDocNumber: sale.docNumber,
+      customerId: sale.customerId,
+      actorUserId: _actor.userId,
     });
   }
 

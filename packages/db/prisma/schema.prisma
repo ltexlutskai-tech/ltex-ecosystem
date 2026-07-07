@@ -1787,6 +1787,7 @@ enum MgrReminderSource {
   auto_bron
   auto_receiving_review
   auto_site_order
+  auto_sale_closed_order
 
   @@map("mgr_reminder_source")
 }
