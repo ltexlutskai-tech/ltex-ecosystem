@@ -13,10 +13,17 @@ export default async function NewProductPage() {
   if (!user) redirect("/manager/login");
   if (!canManageCatalog(user.role)) redirect("/manager/prices");
 
-  const categories = await prisma.category.findMany({
-    orderBy: [{ position: "asc" }, { name: "asc" }],
-    select: { id: true, name: true, parentId: true },
-  });
+  const [categories, producerRows] = await Promise.all([
+    prisma.category.findMany({
+      orderBy: [{ position: "asc" }, { name: "asc" }],
+      select: { id: true, name: true, parentId: true },
+    }),
+    prisma.mgrProducer.findMany({
+      orderBy: [{ sortOrder: "asc" }, { label: "asc" }],
+      select: { label: true },
+    }),
+  ]);
+  const producers = producerRows.map((p) => p.label);
 
   return (
     <div className="mx-auto max-w-3xl space-y-4">
@@ -35,7 +42,7 @@ export default async function NewProductPage() {
         </p>
       </div>
       <div className="rounded-lg border bg-white p-5">
-        <ProductCreateForm categories={categories} />
+        <ProductCreateForm categories={categories} producers={producers} />
       </div>
     </div>
   );

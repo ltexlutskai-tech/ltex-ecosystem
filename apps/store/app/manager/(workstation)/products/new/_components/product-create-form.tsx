@@ -17,10 +17,14 @@ import {
 const inputCls =
   "w-full rounded-md border border-input bg-background px-3 py-2 text-sm";
 
+const GENDERS = ["Чоловіча", "Жіноча", "Дитяча", "Унісекс", "Мікс"] as const;
+
 export function ProductCreateForm({
   categories,
+  producers,
 }: {
   categories: CascaderNode[];
+  producers: string[];
 }) {
   const [state, formAction, pending] = useActionState<
     CreateProductState,
@@ -88,11 +92,16 @@ export function ProductCreateForm({
         </div>
         <div>
           <label className="mb-1 block text-sm font-medium">Стать *</label>
-          <Input
-            name="gender"
-            required
-            placeholder="Чоловіча / Жіноча / Дитяча"
-          />
+          <select name="gender" required defaultValue="" className={inputCls}>
+            <option value="" disabled>
+              Оберіть стать…
+            </option>
+            {GENDERS.map((g) => (
+              <option key={g} value={g}>
+                {g}
+              </option>
+            ))}
+          </select>
         </div>
         <div>
           <label className="mb-1 block text-sm font-medium">Розміри *</label>
@@ -100,7 +109,19 @@ export function ProductCreateForm({
         </div>
         <div>
           <label className="mb-1 block text-sm font-medium">Виробник</label>
-          <Input name="producer" placeholder="Напр. VIVE / SOEX / Канада" />
+          <select name="producer" defaultValue="" className={inputCls}>
+            <option value="">— не вказано —</option>
+            {producers.map((p) => (
+              <option key={p} value={p}>
+                {p}
+              </option>
+            ))}
+          </select>
+          {producers.length === 0 && (
+            <p className="mt-1 text-xs text-gray-400">
+              Список порожній — додайте виробників у Довідники → Виробники.
+            </p>
+          )}
         </div>
         <div>
           <label className="mb-1 block text-sm font-medium">

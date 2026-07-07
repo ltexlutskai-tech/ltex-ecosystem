@@ -68,6 +68,12 @@ export async function loadDictRows(type: SimpleDictType): Promise<DictRow[]> {
         active: r.isActive,
       }));
     }
+    case "producers": {
+      const rows = await prisma.mgrProducer.findMany({
+        orderBy: [{ sortOrder: "asc" }, { label: "asc" }],
+      });
+      return rows.map((r) => ({ id: r.id, label: r.label }));
+    }
   }
 }
 
@@ -106,6 +112,11 @@ export async function createDictEntry(
       break;
     case "routes":
       await prisma.mgrRoute.create({ data: { name: label } });
+      break;
+    case "producers":
+      await prisma.mgrProducer.create({
+        data: { code: makeCode(label), label },
+      });
       break;
   }
   revalidate(type);
@@ -147,6 +158,9 @@ export async function updateDictEntry(
         data: { name: label, isActive: active },
       });
       break;
+    case "producers":
+      await prisma.mgrProducer.update({ where: { id }, data: { label } });
+      break;
   }
   revalidate(type);
 }
@@ -175,6 +189,9 @@ export async function deleteDictEntry(
         break;
       case "routes":
         await prisma.mgrRoute.delete({ where: { id } });
+        break;
+      case "producers":
+        await prisma.mgrProducer.delete({ where: { id } });
         break;
     }
   } catch {

@@ -1733,6 +1733,16 @@ model MgrLead {
   @@map("mgr_leads")
 }
 
+// ─── Довідник виробників (7.2) ──────────────────────────────────────────────
+model MgrProducer {
+  id        String @id @default(cuid())
+  code      String @unique
+  label     String
+  sortOrder Int    @default(0) @map("sort_order")
+
+  @@map("mgr_producers")
+}
+
 // ─── Лічильник візитів сайту (7.2 Блок 4) ──────────────────────────────────
 // Легкий, без кукі/персональних даних: агрегати по днях.
 model SiteVisitDay {

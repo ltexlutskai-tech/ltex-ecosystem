@@ -144,6 +144,13 @@ export const DICTIONARIES: readonly DictionaryEntry[] = [
     status: "ready",
   },
   {
+    key: "producers",
+    label: "Виробники",
+    description: "Виробники товарів (VIVE, SOEX…).",
+    href: "/manager/dictionaries/producers",
+    status: "ready",
+  },
+  {
     key: "message_templates",
     label: "Шаблони повідомлень",
     description: "Готові тексти для Viber / Telegram.",

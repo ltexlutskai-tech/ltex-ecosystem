@@ -33,6 +33,12 @@ export const SIMPLE_DICTS = {
     hasColor: false,
     desc: "Маршрути виїздів торгових агентів.",
   },
+  producers: {
+    title: "Виробники",
+    kind: "labeled",
+    hasColor: false,
+    desc: "Виробники товарів (VIVE, SOEX, Канада…).",
+  },
 } as const;
 
 export type SimpleDictType = keyof typeof SIMPLE_DICTS;
