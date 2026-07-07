@@ -1,7 +1,9 @@
 import { prisma } from "@ltex/db";
+import { hiddenCategoryProductFilter } from "./catalog-visibility";
 
 export async function getFeaturedProducts(limit = 12) {
   const entries = await prisma.featuredProduct.findMany({
+    where: { product: await hiddenCategoryProductFilter() },
     orderBy: { position: "asc" },
     take: limit,
     include: {

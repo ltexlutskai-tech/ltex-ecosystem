@@ -11,6 +11,11 @@ vi.mock("@/lib/mobile-auth", () => ({
   tryMobileSession: vi.fn(),
 }));
 
+vi.mock("@/lib/catalog-visibility", () => ({
+  getHiddenCategoryIds: vi.fn().mockResolvedValue([]),
+  hiddenCategoryProductFilter: vi.fn().mockResolvedValue({}),
+}));
+
 import { GET } from "./route";
 import { prisma } from "@ltex/db";
 import { tryMobileSession } from "@/lib/mobile-auth";

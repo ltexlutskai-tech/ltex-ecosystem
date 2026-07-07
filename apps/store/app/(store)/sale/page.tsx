@@ -5,6 +5,7 @@ import { Pagination } from "@/components/store/pagination";
 import { ProductCard } from "@/components/store/product-card";
 import { getDictionary } from "@/lib/i18n";
 import { stripPricesForGuests } from "@/lib/customer-auth";
+import { hiddenCategoryProductFilter } from "@/lib/catalog-visibility";
 
 const dict = getDictionary();
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://ltex.com.ua";
@@ -26,6 +27,7 @@ async function loadSaleProducts(page: number) {
   const where = {
     inStock: true,
     prices: { some: { priceType: "akciya" } },
+    ...(await hiddenCategoryProductFilter()),
   };
 
   const [products, total] = await Promise.all([

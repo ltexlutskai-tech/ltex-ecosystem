@@ -11,6 +11,11 @@ vi.mock("@ltex/db", () => ({
   },
 }));
 
+vi.mock("@/lib/catalog-visibility", () => ({
+  getHiddenCategoryIds: vi.fn().mockResolvedValue([]),
+  hiddenCategoryProductFilter: vi.fn().mockResolvedValue({}),
+}));
+
 vi.mock("@/lib/customer-auth", async () => {
   const actual = await vi.importActual<typeof import("@/lib/customer-auth")>(
     "@/lib/customer-auth",

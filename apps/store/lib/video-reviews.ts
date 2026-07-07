@@ -1,4 +1,5 @@
 import { prisma } from "@ltex/db";
+import { hiddenCategoryProductFilter } from "./catalog-visibility";
 
 export {
   extractYouTubeId,
@@ -11,6 +12,7 @@ export async function getVideoReviewProducts(limit = 12) {
     where: {
       inStock: true,
       videoUrl: { not: null },
+      ...(await hiddenCategoryProductFilter()),
     },
     orderBy: { updatedAt: "desc" },
     take: limit,

@@ -6,6 +6,7 @@ import {
   type MobileRawProduct,
 } from "@/lib/mobile-product-shape";
 import { getCurrentCustomer, stripPricesForGuests } from "@/lib/customer-auth";
+import { getHiddenCategoryIds } from "@/lib/catalog-visibility";
 
 export const dynamic = "force-dynamic";
 
@@ -30,6 +31,9 @@ export async function GET(request: NextRequest) {
     .filter(Boolean)
     .slice(0, SEEN_LIMIT);
 
+  // Приховані категорії (7.2): не рекомендуємо їхні товари.
+  const hiddenSet = new Set(await getHiddenCategoryIds());
+
   let products: MobileRawProduct[] | null = null;
 
   if (seenIds.length > 0) {
@@ -41,7 +45,9 @@ export async function GET(request: NextRequest) {
       ...new Set(
         seenProducts
           .map((p) => p.categoryId)
-          .filter((id): id is string => typeof id === "string"),
+          .filter(
+            (id): id is string => typeof id === "string" && !hiddenSet.has(id),
+          ),
       ),
     ];
 
@@ -61,7 +67,12 @@ export async function GET(request: NextRequest) {
 
   if (!products || products.length === 0) {
     products = (await prisma.product.findMany({
-      where: { inStock: true },
+      where: {
+        inStock: true,
+        ...(hiddenSet.size > 0
+          ? { categoryId: { notIn: [...hiddenSet] } }
+          : {}),
+      },
       take: RESULT_LIMIT,
       orderBy: { createdAt: "desc" },
       include: mobileProductInclude,

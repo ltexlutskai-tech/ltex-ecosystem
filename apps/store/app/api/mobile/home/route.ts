@@ -5,6 +5,10 @@ import {
   mapMobileProduct,
   type MobileRawProduct,
 } from "@/lib/mobile-product-shape";
+import {
+  getHiddenCategoryIds,
+  hiddenCategoryProductFilter,
+} from "@/lib/catalog-visibility";
 
 // Force dynamic rendering: this route hits the database, so it must not
 // prerender at build time (CI does not have DATABASE_URL). The 60s edge
@@ -12,6 +16,10 @@ import {
 export const dynamic = "force-dynamic";
 
 export async function GET() {
+  // Приховані категорії (7.2): не показуємо їхні товари в жодній рейці.
+  const hiddenSet = new Set(await getHiddenCategoryIds());
+  const visibleFilter = await hiddenCategoryProductFilter();
+
   const [
     banners,
     featuredEntries,
@@ -33,6 +41,7 @@ export async function GET() {
       },
     }),
     prisma.featuredProduct.findMany({
+      where: { product: visibleFilter },
       orderBy: { position: "asc" },
       take: 12,
       include: { product: { include: mobileProductInclude } },
@@ -40,6 +49,7 @@ export async function GET() {
     prisma.product.findMany({
       where: {
         inStock: true,
+        ...visibleFilter,
         prices: { some: { priceType: "akciya" } },
       },
       take: 12,
@@ -47,13 +57,13 @@ export async function GET() {
       include: mobileProductInclude,
     }),
     prisma.product.findMany({
-      where: { inStock: true },
+      where: { inStock: true, ...visibleFilter },
       take: 12,
       orderBy: { createdAt: "desc" },
       include: mobileProductInclude,
     }),
     prisma.product.findMany({
-      where: { inStock: true, videoUrl: { not: null } },
+      where: { inStock: true, ...visibleFilter, videoUrl: { not: null } },
       take: 8,
       orderBy: { createdAt: "desc" },
       include: mobileProductInclude,
@@ -79,12 +89,14 @@ export async function GET() {
       onSale: onSaleProducts.map(mapMobileProduct),
       newArrivals: newProducts.map(mapMobileProduct),
       videoReviews: videoProducts.map(mapMobileProduct),
-      categories: categories.map((c) => ({
-        id: c.id,
-        slug: c.slug,
-        name: c.name,
-        productCount: c._count.products,
-      })),
+      categories: categories
+        .filter((c) => !hiddenSet.has(c.id))
+        .map((c) => ({
+          id: c.id,
+          slug: c.slug,
+          name: c.name,
+          productCount: c._count.products,
+        })),
     },
     {
       headers: {

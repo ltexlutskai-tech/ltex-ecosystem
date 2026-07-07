@@ -36,3 +36,15 @@ export const getHiddenCategoryIds = cache(async (): Promise<string[]> => {
 
   return [...hidden];
 });
+
+/**
+ * Готовий фрагмент Prisma-where для товарних вибірок сайту: виключає товари
+ * з прихованих категорій. Порожній обʼєкт, коли прихованих немає — можна
+ * безпечно спредити в будь-який `where` (`{ inStock: true, ...filter }`).
+ */
+export async function hiddenCategoryProductFilter(): Promise<
+  Record<string, never> | { categoryId: { notIn: string[] } }
+> {
+  const hidden = await getHiddenCategoryIds();
+  return hidden.length > 0 ? { categoryId: { notIn: hidden } } : {};
+}

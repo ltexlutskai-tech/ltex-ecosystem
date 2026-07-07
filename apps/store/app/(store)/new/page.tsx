@@ -5,6 +5,7 @@ import { Pagination } from "@/components/store/pagination";
 import { ProductCard } from "@/components/store/product-card";
 import { getDictionary } from "@/lib/i18n";
 import { stripPricesForGuests } from "@/lib/customer-auth";
+import { hiddenCategoryProductFilter } from "@/lib/catalog-visibility";
 
 const dict = getDictionary();
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://ltex.com.ua";
@@ -23,9 +24,10 @@ export const metadata: Metadata = {
 };
 
 async function loadNewProducts(page: number) {
+  const where = { inStock: true, ...(await hiddenCategoryProductFilter()) };
   const [products, total] = await Promise.all([
     prisma.product.findMany({
-      where: { inStock: true },
+      where,
       orderBy: { createdAt: "desc" },
       skip: (page - 1) * PER_PAGE,
       take: PER_PAGE,
@@ -38,7 +40,7 @@ async function loadNewProducts(page: number) {
         _count: { select: { lots: true } },
       },
     }),
-    prisma.product.count({ where: { inStock: true } }),
+    prisma.product.count({ where }),
   ]);
 
   return { products, total };

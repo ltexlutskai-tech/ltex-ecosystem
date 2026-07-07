@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@ltex/db";
+import { getHiddenCategoryIds } from "@/lib/catalog-visibility";
 
 export const revalidate = 300;
 
@@ -13,6 +14,9 @@ export async function GET(request: NextRequest) {
   const { searchParams } = request.nextUrl;
   const parentSlug = searchParams.get("parent");
 
+  // Приховані категорії (7.2): не віддаємо їх у публічні списки.
+  const hiddenSet = new Set(await getHiddenCategoryIds());
+
   if (parentSlug) {
     const parent = await prisma.category.findUnique({
       where: { slug: parentSlug },
@@ -23,7 +27,9 @@ export async function GET(request: NextRequest) {
         },
       },
     });
-    return NextResponse.json({ categories: parent?.children ?? [] });
+    return NextResponse.json({
+      categories: (parent?.children ?? []).filter((c) => !hiddenSet.has(c.id)),
+    });
   }
 
   const categories = await prisma.category.findMany({
@@ -32,5 +38,7 @@ export async function GET(request: NextRequest) {
     select: { id: true, slug: true, name: true, parentId: true },
   });
 
-  return NextResponse.json({ categories });
+  return NextResponse.json({
+    categories: categories.filter((c) => !hiddenSet.has(c.id)),
+  });
 }

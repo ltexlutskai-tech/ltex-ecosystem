@@ -12,6 +12,7 @@ import { TestimonialsSlider } from "@/components/store/testimonials-slider";
 import { ProductCard } from "@/components/store/product-card";
 import { getFeaturedProducts } from "@/lib/featured";
 import { getVideoReviewProducts } from "@/lib/video-reviews";
+import { getHiddenCategoryIds } from "@/lib/catalog-visibility";
 import { getDictionary } from "@/lib/i18n";
 import { stripPricesForGuests } from "@/lib/customer-auth";
 
@@ -22,6 +23,12 @@ export const dynamic = "force-dynamic";
 
 const getCachedHomeData = unstable_cache(
   async () => {
+    // Приховані категорії (7.2): їхні товари не показуємо в жодній рейці.
+    const hiddenIds = await getHiddenCategoryIds();
+    const hiddenSet = new Set(hiddenIds);
+    const visibleFilter =
+      hiddenIds.length > 0 ? { categoryId: { notIn: hiddenIds } } : {};
+
     const [
       parentCategories,
       counts,
@@ -38,7 +45,7 @@ const getCachedHomeData = unstable_cache(
       }),
       prisma.product.groupBy({
         by: ["categoryId"],
-        where: { inStock: true },
+        where: { inStock: true, ...visibleFilter },
         _count: { _all: true },
       }),
       prisma.banner
@@ -49,7 +56,7 @@ const getCachedHomeData = unstable_cache(
         .then((rows) => rows.filter((b) => b.ctaHref)),
       getFeaturedProducts(12),
       prisma.product.findMany({
-        where: { inStock: true },
+        where: { inStock: true, ...visibleFilter },
         orderBy: { createdAt: "desc" },
         take: 8,
         include: {
@@ -62,7 +69,11 @@ const getCachedHomeData = unstable_cache(
         },
       }),
       prisma.product.findMany({
-        where: { inStock: true, prices: { some: { priceType: "akciya" } } },
+        where: {
+          inStock: true,
+          ...visibleFilter,
+          prices: { some: { priceType: "akciya" } },
+        },
         orderBy: { updatedAt: "desc" },
         take: 8,
         include: {
@@ -78,7 +89,7 @@ const getCachedHomeData = unstable_cache(
     ]);
 
     return {
-      parentCategories,
+      parentCategories: parentCategories.filter((c) => !hiddenSet.has(c.id)),
       counts,
       banners,
       featured,

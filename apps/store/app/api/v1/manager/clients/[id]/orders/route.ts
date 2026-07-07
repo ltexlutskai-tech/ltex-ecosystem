@@ -18,6 +18,7 @@ export async function GET(
     select: {
       id: true,
       code1C: true,
+      phonePrimary: true,
       agentUserId: true,
       assignments: {
         where: { userId: user.id },
@@ -44,11 +45,16 @@ export async function GET(
   const page = Math.max(1, parseInt(url.searchParams.get("page") ?? "1", 10));
   const pageSize = 10;
 
-  if (!client.code1C) {
+  // Матчимо замовлення за code1C, а для сайтових клієнтів без code1C —
+  // за основним телефоном (той самий фолбек, що в картці замовлення).
+  const customerMatch: { code1C?: string; phone?: string }[] = [];
+  if (client.code1C) customerMatch.push({ code1C: client.code1C });
+  if (client.phonePrimary) customerMatch.push({ phone: client.phonePrimary });
+  if (customerMatch.length === 0) {
     return NextResponse.json({ items: [], total: 0, page, pageSize });
   }
 
-  const where = { customer: { code1C: client.code1C } };
+  const where = { customer: { OR: customerMatch } };
 
   const [items, total] = await Promise.all([
     prisma.order.findMany({
