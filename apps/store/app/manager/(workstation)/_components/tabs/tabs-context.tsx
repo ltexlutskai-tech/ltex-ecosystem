@@ -23,6 +23,11 @@ export interface WorkTab {
 export interface TabsState {
   tabs: WorkTab[];
   activeId: string | null;
+  /**
+   * Вкладка, закріплена у правій половині робочої області («Показати поруч»,
+   * 7.3). null/undefined — розділення вимкнене.
+   */
+  splitId?: string | null;
 }
 
 export type TabsAction =
@@ -35,10 +40,15 @@ export type TabsAction =
     }
   | { type: "focus"; id: string }
   | { type: "close"; id: string; dashboardId: string }
+  | { type: "closeOthers"; id: string }
   | { type: "rename"; id: string; label: string }
+  | { type: "setSplit"; id: string | null }
   | { type: "hydrate"; state: TabsState };
 
 const DASHBOARD_URL = "/manager";
+
+/** Префікс `window.name` відкріпленого вікна (контент без shell, як у 1С). */
+export const DETACHED_WINDOW_PREFIX = "ltex-mgr-detached";
 
 function makeTab(id: string, url: string, label?: string): WorkTab {
   return { id, url, label: label ?? tabLabelForPath(url) };
@@ -62,7 +72,7 @@ export function tabsReducer(state: TabsState, action: TabsAction): TabsState {
         }
       }
       const tab = makeTab(action.id, action.url, action.label);
-      return { tabs: [...state.tabs, tab], activeId: tab.id };
+      return { ...state, tabs: [...state.tabs, tab], activeId: tab.id };
     }
 
     case "focus": {
@@ -74,11 +84,12 @@ export function tabsReducer(state: TabsState, action: TabsAction): TabsState {
       const idx = state.tabs.findIndex((t) => t.id === action.id);
       if (idx === -1) return state;
       const tabs = state.tabs.filter((t) => t.id !== action.id);
+      const splitId = state.splitId === action.id ? null : state.splitId;
 
       // Якщо вкладок не лишилось — відкрити дашборд.
       if (tabs.length === 0) {
         const tab = makeTab(action.dashboardId, DASHBOARD_URL);
-        return { tabs: [tab], activeId: tab.id };
+        return { tabs: [tab], activeId: tab.id, splitId: null };
       }
 
       let activeId = state.activeId;
@@ -88,7 +99,17 @@ export function tabsReducer(state: TabsState, action: TabsAction): TabsState {
         const neighbour = tabs[idx] ?? tabs[idx - 1] ?? tabs[tabs.length - 1];
         activeId = neighbour ? neighbour.id : state.activeId;
       }
-      return { tabs, activeId };
+      return { tabs, activeId, splitId };
+    }
+
+    case "closeOthers": {
+      const keep = state.tabs.find((t) => t.id === action.id);
+      if (!keep) return state;
+      return {
+        tabs: [keep],
+        activeId: keep.id,
+        splitId: state.splitId === keep.id ? state.splitId : null,
+      };
     }
 
     case "rename": {
@@ -96,6 +117,13 @@ export function tabsReducer(state: TabsState, action: TabsAction): TabsState {
         t.id === action.id ? { ...t, label: action.label } : t,
       );
       return { ...state, tabs };
+    }
+
+    case "setSplit": {
+      if (action.id !== null && !state.tabs.some((t) => t.id === action.id)) {
+        return state;
+      }
+      return { ...state, splitId: action.id };
     }
 
     default:
@@ -107,6 +135,8 @@ export interface TabsContextValue {
   tabs: WorkTab[];
   activeId: string | null;
   activeTab: WorkTab | null;
+  /** Вкладка у правій половині (розділення робочої області) або null. */
+  splitId: string | null;
   openTab: (
     url: string,
     label?: string,
@@ -114,7 +144,13 @@ export interface TabsContextValue {
   ) => void;
   focusTab: (id: string) => void;
   closeTab: (id: string) => void;
+  /** Закрити всі вкладки, крім вказаної. */
+  closeOtherTabs: (id: string) => void;
   renameTab: (id: string, label: string) => void;
+  /** Закріпити вкладку праворуч (null — прибрати розділення). */
+  setSplitTab: (id: string | null) => void;
+  /** Винести вкладку в окреме вікно браузера (як у 1С) і закрити її тут. */
+  detachTab: (id: string) => void;
 }
 
 const TabsContext = createContext<TabsContextValue | null>(null);
@@ -154,7 +190,12 @@ function readStoredState(): TabsState | null {
         candidate.activeId && tabs.some((t) => t.id === candidate.activeId)
           ? candidate.activeId
           : first.id;
-      return { tabs, activeId };
+      const splitId =
+        typeof candidate.splitId === "string" &&
+        tabs.some((t) => t.id === candidate.splitId)
+          ? candidate.splitId
+          : null;
+      return { tabs, activeId, splitId };
     }
   } catch {
     // ignore corrupt / unavailable storage
@@ -169,6 +210,7 @@ export function TabsProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(tabsReducer, {
     tabs: [],
     activeId: null,
+    splitId: null,
   });
 
   // Гідрація зі сховища (один раз, на mount, у браузері).
@@ -206,6 +248,35 @@ export function TabsProvider({ children }: { children: ReactNode }) {
     return () => window.clearTimeout(handle);
   }, [state]);
 
+  // Повідомлення від embedded-сторінок (iframe): «відкрий нову вкладку».
+  // Використовується плитками дашборда та іншими block-лінками (7.3).
+  useEffect(() => {
+    function onMessage(e: MessageEvent) {
+      if (e.origin !== window.location.origin) return;
+      const data = e.data as {
+        type?: unknown;
+        url?: unknown;
+        label?: unknown;
+      } | null;
+      if (
+        data &&
+        data.type === "ltex:open-tab" &&
+        typeof data.url === "string" &&
+        data.url.startsWith("/manager")
+      ) {
+        dispatch({
+          type: "open",
+          url: data.url,
+          label: typeof data.label === "string" ? data.label : undefined,
+          duplicate: true,
+          id: newId(),
+        });
+      }
+    }
+    window.addEventListener("message", onMessage);
+    return () => window.removeEventListener("message", onMessage);
+  }, []);
+
   const openTab = useCallback(
     (url: string, label?: string, opts?: { duplicate?: boolean }) => {
       dispatch({
@@ -227,9 +298,34 @@ export function TabsProvider({ children }: { children: ReactNode }) {
     dispatch({ type: "close", id, dashboardId: newId() });
   }, []);
 
+  const closeOtherTabs = useCallback((id: string) => {
+    dispatch({ type: "closeOthers", id });
+  }, []);
+
   const renameTab = useCallback((id: string, label: string) => {
     dispatch({ type: "rename", id, label });
   }, []);
+
+  const setSplitTab = useCallback((id: string | null) => {
+    dispatch({ type: "setSplit", id });
+  }, []);
+
+  const detachTab = useCallback(
+    (id: string) => {
+      const tab = state.tabs.find((t) => t.id === id);
+      if (!tab) return;
+      // Іменоване вікно: window.name зберігається при навігації всередині
+      // нього — WorkstationShell бачить префікс і рендерить контент без shell.
+      const win = window.open(
+        tab.url,
+        `${DETACHED_WINDOW_PREFIX}-${id}`,
+        "popup=yes,width=1280,height=820",
+      );
+      // Якщо браузер заблокував popup — вкладку не чіпаємо.
+      if (win) dispatch({ type: "close", id, dashboardId: newId() });
+    },
+    [state.tabs],
+  );
 
   const value = useMemo<TabsContextValue>(() => {
     const activeTab = state.tabs.find((t) => t.id === state.activeId) ?? null;
@@ -237,12 +333,25 @@ export function TabsProvider({ children }: { children: ReactNode }) {
       tabs: state.tabs,
       activeId: state.activeId,
       activeTab,
+      splitId: state.splitId ?? null,
       openTab,
       focusTab,
       closeTab,
+      closeOtherTabs,
       renameTab,
+      setSplitTab,
+      detachTab,
     };
-  }, [state, openTab, focusTab, closeTab, renameTab]);
+  }, [
+    state,
+    openTab,
+    focusTab,
+    closeTab,
+    closeOtherTabs,
+    renameTab,
+    setSplitTab,
+    detachTab,
+  ]);
 
   return <TabsContext.Provider value={value}>{children}</TabsContext.Provider>;
 }

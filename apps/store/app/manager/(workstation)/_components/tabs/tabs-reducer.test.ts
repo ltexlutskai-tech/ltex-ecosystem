@@ -112,4 +112,57 @@ describe("tabsReducer", () => {
     const s = tabsReducer(empty, { type: "hydrate", state: hydrated });
     expect(s).toEqual(hydrated);
   });
+
+  it("setSplit pins an existing tab to the right pane and null clears it", () => {
+    let s = empty;
+    s = tabsReducer(s, { type: "open", url: "/manager/orders", id: "a" });
+    s = tabsReducer(s, { type: "open", url: "/manager/sales", id: "b" });
+    s = tabsReducer(s, { type: "setSplit", id: "a" });
+    expect(s.splitId).toBe("a");
+    s = tabsReducer(s, { type: "setSplit", id: null });
+    expect(s.splitId).toBeNull();
+  });
+
+  it("setSplit ignores unknown tab ids", () => {
+    let s = tabsReducer(empty, {
+      type: "open",
+      url: "/manager/orders",
+      id: "a",
+    });
+    s = tabsReducer(s, { type: "setSplit", id: "ghost" });
+    expect(s.splitId ?? null).toBeNull();
+  });
+
+  it("closing the split tab clears splitId", () => {
+    let s = empty;
+    s = tabsReducer(s, { type: "open", url: "/manager/orders", id: "a" });
+    s = tabsReducer(s, { type: "open", url: "/manager/sales", id: "b" });
+    s = tabsReducer(s, { type: "setSplit", id: "a" });
+    s = tabsReducer(s, { type: "close", id: "a", dashboardId: "dash" });
+    expect(s.splitId).toBeNull();
+    expect(s.tabs.map((t) => t.id)).toEqual(["b"]);
+  });
+
+  it("closing a non-split tab keeps splitId", () => {
+    let s = empty;
+    s = tabsReducer(s, { type: "open", url: "/manager/orders", id: "a" });
+    s = tabsReducer(s, { type: "open", url: "/manager/sales", id: "b" });
+    s = tabsReducer(s, { type: "open", url: "/manager/payments", id: "c" });
+    s = tabsReducer(s, { type: "setSplit", id: "a" });
+    s = tabsReducer(s, { type: "close", id: "b", dashboardId: "dash" });
+    expect(s.splitId).toBe("a");
+  });
+
+  it("closeOthers keeps only the given tab and activates it", () => {
+    let s = empty;
+    s = tabsReducer(s, { type: "open", url: "/manager/orders", id: "a" });
+    s = tabsReducer(s, { type: "open", url: "/manager/sales", id: "b" });
+    s = tabsReducer(s, { type: "open", url: "/manager/payments", id: "c" });
+    s = tabsReducer(s, { type: "setSplit", id: "b" });
+    s = tabsReducer(s, { type: "closeOthers", id: "a" });
+    expect(s.tabs.map((t) => t.id)).toEqual(["a"]);
+    expect(s.activeId).toBe("a");
+    // Закріплена праворуч вкладка закрилась — розділення знято.
+    expect(s.splitId).toBeNull();
+  });
 });

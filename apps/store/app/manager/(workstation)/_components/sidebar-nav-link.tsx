@@ -62,14 +62,16 @@ export function SidebarNavLink({
     </>
   );
 
-  // У top-shell — відкриваємо вкладку (iframe) замість навігації.
+  // У top-shell — відкриваємо НОВУ вкладку (iframe) замість навігації.
+  // duplicate:true — кожен клік по блоку дає окрему вкладку (7.3, як у 1С);
+  // тому можна тримати кілька вкладок Клієнтів/Замовлень одночасно.
   if (tabs) {
     return (
       <button
         type="button"
         onClick={() => {
           onNavigate?.();
-          tabs.openTab(href, label);
+          tabs.openTab(href, label, { duplicate: true });
         }}
         className={cn(className, "w-full text-left")}
       >

@@ -1,6 +1,6 @@
-import Link from "next/link";
 import type { ComponentType } from "react";
 import { Card } from "@ltex/ui";
+import { OpenTabLink } from "./open-tab-link";
 
 export function DashboardTile({
   href,
@@ -16,7 +16,7 @@ export function DashboardTile({
   countLabel: string;
 }) {
   return (
-    <Link href={href} className="block">
+    <OpenTabLink href={href} label={title} className="block">
       <Card className="h-full p-6 transition-shadow hover:shadow-md">
         <Icon className="mb-3 h-8 w-8 text-green-700" />
         <h3 className="font-semibold text-gray-800">{title}</h3>
@@ -24,6 +24,6 @@ export function DashboardTile({
           {count === 0 ? `Немає ${countLabel}` : `${count} ${countLabel}`}
         </p>
       </Card>
-    </Link>
+    </OpenTabLink>
   );
 }

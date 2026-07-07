@@ -4,7 +4,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { Toaster } from "@ltex/ui";
 import { IframeHost } from "./tabs/iframe-host";
 import { TabStrip } from "./tabs/tab-strip";
-import { TabsProvider } from "./tabs/tabs-context";
+import { DETACHED_WINDOW_PREFIX, TabsProvider } from "./tabs/tabs-context";
 
 export function WorkstationShell({
   header,
@@ -21,7 +21,13 @@ export function WorkstationShell({
   const [framed, setFramed] = useState<boolean | null>(null);
 
   useEffect(() => {
-    setFramed(window.self !== window.top);
+    // framed = iframe усередині shell АБО відкріплене вікно («В окреме
+    // вікно», 7.3): window.name зберігається при навігації в межах вікна,
+    // тож увесь його вміст рендериться без shell (контент-only, як у 1С).
+    setFramed(
+      window.self !== window.top ||
+        window.name.startsWith(DETACHED_WINDOW_PREFIX),
+    );
   }, []);
 
   if (framed === null) {
