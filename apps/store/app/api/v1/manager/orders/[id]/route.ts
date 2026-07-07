@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
+import { z } from "zod";
 import { Prisma, prisma } from "@ltex/db";
 import { getCurrentUser } from "@/lib/auth/manager-auth";
 import { canDeleteManagerDoc } from "@/lib/manager/doc-delete-permission";
@@ -123,15 +124,43 @@ export async function PATCH(
     );
   }
 
-  // Проведене в 1С замовлення (`posted`) заблоковане для будь-яких змін.
+  const body = await req.json().catch(() => null);
+
+  // Проведене замовлення (`posted`) заблоковане для змін шапки/товарів.
+  // Виняток (7.3, як у 1С): перемикання «Актуальне» — окремим запитом
+  // `{ isActual: boolean }` (актуальність проведеного замовлення керована).
   if (isOrderLocked(existing.status)) {
-    return NextResponse.json(
-      { error: "Замовлення проведено в 1С — редагування заборонено" },
-      { status: 409 },
-    );
+    const actualOnly = z
+      .object({ isActual: z.boolean() })
+      .strict()
+      .safeParse(body);
+    if (!actualOnly.success) {
+      return NextResponse.json(
+        {
+          error:
+            "Замовлення проведено — редагування заборонено (можна лише змінити «Актуальне»)",
+        },
+        { status: 409 },
+      );
+    }
+    if (actualOnly.data.isActual === true && existing.archived) {
+      return NextResponse.json(
+        { error: "Архівне замовлення не може бути актуальним" },
+        { status: 400 },
+      );
+    }
+    const updated = await prisma.order.update({
+      where: { id },
+      data: {
+        isActual: actualOnly.data.isActual,
+        version: { increment: 1 },
+      },
+      select: { id: true, status: true, isActual: true, version: true },
+    });
+    revalidatePath("/manager/orders");
+    return NextResponse.json(updated);
   }
 
-  const body = await req.json().catch(() => null);
   const parsed = updateOrderSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json(
@@ -174,13 +203,10 @@ export async function PATCH(
   }
 
   // Guard: не можна позначити закрите/архівне замовлення як актуальне.
-  if (
-    input.isActual === true &&
-    (existing.closedAt || existing.archived || isOrderLocked(existing.status))
-  ) {
+  if (input.isActual === true && (existing.closedAt || existing.archived)) {
     return NextResponse.json(
       {
-        error: "Закрите або проведене замовлення не може бути актуальним",
+        error: "Закрите або архівне замовлення не може бути актуальним",
       },
       { status: 400 },
     );

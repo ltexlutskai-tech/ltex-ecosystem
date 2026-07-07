@@ -18,36 +18,15 @@ describe("averageBagWeight", () => {
     );
   });
 
-  it("fallback на середнє по лотах коли averageWeight відсутній", () => {
-    const avg = averageBagWeight({ averageWeight: null }, [
-      { weight: 18 },
-      { weight: 22 },
-    ]);
-    expect(avg).toBe(20);
-  });
-
-  it("відкидає невалідні ваги лотів при усередненні", () => {
-    const avg = averageBagWeight({ averageWeight: null }, [
-      { weight: 0 },
-      { weight: -3 },
-      { weight: 30 },
-    ]);
-    expect(avg).toBe(30);
-  });
-
-  it("дефолт коли немає ні averageWeight, ні валідних лотів", () => {
-    expect(averageBagWeight({ averageWeight: null }, [])).toBe(
+  it("ігнорує неправдоподібну вагу мішка (> 100 кг — вага залишку) → 20 кг", () => {
+    expect(averageBagWeight({ averageWeight: 726.7 })).toBe(
       DEFAULT_BAG_WEIGHT_KG,
     );
-    expect(averageBagWeight({ averageWeight: null }, [{ weight: 0 }])).toBe(
+    expect(averageBagWeight({ averageWeight: 100.01 })).toBe(
       DEFAULT_BAG_WEIGHT_KG,
     );
-  });
-
-  it("averageWeight має пріоритет над лотами", () => {
-    expect(
-      averageBagWeight({ averageWeight: 25 }, [{ weight: 10 }, { weight: 12 }]),
-    ).toBe(25);
+    // 100 кг включно — ще правдоподібно (великогабарит).
+    expect(averageBagWeight({ averageWeight: 100 })).toBe(100);
   });
 });
 

@@ -28,6 +28,11 @@ describe("tabsReducer", () => {
     s = tabsReducer(s, { type: "open", url: "/manager/orders", id: "c" });
     expect(s.tabs).toHaveLength(2);
     expect(s.activeId).toBe("a");
+    // 7.3: повторний клік по блоку бампає nav → iframe повертається на
+    // головну сторінку блоку.
+    expect(s.tabs[0]?.nav).toBe(1);
+    s = tabsReducer(s, { type: "open", url: "/manager/orders", id: "d" });
+    expect(s.tabs[0]?.nav).toBe(2);
   });
 
   it("opens a duplicate tab when duplicate === true", () => {

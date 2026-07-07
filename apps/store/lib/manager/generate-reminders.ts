@@ -31,11 +31,13 @@ export interface GenerateRemindersResult {
 
 /**
  * Активні статуси замовлення для генерації нагадувань.
- * Виключаємо posted/cancelled/delivered + archived/closed.
+ * 7.3: `posted` — активний (проведене замовлення «в роботі», як у 1С);
+ * виключаємо cancelled/delivered + archived/closed (фільтр у запиті).
  */
 const ORDER_ACTIVE_STATUSES = [
   "draft",
   "sent",
+  "posted",
   "pending",
   "approved",
   "shipped",

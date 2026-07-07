@@ -15,7 +15,7 @@ describe("order-status meta", () => {
   it("returns meta for known status", () => {
     const m = getOrderStatusMeta("posted");
     expect(m).toEqual(ORDER_STATUS_META.posted);
-    expect(m.label).toBe("Проведено (архів)");
+    expect(m.label).toBe("Проведено");
   });
 
   it("falls back to raw status with gray color for unknown", () => {

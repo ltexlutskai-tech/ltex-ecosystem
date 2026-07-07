@@ -18,6 +18,12 @@ export interface WorkTab {
   /** Внутрішній шлях `/manager/...`, який завантажується в iframe. */
   url: string;
   label: string;
+  /**
+   * Лічильник «повернення на головну» (7.3): повторний клік по блоку в
+   * сайдбарі фокусує наявну вкладку і збільшує nav → iframe перезавантажується
+   * на головну сторінку блоку (ключ iframe містить nav).
+   */
+  nav?: number;
 }
 
 export interface TabsState {
@@ -68,7 +74,18 @@ export function tabsReducer(state: TabsState, action: TabsAction): TabsState {
       if (!action.duplicate) {
         const existing = state.tabs.find((t) => t.url === action.url);
         if (existing) {
-          return { ...state, activeId: existing.id };
+          // Фокус наявної вкладки блоку + повернення її на головну сторінку
+          // блоку (nav++ → iframe перезавантажиться на existing.url).
+          const tabs = state.tabs.map((t) =>
+            t.id === existing.id
+              ? {
+                  ...t,
+                  nav: (t.nav ?? 0) + 1,
+                  label: action.label ?? tabLabelForPath(t.url),
+                }
+              : t,
+          );
+          return { ...state, tabs, activeId: existing.id };
         }
       }
       const tab = makeTab(action.id, action.url, action.label);
@@ -268,7 +285,6 @@ export function TabsProvider({ children }: { children: ReactNode }) {
           type: "open",
           url: data.url,
           label: typeof data.label === "string" ? data.label : undefined,
-          duplicate: true,
           id: newId(),
         });
       }

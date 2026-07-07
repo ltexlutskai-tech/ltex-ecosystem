@@ -62,16 +62,16 @@ export function SidebarNavLink({
     </>
   );
 
-  // У top-shell — відкриваємо НОВУ вкладку (iframe) замість навігації.
-  // duplicate:true — кожен клік по блоку дає окрему вкладку (7.3, як у 1С);
-  // тому можна тримати кілька вкладок Клієнтів/Замовлень одночасно.
+  // У top-shell — відкриваємо вкладку (iframe) замість навігації. Якщо
+  // вкладка блоку вже є — фокусуємо її і повертаємо на головну сторінку
+  // блоку (7.3). Кілька вкладок одного блоку — через ПКМ «Дублювати».
   if (tabs) {
     return (
       <button
         type="button"
         onClick={() => {
           onNavigate?.();
-          tabs.openTab(href, label, { duplicate: true });
+          tabs.openTab(href, label);
         }}
         className={cn(className, "w-full text-left")}
       >

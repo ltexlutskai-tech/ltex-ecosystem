@@ -21,6 +21,8 @@ const h = vi.hoisted(() => {
         cb({
           order: { create: txOrderCreate },
           lot: { updateMany: txLotUpdateMany },
+          // Нумерація 7.3 (nextOrderNumber1C).
+          $queryRaw: vi.fn(async () => [{ max_num: null }]),
         }),
       ),
     },

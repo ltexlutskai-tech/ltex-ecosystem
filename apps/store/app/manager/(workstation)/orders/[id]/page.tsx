@@ -5,6 +5,7 @@ import { prisma } from "@ltex/db";
 import { getCurrentUser } from "@/lib/auth/manager-auth";
 import { getCurrentRate } from "@/lib/exchange-rate";
 import { canViewOrder } from "@/lib/manager/order-ownership";
+import { getOwnedClientIds } from "@/lib/manager/client-visibility";
 import { canEditOrder, isOrderLocked } from "@/lib/manager/order-status";
 import { formatOrderNumber } from "@/lib/manager/order-number";
 import {
@@ -13,6 +14,7 @@ import {
 } from "@/lib/manager/delivery-methods";
 import { OrderForm } from "../new/_components/order-form";
 import { OrderCloseButton } from "./_components/order-close-button";
+import { OrderActualToggle } from "./_components/order-actual-toggle";
 import type {
   ClientPickerItem,
   OrderEditInitial,
@@ -124,7 +126,7 @@ export default async function ManagerOrderDetailPage({
     : order.customer.phone
       ? { phonePrimary: order.customer.phone }
       : null;
-  const [exchangeRate, mgr] = await Promise.all([
+  const [exchangeRate, mgr, ownedIds] = await Promise.all([
     getCurrentRate(),
     mgrWhere
       ? prisma.mgrClient.findFirst({
@@ -138,8 +140,12 @@ export default async function ManagerOrderDetailPage({
           },
         })
       : Promise.resolve(null),
+    getOwnedClientIds(user),
   ]);
-  const mgrClientId = mgr?.id ?? null;
+  // Лінк/клік на картку клієнта — лише для СВОГО клієнта (7.3, рішення user);
+  // чужі клієнти з форми замовлення не відкриваються.
+  const mgrClientId =
+    mgr && (ownedIds === null || ownedIds.has(mgr.id)) ? mgr.id : null;
 
   const mgrAddress = mgr
     ? [mgr.street, mgr.house].filter(Boolean).join(", ") || null
@@ -240,6 +246,9 @@ export default async function ManagerOrderDetailPage({
         </div>
         <div className="flex items-center gap-2">
           {!editable && <OrderStatusBadge status={order.status} />}
+          {locked && !order.closedAt && !order.archived && (
+            <OrderActualToggle orderId={order.id} isActual={order.isActual} />
+          )}
           <Link
             href={`/manager/orders/${id}/print`}
             target="_blank"

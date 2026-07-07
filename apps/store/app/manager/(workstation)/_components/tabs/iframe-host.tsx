@@ -36,7 +36,9 @@ export function IframeHost() {
         const visible = isMain || isSplitPane;
         return (
           <div
-            key={tab.id}
+            // nav у ключі: повторний клік по блоку в сайдбарі перезавантажує
+            // iframe на головну сторінку блоку (7.3).
+            key={`${tab.id}:${tab.nav ?? 0}`}
             className="absolute inset-y-0 flex flex-col"
             style={{
               display: visible ? "flex" : "none",

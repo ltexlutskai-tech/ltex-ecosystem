@@ -5,11 +5,18 @@ const { mockPrisma, getCurrentRateMock, recordClientEventSafeMock } =
     const tx = {
       orderItem: { deleteMany: vi.fn() },
       order: { update: vi.fn(), create: vi.fn(), updateMany: vi.fn() },
+      // Нумерація 7.3 (nextOrderNumber1C) — MAX(number_1c) по L-номерах.
+      $queryRaw: vi.fn(
+        async (): Promise<Array<{ max_num: bigint | null }>> => [
+          { max_num: 2477n },
+        ],
+      ),
     };
     return {
       mockPrisma: {
         order: {
-          create: vi.fn(),
+          // create завжди йде через транзакцію (нумерація 7.3) — той самий fn.
+          create: tx.order.create,
           update: tx.order.update,
           updateMany: tx.order.updateMany,
         },
@@ -215,7 +222,7 @@ describe("createOrderWithItems", () => {
     expect(call.data.isActual).toBe(true);
   });
 
-  it("post=true → status=posted, archived=true, isActual=false", async () => {
+  it("post=true → status=posted, АКТУАЛЬНЕ і НЕ архів (7.3, як 1С)", async () => {
     mockPrisma.order.create.mockResolvedValueOnce(fakeOrder());
     await createOrderWithItems(
       { ...baseInput, post: true },
@@ -226,16 +233,34 @@ describe("createOrderWithItems", () => {
       data: { status: string; archived: boolean; isActual: boolean };
     };
     expect(call.data.status).toBe("posted");
-    expect(call.data.archived).toBe(true);
-    expect(call.data.isActual).toBe(false);
+    expect(call.data.archived).toBe(false);
+    expect(call.data.isActual).toBe(true);
   });
 
-  it("clearOtherActual=false → НЕ використовує транзакцію, прямий create", async () => {
+  it("присвоює номер L… (продовження нумерації 1С, 7.3)", async () => {
+    mockPrisma.order.create.mockResolvedValueOnce(fakeOrder());
+    await createOrderWithItems(baseInput, baseCustomer, actor);
+    const call = mockPrisma.order.create.mock.calls[0]?.[0] as {
+      data: { number1C: string };
+    };
+    expect(call.data.number1C).toBe("L0000002478");
+  });
+
+  it("нумерація з порожньої бази стартує з L0000000001", async () => {
+    mockPrisma._tx.$queryRaw.mockResolvedValueOnce([{ max_num: null }]);
+    mockPrisma.order.create.mockResolvedValueOnce(fakeOrder());
+    await createOrderWithItems(baseInput, baseCustomer, actor);
+    const call = mockPrisma.order.create.mock.calls[0]?.[0] as {
+      data: { number1C: string };
+    };
+    expect(call.data.number1C).toBe("L0000000001");
+  });
+
+  it("clearOtherActual=false → створює без зняття isActual зі старих", async () => {
     mockPrisma.order.create.mockResolvedValueOnce(fakeOrder());
     await createOrderWithItems(baseInput, baseCustomer, actor, {
       clearOtherActual: false,
     });
-    expect(mockPrisma.$transaction).not.toHaveBeenCalled();
     expect(mockPrisma.order.create).toHaveBeenCalledOnce();
     expect(mockPrisma._tx.order.updateMany).not.toHaveBeenCalled();
   });
@@ -367,7 +392,7 @@ describe("updateOrderWithItems", () => {
     expect(call.data.isActual).toBe(false);
   });
 
-  it("posted (archived) форсує isActual=false навіть якщо передано true", async () => {
+  it("проведення (posted) НЕ архівує і не знімає актуальність (7.3)", async () => {
     mockPrisma.order.update.mockResolvedValueOnce(fakeUpdatedOrder());
     await updateOrderWithItems(
       "ord1",
@@ -375,6 +400,23 @@ describe("updateOrderWithItems", () => {
       actor,
       {
         nextStatus: "posted",
+      },
+    );
+    const call = mockPrisma.order.update.mock.calls[0]?.[0] as {
+      data: { isActual?: boolean; archived?: boolean };
+    };
+    expect(call.data.isActual).toBe(true);
+    expect(call.data.archived).toBeUndefined();
+  });
+
+  it("скасування (cancelled) архівує і форсує isActual=false", async () => {
+    mockPrisma.order.update.mockResolvedValueOnce(fakeUpdatedOrder());
+    await updateOrderWithItems(
+      "ord1",
+      { ...baseInput, isActual: true },
+      actor,
+      {
+        nextStatus: "cancelled",
       },
     );
     const call = mockPrisma.order.update.mock.calls[0]?.[0] as {

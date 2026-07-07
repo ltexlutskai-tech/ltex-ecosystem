@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Prisma, prisma } from "@ltex/db";
+import { maskPhone } from "@ltex/shared";
 import { getCurrentUser } from "@/lib/auth/manager-auth";
 import { getOwnedClientIds } from "@/lib/manager/client-visibility";
 
@@ -58,6 +59,9 @@ export async function GET(req: NextRequest) {
         region: true,
         debt: true,
         priceTypeId: true,
+        phonePrimary: true,
+        street: true,
+        house: true,
         deliveryMethod: { select: { code: true } },
         agent: { select: { id: true, fullName: true } },
       },
@@ -65,19 +69,27 @@ export async function GET(req: NextRequest) {
   ]);
 
   return NextResponse.json({
-    items: rows.map((c) => ({
-      id: c.id,
-      code1C: c.code1C,
-      name: c.name,
-      tradePointName: c.tradePointName,
-      city: c.city,
-      region: c.region,
-      debt: c.debt.toString(),
-      priceTypeId: c.priceTypeId,
-      deliveryMethodCode: c.deliveryMethod?.code ?? null,
-      agent: c.agent ? { id: c.agent.id, fullName: c.agent.fullName } : null,
-      isOwned: ownedIds === null ? true : ownedIds.has(c.id),
-    })),
+    items: rows.map((c) => {
+      const isOwned = ownedIds === null ? true : ownedIds.has(c.id);
+      // Контакти: своїм — повністю; чужим — телефон masked, адреса прихована
+      // (та сама політика, що в картці клієнта, M1.3f).
+      const address = [c.street, c.house].filter(Boolean).join(", ") || null;
+      return {
+        id: c.id,
+        code1C: c.code1C,
+        name: c.name,
+        tradePointName: c.tradePointName,
+        city: c.city,
+        region: c.region,
+        phone: (isOwned ? c.phonePrimary : maskPhone(c.phonePrimary)) ?? null,
+        address: isOwned ? address : null,
+        debt: c.debt.toString(),
+        priceTypeId: c.priceTypeId,
+        deliveryMethodCode: c.deliveryMethod?.code ?? null,
+        agent: c.agent ? { id: c.agent.id, fullName: c.agent.fullName } : null,
+        isOwned,
+      };
+    }),
     total,
     page,
     pageSize,

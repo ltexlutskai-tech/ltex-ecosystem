@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { Search, X } from "lucide-react";
 import { Input } from "@ltex/ui";
 import { useDebouncedValue } from "./use-debounced-search";
@@ -69,7 +70,18 @@ export function ClientPicker({
         <label className="text-sm font-medium text-gray-700">Клієнт</label>
         <div className="flex items-center justify-between rounded-lg border bg-white p-3">
           <div>
-            <div className="font-medium text-gray-900">{selected.name}</div>
+            {/* Свій клієнт → ПІБ клікабельний (картка клієнта); чужий — ні. */}
+            {selected.isOwned ? (
+              <Link
+                href={`/manager/customers/${selected.id}`}
+                title="Відкрити картку клієнта"
+                className="font-medium text-gray-900 hover:text-green-700 hover:underline"
+              >
+                {selected.name}
+              </Link>
+            ) : (
+              <div className="font-medium text-gray-900">{selected.name}</div>
+            )}
             <div className="text-xs text-gray-500">
               {selected.tradePointName ? `${selected.tradePointName} · ` : ""}
               {selected.city ?? ""}{" "}

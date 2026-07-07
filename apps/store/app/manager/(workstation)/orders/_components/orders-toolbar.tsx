@@ -34,13 +34,29 @@ export function OrdersToolbar() {
   const [showFilters, setShowFilters] = useState(hasColumnFilters);
 
   useEffect(() => {
-    setSearch(searchParams.get("search") ?? "");
+    // `search` НЕ синхронізуємо з URL — живий пошук (нижче) сам веде URL,
+    // а зворотна синхронізація перетирала б набраний текст під час transition.
     setFrom(searchParams.get("from") ?? "");
     setTo(searchParams.get("to") ?? "");
     setClientName(searchParams.get("clientName") ?? "");
     setCity(searchParams.get("city") ?? "");
     setAgent(searchParams.get("agent") ?? "");
   }, [searchParams]);
+
+  // Живий пошук (7.3): застосовується при наборі, без Enter (debounce 350мс).
+  useEffect(() => {
+    const urlValue = searchParams.get("search") ?? "";
+    if (search.trim() === urlValue) return;
+    const handle = window.setTimeout(() => {
+      const sp = new URLSearchParams(searchParams.toString());
+      if (search.trim()) sp.set("search", search.trim());
+      else sp.delete("search");
+      sp.delete("page");
+      startTransition(() => router.replace(`${pathname}?${sp.toString()}`));
+    }, 350);
+    return () => window.clearTimeout(handle);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [search, searchParams]);
 
   function setParam(name: string, value: string | null) {
     const sp = new URLSearchParams(searchParams.toString());
@@ -98,9 +114,6 @@ export function OrdersToolbar() {
               className="pl-8"
             />
           </div>
-          <Button type="submit" variant="outline" size="sm">
-            Шукати
-          </Button>
         </form>
 
         <select

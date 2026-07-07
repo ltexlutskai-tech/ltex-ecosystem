@@ -162,6 +162,8 @@ describe("GET /api/v1/manager/clients/search-all", () => {
         "name",
         "tradePointName",
         "city",
+        "phone",
+        "address",
         "debt",
         "priceTypeId",
         "deliveryMethodCode",

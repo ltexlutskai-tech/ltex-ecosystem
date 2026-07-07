@@ -10,6 +10,7 @@ import {
 import { rateLimit, getClientIp } from "@/lib/rate-limit";
 import { resolveOrCreateSiteClient } from "@/lib/manager/site-client";
 import { createSiteOrderReminders } from "@/lib/manager/site-order-reminders";
+import { nextOrderNumber1C } from "@/lib/manager/order-number-generator";
 
 export async function POST(request: NextRequest) {
   // Rate limit: 5 orders per minute per IP
@@ -118,9 +119,12 @@ export async function POST(request: NextRequest) {
 
   try {
     const order = await prisma.$transaction(async (tx) => {
+      // Людський номер (7.3): продовжуємо нумерацію 1С (L…).
+      const number1C = await nextOrderNumber1C(tx);
       const ord = await tx.order.create({
         data: {
           customerId: dbCustomer.id,
+          number1C,
           status: "draft",
           source: "site",
           assignedAgentUserId,

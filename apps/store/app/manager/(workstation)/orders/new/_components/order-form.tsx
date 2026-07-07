@@ -329,7 +329,17 @@ export function OrderForm({
             <div className="flex items-center justify-between rounded-lg border bg-gray-50 p-3">
               <div>
                 <div className="font-medium text-gray-900">
-                  {clientSummary?.name ?? "—"}
+                  {mgrClientId && clientSummary ? (
+                    <Link
+                      href={`/manager/customers/${mgrClientId}`}
+                      title="Відкрити картку клієнта"
+                      className="hover:text-green-700 hover:underline"
+                    >
+                      {clientSummary.name}
+                    </Link>
+                  ) : (
+                    (clientSummary?.name ?? "—")
+                  )}
                 </div>
                 <div className="text-xs text-gray-500">
                   {clientSummary?.city ?? ""}{" "}
