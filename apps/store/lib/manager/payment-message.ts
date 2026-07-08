@@ -65,12 +65,19 @@ export interface PaymentReceiptRates {
 export interface PaymentReceiptInput {
   /** Назва клієнта (контрагента). */
   clientName: string;
+  /**
+   * Вид руху: `income` (Приход/ПКО — оплата від клієнта, дефолт) або `expense`
+   * (Расход/РКО — видача коштів клієнту). Керує шапкою/підписами квитанції.
+   */
+  type?: "income" | "expense";
   /** Фактична оплата по каналах. */
   paid: PaymentReceiptPaid;
   /** Решта (здача) по валютах (готівкою). */
   change: PaymentReceiptChange;
   /** Назва банк. рахунку (для рядка безналу, за наявності). */
   bankAccountName?: string | null;
+  /** Призначення платежу (для безготівки, за наявності). */
+  paymentPurpose?: string | null;
   /** Курси-знімок. */
   rates: PaymentReceiptRates;
   /** Сума до сплати (EUR) — база для розрахунку боргу/переплати. */
@@ -144,33 +151,34 @@ function changeToEur(
  */
 export function buildPaymentReceiptText(input: PaymentReceiptInput): string {
   const lines: string[] = [];
+  const isExpense = input.type === "expense";
 
-  // ── Шапка ──
-  lines.push("Оплата");
+  // ── Шапка ── (Приход = «Оплата», Расход = «Видача коштів»)
+  lines.push(isExpense ? "Видача коштів" : "Оплата");
   lines.push(input.clientName.trim());
 
-  // ── Оплачено (зведено у EUR) ──
+  // ── Зведена сума (у EUR) ──
   const paidEur = paidToEur(input.paid, input.rates);
   lines.push("");
-  lines.push(`Оплачено: ${eur(paidEur)}`);
+  lines.push(`${isExpense ? "Видано" : "Оплачено"}: ${eur(paidEur)}`);
 
-  // ── Фактична оплата по валютах (лише ненульові) ──
+  // ── Фактична сума по валютах (лише ненульові) ──
   const factLines: string[] = [];
   if (input.paid.uah > 0)
     factLines.push(`  Готівка грн: ${uah(input.paid.uah)}`);
   if (input.paid.uahCashless > 0) {
     const acct = input.bankAccountName?.trim();
-    factLines.push(
-      acct
-        ? `  Безнал грн: ${uah(input.paid.uahCashless)} (${acct})`
-        : `  Безнал грн: ${uah(input.paid.uahCashless)}`,
-    );
+    const purpose = input.paymentPurpose?.trim();
+    let line = `  Безнал грн: ${uah(input.paid.uahCashless)}`;
+    if (acct) line += ` (${acct})`;
+    if (purpose) line += ` — ${purpose}`;
+    factLines.push(line);
   }
   if (input.paid.eur > 0) factLines.push(`  EUR: ${eur(input.paid.eur)}`);
   if (input.paid.usd > 0) factLines.push(`  USD: ${usd(input.paid.usd)}`);
   if (factLines.length > 0) {
     lines.push("");
-    lines.push("Фактична оплата:");
+    lines.push(isExpense ? "Фактична видача:" : "Фактична оплата:");
     lines.push(...factLines);
   }
 
@@ -191,14 +199,17 @@ export function buildPaymentReceiptText(input: PaymentReceiptInput): string {
     lines.push(`Накладений платіж: ${uah(input.codAmountUah)}`);
   }
 
-  // ── Борг / переплата (залишок документа, §B-3) ──
-  const changeEur = changeToEur(input.change, input.rates);
-  const balanceEur =
-    Math.round((input.sumToPayEur - paidEur + changeEur) * 100) / 100;
-  if (balanceEur > 0) {
-    lines.push(`Борг: ${eur(balanceEur)}`);
-  } else if (balanceEur < 0) {
-    lines.push(`Переплата: ${eur(-balanceEur)}`);
+  // ── Борг / переплата (залишок документа, §B-3) ── лише для Приходу; для
+  // Расходу (видача коштів) поняття боргу з цієї суми не застосовне.
+  if (!isExpense) {
+    const changeEur = changeToEur(input.change, input.rates);
+    const balanceEur =
+      Math.round((input.sumToPayEur - paidEur + changeEur) * 100) / 100;
+    if (balanceEur > 0) {
+      lines.push(`Борг: ${eur(balanceEur)}`);
+    } else if (balanceEur < 0) {
+      lines.push(`Переплата: ${eur(-balanceEur)}`);
+    }
   }
 
   return lines.join("\n");

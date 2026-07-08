@@ -78,6 +78,9 @@ export const processPaymentSchema = z
     changeUsd: amountField,
     /** Банківський рахунок (довідник) — для безналу. */
     bankAccountId: z.string().min(1).optional(),
+    /** Задача E — реквізити безготівки (для звірки з банком). */
+    paymentMethod: z.enum(["cash", "card", "bank"]).optional(),
+    paymentPurpose: z.string().max(500).optional(),
     /** Стаття руху коштів (довідник) — обов'язкова для Расход. */
     cashFlowArticleId: z.string().min(1).optional(),
     comment: z.string().max(2000).optional(),

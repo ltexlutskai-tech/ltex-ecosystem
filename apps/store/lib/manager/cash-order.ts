@@ -403,6 +403,9 @@ export interface CreatePaymentArgs {
   /** Ручна решта (здача) у 3 валютах. */
   change: ChangeChannels;
   bankAccountId?: string | null;
+  /** Задача E — реквізити безготівки (спосіб + призначення платежу). */
+  paymentMethod?: string | null;
+  paymentPurpose?: string | null;
   cashFlowArticleId?: string | null;
   comment?: string | null;
   /** Курси-знімок (грн за €/$) — для `documentSumEur`. */
@@ -434,6 +437,8 @@ export async function createPaymentOrders(args: CreatePaymentArgs) {
     paid,
     change,
     bankAccountId,
+    paymentMethod,
+    paymentPurpose,
     cashFlowArticleId,
     comment,
     rates,
@@ -456,6 +461,9 @@ export async function createPaymentOrders(args: CreatePaymentArgs) {
         amountUsd: paid.usd,
         amountUahCashless: paid.uahCashless,
         bankAccountId: bankAccountId ?? null,
+        // Задача E — реквізити безготівки (лише коли є безнал).
+        paymentMethod: paid.uahCashless > 0 ? (paymentMethod ?? null) : null,
+        paymentPurpose: paid.uahCashless > 0 ? (paymentPurpose ?? null) : null,
         cashFlowArticleId: cashFlowArticleId ?? null,
         rateEur: rates.eur,
         rateUsd: rates.usd,

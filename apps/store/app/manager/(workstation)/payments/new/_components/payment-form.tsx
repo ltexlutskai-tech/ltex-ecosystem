@@ -151,6 +151,9 @@ export function PaymentForm({
 
   // ─── Банк. рахунок / стаття / коментар ────────────────────────────────────
   const [bankAccountId, setBankAccountId] = useState("");
+  // Задача E — реквізити безготівки (спосіб + призначення платежу).
+  const [paymentMethod, setPaymentMethod] = useState<"card" | "bank">("bank");
+  const [paymentPurpose, setPaymentPurpose] = useState("");
   const [cashFlowArticleId, setCashFlowArticleId] = useState("");
   const [comment, setComment] = useState("");
 
@@ -287,6 +290,12 @@ export function PaymentForm({
           changeEur: change.eur,
           changeUsd: change.usd,
           bankAccountId: bankAccountId || undefined,
+          // Задача E — реквізити безготівки (лише коли є безнал).
+          paymentMethod: paid.uahCashless > 0 ? paymentMethod : undefined,
+          paymentPurpose:
+            paid.uahCashless > 0
+              ? paymentPurpose.trim() || undefined
+              : undefined,
           cashFlowArticleId: cashFlowArticleId || undefined,
           comment: comment.trim() || undefined,
           rateEur: rates.eur,
@@ -367,6 +376,7 @@ export function PaymentForm({
     setShareText(
       buildPaymentReceiptText({
         clientName: pickedClientLabel ?? clientLabel ?? "",
+        type: direction,
         paid: {
           uah: paid.uah,
           eur: paid.eur,
@@ -375,6 +385,7 @@ export function PaymentForm({
         },
         change: { uah: change.uah, eur: change.eur, usd: change.usd },
         bankAccountName: acct,
+        paymentPurpose: paymentPurpose.trim() || null,
         rates: { eur: rates.eur, usd: rates.usd },
         sumToPayEur,
         cashOnDelivery: codAmountUah !== null,
@@ -563,6 +574,28 @@ export function PaymentForm({
                 Частина рахунків прихована при приході.
               </p>
             )}
+            {/* Задача E — реквізити безготівки для звірки з банком. */}
+            <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <Field label="Спосіб">
+                <select
+                  value={paymentMethod}
+                  onChange={(e) =>
+                    setPaymentMethod(e.target.value as "card" | "bank")
+                  }
+                  className={INPUT_CLASS}
+                >
+                  <option value="bank">Банківський переказ</option>
+                  <option value="card">Картка</option>
+                </select>
+              </Field>
+              <Field label="Призначення платежу">
+                <Input
+                  value={paymentPurpose}
+                  onChange={(e) => setPaymentPurpose(e.target.value)}
+                  placeholder="Оплата за товар…"
+                />
+              </Field>
+            </div>
           </div>
         )}
       </Section>

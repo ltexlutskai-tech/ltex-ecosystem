@@ -211,6 +211,8 @@ export async function POST(req: NextRequest) {
         usd: input.changeUsd,
       },
       bankAccountId: input.bankAccountId ?? null,
+      paymentMethod: input.paymentMethod ?? null,
+      paymentPurpose: input.paymentPurpose ?? null,
       cashFlowArticleId: input.cashFlowArticleId ?? null,
       comment: input.comment ?? null,
       rates,
