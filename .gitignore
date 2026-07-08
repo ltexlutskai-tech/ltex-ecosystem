@@ -157,3 +157,9 @@ packages/db/prisma/*.db-journal
 .env.test.local
 .env.production.local
 .claude/
+# ...але тримаємо спільні (командні) налаштування у репозиторії:
+!.claude/
+.claude/*
+!.claude/settings.json
+!.claude/hooks/
+.claude/settings.local.json

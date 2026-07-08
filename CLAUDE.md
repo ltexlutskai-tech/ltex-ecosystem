@@ -282,6 +282,15 @@ Contacts: Telegram @L_TEX, +380 67 671 05 15, +380 99 358 49 92, ltex.lutsk.ai@g
 
 Більше правил — у `docs/CONVENTIONS.md`.
 
+## Dev Tooling — Skills & Hooks (2026-07-08)
+
+Налаштовано інструменти для ефективнішої й безпечнішої розробки:
+
+- **SessionStart hook** (`.claude/hooks/session-start.sh` + `.claude/settings.json`) — при старті кожної хмарної (web) сесії автоматично робить `pnpm install --frozen-lockfile` + `prisma generate`, щоб typecheck/тести/prettier працювали одразу (дзеркалить CI). Gated на `CLAUDE_CODE_REMOTE=true` — локально нічого не робить. ~20с.
+- **`/code-review`** (built-in skill) — перед мержем гілки воркера у `main` прогнати по діфу; ловить баги/спрощення. Орієнтир для orchestrator-а.
+- **`/security-review`** (built-in skill) — перед кожним деплоєм (особливо великим) прогнати по змінах; шукає вразливості (auth, ін'єкції, витік даних). У проекті каса/борги/JWT — безпека критична.
+- **CodeQL** (`.github/workflows/codeql.yml`) — автоматичний статичний аналіз безпеки на кожен PR/пуш у `main` + щотижня. Ловить SQL-ін'єкції, XSS, path traversal, діри в авторизації без ручного запуску. Результати — у вкладці **Security** репозиторію на GitHub.
+
 ## Orchestration Workflow
 
 ### Session Types
