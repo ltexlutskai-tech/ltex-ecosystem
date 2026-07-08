@@ -92,56 +92,85 @@ export default async function CashFlowRegisterPage({
     .filter((c) => c.startsWith("local:"))
     .map((c) => c.slice("local:".length));
 
-  // Документ-реєстратор може бути касовим ордером АБО банк-платіжкою.
-  const [articles, accounts, cashOrders, localCashOrders, bankIn, bankOut] =
-    await Promise.all([
-      articleCodes.length
-        ? prisma.mgrCashFlowArticle.findMany({
-            where: {
-              OR: [
-                { code1C: { in: articleCodes } },
-                { id: { in: articleCodes } },
-              ],
-            },
-            select: { id: true, code1C: true, name: true },
-          })
-        : Promise.resolve([]),
-      accountCodes.length
-        ? prisma.mgrBankAccount.findMany({
-            where: {
-              OR: [
-                { code1C: { in: accountCodes } },
-                { id: { in: accountCodes } },
-              ],
-            },
-            select: { id: true, code1C: true, name: true },
-          })
-        : Promise.resolve([]),
-      recorderCodes.length
-        ? prisma.mgrCashOrder.findMany({
-            where: { code1C: { in: recorderCodes } },
-            select: { id: true, code1C: true, number1C: true },
-          })
-        : Promise.resolve([]),
-      localRecorderIds.length
-        ? prisma.mgrCashOrder.findMany({
-            where: { id: { in: localRecorderIds } },
-            select: { id: true, number1C: true, type: true },
-          })
-        : Promise.resolve([]),
-      recorderCodes.length
-        ? prisma.bankPaymentIncoming.findMany({
-            where: { code1C: { in: recorderCodes } },
-            select: { id: true, code1C: true, number1C: true },
-          })
-        : Promise.resolve([]),
-      recorderCodes.length
-        ? prisma.bankPaymentOutgoing.findMany({
-            where: { code1C: { in: recorderCodes } },
-            select: { id: true, code1C: true, number1C: true },
-          })
-        : Promise.resolve([]),
-    ]);
+  // Документ-реєстратор може бути касовим ордером АБО банк-платіжкою АБО
+  // переміщенням. Історичні (1С) резолвляться по `code1C` (hex); нативні —
+  // по `id` з ключа `local:<id>` (касовий ордер / банк-платіжка / переміщення).
+  const [
+    articles,
+    accounts,
+    cashOrders,
+    localCashOrders,
+    bankIn,
+    bankOut,
+    localBankIn,
+    localBankOut,
+    localTransfers,
+  ] = await Promise.all([
+    articleCodes.length
+      ? prisma.mgrCashFlowArticle.findMany({
+          where: {
+            OR: [
+              { code1C: { in: articleCodes } },
+              { id: { in: articleCodes } },
+            ],
+          },
+          select: { id: true, code1C: true, name: true },
+        })
+      : Promise.resolve([]),
+    accountCodes.length
+      ? prisma.mgrBankAccount.findMany({
+          where: {
+            OR: [
+              { code1C: { in: accountCodes } },
+              { id: { in: accountCodes } },
+            ],
+          },
+          select: { id: true, code1C: true, name: true },
+        })
+      : Promise.resolve([]),
+    recorderCodes.length
+      ? prisma.mgrCashOrder.findMany({
+          where: { code1C: { in: recorderCodes } },
+          select: { id: true, code1C: true, number1C: true },
+        })
+      : Promise.resolve([]),
+    localRecorderIds.length
+      ? prisma.mgrCashOrder.findMany({
+          where: { id: { in: localRecorderIds } },
+          select: { id: true, number1C: true, type: true },
+        })
+      : Promise.resolve([]),
+    recorderCodes.length
+      ? prisma.bankPaymentIncoming.findMany({
+          where: { code1C: { in: recorderCodes } },
+          select: { id: true, code1C: true, number1C: true },
+        })
+      : Promise.resolve([]),
+    recorderCodes.length
+      ? prisma.bankPaymentOutgoing.findMany({
+          where: { code1C: { in: recorderCodes } },
+          select: { id: true, code1C: true, number1C: true },
+        })
+      : Promise.resolve([]),
+    localRecorderIds.length
+      ? prisma.bankPaymentIncoming.findMany({
+          where: { id: { in: localRecorderIds } },
+          select: { id: true, number1C: true, docNumber: true },
+        })
+      : Promise.resolve([]),
+    localRecorderIds.length
+      ? prisma.bankPaymentOutgoing.findMany({
+          where: { id: { in: localRecorderIds } },
+          select: { id: true, number1C: true, docNumber: true },
+        })
+      : Promise.resolve([]),
+    localRecorderIds.length
+      ? prisma.cashTransfer.findMany({
+          where: { id: { in: localRecorderIds } },
+          select: { id: true, number1C: true, docNumber: true },
+        })
+      : Promise.resolve([]),
+  ]);
 
   const articleName = new Map<string, string>();
   for (const a of articles) {
@@ -180,6 +209,22 @@ export default async function CashFlowRegisterPage({
         text: b.number1C ?? "Платіжка вих.",
         href: `/manager/bank-payments-outgoing/${b.id}`,
       });
+  // Нативні (не-1С) казначейські документи — ключ `local:<id>`.
+  for (const b of localBankIn)
+    docByCode.set(`local:${b.id}`, {
+      text: b.number1C ?? `Платіжка вх. №${b.docNumber}`,
+      href: `/manager/bank-payments-incoming/${b.id}`,
+    });
+  for (const b of localBankOut)
+    docByCode.set(`local:${b.id}`, {
+      text: b.number1C ?? `Платіжка вих. №${b.docNumber}`,
+      href: `/manager/bank-payments-outgoing/${b.id}`,
+    });
+  for (const t of localTransfers)
+    docByCode.set(`local:${t.id}`, {
+      text: t.number1C ?? `Переміщення №${t.docNumber}`,
+      href: `/manager/cash-transfers/${t.id}`,
+    });
 
   const short = (h: string | null) => (h ? `…${h.slice(-6)}` : "—");
 
