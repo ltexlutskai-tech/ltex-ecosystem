@@ -40,8 +40,10 @@ export async function POST(req: NextRequest) {
   }
 
   const { email, password } = parsed.data;
+  // Нормалізація email: trim + lowercase (мобільні клавіатури додають пробіл /
+  // велику першу літеру — інакше вхід падає з «невірний логін/пароль»).
   const user = await prisma.user.findUnique({
-    where: { email: email.toLowerCase() },
+    where: { email: email.trim().toLowerCase() },
   });
 
   // Anti-enumeration — same response for "no user" + "wrong password"

@@ -19,7 +19,9 @@ export function LoginForm() {
       const res = await fetch("/api/v1/manager/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
+        // Мобільні клавіатури часто додають пробіл/велику літеру в email —
+        // нормалізуємо, щоб вхід не падав через це. Пароль НЕ чіпаємо.
+        body: JSON.stringify({ email: email.trim().toLowerCase(), password }),
       });
       if (res.ok) {
         router.push("/manager");
@@ -77,6 +79,10 @@ export function LoginForm() {
         <Input
           id="email"
           type="email"
+          inputMode="email"
+          autoCapitalize="none"
+          autoCorrect="off"
+          spellCheck={false}
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           autoComplete="email"

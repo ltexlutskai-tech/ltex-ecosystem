@@ -1,7 +1,9 @@
 import { z } from "zod";
 
 export const loginSchema = z.object({
-  email: z.string().email("Невірний email").max(120),
+  // trim + lowercase ДО перевірки формату — мобільні клавіатури додають пробіл
+  // / велику першу літеру, через що вхід падав «невірний логін/пароль».
+  email: z.string().trim().toLowerCase().email("Невірний email").max(120),
   password: z.string().min(1).max(200),
 });
 export type LoginInput = z.infer<typeof loginSchema>;

@@ -91,6 +91,18 @@ describe("POST /api/v1/manager/auth/login", () => {
     expect(recordFailedMock).not.toHaveBeenCalled();
   });
 
+  it("нормалізує «мобільний» email (пробіл + велика літера) → 200", async () => {
+    mockPrisma.user.findUnique.mockResolvedValue(ACTIVE_USER);
+    const res = await POST(
+      makeReq({ email: "  Alice@Example.com ", password: "alice-pw-1234" }),
+    );
+    expect(res.status).toBe(200);
+    // Пошук користувача — за нормалізованим email (без пробілів, нижній регістр).
+    expect(mockPrisma.user.findUnique).toHaveBeenCalledWith({
+      where: { email: "alice@example.com" },
+    });
+  });
+
   it("returns 401 + records failed login on wrong password", async () => {
     mockPrisma.user.findUnique.mockResolvedValue(ACTIVE_USER);
     const res = await POST(
