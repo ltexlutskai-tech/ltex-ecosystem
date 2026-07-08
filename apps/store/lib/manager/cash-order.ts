@@ -1,6 +1,7 @@
 import { prisma } from "@ltex/db";
 import type { ChangeCurrency } from "@/lib/validations/manager-cash-order";
 import { applyDebtMovementSafe } from "@/lib/manager/debt-register";
+import { applyCashFlowMovementsSafe } from "@/lib/manager/cashflow-register";
 
 /**
  * Блок «Реалізація» — Етап 4. Касовий ордер (каса) + розрахунок здачі.
@@ -548,6 +549,42 @@ export async function createPaymentOrders(args: CreatePaymentArgs) {
         createdByUserId: agentUserId ?? null,
       });
     }
+  }
+
+  // Задача A: рухи в регістр ДДС `CashFlowMovement` (як проведення 1С). Пишемо і
+  // для основного ордера, і для ордера-здачі (розхід). Fire-and-forget після
+  // коміту; чиста корекція боргу (усі суми 0) рухів не створює.
+  applyCashFlowMovementsSafe({
+    id: result.income.id,
+    type: result.income.type,
+    amountUah: result.income.amountUah,
+    amountEur: result.income.amountEur,
+    amountUsd: result.income.amountUsd,
+    amountUahCashless: result.income.amountUahCashless,
+    rateEur: result.income.rateEur,
+    rateUsd: result.income.rateUsd,
+    bankAccountId: result.income.bankAccountId,
+    cashFlowArticleId: result.income.cashFlowArticleId,
+    customerId: result.income.customerId,
+    saleId: result.income.saleId,
+    occurredAt: result.income.paidAt ?? result.income.createdAt ?? new Date(),
+  });
+  if (result.change) {
+    applyCashFlowMovementsSafe({
+      id: result.change.id,
+      type: result.change.type,
+      amountUah: result.change.amountUah,
+      amountEur: result.change.amountEur,
+      amountUsd: result.change.amountUsd,
+      amountUahCashless: result.change.amountUahCashless,
+      rateEur: result.change.rateEur,
+      rateUsd: result.change.rateUsd,
+      bankAccountId: result.change.bankAccountId,
+      cashFlowArticleId: result.change.cashFlowArticleId,
+      customerId: result.change.customerId,
+      saleId: result.change.saleId,
+      occurredAt: result.change.paidAt ?? result.change.createdAt ?? new Date(),
+    });
   }
 
   return result;

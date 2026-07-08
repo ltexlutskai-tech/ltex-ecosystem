@@ -8,6 +8,7 @@ import {
   recomputeDebtForClients,
   resolveClientIdByCustomer,
 } from "@/lib/manager/debt-register";
+import { deleteCashFlowMovementsForOrder } from "@/lib/manager/cashflow-register";
 
 /**
  * Видалення касового ордера / оплати (з контекстного меню списку Оплати).
@@ -86,11 +87,23 @@ export async function DELETE(
     });
     const affectedClientIds = new Set(debtMovements.map((m) => m.clientId));
 
+    // Парні ордери-здачі (розхід) цього приходу — потрібні їхні id, щоб прибрати
+    // їхні рухи ДДС (реєстратор `local:<changeId>`).
+    const changeOrders = await prisma.mgrCashOrder.findMany({
+      where: { changeForId: id },
+      select: { id: true },
+    });
+
     await prisma.$transaction(async (tx) => {
       // Спочатку прибираємо рух боргу цього ордера.
       await tx.mgrDebtMovement.deleteMany({
         where: { sourceType: "cash_order", sourceId: id },
       });
+      // Рухи ДДС основного ордера + усіх його ордерів-здач.
+      await deleteCashFlowMovementsForOrder(tx, [
+        id,
+        ...changeOrders.map((o) => o.id),
+      ]);
       // Парний ордер-здача (розхід) посилається на цей прихід через changeForId —
       // видаляємо його теж, інакше лишиться «висячий» розхід.
       await tx.mgrCashOrder.deleteMany({ where: { changeForId: id } });

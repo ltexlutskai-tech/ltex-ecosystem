@@ -478,14 +478,26 @@ async function resolveMaps(
     }),
     accountCodes.length
       ? prisma.mgrBankAccount.findMany({
-          where: { code1C: { in: accountCodes } },
-          select: { code1C: true, name: true },
+          // Нативні рухи пишуть `code1C ?? id`, історичні — hex(code1C).
+          where: {
+            OR: [
+              { code1C: { in: accountCodes } },
+              { id: { in: accountCodes } },
+            ],
+          },
+          select: { id: true, code1C: true, name: true },
         })
       : Promise.resolve([]),
     clientCodes.length
       ? prisma.mgrClient.findMany({
-          where: { uid1C: { in: clientCodes } },
-          select: { uid1C: true, name: true },
+          // Нативні рухи пишуть `Customer.code1C`, історичні — hex(Контрагент)=uid1C.
+          where: {
+            OR: [
+              { uid1C: { in: clientCodes } },
+              { code1C: { in: clientCodes } },
+            ],
+          },
+          select: { uid1C: true, code1C: true, name: true },
         })
       : Promise.resolve([]),
   ]);
@@ -495,34 +507,46 @@ async function resolveMaps(
   const articleParentByCode = new Map<string, string>();
   const articleRootByCode = new Map<string, string>();
   for (const a of allArticles) {
-    if (!a.code1C) continue;
-    articleNameByCode.set(a.code1C, a.name);
-    // Безпосередня папка-категорія.
+    // Безпосередня папка-категорія + коренева (підіймаємось до верху; захист
+    // від циклів). Обчислюємо раз, реєструємо під code1C (1С) І під id (нативні).
     const parent = a.parentId ? articleById.get(a.parentId) : undefined;
-    articleParentByCode.set(a.code1C, parent?.name ?? "Без категорії");
-    // Коренева папка (підіймаємось до верху; захист від циклів).
+    const parentName = parent?.name ?? "Без категорії";
     let cur = parent;
     const seen = new Set<string>();
     while (cur?.parentId && !seen.has(cur.id)) {
       seen.add(cur.id);
       cur = articleById.get(cur.parentId);
     }
-    articleRootByCode.set(
-      a.code1C,
-      cur?.name ?? parent?.name ?? "Без категорії",
-    );
+    const rootName = cur?.name ?? parent?.name ?? "Без категорії";
+
+    const keys = a.code1C ? [a.code1C, a.id] : [a.id];
+    for (const key of keys) {
+      articleNameByCode.set(key, a.name);
+      articleParentByCode.set(key, parentName);
+      articleRootByCode.set(key, rootName);
+    }
+  }
+
+  const accountNameByCode = new Map<string, string>();
+  for (const a of accounts) {
+    if (a.code1C) accountNameByCode.set(a.code1C, a.name);
+    accountNameByCode.set(a.id, a.name);
+  }
+  // Сентинел готівкової каси (нативні готівкові ноги — Задача A).
+  accountNameByCode.set("CASH", "Каса (готівка)");
+
+  const clientNameByCode = new Map<string, string>();
+  for (const c of clients) {
+    if (c.uid1C) clientNameByCode.set(c.uid1C, c.name);
+    if (c.code1C) clientNameByCode.set(c.code1C, c.name);
   }
 
   return {
     articleNameByCode,
     articleParentByCode,
     articleRootByCode,
-    accountNameByCode: new Map(
-      accounts.map((a) => [a.code1C ?? "", a.name] as const),
-    ),
-    clientNameByCode: new Map(
-      clients.map((c) => [c.uid1C ?? "", c.name] as const),
-    ),
+    accountNameByCode,
+    clientNameByCode,
   };
 }
 
