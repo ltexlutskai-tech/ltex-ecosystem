@@ -296,6 +296,7 @@ export async function buildMarginFlexReport(
       },
       sale: {
         select: {
+          id: true,
           code1C: true,
           createdAt: true,
           customer: { select: { code1C: true, name: true } },
@@ -312,8 +313,10 @@ export async function buildMarginFlexReport(
   const customerCodes = new Set<string>();
   const productKeysSeen = new Set<string>();
   for (const it of items) {
-    const code = it.sale.code1C;
-    if (code && !saleCustomerByCode.has(code)) {
+    // Реєстратор нових реалізацій = Sale.id (code1C=null), історичних = code1C.
+    // Збігається з ключем, що пише `applySaleMovements` у CostMovement.
+    const code = it.sale.code1C ?? it.sale.id;
+    if (!saleCustomerByCode.has(code)) {
       saleCustomerByCode.set(code, {
         customerCode1C: it.sale.customer?.code1C ?? null,
         customerName: it.sale.customer?.name ?? "—",
@@ -491,8 +494,8 @@ export async function buildMarginFlexReport(
   }
 
   for (const it of items) {
-    if (!it.sale.code1C) continue;
-    const e = ensure(it.sale.code1C, it.productId, null);
+    const code = it.sale.code1C ?? it.sale.id;
+    const e = ensure(code, it.productId, null);
     e.revenueEur += Number(it.priceEur);
   }
 

@@ -1,6 +1,19 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { buildSalesTree, type NormalizedRow } from "./sales-flex";
+
+const { mockPrisma } = vi.hoisted(() => ({
+  mockPrisma: {
+    saleItem: { count: vi.fn(), findMany: vi.fn() },
+    costMovement: { findMany: vi.fn() },
+    product: { findMany: vi.fn() },
+    mgrClient: { findMany: vi.fn() },
+  },
+}));
+
+vi.mock("@ltex/db", () => ({ prisma: mockPrisma }));
+
 import {
+  buildMarginFlexReport,
   deriveMarginPct,
   flattenMarginToReportShape,
   MARGIN_DIMENSIONS,
@@ -206,6 +219,65 @@ describe("flattenMarginToReportShape", () => {
     const total = shape.rows.find((r) => r[0] === "Разом")!;
     expect(total[1]).toBe(100); // виручка
     expect(total[3]).toBe(15); // валовий = 100-85
+  });
+});
+
+// ─── buildMarginFlexReport: fallback recorder = code1C ?? id ──────────────────
+
+describe("buildMarginFlexReport — нова реалізація (code1C=null)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockPrisma.product.findMany.mockResolvedValue([]);
+    mockPrisma.mgrClient.findMany.mockResolvedValue([]);
+  });
+
+  it("собівартість CostMovement по recorder=id підтягується у звіт", async () => {
+    // Нова реалізація s1: code1C=null → реєстратор рухів = Sale.id.
+    mockPrisma.saleItem.findMany.mockResolvedValue([
+      {
+        priceEur: 100,
+        productId: "p1",
+        product: {
+          id: "p1",
+          code1C: null,
+          name: "Товар",
+          categoryId: "c1",
+          category: { id: "c1", name: "Кат" },
+        },
+        sale: {
+          id: "s1",
+          code1C: null,
+          createdAt: new Date("2026-07-08T00:00:00Z"),
+          customer: null,
+        },
+      },
+    ]);
+    // CostMovement записано з recorderCode1C = Sale.id ("s1").
+    mockPrisma.costMovement.findMany.mockResolvedValue([
+      {
+        recorderCode1C: "s1",
+        productId: "p1",
+        productCode1C: null,
+        costEur: 60,
+      },
+    ]);
+
+    const params = new URLSearchParams({
+      from: "2026-07-01",
+      to: "2026-07-31",
+      groups: "product",
+    });
+    const result = await buildMarginFlexReport(params);
+
+    // Собівартість шукалась саме за id нової реалізації.
+    expect(mockPrisma.costMovement.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { recorderCode1C: { in: ["s1"] } },
+      }),
+    );
+    expect(result.grand.revenueEur).toBe(100);
+    expect(result.grand.costEur).toBe(60);
+    expect(result.grand.grossEur).toBe(40);
   });
 });
 

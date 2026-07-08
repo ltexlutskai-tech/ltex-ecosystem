@@ -5,6 +5,7 @@ import {
   recordClientEventSafe,
 } from "@/lib/manager/client-timeline";
 import { applyDebtMovementSafe } from "@/lib/manager/debt-register";
+import { applySaleMovements } from "@/lib/manager/sale-movement-hooks";
 import { notifyOrdersClosedBySale } from "@/lib/manager/sale-order-close";
 import type {
   CreateSaleInputRaw,
@@ -170,6 +171,9 @@ export async function createSaleWithItems(
       note: "Реалізація проведена",
       createdByUserId: actor.userId,
     });
+    // Рухи регістрів (склад/продажі/собівартість) при проведенні — best-effort,
+    // ідемпотентно (delete-then-create за реєстратором sale.code1C ?? sale.id).
+    applySaleMovements(sale.id);
     // 7.3: нагадування менеджеру, якщо реалізація могла закрити замовлення.
     void notifyOrdersClosedBySale({
       saleId: sale.id,
@@ -247,6 +251,8 @@ export async function updateSaleWithItems(
       note: "Реалізація проведена",
       createdByUserId: _actor.userId,
     });
+    // Рухи регістрів (склад/продажі/собівартість) при проведенні з картки.
+    applySaleMovements(sale.id);
     // 7.3: нагадування менеджеру, якщо реалізація могла закрити замовлення.
     void notifyOrdersClosedBySale({
       saleId: sale.id,
