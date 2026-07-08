@@ -43,10 +43,13 @@ import {
 } from "@/lib/manager/sale-message";
 import { type ManagerSaleStatus } from "@/lib/manager/sale-status";
 import {
+  collectPriceDeviations,
   draftToWire,
+  isForeignActiveReservation,
   lineTotalEur,
   type ClientPickerItem,
   type OrderDeliveryOption,
+  type PriceDeviation,
   type ProductSummary,
   type SaleEditInitial,
   type SaleItemDraft,
@@ -155,6 +158,8 @@ export function SaleForm({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [barcodeError, setBarcodeError] = useState<string | null>(null);
+  // Попередження про відхилення ціни при проведенні (контроль ПеревіркаЦіни).
+  const [priceWarn, setPriceWarn] = useState<PriceDeviation[] | null>(null);
 
   // ─── Повідомлення (Viber/share) ─────────────────────────────────────────
   const [shareOpen, setShareOpen] = useState(false);
@@ -352,6 +357,20 @@ export function SaleForm({
         return;
       }
 
+      // Чужа активна бронь мішка (1С АктивнаБроньМішка) — не додаємо рядок.
+      if (isForeignActiveReservation(data.lot, currentUserId, Date.now())) {
+        const until = data.lot.reservedUntil
+          ? new Date(data.lot.reservedUntil).toLocaleDateString("uk-UA")
+          : "";
+        setBarcodeError(
+          `Активна бронь мішка до ${until}` +
+            (data.lot.reservedByName
+              ? ` (заброньовано: ${data.lot.reservedByName})`
+              : ""),
+        );
+        return;
+      }
+
       const product: ProductSummary = {
         id: data.product.id,
         code1C: data.product.code1C,
@@ -487,6 +506,27 @@ export function SaleForm({
     }
     // МЛ-контекст → назад на сторінку Маршрутного листа; інакше — список.
     router.push(successHref);
+  }
+
+  /**
+   * «Зберегти та провести» з контролем відхилення ціни (1С ПеревіркаЦіни):
+   * якщо ціна/кг рядка відхиляється від еталонної (тип цін) > 0.20 € — спершу
+   * показуємо діалог-підтвердження зі списком позицій; лише «Все одно провести»
+   * реально проводить документ. Для чернетки («Зберегти») контроль не діє.
+   */
+  function requestPost(): void {
+    const deviations = collectPriceDeviations(items);
+    if (deviations.length > 0) {
+      setPriceWarn(deviations);
+      return;
+    }
+    void submit(true);
+  }
+
+  /** Підтвердження з діалогу відхилення ціни → проводимо. */
+  function confirmPostDespiteDeviation(): void {
+    setPriceWarn(null);
+    void submit(true);
   }
 
   /** Зберегти й перейти до оплат на детальній сторінці (Fix 6). */
@@ -1230,7 +1270,7 @@ export function SaleForm({
           <Button
             type="button"
             disabled={!canSubmit}
-            onClick={() => submit(true)}
+            onClick={requestPost}
             className="bg-green-600 text-white hover:bg-green-700"
           >
             {submitting ? "Збереження…" : "Зберегти та провести"}
@@ -1251,6 +1291,62 @@ export function SaleForm({
         title={shareTitle}
         text={shareText}
       />
+
+      {/* Діалог контролю відхилення ціни (без window.confirm — блокується в
+          iframe-менеджерці). Показується лише при проведенні з відхиленням. */}
+      {priceWarn && (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4"
+          onMouseDown={() => setPriceWarn(null)}
+          role="presentation"
+        >
+          <div
+            className="w-full max-w-md rounded-lg bg-white p-5 shadow-xl"
+            role="dialog"
+            aria-modal="true"
+            onMouseDown={(e) => e.stopPropagation()}
+          >
+            <h2 className="text-base font-semibold text-gray-900">
+              Ціна відхиляється від типу цін
+            </h2>
+            <p className="mt-2 text-sm text-gray-600">
+              Наступні позиції мають ціну, що відрізняється від рекомендованої
+              більш ніж на 0,20 €:
+            </p>
+            <ul className="mt-3 max-h-60 space-y-1 overflow-y-auto rounded border bg-gray-50 p-3 text-sm">
+              {priceWarn.map((d, i) => (
+                <li key={i} className="text-gray-700">
+                  <span className="font-medium text-gray-900">{d.name}</span>:
+                  має бути{" "}
+                  <span className="font-semibold">
+                    {d.expected.toFixed(2)} €
+                  </span>
+                  , введено{" "}
+                  <span className="font-semibold text-amber-700">
+                    {d.actual.toFixed(2)} €
+                  </span>
+                </li>
+              ))}
+            </ul>
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setPriceWarn(null)}
+                className="rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50"
+              >
+                Скасувати
+              </button>
+              <button
+                type="button"
+                onClick={confirmPostDespiteDeviation}
+                className="rounded-md bg-green-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-green-700"
+              >
+                Все одно провести
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

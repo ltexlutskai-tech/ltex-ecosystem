@@ -14,6 +14,7 @@ import {
   recomputeDebtForClients,
   resolveClientIdByCustomer,
 } from "@/lib/manager/debt-register";
+import { removeSaleMovements } from "@/lib/manager/sale-movement-hooks";
 
 export async function GET(
   req: NextRequest,
@@ -258,7 +259,7 @@ export async function DELETE(
 
   const existing = await prisma.sale.findUnique({
     where: { id },
-    select: { id: true, customerId: true },
+    select: { id: true, customerId: true, code1C: true },
   });
   if (!existing) {
     return NextResponse.json(
@@ -266,6 +267,9 @@ export async function DELETE(
       { status: 404 },
     );
   }
+
+  // Ключ реєстратора рухів регістрів (як пише `applySaleMovements`).
+  const recorder = existing.code1C ?? existing.id;
 
   try {
     // Клієнти, чий борг треба перерахувати після видалення рухів реалізації.
@@ -293,6 +297,10 @@ export async function DELETE(
     if (affectedClientIds.size > 0) {
       await recomputeDebtForClients(prisma, [...affectedClientIds]);
     }
+
+    // Прибираємо рухи регістрів реалізації (склад/продажі/собівартість) —
+    // best-effort, після успішного видалення документа.
+    removeSaleMovements(recorder);
 
     revalidatePath("/manager/sales");
     return NextResponse.json({ ok: true });

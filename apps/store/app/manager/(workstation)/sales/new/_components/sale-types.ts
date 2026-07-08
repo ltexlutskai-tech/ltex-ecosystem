@@ -12,6 +12,8 @@
  * UI-компоненти підбору/клієнта працювали без дублювання.
  */
 
+import { unitPriceForType } from "@/lib/manager/order-pricing";
+
 export type {
   ProductSummary,
   ProductPriceEntry,
@@ -134,6 +136,70 @@ export function repeatPriceForProduct(
       isAkciya: source.isAkciya ?? false,
     };
   });
+}
+
+/** Одне відхилення ціни рядка від еталонної (для попередження перед проведенням). */
+export interface PriceDeviation {
+  name: string;
+  /** Еталонна ціна/кг (з типу цін `wholesale`). */
+  expected: number;
+  /** Введена менеджером ціна/кг. */
+  actual: number;
+}
+
+/**
+ * Контроль відхилення ціни (1С `ПеревіркаЦіни`). Для кожного рядка з відомим
+ * еталоном порівнює введену ціну/кг з еталонною (продажна `wholesale`); якщо
+ * `|actual − expected| > threshold` (за замовч. 0.20 €) — додає у список.
+ *
+ * Рядки без товару та без еталонної ціни (немає з чим порівнювати) пропускаються.
+ * Чиста функція (без I/O) — покрита тестами.
+ */
+export function collectPriceDeviations(
+  items: SaleItemDraft[],
+  threshold = 0.2,
+): PriceDeviation[] {
+  const out: PriceDeviation[] = [];
+  for (const row of items) {
+    if (!row.product) continue;
+    const ref = unitPriceForType(row.product.prices, "wholesale");
+    if (ref == null) continue;
+    // Округлюємо відхилення до копійок, щоб float-шум (напр. 4.2−4.0=0.2000…18)
+    // не робив рівно-порогове відхилення хибним порушником.
+    const deviation = Math.round(Math.abs(row.pricePerKg - ref) * 100) / 100;
+    if (deviation > threshold) {
+      out.push({
+        name: row.product.name,
+        expected: ref,
+        actual: row.pricePerKg,
+      });
+    }
+  }
+  return out;
+}
+
+/** Мінімальна форма броні лота для перевірки «чужа активна бронь». */
+export interface LotReservationInfo {
+  reservedByUserId: string | null;
+  reservedUntil: string | null;
+}
+
+/**
+ * Перевірка чужої активної броні мішка (1С `АктивнаБроньМішка`). Повертає
+ * `true`, коли лот заброньований **іншим** користувачем і бронь ще активна
+ * (`reservedUntil` у майбутньому). Своя бронь, протермінована або відсутня → `false`.
+ *
+ * Чиста функція (без I/O) — покрита тестами.
+ */
+export function isForeignActiveReservation(
+  lot: LotReservationInfo,
+  currentUserId: string,
+  now: number,
+): boolean {
+  if (!lot.reservedUntil || !lot.reservedByUserId) return false;
+  const until = new Date(lot.reservedUntil).getTime();
+  if (!Number.isFinite(until) || until <= now) return false;
+  return lot.reservedByUserId !== currentUserId;
 }
 
 /**

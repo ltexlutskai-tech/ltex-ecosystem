@@ -1,6 +1,8 @@
 import { describe, it, expect } from "vitest";
 import {
+  collectPriceDeviations,
   draftToWire,
+  isForeignActiveReservation,
   lineTotalEur,
   parseNumericInput,
   repeatPriceForProduct,
@@ -118,6 +120,124 @@ describe("repeatPriceForProduct (Fix 4 / 1С ПовторитьЦену)", () =>
     const items = [row("a", "p1", 5), draft({ uid: "empty", product: null })];
     const next = repeatPriceForProduct(items, "a");
     expect(next[1]?.product).toBeNull();
+  });
+});
+
+describe("collectPriceDeviations (контроль ПеревіркаЦіни)", () => {
+  function row(
+    uid: string,
+    pricePerKg: number,
+    wholesale: number | null,
+    name = uid,
+  ): SaleItemDraft {
+    return draft({
+      uid,
+      product: {
+        id: uid,
+        code1C: null,
+        articleCode: null,
+        name,
+        slug: uid,
+        priceUnit: "kg",
+        averageWeight: 20,
+        inStock: true,
+        prices:
+          wholesale == null
+            ? []
+            : [{ priceType: "wholesale", amount: wholesale, currency: "EUR" }],
+      },
+      pricePerKg,
+    });
+  }
+
+  it("додає рядки, де |ціна − еталон| > 0.20 €", () => {
+    const devs = collectPriceDeviations([
+      row("a", 4.5, 4.0, "Куртки"), // відхилення 0.5 → порушник
+      row("b", 4.1, 4.0), // відхилення 0.1 → ок
+    ]);
+    expect(devs).toHaveLength(1);
+    expect(devs[0]?.name).toBe("Куртки");
+    expect(devs[0]?.expected).toBe(4.0);
+    expect(devs[0]?.actual).toBe(4.5);
+  });
+
+  it("рівно 0.20 € — НЕ порушник (строго більше порогу)", () => {
+    expect(collectPriceDeviations([row("a", 4.2, 4.0)])).toHaveLength(0);
+  });
+
+  it("відхилення вниз теж ловиться (abs)", () => {
+    expect(collectPriceDeviations([row("a", 3.5, 4.0)])).toHaveLength(1);
+  });
+
+  it("рядки без еталонної ціни пропускаються", () => {
+    expect(collectPriceDeviations([row("a", 99, null)])).toHaveLength(0);
+  });
+
+  it("рядки без товару пропускаються", () => {
+    expect(
+      collectPriceDeviations([draft({ uid: "x", product: null })]),
+    ).toHaveLength(0);
+  });
+
+  it("кастомний поріг", () => {
+    expect(collectPriceDeviations([row("a", 4.4, 4.0)], 0.5)).toHaveLength(0);
+    expect(collectPriceDeviations([row("a", 4.6, 4.0)], 0.5)).toHaveLength(1);
+  });
+});
+
+describe("isForeignActiveReservation (АктивнаБроньМішка)", () => {
+  const now = new Date("2026-07-08T12:00:00Z").getTime();
+  const future = new Date("2026-07-20T12:00:00Z").toISOString();
+  const past = new Date("2026-07-01T12:00:00Z").toISOString();
+
+  it("чужа активна бронь → true", () => {
+    expect(
+      isForeignActiveReservation(
+        { reservedByUserId: "other", reservedUntil: future },
+        "me",
+        now,
+      ),
+    ).toBe(true);
+  });
+
+  it("своя бронь → false", () => {
+    expect(
+      isForeignActiveReservation(
+        { reservedByUserId: "me", reservedUntil: future },
+        "me",
+        now,
+      ),
+    ).toBe(false);
+  });
+
+  it("протермінована бронь → false", () => {
+    expect(
+      isForeignActiveReservation(
+        { reservedByUserId: "other", reservedUntil: past },
+        "me",
+        now,
+      ),
+    ).toBe(false);
+  });
+
+  it("без броні (null) → false", () => {
+    expect(
+      isForeignActiveReservation(
+        { reservedByUserId: null, reservedUntil: null },
+        "me",
+        now,
+      ),
+    ).toBe(false);
+  });
+
+  it("є дата, але немає власника → false", () => {
+    expect(
+      isForeignActiveReservation(
+        { reservedByUserId: null, reservedUntil: future },
+        "me",
+        now,
+      ),
+    ).toBe(false);
   });
 });
 
