@@ -29,6 +29,7 @@ CLAUDE.md). Розбито на 2 фази.
 дефолтним `now()`.
 
 **Фікс:**
+
 1. Прочитати один раз значення offset з 1С: `SELECT * FROM _YearOffset`
    (таблиця у `docs/1c-mssql-schema/config_tables.tsv`).
 2. У `asDate()` — додати offset роки до `Date` яке повернув mssql.
@@ -47,11 +48,13 @@ CLAUDE.md). Розбито на 2 фази.
 форма складає з items на льоту.
 
 **Фікс:** у `importOrders` / `importSales` після створення items:
+
 ```ts
 const totalEur = items.reduce((s, i) => s + Number(i.priceEur), 0);
 const totalUah = totalEur * (rateEur ?? defaultRate);
 // далі prisma.order.update({ where:{id}, data:{ totalEur, totalUah } })
 ```
+
 Або порахувати ДО create в одному upsert.
 
 ### A3. Маршрутні листи: порожні всі вкладки
@@ -63,6 +66,7 @@ const totalUah = totalEur * (rateEur ?? defaultRate);
 декодував поіменно VT-таблиці маршрутного.
 
 **Фікс план:**
+
 1. Декодувати кожну VT (їх ~10) — через `dbnames.txt` знайти UUID кожної
    VT з `Documents/МаршрутныйЛист.xml`, потім поля кожної VT через
    `_Document6630_VT<N>` колонки.
@@ -86,13 +90,15 @@ const totalUah = totalEur * (rateEur ?? defaultRate);
 6. **Прайс** (`Catalog.Номенклатура` + `ХарактеристикиНоменклатуры` + `_InfoRg5225`)
 
 Кожен агент читає:
+
 - 1С форму: `docs/1c-export-2026-06-02/<Catalogs|Documents>/<X>/Forms/*`
 - 1С бізнес-логіку: `docs/1c-export-2026-06-02/CommonModules/ОбменАРМ/Ext/Module.bsl`
   (7635 LOC) + Module.bsl самого об'єкта
 - Наша поточна реалізація: `apps/store/app/manager/<block>/`
-  + `apps/store/lib/manager/<block>*.ts`
+  - `apps/store/lib/manager/<block>*.ts`
 
 Результат — `docs/PARITY_AUDIT_<block>.md` зі списком:
+
 - ✓ є в обох
 - ⚠️ є в 1С, нема в нас (gap — пріоритизувати)
 - ⚠️ є в нас, нема в 1С (поліпшення — лишити)
