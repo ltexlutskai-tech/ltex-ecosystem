@@ -1,10 +1,23 @@
 "use client";
 
 import { useEffect, useState, type ReactNode } from "react";
+import { usePathname } from "next/navigation";
 import { Toaster } from "@ltex/ui";
 import { IframeHost } from "./tabs/iframe-host";
 import { TabStrip } from "./tabs/tab-strip";
 import { DETACHED_WINDOW_PREFIX, TabsProvider } from "./tabs/tabs-context";
+
+/**
+ * Автономні маршрути менеджерки — рендеряться контентом (БЕЗ shell з
+ * вкладками) навіть у новій вкладці браузера верхнього рівня. Сюди належать
+ * сторінки друку (рахунок, накладна, касовий ордер, маршрутний лист): вони
+ * відкриваються через `target="_blank"`, тож без цього top-window показував би
+ * оболонку з вкладками (список замовлень), а не сам документ (7.3 фікс).
+ */
+function isStandaloneRoute(pathname: string | null): boolean {
+  if (!pathname) return false;
+  return pathname.endsWith("/print") || pathname.includes("/print/");
+}
 
 export function WorkstationShell({
   header,
@@ -15,6 +28,7 @@ export function WorkstationShell({
   sidebar: ReactNode;
   children: ReactNode;
 }) {
+  const pathname = usePathname();
   // mount-gate: до визначення framed рендеримо нейтральний сплеш —
   // це водночас уникає hydration mismatch і гарантує, що embedded-сторінка
   // НІКОЛИ не змонтує iframe-host (глибина iframe = 1, рекурсії немає).
@@ -29,6 +43,12 @@ export function WorkstationShell({
         window.name.startsWith(DETACHED_WINDOW_PREFIX),
     );
   }, []);
+
+  // Автономні маршрути (друк) — завжди контент, без сплеш-гейта й без shell:
+  // це те, що очікує «Рахунок»/«Друк», відкритий у новій вкладці.
+  if (isStandaloneRoute(pathname)) {
+    return <>{children}</>;
+  }
 
   if (framed === null) {
     // Нейтральний сплеш — нейтральне тло на повну висоту.

@@ -76,12 +76,9 @@ export function SalesRow({
           dimmed ? "text-gray-400" : "text-gray-800"
         }`}
       >
-        <Link
-          href={`/manager/customers/${sale.customer.id}`}
-          className="hover:text-blue-600"
-        >
-          {sale.customer.name}
-        </Link>
+        {/* Ім'я клієнта — простий текст (без переходу): рядок відкривається
+            через № реалізації, а не через клієнта (7.3). */}
+        <span>{sale.customer.name}</span>
       </td>
       <td
         data-col="city"

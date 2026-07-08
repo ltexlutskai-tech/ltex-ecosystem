@@ -77,12 +77,9 @@ export function OrdersRow({
           dimmed ? "text-gray-400" : "text-gray-800"
         }`}
       >
-        <Link
-          href={`/manager/customers/${order.customer.id}`}
-          className="hover:text-blue-600"
-        >
-          {order.customer.name}
-        </Link>
+        {/* Ім'я клієнта — простий текст (без переходу): рядок відкривається
+            через № замовлення, а не через клієнта (7.3). */}
+        <span>{order.customer.name}</span>
       </td>
       <td
         data-col="city"

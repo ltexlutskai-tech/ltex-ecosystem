@@ -68,16 +68,9 @@ export function PaymentsRow({
           dimmed ? "text-gray-400" : "text-gray-800"
         }`}
       >
-        {order.customerId ? (
-          <Link
-            href={`/manager/customers/${order.customerId}`}
-            className="hover:text-blue-600"
-          >
-            {order.customerName}
-          </Link>
-        ) : (
-          order.customerName
-        )}
+        {/* Ім'я клієнта — простий текст (без переходу); документ відкривається
+            через № (7.3). */}
+        <span>{order.customerName}</span>
       </td>
       <td
         data-col="article"
