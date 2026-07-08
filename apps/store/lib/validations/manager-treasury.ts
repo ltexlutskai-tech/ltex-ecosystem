@@ -10,14 +10,16 @@ import { z } from "zod";
 //     зачіпає);
 //   • CashTransfer — інкасація каса↔банк / переміщення каса↔каса (2 рухи ДДС).
 //
-// Валюта документа: UAH | EUR | USD. `rateEur` — курс-знімок (грн за €), за яким
-// сума зводиться до EUR (`amountEur`) на сервері при створенні. У L-TEX одна каса
-// (сентинел `CASH` у рухах ДДС), тому окремого довідника кас немає.
+// Валюта документа: UAH | EUR. `rateEur` — курс-знімок (грн за €), за яким сума
+// зводиться до EUR (`amountEur`) на сервері при створенні. USD у казначейських
+// документах НЕ підтримуємо (немає окремого курсу USD, а бізнес — у EUR/UAH);
+// USD-готівка обліковується касовим ордером, не банк-документами. У L-TEX одна
+// каса (сентинел `CASH` у рухах ДДС), тому окремого довідника кас немає.
 // ─────────────────────────────────────────────────────────────────────────────
 
 const MAX_AMOUNT = 100_000_000;
 
-export const TREASURY_CURRENCIES = ["UAH", "EUR", "USD"] as const;
+export const TREASURY_CURRENCIES = ["UAH", "EUR"] as const;
 export type TreasuryCurrency = (typeof TREASURY_CURRENCIES)[number];
 
 const currencyField = z.enum(TREASURY_CURRENCIES).default("UAH");

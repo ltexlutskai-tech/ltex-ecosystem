@@ -35,25 +35,21 @@ function round2(n: number): number {
 }
 
 function normalizeCurrency(currency: string): TreasuryCurrency {
-  return currency === "EUR" || currency === "USD" ? currency : "UAH";
+  return currency === "EUR" ? "EUR" : "UAH";
 }
 
 /**
  * PURE. Зводить суму документа у EUR за курсом-знімком (грн за €).
  *
  * • EUR → сама сума;
- * • UAH → `amount / rateEur`;
- * • USD → `amount / rateEur` (best-effort: у казначейських моделях лише один
- *   курс `rateEur`; для USD-документів курс вводиться як грн за одиницю валюти
- *   документа). Захист від ділення на 0.
+ * • UAH (та будь-що інше) → `amount / rateEur` (захист від ділення на 0).
  */
 export function computeAmountEur(
   amount: number,
   currency: string,
   rateEur: number,
 ): number {
-  const cur = normalizeCurrency(currency);
-  if (cur === "EUR") return round2(amount);
+  if (normalizeCurrency(currency) === "EUR") return round2(amount);
   return rateEur > 0 ? round2(amount / rateEur) : 0;
 }
 

@@ -58,7 +58,7 @@ describe("computeAmountEur", () => {
   it("нульовий курс → 0 (без ділення на 0)", () => {
     expect(computeAmountEur(430, "UAH", 0)).toBe(0);
   });
-  it("USD → best-effort amount / rateEur", () => {
+  it("невідома/непідтримувана валюта → трактується як UAH (amount / rateEur)", () => {
     expect(computeAmountEur(400, "USD", 40)).toBe(10);
   });
 });
