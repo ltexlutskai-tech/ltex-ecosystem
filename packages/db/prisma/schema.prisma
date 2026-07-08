@@ -422,10 +422,13 @@ model MgrCashOrder {
   rateEur           Float    @default(0) @map("rate_eur")
   rateUsd           Float    @default(0) @map("rate_usd")
   documentSumEur    Float    @default(0) @map("document_sum_eur")
-  // Коректировка боргу (знижка на залишок без реалізації) + ключ корекції.
+  // Коректировка боргу (знижка на залишок без реалізації).
   debtCorrection    Float    @default(0) @map("debt_correction")
+  // @deprecated ключ корекції для обміну з 1С — не заповнюється (1С відключено).
   correctionUid     String?  @map("correction_uid")
-  // Мультивалютні бізнес-ключі обміну (УИДГРН / ПКО_УИД / УИДUSD).
+  // @deprecated мультивалютні бізнес-ключі обміну з 1С (УИДГРН/ПКО_УИД/УИДUSD).
+  // Були потрібні лише для зворотної синхронізації (одна оплата → 3 ПКО у 1С).
+  // 1С відключено → не заповнюються; колонки лишено заради історичного імпорту.
   uidUah            String?  @map("uid_uah")
   uidEur            String?  @map("uid_eur")
   uidUsd            String?  @map("uid_usd")
