@@ -224,7 +224,7 @@ export function SaleForm({
         return {
           ...row,
           pricePerKg: unit,
-          priceEur: lineTotalEur(unit, row.weight, row.quantity),
+          priceEur: lineTotalEur(unit, row.weight),
           isAkciya,
         };
       }),
@@ -271,7 +271,7 @@ export function SaleForm({
         quantity: 1,
         weight,
         pricePerKg: unit,
-        priceEur: lineTotalEur(unit, weight, 1),
+        priceEur: lineTotalEur(unit, weight),
         isAkciya,
       };
       return [...prev, draft];
@@ -304,7 +304,7 @@ export function SaleForm({
                 quantity,
                 weight,
                 pricePerKg: unit,
-                priceEur: lineTotalEur(unit, weight, 1),
+                priceEur: lineTotalEur(unit, weight),
                 isAkciya,
               }
             : r,
@@ -323,7 +323,7 @@ export function SaleForm({
         quantity,
         weight,
         pricePerKg: unit,
-        priceEur: lineTotalEur(unit, weight, 1),
+        priceEur: lineTotalEur(unit, weight),
         isAkciya,
       };
       return [...prev, draft];
@@ -394,7 +394,7 @@ export function SaleForm({
         quantity: 1,
         weight,
         pricePerKg: unit,
-        priceEur: lineTotalEur(unit, weight, 1),
+        priceEur: lineTotalEur(unit, weight),
         isAkciya: auto.isAkciya,
       };
       setItems((prev) => [...prev, draft]);

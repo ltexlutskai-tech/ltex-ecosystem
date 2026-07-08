@@ -107,14 +107,14 @@ export function SaleItemsEditor({
     } else {
       weight = draft.weight;
     }
-    const priceEur = lineTotalEur(draft.pricePerKg, weight, 1);
+    const priceEur = lineTotalEur(draft.pricePerKg, weight);
     updateRow(draft.uid, { ...draft, quantity, weight, priceEur });
   }
 
   /** Зміна ціни за кг — перераховує суму; ручний ввід знімає прапор «Акція». */
   function changeUnitPrice(draft: SaleItemDraft, pricePerKg: number): void {
     const unit = Math.max(0, pricePerKg);
-    const priceEur = lineTotalEur(unit, draft.weight, draft.quantity);
+    const priceEur = lineTotalEur(unit, draft.weight);
     updateRow(draft.uid, {
       ...draft,
       pricePerKg: unit,

@@ -3,7 +3,9 @@
  *
  * `SaleItemDraft` — стан item-rows у формі. На відміну від замовлення, кожен
  * рядок несе `pricePerKg` (ЦенаПродажиВес), опційний `lotId`/`barcode`
- * (заповнюються при скані ШК) та `priceEur` = pricePerKg × weight × quantity.
+ * (заповнюються при скані ШК) та `priceEur` = pricePerKg × weight, де
+ * `weight` — **сумарна** вага рядка (мішки вже враховані у вазі, тому на
+ * кількість додатково НЕ множимо).
  *
  * `WireSaleItem` — payload рядка, що відправляється у POST/PATCH /sales.
  *
@@ -68,13 +70,13 @@ export interface WireSaleItem {
   priceEur: number;
 }
 
-/** Перерахунок сумарної ціни рядка: ціна за кг × вага × мішки (округлення до копійок). */
-export function lineTotalEur(
-  pricePerKg: number,
-  weight: number,
-  quantity: number,
-): number {
-  return Math.round(pricePerKg * weight * quantity * 100) / 100;
+/**
+ * Сумарна ціна рядка = ціна за кг × **сумарна** вага рядка (округлення до
+ * копійок). `weight` уже включає всі мішки (див. `changeBags`/підбір), тому на
+ * кількість додатково НЕ множимо — інакше сума подвоювалась би при quantity>1.
+ */
+export function lineTotalEur(pricePerKg: number, weight: number): number {
+  return Math.round(pricePerKg * weight * 100) / 100;
 }
 
 /**
@@ -132,7 +134,7 @@ export function repeatPriceForProduct(
     return {
       ...row,
       pricePerKg: unit,
-      priceEur: lineTotalEur(unit, row.weight, row.quantity),
+      priceEur: lineTotalEur(unit, row.weight),
       isAkciya: source.isAkciya ?? false,
     };
   });

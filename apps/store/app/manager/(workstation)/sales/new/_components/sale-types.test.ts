@@ -35,13 +35,13 @@ function draft(over: Partial<SaleItemDraft> = {}): SaleItemDraft {
 }
 
 describe("lineTotalEur", () => {
-  it("= ціна/кг × вага × мішки (округлення до копійок)", () => {
-    expect(lineTotalEur(2.5, 25, 1)).toBe(62.5);
-    expect(lineTotalEur(2, 10, 3)).toBe(60);
+  it("= ціна/кг × сумарна вага рядка (без множення на к-сть)", () => {
+    expect(lineTotalEur(2.5, 25)).toBe(62.5);
+    expect(lineTotalEur(2, 30)).toBe(60);
   });
 
   it("округлює до копійок", () => {
-    expect(lineTotalEur(2.333, 10, 1)).toBe(23.33);
+    expect(lineTotalEur(2.333, 10)).toBe(23.33);
   });
 });
 
@@ -94,7 +94,7 @@ describe("repeatPriceForProduct (Fix 4 / 1С ПовторитьЦену)", () =>
       pricePerKg,
       weight,
       quantity,
-      priceEur: lineTotalEur(pricePerKg, weight, quantity),
+      priceEur: lineTotalEur(pricePerKg, weight),
     });
   }
 
@@ -107,7 +107,7 @@ describe("repeatPriceForProduct (Fix 4 / 1С ПовторитьЦену)", () =>
     const next = repeatPriceForProduct(items, "a");
     expect(next[0]?.pricePerKg).toBe(5); // джерело без змін
     expect(next[1]?.pricePerKg).toBe(5); // скопійовано
-    expect(next[1]?.priceEur).toBe(lineTotalEur(5, 20, 2)); // 5×20×2 = 200
+    expect(next[1]?.priceEur).toBe(lineTotalEur(5, 20)); // 5×20 = 100 (вага рядка сумарна)
     expect(next[2]?.pricePerKg).toBe(7); // інший товар незмінний
   });
 
