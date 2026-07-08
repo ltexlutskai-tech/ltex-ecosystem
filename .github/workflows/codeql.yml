@@ -1,0 +1,44 @@
+name: "CodeQL Security Scan"
+
+# Автоматичний аналіз коду на вразливості до зовнішнього зламу
+# (SQL-ін'єкції, XSS, path traversal, діри в авторизації тощо).
+# Працює на кожен PR, кожен пуш у main і раз на тиждень.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    # Щопонеділка о 06:00 UTC — ловить нові відомі вразливості у вже змердженому коді.
+    - cron: "0 6 * * 1"
+
+concurrency:
+  group: codeql-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  analyze:
+    name: Analyze (JavaScript/TypeScript)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: javascript-typescript
+          # security-extended додає ширший набір правил безпеки понад базовий.
+          queries: security-extended
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:javascript-typescript"
