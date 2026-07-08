@@ -130,6 +130,8 @@ export default async function ManagerOrderDetailPage({
       ? { phonePrimary: order.customer.phone }
       : null;
   const [exchangeRate, mgr, ownedIds] = await Promise.all([
+    // Задача B: живий курс — лише дефолт/fallback. Форма редагування існуючого
+    // замовлення нижче бере курс-знімок документа (order.exchangeRate).
     getCurrentRate(),
     mgrWhere
       ? prisma.mgrClient.findFirst({
@@ -294,7 +296,9 @@ export default async function ManagerOrderDetailPage({
           initialClientId={order.customer.id}
           initialClient={clientSummary}
           mgrClientId={mgrClientId}
-          exchangeRate={exchangeRate}
+          exchangeRate={
+            order.exchangeRate > 0 ? order.exchangeRate : exchangeRate
+          }
           deliveryMethods={deliveryMethods}
           currentUserId={user.id}
           currentUserName={user.fullName}
