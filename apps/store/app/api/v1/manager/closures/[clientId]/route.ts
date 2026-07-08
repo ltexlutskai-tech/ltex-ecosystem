@@ -4,17 +4,29 @@ import { getCurrentUser } from "@/lib/auth/manager-auth";
 import { getMyClientCodes1C } from "@/lib/manager/order-ownership";
 import { formatOrderNumber } from "@/lib/manager/order-number";
 
-/** Рядок огляду «незакрите замовлення × позиція» для блоку Закриття. */
-interface ClosuresListItem {
+/** Позиція замовлення у блоці Закриття (з даними для переносу в нове). */
+interface ClosureItem {
+  productUid: string;
+  productName: string;
+  articleCode: string | null;
+  quantity: number;
+  weight: number;
+  unitPriceEur: number;
+  sum: number;
+  sold: number;
+  fullySold: boolean;
+}
+
+/** Незакрите замовлення клієнта з позиціями (для блоку Закриття). */
+interface ClosureOrder {
   orderUid: string;
   orderNumber: string;
   orderDate: string;
-  productUid: string;
-  productName: string;
-  quantity: number;
-  sum: number;
-  sold: number;
   status: string;
+  isActual: boolean;
+  closable: boolean;
+  totalEur: number;
+  items: ClosureItem[];
 }
 
 /**
@@ -73,12 +85,23 @@ export async function GET(req: NextRequest, ctx: RouteContext) {
   }
 
   const orders = await prisma.order.findMany({
-    where: { customer: { code1C: resolved.code1C }, closedAt: null },
+    where: {
+      customer: { code1C: resolved.code1C },
+      closedAt: null,
+      archived: false,
+    },
     orderBy: { createdAt: "desc" },
     include: {
       items: {
         include: {
-          product: { select: { id: true, name: true, code1C: true } },
+          product: {
+            select: {
+              id: true,
+              name: true,
+              code1C: true,
+              articleCode: true,
+            },
+          },
         },
       },
     },
@@ -105,28 +128,41 @@ export async function GET(req: NextRequest, ctx: RouteContext) {
     }
   }
 
-  const items: ClosuresListItem[] = [];
-  for (const order of orders) {
-    const orderNumber =
-      order.number1C ?? order.code1C ?? `№${order.id.slice(0, 8)}`;
-    const orderDate = order.createdAt.toISOString();
-    for (const item of order.items) {
-      const sold = soldMap.get(`${order.id}:${item.productId}`) ?? 0;
-      items.push({
-        orderUid: order.id,
-        orderNumber,
-        orderDate,
-        productUid: item.productId,
-        productName: item.product.name,
-        quantity: item.quantity,
-        sum: item.priceEur,
-        sold,
-        status: sold >= item.quantity && item.quantity > 0 ? "sold" : "open",
-      });
-    }
-  }
+  const result: ClosureOrder[] = orders.map((order) => {
+    const orderNumber = formatOrderNumber(order);
+    return {
+      orderUid: order.id,
+      orderNumber,
+      orderDate: order.createdAt.toISOString(),
+      status: order.status,
+      isActual: order.isActual,
+      // Закрити можна незакрите й неархівне (усе, що потрапило у вибірку);
+      // скасоване сюди не потрапляє (archived).
+      closable: order.status !== "cancelled",
+      totalEur: Number(order.totalEur),
+      items: order.items.map((item) => {
+        const sold = soldMap.get(`${order.id}:${item.productId}`) ?? 0;
+        return {
+          productUid: item.productId,
+          productName: item.product.name,
+          articleCode: item.product.articleCode,
+          quantity: item.quantity,
+          weight: Number(item.weight),
+          unitPriceEur:
+            item.unitPriceEur != null ? Number(item.unitPriceEur) : 0,
+          sum: Number(item.priceEur),
+          sold,
+          fullySold: sold >= item.quantity && item.quantity > 0,
+        };
+      }),
+    };
+  });
 
-  return NextResponse.json({ ok: true, items });
+  return NextResponse.json({
+    ok: true,
+    client: { mgrClientId: resolved.mgrClientId, code1C: resolved.code1C },
+    orders: result,
+  });
 }
 
 /**

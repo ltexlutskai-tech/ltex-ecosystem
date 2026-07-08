@@ -6,21 +6,111 @@ import { getCurrentUser } from "@/lib/auth/manager-auth";
 import { getCurrentRate } from "@/lib/exchange-rate";
 import { getDeliveryMethodOptions } from "@/lib/manager/delivery-methods";
 import { OrderForm } from "./_components/order-form";
-import type { ClientPickerItem } from "./_components/types";
+import type { ClientPickerItem, OrderItemDraft } from "./_components/types";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Нове замовлення — L-TEX Manager" };
 
+/**
+ * Перенос позицій із блоку «Закриття замовлень» (7.3): `?carry=<orderId:productId,…>`.
+ * Вантажимо ці рядки з БД, будуємо item-драфти й підтягуємо клієнта з замовлення.
+ */
+async function loadCarry(carry: string): Promise<{
+  items: OrderItemDraft[];
+  customerId: string | null;
+}> {
+  const pairs = carry
+    .split(",")
+    .map((s) => s.split(":"))
+    .filter((p): p is [string, string] => p.length === 2 && !!p[0] && !!p[1]);
+  if (pairs.length === 0) return { items: [], customerId: null };
+  const orderIds = [...new Set(pairs.map((p) => p[0]))];
+  const wanted = new Set(pairs.map((p) => `${p[0]}:${p[1]}`));
+
+  const orders = await prisma.order.findMany({
+    where: { id: { in: orderIds } },
+    select: {
+      id: true,
+      customerId: true,
+      items: {
+        include: {
+          product: {
+            select: {
+              id: true,
+              code1C: true,
+              articleCode: true,
+              name: true,
+              slug: true,
+              priceUnit: true,
+              averageWeight: true,
+              inStock: true,
+              prices: {
+                where: { priceType: { in: ["wholesale", "akciya"] } },
+                select: { priceType: true, amount: true, currency: true },
+              },
+            },
+          },
+        },
+      },
+    },
+  });
+
+  const items: OrderItemDraft[] = [];
+  let customerId: string | null = null;
+  for (const order of orders) {
+    customerId = order.customerId;
+    for (const it of order.items) {
+      if (!wanted.has(`${order.id}:${it.productId}`)) continue;
+      items.push({
+        uid: `carry-${it.id}`,
+        product: {
+          id: it.product.id,
+          code1C: it.product.code1C,
+          articleCode: it.product.articleCode,
+          name: it.product.name,
+          slug: it.product.slug,
+          priceUnit: it.product.priceUnit,
+          averageWeight: it.product.averageWeight,
+          inStock: it.product.inStock,
+          prices: it.product.prices.map((pr) => ({
+            priceType: pr.priceType,
+            amount: pr.amount,
+            currency: pr.currency,
+          })),
+        },
+        lot: null,
+        bindToLot: false,
+        weight: Number(it.weight),
+        quantity: it.quantity,
+        priceEur: Number(it.priceEur),
+        unitPriceEur:
+          Number(it.weight) > 0
+            ? Math.round((Number(it.priceEur) / Number(it.weight)) * 100) / 100
+            : 0,
+      });
+    }
+  }
+  return { items, customerId };
+}
+
 export default async function NewOrderPage({
   searchParams,
 }: {
-  searchParams: Promise<{ clientId?: string }>;
+  searchParams: Promise<{ clientId?: string; carry?: string }>;
 }) {
   const user = await getCurrentUser();
   if (!user) redirect("/manager/login");
 
   const sp = await searchParams;
-  const requestedClientId = sp.clientId ?? null;
+
+  // Перенос позицій із «Закриття замовлень» — має пріоритет над clientId.
+  let carryItems: OrderItemDraft[] = [];
+  let requestedClientId = sp.clientId ?? null;
+  if (sp.carry) {
+    const carried = await loadCarry(sp.carry);
+    carryItems = carried.items;
+    if (carried.customerId) requestedClientId = carried.customerId;
+  }
 
   // Pre-fetch initial client summary якщо clientId передано через query.
   let initialClient: ClientPickerItem | null = null;
@@ -91,6 +181,7 @@ export default async function NewOrderPage({
       <OrderForm
         initialClientId={initialClient?.id ?? null}
         initialClient={initialClient}
+        initialItems={carryItems}
         exchangeRate={exchangeRate}
         deliveryMethods={deliveryMethods}
         currentUserId={user.id}

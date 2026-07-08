@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
+import { openManagerTab } from "../../../_components/open-manager-tab";
 import { useRouter } from "next/navigation";
 import { MessageSquare, ListPlus } from "lucide-react";
 import {
@@ -42,6 +42,8 @@ export interface OrderFormProps {
   initialOrder?: OrderEditInitial | null;
   initialClientId?: string | null;
   initialClient?: ClientPickerItem | null;
+  /** Початкові позиції для create (перенос із «Закриття замовлень», 7.3). */
+  initialItems?: OrderItemDraft[];
   /** MgrClient.id для лінка «Відкрити картку клієнта» (edit-режим). */
   mgrClientId?: string | null;
   exchangeRate: number;
@@ -56,9 +58,9 @@ export interface OrderFormProps {
 const FORCE_ROLES = ["admin", "owner", "senior_manager"];
 
 /**
- * Зіставляє код способу доставки клієнта (MgrDeliveryMethod.code, напр.
- * `nova_poshta`/`delivery`/`pickup`) з кодом доставки замовлення
- * (delivery|post|pickup). Те, що не мапиться — лишаємо порожнім.
+ * Спосіб доставки клієнта → код доставки замовлення (7.3). Тепер обидва — з
+ * одного довідника `MgrDeliveryMethod`, тож код клієнта прямо збігається з
+ * опцією. Легасі-fallback для старих кодів (`nova_poshta`→`post`).
  */
 function mapClientDeliveryToOrder(
   code: string | null | undefined,
@@ -67,7 +69,7 @@ function mapClientDeliveryToOrder(
   if (!code) return "";
   const direct = options.find((o) => o.code === code);
   if (direct) return direct.code;
-  if (code === "nova_poshta" || code === "post" || code === "ukrposhta") {
+  if (code === "nova_poshta" || code === "ukrposhta") {
     return options.find((o) => o.code === "post")?.code ?? "";
   }
   return "";
@@ -84,6 +86,7 @@ export function OrderForm({
   initialOrder,
   initialClientId,
   initialClient,
+  initialItems,
   mgrClientId,
   exchangeRate,
   deliveryMethods,
@@ -101,7 +104,7 @@ export function OrderForm({
     initialClient ?? null,
   );
   const [items, setItems] = useState<OrderItemDraft[]>(
-    initialOrder?.items ?? [],
+    initialOrder?.items ?? initialItems ?? [],
   );
   const [notes, setNotes] = useState(initialOrder?.notes ?? "");
   const [showComment, setShowComment] = useState(
@@ -171,14 +174,43 @@ export function OrderForm({
   ): void {
     setClientId(id);
     setClientSummary(summary);
+    setActiveConflict(null);
     if (summary) {
-      // Тип цін більше не залежить від клієнта (дві фіксовані опції) — лише
-      // підтягуємо спосіб доставки.
+      // Спосіб доставки за замовчуванням — з картки клієнта.
       const mappedDelivery = mapClientDeliveryToOrder(
         summary.deliveryMethodCode,
         deliveryMethods,
       );
       if (mappedDelivery) setDeliveryMethod(mappedDelivery);
+      // Ранній діалог (7.3): одразу перевіряємо, чи у клієнта вже є активне
+      // замовлення — щоб не робити зайву роботу з позиціями (лише create).
+      if (!isEdit) void checkActiveOrder(id);
+    }
+  }
+
+  /**
+   * Перевіряє наявність активного замовлення у клієнта (за MgrClient.id) і,
+   * якщо є, одразу показує діалог конфлікту — до заповнення позицій.
+   */
+  async function checkActiveOrder(mgrId: string | null): Promise<void> {
+    if (!mgrId) return;
+    try {
+      const res = await fetch(
+        `/api/v1/manager/orders/active-check?clientId=${encodeURIComponent(mgrId)}`,
+      );
+      if (!res.ok) return;
+      const body = (await res.json()) as {
+        existingOrderId?: string;
+        existingOrderNumber?: string;
+      };
+      if (body.existingOrderId) {
+        setActiveConflict({
+          existingOrderId: body.existingOrderId,
+          existingOrderNumber: body.existingOrderNumber ?? "",
+        });
+      }
+    } catch {
+      // best-effort — фінальний guard все одно спрацює при збереженні
     }
   }
 
@@ -330,13 +362,19 @@ export function OrderForm({
               <div>
                 <div className="font-medium text-gray-900">
                   {mgrClientId && clientSummary ? (
-                    <Link
-                      href={`/manager/customers/${mgrClientId}`}
-                      title="Відкрити картку клієнта"
-                      className="hover:text-green-700 hover:underline"
+                    <button
+                      type="button"
+                      title="Відкрити картку клієнта (нова вкладка)"
+                      onClick={() =>
+                        openManagerTab(
+                          `/manager/customers/${mgrClientId}`,
+                          "Клієнт",
+                        )
+                      }
+                      className="text-left hover:text-green-700 hover:underline"
                     >
                       {clientSummary.name}
-                    </Link>
+                    </button>
                   ) : (
                     (clientSummary?.name ?? "—")
                   )}
@@ -348,12 +386,18 @@ export function OrderForm({
               </div>
               <div className="flex flex-col items-end gap-1">
                 {mgrClientId && (
-                  <Link
-                    href={`/manager/customers/${mgrClientId}`}
+                  <button
+                    type="button"
+                    onClick={() =>
+                      openManagerTab(
+                        `/manager/customers/${mgrClientId}`,
+                        "Клієнт",
+                      )
+                    }
                     className="text-xs font-medium text-blue-600 hover:text-blue-700"
                   >
                     Відкрити картку клієнта →
-                  </Link>
+                  </button>
                 )}
                 <span className="text-xs text-gray-400">не змінюється</span>
               </div>

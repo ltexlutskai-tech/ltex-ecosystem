@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import Link from "next/link";
+import { openManagerTab } from "../../../_components/open-manager-tab";
 import { Search, X } from "lucide-react";
 import { Input } from "@ltex/ui";
 import { useDebouncedValue } from "./use-debounced-search";
@@ -87,15 +87,19 @@ export function ClientPicker({
         <label className="text-sm font-medium text-gray-700">Клієнт</label>
         <div className="flex items-center justify-between rounded-lg border bg-white p-3">
           <div>
-            {/* Свій клієнт → ПІБ клікабельний (картка клієнта); чужий — ні. */}
+            {/* Свій клієнт → картка відкривається в НОВІЙ вкладці програми
+                (щоб «Назад» не втрачав документ); чужий — просто текст. */}
             {selected.isOwned ? (
-              <Link
-                href={`/manager/customers/${selected.id}`}
-                title="Відкрити картку клієнта"
-                className="font-medium text-gray-900 hover:text-green-700 hover:underline"
+              <button
+                type="button"
+                title="Відкрити картку клієнта (нова вкладка)"
+                onClick={() =>
+                  openManagerTab(`/manager/customers/${selected.id}`, "Клієнт")
+                }
+                className="text-left font-medium text-gray-900 hover:text-green-700 hover:underline"
               >
                 {selected.name}
-              </Link>
+              </button>
             ) : (
               <div className="font-medium text-gray-900">{selected.name}</div>
             )}

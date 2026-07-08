@@ -84,7 +84,7 @@ describe("GET /api/v1/manager/closures/[clientId]", () => {
     expect(res.status).toBe(403);
   });
 
-  it("returns 200 з items + локальним sold per (order, product)", async () => {
+  it("returns 200 з orders+items + локальним sold per (order, product)", async () => {
     mockPrisma.mgrClient.findUnique.mockResolvedValueOnce({
       id: "c1",
       code1C: "000001",
@@ -94,14 +94,25 @@ describe("GET /api/v1/manager/closures/[clientId]", () => {
       {
         id: "ord1",
         code1C: "L-1",
+        number1C: "L0000000001",
         docNumber: 1,
+        status: "posted",
+        isActual: true,
+        totalEur: 100,
         createdAt: new Date("2026-01-01T00:00:00Z"),
         items: [
           {
             productId: "p1",
             quantity: 10,
+            weight: 200,
+            unitPriceEur: 0.5,
             priceEur: 100,
-            product: { id: "p1", name: "Test Mix", code1C: "P1" },
+            product: {
+              id: "p1",
+              name: "Test Mix",
+              code1C: "P1",
+              articleCode: "37047",
+            },
           },
         ],
       },
@@ -116,16 +127,22 @@ describe("GET /api/v1/manager/closures/[clientId]", () => {
     expect(res.status).toBe(200);
     const json = (await res.json()) as {
       ok: boolean;
-      items: Array<{ sold: number; status: string; orderUid: string }>;
+      orders: Array<{
+        orderUid: string;
+        closable: boolean;
+        items: Array<{ sold: number; fullySold: boolean; weight: number }>;
+      }>;
     };
     expect(json.ok).toBe(true);
-    expect(json.items).toHaveLength(1);
-    expect(json.items[0]?.sold).toBe(5);
-    expect(json.items[0]?.status).toBe("open");
-    expect(json.items[0]?.orderUid).toBe("ord1");
+    expect(json.orders).toHaveLength(1);
+    expect(json.orders[0]?.orderUid).toBe("ord1");
+    expect(json.orders[0]?.closable).toBe(true);
+    expect(json.orders[0]?.items[0]?.sold).toBe(5);
+    expect(json.orders[0]?.items[0]?.fullySold).toBe(false);
+    expect(json.orders[0]?.items[0]?.weight).toBe(200);
   });
 
-  it("status='sold' коли sold >= quantity", async () => {
+  it("fullySold=true коли sold >= quantity", async () => {
     mockPrisma.mgrClient.findUnique.mockResolvedValueOnce({
       id: "c1",
       code1C: "000001",
@@ -135,14 +152,25 @@ describe("GET /api/v1/manager/closures/[clientId]", () => {
       {
         id: "ord1",
         code1C: "L-1",
+        number1C: null,
         docNumber: 1,
+        status: "draft",
+        isActual: true,
+        totalEur: 100,
         createdAt: new Date("2026-01-01T00:00:00Z"),
         items: [
           {
             productId: "p1",
             quantity: 5,
+            weight: 100,
+            unitPriceEur: 1,
             priceEur: 100,
-            product: { id: "p1", name: "Test Mix", code1C: "P1" },
+            product: {
+              id: "p1",
+              name: "Test Mix",
+              code1C: "P1",
+              articleCode: null,
+            },
           },
         ],
       },
@@ -155,9 +183,9 @@ describe("GET /api/v1/manager/closures/[clientId]", () => {
     ]);
     const res = await GET(getReq("c1"), ctx("c1"));
     const json = (await res.json()) as {
-      items: Array<{ status: string }>;
+      orders: Array<{ items: Array<{ fullySold: boolean }> }>;
     };
-    expect(json.items[0]?.status).toBe("sold");
+    expect(json.orders[0]?.items[0]?.fullySold).toBe(true);
   });
 
   it("admin отримує доступ до будь-якого клієнта (порожній список)", async () => {
@@ -169,8 +197,8 @@ describe("GET /api/v1/manager/closures/[clientId]", () => {
     getMyClientCodes1CMock.mockResolvedValueOnce(null); // admin → null
     const res = await GET(getReq("any"), ctx("any"));
     expect(res.status).toBe(200);
-    const json = (await res.json()) as { items: unknown[] };
-    expect(json.items).toHaveLength(0);
+    const json = (await res.json()) as { orders: unknown[] };
+    expect(json.orders).toHaveLength(0);
   });
 });
 
