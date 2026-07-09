@@ -21,12 +21,12 @@ L-TEX **не веде бухгалтерію** — тому синхроніза
 
 ## Обсяг
 
-| # | Задача | Пріоритет |
-|---|---|:---:|
+| #     | Задача                                                                                                   | Пріоритет  |
+| ----- | -------------------------------------------------------------------------------------------------------- | :--------: |
 | **A** | Проведення реалізації → рухи `StockMovement` + `SalesMovement` + `CostMovement` (+ реверс при видаленні) | 🔴 головне |
-| **B** | Контроль відхилення ціни > 0.20 EUR (попередження перед проведенням) | 🟢 |
-| **C** | Перевірка чужої броні мішка при скані ШК | 🟢 |
-| **D** | «Повторити ціну» — **верифікувати** (вже реалізовано) + опційне контекст-меню | 🟢 |
+| **B** | Контроль відхилення ціни > 0.20 EUR (попередження перед проведенням)                                     |     🟢     |
+| **C** | Перевірка чужої броні мішка при скані ШК                                                                 |     🟢     |
+| **D** | «Повторити ціну» — **верифікувати** (вже реалізовано) + опційне контекст-меню                            |     🟢     |
 
 **НЕ робимо** (за рішенням user — немає живого 1С): реальний sync/вивантаження в 1С; регламентну бухгалтерію (ПДВ, книги, партіонний облік). Прапорець `exportTo1C` **залишаємо як є** — він керує лише семантикою «проводити/не проводити» і зберігається на документі, нікуди не передається.
 
@@ -39,8 +39,8 @@ L-TEX **не веде бухгалтерію** — тому синхроніза
 Створити за зразком `stock-movement-hooks.ts`. Дві публічні функції:
 
 ```ts
-export function applySaleMovements(saleId: string): void   // fire-and-forget
-export function removeSaleMovements(saleId: string): void   // fire-and-forget
+export function applySaleMovements(saleId: string): void; // fire-and-forget
+export function removeSaleMovements(saleId: string): void; // fire-and-forget
 ```
 
 #### `applySaleMovements(saleId)`
@@ -50,13 +50,20 @@ export function removeSaleMovements(saleId: string): void   // fire-and-forget
    const sale = await prisma.sale.findUnique({
      where: { id: saleId },
      select: {
-       id: true, code1C: true, createdAt: true,
+       id: true,
+       code1C: true,
+       createdAt: true,
        assignedAgentUserId: true,
        customer: { select: { code1C: true } },
        items: {
          select: {
-           id: true, productId: true, lotId: true, barcode: true,
-           weight: true, quantity: true, priceEur: true,
+           id: true,
+           productId: true,
+           lotId: true,
+           barcode: true,
+           weight: true,
+           quantity: true,
+           priceEur: true,
            product: { select: { code1C: true, priceUnit: true } },
            lot: { select: { purchasePriceEur: true } },
          },
@@ -71,6 +78,7 @@ export function removeSaleMovements(saleId: string): void   // fire-and-forget
 4. Для кожного рядка (`lineNo` = індекс+1) сформувати три рухи:
 
    **StockMovement — розхід зі складу** (`recordKind = 1`):
+
    ```ts
    {
      occurredAt: sale.createdAt,
@@ -90,6 +98,7 @@ export function removeSaleMovements(saleId: string): void   // fire-and-forget
    ```
 
    **SalesMovement — продаж** (`recordKind = 0`):
+
    ```ts
    {
      occurredAt: sale.createdAt,
@@ -112,6 +121,7 @@ export function removeSaleMovements(saleId: string): void   // fire-and-forget
    ```
 
    **CostMovement — собівартість**:
+
    ```ts
    {
      recorderCode1C: recorder,
@@ -143,6 +153,7 @@ export function removeSaleMovements(saleId: string): void   // fire-and-forget
 #### `removeSaleMovements(saleId)`
 
 Прибирає всі рухи документа (при видаленні). Реєстратор той самий (`sale.code1C ?? sale.id`) — але оскільки при DELETE документ ще існує до транзакції, можна прийняти `recorder` як параметр або обчислити з `saleId` до видалення. Просте рішення — приймати обидва ключі:
+
 ```ts
 export function removeSaleMovements(recorder: string): void {
   void (async () => {
@@ -160,6 +171,7 @@ export function removeSaleMovements(recorder: string): void {
 ### A2. Джерело собівартості (costPerKg)
 
 Пріоритет:
+
 1. `item.lot.purchasePriceEur` (€/кг конкретної партії) — якщо `lotId` заданий і поле не null.
 2. Остання закупівельна ціна товару: `PurchasePrice` за `productId`, `orderBy: { validFrom: "desc" }`, `take: 1` → `priceEur`. (Та сама логіка, що в endpoint `apps/store/app/api/v1/manager/warehouse/last-purchase-price/route.ts`, але напряму через `prisma.purchasePrice`, batch-ом для всіх productId рядків одразу.)
 3. `0` (рух усе одно пишемо — щоб кількість/склад рахувались; маржа по такому рядку = 100%, це прийнятно, краще ніж «пропала» позиція).
@@ -169,6 +181,7 @@ export function removeSaleMovements(recorder: string): void {
 ### A3. Під'єднання у `apps/store/lib/manager/sale-create.ts`
 
 Додати виклик `applySaleMovements(sale.id)` **поруч із наявним `applyDebtMovementSafe`** у двох місцях:
+
 - `createSaleWithItems` — у блоці `if (post) { ... }` (після `applyDebtMovementSafe`, рядок ~172).
 - `updateSaleWithItems` — у блоці `if (becomesArchived) { ... }` (після `applyDebtMovementSafe`, рядок ~249).
 
@@ -177,6 +190,7 @@ export function removeSaleMovements(recorder: string): void {
 ### A4. Реверс у DELETE-роуті `apps/store/app/api/v1/manager/sales/[id]/route.ts`
 
 У наявному `DELETE` (рядки 233-309) вже реверсується борг. Додати прибирання рухів регістрів. Порядок:
+
 1. Перед видаленням прочитати `code1C`: розширити `existing` select на `code1C`.
 2. Обчислити `const recorder = existing.code1C ?? existing.id;`
 3. Після успішної транзакції видалення (після `recomputeDebtForClients`) викликати `removeSaleMovements(recorder)` (fire-and-forget).
@@ -186,6 +200,7 @@ export function removeSaleMovements(recorder: string): void {
 ### A5. Правка звіту маржі `apps/store/lib/reports/margin-flex.ts`
 
 Звіт собівартості джойнить `CostMovement` по `recorderCode1C = Sale.code1C`. Нові реалізації мають `code1C = null` → їхня собівартість не підтягнеться. Виправити на fallback `code1C ?? id`:
+
 - Додати `id: true` у select реалізацій (там, де вже беруться `sale.code1C`, `sale.createdAt`, `customer`).
 - У циклі побудови `saleCustomerByCode` замість `const code = it.sale.code1C;` використати `const code = it.sale.code1C ?? it.sale.id;`.
 - `saleCodes` (ключ для `costMovement.findMany({ where: { recorderCode1C: { in: saleCodes } } })`) відповідно міститиме `id` для нових реалізацій — збіжиться з тим, що пише `applySaleMovements`.
@@ -208,6 +223,7 @@ export function removeSaleMovements(recorder: string): void {
 **Де:** клієнтська перевірка у `apps/store/app/manager/(workstation)/sales/new/_components/sale-form.tsx`, у момент **«Зберегти та провести»** (submit з `post=true`). Для «Зберегти» (draft) — не перевіряти (чернетка).
 
 **Логіка:**
+
 1. Для кожного рядка обчислити еталон: `ref = unitPriceForType(row.prices, "wholesale")` (з `apps/store/lib/manager/order-pricing.ts`). Якщо `ref == null` — пропустити рядок (немає з чим порівнювати).
 2. `deviation = Math.abs(row.pricePerKg - ref)`. Якщо `deviation > 0.20` — додати рядок у список порушників.
 3. Якщо список не порожній — показати діалог-підтвердження (реюз наявного портального `useDocDelete`-подібного діалогу або простий inline-confirm компонент, БЕЗ `window.confirm` — він тихо блокується в iframe-shell менеджерки) зі списком: `Назва — має бути {ref}€, введено {pricePerKg}€`. Кнопки «Все одно провести» / «Скасувати». Тільки при підтвердженні — реальний submit.
@@ -226,14 +242,17 @@ export function removeSaleMovements(recorder: string): void {
 **Де:** `sale-form.tsx`, функція `onBarcode(code)` — між отриманням `data` (рядок ~346) і створенням draft-рядка (рядок ~370), поряд із наявною перевіркою дубля.
 
 **Логіка:**
+
 ```ts
 const r = data.lot;
 const now = Date.now();
 const active = r.reservedUntil && new Date(r.reservedUntil).getTime() > now;
 if (active && r.reservedByUserId && r.reservedByUserId !== currentUserId) {
   // показати попередження (toast / inline-alert), НЕ додавати рядок
-  setScanError(`Активна бронь мішка до ${formatDate(r.reservedUntil)}` +
-               (r.reservedByName ? ` (заброньовано: ${r.reservedByName})` : ""));
+  setScanError(
+    `Активна бронь мішка до ${formatDate(r.reservedUntil)}` +
+      (r.reservedByName ? ` (заброньовано: ${r.reservedByName})` : ""),
+  );
   return;
 }
 ```
@@ -247,6 +266,7 @@ if (active && r.reservedByUserId && r.reservedByUserId !== currentUserId) {
 **Статус: уже реалізовано.** У `apps/store/app/manager/(workstation)/sales/new/_components/sale-items-editor.tsx` є кнопка «Повторити ціну» (іконка Copy), що показується коли в документі > 1 рядка того самого товару, і викликає `repeatPriceForProduct(items, uid)` — копіює ціну/кг поточного рядка на всі рядки тієї ж номенклатури.
 
 **Завдання:**
+
 1. **Верифікувати** роботу (є юніт-тест на `repeatPriceForProduct`? якщо ні — додати).
 2. **Опційно** (лише якщо просто): додати правий клік / long-press як альтернативний тригер тієї самої дії (контекст-меню), реюз патерну ПКМ із списків Замовлень/Реалізацій (`use-context-menu` чи наявний компонент). Якщо реалізація контекст-меню нетривіальна — **пропустити**, наявної inline-кнопки достатньо; зафіксувати це у звіті.
 
@@ -255,11 +275,13 @@ if (active && r.reservedByUserId && r.reservedByUserId !== currentUserId) {
 ## Файли (орієнтовний перелік)
 
 **Нове:**
+
 - `apps/store/lib/manager/sale-movement-hooks.ts` (+ чиста `buildSaleMovementRows`)
 - `apps/store/lib/manager/sale-movement-hooks.test.ts`
 - (опц.) util для `collectPriceDeviations` + `isForeignActiveReservation` (+ тести)
 
 **Змінюємо:**
+
 - `apps/store/lib/manager/sale-create.ts` — 2 виклики `applySaleMovements`
 - `apps/store/app/api/v1/manager/sales/[id]/route.ts` — `removeSaleMovements` у DELETE (+ `code1C` у select)
 - `apps/store/lib/reports/margin-flex.ts` — recorder fallback `code1C ?? id`
