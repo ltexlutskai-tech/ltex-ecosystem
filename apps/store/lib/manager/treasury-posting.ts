@@ -9,7 +9,11 @@ import {
   recomputeDebtForClients,
   resolveClientIdByCustomer,
 } from "./debt-register";
-import type { TreasuryCurrency } from "@/lib/validations/manager-treasury";
+import type {
+  BankPaymentDraftInput,
+  CashTransferDraftInput,
+  TreasuryCurrency,
+} from "@/lib/validations/manager-treasury";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Задача D — проведення казначейських документів (банк/каса) у регістр ДДС.
@@ -400,4 +404,129 @@ export async function cancelCashTransfer(id: string): Promise<PostResult> {
   });
 
   return { ok: true };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Автозбереження чернетки (draft) казначейських документів — рівень 2
+// (План AUTOSAVE_REALTIME_PLAN §2). Пишуть/оновлюють рядок зі `status="draft"`.
+//
+// ⚠️ Грошова безпека: жодних рухів ДДС/боргу — вони з'являються ЛИШЕ при
+// проведенні (`postBankPayment*`/`postCashTransfer` через `[id]/post`). Тобто
+// autosave тут безпечний за визначенням (створення документа не проводить рухів).
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Парсить опційну ISO-дату у Date (fallback — `now`). */
+function draftDate(raw: string | null | undefined): Date {
+  if (!raw) return new Date();
+  const d = new Date(raw);
+  return Number.isNaN(d.getTime()) ? new Date() : d;
+}
+
+/** Спільний набір даних чернетки банк-платіжки (для create/update). */
+function bankPaymentDraftData(input: BankPaymentDraftInput) {
+  const amount = input.amount ?? 0;
+  const currency = input.currency ?? "UAH";
+  const rateEur = input.rateEur ?? 0;
+  return {
+    customerId: input.customerId ?? null,
+    bankAccountId: input.bankAccountId ?? null,
+    cashFlowArticleId: input.cashFlowArticleId ?? null,
+    amount,
+    currency,
+    amountEur: computeAmountEur(amount, currency, rateEur),
+    rateEur,
+    iban: input.iban ?? null,
+    purpose: input.purpose ?? null,
+    comment: input.comment ?? null,
+    paidAt: draftDate(input.paidAt),
+    status: "draft",
+  };
+}
+
+/** Створює чернетку вхідної платіжки (`status="draft"`, БЕЗ рухів). */
+export async function createBankPaymentIncomingDraft(
+  input: BankPaymentDraftInput,
+  userId: string,
+) {
+  return prisma.bankPaymentIncoming.create({
+    data: { ...bankPaymentDraftData(input), createdByUserId: userId },
+    select: { id: true, status: true },
+  });
+}
+
+/** Оновлює чернетку вхідної платіжки (БЕЗ рухів). */
+export async function updateBankPaymentIncomingDraft(
+  id: string,
+  input: BankPaymentDraftInput,
+) {
+  return prisma.bankPaymentIncoming.update({
+    where: { id },
+    data: bankPaymentDraftData(input),
+    select: { id: true, status: true },
+  });
+}
+
+/** Створює чернетку вихідної платіжки (`status="draft"`, БЕЗ рухів). */
+export async function createBankPaymentOutgoingDraft(
+  input: BankPaymentDraftInput,
+  userId: string,
+) {
+  return prisma.bankPaymentOutgoing.create({
+    data: { ...bankPaymentDraftData(input), createdByUserId: userId },
+    select: { id: true, status: true },
+  });
+}
+
+/** Оновлює чернетку вихідної платіжки (БЕЗ рухів). */
+export async function updateBankPaymentOutgoingDraft(
+  id: string,
+  input: BankPaymentDraftInput,
+) {
+  return prisma.bankPaymentOutgoing.update({
+    where: { id },
+    data: bankPaymentDraftData(input),
+    select: { id: true, status: true },
+  });
+}
+
+/** Спільний набір даних чернетки переміщення готівки. */
+function cashTransferDraftData(input: CashTransferDraftInput) {
+  const amount = input.amount ?? 0;
+  const currency = input.currency ?? "UAH";
+  const rateEur = input.rateEur ?? 0;
+  return {
+    fromAccountId: input.fromAccountId ?? null,
+    toAccountId: input.toAccountId ?? null,
+    cashFlowArticleId: input.cashFlowArticleId ?? null,
+    amount,
+    currency,
+    amountEur: computeAmountEur(amount, currency, rateEur),
+    rateEur,
+    comment: input.comment ?? null,
+    transferredAt: draftDate(input.transferredAt),
+    status: "draft",
+  };
+}
+
+/** Створює чернетку переміщення готівки (`status="draft"`, БЕЗ рухів). */
+export async function createCashTransferDraft(
+  input: CashTransferDraftInput,
+  userId: string,
+) {
+  return prisma.cashTransfer.create({
+    data: { ...cashTransferDraftData(input), createdByUserId: userId },
+    select: { id: true, status: true },
+  });
+}
+
+/** Оновлює чернетку переміщення готівки (БЕЗ рухів). */
+export async function updateCashTransferDraft(
+  id: string,
+  input: CashTransferDraftInput,
+) {
+  return prisma.cashTransfer.update({
+    where: { id },
+    data: cashTransferDraftData(input),
+    select: { id: true, status: true },
+  });
 }

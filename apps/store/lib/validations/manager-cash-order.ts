@@ -119,6 +119,43 @@ export const processPaymentSchema = z
 export type ProcessPaymentInput = z.infer<typeof processPaymentSchema>;
 export type ProcessPaymentInputRaw = z.input<typeof processPaymentSchema>;
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Автозбереження чернетки (draft) касового ордера — План AUTOSAVE_REALTIME_PLAN.
+//
+// Послаблена версія `processPaymentSchema`: усі поля опційні (жодних `.refine`),
+// щоб чернетка зберігалась «з першого символу» навіть напівпорожня. Обирається у
+// POST/PATCH коли body містить `draft === true`.
+//
+// ⚠️ Грошова безпека: draft НЕ проводить документ і НЕ рахує здачу/борг/ДДС.
+// Він пише ЛИШЕ один рядок `MgrCashOrder` зі `status="draft"` без ефектів
+// проведення (`applyCashOrderPostingEffects` тут не викликається) і без
+// авто-ордера здачі. Повна оплата (здача + рухи ДДС + борг) — ЛИШЕ при
+// «Провести» (`processPaymentSchema`).
+// ─────────────────────────────────────────────────────────────────────────────
+
+const draftAmountField = z.number().nonnegative().max(MAX_AMOUNT).optional();
+
+export const cashOrderDraftSchema = z.object({
+  /** Прапорець draft-режиму — endpoint обирає цю схему коли `true`. */
+  draft: z.literal(true),
+  saleId: z.string().min(1).nullable().optional(),
+  clientId: z.string().min(1).nullable().optional(),
+  type: z.enum(CASH_FLOW_DIRECTIONS).optional(),
+  amountUah: draftAmountField,
+  amountEur: draftAmountField,
+  amountUsd: draftAmountField,
+  amountUahCashless: draftAmountField,
+  bankAccountId: z.string().min(1).nullable().optional(),
+  cashFlowArticleId: z.string().min(1).nullable().optional(),
+  comment: z.string().max(2000).nullable().optional(),
+  /** Курси-знімок (грн за €/$) — опційні для чернетки. */
+  rateEur: z.number().nonnegative().max(MAX_AMOUNT).optional(),
+  rateUsd: z.number().nonnegative().max(MAX_AMOUNT).optional(),
+  routeSheetId: z.string().min(1).nullable().optional(),
+});
+
+export type CashOrderDraftInput = z.infer<typeof cashOrderDraftSchema>;
+
 /**
  * Zod schema для POST /api/v1/manager/cash-orders/discount-remainder
  * (1С `ДатьСкидкуНаОстаток`). Зменшує найдорожчий рядок реалізації на залишок.

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button, Input, useToast } from "@ltex/ui";
 import {
@@ -14,10 +14,40 @@ import {
 } from "@/lib/manager/cash-order";
 import type { CashFlowDirection } from "@/lib/validations/manager-cash-order";
 import { buildPaymentReceiptText } from "@/lib/manager/payment-message";
+import { useDocumentAutosave } from "@/lib/autosave/use-document-autosave";
+import {
+  AutosaveStatus,
+  RestoreDraftBanner,
+} from "../../../_components/autosave-status";
 import { ClientPicker } from "../../../orders/new/_components/client-picker";
 import type { ClientPickerItem } from "../../../orders/new/_components/types";
 import { ShareSheet } from "../../../prices/_components/share-sheet";
 import { ArticleCombobox } from "./article-combobox";
+
+/**
+ * Серіалізований знімок стану payment-форми — джерело як для локальної копії
+ * (рівень 1 localStorage), так і для серверної чернетки (рівень 2). JSON-safe.
+ */
+interface PaymentDraftData {
+  direction: CashFlowDirection;
+  clientId: string | null;
+  clientLabel: string | null;
+  clientDebtEur: number;
+  sumToPayRaw: string;
+  includeDebt: boolean;
+  rateEurRaw: string;
+  rateUsdRaw: string;
+  payUahRaw: string;
+  payCashlessRaw: string;
+  payEurRaw: string;
+  payUsdRaw: string;
+  changeUahRaw: string;
+  changeEurRaw: string;
+  changeUsdRaw: string;
+  bankAccountId: string;
+  cashFlowArticleId: string;
+  comment: string;
+}
 
 /** Довідник банк. рахунків (з GET /dictionaries). */
 export interface BankAccountOption {
@@ -178,6 +208,13 @@ export function PaymentForm({
   const [submitting, setSubmitting] = useState(false);
   const [discounting, setDiscounting] = useState(false);
 
+  /**
+   * Id збереженого документа: `null` доки чернетку ще не створено (нова оплата).
+   * Оновлюється явним POST АБО autosave (`onIdAssigned`). Використовується у
+   * `submit`: якщо є id → PATCH (перевикористати чернетку), інакше POST.
+   */
+  const [savedId, setSavedId] = useState<string | null>(null);
+
   // ─── Повідомлення (Viber/share квитанція) ─────────────────────────────────
   const [shareOpen, setShareOpen] = useState(false);
   const [shareText, setShareText] = useState("");
@@ -286,6 +323,140 @@ export function PaymentForm({
     Boolean(cashFlowArticleId) &&
     (isExpense || totalPaid > 0);
 
+  // ─── Автозбереження чернетки (наскрізне, План AUTOSAVE_REALTIME_PLAN) ──────
+  // Дворівневий захист: рівень 1 (localStorage) + рівень 2 (жива чернетка в БД).
+  // ⚠️ Грошова безпека: draft НЕ проводить оплату й НЕ рахує здачу/борг/ДДС —
+  // пише лише один рядок MgrCashOrder зі status="draft" (`createCashOrderDraft`).
+  const draftData = useMemo<PaymentDraftData>(
+    () => ({
+      direction,
+      clientId: effectiveClientId,
+      clientLabel: pickedClientLabel ?? clientLabel ?? null,
+      clientDebtEur: pickedClientDebtEur,
+      sumToPayRaw,
+      includeDebt,
+      rateEurRaw,
+      rateUsdRaw,
+      payUahRaw,
+      payCashlessRaw,
+      payEurRaw,
+      payUsdRaw,
+      changeUahRaw,
+      changeEurRaw,
+      changeUsdRaw,
+      bankAccountId,
+      cashFlowArticleId,
+      comment,
+    }),
+    [
+      direction,
+      effectiveClientId,
+      pickedClientLabel,
+      clientLabel,
+      pickedClientDebtEur,
+      sumToPayRaw,
+      includeDebt,
+      rateEurRaw,
+      rateUsdRaw,
+      payUahRaw,
+      payCashlessRaw,
+      payEurRaw,
+      payUsdRaw,
+      changeUahRaw,
+      changeEurRaw,
+      changeUsdRaw,
+      bankAccountId,
+      cashFlowArticleId,
+      comment,
+    ],
+  );
+
+  /** Тіло draft-запиту (спільне для POST/PATCH чернетки). */
+  const draftBody = useCallback(
+    (d: PaymentDraftData): Record<string, unknown> => ({
+      draft: true,
+      type: d.direction,
+      amountUah: parseAmount(d.payUahRaw),
+      amountEur: parseAmount(d.payEurRaw),
+      amountUsd: parseAmount(d.payUsdRaw),
+      amountUahCashless: parseAmount(d.payCashlessRaw),
+      bankAccountId: d.bankAccountId || undefined,
+      cashFlowArticleId: d.cashFlowArticleId || undefined,
+      comment: d.comment.trim() || undefined,
+      rateEur: parseRate(d.rateEurRaw),
+      rateUsd: parseRate(d.rateUsdRaw),
+    }),
+    [],
+  );
+
+  const createDraftServer = useCallback(
+    async (d: PaymentDraftData): Promise<string> => {
+      const res = await fetch("/api/v1/manager/cash-orders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...draftBody(d),
+          saleId: saleId ?? undefined,
+          clientId: saleId ? undefined : (d.clientId ?? undefined),
+          ...(routeSheetId ? { routeSheetId } : {}),
+        }),
+      });
+      if (!res.ok) throw new Error(`draft create ${res.status}`);
+      const j = (await res.json()) as { id: string };
+      return j.id;
+    },
+    [draftBody, saleId, routeSheetId],
+  );
+
+  const updateDraftServer = useCallback(
+    async (id: string, d: PaymentDraftData): Promise<void> => {
+      const res = await fetch(`/api/v1/manager/cash-orders/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(draftBody(d)),
+      });
+      if (!res.ok) throw new Error(`draft update ${res.status}`);
+    },
+    [draftBody],
+  );
+
+  const autosave = useDocumentAutosave<PaymentDraftData>({
+    docType: "cash-order",
+    existingId: null,
+    data: draftData,
+    // Серверна чернетка можлива лише коли є підстава (реалізація або клієнт).
+    canCreateDraft: hasBasis,
+    createDraft: createDraftServer,
+    updateDraft: updateDraftServer,
+    onIdAssigned: (id) => {
+      setSavedId(id);
+      window.history.replaceState(null, "", `/manager/payments/${id}`);
+    },
+  });
+
+  /** Застосувати відновлені з localStorage дані у стан форми. */
+  function applyRestore(d: PaymentDraftData): void {
+    setDirection(d.direction);
+    setPickedClientId(d.clientId);
+    setPickedClientLabel(d.clientLabel);
+    setPickedClientDebtEur(d.clientDebtEur);
+    setSumToPayRaw(d.sumToPayRaw);
+    setIncludeDebt(d.includeDebt);
+    setRateEurRaw(d.rateEurRaw);
+    setRateUsdRaw(d.rateUsdRaw);
+    setPayUahRaw(d.payUahRaw);
+    setPayCashlessRaw(d.payCashlessRaw);
+    setPayEurRaw(d.payEurRaw);
+    setPayUsdRaw(d.payUsdRaw);
+    setChangeUahRaw(d.changeUahRaw);
+    setChangeEurRaw(d.changeEurRaw);
+    setChangeUsdRaw(d.changeUsdRaw);
+    setBankAccountId(d.bankAccountId);
+    setCashFlowArticleId(d.cashFlowArticleId);
+    setComment(d.comment);
+    autosave.acceptRestore();
+  }
+
   function onClientPicked(
     id: string | null,
     summary: ClientPickerItem | null,
@@ -316,10 +487,22 @@ export function PaymentForm({
     if (!canSubmit) return;
     setSubmitting(true);
     try {
-      const res = await fetch("/api/v1/manager/cash-orders", {
-        method: "POST",
+      // Гасимо чергу autosave, щоб відкладений draft-PATCH не перезаписав
+      // проведений/збережений документ після цього запиту.
+      autosave.clearAll();
+      // Якщо autosave вже створив чернетку (`savedId`) — PATCH перевикористовує
+      // її як ордер (реквізити безпечні: рухи ДДС/боргу лише при post). Інакше —
+      // POST нового документа.
+      const usePatch = savedId != null;
+      const url = usePatch
+        ? `/api/v1/manager/cash-orders/${savedId}`
+        : "/api/v1/manager/cash-orders";
+      const res = await fetch(url, {
+        method: usePatch ? "PATCH" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          // Підстава потрібна strict-схемі (refine saleId||clientId); при PATCH
+          // сервер бере її з наявного рядка, але поле має бути присутнім.
           saleId: saleId ?? undefined,
           clientId: saleId ? undefined : (effectiveClientId ?? undefined),
           type: direction,
@@ -338,7 +521,7 @@ export function PaymentForm({
           rateUsd: rates.usd,
           sumToPayEur,
           includeDebt,
-          routeSheetId: routeSheetId ?? undefined,
+          ...(usePatch ? {} : { routeSheetId: routeSheetId ?? undefined }),
         }),
       });
       if (!res.ok) {
@@ -349,6 +532,10 @@ export function PaymentForm({
         });
         return;
       }
+      const j = (await res.json().catch(() => null)) as {
+        income?: { id?: string };
+      } | null;
+      if (!usePatch && j?.income?.id) setSavedId(j.income.id);
       toast({ title: post ? "Оплату проведено" : "Чернетку збережено" });
       router.push(returnHref ?? "/manager/payments");
       router.refresh();
@@ -441,6 +628,15 @@ export function PaymentForm({
 
   return (
     <div className="space-y-4">
+      {autosave.restoreData && (
+        <RestoreDraftBanner
+          onRestore={() =>
+            applyRestore(autosave.restoreData as PaymentDraftData)
+          }
+          onDismiss={autosave.dismissRestore}
+        />
+      )}
+
       {/* ─── Вид руху ──────────────────────────────────────────────────── */}
       <Section title="Вид руху коштів">
         <div className="inline-flex overflow-hidden rounded-md border border-gray-300">
@@ -733,6 +929,11 @@ export function PaymentForm({
 
       {/* ─── Кнопки ────────────────────────────────────────────────────── */}
       <div className="flex flex-wrap items-center justify-end gap-2">
+        <AutosaveStatus
+          status={autosave.status}
+          savedAt={autosave.savedAt}
+          className="mr-auto"
+        />
         {canDiscount && (
           <Button
             type="button"

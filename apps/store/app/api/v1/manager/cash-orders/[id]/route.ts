@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
-import { prisma } from "@ltex/db";
+import { Prisma, prisma } from "@ltex/db";
 import { getCurrentUser } from "@/lib/auth/manager-auth";
 import { canDeleteManagerDoc } from "@/lib/manager/doc-delete-permission";
 import { getMyClientCodes1C } from "@/lib/manager/sale-ownership";
@@ -9,6 +9,211 @@ import {
   resolveClientIdByCustomer,
 } from "@/lib/manager/debt-register";
 import { deleteCashFlowMovementsForOrder } from "@/lib/manager/cashflow-register";
+import {
+  createPaymentOrders,
+  updateCashOrderDraft,
+} from "@/lib/manager/cash-order";
+import {
+  cashOrderDraftSchema,
+  processPaymentSchema,
+} from "@/lib/validations/manager-cash-order";
+
+type ManagerUser = NonNullable<Awaited<ReturnType<typeof getCurrentUser>>>;
+
+/**
+ * Ownership-гард касового ордера: manager — лише свої клієнти (через code1C
+ * платника — Контрагент ордера АБО клієнт його реалізації); admin — будь-який.
+ * Повертає `true` якщо видно.
+ */
+async function canAccessCashOrder(
+  user: ManagerUser,
+  existing: {
+    customer: { code1C: string | null } | null;
+    sale: { customerId: string } | null;
+  },
+): Promise<boolean> {
+  const myCodes = await getMyClientCodes1C(user);
+  if (myCodes === null) return true; // admin
+  let code1C = existing.customer?.code1C ?? null;
+  if (!code1C && existing.sale?.customerId) {
+    const saleCustomer = await prisma.customer.findUnique({
+      where: { id: existing.sale.customerId },
+      select: { code1C: true },
+    });
+    code1C = saleCustomer?.code1C ?? null;
+  }
+  return !!code1C && myCodes.includes(code1C);
+}
+
+/**
+ * PATCH касового ордера. Дві гілки:
+ *  • `draft:true` — автозбереження чернетки: послаблена схема, оновлення БЕЗ
+ *    ефектів проведення (`updateCashOrderDraft`);
+ *  • інакше — явне «Зберегти/Провести» з форми: перевикористовує цей рядок як
+ *    прихідний ордер (`createPaymentOrders({ reuseIncomeId })`), тож autosave не
+ *    дублює документ. Обидві гілки заборонені для вже проведеного (`posted`).
+ */
+export async function PATCH(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  const user = await getCurrentUser(req);
+  if (!user) {
+    return NextResponse.json({ error: "Не авторизовано" }, { status: 401 });
+  }
+
+  const { id } = await params;
+
+  const existing = await prisma.mgrCashOrder.findUnique({
+    where: { id },
+    select: {
+      id: true,
+      status: true,
+      customer: { select: { code1C: true } },
+      sale: { select: { customerId: true } },
+    },
+  });
+  if (!existing) {
+    return NextResponse.json({ error: "Оплату не знайдено" }, { status: 404 });
+  }
+  if (!(await canAccessCashOrder(user, existing))) {
+    return NextResponse.json({ error: "Оплату не знайдено" }, { status: 404 });
+  }
+
+  // Проведений ордер заблокований для будь-яких змін (рухи ДДС/боргу вже є).
+  if (existing.status === "posted") {
+    return NextResponse.json(
+      { error: "Оплату проведено — редагування заборонено" },
+      { status: 409 },
+    );
+  }
+
+  const body = await req.json().catch(() => null);
+
+  // ─── Автозбереження чернетки (draft) ──────────────────────────────────────
+  if (body && typeof body === "object" && (body as { draft?: unknown }).draft) {
+    const parsedDraft = cashOrderDraftSchema.safeParse(body);
+    if (!parsedDraft.success) {
+      return NextResponse.json(
+        {
+          error: "Невірні дані",
+          details: parsedDraft.error.issues.slice(0, 5),
+        },
+        { status: 400 },
+      );
+    }
+    const input = parsedDraft.data;
+    try {
+      const draft = await updateCashOrderDraft(id, {
+        type: input.type ?? "income",
+        paid: {
+          uah: input.amountUah ?? 0,
+          eur: input.amountEur ?? 0,
+          usd: input.amountUsd ?? 0,
+          uahCashless: input.amountUahCashless ?? 0,
+        },
+        bankAccountId: input.bankAccountId ?? null,
+        cashFlowArticleId: input.cashFlowArticleId ?? null,
+        comment: input.comment ?? null,
+        rates: { eur: input.rateEur ?? 0, usd: input.rateUsd ?? 0 },
+      });
+      return NextResponse.json({ id: draft.id, status: draft.status });
+    } catch (err) {
+      if (err instanceof Prisma.PrismaClientKnownRequestError) {
+        if (err.code === "P2003" || err.code === "P2025") {
+          return NextResponse.json(
+            { error: "Невалідні дані оплати" },
+            { status: 400 },
+          );
+        }
+      }
+      console.error("[L-TEX] Cash order draft update failed", {
+        cashOrderId: id,
+        error: err instanceof Error ? err.message : String(err),
+      });
+      return NextResponse.json(
+        { error: "Помилка збереження чернетки" },
+        { status: 500 },
+      );
+    }
+  }
+
+  // ─── Явне збереження/проведення (перевикористання чернетки як ордера) ──────
+  const parsed = processPaymentSchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: "Невірні дані", details: parsed.error.issues.slice(0, 5) },
+      { status: 400 },
+    );
+  }
+  const input = parsed.data;
+
+  // Гард прихованого рахунку при приході (як у POST).
+  if (input.type === "income" && input.bankAccountId) {
+    const acct = await prisma.mgrBankAccount.findUnique({
+      where: { id: input.bankAccountId },
+      select: { hiddenInApp: true },
+    });
+    if (acct?.hiddenInApp) {
+      return NextResponse.json(
+        { error: "Цей рахунок не можна вибирати при приході" },
+        { status: 400 },
+      );
+    }
+  }
+
+  // Резолв платника з наявного ордера (клієнт/реалізація не змінюються при PATCH).
+  const current = await prisma.mgrCashOrder.findUnique({
+    where: { id },
+    select: { saleId: true, customerId: true },
+  });
+
+  try {
+    const { income, change } = await createPaymentOrders({
+      reuseIncomeId: id,
+      saleId: current?.saleId ?? null,
+      customerId: current?.customerId ?? null,
+      type: input.type,
+      paid: {
+        uah: input.amountUah,
+        eur: input.amountEur,
+        usd: input.amountUsd,
+        uahCashless: input.amountUahCashless,
+      },
+      change: {
+        uah: input.changeUah,
+        eur: input.changeEur,
+        usd: input.changeUsd,
+      },
+      bankAccountId: input.bankAccountId ?? null,
+      cashFlowArticleId: input.cashFlowArticleId ?? null,
+      comment: input.comment ?? null,
+      post: input.post,
+      rates: { eur: input.rateEur, usd: input.rateUsd },
+      sumToPayEur: input.sumToPayEur,
+      agentUserId: user.id,
+    });
+    revalidatePath("/manager/payments");
+    return NextResponse.json({ income, change });
+  } catch (err) {
+    if (err instanceof Prisma.PrismaClientKnownRequestError) {
+      if (err.code === "P2003" || err.code === "P2025") {
+        return NextResponse.json(
+          { error: "Невалідні дані оплати" },
+          { status: 400 },
+        );
+      }
+    }
+    console.error("[L-TEX] Cash order update failed", {
+      cashOrderId: id,
+      error: err instanceof Error ? err.message : String(err),
+    });
+    return NextResponse.json(
+      { error: "Помилка оновлення оплати" },
+      { status: 500 },
+    );
+  }
+}
 
 /**
  * Видалення касового ордера / оплати (з контекстного меню списку Оплати).
