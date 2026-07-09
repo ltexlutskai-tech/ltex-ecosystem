@@ -58,6 +58,22 @@ export interface ClientPresentationItem {
   notDirectInput: boolean;
 }
 
+export interface ClientContact {
+  id: string;
+  fullName: string;
+  position: string | null;
+  phone: string | null;
+  email: string | null;
+  comment: string | null;
+}
+
+/** Мінімальне посилання на клієнта у дереві «головний → філії». */
+export interface ClientHierarchyRef {
+  id: string;
+  name: string;
+  code1C: string | null;
+}
+
 export interface ClientBankAccount {
   id: string;
   accountNumber: string;
@@ -169,7 +185,12 @@ export interface ClientDetail {
   assortmentItems: ClientAssortmentItem[];
   presentations: ClientPresentationItem[];
   bankAccounts: ClientBankAccount[];
+  contacts: ClientContact[];
   reminders: ClientReminder[];
   timeline: ClientTimelineEntry[];
   assignedManager: { id: string; fullName: string } | null;
+  /** ТЗ 8.0 — Блок E1: головний клієнт (за `parentCode1C`) або null. */
+  parentClient: ClientHierarchyRef | null;
+  /** ТЗ 8.0 — Блок E1: філії (клієнти з `parentCode1C === code1C`). */
+  childClients: ClientHierarchyRef[];
 }

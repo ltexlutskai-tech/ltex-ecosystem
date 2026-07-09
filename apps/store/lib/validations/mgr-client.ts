@@ -209,6 +209,42 @@ export type MgrClientRouteReorderInput = z.infer<
   typeof mgrClientRouteReorderSchema
 >;
 
+// ── Contacts CRUD (ТЗ 8.0 — Блок E2) ────────────────────────────────────
+// Контактні особи клієнта (`MgrClientContact`). fullName обовʼязковий,
+// решта — опційні. Авто `sortOrder` (max+1) на сервері.
+const contactFullNameField = z.string().trim().min(1, "Введіть ПІБ").max(255);
+const contactOptionalField = z.string().trim().max(255).nullable().optional();
+
+export const mgrClientContactCreateSchema = z
+  .object({
+    fullName: contactFullNameField,
+    position: contactOptionalField,
+    phone: z.string().trim().max(50).nullable().optional(),
+    email: contactOptionalField,
+    comment: z.string().trim().max(500).nullable().optional(),
+  })
+  .strict();
+
+export const mgrClientContactUpdateSchema = z
+  .object({
+    fullName: contactFullNameField.optional(),
+    position: contactOptionalField,
+    phone: z.string().trim().max(50).nullable().optional(),
+    email: contactOptionalField,
+    comment: z.string().trim().max(500).nullable().optional(),
+  })
+  .strict()
+  .refine((d) => Object.keys(d).length > 0, {
+    message: "Немає полів для оновлення",
+  });
+
+export type MgrClientContactCreateInput = z.infer<
+  typeof mgrClientContactCreateSchema
+>;
+export type MgrClientContactUpdateInput = z.infer<
+  typeof mgrClientContactUpdateSchema
+>;
+
 export const MGR_CLIENT_ADMIN_ONLY_FIELDS = ["agentUserId"] as const;
 export type MgrClientAdminOnlyField =
   (typeof MGR_CLIENT_ADMIN_ONLY_FIELDS)[number];

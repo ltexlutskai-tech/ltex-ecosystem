@@ -105,6 +105,7 @@ interface MaskableClient {
   additionalDescription?: string | null;
   messengers?: unknown[];
   bankAccounts?: unknown[];
+  contacts?: unknown[];
   reminders?: unknown[];
   presentations?: unknown[];
   timeline?: unknown[];
@@ -143,6 +144,7 @@ export function maskClientForForeign<T extends MaskableClient>(client: T): T {
     additionalDescription: null,
     messengers: [],
     bankAccounts: [],
+    contacts: [],
     reminders: [],
     presentations: [],
     timeline: [],
