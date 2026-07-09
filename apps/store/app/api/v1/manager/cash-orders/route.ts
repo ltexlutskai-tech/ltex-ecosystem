@@ -2,12 +2,18 @@ import { NextRequest, NextResponse } from "next/server";
 import { Prisma, prisma } from "@ltex/db";
 import { getCurrentUser } from "@/lib/auth/manager-auth";
 import { getMyClientCodes1C } from "@/lib/manager/sale-ownership";
-import { createPaymentOrders } from "@/lib/manager/cash-order";
+import {
+  createCashOrderDraft,
+  createPaymentOrders,
+} from "@/lib/manager/cash-order";
 import {
   resolveCustomerForOrder,
   ResolveCustomerError,
 } from "@/lib/manager/resolve-customer";
-import { processPaymentSchema } from "@/lib/validations/manager-cash-order";
+import {
+  cashOrderDraftSchema,
+  processPaymentSchema,
+} from "@/lib/validations/manager-cash-order";
 import {
   buildCashOrdersWhere,
   cashOrderRowInclude,
@@ -101,6 +107,124 @@ export async function GET(req: NextRequest) {
  * при здачі > 0 авто-створюється ордер-розхід (`changeForId`). Анти-дубля немає
  * (кілька оплат на одну реалізацію дозволено).
  */
+type ManagerUser = NonNullable<Awaited<ReturnType<typeof getCurrentUser>>>;
+
+/**
+ * Створення чернетки касового ордера (autosave, `draft:true`). Послаблена
+ * валідація (`cashOrderDraftSchema`), той самий ownership, що й strict-POST, але
+ * запис БЕЗ ефектів проведення (`createCashOrderDraft` — без здачі/ДДС/боргу).
+ * Повертає `{ id }`. Локальний хелпер POST (не HTTP-метод — не експортується).
+ */
+async function createDraftCashOrder(
+  body: unknown,
+  user: ManagerUser,
+): Promise<NextResponse> {
+  const parsed = cashOrderDraftSchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: "Невірні дані", details: parsed.error.issues.slice(0, 5) },
+      { status: 400 },
+    );
+  }
+  const input = parsed.data;
+
+  const myCodes = await getMyClientCodes1C(user);
+  let saleId: string | null = null;
+  let customerId: string | null = null;
+
+  if (input.saleId) {
+    const sale = await prisma.sale.findUnique({
+      where: { id: input.saleId },
+      select: { id: true, customer: { select: { id: true, code1C: true } } },
+    });
+    if (!sale) {
+      return NextResponse.json(
+        { error: "Реалізацію не знайдено" },
+        { status: 404 },
+      );
+    }
+    if (myCodes !== null) {
+      if (!sale.customer.code1C || !myCodes.includes(sale.customer.code1C)) {
+        return NextResponse.json({ error: "Не ваш клієнт" }, { status: 403 });
+      }
+    }
+    saleId = sale.id;
+    customerId = sale.customer.id;
+  } else if (input.clientId) {
+    let resolved;
+    try {
+      resolved = await resolveCustomerForOrder(input.clientId);
+    } catch (err) {
+      if (err instanceof ResolveCustomerError) {
+        return NextResponse.json(
+          { error: err.message },
+          { status: err.status },
+        );
+      }
+      throw err;
+    }
+    if (myCodes !== null) {
+      if (!resolved.code1C || !myCodes.includes(resolved.code1C)) {
+        return NextResponse.json({ error: "Не ваш клієнт" }, { status: 403 });
+      }
+    }
+    customerId = resolved.id;
+  }
+
+  if (input.routeSheetId) {
+    const routeSheet = await prisma.routeSheet.findUnique({
+      where: { id: input.routeSheetId },
+      select: { id: true },
+    });
+    if (!routeSheet) {
+      return NextResponse.json(
+        { error: "Маршрутний лист не знайдено" },
+        { status: 404 },
+      );
+    }
+  }
+
+  try {
+    const draft = await createCashOrderDraft({
+      saleId,
+      customerId,
+      type: input.type ?? "income",
+      paid: {
+        uah: input.amountUah ?? 0,
+        eur: input.amountEur ?? 0,
+        usd: input.amountUsd ?? 0,
+        uahCashless: input.amountUahCashless ?? 0,
+      },
+      bankAccountId: input.bankAccountId ?? null,
+      cashFlowArticleId: input.cashFlowArticleId ?? null,
+      comment: input.comment ?? null,
+      rates: { eur: input.rateEur ?? 0, usd: input.rateUsd ?? 0 },
+      agentUserId: user.id,
+      routeSheetId: input.routeSheetId ?? null,
+    });
+    return NextResponse.json(
+      { id: draft.id, status: draft.status },
+      { status: 201 },
+    );
+  } catch (err) {
+    if (err instanceof Prisma.PrismaClientKnownRequestError) {
+      if (err.code === "P2003" || err.code === "P2025") {
+        return NextResponse.json(
+          { error: "Невалідні дані оплати" },
+          { status: 400 },
+        );
+      }
+    }
+    console.error("[L-TEX] Cash order draft create failed", {
+      error: err instanceof Error ? err.message : String(err),
+    });
+    return NextResponse.json(
+      { error: "Помилка збереження чернетки" },
+      { status: 500 },
+    );
+  }
+}
+
 export async function POST(req: NextRequest) {
   const user = await getCurrentUser(req);
   if (!user) {
@@ -108,6 +232,13 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json().catch(() => null);
+
+  // ─── Автозбереження чернетки (draft) ──────────────────────────────────────
+  // `draft === true` → послаблена схема, створення БЕЗ ефектів проведення.
+  if (body && typeof body === "object" && (body as { draft?: unknown }).draft) {
+    return createDraftCashOrder(body, user);
+  }
+
   const parsed = processPaymentSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json(

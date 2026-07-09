@@ -8,8 +8,14 @@ import {
   saleRowInclude,
   serializeSaleRow,
 } from "@/lib/manager/sales-list";
-import { createSaleSchema } from "@/lib/validations/manager-sale";
-import { createSaleWithItems } from "@/lib/manager/sale-create";
+import {
+  createSaleSchema,
+  saleDraftSchema,
+} from "@/lib/validations/manager-sale";
+import {
+  createSaleDraft,
+  createSaleWithItems,
+} from "@/lib/manager/sale-create";
 import {
   resolveCustomerForOrder,
   ResolveCustomerError,
@@ -99,6 +105,94 @@ export async function GET(req: NextRequest) {
   });
 }
 
+type ManagerUser = NonNullable<Awaited<ReturnType<typeof getCurrentUser>>>;
+
+/**
+ * Створення чернетки реалізації (autosave, `draft:true`). Послаблена валідація
+ * (`saleDraftSchema`), той самий ownership, що й strict-POST, але створення БЕЗ
+ * ефектів проведення (`createSaleDraft`). Повертає `{ id }`.
+ *
+ * Не експортується з route-файлу (лише HTTP-методи є експортами) — це локальний
+ * хелпер POST.
+ */
+async function createDraftSale(
+  body: unknown,
+  user: ManagerUser,
+): Promise<NextResponse> {
+  const parsed = saleDraftSchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: "Невірні дані", details: parsed.error.issues.slice(0, 5) },
+      { status: 400 },
+    );
+  }
+  const input = parsed.data;
+
+  // `Sale.customerId` — обов'язковий FK: draft-рядок неможливий без клієнта.
+  // До вибору клієнта прогрес захищає локальна копія (рівень 1 автозбереження).
+  if (!input.customerId) {
+    return NextResponse.json(
+      { error: "Виберіть клієнта, щоб зберегти чернетку" },
+      { status: 400 },
+    );
+  }
+
+  let customer;
+  try {
+    customer = await resolveCustomerForOrder(input.customerId);
+  } catch (err) {
+    if (err instanceof ResolveCustomerError) {
+      return NextResponse.json({ error: err.message }, { status: err.status });
+    }
+    throw err;
+  }
+
+  // Ownership: manager — лише свої клієнти; admin — будь-кого.
+  const myCodes = await getMyClientCodes1C(user);
+  if (myCodes !== null) {
+    if (!customer.code1C || !myCodes.includes(customer.code1C)) {
+      return NextResponse.json({ error: "Не ваш клієнт" }, { status: 403 });
+    }
+  }
+
+  if (input.routeSheetId) {
+    const routeSheet = await prisma.routeSheet.findUnique({
+      where: { id: input.routeSheetId },
+      select: { id: true },
+    });
+    if (!routeSheet) {
+      return NextResponse.json(
+        { error: "Маршрутний лист не знайдено" },
+        { status: 404 },
+      );
+    }
+  }
+
+  try {
+    const sale = await createSaleDraft(input, customer, { userId: user.id });
+    return NextResponse.json(
+      { id: sale.id, status: sale.status },
+      { status: 201 },
+    );
+  } catch (err) {
+    if (err instanceof Prisma.PrismaClientKnownRequestError) {
+      if (err.code === "P2003" || err.code === "P2025") {
+        return NextResponse.json(
+          { error: "Невалідний product/lot у items" },
+          { status: 400 },
+        );
+      }
+    }
+    console.error("[L-TEX] Sale draft create failed", {
+      error: err instanceof Error ? err.message : String(err),
+    });
+    return NextResponse.json(
+      { error: "Помилка збереження чернетки" },
+      { status: 500 },
+    );
+  }
+}
+
 export async function POST(req: NextRequest) {
   const user = await getCurrentUser(req);
   if (!user) {
@@ -106,6 +200,13 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json().catch(() => null);
+
+  // ─── Автозбереження чернетки (draft) ──────────────────────────────────────
+  // `draft === true` → послаблена схема, створення БЕЗ ефектів проведення.
+  if (body && typeof body === "object" && (body as { draft?: unknown }).draft) {
+    return createDraftSale(body, user);
+  }
+
   const parsed = createSaleSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json(

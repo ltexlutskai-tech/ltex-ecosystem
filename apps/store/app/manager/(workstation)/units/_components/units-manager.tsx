@@ -2,8 +2,10 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Check, Pencil } from "lucide-react";
+import { Plus, Pencil } from "lucide-react";
 import { Button, Input, useToast } from "@ltex/ui";
+import { useInlineRecordEdit } from "@/lib/autosave/use-inline-record-edit";
+import { InlineAutosaveControls } from "../../_components/inline-autosave-controls";
 
 export interface UnitItem {
   id: string;
@@ -16,6 +18,10 @@ export interface UnitItem {
 
 const BASE = "/api/v1/manager/admin/units";
 
+interface NameEditFields extends Record<string, unknown> {
+  name: string;
+}
+
 export function UnitsManager({ initial }: { initial: UnitItem[] }) {
   const router = useRouter();
   const { toast } = useToast();
@@ -25,7 +31,6 @@ export function UnitsManager({ initial }: { initial: UnitItem[] }) {
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [editName, setEditName] = useState("");
 
   async function call(url: string, method: string, body: unknown) {
     setBusy(true);
@@ -57,12 +62,6 @@ export function UnitsManager({ initial }: { initial: UnitItem[] }) {
       setName("");
       setCode("");
     }
-  }
-
-  async function saveEdit(id: string) {
-    if (!editName.trim()) return;
-    const ok = await call(`${BASE}/${id}`, "PATCH", { name: editName.trim() });
-    if (ok) setEditingId(null);
   }
 
   return (
@@ -116,65 +115,130 @@ export function UnitsManager({ initial }: { initial: UnitItem[] }) {
                   u.archived ? "bg-gray-50 text-gray-400" : ""
                 }`}
               >
-                <td className="px-4 py-2 font-medium text-gray-800">
-                  {editingId === u.id ? (
-                    <Input
-                      value={editName}
-                      onChange={(e) => setEditName(e.target.value)}
-                      className="h-8"
-                    />
-                  ) : (
-                    u.name
-                  )}
-                </td>
-                <td className="px-4 py-2 text-gray-600">{u.code ?? "—"}</td>
-                <td className="px-4 py-2 text-gray-600">
-                  {u.coefficient ?? "—"}
-                </td>
-                <td className="px-4 py-2 text-right">
-                  <div className="flex items-center justify-end gap-2">
-                    {editingId === u.id ? (
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        disabled={busy}
-                        onClick={() => saveEdit(u.id)}
-                      >
-                        <Check className="h-4 w-4" />
-                      </Button>
-                    ) : (
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => {
-                          setEditingId(u.id);
-                          setEditName(u.name);
-                        }}
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                    )}
-                    <button
-                      type="button"
-                      disabled={busy}
-                      onClick={() =>
-                        call(`${BASE}/${u.id}`, "PATCH", {
-                          archived: !u.archived,
-                        })
-                      }
-                      className="text-xs text-gray-500 hover:text-gray-700"
-                    >
-                      {u.archived ? "Відновити" : "Архівувати"}
-                    </button>
-                  </div>
-                </td>
+                {editingId === u.id ? (
+                  <EditableUnitRow
+                    item={u}
+                    busy={busy}
+                    onToggleArchived={() =>
+                      call(`${BASE}/${u.id}`, "PATCH", {
+                        archived: !u.archived,
+                      })
+                    }
+                    onDone={() => {
+                      setEditingId(null);
+                      startTransition(() => router.refresh());
+                    }}
+                  />
+                ) : (
+                  <>
+                    <td className="px-4 py-2 font-medium text-gray-800">
+                      {u.name}
+                    </td>
+                    <td className="px-4 py-2 text-gray-600">{u.code ?? "—"}</td>
+                    <td className="px-4 py-2 text-gray-600">
+                      {u.coefficient ?? "—"}
+                    </td>
+                    <td className="px-4 py-2 text-right">
+                      <div className="flex items-center justify-end gap-2">
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => setEditingId(u.id)}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <button
+                          type="button"
+                          disabled={busy}
+                          onClick={() =>
+                            call(`${BASE}/${u.id}`, "PATCH", {
+                              archived: !u.archived,
+                            })
+                          }
+                          className="text-xs text-gray-500 hover:text-gray-700"
+                        >
+                          {u.archived ? "Відновити" : "Архівувати"}
+                        </button>
+                      </div>
+                    </td>
+                  </>
+                )}
               </tr>
             ))}
           </tbody>
         </table>
       </div>
     </div>
+  );
+}
+
+/**
+ * Рядок одиниці у режимі редагування — назва автозберігається одразу (без кнопки
+ * «Зберегти») через PATCH.
+ */
+function EditableUnitRow({
+  item,
+  busy,
+  onToggleArchived,
+  onDone,
+}: {
+  item: UnitItem;
+  busy: boolean;
+  onToggleArchived: () => void;
+  onDone: () => void;
+}) {
+  const edit = useInlineRecordEdit<NameEditFields>({
+    recordKey: `unit:${item.id}`,
+    initial: { name: item.name },
+    save: async (data) => {
+      if (!data.name.trim()) throw new Error("Вкажіть назву");
+      const res = await fetch(`${BASE}/${item.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: data.name.trim() }),
+      });
+      if (!res.ok) {
+        const j = (await res.json().catch(() => ({}))) as { error?: string };
+        throw new Error(j.error ?? "Помилка збереження");
+      }
+    },
+  });
+
+  return (
+    <>
+      <td className="px-4 py-2 font-medium text-gray-800">
+        <Input
+          value={edit.fields.name}
+          onChange={(e) => edit.setField("name", e.target.value)}
+          className="h-8"
+          autoFocus
+        />
+      </td>
+      <td className="px-4 py-2 text-gray-600">{item.code ?? "—"}</td>
+      <td className="px-4 py-2 text-gray-600">{item.coefficient ?? "—"}</td>
+      <td className="px-4 py-2 text-right">
+        <div className="flex flex-col items-end gap-1">
+          <InlineAutosaveControls
+            status={edit.status}
+            savedAt={edit.savedAt}
+            hasRestore={edit.hasRestore}
+            onApplyRestore={edit.applyRestore}
+            onDismissRestore={edit.dismissRestore}
+            onDone={() => {
+              void edit.flush().finally(onDone);
+            }}
+          />
+          <button
+            type="button"
+            disabled={busy}
+            onClick={onToggleArchived}
+            className="text-xs text-gray-500 hover:text-gray-700"
+          >
+            {item.archived ? "Відновити" : "Архівувати"}
+          </button>
+        </div>
+      </td>
+    </>
   );
 }

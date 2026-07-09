@@ -1,10 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ExternalLink, Pencil, Plus, Trash2, X } from "lucide-react";
 import { buildSocialUrl, socialNetworkLabel } from "@ltex/shared";
 import { Button, Input, useToast } from "@ltex/ui";
+import { useRecordAutosave } from "@/lib/autosave/use-record-autosave";
+import { AutosaveStatus } from "../../../_components/autosave-status";
 import {
   BrandIcon,
   resolveBrandIconKind,
@@ -110,6 +112,29 @@ function MessengerRow({
     comment: messenger.comment ?? "",
   });
 
+  const autosaveSave = useCallback(
+    async (snap: MessengerFormState): Promise<void> => {
+      if (!hasHandleOrUrl(snap)) return; // потрібне посилання/ідентифікатор
+      const res = await fetch(
+        `/api/v1/manager/clients/${clientId}/messengers/${messenger.id}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify(buildBody(snap)),
+        },
+      );
+      if (!res.ok) throw new Error("save_failed");
+    },
+    [clientId, messenger.id],
+  );
+  const autosave = useRecordAutosave<MessengerFormState>({
+    recordKey: `client-messenger:${messenger.id}`,
+    data: state,
+    enabled: editing && canEdit,
+    save: autosaveSave,
+  });
+
   const url = buildSocialUrl(
     messenger.network,
     messenger.handle,
@@ -145,6 +170,7 @@ function MessengerRow({
         });
         return;
       }
+      autosave.reset();
       setEditing(false);
       onChanged();
     } finally {
@@ -190,6 +216,7 @@ function MessengerRow({
           <button
             type="button"
             onClick={() => {
+              autosave.reset();
               setEditing(false);
               setState({
                 network: messenger.network,
@@ -204,6 +231,7 @@ function MessengerRow({
           >
             <X className="h-4 w-4" />
           </button>
+          <AutosaveStatus status={autosave.status} savedAt={autosave.savedAt} />
         </div>
       </div>
     );

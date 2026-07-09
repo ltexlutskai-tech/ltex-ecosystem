@@ -11,6 +11,11 @@ import {
   isRouteSheetLocked,
 } from "@/lib/manager/route-sheet-status";
 import { getSaleStatusMeta } from "@/lib/manager/sale-status";
+import { useRecordAutosave } from "@/lib/autosave/use-record-autosave";
+import {
+  AutosaveStatus,
+  RestoreDraftBanner,
+} from "../../../_components/autosave-status";
 import { RouteSheetStatusBadge } from "../../_components/route-sheet-status-badge";
 import { OrderPickerModal } from "./order-picker-modal";
 import { TaskClientPicker } from "./task-client-picker";
@@ -311,6 +316,35 @@ export function RouteSheetForm({
     [sheetId],
   );
 
+  // ─── Автозбереження шапкових полів (План AUTOSAVE_REALTIME_PLAN, рівень
+  // «картка/довідник»). Дебаунс + localStorage-буфер + індикатор. Секційні дії
+  // (замовлення/завдання/оплати) лишаються окремими явними PATCH-ами.
+  const headerDraft = useMemo(
+    () => ({
+      comment: routeName.trim() ? routeName : null,
+      expeditorUserId: expeditorUserId || null,
+    }),
+    [routeName, expeditorUserId],
+  );
+  type HeaderDraft = typeof headerDraft;
+
+  const headerAutosave = useRecordAutosave<HeaderDraft>({
+    recordKey: `route-sheet-${sheetId}`,
+    data: headerDraft,
+    enabled: !locked,
+    save: async (d) => {
+      const ok = await patchHeader(d);
+      if (!ok) throw new Error("route sheet header save failed");
+    },
+  });
+
+  /** Застосувати відновлені з localStorage шапкові поля. */
+  function applyHeaderRestore(d: HeaderDraft): void {
+    setRouteName(d.comment ?? "");
+    setExpeditorUserId(d.expeditorUserId ?? "");
+    headerAutosave.acceptRestore();
+  }
+
   /**
    * Статус-перехід. GPS/кілометраж надходять з 1С (офіс-застосунок свій GPS
    * не штампує) — тут лише змінюємо статус.
@@ -517,6 +551,26 @@ export function RouteSheetForm({
           </div>
         </div>
 
+        {!locked && headerAutosave.restoreData && (
+          <div className="mb-3">
+            <RestoreDraftBanner
+              onRestore={() =>
+                applyHeaderRestore(headerAutosave.restoreData as HeaderDraft)
+              }
+              onDismiss={headerAutosave.dismissRestore}
+            />
+          </div>
+        )}
+
+        <div className="mb-2 flex justify-end">
+          {!locked && (
+            <AutosaveStatus
+              status={headerAutosave.status}
+              savedAt={headerAutosave.savedAt}
+            />
+          )}
+        </div>
+
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {/* Маршрут — вільнотекстова назва (1С: документ = Комментарий). */}
           <div className="min-w-0 sm:col-span-2 lg:col-span-2">
@@ -528,7 +582,6 @@ export function RouteSheetForm({
               value={routeName}
               disabled={locked}
               onChange={(e) => setRouteName(e.target.value)}
-              onBlur={() => void patchHeader({ comment: routeName || null })}
               maxLength={2000}
               placeholder="Напр. 11-12.02.26 Житомир-Вінниця"
               className="h-10 w-full rounded-md border border-gray-300 bg-white px-3 text-sm focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500 disabled:bg-gray-50 disabled:text-gray-500"
@@ -543,10 +596,7 @@ export function RouteSheetForm({
             <select
               value={expeditorUserId}
               disabled={locked}
-              onChange={(e) => {
-                setExpeditorUserId(e.target.value);
-                void patchHeader({ expeditorUserId: e.target.value || null });
-              }}
+              onChange={(e) => setExpeditorUserId(e.target.value)}
               className="h-10 w-full rounded-md border border-gray-300 bg-white px-3 text-sm focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500 disabled:bg-gray-50 disabled:text-gray-500"
             >
               <option value="">— Не вибрано —</option>

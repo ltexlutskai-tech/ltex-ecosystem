@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   createOrderSchema,
+  orderDraftSchema,
   orderItemInputSchema,
   updateOrderSchema,
 } from "./manager-order";
@@ -203,5 +204,53 @@ describe("updateOrderSchema", () => {
     });
     expect(result.cashOnDelivery).toBe(false);
     expect(result.exportTo1C).toBe(true);
+  });
+});
+
+describe("orderDraftSchema (relaxed draft mode для autosave)", () => {
+  const minimalItem = { productId: "p1", weight: 10, priceEur: 10 };
+
+  it("приймає майже порожнє тіло (лише draft:true)", () => {
+    expect(orderDraftSchema.safeParse({ draft: true }).success).toBe(true);
+  });
+
+  it("приймає draft із порожнім масивом items", () => {
+    expect(orderDraftSchema.safeParse({ draft: true, items: [] }).success).toBe(
+      true,
+    );
+  });
+
+  it("приймає draft без customerId (клієнт ще не обраний)", () => {
+    const result = orderDraftSchema.safeParse({
+      draft: true,
+      notes: "чернетка",
+      deliveryMethod: "post",
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("приймає draft із повними рядками + менеджерськими полями", () => {
+    const result = orderDraftSchema.safeParse({
+      draft: true,
+      customerId: "c1",
+      items: [minimalItem],
+      cashOnDelivery: true,
+      deliveryMethod: "post",
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("відхиляє тіло без прапорця draft (не draft-режим)", () => {
+    expect(orderDraftSchema.safeParse({ customerId: "c1" }).success).toBe(
+      false,
+    );
+  });
+
+  it("відхиляє некоректний рядок (від'ємна вага)", () => {
+    const result = orderDraftSchema.safeParse({
+      draft: true,
+      items: [{ ...minimalItem, weight: -1 }],
+    });
+    expect(result.success).toBe(false);
   });
 });

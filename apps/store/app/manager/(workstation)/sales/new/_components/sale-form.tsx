@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   MessageSquare,
@@ -41,7 +41,15 @@ import {
   type SaleMessageInput,
   type SaleMessageItem,
 } from "@/lib/manager/sale-message";
-import { type ManagerSaleStatus } from "@/lib/manager/sale-status";
+import {
+  isSaleLocked,
+  type ManagerSaleStatus,
+} from "@/lib/manager/sale-status";
+import { useDocumentAutosave } from "@/lib/autosave/use-document-autosave";
+import {
+  AutosaveStatus,
+  RestoreDraftBanner,
+} from "../../../_components/autosave-status";
 import {
   collectPriceDeviations,
   draftToWire,
@@ -54,6 +62,23 @@ import {
   type SaleEditInitial,
   type SaleItemDraft,
 } from "./sale-types";
+
+/**
+ * Серіалізований знімок стану форми реалізації — джерело як для локальної копії
+ * (рівень 1), так і для серверної чернетки (рівень 2). Має бути JSON-safe.
+ */
+interface SaleDraftData {
+  clientId: string | null;
+  clientSummary: ClientPickerItem | null;
+  items: SaleItemDraft[];
+  notes: string;
+  deliveryMethod: string;
+  novaPoshtaBranch: string;
+  cashOnDelivery: boolean;
+  onTradeAgent: boolean;
+  expressWaybill: string;
+  sellingTypeCode: string;
+}
 
 export interface SaleFormProps {
   mode?: "create" | "edit";
@@ -142,6 +167,14 @@ export function SaleForm({
   /** Куди повертатись після звичайного збереження (МЛ або список). */
   const successHref = returnHref ?? "/manager/sales";
 
+  /**
+   * Поточний id збереженого документа. `null` доки чернетку ще не створено
+   * (новий документ). Оновлюється або явним POST, або autosave (`onIdAssigned`).
+   * Використовується у `saveSale`: якщо є id → PATCH, інакше POST — щоб явне
+   * збереження не дублювало вже створену autosave-чернетку.
+   */
+  const [savedId, setSavedId] = useState<string | null>(saleId ?? null);
+
   const [clientId, setClientId] = useState<string | null>(
     initialClientId ?? null,
   );
@@ -200,6 +233,125 @@ export function SaleForm({
   const [expressWaybill, setExpressWaybill] = useState(
     initialSale?.expressWaybill ?? "",
   );
+
+  // ─── Автозбереження чернетки (наскрізне, План AUTOSAVE_REALTIME_PLAN) ──────
+  // Дворівневий захист: рівень 1 (localStorage) + рівень 2 (жива чернетка в БД).
+  // Заблоковані (проведені) документи не автозберігаються — лише перегляд.
+  const autosaveEnabled = !isSaleLocked(initialSale?.status ?? "draft");
+
+  const draftData = useMemo<SaleDraftData>(
+    () => ({
+      clientId,
+      clientSummary,
+      items,
+      notes,
+      deliveryMethod,
+      novaPoshtaBranch,
+      cashOnDelivery,
+      onTradeAgent,
+      expressWaybill,
+      sellingTypeCode,
+    }),
+    [
+      clientId,
+      clientSummary,
+      items,
+      notes,
+      deliveryMethod,
+      novaPoshtaBranch,
+      cashOnDelivery,
+      onTradeAgent,
+      expressWaybill,
+      sellingTypeCode,
+    ],
+  );
+
+  /** Тіло draft-запиту з знімка форми (спільне для POST/PATCH чернетки). */
+  const draftBody = useCallback(
+    (d: SaleDraftData): Record<string, unknown> => {
+      const wire = d.items
+        .map(draftToWire)
+        .filter((x): x is NonNullable<typeof x> => x !== null);
+      return {
+        draft: true,
+        items: wire,
+        notes: d.notes.trim() || null,
+        exchangeRateEur: exchangeRateEur > 0 ? exchangeRateEur : undefined,
+        exchangeRateUsd: exchangeRateUsd > 0 ? exchangeRateUsd : undefined,
+        priceTypeId: null,
+        deliveryMethod: d.deliveryMethod || null,
+        novaPoshtaBranch: d.novaPoshtaBranch.trim() || null,
+        cashOnDelivery: d.cashOnDelivery,
+        assignedAgentUserId: d.onTradeAgent ? null : currentUserId,
+        onTradeAgent: d.onTradeAgent,
+        expressWaybill: d.expressWaybill.trim() || null,
+      };
+    },
+    [exchangeRateEur, exchangeRateUsd, currentUserId],
+  );
+
+  const createDraftServer = useCallback(
+    async (d: SaleDraftData): Promise<string> => {
+      const res = await fetch("/api/v1/manager/sales", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...draftBody(d),
+          customerId: d.clientId,
+          ...(routeSheetId ? { routeSheetId } : {}),
+        }),
+      });
+      if (!res.ok) throw new Error(`draft create ${res.status}`);
+      const j = (await res.json()) as { id: string };
+      return j.id;
+    },
+    [draftBody, routeSheetId],
+  );
+
+  const updateDraftServer = useCallback(
+    async (id: string, d: SaleDraftData): Promise<void> => {
+      const res = await fetch(`/api/v1/manager/sales/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(draftBody(d)),
+      });
+      if (!res.ok) throw new Error(`draft update ${res.status}`);
+    },
+    [draftBody],
+  );
+
+  const autosave = useDocumentAutosave<SaleDraftData>({
+    docType: "sale",
+    existingId: saleId ?? null,
+    data: draftData,
+    enabled: autosaveEnabled,
+    // Новий документ: серверна чернетка можлива лише коли обрано клієнта
+    // (`Sale.customerId` — обов'язковий FK). До того захищає localStorage.
+    canCreateDraft: clientId != null,
+    createDraft: createDraftServer,
+    updateDraft: updateDraftServer,
+    onIdAssigned: (id) => {
+      setSavedId(id);
+      // Міняємо URL без remount форми (рефреш відкриє чернетку з БД).
+      window.history.replaceState(null, "", `/manager/sales/${id}`);
+    },
+  });
+
+  /** Застосувати відновлені з localStorage дані у стан форми. */
+  function applyRestore(d: SaleDraftData): void {
+    setClientId(d.clientId);
+    setClientSummary(d.clientSummary);
+    setItems(d.items);
+    setNotes(d.notes);
+    setShowComment(!!d.notes.trim());
+    setDeliveryMethod(d.deliveryMethod);
+    setNovaPoshtaBranch(d.novaPoshtaBranch);
+    setCashOnDelivery(d.cashOnDelivery);
+    setOnTradeAgent(d.onTradeAgent);
+    setExpressWaybill(d.expressWaybill);
+    setSellingTypeCode(d.sellingTypeCode);
+    autosave.acceptRestore();
+  }
 
   /**
    * Перерахунок цін за кг усіх рядків під обраний тип цін (override, як у 1С):
@@ -434,25 +586,31 @@ export function SaleForm({
     nextStatus?: ManagerSaleStatus,
     post = false,
   ): Promise<string | null> {
-    if (!isEdit && !clientId) return null;
-    if (isEdit && !saleId) return null;
+    // `savedId` існує коли документ уже створено (edit-режим АБО autosave вже
+    // створив чернетку). Тоді — PATCH; інакше — POST нового документа.
+    const effectiveId = savedId;
+    const usePatch = effectiveId != null;
+    if (!usePatch && !clientId) return null;
     setSubmitting(true);
     setError(null);
     try {
+      // Перед явним записом — гасимо чергу autosave, щоб відкладений draft-PATCH
+      // не перезаписав проведений/збережений документ після цього запиту.
+      autosave.clearAll();
       // Fix 3: «На торгового контрагента» → продаж зараховується агенту клієнта
       // (1С сам визначає кого) → assignedAgentUserId=null; інакше — поточний
       // продавець.
       const payloadAgent = onTradeAgent ? null : currentUserId;
-      const url = isEdit
-        ? `/api/v1/manager/sales/${saleId}`
+      const url = usePatch
+        ? `/api/v1/manager/sales/${effectiveId}`
         : "/api/v1/manager/sales";
       const res = await fetch(url, {
-        method: isEdit ? "PATCH" : "POST",
+        method: usePatch ? "PATCH" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          ...(isEdit ? {} : { customerId: clientId }),
+          ...(usePatch ? {} : { customerId: clientId }),
           items: wireItems,
-          notes: notes.trim() || (isEdit ? null : undefined),
+          notes: notes.trim() || (usePatch ? null : undefined),
           exchangeRateEur: exchangeRateEur > 0 ? exchangeRateEur : undefined,
           exchangeRateUsd: exchangeRateUsd > 0 ? exchangeRateUsd : undefined,
           // Тип цін відв'язаний від MgrPriceType (wholesale/akciya — НЕ id) —
@@ -464,8 +622,8 @@ export function SaleForm({
           assignedAgentUserId: payloadAgent,
           onTradeAgent,
           expressWaybill: expressWaybill.trim() || null,
-          ...(isEdit ? {} : { routeSheetId: routeSheetId ?? undefined }),
-          ...(isEdit && nextStatus ? { status: nextStatus } : {}),
+          ...(usePatch ? {} : { routeSheetId: routeSheetId ?? undefined }),
+          ...(usePatch && nextStatus ? { status: nextStatus } : {}),
           ...(post ? { post: true } : {}),
         }),
       });
@@ -476,10 +634,11 @@ export function SaleForm({
         setError(errBody.error ?? `Помилка ${res.status}`);
         return null;
       }
-      if (isEdit) {
-        return saleId ?? null;
+      if (usePatch) {
+        return effectiveId;
       }
       const sale = (await res.json()) as { id: string };
+      setSavedId(sale.id);
       return sale.id;
     } catch (e) {
       setError((e as Error).message ?? "Невідома помилка");
@@ -650,6 +809,13 @@ export function SaleForm({
 
   return (
     <div className="space-y-4">
+      {autosave.restoreData && (
+        <RestoreDraftBanner
+          onRestore={() => applyRestore(autosave.restoreData as SaleDraftData)}
+          onDismiss={autosave.dismissRestore}
+        />
+      )}
+
       {/* ─── Секція: Контрагент ──────────────────────────────────────────── */}
       <section className="rounded-lg border bg-white p-4 shadow-sm">
         <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-gray-500">
@@ -1245,14 +1411,19 @@ export function SaleForm({
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
+          {autosaveEnabled && (
+            <AutosaveStatus
+              status={autosave.status}
+              savedAt={autosave.savedAt}
+              className="mr-1"
+            />
+          )}
           <Button
             type="button"
             variant="outline"
             onClick={() =>
               router.push(
-                isEdit && saleId
-                  ? `/manager/sales/${saleId}`
-                  : "/manager/sales",
+                savedId ? `/manager/sales/${savedId}` : "/manager/sales",
               )
             }
             disabled={submitting}

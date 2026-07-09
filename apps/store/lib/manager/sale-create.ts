@@ -12,6 +12,7 @@ import { applySaleMovements } from "@/lib/manager/sale-movement-hooks";
 import { notifyOrdersClosedBySale } from "@/lib/manager/sale-order-close";
 import type {
   CreateSaleInputRaw,
+  SaleDraftInput,
   SaleItemInput,
   UpdateSaleInputRaw,
 } from "@/lib/validations/manager-sale";
@@ -300,4 +301,94 @@ export async function updateSaleWithItems(
   }
 
   return sale;
+}
+
+// ─── Автозбереження чернетки (draft) ────────────────────────────────────────
+//
+// Легкі шляхи для наскрізного autosave (План AUTOSAVE_REALTIME_PLAN §2, рівень
+// 2). Пишуть ЛИШЕ шапку + рядки зі `status="draft"` (`archived=false`) БЕЗ
+// жодних ефектів проведення: не чіпають рух боргу (`MgrDebtMovement`), регістри
+// складу/продажів/собівартості (`applySaleMovements`), історію клієнта та
+// нагадування. Це робить autosave безпечним для обліку — облікові рухи
+// з'являються ЛИШЕ при «Провести» (`createSaleWithItems`/`updateSaleWithItems`
+// з `post`/`nextStatus="posted"`).
+
+/**
+ * Створює чернетку реалізації (`status="draft"`) — легкий шлях autosave.
+ * Повертає лише поля, потрібні формі (`id` для присвоєння URL-у + шапка).
+ */
+export async function createSaleDraft(
+  input: SaleDraftInput,
+  customer: CreateSaleCustomer,
+  actor: CreateSaleActor,
+) {
+  const rateEur = input.exchangeRateEur ?? (await getCurrentRate());
+  const rateUsd = input.exchangeRateUsd ?? 0;
+  const items = (input.items ?? []) as SaleItemInput[];
+  const { totalEur, totalUah, itemRows } = buildSaleTotals(items, rateEur);
+  const cashOnDelivery = input.cashOnDelivery ?? false;
+
+  return prisma.sale.create({
+    data: {
+      customerId: customer.id,
+      status: "draft",
+      archived: false,
+      totalEur,
+      totalUah,
+      exchangeRateEur: rateEur,
+      exchangeRateUsd: rateUsd,
+      notes: input.notes ?? null,
+      priceTypeId: input.priceTypeId ?? null,
+      deliveryMethod: input.deliveryMethod ?? null,
+      novaPoshtaBranch: input.novaPoshtaBranch ?? null,
+      cashOnDelivery,
+      codAmountUah: codAmountFor(cashOnDelivery, totalUah),
+      assignedAgentUserId: input.assignedAgentUserId ?? null,
+      onTradeAgent: input.onTradeAgent ?? true,
+      expressWaybill: input.expressWaybill ?? null,
+      routeSheetId: input.routeSheetId ?? null,
+      items: { create: itemRows },
+    },
+    select: { id: true, status: true, docNumber: true, code1C: true },
+  });
+  // actor лишається у сигнатурі для симетрії з create/update та майбутнього
+  // авторства чернетки; наразі draft не пише авторських слідів.
+}
+
+/**
+ * Оновлює чернетку реалізації (повна заміна шапки + items) — легкий шлях
+ * autosave. Статус НЕ змінюється (лишається як є, зазвичай `draft`/`sent`);
+ * жодних ефектів проведення. Caller (endpoint) гарантує, що документ не
+ * заблокований (`isSaleLocked`).
+ */
+export async function updateSaleDraft(saleId: string, input: SaleDraftInput) {
+  const rateEur = input.exchangeRateEur ?? (await getCurrentRate());
+  const rateUsd = input.exchangeRateUsd ?? 0;
+  const items = (input.items ?? []) as SaleItemInput[];
+  const { totalEur, totalUah, itemRows } = buildSaleTotals(items, rateEur);
+  const cashOnDelivery = input.cashOnDelivery ?? false;
+
+  return prisma.$transaction(async (tx) => {
+    await tx.saleItem.deleteMany({ where: { saleId } });
+    return tx.sale.update({
+      where: { id: saleId },
+      data: {
+        totalEur,
+        totalUah,
+        exchangeRateEur: rateEur,
+        exchangeRateUsd: rateUsd,
+        notes: input.notes ?? null,
+        priceTypeId: input.priceTypeId ?? null,
+        deliveryMethod: input.deliveryMethod ?? null,
+        novaPoshtaBranch: input.novaPoshtaBranch ?? null,
+        cashOnDelivery,
+        codAmountUah: codAmountFor(cashOnDelivery, totalUah),
+        assignedAgentUserId: input.assignedAgentUserId ?? null,
+        onTradeAgent: input.onTradeAgent ?? true,
+        expressWaybill: input.expressWaybill ?? null,
+        items: { create: itemRows },
+      },
+      select: { id: true, status: true, docNumber: true, code1C: true },
+    });
+  });
 }

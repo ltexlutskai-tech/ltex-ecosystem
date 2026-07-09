@@ -8,6 +8,7 @@ const {
   mockPrisma,
   getCurrentUserMock,
   createSaleWithItemsMock,
+  createSaleDraftMock,
   resolveCustomerForOrderMock,
   ResolveCustomerError,
   FakePrismaError,
@@ -35,6 +36,7 @@ const {
     },
     getCurrentUserMock: vi.fn(),
     createSaleWithItemsMock: vi.fn(),
+    createSaleDraftMock: vi.fn(),
     resolveCustomerForOrderMock: vi.fn(),
     ResolveCustomerError,
     FakePrismaError,
@@ -52,6 +54,7 @@ vi.mock("@/lib/auth/manager-auth", () => ({
 }));
 vi.mock("@/lib/manager/sale-create", () => ({
   createSaleWithItems: (...args: unknown[]) => createSaleWithItemsMock(...args),
+  createSaleDraft: (...args: unknown[]) => createSaleDraftMock(...args),
 }));
 vi.mock("@/lib/manager/resolve-customer", () => ({
   resolveCustomerForOrder: (...args: unknown[]) =>
@@ -416,5 +419,53 @@ describe("POST /api/v1/manager/sales", () => {
     const res = await POST(postReq({ ...validBody, routeSheetId: "missing" }));
     expect(res.status).toBe(404);
     expect(createSaleWithItemsMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("POST /api/v1/manager/sales (draft mode)", () => {
+  it("draft із порожніми items створює чернетку (201) без ефектів проведення", async () => {
+    getCurrentUserMock.mockResolvedValueOnce(ADMIN);
+    resolveCustomerForOrderMock.mockResolvedValueOnce({
+      id: "cust1",
+      code1C: "000001",
+      name: "Mine",
+    });
+    createSaleDraftMock.mockResolvedValueOnce({
+      id: "draft1",
+      status: "draft",
+    });
+    const res = await POST(postReq({ draft: true, customerId: "cust1" }));
+    expect(res.status).toBe(201);
+    const json = (await res.json()) as { id: string; status: string };
+    expect(json.id).toBe("draft1");
+    expect(json.status).toBe("draft");
+    // Draft НЕ проводить документ — strict-шлях не викликається.
+    expect(createSaleWithItemsMock).not.toHaveBeenCalled();
+    expect(createSaleDraftMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("draft без customerId → 400 (Sale.customerId — обов'язковий FK)", async () => {
+    getCurrentUserMock.mockResolvedValueOnce(ADMIN);
+    const res = await POST(postReq({ draft: true }));
+    expect(res.status).toBe(400);
+    expect(createSaleDraftMock).not.toHaveBeenCalled();
+  });
+
+  it("draft manager НЕ власника клієнта → 403", async () => {
+    resolveCustomerForOrderMock.mockResolvedValueOnce({
+      id: "cust1",
+      code1C: "FOREIGN",
+      name: "Foreign",
+    });
+    mockPrisma.mgrClient.findMany.mockResolvedValueOnce([{ code1C: "MINE-1" }]);
+    const res = await POST(postReq({ draft: true, customerId: "cust1" }));
+    expect(res.status).toBe(403);
+    expect(createSaleDraftMock).not.toHaveBeenCalled();
+  });
+
+  it("draft returns 401 when not authed", async () => {
+    getCurrentUserMock.mockResolvedValueOnce(null);
+    const res = await POST(postReq({ draft: true, customerId: "cust1" }));
+    expect(res.status).toBe(401);
   });
 });

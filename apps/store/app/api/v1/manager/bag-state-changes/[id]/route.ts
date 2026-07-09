@@ -1,10 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@ltex/db";
 import { getCurrentUser } from "@/lib/auth/manager-auth";
-import {
-  updateBagStateChange,
-  BAG_STATE_WRITE_ROLES,
-} from "@/lib/manager/bag-state";
+import { updateBagStateChange } from "@/lib/manager/bag-state";
+import { BAG_STATE_WRITE_ROLES } from "@/lib/manager/bag-state-roles";
 import {
   isBeforeToday,
   removeBagStateChange,

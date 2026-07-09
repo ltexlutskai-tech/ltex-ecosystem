@@ -2,8 +2,10 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Check, Pencil } from "lucide-react";
+import { Plus, Pencil } from "lucide-react";
 import { Button, Input, useToast } from "@ltex/ui";
+import { useInlineRecordEdit } from "@/lib/autosave/use-inline-record-edit";
+import { InlineAutosaveControls } from "../../_components/inline-autosave-controls";
 
 export interface RegionItem {
   id: string;
@@ -14,6 +16,10 @@ export interface RegionItem {
 
 const BASE = "/api/v1/manager/admin/regions";
 
+interface NameEditFields extends Record<string, unknown> {
+  name: string;
+}
+
 export function RegionsManager({ initial }: { initial: RegionItem[] }) {
   const router = useRouter();
   const { toast } = useToast();
@@ -22,7 +28,6 @@ export function RegionsManager({ initial }: { initial: RegionItem[] }) {
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [editName, setEditName] = useState("");
 
   async function call(url: string, method: string, body: unknown) {
     setBusy(true);
@@ -48,12 +53,6 @@ export function RegionsManager({ initial }: { initial: RegionItem[] }) {
     if (!name.trim()) return;
     const ok = await call(BASE, "POST", { name: name.trim() });
     if (ok) setName("");
-  }
-
-  async function saveEdit(id: string) {
-    if (!editName.trim()) return;
-    const ok = await call(`${BASE}/${id}`, "PATCH", { name: editName.trim() });
-    if (ok) setEditingId(null);
   }
 
   return (
@@ -101,62 +100,126 @@ export function RegionsManager({ initial }: { initial: RegionItem[] }) {
                   r.archived ? "bg-gray-50 text-gray-400" : ""
                 }`}
               >
-                <td className="px-4 py-2 font-medium text-gray-800">
-                  {editingId === r.id ? (
-                    <Input
-                      value={editName}
-                      onChange={(e) => setEditName(e.target.value)}
-                      className="h-8"
-                    />
-                  ) : (
-                    r.name
-                  )}
-                </td>
-                <td className="px-4 py-2 text-gray-600">{r.code ?? "—"}</td>
-                <td className="px-4 py-2 text-right">
-                  <div className="flex items-center justify-end gap-2">
-                    {editingId === r.id ? (
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        disabled={busy}
-                        onClick={() => saveEdit(r.id)}
-                      >
-                        <Check className="h-4 w-4" />
-                      </Button>
-                    ) : (
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => {
-                          setEditingId(r.id);
-                          setEditName(r.name);
-                        }}
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                    )}
-                    <button
-                      type="button"
-                      disabled={busy}
-                      onClick={() =>
-                        call(`${BASE}/${r.id}`, "PATCH", {
-                          archived: !r.archived,
-                        })
-                      }
-                      className="text-xs text-gray-500 hover:text-gray-700"
-                    >
-                      {r.archived ? "Відновити" : "Архівувати"}
-                    </button>
-                  </div>
-                </td>
+                {editingId === r.id ? (
+                  <EditableRegionRow
+                    item={r}
+                    busy={busy}
+                    onToggleArchived={() =>
+                      call(`${BASE}/${r.id}`, "PATCH", {
+                        archived: !r.archived,
+                      })
+                    }
+                    onDone={() => {
+                      setEditingId(null);
+                      startTransition(() => router.refresh());
+                    }}
+                  />
+                ) : (
+                  <>
+                    <td className="px-4 py-2 font-medium text-gray-800">
+                      {r.name}
+                    </td>
+                    <td className="px-4 py-2 text-gray-600">{r.code ?? "—"}</td>
+                    <td className="px-4 py-2 text-right">
+                      <div className="flex items-center justify-end gap-2">
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => setEditingId(r.id)}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <button
+                          type="button"
+                          disabled={busy}
+                          onClick={() =>
+                            call(`${BASE}/${r.id}`, "PATCH", {
+                              archived: !r.archived,
+                            })
+                          }
+                          className="text-xs text-gray-500 hover:text-gray-700"
+                        >
+                          {r.archived ? "Відновити" : "Архівувати"}
+                        </button>
+                      </div>
+                    </td>
+                  </>
+                )}
               </tr>
             ))}
           </tbody>
         </table>
       </div>
     </div>
+  );
+}
+
+/**
+ * Рядок області у режимі редагування — назва автозберігається одразу (без кнопки
+ * «Зберегти») через PATCH.
+ */
+function EditableRegionRow({
+  item,
+  busy,
+  onToggleArchived,
+  onDone,
+}: {
+  item: RegionItem;
+  busy: boolean;
+  onToggleArchived: () => void;
+  onDone: () => void;
+}) {
+  const edit = useInlineRecordEdit<NameEditFields>({
+    recordKey: `region:${item.id}`,
+    initial: { name: item.name },
+    save: async (data) => {
+      if (!data.name.trim()) throw new Error("Вкажіть назву");
+      const res = await fetch(`${BASE}/${item.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: data.name.trim() }),
+      });
+      if (!res.ok) {
+        const j = (await res.json().catch(() => ({}))) as { error?: string };
+        throw new Error(j.error ?? "Помилка збереження");
+      }
+    },
+  });
+
+  return (
+    <>
+      <td className="px-4 py-2 font-medium text-gray-800">
+        <Input
+          value={edit.fields.name}
+          onChange={(e) => edit.setField("name", e.target.value)}
+          className="h-8"
+          autoFocus
+        />
+      </td>
+      <td className="px-4 py-2 text-gray-600">{item.code ?? "—"}</td>
+      <td className="px-4 py-2 text-right">
+        <div className="flex flex-col items-end gap-1">
+          <InlineAutosaveControls
+            status={edit.status}
+            savedAt={edit.savedAt}
+            hasRestore={edit.hasRestore}
+            onApplyRestore={edit.applyRestore}
+            onDismissRestore={edit.dismissRestore}
+            onDone={() => {
+              void edit.flush().finally(onDone);
+            }}
+          />
+          <button
+            type="button"
+            disabled={busy}
+            onClick={onToggleArchived}
+            className="text-xs text-gray-500 hover:text-gray-700"
+          >
+            {item.archived ? "Відновити" : "Архівувати"}
+          </button>
+        </div>
+      </td>
+    </>
   );
 }

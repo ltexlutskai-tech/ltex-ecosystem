@@ -4,6 +4,13 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Plus, Search, Trash2, X } from "lucide-react";
 import { Button, Input, useToast } from "@ltex/ui";
 import { recurrenceHint } from "@/lib/manager/reminder-recurrence";
+import {
+  clearLocalDraft,
+  localDraftKey,
+  readLocalDraft,
+  writeLocalDraft,
+} from "@/lib/autosave/local-draft";
+import { RestoreDraftBanner } from "../../_components/autosave-status";
 import { ReminderClientPicker } from "./reminder-client-picker";
 import {
   PERIOD_OPTIONS,
@@ -197,6 +204,74 @@ export function ReminderCreateForm({
 
   const rowIds = useMemo(() => new Set(rows.map((r) => r.productId)), [rows]);
 
+  // ─── Захист незбереженого вводу (План AUTOSAVE_REALTIME_PLAN, рівень 1) ────
+  // Нагадування створюється одним POST (без серверної чернетки), тож тут —
+  // локальний буфер введеного тексту/полів: переживає закриття вкладки й
+  // пропонує відновити при поверненні. Чиститься після успішного створення.
+  interface ReminderDraft {
+    kind: ReminderKind;
+    body: string;
+    remindAt: string;
+    periodicity: ReminderPeriod;
+    clientId: string | null;
+    clientName: string | null;
+    rows: ProductRow[];
+  }
+  const draftKeyRef = useRef(
+    localDraftKey("reminder-create", fixedClientId ?? null),
+  );
+  const draftMountedRef = useRef(false);
+  const [restore, setRestore] = useState<ReminderDraft | null>(null);
+
+  useEffect(() => {
+    const env = readLocalDraft<ReminderDraft>(draftKeyRef.current);
+    if (env && env.data != null) setRestore(env.data);
+    draftMountedRef.current = true;
+  }, []);
+
+  useEffect(() => {
+    if (!draftMountedRef.current) return;
+    // Не буферимо порожню форму.
+    if (!body.trim() && rows.length === 0) return;
+    const snap: ReminderDraft = {
+      kind,
+      body,
+      remindAt,
+      periodicity,
+      clientId: client?.id ?? null,
+      clientName: client?.name ?? null,
+      rows,
+    };
+    const h = setTimeout(
+      () =>
+        writeLocalDraft(draftKeyRef.current, snap, new Date().toISOString()),
+      600,
+    );
+    return () => clearTimeout(h);
+  }, [kind, body, remindAt, periodicity, client, rows]);
+
+  /** Застосувати відновлений з localStorage чернетковий ввід. */
+  function applyRestore(d: ReminderDraft): void {
+    setKind(d.kind);
+    setBody(d.body);
+    setRemindAt(d.remindAt);
+    setPeriodicity(d.periodicity);
+    setRows(d.rows);
+    // Клієнта відновлюємо лише у вільному режимі (не фіксований контрагент).
+    if (!fixedClientId && d.clientId) {
+      setClient({
+        id: d.clientId,
+        name: d.clientName ?? "",
+        tradePointName: null,
+        city: null,
+        code1C: null,
+        isOwned: true,
+        agent: null,
+      });
+    }
+    setRestore(null);
+  }
+
   function addProduct(p: ProductPick) {
     setRows((prev) =>
       prev.some((r) => r.productId === p.id)
@@ -286,6 +361,8 @@ export function ReminderCreateForm({
           description: `Деякі товари вже були в активних нагадуваннях і пропущені (${data.skippedProductIds.length})`,
         });
       }
+      clearLocalDraft(draftKeyRef.current);
+      setRestore(null);
       setBody("");
       setRemindAt(isoLocalNowPlus(1));
       setPeriodicity("none");
@@ -313,6 +390,16 @@ export function ReminderCreateForm({
       onSubmit={submit}
       className="space-y-4 rounded-lg border bg-white p-4 shadow-sm"
     >
+      {restore && (
+        <RestoreDraftBanner
+          onRestore={() => applyRestore(restore)}
+          onDismiss={() => {
+            clearLocalDraft(draftKeyRef.current);
+            setRestore(null);
+          }}
+        />
+      )}
+
       {/* Перемикач типу */}
       <div className="grid grid-cols-2 gap-1 rounded-md border border-gray-200 p-1">
         {(

@@ -1,12 +1,27 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button, Input, useToast } from "@ltex/ui";
 import { TREASURY_CURRENCIES } from "@/lib/validations/manager-treasury";
+import { useDocumentAutosave } from "@/lib/autosave/use-document-autosave";
+import { AutosaveStatus, RestoreDraftBanner } from "../autosave-status";
 import { ClientPicker } from "../../orders/new/_components/client-picker";
 import type { ClientPickerItem } from "../../orders/new/_components/types";
 import { currencySymbol } from "./treasury-status";
+
+/** Серіалізований знімок стану банк-платіжки (localStorage + серверна чернетка). */
+interface BankPaymentDraftData {
+  clientId: string | null;
+  bankAccountId: string;
+  articleId: string;
+  amountRaw: string;
+  currency: string;
+  rateEurRaw: string;
+  iban: string;
+  purpose: string;
+  comment: string;
+}
 
 export interface BankAccountOption {
   id: string;
@@ -60,6 +75,7 @@ export function BankPaymentForm({
   const [purpose, setPurpose] = useState("");
   const [comment, setComment] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [savedId, setSavedId] = useState<string | null>(null);
 
   const amount = parseNum(amountRaw);
   const rateEur = parseNum(rateEurRaw);
@@ -76,10 +92,132 @@ export function BankPaymentForm({
     rateEur > 0 &&
     (!isOutgoing || Boolean(articleId));
 
+  // ─── Автозбереження чернетки (наскрізне) ──────────────────────────────────
+  // Дворівневий захист. ⚠️ Грошова безпека: draft лише status="draft" — рухи ДДС
+  // з'являються ЛИШЕ при «Провести» (окремий крок на картці документа).
+  const draftData = useMemo<BankPaymentDraftData>(
+    () => ({
+      clientId,
+      bankAccountId,
+      articleId,
+      amountRaw,
+      currency,
+      rateEurRaw,
+      iban,
+      purpose,
+      comment,
+    }),
+    [
+      clientId,
+      bankAccountId,
+      articleId,
+      amountRaw,
+      currency,
+      rateEurRaw,
+      iban,
+      purpose,
+      comment,
+    ],
+  );
+
+  const draftBody = useCallback(
+    (d: BankPaymentDraftData): Record<string, unknown> => ({
+      draft: true,
+      customerId: d.clientId ?? undefined,
+      bankAccountId: d.bankAccountId || undefined,
+      cashFlowArticleId: d.articleId || undefined,
+      amount: parseNum(d.amountRaw),
+      currency: d.currency,
+      rateEur: parseNum(d.rateEurRaw),
+      iban: d.iban.trim() || undefined,
+      purpose: d.purpose.trim() || undefined,
+      comment: d.comment.trim() || undefined,
+    }),
+    [],
+  );
+
+  const createDraftServer = useCallback(
+    async (d: BankPaymentDraftData): Promise<string> => {
+      const res = await fetch(basePath, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(draftBody(d)),
+      });
+      if (!res.ok) throw new Error(`draft create ${res.status}`);
+      const j = (await res.json()) as { id: string };
+      return j.id;
+    },
+    [basePath, draftBody],
+  );
+
+  const updateDraftServer = useCallback(
+    async (id: string, d: BankPaymentDraftData): Promise<void> => {
+      const res = await fetch(`${basePath}/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(draftBody(d)),
+      });
+      if (!res.ok) throw new Error(`draft update ${res.status}`);
+    },
+    [basePath, draftBody],
+  );
+
+  const autosave = useDocumentAutosave<BankPaymentDraftData>({
+    docType: `bank-payment-${direction}`,
+    existingId: null,
+    data: draftData,
+    // Серверна чернетка можлива лише коли введено суму (гейт від порожніх draft).
+    canCreateDraft: amount > 0,
+    createDraft: createDraftServer,
+    updateDraft: updateDraftServer,
+    onIdAssigned: (id) => {
+      setSavedId(id);
+      window.history.replaceState(null, "", `${listPath}/${id}`);
+    },
+  });
+
+  function applyRestore(d: BankPaymentDraftData): void {
+    setClientId(d.clientId);
+    setBankAccountId(d.bankAccountId);
+    setArticleId(d.articleId);
+    setAmountRaw(d.amountRaw);
+    setCurrency(d.currency);
+    setRateEurRaw(d.rateEurRaw);
+    setIban(d.iban);
+    setPurpose(d.purpose);
+    setComment(d.comment);
+    autosave.acceptRestore();
+  }
+
   async function submit(): Promise<void> {
     if (!canSubmit) return;
     setSubmitting(true);
     try {
+      // Гасимо чергу autosave, щоб відкладений draft-PATCH не наклав поверх.
+      autosave.clearAll();
+      // Якщо autosave вже створив чернетку (`savedId`) — фіналізуємо її PATCH-ем
+      // (дані повні, бо canSubmit); інакше — POST нового draft-документа.
+      if (savedId) {
+        const res = await fetch(`${basePath}/${savedId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(draftBody(draftData)),
+        });
+        if (!res.ok) {
+          const body = (await res.json().catch(() => ({}))) as {
+            error?: string;
+          };
+          toast({
+            title: body.error ?? `Помилка ${res.status}`,
+            variant: "destructive",
+          });
+          return;
+        }
+        toast({ title: "Документ збережено" });
+        router.push(`${listPath}/${savedId}`);
+        router.refresh();
+        return;
+      }
       const res = await fetch(basePath, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -126,6 +264,15 @@ export function BankPaymentForm({
 
   return (
     <div className="space-y-4">
+      {autosave.restoreData && (
+        <RestoreDraftBanner
+          onRestore={() =>
+            applyRestore(autosave.restoreData as BankPaymentDraftData)
+          }
+          onDismiss={autosave.dismissRestore}
+        />
+      )}
+
       <Section title={isOutgoing ? "Отримувач" : "Платник"}>
         <ClientPicker value={clientId} onChange={onClientPicked} />
         <p className="mt-1 text-xs text-gray-500">
@@ -238,6 +385,11 @@ export function BankPaymentForm({
       </Section>
 
       <div className="flex items-center justify-end gap-2">
+        <AutosaveStatus
+          status={autosave.status}
+          savedAt={autosave.savedAt}
+          className="mr-auto"
+        />
         <Button
           type="button"
           disabled={!canSubmit}

@@ -1,10 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Mail, Pencil, Phone, Plus, Trash2, User, X } from "lucide-react";
 import { formatPhoneUkr, phoneToTelUrl } from "@ltex/shared";
 import { Button, Input, useToast } from "@ltex/ui";
+import { useRecordAutosave } from "@/lib/autosave/use-record-autosave";
+import { AutosaveStatus } from "../../../_components/autosave-status";
 import type { ClientContact } from "./types";
 
 interface Props {
@@ -119,6 +121,30 @@ function ContactRow({
     comment: contact.comment ?? "",
   });
 
+  // Автозбереження редагування наявної особи (додавання — окрема дія нижче).
+  const autosaveSave = useCallback(
+    async (snap: DraftFields): Promise<void> => {
+      if (!snap.fullName.trim()) return; // ПІБ обовʼязковий — чекаємо валідного
+      const res = await fetch(
+        `/api/v1/manager/clients/${clientId}/contacts/${contact.id}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify(toPayload(snap)),
+        },
+      );
+      if (!res.ok) throw new Error("save_failed");
+    },
+    [clientId, contact.id],
+  );
+  const autosave = useRecordAutosave<DraftFields>({
+    recordKey: `client-contact:${contact.id}`,
+    data: draft,
+    enabled: editing && canEdit,
+    save: autosaveSave,
+  });
+
   async function save() {
     if (!draft.fullName.trim()) return;
     setBusy(true);
@@ -140,6 +166,7 @@ function ContactRow({
         });
         return;
       }
+      autosave.reset();
       setEditing(false);
       onChanged();
     } finally {
@@ -185,6 +212,7 @@ function ContactRow({
           <button
             type="button"
             onClick={() => {
+              autosave.reset();
               setEditing(false);
               setDraft({
                 fullName: contact.fullName,
@@ -200,6 +228,7 @@ function ContactRow({
           >
             <X className="h-4 w-4" />
           </button>
+          <AutosaveStatus status={autosave.status} savedAt={autosave.savedAt} />
         </div>
       </div>
     );

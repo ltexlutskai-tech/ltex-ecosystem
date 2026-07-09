@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   createSaleSchema,
+  saleDraftSchema,
   saleItemInputSchema,
   updateSaleSchema,
 } from "./manager-sale";
@@ -205,6 +206,58 @@ describe("updateSaleSchema", () => {
     const result = updateSaleSchema.safeParse({
       items: [minimalItem],
       status: "delivered",
+    });
+    expect(result.success).toBe(false);
+  });
+});
+
+describe("saleDraftSchema (relaxed draft mode для autosave)", () => {
+  const minimalItem = {
+    productId: "p1",
+    pricePerKg: 1,
+    weight: 10,
+    priceEur: 10,
+  };
+
+  it("приймає майже порожнє тіло (лише draft:true)", () => {
+    expect(saleDraftSchema.safeParse({ draft: true }).success).toBe(true);
+  });
+
+  it("приймає draft із порожнім масивом items", () => {
+    expect(saleDraftSchema.safeParse({ draft: true, items: [] }).success).toBe(
+      true,
+    );
+  });
+
+  it("приймає draft без customerId (клієнт ще не обраний)", () => {
+    const result = saleDraftSchema.safeParse({
+      draft: true,
+      notes: "чернетка",
+      deliveryMethod: "post",
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("приймає draft із повними рядками + менеджерськими полями", () => {
+    const result = saleDraftSchema.safeParse({
+      draft: true,
+      customerId: "c1",
+      items: [minimalItem],
+      cashOnDelivery: true,
+      onTradeAgent: false,
+      expressWaybill: "20450000123",
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("відхиляє тіло без прапорця draft (не draft-режим)", () => {
+    expect(saleDraftSchema.safeParse({ customerId: "c1" }).success).toBe(false);
+  });
+
+  it("відхиляє некоректний рядок (від'ємна ціна)", () => {
+    const result = saleDraftSchema.safeParse({
+      draft: true,
+      items: [{ ...minimalItem, pricePerKg: -1 }],
     });
     expect(result.success).toBe(false);
   });

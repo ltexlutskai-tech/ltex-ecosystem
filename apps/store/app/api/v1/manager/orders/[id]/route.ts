@@ -15,8 +15,14 @@ import {
   canForceActive,
 } from "@/lib/manager/order-active-guard";
 import { formatOrderNumber } from "@/lib/manager/order-number";
-import { updateOrderSchema } from "@/lib/validations/manager-order";
-import { updateOrderWithItems } from "@/lib/manager/order-create";
+import {
+  orderDraftSchema,
+  updateOrderSchema,
+} from "@/lib/validations/manager-order";
+import {
+  updateOrderDraft,
+  updateOrderWithItems,
+} from "@/lib/manager/order-create";
 import { completeSiteOrderReminders } from "@/lib/manager/site-order-reminders";
 
 export async function GET(
@@ -136,6 +142,49 @@ export async function PATCH(
   }
 
   const body = await req.json().catch(() => null);
+
+  // ─── Автозбереження чернетки (draft) ──────────────────────────────────────
+  // Послаблена схема, оновлення БЕЗ ефектів проведення. Статус не змінюється.
+  // Заблокований (проведений/архівний) документ автозберігати не можна.
+  if (body && typeof body === "object" && (body as { draft?: unknown }).draft) {
+    if (isOrderLocked(existing.status) || existing.archived) {
+      return NextResponse.json(
+        { error: "Замовлення заблоковано — редагування заборонено" },
+        { status: 409 },
+      );
+    }
+    const parsedDraft = orderDraftSchema.safeParse(body);
+    if (!parsedDraft.success) {
+      return NextResponse.json(
+        {
+          error: "Невірні дані",
+          details: parsedDraft.error.issues.slice(0, 5),
+        },
+        { status: 400 },
+      );
+    }
+    try {
+      const order = await updateOrderDraft(id, parsedDraft.data);
+      return NextResponse.json({ id: order.id, status: order.status });
+    } catch (err) {
+      if (err instanceof Prisma.PrismaClientKnownRequestError) {
+        if (err.code === "P2003" || err.code === "P2025") {
+          return NextResponse.json(
+            { error: "Невалідний product/lot у items" },
+            { status: 400 },
+          );
+        }
+      }
+      console.error("[L-TEX] Order draft update failed", {
+        orderId: id,
+        error: err instanceof Error ? err.message : String(err),
+      });
+      return NextResponse.json(
+        { error: "Помилка збереження чернетки" },
+        { status: 500 },
+      );
+    }
+  }
 
   // ─── Вузьке перемикання «Актуальне» (7.3) ────────────────────────────────
   // Тіло рівно `{ isActual: boolean }` (кнопка-перемикач на картці/у списку).

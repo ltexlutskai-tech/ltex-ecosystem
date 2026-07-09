@@ -92,6 +92,8 @@ export interface UseClientEditResult {
     key: K,
     value: EditableClientFields[K],
   ) => void;
+  /** Замінити всі значення (напр. відновлення з локального буфера). */
+  setAll: (next: EditableClientFields) => void;
   reset: () => void;
   diff: () => Partial<EditableClientFields>;
 }
@@ -117,6 +119,11 @@ export function useClientEdit(client: ClientDetail): UseClientEditResult {
     [],
   );
 
+  const setAll = useCallback(
+    (next: EditableClientFields) => setValues(next),
+    [],
+  );
+
   const reset = useCallback(() => setValues(initial), [initial]);
 
   const diff = useCallback((): Partial<EditableClientFields> => {
@@ -127,7 +134,7 @@ export function useClientEdit(client: ClientDetail): UseClientEditResult {
     return out;
   }, [dirtyKeys, values]);
 
-  return { values, isDirty, dirtyKeys, setField, reset, diff };
+  return { values, isDirty, dirtyKeys, setField, setAll, reset, diff };
 }
 
 function shallowEqual(a: unknown, b: unknown): boolean {
