@@ -8,8 +8,14 @@ import {
   orderRowInclude,
   serializeOrderRow,
 } from "@/lib/manager/orders-list";
-import { createOrderSchema } from "@/lib/validations/manager-order";
-import { createOrderWithItems } from "@/lib/manager/order-create";
+import {
+  createOrderSchema,
+  orderDraftSchema,
+} from "@/lib/validations/manager-order";
+import {
+  createOrderDraft,
+  createOrderWithItems,
+} from "@/lib/manager/order-create";
 import {
   findOtherActiveOrder,
   canForceActive,
@@ -107,6 +113,79 @@ export async function GET(req: NextRequest) {
   });
 }
 
+type ManagerUser = NonNullable<Awaited<ReturnType<typeof getCurrentUser>>>;
+
+/**
+ * Створення чернетки замовлення (autosave, `draft:true`). Послаблена валідація
+ * (`orderDraftSchema`), той самий ownership, що й strict-POST, але створення БЕЗ
+ * ефектів проведення й БЕЗ гварда «одне активне замовлення» (`createOrderDraft`).
+ * Повертає `{ id }`. Не експортується з route-файлу (лише HTTP-методи є
+ * експортами) — це локальний хелпер POST.
+ */
+async function createDraftOrder(
+  body: unknown,
+  user: ManagerUser,
+): Promise<NextResponse> {
+  const parsed = orderDraftSchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: "Невірні дані", details: parsed.error.issues.slice(0, 5) },
+      { status: 400 },
+    );
+  }
+  const input = parsed.data;
+
+  // `Order.customerId` — обов'язковий FK: draft-рядок неможливий без клієнта.
+  // До вибору клієнта прогрес захищає локальна копія (рівень 1 автозбереження).
+  if (!input.customerId) {
+    return NextResponse.json(
+      { error: "Виберіть клієнта, щоб зберегти чернетку" },
+      { status: 400 },
+    );
+  }
+
+  let customer;
+  try {
+    customer = await resolveCustomerForOrder(input.customerId);
+  } catch (err) {
+    if (err instanceof ResolveCustomerError) {
+      return NextResponse.json({ error: err.message }, { status: err.status });
+    }
+    throw err;
+  }
+
+  const myCodes = await getMyClientCodes1C(user);
+  if (myCodes !== null) {
+    if (!customer.code1C || !myCodes.includes(customer.code1C)) {
+      return NextResponse.json({ error: "Не ваш клієнт" }, { status: 403 });
+    }
+  }
+
+  try {
+    const order = await createOrderDraft(input, customer, { userId: user.id });
+    return NextResponse.json(
+      { id: order.id, status: order.status },
+      { status: 201 },
+    );
+  } catch (err) {
+    if (err instanceof Prisma.PrismaClientKnownRequestError) {
+      if (err.code === "P2003" || err.code === "P2025") {
+        return NextResponse.json(
+          { error: "Невалідний product/lot у items" },
+          { status: 400 },
+        );
+      }
+    }
+    console.error("[L-TEX] Order draft create failed", {
+      error: err instanceof Error ? err.message : String(err),
+    });
+    return NextResponse.json(
+      { error: "Помилка збереження чернетки" },
+      { status: 500 },
+    );
+  }
+}
+
 export async function POST(req: NextRequest) {
   const user = await getCurrentUser(req);
   if (!user) {
@@ -115,6 +194,13 @@ export async function POST(req: NextRequest) {
 
   const url = new URL(req.url);
   const body = await req.json().catch(() => null);
+
+  // ─── Автозбереження чернетки (draft) ──────────────────────────────────────
+  // `draft === true` → послаблена схема, створення БЕЗ ефектів проведення.
+  if (body && typeof body === "object" && (body as { draft?: unknown }).draft) {
+    return createDraftOrder(body, user);
+  }
+
   const parsed = createOrderSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json(

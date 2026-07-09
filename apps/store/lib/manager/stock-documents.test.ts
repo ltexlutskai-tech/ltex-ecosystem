@@ -19,7 +19,7 @@ import {
   applyReturnFromCustomerDebt,
 } from "./stock-documents";
 import { normalizeLine, type NormLine } from "./stock-documents-repo";
-import { isStockDocKind } from "./stock-documents-api";
+import { isStockDocKind, parseCreateBody } from "./stock-documents-api";
 
 beforeEach(() => applyDebtMovementSafeMock.mockReset());
 
@@ -166,5 +166,36 @@ describe("applyReturnFromCustomerDebt", () => {
       occurredAt: new Date(),
     });
     expect(applyDebtMovementSafeMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("parseCreateBody — draft-режим (autosave)", () => {
+  it("приймає майже порожнє draft-тіло (items за замовч. [])", () => {
+    const r = parseCreateBody("write-offs", { draft: true }, "u1");
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.data.lines).toHaveLength(0);
+  });
+
+  it("ігнорує прапорець draft і парсить рядки", () => {
+    const r = parseCreateBody(
+      "write-offs",
+      { draft: true, items: [{ productId: "p1", weight: 5, priceEur: 2 }] },
+      "u1",
+    );
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.data.lines).toHaveLength(1);
+      expect(r.data.lines[0]!.amountEur).toBe(10);
+    }
+  });
+
+  it("product-returns draft приймає порожні items + клієнта-назву", () => {
+    const r = parseCreateBody(
+      "product-returns",
+      { draft: true, customerName: "ТТ Іванов", items: [] },
+      "u1",
+    );
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.data.customerName).toBe("ТТ Іванов");
   });
 });

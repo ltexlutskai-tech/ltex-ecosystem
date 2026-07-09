@@ -1,7 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useDocumentAutosave } from "@/lib/autosave/use-document-autosave";
+import {
+  AutosaveStatus,
+  RestoreDraftBanner,
+} from "../../_components/autosave-status";
 import {
   BagStateRowCard,
   type AgentOption,
@@ -88,6 +93,8 @@ export function BagStateForm(props: BagStateFormProps) {
   const [error, setError] = useState<string | null>(null);
   const [fillSectorId, setFillSectorId] = useState("");
   const [missingWarn, setMissingWarn] = useState<string[] | null>(null);
+  /** id збереженого документа (edit-режим АБО створена autosave чернетка). */
+  const [savedId, setSavedId] = useState<string | null>(props.docId ?? null);
 
   function updateRow(key: string, patch: Partial<BagRow>) {
     setRows((rs) => rs.map((r) => (r.key === key ? { ...r, ...patch } : r)));
@@ -208,8 +215,13 @@ export function BagStateForm(props: BagStateFormProps) {
     return null;
   }
 
-  function buildPayload(): Record<string, unknown> {
-    const items = rows
+  function buildPayload(src?: {
+    docDate: string;
+    notes: string;
+    rows: BagRow[];
+  }): Record<string, unknown> {
+    const s = src ?? { docDate, notes, rows };
+    const items = s.rows
       .filter((r) => r.barcode.trim())
       .map((r) => ({
         barcode: r.barcode.trim(),
@@ -229,7 +241,73 @@ export function BagStateForm(props: BagStateFormProps) {
           : null,
         sector: sectorTextForRow(r),
       }));
-    return { docDate: `${docDate}T00:00:00.000Z`, notes: notes || null, items };
+    return {
+      docDate: `${s.docDate}T00:00:00.000Z`,
+      notes: s.notes || null,
+      items,
+    };
+  }
+
+  // ─── Автозбереження чернетки (наскрізне, План AUTOSAVE_REALTIME_PLAN) ──────
+  // Дворівневий захист (localStorage + жива чернетка в БД). Draft НЕ проводить
+  // документ — запис у лоти/журнал ЛИШЕ при «Провести» (`/[id]/post`).
+  const draftData = useMemo(
+    () => ({ docDate, notes, rows }),
+    [docDate, notes, rows],
+  );
+  type BagDraftData = typeof draftData;
+
+  // Документ має сенс лише з ≥1 мішком — до першого сканування захищає localStorage.
+  const hasItems = rows.some((r) => r.barcode.trim() !== "");
+
+  const createDraftServer = useCallback(
+    async (d: BagDraftData): Promise<string> => {
+      const res = await fetch("/api/v1/manager/bag-state-changes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...buildPayload(d), draft: true }),
+      });
+      if (!res.ok) throw new Error(`draft create ${res.status}`);
+      const j = (await res.json()) as { id: string };
+      return j.id;
+      // buildPayload — чистий трансформ переданого знімка `d` (стабільно).
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    },
+    [],
+  );
+
+  const updateDraftServer = useCallback(
+    async (id: string, d: BagDraftData): Promise<void> => {
+      const res = await fetch(`/api/v1/manager/bag-state-changes/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...buildPayload(d), draft: true }),
+      });
+      if (!res.ok) throw new Error(`draft update ${res.status}`);
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    },
+    [],
+  );
+
+  const autosave = useDocumentAutosave<BagDraftData>({
+    docType: "bag-state",
+    existingId: props.docId ?? null,
+    data: draftData,
+    canCreateDraft: hasItems,
+    createDraft: createDraftServer,
+    updateDraft: updateDraftServer,
+    onIdAssigned: (id) => {
+      setSavedId(id);
+      window.history.replaceState(null, "", `/manager/bag-state-changes/${id}`);
+    },
+  });
+
+  /** Застосувати відновлені з localStorage дані у стан форми. */
+  function applyRestore(d: BagDraftData): void {
+    setDocDate(d.docDate);
+    setNotes(d.notes);
+    setRows(d.rows);
+    autosave.acceptRestore();
   }
 
   async function save(thenPost: boolean) {
@@ -241,11 +319,14 @@ export function BagStateForm(props: BagStateFormProps) {
     setError(null);
     setMissingWarn(null);
     try {
-      const url =
-        props.mode === "edit"
-          ? `/api/v1/manager/bag-state-changes/${props.docId}`
-          : "/api/v1/manager/bag-state-changes";
-      const method = props.mode === "edit" ? "PATCH" : "POST";
+      // Гасимо чергу autosave, щоб відкладений draft-PATCH не перезаписав
+      // проведений документ після цього запиту.
+      autosave.clearAll();
+      const usePatch = savedId != null;
+      const url = usePatch
+        ? `/api/v1/manager/bag-state-changes/${savedId}`
+        : "/api/v1/manager/bag-state-changes";
+      const method = usePatch ? "PATCH" : "POST";
       const res = await fetch(url, {
         method,
         headers: { "Content-Type": "application/json" },
@@ -258,7 +339,8 @@ export function BagStateForm(props: BagStateFormProps) {
         return;
       }
       const saved = (await res.json()) as { id: string };
-      const id = props.mode === "edit" ? (props.docId as string) : saved.id;
+      const id = usePatch ? (savedId as string) : saved.id;
+      setSavedId(id);
 
       if (thenPost) {
         const postRes = await fetch(
@@ -292,6 +374,13 @@ export function BagStateForm(props: BagStateFormProps) {
 
   return (
     <div className="space-y-4">
+      {autosave.restoreData && (
+        <RestoreDraftBanner
+          onRestore={() => applyRestore(autosave.restoreData as BagDraftData)}
+          onDismiss={autosave.dismissRestore}
+        />
+      )}
+
       {error && (
         <div className="rounded-md bg-red-50 p-3 text-sm text-red-700">
           {error}
@@ -414,7 +503,7 @@ export function BagStateForm(props: BagStateFormProps) {
         </div>
       </div>
 
-      <div className="flex gap-2">
+      <div className="flex items-center gap-2">
         <button
           type="button"
           disabled={busy}
@@ -431,6 +520,11 @@ export function BagStateForm(props: BagStateFormProps) {
         >
           Зберегти та провести
         </button>
+        <AutosaveStatus
+          status={autosave.status}
+          savedAt={autosave.savedAt}
+          className="ml-2"
+        />
       </div>
 
       {/* Діалог ненайдених ШК (без window.confirm — блокується в iframe-shell). */}

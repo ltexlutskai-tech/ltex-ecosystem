@@ -7,6 +7,7 @@ import {
 } from "@/lib/manager/client-timeline";
 import type {
   CreateOrderInputRaw,
+  OrderDraftInput,
   OrderItemInput,
   UpdateOrderInputRaw,
 } from "@/lib/validations/manager-order";
@@ -206,4 +207,85 @@ export async function updateOrderWithItems(
   });
 
   return order;
+}
+
+// ─── Автозбереження чернетки (draft) ────────────────────────────────────────
+//
+// Легкі шляхи для наскрізного autosave (План AUTOSAVE_REALTIME_PLAN §2, рівень
+// 2). Пишуть ЛИШЕ шапку + рядки зі `status="draft"` (`archived=false`) БЕЗ
+// жодних ефектів проведення: не чіпають гвардів «одне активне на клієнта» на
+// рівні draft (чернетки можуть співіснувати; guard діє при явному
+// створенні/проведенні), історію клієнта та нагадування. Це робить autosave
+// безпечним для обліку — облікові ефекти з'являються ЛИШЕ при «Провести»
+// (`createOrderWithItems`/`updateOrderWithItems` з `post`/`nextStatus`).
+
+/**
+ * Створює чернетку замовлення (`status="draft"`) — легкий шлях autosave.
+ * Присвоює людський номер (продовжує 1С-нумерацію), як звичайне замовлення, щоб
+ * проведений з чернетки документ мав номер. Повертає лише поля, потрібні формі.
+ */
+export async function createOrderDraft(
+  input: OrderDraftInput,
+  customer: CreateOrderCustomer,
+  actor: CreateOrderActor,
+) {
+  const rate = input.exchangeRate ?? (await getCurrentRate());
+  const items = (input.items ?? []) as OrderItemInput[];
+  const { totalEur, totalUah, itemRows } = buildOrderTotals(items, rate);
+
+  return prisma.$transaction(async (tx) => {
+    const number1C = await nextOrderNumber1C(tx);
+    return tx.order.create({
+      data: {
+        customerId: customer.id,
+        number1C,
+        status: "draft",
+        archived: false,
+        isActual: true,
+        totalEur,
+        totalUah,
+        exchangeRate: rate,
+        notes: input.notes ?? null,
+        priceTypeId: input.priceTypeId ?? null,
+        deliveryMethod: input.deliveryMethod ?? null,
+        cashOnDelivery: input.cashOnDelivery ?? false,
+        assignedAgentUserId: input.assignedAgentUserId ?? actor.userId,
+        items: { create: itemRows },
+      },
+      select: { id: true, status: true, number1C: true, code1C: true },
+    });
+  });
+}
+
+/**
+ * Оновлює чернетку замовлення (повна заміна шапки + items) — легкий шлях
+ * autosave. Статус НЕ змінюється; жодних ефектів проведення. Caller (endpoint)
+ * гарантує, що документ не заблокований.
+ */
+export async function updateOrderDraft(
+  orderId: string,
+  input: OrderDraftInput,
+) {
+  const rate = input.exchangeRate ?? (await getCurrentRate());
+  const items = (input.items ?? []) as OrderItemInput[];
+  const { totalEur, totalUah, itemRows } = buildOrderTotals(items, rate);
+
+  return prisma.$transaction(async (tx) => {
+    await tx.orderItem.deleteMany({ where: { orderId } });
+    return tx.order.update({
+      where: { id: orderId },
+      data: {
+        totalEur,
+        totalUah,
+        exchangeRate: rate,
+        notes: input.notes ?? null,
+        priceTypeId: input.priceTypeId ?? null,
+        deliveryMethod: input.deliveryMethod ?? null,
+        cashOnDelivery: input.cashOnDelivery ?? false,
+        version: { increment: 1 },
+        items: { create: itemRows },
+      },
+      select: { id: true, status: true, number1C: true, code1C: true },
+    });
+  });
 }

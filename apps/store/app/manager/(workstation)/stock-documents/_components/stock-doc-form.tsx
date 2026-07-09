@@ -1,7 +1,12 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useDocumentAutosave } from "@/lib/autosave/use-document-autosave";
+import {
+  AutosaveStatus,
+  RestoreDraftBanner,
+} from "../../_components/autosave-status";
 
 /**
  * Універсальна форма створення документа руху товару (Фаза 5).
@@ -104,6 +109,12 @@ export function StockDocForm(props: StockDocFormProps) {
   const [searchKey, setSearchKey] = useState<string | null>(null);
   const [hits, setHits] = useState<ProductHit[]>([]);
   const [weightWarn, setWeightWarn] = useState(false);
+  /**
+   * id збереженої чернетки. `null` доки документ ще не створено. Оновлюється
+   * явним POST або autosave (`onIdAssigned`) — щоб явне збереження PATCH-ило
+   * вже створену чернетку, а не дублювало документ.
+   */
+  const [savedId, setSavedId] = useState<string | null>(null);
 
   async function searchProducts(rowKey: string, q: string) {
     setSearchKey(rowKey);
@@ -219,8 +230,23 @@ export function StockDocForm(props: StockDocFormProps) {
     };
   }, [rows, tolerance]);
 
-  function buildPayload(): Record<string, unknown> {
-    const items = rows
+  function buildPayload(src?: {
+    docDate: string;
+    notes: string;
+    customerName: string;
+    supplierName: string;
+    reason: string;
+    rows: Row[];
+  }): Record<string, unknown> {
+    const s = src ?? {
+      docDate,
+      notes,
+      customerName,
+      supplierName,
+      reason,
+      rows,
+    };
+    const items = s.rows
       .filter((r) => r.productId || r.barcode || Number(r.weight) > 0)
       .map((r) => {
         const base: Record<string, unknown> = {
@@ -254,14 +280,93 @@ export function StockDocForm(props: StockDocFormProps) {
         return base;
       });
     const payload: Record<string, unknown> = {
-      docDate,
-      notes: notes || null,
+      docDate: s.docDate,
+      notes: s.notes || null,
       items,
     };
-    if (props.showCustomer) payload.customerName = customerName || null;
-    if (props.showSupplier) payload.supplierName = supplierName || null;
-    if (props.showReason) payload.reason = reason || null;
+    if (props.showCustomer) payload.customerName = s.customerName || null;
+    if (props.showSupplier) payload.supplierName = s.supplierName || null;
+    if (props.showReason) payload.reason = s.reason || null;
     return payload;
+  }
+
+  // ─── Автозбереження чернетки (наскрізне, План AUTOSAVE_REALTIME_PLAN) ──────
+  // Дворівневий захист: рівень 1 (localStorage) + рівень 2 (жива чернетка в БД).
+  // Draft НЕ проводить документ — облікові рухи ЛИШЕ при «Провести».
+  const draftData = useMemo(
+    () => ({ docDate, notes, customerName, supplierName, reason, rows }),
+    [docDate, notes, customerName, supplierName, reason, rows],
+  );
+
+  type DocDraftData = typeof draftData;
+
+  // Створювати серверну чернетку лише коли є хоч якийсь змістовний ввід (щоб не
+  // засмічувати список порожніми документами). Порожні чернетки прибирає cron.
+  const hasContent =
+    rows.some((r) => r.productId || r.barcode.trim() || Number(r.weight) > 0) ||
+    notes.trim() !== "" ||
+    customerName.trim() !== "" ||
+    supplierName.trim() !== "" ||
+    reason.trim() !== "";
+
+  const createDraftServer = useCallback(
+    async (d: DocDraftData): Promise<string> => {
+      const res = await fetch(`/api/v1/manager/stock-documents/${props.kind}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...buildPayload(d), draft: true }),
+      });
+      if (!res.ok) throw new Error(`draft create ${res.status}`);
+      const j = (await res.json()) as { id: string };
+      return j.id;
+      // buildPayload — чистий трансформ переданого знімка `d` (стабільно).
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    },
+    [props.kind],
+  );
+
+  const updateDraftServer = useCallback(
+    async (id: string, d: DocDraftData): Promise<void> => {
+      const res = await fetch(
+        `/api/v1/manager/stock-documents/${props.kind}/${id}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ...buildPayload(d), draft: true }),
+        },
+      );
+      if (!res.ok) throw new Error(`draft update ${res.status}`);
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    },
+    [props.kind],
+  );
+
+  const autosave = useDocumentAutosave<DocDraftData>({
+    docType: `stock-${props.kind}`,
+    existingId: null,
+    data: draftData,
+    canCreateDraft: hasContent,
+    createDraft: createDraftServer,
+    updateDraft: updateDraftServer,
+    onIdAssigned: (id) => {
+      setSavedId(id);
+      window.history.replaceState(
+        null,
+        "",
+        `/manager/stock-documents/${props.kind}/${id}`,
+      );
+    },
+  });
+
+  /** Застосувати відновлені з localStorage дані у стан форми. */
+  function applyRestore(d: DocDraftData): void {
+    setDocDate(d.docDate);
+    setNotes(d.notes);
+    setCustomerName(d.customerName);
+    setSupplierName(d.supplierName);
+    setReason(d.reason);
+    setRows(d.rows.length > 0 ? d.rows : [emptyRow()]);
+    autosave.acceptRestore();
   }
 
   async function save(thenPost: boolean, force = false) {
@@ -275,8 +380,16 @@ export function StockDocForm(props: StockDocFormProps) {
     setBusy(true);
     setError(null);
     try {
-      const res = await fetch(`/api/v1/manager/stock-documents/${props.kind}`, {
-        method: "POST",
+      // Гасимо чергу autosave, щоб відкладений draft-PATCH не перезаписав
+      // проведений документ після цього запиту.
+      autosave.clearAll();
+      // Якщо чернетку вже створено (autosave) — PATCH; інакше POST нового.
+      const usePatch = savedId != null;
+      const url = usePatch
+        ? `/api/v1/manager/stock-documents/${props.kind}/${savedId}`
+        : `/api/v1/manager/stock-documents/${props.kind}`;
+      const res = await fetch(url, {
+        method: usePatch ? "PATCH" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(buildPayload()),
       });
@@ -286,7 +399,8 @@ export function StockDocForm(props: StockDocFormProps) {
         setBusy(false);
         return;
       }
-      const { id } = await res.json();
+      const { id } = (await res.json()) as { id: string };
+      setSavedId(id);
       if (thenPost) {
         const postRes = await fetch(
           `/api/v1/manager/stock-documents/${props.kind}/${id}/post`,
@@ -309,6 +423,13 @@ export function StockDocForm(props: StockDocFormProps) {
 
   return (
     <div className="space-y-4">
+      {autosave.restoreData && (
+        <RestoreDraftBanner
+          onRestore={() => applyRestore(autosave.restoreData as DocDraftData)}
+          onDismiss={autosave.dismissRestore}
+        />
+      )}
+
       {error && (
         <div className="rounded-md bg-red-50 p-3 text-sm text-red-700">
           {error}
@@ -650,7 +771,7 @@ export function StockDocForm(props: StockDocFormProps) {
         </div>
       )}
 
-      <div className="flex gap-2">
+      <div className="flex items-center gap-2">
         <button
           type="button"
           disabled={busy}
@@ -667,6 +788,11 @@ export function StockDocForm(props: StockDocFormProps) {
         >
           Зберегти та провести
         </button>
+        <AutosaveStatus
+          status={autosave.status}
+          savedAt={autosave.savedAt}
+          className="ml-2"
+        />
       </div>
 
       {/* Діалог допуску ваги (без window.confirm — блокується в iframe-shell). */}
