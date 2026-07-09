@@ -207,22 +207,79 @@ export async function listStockDocs(
       { docNumber: { contains: q, mode: "insensitive" } },
       { number1C: { contains: q, mode: "insensitive" } },
     ];
-  const select = {
+  const orderBy = { docDate: "desc" as const };
+  const skip = (page - 1) * pageSize;
+  const paged = { where, orderBy, skip, take: pageSize } as const;
+
+  // Спільні колонки заголовка для всіх видів документів.
+  const headerSelect = {
     id: true,
     docNumber: true,
     number1C: true,
     docDate: true,
     status: true,
-    totalWeight: true,
-    totalQuantity: true,
   } as const;
-  const orderBy = { docDate: "desc" as const };
-  const skip = (page - 1) * pageSize;
-  const delegate = stockDocDelegate(kind);
-  const [total, items] = await Promise.all([
-    delegate.count({ where }),
-    delegate.findMany({ where, orderBy, skip, take: pageSize, select }),
-  ]);
+
+  let total = 0;
+  let items: ListItem[] = [];
+
+  // ⚠️ Repacking та Inventory НЕ мають колонок total_weight/total_quantity
+  // (у них inputWeight/outputWeight/lossWeight та is_closed відповідно), тому
+  // вибірка тих полів валила Prisma. Обробляємо їх окремо, нормалізуючи у
+  // спільну форму ListItem, щоб сторінка списку лишалась незмінною.
+  if (kind === "repackings") {
+    const delegate = prisma.repacking as unknown as CountFindDelegate<{
+      id: string;
+      docNumber: string;
+      number1C: string | null;
+      docDate: Date;
+      status: string;
+      inputWeight: number;
+    }>;
+    const select = { ...headerSelect, inputWeight: true } as const;
+    const [t, rows] = await Promise.all([
+      delegate.count({ where }),
+      delegate.findMany({ ...paged, select }),
+    ]);
+    total = t;
+    items = rows.map((r) => ({
+      id: r.id,
+      docNumber: r.docNumber,
+      number1C: r.number1C,
+      docDate: r.docDate,
+      status: r.status,
+      totalWeight: r.inputWeight,
+      totalQuantity: 0,
+    }));
+  } else if (kind === "inventories") {
+    const delegate = prisma.inventory as unknown as CountFindDelegate<{
+      id: string;
+      docNumber: string;
+      number1C: string | null;
+      docDate: Date;
+      status: string;
+    }>;
+    const [t, rows] = await Promise.all([
+      delegate.count({ where }),
+      delegate.findMany({ ...paged, select: headerSelect }),
+    ]);
+    total = t;
+    items = rows.map((r) => ({ ...r, totalWeight: 0, totalQuantity: 0 }));
+  } else {
+    const delegate = totalsDelegate(kind);
+    const select = {
+      ...headerSelect,
+      totalWeight: true,
+      totalQuantity: true,
+    } as const;
+    const [t, rows] = await Promise.all([
+      delegate.count({ where }),
+      delegate.findMany({ ...paged, select }),
+    ]);
+    total = t;
+    items = rows;
+  }
+
   return {
     items,
     total,
@@ -232,7 +289,7 @@ export async function listStockDocs(
   };
 }
 
-interface ListDelegate {
+interface CountFindDelegate<Row> {
   count(args: { where: Record<string, unknown> }): Promise<number>;
   findMany(args: {
     where: Record<string, unknown>;
@@ -240,19 +297,18 @@ interface ListDelegate {
     skip: number;
     take: number;
     select: Record<string, true>;
-  }): Promise<ListItem[]>;
+  }): Promise<Row[]>;
 }
 
-function stockDocDelegate(kind: StockDocKind): ListDelegate {
-  const map: Record<StockDocKind, unknown> = {
+/** Делегати видів документів, що мають total_weight/total_quantity. */
+function totalsDelegate(kind: StockDocKind): CountFindDelegate<ListItem> {
+  const map: Partial<Record<StockDocKind, unknown>> = {
     "product-returns": prisma.productReturnFromCustomer,
     "warehouse-returns": prisma.warehouseReturn,
     "supplier-returns": prisma.returnToSupplier,
-    repackings: prisma.repacking,
     "write-offs": prisma.writeOff,
     "stock-adjustments": prisma.stockAdjustment,
-    inventories: prisma.inventory,
     "stock-transfers": prisma.stockTransfer,
   };
-  return map[kind] as ListDelegate;
+  return map[kind] as CountFindDelegate<ListItem>;
 }
