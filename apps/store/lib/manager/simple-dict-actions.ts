@@ -34,34 +34,49 @@ function makeCode(label: string): string {
 }
 
 // ─── Читання (нормалізовані рядки) ───────────────────────────────────────────
+// ТЗ 8.0 B7: у редакторі приховуємо позначені на вилучення / заархівовані
+// записи (видалення тепер = мʼяка позначка archived, а не hard-delete —
+// запис лишається у вже збережених документах/клієнтах, але зникає зі списку).
+const ACTIVE_DICT: { markedForDeletion: false; archived: false } = {
+  markedForDeletion: false,
+  archived: false,
+};
+
 export async function loadDictRows(type: SimpleDictType): Promise<DictRow[]> {
   switch (type) {
     case "client-statuses": {
       const rows = await prisma.mgrClientStatus.findMany({
+        where: ACTIVE_DICT,
         orderBy: [{ sortOrder: "asc" }, { label: "asc" }],
       });
       return rows.map((r) => ({ id: r.id, label: r.label, color: r.colorHex }));
     }
     case "search-channels": {
       const rows = await prisma.mgrSearchChannel.findMany({
+        where: ACTIVE_DICT,
         orderBy: [{ sortOrder: "asc" }, { label: "asc" }],
       });
       return rows.map((r) => ({ id: r.id, label: r.label }));
     }
     case "categories-tt": {
       const rows = await prisma.mgrCategoryTT.findMany({
+        where: ACTIVE_DICT,
         orderBy: [{ sortOrder: "asc" }, { label: "asc" }],
       });
       return rows.map((r) => ({ id: r.id, label: r.label }));
     }
     case "delivery-methods": {
       const rows = await prisma.mgrDeliveryMethod.findMany({
+        where: ACTIVE_DICT,
         orderBy: [{ sortOrder: "asc" }, { label: "asc" }],
       });
       return rows.map((r) => ({ id: r.id, label: r.label }));
     }
     case "routes": {
-      const rows = await prisma.mgrRoute.findMany({ orderBy: { name: "asc" } });
+      const rows = await prisma.mgrRoute.findMany({
+        where: ACTIVE_DICT,
+        orderBy: { name: "asc" },
+      });
       return rows.map((r) => ({
         id: r.id,
         label: r.name,
@@ -70,6 +85,7 @@ export async function loadDictRows(type: SimpleDictType): Promise<DictRow[]> {
     }
     case "producers": {
       const rows = await prisma.mgrProducer.findMany({
+        where: ACTIVE_DICT,
         orderBy: [{ sortOrder: "asc" }, { label: "asc" }],
       });
       return rows.map((r) => ({ id: r.id, label: r.label }));
@@ -165,39 +181,190 @@ export async function updateDictEntry(
   revalidate(type);
 }
 
-// ─── Видалення ──────────────────────────────────────────────────────────────
+// ─── Видалення (ТЗ 8.0 B7 — мʼяке, із захистом «1С не видаляти») ─────────────
+//
+// Правила:
+//  • запис із `code1C != null` (історичний, з 1С — стосується маршрутів) фізично
+//    НЕ видаляється: лише архівується (`archived = true`), щоб не осиротити
+//    звʼязки клієнтів/документів;
+//  • запис, що ВЖЕ використовується (FK: клієнти/маршрутні листи) — теж лише
+//    архівується;
+//  • вільний не-1С запис — фізично видаляється.
+//
+// Заархівований запис зникає зі списків вибору й з редактора, але лишається у
+// вже збережених документах/клієнтах (історія не ламається). Це прибирає стару
+// незрозумілу помилку «можливо, значення вже використовується».
+export type DeleteDictResult = { deleted: boolean; archived: boolean };
+
+/** Чи використовується запис (кількість залежних рядків > 0). */
+async function isDictEntryReferenced(
+  type: SimpleDictType,
+  id: string,
+): Promise<{ referenced: boolean; hasCode1C: boolean }> {
+  switch (type) {
+    case "client-statuses": {
+      const row = await prisma.mgrClientStatus.findUnique({
+        where: { id },
+        select: {
+          _count: {
+            select: { clientsGeneral: true, clientsOperational: true },
+          },
+        },
+      });
+      const c = row?._count;
+      return {
+        referenced: !!c && c.clientsGeneral + c.clientsOperational > 0,
+        hasCode1C: false,
+      };
+    }
+    case "search-channels": {
+      const row = await prisma.mgrSearchChannel.findUnique({
+        where: { id },
+        select: { _count: { select: { clients: true } } },
+      });
+      return { referenced: (row?._count.clients ?? 0) > 0, hasCode1C: false };
+    }
+    case "categories-tt": {
+      const row = await prisma.mgrCategoryTT.findUnique({
+        where: { id },
+        select: { _count: { select: { clients: true } } },
+      });
+      return { referenced: (row?._count.clients ?? 0) > 0, hasCode1C: false };
+    }
+    case "delivery-methods": {
+      const row = await prisma.mgrDeliveryMethod.findUnique({
+        where: { id },
+        select: { _count: { select: { clients: true } } },
+      });
+      return { referenced: (row?._count.clients ?? 0) > 0, hasCode1C: false };
+    }
+    case "routes": {
+      const row = await prisma.mgrRoute.findUnique({
+        where: { id },
+        select: {
+          code1C: true,
+          _count: {
+            select: {
+              primaryForClients: true,
+              assignments: true,
+              routeSheets: true,
+            },
+          },
+        },
+      });
+      const c = row?._count;
+      return {
+        referenced:
+          !!c && c.primaryForClients + c.assignments + c.routeSheets > 0,
+        hasCode1C: !!row?.code1C,
+      };
+    }
+    case "producers":
+      // Виробник у товарі зберігається як текст (не FK) — фізичного звʼязку
+      // немає, тож вільний запис можна стерти.
+      return { referenced: false, hasCode1C: false };
+  }
+}
+
+/** Мʼяко архівує запис довідника (без hard-delete). */
+async function archiveDictEntry(
+  type: SimpleDictType,
+  id: string,
+): Promise<void> {
+  switch (type) {
+    case "client-statuses":
+      await prisma.mgrClientStatus.update({
+        where: { id },
+        data: { archived: true },
+      });
+      break;
+    case "search-channels":
+      await prisma.mgrSearchChannel.update({
+        where: { id },
+        data: { archived: true },
+      });
+      break;
+    case "categories-tt":
+      await prisma.mgrCategoryTT.update({
+        where: { id },
+        data: { archived: true },
+      });
+      break;
+    case "delivery-methods":
+      await prisma.mgrDeliveryMethod.update({
+        where: { id },
+        data: { archived: true },
+      });
+      break;
+    case "routes":
+      await prisma.mgrRoute.update({
+        where: { id },
+        data: { archived: true, isActive: false },
+      });
+      break;
+    case "producers":
+      await prisma.mgrProducer.update({
+        where: { id },
+        data: { archived: true },
+      });
+      break;
+  }
+}
+
+/** Фізично видаляє вільний не-1С запис. */
+async function hardDeleteDictEntry(
+  type: SimpleDictType,
+  id: string,
+): Promise<void> {
+  switch (type) {
+    case "client-statuses":
+      await prisma.mgrClientStatus.delete({ where: { id } });
+      break;
+    case "search-channels":
+      await prisma.mgrSearchChannel.delete({ where: { id } });
+      break;
+    case "categories-tt":
+      await prisma.mgrCategoryTT.delete({ where: { id } });
+      break;
+    case "delivery-methods":
+      await prisma.mgrDeliveryMethod.delete({ where: { id } });
+      break;
+    case "routes":
+      await prisma.mgrRoute.delete({ where: { id } });
+      break;
+    case "producers":
+      await prisma.mgrProducer.delete({ where: { id } });
+      break;
+  }
+}
+
 export async function deleteDictEntry(
   typeRaw: string,
   id: string,
-): Promise<void> {
+): Promise<DeleteDictResult> {
   await requireDictAdmin();
   if (!isSimpleDictType(typeRaw)) throw new Error("Невідомий довідник");
   const type = typeRaw;
-  try {
-    switch (type) {
-      case "client-statuses":
-        await prisma.mgrClientStatus.delete({ where: { id } });
-        break;
-      case "search-channels":
-        await prisma.mgrSearchChannel.delete({ where: { id } });
-        break;
-      case "categories-tt":
-        await prisma.mgrCategoryTT.delete({ where: { id } });
-        break;
-      case "delivery-methods":
-        await prisma.mgrDeliveryMethod.delete({ where: { id } });
-        break;
-      case "routes":
-        await prisma.mgrRoute.delete({ where: { id } });
-        break;
-      case "producers":
-        await prisma.mgrProducer.delete({ where: { id } });
-        break;
+
+  const { referenced, hasCode1C } = await isDictEntryReferenced(type, id);
+
+  let result: DeleteDictResult;
+  if (hasCode1C || referenced) {
+    // Історичний (1С) або використовуваний запис — лише архівуємо.
+    await archiveDictEntry(type, id);
+    result = { deleted: false, archived: true };
+  } else {
+    // Вільний не-1С запис — фізично стираємо; на будь-який FK-збій
+    // (страхувальник) архівуємо замість помилки.
+    try {
+      await hardDeleteDictEntry(type, id);
+      result = { deleted: true, archived: false };
+    } catch {
+      await archiveDictEntry(type, id);
+      result = { deleted: false, archived: true };
     }
-  } catch {
-    throw new Error(
-      "Не вдалося видалити (можливо, значення вже використовується)",
-    );
   }
+
   revalidate(type);
+  return result;
 }

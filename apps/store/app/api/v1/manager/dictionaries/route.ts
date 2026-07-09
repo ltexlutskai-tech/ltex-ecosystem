@@ -2,6 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@ltex/db";
 import { getCurrentUser } from "@/lib/auth/manager-auth";
 
+/** ТЗ 8.0 B7: активні значення довідника (без архіву / позначки на вилучення). */
+const DICT_SELECT_WHERE = {
+  archived: false,
+  markedForDeletion: false,
+} as const;
+
 export async function GET(req: NextRequest) {
   const user = await getCurrentUser(req);
   if (!user) {
@@ -19,13 +25,27 @@ export async function GET(req: NextRequest) {
     bankAccounts,
     cashFlowArticles,
   ] = await Promise.all([
-    prisma.mgrClientStatus.findMany({ orderBy: { sortOrder: "asc" } }),
-    prisma.mgrSearchChannel.findMany({ orderBy: { sortOrder: "asc" } }),
-    prisma.mgrCategoryTT.findMany({ orderBy: { sortOrder: "asc" } }),
-    prisma.mgrDeliveryMethod.findMany({ orderBy: { sortOrder: "asc" } }),
+    // ТЗ 8.0 B7: у списках вибору не показуємо заархівовані / позначені на
+    // вилучення значення довідників.
+    prisma.mgrClientStatus.findMany({
+      where: DICT_SELECT_WHERE,
+      orderBy: { sortOrder: "asc" },
+    }),
+    prisma.mgrSearchChannel.findMany({
+      where: DICT_SELECT_WHERE,
+      orderBy: { sortOrder: "asc" },
+    }),
+    prisma.mgrCategoryTT.findMany({
+      where: DICT_SELECT_WHERE,
+      orderBy: { sortOrder: "asc" },
+    }),
+    prisma.mgrDeliveryMethod.findMany({
+      where: DICT_SELECT_WHERE,
+      orderBy: { sortOrder: "asc" },
+    }),
     prisma.mgrAssortmentCode.findMany({ orderBy: { sortOrder: "asc" } }),
     prisma.mgrRoute.findMany({
-      where: { isActive: true },
+      where: { ...DICT_SELECT_WHERE, isActive: true },
       orderBy: { name: "asc" },
     }),
     prisma.mgrPriceType.findMany({ orderBy: { sortOrder: "asc" } }),

@@ -85,6 +85,9 @@ export function buildCashOrdersWhere(
     where.archived = false;
   }
 
+  // ТЗ 8.0 B6: позначені на вилучення завжди приховані зі списку.
+  where.markedForDeletion = false;
+
   if (p.type) {
     where.type = p.type;
   }

@@ -19,6 +19,8 @@ export default async function NewProductPage() {
       select: { id: true, name: true, parentId: true },
     }),
     prisma.mgrProducer.findMany({
+      // ТЗ 8.0 B7: не пропонуємо заархівовані / позначені на вилучення виробники.
+      where: { archived: false, markedForDeletion: false },
       orderBy: [{ sortOrder: "asc" }, { label: "asc" }],
       select: { label: true },
     }),

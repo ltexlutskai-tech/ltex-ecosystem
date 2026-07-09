@@ -21,6 +21,8 @@ export interface DeliveryMethodOption {
 export const getDeliveryMethodOptions = cache(
   async (): Promise<DeliveryMethodOption[]> => {
     const rows = await prisma.mgrDeliveryMethod.findMany({
+      // ТЗ 8.0 B7: у формах не пропонуємо заархівовані / позначені способи.
+      where: { archived: false, markedForDeletion: false },
       orderBy: [{ sortOrder: "asc" }, { label: "asc" }],
       select: { code: true, label: true },
     });

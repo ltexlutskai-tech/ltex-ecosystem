@@ -97,6 +97,9 @@ export function buildSalesWhere(
     where.archived = false;
   }
 
+  // ТЗ 8.0 B6: позначені на вилучення завжди приховані зі списку.
+  where.markedForDeletion = false;
+
   // Пошук: № документа / клієнт (ім'я·телефон·місто) / товари (назва·артикул).
   if (p.search && p.search.trim().length > 0) {
     const q = p.search.trim();
