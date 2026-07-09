@@ -10,6 +10,8 @@ import { createStockDoc } from "@/lib/manager/stock-documents-repo";
 /** GET/POST /api/v1/manager/stock-documents/[kind] — список / створити draft. */
 
 const WRITE_ROLES = ["manager", "admin", "owner", "warehouse"] as const;
+// Перепаковка (повний цикл) — лише склад + адмін/власник.
+const REPACK_ROLES = ["warehouse", "admin", "owner"] as const;
 const READ_ROLES = [
   "manager",
   "senior_manager",
@@ -53,7 +55,11 @@ export async function POST(
   const user = await getCurrentUser(req);
   if (!user)
     return NextResponse.json({ error: "Не авторизовано" }, { status: 401 });
-  if (!(WRITE_ROLES as readonly string[]).includes(user.role))
+  const writeAllowed =
+    kind === "repackings"
+      ? (REPACK_ROLES as readonly string[])
+      : (WRITE_ROLES as readonly string[]);
+  if (!writeAllowed.includes(user.role))
     return NextResponse.json({ error: "Нема доступу" }, { status: 403 });
   const body = await req.json().catch(() => null);
   const parsed = parseCreateBody(kind, body, user.id);

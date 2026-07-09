@@ -93,7 +93,22 @@ export function parseCreateBody(
           ...common(p.data.docDate),
           warehouseId: p.data.warehouseId,
           notes: p.data.notes,
-          lines: p.data.items.map((l) => normalizeLine(l)),
+          lines: p.data.items.map((l) =>
+            normalizeLine({
+              ...l,
+              // Для комплектації ЦінаПродажуВес = priceEur рядка (щоб amountEur
+              // рахувалась), + окреме поле salePriceEur.
+              priceEur:
+                l.role === "assembled" && l.salePriceEur != null
+                  ? l.salePriceEur
+                  : l.priceEur,
+              sourceLotId: l.sourceLotId,
+              salePriceEur: l.salePriceEur,
+              qualityId: l.qualityId,
+              sector: l.sector,
+              sectorId: l.sectorId,
+            }),
+          ),
         },
       };
     }

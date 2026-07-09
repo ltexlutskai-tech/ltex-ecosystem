@@ -149,6 +149,10 @@ model Lot {
   receivingId         String?   @map("receiving_id")
   // Закупкова ціна (€/кг) — собівартість партії, для маржі.
   purchasePriceEur    Float?    @map("purchase_price_eur")
+  // ── Зміна стану мішка (2026-07-14) — сектор як FK на довідник паралельно до
+  //    текстового `sector` (сумісність). FK-констрейнт (ON DELETE SET NULL) —
+  //    у SQL-міграції; у Prisma тримаємо плоский скаляр, як `RepackingItem`.
+  sectorId            String?   @map("sector_id")
   createdAt           DateTime  @default(now()) @map("created_at")
   updatedAt           DateTime  @updatedAt @map("updated_at")
 
@@ -967,6 +971,9 @@ model WarehouseSector {
   id          String   @id @default(cuid())
   warehouseId String?  @map("warehouse_id")
   name        String
+  // Стабільний ключ для find-or-create за назвою (перепаковка). Nullable для
+  // сумісності з наявними записами.
+  code        String?  @unique
   isActive    Boolean  @default(true) @map("is_active")
   createdAt   DateTime @default(now()) @map("created_at")
 
@@ -2299,6 +2306,16 @@ model MgrSyncState {
   @@map("mgr_sync_state")
 }
 
+// Key-value налаштування менеджерки (редаговані на сторінці «Налаштування»).
+// Наразі: `repack.weight_tolerance_kg` — допуск різниці ваги при перепаковці.
+model MgrSetting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@map("mgr_settings")
+}
+
 // ─── Manager message templates (M1.7 / Прайс Stage 5b) ──────────────────────
 // Простий довідник готових фраз {назва, текст} — відтворює 1С
 // Catalog.ШаблоныСообщений. Спільний для всіх менеджерів (як довідник 1С):
@@ -2608,12 +2625,112 @@ model RepackingItem {
   amountEur   Decimal  @default(0) @map("amount_eur") @db.Decimal(12, 2)
   notes       String?
   createdAt   DateTime @default(now()) @map("created_at")
+  // ── Перепаковка повного циклу (2026-07-13) — усі поля additive/nullable ──
+  // РОЗБІР (disassembled): який лот розібрали + попередній статус для реверсу.
+  sourceLotId      String?  @map("source_lot_id")
+  sourcePrevStatus String?  @map("source_prev_status")
+  // КОМПЛЕКТАЦІЯ (assembled): створений лот, ціна продажу €/кг, якість, сектор,
+  // рознесена собівартість €/кг.
+  createdLotId String?  @map("created_lot_id")
+  salePriceEur Decimal? @map("sale_price_eur") @db.Decimal(12, 2)
+  qualityId    String?  @map("quality_id")
+  sector       String?
+  sectorId     String?  @map("sector_id")
+  costPerKgEur Decimal? @map("cost_per_kg_eur") @db.Decimal(12, 2)
 
   document Repacking @relation(fields: [repackingId], references: [id], onDelete: Cascade)
 
   @@index([repackingId])
   @@index([role])
   @@map("mgr_repacking_items")
+}
+
+// ─── Зміна стану мішка (← 1С Документ.ИзменениеСостоянияМешка, 2026-07-14) ───
+// Пакетний редактор мішків: шапка + рядки (кожен = один Lot за barcode). При
+// проведенні поля стану записуються у самі лоти + пишеться журнал `LotStateHistory`.
+model BagStateChange {
+  id              String    @id @default(cuid())
+  docNumber       String    @unique @map("doc_number") // LT-BSC-YYYYMM-NNNN
+  number1C        String?   @map("number_1c") // для історичного імпорту (опц.)
+  code1C          String?   @unique @map("code_1c")
+  docDate         DateTime  @default(now()) @map("doc_date")
+  status          String    @default("draft") // draft | posted | cancelled
+  notes           String?
+  warehouseId     String?   @map("warehouse_id")
+  createdByUserId String?   @map("created_by_user_id")
+  postedAt        DateTime? @map("posted_at")
+  postedByUserId  String?   @map("posted_by_user_id")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  items BagStateChangeItem[]
+
+  @@index([status])
+  @@index([docDate(sort: Desc)])
+  @@map("mgr_bag_state_changes")
+}
+
+model BagStateChangeItem {
+  id                  String    @id @default(cuid())
+  documentId          String    @map("document_id")
+  lineNo              Int       @map("line_no")
+  lotId               String?   @map("lot_id") // резолв за barcode
+  barcode             String // ключ пошуку мішка
+  productId           String?   @map("product_id")
+  // Стан мішка (усі редаговані поля):
+  isOpen              Boolean   @default(false) @map("is_open")
+  hasVideo            Boolean   @default(false) @map("has_video")
+  isTarget            Boolean   @default(false) @map("is_target")
+  youtubeUrl          String?   @map("youtube_url")
+  description         String?
+  comment             String?
+  onAir               Boolean   @default(false) @map("on_air")
+  onAirDelivery       Boolean   @default(false) @map("on_air_delivery")
+  reservedAgentUserId String?   @map("reserved_agent_user_id") // «Бронь» = агент
+  reservedClientId    String?   @map("reserved_client_id") // «Контрагент»
+  reservedUntil       DateTime? @map("reserved_until")
+  sector              String?
+  sectorId            String?   @map("sector_id") // FK → WarehouseSector (у SQL)
+  createdAt           DateTime  @default(now()) @map("created_at")
+
+  document BagStateChange @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@index([documentId])
+  @@index([barcode])
+  @@map("mgr_bag_state_change_items")
+}
+
+// Регістр історії (= 1С InformationRegister.ІсторіяЗміниСтануМішка). Реєстратор
+// (`recorderDocId`) — id документа `BagStateChange`; знімок стану мішка на момент
+// проведення. Ідемпотентність — delete-then-write за `recorderDocId`.
+model LotStateHistory {
+  id                  String    @id @default(cuid())
+  lotId               String?   @map("lot_id")
+  barcode             String
+  productId           String?   @map("product_id")
+  recorderDocId       String?   @map("recorder_doc_id") // BagStateChange.id
+  occurredAt          DateTime  @map("occurred_at")
+  changedByUserId     String?   @map("changed_by_user_id") // «Відповідальний»
+  // Знімок стану:
+  isOpen              Boolean   @default(false) @map("is_open")
+  hasVideo            Boolean   @default(false) @map("has_video")
+  isTarget            Boolean   @default(false) @map("is_target")
+  youtubeUrl          String?   @map("youtube_url")
+  description         String?
+  comment             String?
+  onAir               Boolean   @default(false) @map("on_air")
+  onAirDelivery       Boolean   @default(false) @map("on_air_delivery")
+  reservedAgentUserId String?   @map("reserved_agent_user_id")
+  reservedClientId    String?   @map("reserved_client_id")
+  reservedUntil       DateTime? @map("reserved_until")
+  sector              String?
+  createdAt           DateTime  @default(now()) @map("created_at")
+
+  @@index([lotId])
+  @@index([barcode])
+  @@index([recorderDocId])
+  @@index([occurredAt(sort: Desc)])
+  @@map("lot_state_history")
 }
 
 model WriteOff {

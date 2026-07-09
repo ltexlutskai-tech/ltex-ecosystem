@@ -1,11 +1,16 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { prisma } from "@ltex/db";
 import { requireRole } from "@/lib/auth/manager-auth";
 import { isStockDocKind } from "@/lib/manager/stock-documents-api";
 import { getStockDocMeta } from "@/lib/manager/stock-documents";
+import { getRepackWeightTolerance } from "@/lib/manager/mgr-settings";
 import { StockDocForm } from "../../_components/stock-doc-form";
 
 export const dynamic = "force-dynamic";
+
+// Перепаковка (повний цикл) — лише склад + адмін/власник.
+const REPACK_ROLES = ["warehouse", "admin", "owner"];
 
 export async function generateMetadata({
   params,
@@ -26,7 +31,27 @@ export default async function NewStockDocPage({
   if (!isStockDocKind(kind)) notFound();
   const user = await requireRole(["manager", "admin", "owner", "warehouse"]);
   if (!user) notFound();
+  const isRepacking = kind === "repackings";
+  if (isRepacking && !REPACK_ROLES.includes(user.role)) notFound();
   const meta = getStockDocMeta(kind);
+
+  // Довідники якості/секторів + допуск ваги потрібні лише перепаковці.
+  const [qualities, sectors, weightTolerance] = isRepacking
+    ? await Promise.all([
+        prisma.quality.findMany({
+          where: { archived: false },
+          select: { id: true, name: true },
+          orderBy: { name: "asc" },
+        }),
+        prisma.warehouseSector.findMany({
+          where: { isActive: true },
+          select: { id: true, name: true },
+          orderBy: { name: "asc" },
+        }),
+        getRepackWeightTolerance(),
+      ])
+    : [[], [], 2];
+
   return (
     <div className="mx-auto max-w-4xl space-y-4">
       <div className="text-sm">
@@ -43,10 +68,13 @@ export default async function NewStockDocPage({
         label={meta.label}
         showPrice={kind !== "warehouse-returns" && kind !== "stock-transfers"}
         showReason={kind === "write-offs" || kind === "stock-adjustments"}
-        isRepacking={kind === "repackings"}
+        isRepacking={isRepacking}
         isInventory={kind === "inventories"}
         showCustomer={kind === "product-returns"}
         showSupplier={kind === "supplier-returns"}
+        qualities={qualities as { id: string; name: string }[]}
+        sectors={sectors as { id: string; name: string }[]}
+        weightTolerance={weightTolerance as number}
       />
     </div>
   );

@@ -1,88 +1,93 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { Prisma, prisma } from "@ltex/db";
 import { requireRole } from "@/lib/auth/manager-auth";
-import {
-  isStockDocKind,
-  listStockDocs,
-} from "@/lib/manager/stock-documents-api";
-import { getStockDocMeta } from "@/lib/manager/stock-documents";
-import { StockDocStatusBadge } from "../_components/status-badge";
+import { BagStateStatusBadge } from "./_components/status-badge";
 
 export const dynamic = "force-dynamic";
 
-const WRITE_ROLES = ["manager", "admin", "owner", "warehouse"];
-const REPACK_ROLES = ["warehouse", "admin", "owner"];
+export const metadata = { title: "Зміна стану мішка | L-TEX Manager" };
 
-export async function generateMetadata({
-  params,
-}: {
-  params: Promise<{ kind: string }>;
-}) {
-  const { kind } = await params;
-  if (!isStockDocKind(kind)) return { title: "Документи | L-TEX Manager" };
-  return { title: `${getStockDocMeta(kind).label} | L-TEX Manager` };
-}
+const VIEW_ROLES = [
+  "manager",
+  "senior_manager",
+  "supervisor",
+  "admin",
+  "owner",
+  "warehouse",
+  "analyst",
+  "bookkeeper",
+  "expeditor",
+] as const;
 
-export default async function StockDocListPage({
-  params,
+const WRITE_ROLES = ["warehouse", "admin", "owner"];
+
+const PAGE_SIZE = 30;
+
+export default async function BagStateListPage({
   searchParams,
 }: {
-  params: Promise<{ kind: string }>;
   searchParams: Promise<{ status?: string; q?: string; page?: string }>;
 }) {
-  const { kind } = await params;
-  if (!isStockDocKind(kind)) notFound();
-  const user = await requireRole([
-    "manager",
-    "senior_manager",
-    "supervisor",
-    "admin",
-    "owner",
-    "warehouse",
-    "analyst",
-    "bookkeeper",
-    "expeditor",
-  ]);
+  const user = await requireRole([...VIEW_ROLES]);
   if (!user) notFound();
-  const meta = getStockDocMeta(kind);
+
   const sp = await searchParams;
   const status = sp.status ?? "";
-  const q = sp.q ?? "";
-  const page = Math.max(1, Number(sp.page ?? "1"));
-  const result = await listStockDocs(kind, {
-    status: status || undefined,
-    q: q || undefined,
-    page,
-  });
-  const canCreate = (
-    kind === "repackings" ? REPACK_ROLES : WRITE_ROLES
-  ).includes(user.role);
+  const q = (sp.q ?? "").trim();
+  const page = Math.max(1, Number(sp.page ?? "1") || 1);
+
+  const where: Prisma.BagStateChangeWhereInput = {};
+  if (status) where.status = status;
+  if (q) {
+    where.OR = [
+      { docNumber: { contains: q, mode: "insensitive" } },
+      { number1C: { contains: q, mode: "insensitive" } },
+    ];
+  }
+
+  const [items, total] = await Promise.all([
+    prisma.bagStateChange.findMany({
+      where,
+      orderBy: { docDate: "desc" },
+      skip: (page - 1) * PAGE_SIZE,
+      take: PAGE_SIZE,
+      select: {
+        id: true,
+        docNumber: true,
+        number1C: true,
+        docDate: true,
+        status: true,
+        _count: { select: { items: true } },
+      },
+    }),
+    prisma.bagStateChange.count({ where }),
+  ]);
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const canCreate = WRITE_ROLES.includes(user.role);
+
   return (
     <div className="space-y-3">
-      <div className="text-sm">
-        <Link
-          href="/manager/stock-documents"
-          className="text-gray-500 hover:text-gray-800 hover:underline"
-        >
-          ← Усі документи
-        </Link>
-      </div>
       <div className="flex items-start justify-between gap-2">
         <div>
-          <h1 className="text-xl font-semibold">{meta.label}</h1>
-          <p className="mt-1 text-sm text-gray-500">{meta.description}</p>
+          <h1 className="text-xl font-semibold">Зміна стану мішка</h1>
+          <p className="mt-1 text-sm text-gray-500">
+            Пакетний редактор мішків:
+            відкритий/відео/цільовий/ефір/бронь/сектор.
+          </p>
         </div>
         {canCreate && (
           <Link
-            href={`/manager/stock-documents/${meta.slug}/new`}
+            href="/manager/bag-state-changes/new"
             className="rounded-md bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-700"
           >
             ➕ Створити
           </Link>
         )}
       </div>
+
       <form
-        action={`/manager/stock-documents/${meta.slug}`}
+        action="/manager/bag-state-changes"
         className="flex flex-wrap items-center gap-2 rounded-md border bg-white p-3"
       >
         <input
@@ -99,7 +104,7 @@ export default async function StockDocListPage({
           <option value="">— Усі статуси —</option>
           <option value="draft">Чернетка</option>
           <option value="posted">Проведено</option>
-          <option value="archived">Архів</option>
+          <option value="cancelled">Скасовано</option>
         </select>
         <button
           type="submit"
@@ -109,13 +114,14 @@ export default async function StockDocListPage({
         </button>
         {(q || status) && (
           <Link
-            href={`/manager/stock-documents/${meta.slug}`}
+            href="/manager/bag-state-changes"
             className="text-sm text-gray-500 hover:text-gray-800"
           >
             Скинути
           </Link>
         )}
       </form>
+
       <div className="overflow-x-auto rounded-md border bg-white">
         <table className="w-full text-sm">
           <thead className="bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
@@ -123,23 +129,22 @@ export default async function StockDocListPage({
               <th className="px-3 py-2">№ документа</th>
               <th className="px-3 py-2">Дата</th>
               <th className="px-3 py-2">Статус</th>
-              <th className="px-3 py-2 text-right">Вага, кг</th>
-              <th className="px-3 py-2 text-right">К-сть</th>
+              <th className="px-3 py-2 text-right">Мішків</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
-            {result.items.length === 0 && (
+            {items.length === 0 && (
               <tr>
-                <td colSpan={5} className="px-3 py-6 text-center text-gray-400">
+                <td colSpan={4} className="px-3 py-6 text-center text-gray-400">
                   Документів немає
                 </td>
               </tr>
             )}
-            {result.items.map((d) => (
+            {items.map((d) => (
               <tr key={d.id} className="hover:bg-gray-50">
                 <td className="px-3 py-2">
                   <Link
-                    href={`/manager/stock-documents/${meta.slug}/${d.id}`}
+                    href={`/manager/bag-state-changes/${d.id}`}
                     className="font-medium text-emerald-700 hover:underline"
                   >
                     {d.number1C ?? d.docNumber}
@@ -149,33 +154,31 @@ export default async function StockDocListPage({
                   {formatDate(d.docDate)}
                 </td>
                 <td className="px-3 py-2">
-                  <StockDocStatusBadge status={d.status} />
+                  <BagStateStatusBadge status={d.status} />
                 </td>
-                <td className="px-3 py-2 text-right">
-                  {d.totalWeight.toFixed(1)}
-                </td>
-                <td className="px-3 py-2 text-right">{d.totalQuantity}</td>
+                <td className="px-3 py-2 text-right">{d._count.items}</td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
-      {result.totalPages > 1 && (
+
+      {totalPages > 1 && (
         <div className="flex items-center justify-center gap-2 text-sm">
           {page > 1 && (
             <Link
-              href={pageHref(meta.slug, q, status, page - 1)}
+              href={pageHref(q, status, page - 1)}
               className="rounded-md border px-3 py-1 hover:bg-gray-50"
             >
               ← Попередня
             </Link>
           )}
           <span className="text-gray-500">
-            {page} / {result.totalPages}
+            {page} / {totalPages}
           </span>
-          {page < result.totalPages && (
+          {page < totalPages && (
             <Link
-              href={pageHref(meta.slug, q, status, page + 1)}
+              href={pageHref(q, status, page + 1)}
               className="rounded-md border px-3 py-1 hover:bg-gray-50"
             >
               Наступна →
@@ -187,12 +190,12 @@ export default async function StockDocListPage({
   );
 }
 
-function pageHref(slug: string, q: string, status: string, page: number) {
+function pageHref(q: string, status: string, page: number) {
   const sp = new URLSearchParams();
   if (q) sp.set("q", q);
   if (status) sp.set("status", status);
   sp.set("page", String(page));
-  return `/manager/stock-documents/${slug}?${sp.toString()}`;
+  return `/manager/bag-state-changes?${sp.toString()}`;
 }
 
 function formatDate(d: Date): string {
