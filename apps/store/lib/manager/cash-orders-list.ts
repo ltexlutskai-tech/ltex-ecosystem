@@ -161,6 +161,7 @@ export interface RawCashOrderRow {
   number1C: string | null;
   docNumber: number;
   type: string;
+  status: string;
   documentSumEur: number;
   archived: boolean;
   paidAt: Date;
@@ -180,6 +181,7 @@ export interface CashOrderListItem {
   number1C: string | null;
   docNumber: number;
   type: string;
+  status: string;
   documentSumEur: number;
   archived: boolean;
   paidAt: Date;
@@ -201,6 +203,7 @@ export function serializeCashOrderRow(o: RawCashOrderRow): CashOrderListItem {
     number1C: o.number1C,
     docNumber: o.docNumber,
     type: o.type,
+    status: o.status,
     documentSumEur: o.documentSumEur,
     archived: o.archived,
     paidAt: o.paidAt,

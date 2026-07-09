@@ -1,9 +1,7 @@
 import { prisma } from "@ltex/db";
 import type { ChangeCurrency } from "@/lib/validations/manager-cash-order";
-import {
-  applyDebtMovementTx,
-  recomputeDebtForClientsSafe,
-} from "@/lib/manager/debt-register";
+import { applyDebtMovementSafe } from "@/lib/manager/debt-register";
+import { applyCashFlowMovementsSafe } from "@/lib/manager/cashflow-register";
 
 /**
  * Блок «Реалізація» — Етап 4. Касовий ордер (каса) + розрахунок здачі.
@@ -407,6 +405,12 @@ export interface CreatePaymentArgs {
   bankAccountId?: string | null;
   cashFlowArticleId?: string | null;
   comment?: string | null;
+  /**
+   * Провести одразу (true = «Провести»: статус posted, рухи ДДС + борг + архів)
+   * чи лише зберегти чернетку (false = «Зберегти»: статус draft, БЕЗ впливу).
+   * Дефолт true — зворотна сумісність зі старими викликами/тестами.
+   */
+  post?: boolean;
   /** Курси-знімок (грн за €/$) — для `documentSumEur`. */
   rates: CashRates;
   /** Сума «До оплати» у EUR (для перерахунку наложки на Sale). */
@@ -428,6 +432,86 @@ export interface CreatePaymentArgs {
  *
  * Повертає `{ income, change }` (`change` = null коли решти немає).
  */
+/** Мінімальна форма рядка касового ордера для запуску ефектів проведення. */
+type PostableCashOrder = {
+  id: string;
+  type: string;
+  amountUah: number;
+  amountEur: number;
+  amountUsd: number;
+  amountUahCashless: number;
+  rateEur: number;
+  rateUsd: number;
+  bankAccountId: string | null;
+  cashFlowArticleId: string | null;
+  customerId: string | null;
+  saleId: string | null;
+  documentSumEur: number;
+  paidAt: Date | null;
+  createdAt: Date | null;
+  agentUserId: string | null;
+};
+
+/**
+ * Ефекти ПРОВЕДЕННЯ касового ордера (не для чернетки): рухи ДДС для основного
+ * ордера + ордера-здачі та рух боргу (Приход — погашення ЗМЕНШУЄ борг).
+ * Fire-and-forget після коміту (потрібні id). Виноситься окремо, щоб і
+ * `createPaymentOrders(post=true)`, і `postCashOrder(id)` викликали те саме.
+ *
+ * Борг: `settledEur = income.documentSumEur − change.documentSumEur` (здача не
+ * зменшує борг). Розхід (standalone) боргу не обліковує.
+ */
+async function applyCashOrderPostingEffects(
+  income: PostableCashOrder,
+  changeOrder: PostableCashOrder | null,
+): Promise<void> {
+  // Рух боргу — лише для Приходу.
+  if (income.type === "income") {
+    let effectiveCustomerId: string | null = income.customerId ?? null;
+    if (!effectiveCustomerId && income.saleId) {
+      const sale = await prisma.sale.findUnique({
+        where: { id: income.saleId },
+        select: { customerId: true },
+      });
+      effectiveCustomerId = sale?.customerId ?? null;
+    }
+    const settledEur =
+      income.documentSumEur - (changeOrder?.documentSumEur ?? 0);
+    if (effectiveCustomerId && settledEur !== 0) {
+      applyDebtMovementSafe({
+        customerId: effectiveCustomerId,
+        amountEur: -settledEur,
+        kind: "payment",
+        sourceType: "cash_order",
+        sourceId: income.id,
+        occurredAt: income.paidAt ?? income.createdAt ?? new Date(),
+        note: "Оплата (касовий ордер)",
+        createdByUserId: income.agentUserId ?? null,
+      });
+    }
+  }
+
+  // Рухи ДДС (основний + здача).
+  for (const o of [income, changeOrder]) {
+    if (!o) continue;
+    applyCashFlowMovementsSafe({
+      id: o.id,
+      type: o.type,
+      amountUah: o.amountUah,
+      amountEur: o.amountEur,
+      amountUsd: o.amountUsd,
+      amountUahCashless: o.amountUahCashless,
+      rateEur: o.rateEur,
+      rateUsd: o.rateUsd,
+      bankAccountId: o.bankAccountId,
+      cashFlowArticleId: o.cashFlowArticleId,
+      customerId: o.customerId,
+      saleId: o.saleId,
+      occurredAt: o.paidAt ?? o.createdAt ?? new Date(),
+    });
+  }
+}
+
 export async function createPaymentOrders(args: CreatePaymentArgs) {
   const {
     saleId,
@@ -443,12 +527,13 @@ export async function createPaymentOrders(args: CreatePaymentArgs) {
     agentUserId,
     routeSheetId,
   } = args;
+  const post = args.post ?? true;
+  const status = post ? "posted" : "draft";
 
   const documentSumEur = reduceToEur(paid, rates);
   const changeTotal = change.uah + change.eur + change.usd;
-
-  // Клієнт руху боргу — резолвиться у транзакції, для перерахунку кешу після.
-  let debtClientId: string | null = null;
+  // Реквізити безготівки фіксовані (спосіб = банк, призначення = «Оплата товару»).
+  const cashless = paid.uahCashless > 0;
 
   const result = await prisma.$transaction(async (tx) => {
     const income = await tx.mgrCashOrder.create({
@@ -456,11 +541,15 @@ export async function createPaymentOrders(args: CreatePaymentArgs) {
         saleId: saleId ?? null,
         customerId: customerId ?? null,
         type,
+        status,
+        archived: post,
         amountUah: paid.uah,
         amountEur: paid.eur,
         amountUsd: paid.usd,
         amountUahCashless: paid.uahCashless,
         bankAccountId: bankAccountId ?? null,
+        paymentMethod: cashless ? "bank" : null,
+        paymentPurpose: cashless ? "Оплата товару" : null,
         cashFlowArticleId: cashFlowArticleId ?? null,
         rateEur: rates.eur,
         rateUsd: rates.usd,
@@ -478,6 +567,8 @@ export async function createPaymentOrders(args: CreatePaymentArgs) {
           saleId: saleId ?? null,
           customerId: customerId ?? null,
           type: "expense",
+          status,
+          archived: post,
           changeForId: income.id,
           amountUah: change.uah,
           amountEur: change.eur,
@@ -495,14 +586,14 @@ export async function createPaymentOrders(args: CreatePaymentArgs) {
       });
     }
 
-    // Перерахунок наложки на Sale (тільки коли документ — наложковий).
+    // Перерахунок наложки на Sale — рахуємо лише за ПРОВЕДЕНИМИ ордерами.
     if (saleId) {
       const sale = await tx.sale.findUnique({
         where: { id: saleId },
         select: { cashOnDelivery: true },
       });
       const orders = await tx.mgrCashOrder.findMany({
-        where: { saleId, archived: false },
+        where: { saleId, status: "posted" },
         select: {
           type: true,
           amountUah: true,
@@ -521,45 +612,68 @@ export async function createPaymentOrders(args: CreatePaymentArgs) {
       });
     }
 
-    // C1: рух боргу при оплаті (Приход) — погашення ЗМЕНШУЄ борг (−) — пишеться
-    // у ТІЙ САМІЙ транзакції, що й ордер (атомарно; ідемпотентно за income.id).
-    // Расход (standalone) НЕ обліковуємо — семантика боргу для нього неоднозначна.
-    // Здача (change) окремим рухом не йде — вона вже врахована у `settledEur`.
-    if (type === "income") {
-      let effectiveCustomerId: string | null = customerId ?? null;
-      if (!effectiveCustomerId && saleId) {
-        const sale = await tx.sale.findUnique({
-          where: { id: saleId },
-          select: { customerId: true },
-        });
-        effectiveCustomerId = sale?.customerId ?? null;
-      }
-
-      // Сума, що фактично пішла в погашення (здача не зменшує борг).
-      const settledEur =
-        reduceToEur(paid, rates) - reduceChangeToEur(change, rates);
-
-      if (effectiveCustomerId && settledEur !== 0) {
-        debtClientId = await applyDebtMovementTx(tx, {
-          customerId: effectiveCustomerId,
-          amountEur: -settledEur, // оплата ЗМЕНШУЄ борг
-          kind: "payment",
-          sourceType: "cash_order",
-          sourceId: income.id,
-          occurredAt: income.createdAt ?? new Date(),
-          note: "Оплата (касовий ордер)",
-          createdByUserId: agentUserId ?? null,
-        });
-      }
-    }
-
     return { income, change: changeOrder };
   });
 
-  // C1: перерахунок кешу боргу — ПІСЛЯ коміту (кеш похідний, поза транзакцією).
-  if (debtClientId) {
-    await recomputeDebtForClientsSafe([debtClientId]);
+  // Ефекти проведення (ДДС + борг) — ЛИШЕ коли проводимо. Чернетка не впливає.
+  if (post) {
+    await applyCashOrderPostingEffects(result.income, result.change);
   }
 
   return result;
+}
+
+/**
+ * Проведення раніше збереженої ЧЕРНЕТКИ касового ордера (кнопка «Провести» на
+ * картці). draft→posted: статус + архів на основному й ордері-здачі, перерахунок
+ * наложки, потім ефекти проведення (ДДС + борг). Ідемпотентно за статусом.
+ *
+ * @returns `{ ok: false, error }` коли не знайдено / вже проведено.
+ */
+export async function postCashOrder(
+  id: string,
+): Promise<{ ok: boolean; error?: "not_found" | "not_draft" }> {
+  const income = await prisma.mgrCashOrder.findUnique({ where: { id } });
+  if (!income) return { ok: false, error: "not_found" };
+  if (income.status !== "draft") return { ok: false, error: "not_draft" };
+
+  const changeOrder = await prisma.mgrCashOrder.findFirst({
+    where: { changeForId: id },
+  });
+
+  await prisma.$transaction(async (tx) => {
+    await tx.mgrCashOrder.updateMany({
+      where: { OR: [{ id }, { changeForId: id }] },
+      data: { status: "posted", archived: true },
+    });
+
+    if (income.saleId) {
+      const sale = await tx.sale.findUnique({
+        where: { id: income.saleId },
+        select: { cashOnDelivery: true },
+      });
+      const orders = await tx.mgrCashOrder.findMany({
+        where: { saleId: income.saleId, status: "posted" },
+        select: {
+          type: true,
+          amountUah: true,
+          amountEur: true,
+          amountUsd: true,
+          amountUahCashless: true,
+        },
+      });
+      const rates: CashRates = { eur: income.rateEur, usd: income.rateUsd };
+      const dueUah = Math.round(income.documentSumEur * income.rateEur);
+      const { balanceUah } = computeCashSummary({ dueUah, orders, rates });
+      await tx.sale.update({
+        where: { id: income.saleId },
+        data: {
+          codAmountUah: sale?.cashOnDelivery ? Math.max(0, balanceUah) : null,
+        },
+      });
+    }
+  });
+
+  await applyCashOrderPostingEffects(income, changeOrder);
+  return { ok: true };
 }

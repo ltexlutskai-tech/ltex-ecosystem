@@ -72,6 +72,7 @@ describe("PATCH /admin/bank-accounts/[id]", () => {
       id: "ba1",
       name: "X",
       description: null,
+      kind: "account",
       hiddenInApp: false,
       archived: true,
     });
@@ -79,5 +80,25 @@ describe("PATCH /admin/bank-accounts/[id]", () => {
     expect(res.status).toBe(200);
     const json = (await res.json()) as { archived: boolean };
     expect(json.archived).toBe(true);
+  });
+
+  it("updates kind and round-trips it (200)", async () => {
+    mockPrisma.mgrBankAccount.update.mockResolvedValueOnce({
+      id: "ba1",
+      name: "X",
+      description: null,
+      kind: "card",
+      hiddenInApp: false,
+      archived: false,
+    });
+    const res = await PATCH(patchReq({ kind: "card" }), { params });
+    expect(res.status).toBe(200);
+    const json = (await res.json()) as { kind: string };
+    expect(json.kind).toBe("card");
+    expect(mockPrisma.mgrBankAccount.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ kind: "card" }),
+      }),
+    );
   });
 });

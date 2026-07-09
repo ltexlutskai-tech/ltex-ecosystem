@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button, Input, useToast } from "@ltex/ui";
 import {
@@ -17,6 +17,7 @@ import { buildPaymentReceiptText } from "@/lib/manager/payment-message";
 import { ClientPicker } from "../../../orders/new/_components/client-picker";
 import type { ClientPickerItem } from "../../../orders/new/_components/types";
 import { ShareSheet } from "../../../prices/_components/share-sheet";
+import { ArticleCombobox } from "./article-combobox";
 
 /** Довідник банк. рахунків (з GET /dictionaries). */
 export interface BankAccountOption {
@@ -31,6 +32,8 @@ export interface CashFlowArticleOption {
   code: string | null;
   name: string;
   parentId: string | null;
+  /** "income" | "expense" | "both" — напрям, для фільтра за видом руху. */
+  direction: string;
 }
 
 export type PaymentFormMode = "sale" | "client" | "standalone";
@@ -53,6 +56,8 @@ export interface PaymentFormProps {
   clientDebtEur?: number | null;
   bankAccounts: BankAccountOption[];
   cashFlowArticles: CashFlowArticleOption[];
+  /** Роль користувача — для приховування лімітованих рахунків від менеджерів. */
+  userRole: string;
   /** Куди повертатись після створення (за замовч. `/manager/payments`). */
   returnHref?: string | null;
   /**
@@ -103,11 +108,24 @@ export function PaymentForm({
   clientDebtEur,
   bankAccounts,
   cashFlowArticles,
+  userRole,
   returnHref,
   routeSheetId,
 }: PaymentFormProps) {
   const router = useRouter();
   const { toast } = useToast();
+
+  const isManagerRole = userRole !== "admin" && userRole !== "owner";
+
+  // Дефолтна прихідна стаття для менеджера («Оплата від покупця» — за назвою).
+  const defaultIncomeArticleId = useMemo(() => {
+    const match = cashFlowArticles.find(
+      (a) =>
+        (a.direction === "income" || a.direction === "both") &&
+        /покупц|покупател/i.test(a.name),
+    );
+    return match?.id ?? "";
+  }, [cashFlowArticles]);
 
   // ─── Вид руху ───────────────────────────────────────────────────────────
   const [direction, setDirection] = useState<CashFlowDirection>("income");
@@ -151,7 +169,10 @@ export function PaymentForm({
 
   // ─── Банк. рахунок / стаття / коментар ────────────────────────────────────
   const [bankAccountId, setBankAccountId] = useState("");
-  const [cashFlowArticleId, setCashFlowArticleId] = useState("");
+  // Стаття руху коштів (обов'язкова). Менеджеру — дефолт «Оплата від покупця».
+  const [cashFlowArticleId, setCashFlowArticleId] = useState(
+    isManagerRole ? defaultIncomeArticleId : "",
+  );
   const [comment, setComment] = useState("");
 
   const [submitting, setSubmitting] = useState(false);
@@ -216,6 +237,28 @@ export function PaymentForm({
   const totalPaid = paid.uah + paid.eur + paid.usd + paid.uahCashless;
   const showBankAccount = paid.uahCashless > 0;
 
+  // Статті, доступні для поточного виду руху (income/expense + both).
+  const articlesForDirection = useMemo(() => {
+    const want = isExpense ? "expense" : "income";
+    return cashFlowArticles.filter(
+      (a) => a.direction === "both" || a.direction === want,
+    );
+  }, [cashFlowArticles, isExpense]);
+
+  // Якщо обрана стаття не підходить під новий напрям — скидаємо (менеджеру на
+  // Приході підставляємо дефолт «Оплата від покупця»).
+  useEffect(() => {
+    const stillValid = articlesForDirection.some(
+      (a) => a.id === cashFlowArticleId,
+    );
+    if (!stillValid) {
+      setCashFlowArticleId(
+        !isExpense && isManagerRole ? defaultIncomeArticleId : "",
+      );
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [articlesForDirection]);
+
   // Залишок: >0 борг, <0 переплата.
   const balanceLabel =
     balanceEur > 0
@@ -232,15 +275,16 @@ export function PaymentForm({
 
   const effectiveClientId = saleId ? null : (pickedClientId ?? null);
 
-  // Чи можна сабмітити: для income — потрібна сума оплати; для expense —
-  // потрібна стаття; завжди — підстава (saleId або клієнт).
+  // Чи можна сабмітити: завжди — підстава (saleId/клієнт) + стаття руху коштів;
+  // для income ще й сума оплати > 0.
   const hasBasis = Boolean(saleId) || Boolean(effectiveClientId);
   const canSubmit =
     !submitting &&
     hasBasis &&
     rates.eur > 0 &&
     rates.usd > 0 &&
-    (isExpense ? Boolean(cashFlowArticleId) : totalPaid > 0);
+    Boolean(cashFlowArticleId) &&
+    (isExpense || totalPaid > 0);
 
   function onClientPicked(
     id: string | null,
@@ -268,7 +312,7 @@ export function PaymentForm({
       });
   }
 
-  async function submit(): Promise<void> {
+  async function submit(post: boolean): Promise<void> {
     if (!canSubmit) return;
     setSubmitting(true);
     try {
@@ -289,6 +333,7 @@ export function PaymentForm({
           bankAccountId: bankAccountId || undefined,
           cashFlowArticleId: cashFlowArticleId || undefined,
           comment: comment.trim() || undefined,
+          post,
           rateEur: rates.eur,
           rateUsd: rates.usd,
           sumToPayEur,
@@ -304,7 +349,7 @@ export function PaymentForm({
         });
         return;
       }
-      toast({ title: "Оплату сформовано" });
+      toast({ title: post ? "Оплату проведено" : "Чернетку збережено" });
       router.push(returnHref ?? "/manager/payments");
       router.refresh();
     } catch (e) {
@@ -367,6 +412,7 @@ export function PaymentForm({
     setShareText(
       buildPaymentReceiptText({
         clientName: pickedClientLabel ?? clientLabel ?? "",
+        type: direction,
         paid: {
           uah: paid.uah,
           eur: paid.eur,
@@ -375,6 +421,7 @@ export function PaymentForm({
         },
         change: { uah: change.uah, eur: change.eur, usd: change.usd },
         bankAccountName: acct,
+        paymentPurpose: paid.uahCashless > 0 ? "Оплата товару" : null,
         rates: { eur: rates.eur, usd: rates.usd },
         sumToPayEur,
         cashOnDelivery: codAmountUah !== null,
@@ -384,12 +431,13 @@ export function PaymentForm({
     setShareOpen(true);
   }
 
-  // Банк. рахунки: при приході приховуємо/блокуємо `hiddenInApp` (1С §F).
+  // Банк. рахунки: при Розході видно всі; при Приході рахунок з лімітом
+  // (`hiddenInApp`) приховано ЛИШЕ для менеджерів (адмін/власник бачать).
   const visibleAccounts = bankAccounts.filter(
-    (a) => isExpense || !a.hiddenInApp,
+    (a) => isExpense || !a.hiddenInApp || !isManagerRole,
   );
   const hasHiddenAccounts =
-    !isExpense && bankAccounts.some((a) => a.hiddenInApp);
+    !isExpense && isManagerRole && bankAccounts.some((a) => a.hiddenInApp);
 
   return (
     <div className="space-y-4">
@@ -560,32 +608,28 @@ export function PaymentForm({
             </Field>
             {hasHiddenAccounts && (
               <p className="mt-1 text-xs text-gray-500">
-                Частина рахунків прихована при приході.
+                Частина рахунків прихована для менеджерів при приході (ліміт).
               </p>
             )}
           </div>
         )}
       </Section>
 
-      {/* ─── Стаття руху (при Расход) ──────────────────────────────────── */}
-      {isExpense && (
-        <Section title="Стаття руху коштів">
-          <Field label="Стаття (обов'язково для розходу)">
-            <select
-              value={cashFlowArticleId}
-              onChange={(e) => setCashFlowArticleId(e.target.value)}
-              className={INPUT_CLASS}
-            >
-              <option value="">— Виберіть статтю —</option>
-              {cashFlowArticles.map((a) => (
-                <option key={a.id} value={a.id}>
-                  {a.code ? `${a.code} · ${a.name}` : a.name}
-                </option>
-              ))}
-            </select>
-          </Field>
-        </Section>
-      )}
+      {/* ─── Стаття руху коштів (обов'язкова для Приходу і Розходу) ───────── */}
+      <Section title="Стаття руху коштів">
+        <Field label="Стаття (обов'язково)">
+          <ArticleCombobox
+            items={articlesForDirection}
+            value={cashFlowArticleId}
+            onChange={setCashFlowArticleId}
+          />
+        </Field>
+        {!cashFlowArticleId && (
+          <p className="mt-1 text-xs text-amber-600">
+            Оберіть статтю руху коштів.
+          </p>
+        )}
+      </Section>
 
       {/* ─── Решта (здача) — лише прихід ───────────────────────────────── */}
       {!isExpense && (
@@ -702,8 +746,20 @@ export function PaymentForm({
         <Button type="button" variant="outline" onClick={openReceipt}>
           Вайбер
         </Button>
-        <Button type="button" disabled={!canSubmit} onClick={submit}>
-          {submitting ? "Формування…" : "Сформувати"}
+        <Button
+          type="button"
+          variant="outline"
+          disabled={!canSubmit}
+          onClick={() => submit(false)}
+        >
+          {submitting ? "Збереження…" : "Зберегти"}
+        </Button>
+        <Button
+          type="button"
+          disabled={!canSubmit}
+          onClick={() => submit(true)}
+        >
+          {submitting ? "Проведення…" : "Провести"}
         </Button>
       </div>
 

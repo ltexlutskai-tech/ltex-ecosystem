@@ -45,6 +45,7 @@ export async function PATCH(
         code: true,
         name: true,
         parentId: true,
+        direction: true,
         archived: true,
       },
     });

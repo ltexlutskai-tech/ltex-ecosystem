@@ -78,6 +78,7 @@ describe("processPaymentSchema", () => {
       ...base,
       saleId: "sale1",
       amountUah: 4300,
+      cashFlowArticleId: "art1", // стаття тепер обов'язкова
     });
     expect(r.success).toBe(true);
     if (r.success) {
@@ -93,6 +94,7 @@ describe("processPaymentSchema", () => {
       ...base,
       clientId: "mgr1",
       amountUah: 4300,
+      cashFlowArticleId: "art1", // стаття тепер обов'язкова
     });
     expect(r.success).toBe(true);
   });

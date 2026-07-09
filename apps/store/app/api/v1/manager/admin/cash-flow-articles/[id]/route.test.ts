@@ -59,11 +59,32 @@ describe("PATCH /admin/cash-flow-articles/[id]", () => {
       code: "01",
       name: "Нова назва",
       parentId: null,
+      direction: "both",
       archived: false,
     });
     const res = await PATCH(patchReq({ name: "Нова назва" }), { params });
     expect(res.status).toBe(200);
     const json = (await res.json()) as { name: string };
     expect(json.name).toBe("Нова назва");
+  });
+
+  it("updates direction and round-trips it (200)", async () => {
+    mockPrisma.mgrCashFlowArticle.update.mockResolvedValueOnce({
+      id: "cf1",
+      code: "01",
+      name: "Витрати",
+      parentId: null,
+      direction: "expense",
+      archived: false,
+    });
+    const res = await PATCH(patchReq({ direction: "expense" }), { params });
+    expect(res.status).toBe(200);
+    const json = (await res.json()) as { direction: string };
+    expect(json.direction).toBe("expense");
+    expect(mockPrisma.mgrCashFlowArticle.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ direction: "expense" }),
+      }),
+    );
   });
 });

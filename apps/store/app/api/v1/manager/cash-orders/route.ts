@@ -213,6 +213,7 @@ export async function POST(req: NextRequest) {
       bankAccountId: input.bankAccountId ?? null,
       cashFlowArticleId: input.cashFlowArticleId ?? null,
       comment: input.comment ?? null,
+      post: input.post,
       rates,
       sumToPayEur: input.sumToPayEur,
       agentUserId: user.id,

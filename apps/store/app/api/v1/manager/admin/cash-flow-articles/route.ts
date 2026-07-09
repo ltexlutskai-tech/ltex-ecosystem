@@ -23,6 +23,7 @@ export async function GET(req: NextRequest) {
       code: true,
       name: true,
       parentId: true,
+      direction: true,
       archived: true,
     },
   });
@@ -52,12 +53,14 @@ export async function POST(req: NextRequest) {
       name: parsed.data.name,
       code: parsed.data.code ?? null,
       parentId: parsed.data.parentId ?? null,
+      direction: parsed.data.direction,
     },
     select: {
       id: true,
       code: true,
       name: true,
       parentId: true,
+      direction: true,
       archived: true,
     },
   });

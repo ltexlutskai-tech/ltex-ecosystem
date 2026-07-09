@@ -9,6 +9,8 @@ import {
   fmtEur,
   formatDocNo,
 } from "@/lib/manager/financial-docs";
+import { canManageTreasury } from "@/lib/manager/treasury-permission";
+import { TreasuryDocActions } from "../../_components/treasury/treasury-doc-actions";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Переміщення готівки — L-TEX Manager" };
@@ -67,6 +69,14 @@ export default async function Page({
           {doc.archived ? " · архів" : ""}
         </span>
       </header>
+
+      <TreasuryDocActions
+        basePath="/api/v1/manager/cash-transfers"
+        listPath="/manager/cash-transfers"
+        id={doc.id}
+        status={doc.status}
+        canDelete={canManageTreasury(user.role)}
+      />
 
       <div className="grid grid-cols-2 gap-4 rounded-md border bg-white p-4 sm:grid-cols-3">
         <Field

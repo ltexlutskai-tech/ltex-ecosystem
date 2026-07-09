@@ -93,4 +93,40 @@ describe("buildPaymentReceiptText", () => {
     );
     expect(text).toContain("Накладений платіж: 4300.00 грн");
   });
+
+  // ── Задача F: Розхід (РКО) ──
+  it("Розхід → шапка «Видача коштів» + «Видано» + «Фактична видача»", () => {
+    const text = buildPaymentReceiptText(
+      baseInput({
+        type: "expense",
+        paid: { uah: 4300, eur: 0, usd: 0, uahCashless: 0 },
+      }),
+    );
+    const lines = text.split("\n");
+    expect(lines[0]).toBe("Видача коштів");
+    expect(text).toContain("Видано: 100.00 €");
+    expect(text).toContain("Фактична видача:");
+    // Борг/Переплата не показуємо для розходу.
+    expect(text).not.toContain("Борг:");
+    expect(text).not.toContain("Переплата:");
+  });
+
+  it("Приход (дефолт без type) поводиться як раніше", () => {
+    const text = buildPaymentReceiptText(baseInput());
+    expect(text.split("\n")[0]).toBe("Оплата");
+  });
+
+  // ── Задача E: призначення платежу у рядку безналу ──
+  it("додає призначення платежу у рядок безналу", () => {
+    const text = buildPaymentReceiptText(
+      baseInput({
+        paid: { uah: 0, eur: 0, usd: 0, uahCashless: 200 },
+        bankAccountName: "ПриватБанк",
+        paymentPurpose: "Оплата за товар №5",
+      }),
+    );
+    expect(text).toContain(
+      "Безнал грн: 200.00 грн (ПриватБанк) — Оплата за товар №5",
+    );
+  });
 });

@@ -68,6 +68,12 @@ export default async function BankPaymentsOutgoingPage({
             Безготівкові оплати / витрати · усього: {total}
           </p>
         </div>
+        <Link
+          href="/manager/bank-payments-outgoing/new"
+          className="inline-flex h-10 items-center justify-center rounded-md bg-emerald-600 px-4 text-sm font-medium text-white hover:bg-emerald-700"
+        >
+          + Створити
+        </Link>
       </header>
 
       <div className="flex items-center gap-3 text-sm">

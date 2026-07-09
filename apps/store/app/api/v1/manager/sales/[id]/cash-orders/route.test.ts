@@ -70,6 +70,7 @@ describe("GET /api/v1/manager/sales/[id]/cash-orders", () => {
       {
         id: "co1",
         type: "income",
+        status: "posted",
         amountUah: 4300,
         amountEur: 0,
         amountUsd: 0,

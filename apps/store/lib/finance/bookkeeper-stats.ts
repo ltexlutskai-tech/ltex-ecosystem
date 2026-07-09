@@ -53,6 +53,7 @@ export async function getBookkeeperStats(
       prisma.mgrCashOrder.aggregate({
         where: {
           type: "income",
+          status: "posted",
           createdAt: { gte: period.from, lte: period.to },
         },
         _sum: { documentSumEur: true },
@@ -61,6 +62,7 @@ export async function getBookkeeperStats(
       prisma.mgrCashOrder.aggregate({
         where: {
           type: "expense",
+          status: "posted",
           createdAt: { gte: period.from, lte: period.to },
         },
         _sum: { documentSumEur: true },

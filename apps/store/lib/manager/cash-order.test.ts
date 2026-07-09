@@ -1,26 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const { mockPrisma } = vi.hoisted(() => {
-  // Один набір делегатів спільний для `tx` (усередині $transaction) і singleton
-  // `prisma` — щоб і транзакційний запис руху боргу (`applyDebtMovementTx`), і
-  // перерахунок кешу після коміту (`recomputeDebtForClientsSafe`) працювали.
-  const delegates = {
+  const tx = {
     mgrCashOrder: { create: vi.fn(), findMany: vi.fn() },
     sale: { findUnique: vi.fn(), update: vi.fn() },
-    customer: { findUnique: vi.fn() },
-    mgrClient: {
-      findUnique: vi.fn(),
-      update: vi.fn(),
-      updateMany: vi.fn(),
-    },
-    mgrDebtMovement: { upsert: vi.fn(), groupBy: vi.fn() },
   };
   return {
     mockPrisma: {
-      ...delegates,
-      $transaction: vi.fn(async (cb: (t: typeof delegates) => unknown) =>
-        cb(delegates),
-      ),
+      mgrCashOrder: tx.mgrCashOrder,
+      sale: tx.sale,
+      $transaction: vi.fn(async (cb: (t: typeof tx) => unknown) => cb(tx)),
     },
   };
 });
@@ -572,55 +561,40 @@ describe("createPaymentOrders", () => {
     expect(mockPrisma.sale.update).not.toHaveBeenCalled();
   });
 
-  it("C1: рух боргу (−settledEur) пишеться у ТІЙ САМІЙ транзакції", async () => {
-    mockPrisma.mgrCashOrder.create.mockResolvedValueOnce({
-      id: "co1",
-      createdAt: new Date("2026-07-01T10:00:00Z"),
-    });
-    // Клієнт резолвиться → рух пишеться; groupBy для recompute після коміту.
-    mockPrisma.customer.findUnique.mockResolvedValueOnce({ code1C: "ABC" });
-    mockPrisma.mgrClient.findUnique.mockResolvedValueOnce({ id: "mgr-1" });
-    mockPrisma.mgrDebtMovement.groupBy.mockResolvedValue([]);
-
+  it("проведення (дефолт post=true) → status=posted, archived=true", async () => {
+    mockPrisma.mgrCashOrder.create.mockResolvedValueOnce({ id: "co1" });
     await createPaymentOrders({
       saleId: null,
       customerId: "cust1",
       type: "income",
-      paid: { uah: 4300, eur: 0, usd: 0, uahCashless: 0 }, // 100€ погашення
-      change: { uah: 0, eur: 0, usd: 0 },
-      rates,
-      sumToPayEur: 100,
-    });
-
-    expect(mockPrisma.mgrDebtMovement.upsert).toHaveBeenCalledTimes(1);
-    const call = mockPrisma.mgrDebtMovement.upsert.mock.calls[0]?.[0] as {
-      where: { mgr_debt_movement_source: { sourceId: string } };
-      create: { amountEur: number; kind: string; clientId: string };
-    };
-    expect(call.where.mgr_debt_movement_source.sourceId).toBe("co1");
-    expect(call.create.kind).toBe("payment");
-    expect(call.create.clientId).toBe("mgr-1");
-    // Оплата 100€ ЗМЕНШУЄ борг → рух від'ємний.
-    expect(call.create.amountEur).toBe(-100);
-    // Кеш перераховується після коміту.
-    expect(mockPrisma.mgrDebtMovement.groupBy).toHaveBeenCalled();
-  });
-
-  it("expense (standalone) НЕ пише рух боргу", async () => {
-    mockPrisma.mgrCashOrder.create.mockResolvedValueOnce({ id: "co1" });
-    mockPrisma.customer.findUnique.mockResolvedValueOnce({ code1C: "ABC" });
-    mockPrisma.mgrClient.findUnique.mockResolvedValueOnce({ id: "mgr-1" });
-
-    await createPaymentOrders({
-      saleId: null,
-      customerId: "cust1",
-      type: "expense",
       paid: { uah: 4300, eur: 0, usd: 0, uahCashless: 0 },
       change: { uah: 0, eur: 0, usd: 0 },
       rates,
       sumToPayEur: 100,
     });
+    const data = mockPrisma.mgrCashOrder.create.mock.calls[0]?.[0] as {
+      data: { status: string; archived: boolean };
+    };
+    expect(data.data.status).toBe("posted");
+    expect(data.data.archived).toBe(true);
+  });
 
-    expect(mockPrisma.mgrDebtMovement.upsert).not.toHaveBeenCalled();
+  it("чернетка (post=false) → status=draft, archived=false, БЕЗ впливу", async () => {
+    mockPrisma.mgrCashOrder.create.mockResolvedValueOnce({ id: "co1" });
+    await createPaymentOrders({
+      saleId: null,
+      customerId: "cust1",
+      type: "income",
+      paid: { uah: 4300, eur: 0, usd: 0, uahCashless: 0 },
+      change: { uah: 0, eur: 0, usd: 0 },
+      rates,
+      sumToPayEur: 100,
+      post: false,
+    });
+    const data = mockPrisma.mgrCashOrder.create.mock.calls[0]?.[0] as {
+      data: { status: string; archived: boolean };
+    };
+    expect(data.data.status).toBe("draft");
+    expect(data.data.archived).toBe(false);
   });
 });

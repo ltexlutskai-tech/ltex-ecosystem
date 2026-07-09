@@ -5,15 +5,30 @@ import { useRouter } from "next/navigation";
 import { Plus, Check, Pencil } from "lucide-react";
 import { Button, Input, useToast } from "@ltex/ui";
 
+export type CashFlowArticleDirection = "income" | "expense" | "both";
+
 export interface CashFlowArticleItem {
   id: string;
   code: string | null;
   name: string;
   parentId: string | null;
+  direction: CashFlowArticleDirection;
   archived: boolean;
 }
 
 const BASE = "/api/v1/manager/admin/cash-flow-articles";
+
+const DIRECTION_LABELS: Record<CashFlowArticleDirection, string> = {
+  income: "Прихід",
+  expense: "Розхід",
+  both: "Обидва",
+};
+
+const DIRECTION_OPTIONS: CashFlowArticleDirection[] = [
+  "income",
+  "expense",
+  "both",
+];
 
 export function CashFlowArticlesManager({
   initial,
@@ -27,9 +42,12 @@ export function CashFlowArticlesManager({
   const [code, setCode] = useState("");
   const [name, setName] = useState("");
   const [parentId, setParentId] = useState("");
+  const [direction, setDirection] = useState<CashFlowArticleDirection>("both");
   const [busy, setBusy] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
+  const [editDirection, setEditDirection] =
+    useState<CashFlowArticleDirection>("both");
 
   // Тільки кореневі (без батька) — кандидати у батьки (2 рівні, як 1С).
   const parentOptions = initial.filter((a) => !a.parentId && !a.archived);
@@ -61,17 +79,22 @@ export function CashFlowArticlesManager({
       name: name.trim(),
       code: code.trim() || undefined,
       parentId: parentId || undefined,
+      direction,
     });
     if (ok) {
       setName("");
       setCode("");
       setParentId("");
+      setDirection("both");
     }
   }
 
   async function saveEdit(id: string) {
     if (!editName.trim()) return;
-    const ok = await call(`${BASE}/${id}`, "PATCH", { name: editName.trim() });
+    const ok = await call(`${BASE}/${id}`, "PATCH", {
+      name: editName.trim(),
+      direction: editDirection,
+    });
     if (ok) setEditingId(null);
   }
 
@@ -107,6 +130,20 @@ export function CashFlowArticlesManager({
             </option>
           ))}
         </select>
+        <select
+          value={direction}
+          onChange={(e) =>
+            setDirection(e.target.value as CashFlowArticleDirection)
+          }
+          className="h-9 w-full rounded-md border border-gray-300 bg-white px-2 text-sm text-gray-700"
+          aria-label="Напрям"
+        >
+          {DIRECTION_OPTIONS.map((d) => (
+            <option key={d} value={d}>
+              {DIRECTION_LABELS[d]}
+            </option>
+          ))}
+        </select>
         <Button
           type="button"
           onClick={create}
@@ -127,13 +164,14 @@ export function CashFlowArticlesManager({
               <th className="px-4 py-2 font-medium">Код</th>
               <th className="px-4 py-2 font-medium">Назва</th>
               <th className="px-4 py-2 font-medium">Батьківська</th>
+              <th className="px-4 py-2 font-medium">Напрям</th>
               <th className="px-4 py-2 text-right font-medium">Дії</th>
             </tr>
           </thead>
           <tbody>
             {initial.length === 0 && (
               <tr>
-                <td colSpan={4} className="px-4 py-8 text-center text-gray-400">
+                <td colSpan={5} className="px-4 py-8 text-center text-gray-400">
                   Немає статей.
                 </td>
               </tr>
@@ -162,6 +200,30 @@ export function CashFlowArticlesManager({
                 <td className="px-4 py-2 text-gray-600">
                   {a.parentId ? (nameById.get(a.parentId) ?? "—") : "—"}
                 </td>
+                <td className="px-4 py-2">
+                  {editingId === a.id ? (
+                    <select
+                      value={editDirection}
+                      onChange={(e) =>
+                        setEditDirection(
+                          e.target.value as CashFlowArticleDirection,
+                        )
+                      }
+                      className="h-8 rounded-md border border-gray-300 bg-white px-2 text-sm text-gray-700"
+                      aria-label="Напрям"
+                    >
+                      {DIRECTION_OPTIONS.map((d) => (
+                        <option key={d} value={d}>
+                          {DIRECTION_LABELS[d]}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <span className="inline-flex rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">
+                      {DIRECTION_LABELS[a.direction]}
+                    </span>
+                  )}
+                </td>
                 <td className="px-4 py-2 text-right">
                   <div className="flex items-center justify-end gap-2">
                     {editingId === a.id ? (
@@ -182,6 +244,7 @@ export function CashFlowArticlesManager({
                         onClick={() => {
                           setEditingId(a.id);
                           setEditName(a.name);
+                          setEditDirection(a.direction);
                         }}
                       >
                         <Pencil className="h-4 w-4" />

@@ -111,6 +111,7 @@ describe("serializeCashOrderRow", () => {
     number1C: null,
     docNumber: 7,
     type: "income",
+    status: "posted",
     documentSumEur: 123.45,
     archived: false,
     paidAt: new Date("2026-05-01"),

@@ -49,8 +49,15 @@ const BASE: PaymentFormProps = {
     { id: "b2", name: "Прихований", hiddenInApp: true },
   ],
   cashFlowArticles: [
-    { id: "a1", code: "01", name: "Оплата покупця", parentId: null },
+    {
+      id: "a1",
+      code: "01",
+      name: "Оплата покупця",
+      parentId: null,
+      direction: "income",
+    },
   ],
+  userRole: "admin",
   returnHref: "/manager/sales/sale-1",
 };
 
@@ -82,10 +89,11 @@ describe("PaymentForm", () => {
     expect(screen.getByText("Залишок (борг)")).toBeDefined();
   });
 
-  it("перемикання на Розхід показує статтю й ховає решту", () => {
+  it("стаття руху коштів показується завжди; Розхід ховає решту", () => {
     render(<PaymentForm {...BASE} />);
+    // Стаття обов'язкова і для Приходу, і для Розходу — секція є завжди.
+    expect(screen.getByText("Стаття руху коштів")).toBeDefined();
     expect(screen.getByText("Решта (здача)")).toBeDefined();
-    expect(screen.queryByText("Стаття руху коштів")).toBeNull();
 
     fireEvent.click(screen.getByText("Розхід"));
 

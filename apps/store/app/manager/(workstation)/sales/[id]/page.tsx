@@ -119,6 +119,9 @@ export default async function ManagerSaleDetailPage({
     paymentSummary,
     bankAccounts,
   ] = await Promise.all([
+    // Задача B: живий курс — лише дефолт/fallback. Форма редагування існуючої
+    // реалізації нижче бере курс-знімок самого документа (sale.exchangeRateEur/
+    // Usd), інакше документ переоцінився б сьогоднішнім курсом.
     getCurrentRate(),
     getUsdRate(),
     sale.customer.code1C
@@ -134,7 +137,9 @@ export default async function ManagerSaleDetailPage({
         })
       : Promise.resolve(null),
     prisma.mgrCashOrder.findMany({
-      where: { saleId: sale.id, archived: false },
+      // Усі ордери реалізації (чернетки + проведені); зведення все одно рахує
+      // лише проведені. Проведені тепер archived=true, тож фільтр прибрано.
+      where: { saleId: sale.id },
       orderBy: { createdAt: "asc" },
     }),
     getPaymentSummary(sale.id),
@@ -290,8 +295,12 @@ export default async function ManagerSaleDetailPage({
           initialSale={initialSale}
           initialClientId={sale.customer.id}
           initialClient={clientSummary}
-          exchangeRateEur={exchangeRateEur}
-          exchangeRateUsd={exchangeRateUsd}
+          exchangeRateEur={
+            sale.exchangeRateEur > 0 ? sale.exchangeRateEur : exchangeRateEur
+          }
+          exchangeRateUsd={
+            sale.exchangeRateUsd > 0 ? sale.exchangeRateUsd : exchangeRateUsd
+          }
           deliveryMethods={deliveryMethods}
           currentUserId={user.id}
           currentUserName={user.fullName}

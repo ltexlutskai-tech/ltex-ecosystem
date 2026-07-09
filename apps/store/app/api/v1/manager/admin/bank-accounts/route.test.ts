@@ -78,18 +78,42 @@ describe("POST /admin/bank-accounts", () => {
     expect(mockPrisma.mgrBankAccount.create).not.toHaveBeenCalled();
   });
 
-  it("creates account (201)", async () => {
+  it("creates account with default kind (201)", async () => {
     mockPrisma.mgrBankAccount.create.mockResolvedValueOnce({
       id: "ba1",
       name: "ПриватБанк",
       description: null,
+      kind: "account",
       hiddenInApp: false,
       archived: false,
     });
     const res = await POST(req("POST", { name: "ПриватБанк" }));
     expect(res.status).toBe(201);
-    const json = (await res.json()) as { id: string };
+    const json = (await res.json()) as { id: string; kind: string };
     expect(json.id).toBe("ba1");
+    expect(json.kind).toBe("account");
     expect(mockPrisma.mgrBankAccount.create).toHaveBeenCalledOnce();
+  });
+
+  it("round-trips explicit kind on create (201)", async () => {
+    mockPrisma.mgrBankAccount.create.mockResolvedValueOnce({
+      id: "ba2",
+      name: "Готівка магазин",
+      description: null,
+      kind: "cash",
+      hiddenInApp: false,
+      archived: false,
+    });
+    const res = await POST(
+      req("POST", { name: "Готівка магазин", kind: "cash" }),
+    );
+    expect(res.status).toBe(201);
+    const json = (await res.json()) as { kind: string };
+    expect(json.kind).toBe("cash");
+    expect(mockPrisma.mgrBankAccount.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ kind: "cash" }),
+      }),
+    );
   });
 });

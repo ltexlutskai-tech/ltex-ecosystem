@@ -130,7 +130,7 @@ export async function getPaymentSummary(
   if (!sale) return null;
 
   const orders = await prisma.mgrCashOrder.findMany({
-    where: { saleId, archived: false },
+    where: { saleId, status: "posted" },
     select: {
       type: true,
       amountUah: true,

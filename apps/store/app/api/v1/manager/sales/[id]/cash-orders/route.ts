@@ -50,10 +50,13 @@ export async function GET(
     orderBy: { createdAt: "asc" },
   });
 
+  // Зведення (отримано/залишок) рахуємо ЛИШЕ за проведеними ордерами; чернетки
+  // показуємо у списку, але фінансово вони ще не впливають.
+  const postedOrders = orders.filter((o) => o.status === "posted");
   const dueUah = Math.round(sale.totalEur * sale.exchangeRateEur);
   const summary = computeCashSummary({
     dueUah,
-    orders,
+    orders: postedOrders,
     rates: { eur: sale.exchangeRateEur, usd: sale.exchangeRateUsd },
   });
 

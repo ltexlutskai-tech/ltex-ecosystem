@@ -14,10 +14,12 @@ const {
   mockPrisma: {
     mgrCashOrder: {
       findUnique: vi.fn(),
+      findMany: vi.fn(),
       delete: vi.fn(),
       deleteMany: vi.fn(),
     },
     mgrDebtMovement: { findMany: vi.fn(), deleteMany: vi.fn() },
+    cashFlowMovement: { deleteMany: vi.fn() },
     customer: { findUnique: vi.fn() },
     $transaction: vi.fn(),
   },
@@ -75,8 +77,10 @@ beforeEach(() => {
   getCurrentUserMock.mockResolvedValue(MANAGER);
   getMyClientCodesMock.mockResolvedValue(null); // admin-like scope by default
   mockPrisma.mgrDebtMovement.deleteMany.mockResolvedValue({ count: 0 });
+  mockPrisma.mgrCashOrder.findMany.mockResolvedValue([]); // ордери-здачі
   mockPrisma.mgrCashOrder.deleteMany.mockResolvedValue({ count: 0 });
   mockPrisma.mgrCashOrder.delete.mockResolvedValue({ id: "co1" });
+  mockPrisma.cashFlowMovement.deleteMany.mockResolvedValue({ count: 0 });
   recomputeDebtMock.mockResolvedValue(1);
 });
 
