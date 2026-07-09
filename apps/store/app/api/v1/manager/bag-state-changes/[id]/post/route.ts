@@ -5,7 +5,7 @@ import {
   applyBagStateChange,
   isBeforeToday,
 } from "@/lib/manager/bag-state-hooks";
-import { BAG_STATE_WRITE_ROLES } from "../../route";
+import { BAG_STATE_WRITE_ROLES } from "@/lib/manager/bag-state";
 
 /**
  * POST /api/v1/manager/bag-state-changes/[id]/post — провести документ.

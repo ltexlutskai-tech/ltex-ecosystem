@@ -1,13 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@ltex/db";
 import { getCurrentUser } from "@/lib/auth/manager-auth";
-import { updateBagStateChange } from "@/lib/manager/bag-state";
+import {
+  updateBagStateChange,
+  BAG_STATE_WRITE_ROLES,
+} from "@/lib/manager/bag-state";
 import {
   isBeforeToday,
   removeBagStateChange,
 } from "@/lib/manager/bag-state-hooks";
 import { updateBagStateSchema } from "@/lib/validations/bag-state";
-import { BAG_STATE_WRITE_ROLES } from "../route";
 
 /**
  * Документ «Зміна стану мішка» — картка.

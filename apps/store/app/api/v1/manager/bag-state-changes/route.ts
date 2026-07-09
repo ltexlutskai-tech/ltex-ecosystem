@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Prisma, prisma } from "@ltex/db";
 import { getCurrentUser } from "@/lib/auth/manager-auth";
-import { createBagStateChange } from "@/lib/manager/bag-state";
+import {
+  createBagStateChange,
+  BAG_STATE_WRITE_ROLES,
+} from "@/lib/manager/bag-state";
 import { createBagStateSchema } from "@/lib/validations/bag-state";
 
 /**
@@ -9,8 +12,6 @@ import { createBagStateSchema } from "@/lib/validations/bag-state";
  *  GET  — список (усі менеджерські ролі бачать);
  *  POST — створення чернетки (лише склад + адмін/власник).
  */
-
-export const BAG_STATE_WRITE_ROLES = ["warehouse", "admin", "owner"] as const;
 
 function parseInteger(
   raw: string | null,
