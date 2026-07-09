@@ -2297,71 +2297,12 @@ model MgrUserViewPrefs {
   @@map("mgr_user_view_prefs")
 }
 
-// ─── Manager sync queue (M1.5) — outbound write-back to 1С ──────────────────
-// Кожна зміна картки клієнта / замовлення / оплати на стороні менеджера
-// створює row у цій черзі. Cron `/api/cron/process-sync-queue` періодично
-// дренує її викликаючи services/manager-sync proxy.
-//
-// Lifecycle: pending → retrying ⇄ pending → sent
-//                                ↘ failed (attempts ≥ maxAttempts)
-//
-// `idempotencyKey` — UUID; передається у SOAP-call щоб 1С міг dedup
-// duplicate retries. Backoff schedule: 1m / 5m / 30m / 2h / 6h.
-
-enum SyncJobStatus {
-  pending
-  retrying
-  sent
-  failed
-
-  @@map("mgr_sync_job_status")
-}
-
-enum SyncEntityType {
-  client
-  order
-  payment
-  realization
-  cash_order
-  route_sheet
-
-  @@map("mgr_sync_entity_type")
-}
-
-model MgrSyncJob {
-  id             String         @id @default(cuid())
-  entityType     SyncEntityType @map("entity_type")
-  entityId       String         @map("entity_id")
-  action         String
-  payload        Json
-  status         SyncJobStatus  @default(pending)
-  attempts       Int            @default(0)
-  maxAttempts    Int            @default(5) @map("max_attempts")
-  nextAttemptAt  DateTime       @default(now()) @map("next_attempt_at")
-  lastError      String?        @map("last_error")
-  idempotencyKey String         @unique @map("idempotency_key")
-  sentAt         DateTime?      @map("sent_at")
-  createdAt      DateTime       @default(now()) @map("created_at")
-  updatedAt      DateTime       @updatedAt @map("updated_at")
-
-  @@index([status, nextAttemptAt])
-  @@index([entityType, entityId])
-  @@map("mgr_sync_jobs")
-}
-
-// ─── Manager sync state (M3.3 — INBOUND polling) ────────────────────────────
-// Простий key/value store для збереження курсорів синхронізації pull-mode
-// (cron `/api/cron/pull-from-1c`). На сьогодні єдиний ключ —
-// `last_sync_cursor` (ISO-timestamp останнього успішного pull-у з 1С).
-// Cursor зсувається тільки коли всі inbound endpoints успішно прийняли дані.
-
-model MgrSyncState {
-  key       String   @id
-  value     String
-  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
-
-  @@map("mgr_sync_state")
-}
+// ─── ТЗ 8.0 Блок A: моделі живої 1С-синхронізації видалено ──────────────────
+// MgrSyncJob (черга вивантаження) + MgrSyncState (курсори pull-mode) + enum-и
+// SyncJobStatus/SyncEntityType прибрано разом із відмовою від живих обмінів
+// (жива синхронізація знесена ще в сесії 7.0; таблиці не мали жодного
+// runtime-споживача). Офлайн-імпорт історії з 1С — окремий інструмент, лишається.
+// Дроп таблиць — міграція 20260714_drop_sync_tables.
 
 // ─── Manager message templates (M1.7 / Прайс Stage 5b) ──────────────────────
 // Простий довідник готових фраз {назва, текст} — відтворює 1С
