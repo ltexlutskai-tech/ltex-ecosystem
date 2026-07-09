@@ -4,6 +4,7 @@ import { ArrowLeft, Printer } from "lucide-react";
 import { prisma } from "@ltex/db";
 import { getCurrentUser } from "@/lib/auth/manager-auth";
 import { formatDocNumber } from "@/lib/manager/order-number";
+import { PostCashOrderButton } from "./_components/post-cash-order-button";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Касовий ордер — L-TEX Manager" };
@@ -55,6 +56,7 @@ export default async function ManagerCashOrderDetailPage({
   if (!order) notFound();
 
   const isIncome = order.type === "income";
+  const isDraft = order.status === "draft";
   const displayNumber = formatDocNumber(order);
   const date = new Date(order.paidAt).toLocaleString("uk-UA");
 
@@ -76,6 +78,7 @@ export default async function ManagerCashOrderDetailPage({
           <p className="mt-1 text-sm text-gray-500">{date}</p>
         </div>
         <div className="flex items-center gap-3">
+          {isDraft && <PostCashOrderButton id={id} />}
           <Link
             href={`/manager/payments/${id}/print`}
             className="inline-flex items-center gap-1.5 rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
@@ -83,6 +86,11 @@ export default async function ManagerCashOrderDetailPage({
             <Printer className="h-4 w-4" />
             Друк
           </Link>
+          {isDraft && (
+            <span className="inline-flex items-center rounded-full bg-gray-200 px-3 py-1 text-sm font-medium text-gray-700">
+              Чернетка
+            </span>
+          )}
           <span
             className={`inline-flex items-center rounded-full px-3 py-1 text-sm font-medium ${
               isIncome

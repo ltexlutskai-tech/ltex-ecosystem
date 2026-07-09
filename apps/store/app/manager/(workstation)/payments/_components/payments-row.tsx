@@ -10,6 +10,7 @@ export interface PaymentsRowData {
   number1C: string | null;
   docNumber: number;
   type: string;
+  status: string;
   documentSumEur: number;
   archived: boolean;
   paidAt: Date;
@@ -59,7 +60,14 @@ export function PaymentsRow({
         </Link>
       </td>
       <td data-col="type" data-value={order.type} className="px-2.5 py-1.5">
-        <CashOrderTypeBadge type={order.type} />
+        <div className="flex items-center gap-1.5">
+          <CashOrderTypeBadge type={order.type} />
+          {order.status === "draft" && (
+            <span className="inline-flex items-center rounded-full bg-gray-200 px-2 py-0.5 text-xs font-medium text-gray-600">
+              Чернетка
+            </span>
+          )}
+        </div>
       </td>
       <td
         data-col="client"
