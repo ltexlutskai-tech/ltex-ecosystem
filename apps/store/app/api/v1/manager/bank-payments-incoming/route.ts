@@ -2,8 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { Prisma, prisma } from "@ltex/db";
 import { getCurrentUser } from "@/lib/auth/manager-auth";
 import { canManageTreasury } from "@/lib/manager/treasury-permission";
-import { computeAmountEur } from "@/lib/manager/treasury-posting";
-import { createBankPaymentIncomingSchema } from "@/lib/validations/manager-treasury";
+import {
+  computeAmountEur,
+  createBankPaymentIncomingDraft,
+} from "@/lib/manager/treasury-posting";
+import {
+  bankPaymentDraftSchema,
+  createBankPaymentIncomingSchema,
+} from "@/lib/validations/manager-treasury";
 
 const MAX_PAGE_SIZE = 100;
 const DEFAULT_PAGE_SIZE = 20;
@@ -61,6 +67,43 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json().catch(() => null);
+
+  // ─── Автозбереження чернетки (draft) ──────────────────────────────────────
+  // Послаблена схема, запис зі status="draft" БЕЗ рухів ДДС/боргу.
+  if (body && typeof body === "object" && (body as { draft?: unknown }).draft) {
+    const parsedDraft = bankPaymentDraftSchema.safeParse(body);
+    if (!parsedDraft.success) {
+      return NextResponse.json(
+        {
+          error: "Невірні дані",
+          details: parsedDraft.error.issues.slice(0, 5),
+        },
+        { status: 400 },
+      );
+    }
+    try {
+      const draft = await createBankPaymentIncomingDraft(
+        parsedDraft.data,
+        user.id,
+      );
+      return NextResponse.json(
+        { id: draft.id, status: draft.status },
+        { status: 201 },
+      );
+    } catch (err) {
+      if (err instanceof Prisma.PrismaClientKnownRequestError) {
+        return NextResponse.json({ error: "Невалідні дані" }, { status: 400 });
+      }
+      console.error("[L-TEX] BankPaymentIncoming draft create failed", {
+        error: err instanceof Error ? err.message : String(err),
+      });
+      return NextResponse.json(
+        { error: "Помилка збереження чернетки" },
+        { status: 500 },
+      );
+    }
+  }
+
   const parsed = createBankPaymentIncomingSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json(

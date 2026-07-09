@@ -418,6 +418,15 @@ export interface CreatePaymentArgs {
   agentUserId?: string | null;
   /** Зворотне посилання на Маршрутний лист (МЛ) — ставиться на обидва ордери. */
   routeSheetId?: string | null;
+  /**
+   * Id наявної чернетки касового ордера (створеної autosave через
+   * `createCashOrderDraft`), яку треба ПЕРЕВИКОРИСТАТИ як прихідний ордер замість
+   * створення нового рядка. Гарантує, що явне «Зберегти/Провести» з форми не
+   * дублює вже створену autosave-чернетку (той самий патерн, що й у Реалізації:
+   * PATCH наявного draft замість повторного POST). Стара парна здача цього
+   * ордера (`changeForId=reuseIncomeId`) перед записом видаляється.
+   */
+  reuseIncomeId?: string | null;
 }
 
 /**
@@ -526,6 +535,7 @@ export async function createPaymentOrders(args: CreatePaymentArgs) {
     sumToPayEur,
     agentUserId,
     routeSheetId,
+    reuseIncomeId,
   } = args;
   const post = args.post ?? true;
   const status = post ? "posted" : "draft";
@@ -536,29 +546,43 @@ export async function createPaymentOrders(args: CreatePaymentArgs) {
   const cashless = paid.uahCashless > 0;
 
   const result = await prisma.$transaction(async (tx) => {
-    const income = await tx.mgrCashOrder.create({
-      data: {
-        saleId: saleId ?? null,
-        customerId: customerId ?? null,
-        type,
-        status,
-        archived: post,
-        amountUah: paid.uah,
-        amountEur: paid.eur,
-        amountUsd: paid.usd,
-        amountUahCashless: paid.uahCashless,
-        bankAccountId: bankAccountId ?? null,
-        paymentMethod: cashless ? "bank" : null,
-        paymentPurpose: cashless ? "Оплата товару" : null,
-        cashFlowArticleId: cashFlowArticleId ?? null,
-        rateEur: rates.eur,
-        rateUsd: rates.usd,
-        documentSumEur,
-        comment: comment ?? null,
-        agentUserId: agentUserId ?? null,
-        routeSheetId: routeSheetId ?? null,
-      },
-    });
+    // Спільний набір даних прихідного ордера (для create або reuse-update).
+    const incomeData = {
+      saleId: saleId ?? null,
+      customerId: customerId ?? null,
+      type,
+      status,
+      archived: post,
+      amountUah: paid.uah,
+      amountEur: paid.eur,
+      amountUsd: paid.usd,
+      amountUahCashless: paid.uahCashless,
+      bankAccountId: bankAccountId ?? null,
+      paymentMethod: cashless ? "bank" : null,
+      paymentPurpose: cashless ? "Оплата товару" : null,
+      cashFlowArticleId: cashFlowArticleId ?? null,
+      rateEur: rates.eur,
+      rateUsd: rates.usd,
+      documentSumEur,
+      comment: comment ?? null,
+      agentUserId: agentUserId ?? null,
+      routeSheetId: routeSheetId ?? null,
+    };
+
+    let income;
+    if (reuseIncomeId) {
+      // Перевикористовуємо autosave-чернетку як прихідний ордер: чистимо стару
+      // парну здачу (щоб не лишити «висячий» розхід) і оновлюємо цей рядок.
+      await tx.mgrCashOrder.deleteMany({
+        where: { changeForId: reuseIncomeId },
+      });
+      income = await tx.mgrCashOrder.update({
+        where: { id: reuseIncomeId },
+        data: incomeData,
+      });
+    } else {
+      income = await tx.mgrCashOrder.create({ data: incomeData });
+    }
 
     let changeOrder = null;
     if (changeTotal > 0) {
@@ -676,4 +700,86 @@ export async function postCashOrder(
 
   await applyCashOrderPostingEffects(income, changeOrder);
   return { ok: true };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Автозбереження чернетки (draft) касового ордера — рівень 2 (жива чернетка в БД,
+// План AUTOSAVE_REALTIME_PLAN §2). Пишуть ЛИШЕ один рядок `MgrCashOrder` зі
+// `status="draft"` БЕЗ жодних ефектів проведення:
+//   • НЕ викликають `applyCashOrderPostingEffects` (нема рухів ДДС/боргу);
+//   • НЕ створюють авто-ордер здачі (`changeForId`);
+//   • НЕ перераховують наложку `Sale.codAmountUah`.
+// Це робить autosave безпечним для обліку — усі грошові ефекти (здача/ДДС/борг)
+// з'являються ЛИШЕ при «Провести» (`createPaymentOrders`/`postCashOrder`).
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Аргументи легкого шляху autosave касового ордера (без ефектів). */
+export interface CashOrderDraftArgs {
+  saleId?: string | null;
+  customerId?: string | null;
+  type?: "income" | "expense";
+  /** Фактична оплата по каналах (може бути нульова у чернетці). */
+  paid: PaidChannels;
+  bankAccountId?: string | null;
+  cashFlowArticleId?: string | null;
+  comment?: string | null;
+  /** Курси-знімок (грн за €/$); 0 допустимо у чернетці. */
+  rates: CashRates;
+  agentUserId?: string | null;
+  routeSheetId?: string | null;
+}
+
+/** Спільний набір даних чернетки (для create/update). */
+function buildCashOrderDraftData(args: CashOrderDraftArgs) {
+  const { paid, rates } = args;
+  const cashless = paid.uahCashless > 0;
+  return {
+    saleId: args.saleId ?? null,
+    customerId: args.customerId ?? null,
+    type: args.type ?? "income",
+    status: "draft",
+    archived: false,
+    amountUah: paid.uah,
+    amountEur: paid.eur,
+    amountUsd: paid.usd,
+    amountUahCashless: paid.uahCashless,
+    bankAccountId: args.bankAccountId ?? null,
+    paymentMethod: cashless ? "bank" : null,
+    paymentPurpose: cashless ? "Оплата товару" : null,
+    cashFlowArticleId: args.cashFlowArticleId ?? null,
+    rateEur: rates.eur,
+    rateUsd: rates.usd,
+    // documentSumEur — лише зведений показник для списку (не обліковий рух).
+    documentSumEur: reduceToEur(paid, rates),
+    comment: args.comment ?? null,
+    agentUserId: args.agentUserId ?? null,
+    routeSheetId: args.routeSheetId ?? null,
+  };
+}
+
+/**
+ * Створює чернетку касового ордера (`status="draft"`) — легкий шлях autosave.
+ * Один рядок, БЕЗ ефектів проведення / здачі / перерахунку наложки.
+ */
+export async function createCashOrderDraft(args: CashOrderDraftArgs) {
+  return prisma.mgrCashOrder.create({
+    data: buildCashOrderDraftData(args),
+    select: { id: true, status: true },
+  });
+}
+
+/**
+ * Оновлює чернетку касового ордера (повна заміна шапки) — легкий шлях autosave.
+ * Статус лишається `draft`; жодних ефектів проведення. Caller (endpoint)
+ * гарантує, що документ не заблокований (не `posted`).
+ */
+export async function updateCashOrderDraft(
+  id: string,
+  args: CashOrderDraftArgs,
+) {
+  return prisma.mgrCashOrder.update({
+    where: { id },
+    data: buildCashOrderDraftData(args),
+    select: { id: true, status: true },
+  });
 }

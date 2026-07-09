@@ -9,6 +9,7 @@ const {
   getCurrentUserMock,
   getMyClientCodes1CMock,
   createPaymentOrdersMock,
+  createCashOrderDraftMock,
   resolveCustomerMock,
   ResolveCustomerErrorClass,
 } = vi.hoisted(() => {
@@ -30,6 +31,7 @@ const {
     getCurrentUserMock: vi.fn(),
     getMyClientCodes1CMock: vi.fn(),
     createPaymentOrdersMock: vi.fn(),
+    createCashOrderDraftMock: vi.fn(),
     resolveCustomerMock: vi.fn(),
     ResolveCustomerErrorClass: ResolveCustomerError,
   };
@@ -47,6 +49,7 @@ vi.mock("@/lib/manager/sale-ownership", () => ({
 }));
 vi.mock("@/lib/manager/cash-order", () => ({
   createPaymentOrders: (...a: unknown[]) => createPaymentOrdersMock(...a),
+  createCashOrderDraft: (...a: unknown[]) => createCashOrderDraftMock(...a),
 }));
 vi.mock("@/lib/manager/resolve-customer", () => ({
   resolveCustomerForOrder: (...a: unknown[]) => resolveCustomerMock(...a),
@@ -87,6 +90,7 @@ beforeEach(() => {
     income: { id: "co1" },
     change: null,
   });
+  createCashOrderDraftMock.mockResolvedValue({ id: "draft1", status: "draft" });
 });
 
 describe("POST /api/v1/manager/cash-orders (Етап 2)", () => {
@@ -240,6 +244,37 @@ describe("POST /api/v1/manager/cash-orders (Етап 2)", () => {
     mockPrisma.routeSheet.findUnique.mockResolvedValueOnce(null);
     const res = await POST(postReq({ ...validBody, routeSheetId: "missing" }));
     expect(res.status).toBe(404);
+    expect(createPaymentOrdersMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("POST /api/v1/manager/cash-orders — draft (autosave)", () => {
+  it("draft:true пише чернетку БЕЗ проведення (не викликає createPaymentOrders)", async () => {
+    mockPrisma.sale.findUnique.mockResolvedValueOnce(fakeSale("000001"));
+    const res = await POST(
+      postReq({ draft: true, saleId: "sale1", amountUah: 4300, rateEur: 43 }),
+    );
+    expect(res.status).toBe(201);
+    const json = (await res.json()) as { id: string; status: string };
+    expect(json.id).toBe("draft1");
+    expect(json.status).toBe("draft");
+    // Грошова безпека: жодного проведення при autosave.
+    expect(createPaymentOrdersMock).not.toHaveBeenCalled();
+    expect(createCashOrderDraftMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("draft:true зберігає майже порожню чернетку (без сум/статті)", async () => {
+    const res = await POST(postReq({ draft: true, clientId: undefined }));
+    expect(res.status).toBe(201);
+    expect(createCashOrderDraftMock).toHaveBeenCalledTimes(1);
+    expect(createPaymentOrdersMock).not.toHaveBeenCalled();
+  });
+
+  it("draft:true поважає ownership (чужий клієнт → 403, без запису)", async () => {
+    mockPrisma.sale.findUnique.mockResolvedValueOnce(fakeSale("FOREIGN"));
+    const res = await POST(postReq({ draft: true, saleId: "sale1" }));
+    expect(res.status).toBe(403);
+    expect(createCashOrderDraftMock).not.toHaveBeenCalled();
     expect(createPaymentOrdersMock).not.toHaveBeenCalled();
   });
 });

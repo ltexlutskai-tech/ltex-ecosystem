@@ -97,3 +97,47 @@ export type CreateBankPaymentOutgoingInput = z.infer<
   typeof createBankPaymentOutgoingSchema
 >;
 export type CreateCashTransferInput = z.infer<typeof createCashTransferSchema>;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Автозбереження чернетки (draft) казначейських документів — План
+// AUTOSAVE_REALTIME_PLAN. Послаблені версії: усі поля опційні (жодних `.refine`),
+// щоб чернетка зберігалась «з першого символу». Обираються у POST/PATCH коли
+// body містить `draft === true`.
+//
+// ⚠️ Грошова безпека: draft лише пише рядок зі `status="draft"` — рухи ДДС/боргу
+// НЕ зачіпаються (вони лише при «Провести» через `[id]/post`). Тобто autosave тут
+// безпечний за визначенням: створення документа НІКОЛИ не проводить рухів.
+// ─────────────────────────────────────────────────────────────────────────────
+
+const draftAmount = z.number().nonnegative().max(MAX_AMOUNT).optional();
+const draftRate = z.number().nonnegative().max(MAX_AMOUNT).optional();
+const draftCurrency = z.enum(TREASURY_CURRENCIES).optional();
+
+export const bankPaymentDraftSchema = z.object({
+  draft: z.literal(true),
+  customerId: z.string().min(1).nullable().optional(),
+  bankAccountId: z.string().min(1).nullable().optional(),
+  cashFlowArticleId: z.string().min(1).nullable().optional(),
+  amount: draftAmount,
+  currency: draftCurrency,
+  rateEur: draftRate,
+  iban: z.string().max(64).nullable().optional(),
+  purpose: z.string().max(500).nullable().optional(),
+  comment: z.string().max(2000).nullable().optional(),
+  paidAt: optDate,
+});
+
+export const cashTransferDraftSchema = z.object({
+  draft: z.literal(true),
+  fromAccountId: z.string().min(1).nullable().optional(),
+  toAccountId: z.string().min(1).nullable().optional(),
+  cashFlowArticleId: z.string().min(1).nullable().optional(),
+  amount: draftAmount,
+  currency: draftCurrency,
+  rateEur: draftRate,
+  comment: z.string().max(2000).nullable().optional(),
+  transferredAt: optDate,
+});
+
+export type BankPaymentDraftInput = z.infer<typeof bankPaymentDraftSchema>;
+export type CashTransferDraftInput = z.infer<typeof cashTransferDraftSchema>;
