@@ -14,14 +14,20 @@ import {
   Textarea,
   useToast,
 } from "@ltex/ui";
+import { useInlineRecordEdit } from "@/lib/autosave/use-inline-record-edit";
+import {
+  AutosaveStatus,
+  RestoreDraftBanner,
+} from "../_components/autosave-status";
+import { usePortalConfirm } from "../_components/use-portal-confirm";
 
 /**
  * Manager «Прайс» — Stage 5b: довідник шаблонів повідомлень.
  *
- * Клієнтський CRUD-екран (mirror стилю `/manager/admin/users`): список шаблонів +
- * кнопка «Додати» (модалка name+text) + per-row Редагувати / Видалити (з
- * підтвердженням). Дані з API `/api/v1/manager/message-templates`,
- * `router.refresh()` після кожної мутації (server component re-fetch).
+ * Список шаблонів + кнопка «Додати» (модалка name+text) + per-row Редагувати /
+ * Видалити. Редагування наявного шаблону — **автозбереження одразу** (без кнопки
+ * «Зберегти»); створення лишається кнопкою «Додати». Дані з API
+ * `/api/v1/manager/message-templates`, `router.refresh()` після мутацій.
  */
 
 export interface MessageTemplate {
@@ -58,13 +64,8 @@ export function TemplatesManager({ initial }: { initial: MessageTemplate[] }) {
         </ul>
       )}
 
-      <TemplateFormModal
-        mode="create"
-        open={creating}
-        onOpenChange={setCreating}
-      />
-      <TemplateFormModal
-        mode="edit"
+      <TemplateCreateModal open={creating} onOpenChange={setCreating} />
+      <TemplateEditModal
         template={editing ?? undefined}
         open={editing !== null}
         onOpenChange={(open) => {
@@ -85,32 +86,39 @@ function TemplateRow({
   const router = useRouter();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
+  const { confirm, dialog } = usePortalConfirm();
 
-  async function handleDelete() {
-    if (!confirm(`Видалити шаблон «${template.name}»?`)) return;
-    setLoading(true);
-    try {
-      const res = await fetch(
-        `/api/v1/manager/message-templates/${template.id}`,
-        { method: "DELETE" },
-      );
-      if (res.ok) {
-        toast({ title: "Шаблон видалено" });
-        router.refresh();
-      } else {
-        const data = (await res.json().catch(() => ({}))) as {
-          error?: string;
-        };
-        toast({
-          title: data.error ?? "Не вдалося видалити",
-          variant: "destructive",
-        });
-      }
-    } catch {
-      toast({ title: "Помилка зʼєднання", variant: "destructive" });
-    } finally {
-      setLoading(false);
-    }
+  function handleDelete() {
+    confirm({
+      title: `Видалити шаблон «${template.name}»?`,
+      destructive: true,
+      confirmLabel: "Видалити",
+      onConfirm: async () => {
+        setLoading(true);
+        try {
+          const res = await fetch(
+            `/api/v1/manager/message-templates/${template.id}`,
+            { method: "DELETE" },
+          );
+          if (res.ok) {
+            toast({ title: "Шаблон видалено" });
+            router.refresh();
+          } else {
+            const data = (await res.json().catch(() => ({}))) as {
+              error?: string;
+            };
+            toast({
+              title: data.error ?? "Не вдалося видалити",
+              variant: "destructive",
+            });
+          }
+        } catch {
+          toast({ title: "Помилка зʼєднання", variant: "destructive" });
+        } finally {
+          setLoading(false);
+        }
+      },
+    });
   }
 
   return (
@@ -143,57 +151,44 @@ function TemplateRow({
           </Button>
         </div>
       </div>
+      {dialog}
     </li>
   );
 }
 
-function TemplateFormModal({
-  mode,
-  template,
+/** Створення шаблону — звичайна форма з кнопкою «Зберегти». */
+function TemplateCreateModal({
   open,
   onOpenChange,
 }: {
-  mode: "create" | "edit";
-  template?: MessageTemplate;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
   const router = useRouter();
   const { toast } = useToast();
-  const [name, setName] = useState(template?.name ?? "");
-  const [text, setText] = useState(template?.text ?? "");
+  const [name, setName] = useState("");
+  const [text, setText] = useState("");
   const [loading, setLoading] = useState(false);
 
-  // Скидаємо поля коли модалка відкривається з новим шаблоном (edit) або
-  // повторно відкривається порожня (create).
-  const [lastKey, setLastKey] = useState<string | null>(null);
-  const key = open ? (template?.id ?? "new") : null;
-  if (open && key !== lastKey) {
-    setLastKey(key);
-    setName(template?.name ?? "");
-    setText(template?.text ?? "");
+  const [lastOpen, setLastOpen] = useState(false);
+  if (open && !lastOpen) {
+    setLastOpen(true);
+    setName("");
+    setText("");
   }
-  if (!open && lastKey !== null) {
-    setLastKey(null);
-  }
+  if (!open && lastOpen) setLastOpen(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
     try {
-      const url =
-        mode === "edit" && template
-          ? `/api/v1/manager/message-templates/${template.id}`
-          : "/api/v1/manager/message-templates";
-      const res = await fetch(url, {
-        method: mode === "edit" ? "PATCH" : "POST",
+      const res = await fetch("/api/v1/manager/message-templates", {
+        method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name, text }),
       });
       if (res.ok) {
-        toast({
-          title: mode === "edit" ? "Шаблон оновлено" : "Шаблон створено",
-        });
+        toast({ title: "Шаблон створено" });
         onOpenChange(false);
         router.refresh();
       } else {
@@ -216,9 +211,7 @@ function TemplateFormModal({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90vh] max-w-lg overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>
-            {mode === "edit" ? "Редагувати шаблон" : "Новий шаблон"}
-          </DialogTitle>
+          <DialogTitle>Новий шаблон</DialogTitle>
           <DialogDescription>
             Назва — для пошуку у списку. Текст — те, що вставиться у
             повідомлення.
@@ -267,5 +260,129 @@ function TemplateFormModal({
         </form>
       </DialogContent>
     </Dialog>
+  );
+}
+
+/** Редагування наявного шаблону — автозбереження одразу (без кнопки «Зберегти»). */
+function TemplateEditModal({
+  template,
+  open,
+  onOpenChange,
+}: {
+  template?: MessageTemplate;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-h-[90vh] max-w-lg overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Редагувати шаблон</DialogTitle>
+          <DialogDescription>
+            Зміни зберігаються автоматично. Назва — для пошуку у списку. Текст —
+            те, що вставиться у повідомлення.
+          </DialogDescription>
+        </DialogHeader>
+        {template && (
+          <TemplateEditForm
+            key={template.id}
+            template={template}
+            onClose={() => onOpenChange(false)}
+          />
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+interface TemplateEditFields extends Record<string, unknown> {
+  name: string;
+  text: string;
+}
+
+function TemplateEditForm({
+  template,
+  onClose,
+}: {
+  template: MessageTemplate;
+  onClose: () => void;
+}) {
+  const router = useRouter();
+  const edit = useInlineRecordEdit<TemplateEditFields>({
+    recordKey: `message-template:${template.id}`,
+    initial: { name: template.name, text: template.text },
+    save: async (data) => {
+      if (!data.name.trim() || !data.text.trim()) {
+        throw new Error("Назва й текст обовʼязкові");
+      }
+      const res = await fetch(
+        `/api/v1/manager/message-templates/${template.id}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name: data.name, text: data.text }),
+        },
+      );
+      if (!res.ok) {
+        const j = (await res.json().catch(() => ({}))) as { error?: string };
+        throw new Error(j.error ?? "Помилка збереження");
+      }
+    },
+  });
+
+  return (
+    <div className="space-y-4">
+      {edit.hasRestore && (
+        <RestoreDraftBanner
+          onRestore={edit.applyRestore}
+          onDismiss={edit.dismissRestore}
+        />
+      )}
+      <div>
+        <label
+          htmlFor="template-edit-name"
+          className="mb-1 block text-sm font-medium text-gray-700"
+        >
+          Назва
+        </label>
+        <Input
+          id="template-edit-name"
+          type="text"
+          value={edit.fields.name}
+          onChange={(e) => edit.setField("name", e.target.value)}
+          maxLength={100}
+        />
+      </div>
+      <div>
+        <label
+          htmlFor="template-edit-text"
+          className="mb-1 block text-sm font-medium text-gray-700"
+        >
+          Текст
+        </label>
+        <Textarea
+          id="template-edit-text"
+          rows={8}
+          value={edit.fields.text}
+          onChange={(e) => edit.setField("text", e.target.value)}
+          maxLength={5000}
+        />
+      </div>
+      <DialogFooter className="items-center justify-between gap-2 sm:justify-between">
+        <AutosaveStatus status={edit.status} savedAt={edit.savedAt} />
+        <Button
+          type="button"
+          variant="secondary"
+          onClick={() => {
+            void edit.flush().finally(() => {
+              router.refresh();
+              onClose();
+            });
+          }}
+        >
+          Готово
+        </Button>
+      </DialogFooter>
+    </div>
   );
 }
