@@ -1,7 +1,12 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useDocumentAutosave } from "@/lib/autosave/use-document-autosave";
+import {
+  AutosaveStatus,
+  RestoreDraftBanner,
+} from "../../_components/autosave-status";
 
 interface SupplierOption {
   id: string;
@@ -135,7 +140,8 @@ export function ReceivingForm({
   const barcodeRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const priceRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const searchRef = useRef<HTMLInputElement | null>(null);
-  const skipRestoreRef = useRef(false);
+  /** id збереженого документа (edit-режим АБО створена autosave чернетка). */
+  const [savedId, setSavedId] = useState<string | null>(initial?.id ?? null);
 
   // Довідник секторів (autocomplete)
   const [sectorOptions, setSectorOptions] = useState<string[]>([]);
@@ -148,108 +154,106 @@ export function ReceivingForm({
       .catch(() => {});
   }, []);
 
-  // ── Авто-збереження у localStorage ────────────────────────────────────────
-  // Уникнення втрати при випадковому закритті / відсутності інтернету.
-  // На завантаження пропонує відновити збережений стан, якщо є.
-  const STORAGE_KEY = `ltex:receiving-draft:${initial?.id ?? "new"}`;
-  const [lastBackupAt, setLastBackupAt] = useState<Date | null>(null);
-  const [restorePrompt, setRestorePrompt] = useState<null | {
-    backupTime: string;
-    itemsCount: number;
-  }>(null);
+  // ── Наскрізне автозбереження чернетки (План AUTOSAVE_REALTIME_PLAN) ────────
+  // Дворівневий захист: рівень 1 (localStorage — миттєво) + рівень 2 (жива
+  // чернетка в БД). Замінює колишній localStorage-only бекап. Draft НЕ проводить
+  // документ — лоти/прайс створюються ЛИШЕ при «Провести» (`/[id]/post`).
 
-  // Restore on mount
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (!raw) return;
-      const data = JSON.parse(raw);
-      if (data && Array.isArray(data.items) && data.items.length > 0) {
-        setRestorePrompt({
-          backupTime: data.savedAt ?? "—",
-          itemsCount: data.items.length,
-        });
-      }
-    } catch {
-      // ignore
-    }
-  }, []);
+  /** Валідні для збереження рядки (товар + вага > 0, без попереджень). */
+  const validItems = useMemo(
+    () => items.filter((i) => i.productId && i.weight > 0 && !i.barcodeWarning),
+    [items],
+  );
 
-  function restoreBackup() {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (!raw) return;
-      const data = JSON.parse(raw);
-      if (data.supplierId) setSupplierId(data.supplierId);
-      if (data.warehouseId) setWarehouseId(data.warehouseId);
-      if (data.docDate) setDocDate(data.docDate);
-      if (data.notes) setNotes(data.notes);
-      if (Array.isArray(data.items)) {
-        setItems(
-          data.items.map((it: Partial<ItemDraft>) => ({
-            uid: nextUid(),
-            productId: it.productId ?? "",
-            productName: it.productName ?? "",
-            articleCode: it.articleCode ?? null,
-            weight: it.weight ?? 0,
-            purchasePrice: it.purchasePrice ?? 0,
-            salePrice: it.salePrice ?? 0,
-            barcode: it.barcode ?? "",
-            barcodeSource: it.barcodeSource ?? "generated",
-            sector: it.sector ?? "",
-            barcodeWarning: null,
-          })),
-        );
-      }
-    } catch {
-      // ignore
-    }
-    setRestorePrompt(null);
+  /** Тіло запиту чернетки (спільне для POST/PATCH). */
+  const buildDraftBody = useCallback(
+    (): Record<string, unknown> => ({
+      supplierId,
+      warehouseId,
+      docDate: new Date(docDate).toISOString(),
+      notes: notes || null,
+      items: validItems.map((i) => ({
+        productId: i.productId,
+        weight: i.weight,
+        quantity: 1,
+        purchasePrice: i.purchasePrice,
+        salePrice: i.salePrice > 0 ? i.salePrice : null,
+        barcode: i.barcode || null,
+        barcodeSource: i.barcodeSource,
+        sector: i.sector || null,
+      })),
+    }),
+    [supplierId, warehouseId, docDate, notes, validItems],
+  );
+
+  // Знімок стану форми для рівня 1 (localStorage-буфер) — джерело відновлення.
+  const draftData = useMemo(
+    () => ({ supplierId, warehouseId, docDate, notes, items }),
+    [supplierId, warehouseId, docDate, notes, items],
+  );
+  type ReceivingDraftData = typeof draftData;
+
+  const createDraftServer = useCallback(async (): Promise<string> => {
+    const res = await fetch("/api/v1/manager/warehouse/receivings", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(buildDraftBody()),
+    });
+    if (!res.ok) throw new Error(`draft create ${res.status}`);
+    const j = (await res.json()) as { id: string };
+    return j.id;
+  }, [buildDraftBody]);
+
+  const updateDraftServer = useCallback(
+    async (id: string): Promise<void> => {
+      const res = await fetch(`/api/v1/manager/warehouse/receivings/${id}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(buildDraftBody()),
+      });
+      if (!res.ok) throw new Error(`draft update ${res.status}`);
+    },
+    [buildDraftBody],
+  );
+
+  const autosave = useDocumentAutosave<ReceivingDraftData>({
+    docType: "receiving",
+    existingId: initial?.id ?? null,
+    data: draftData,
+    // Серверна чернетка можлива лише коли обрано постачальника+склад (FK) і є
+    // хоч один валідний рядок. До того прогрес захищає localStorage-буфер.
+    canCreateDraft: !!supplierId && !!warehouseId && validItems.length > 0,
+    createDraft: createDraftServer,
+    updateDraft: updateDraftServer,
+    onIdAssigned: (id) => {
+      setSavedId(id);
+      window.history.replaceState(null, "", `/manager/receivings/${id}/edit`);
+    },
+  });
+
+  /** Застосувати відновлені з localStorage дані у стан форми. */
+  function applyRestore(d: ReceivingDraftData): void {
+    setSupplierId(d.supplierId);
+    setWarehouseId(d.warehouseId);
+    setDocDate(d.docDate);
+    setNotes(d.notes);
+    setItems(
+      d.items.map((it) => ({
+        uid: nextUid(),
+        productId: it.productId,
+        productName: it.productName,
+        articleCode: it.articleCode,
+        weight: it.weight,
+        purchasePrice: it.purchasePrice,
+        salePrice: it.salePrice,
+        barcode: it.barcode,
+        barcodeSource: it.barcodeSource,
+        sector: it.sector,
+        barcodeWarning: null,
+      })),
+    );
+    autosave.acceptRestore();
   }
-
-  function dismissBackup() {
-    localStorage.removeItem(STORAGE_KEY);
-    setRestorePrompt(null);
-  }
-
-  // Save on changes (debounced)
-  useEffect(() => {
-    if (skipRestoreRef.current) return;
-    if (
-      items.length === 0 &&
-      !notes &&
-      supplierId === (suppliers[0]?.id ?? "")
-    ) {
-      return; // Не зберігаємо порожній шаблон
-    }
-    const handle = setTimeout(() => {
-      try {
-        const payload = {
-          supplierId,
-          warehouseId,
-          docDate,
-          notes,
-          items: items.map((it) => ({
-            productId: it.productId,
-            productName: it.productName,
-            articleCode: it.articleCode,
-            weight: it.weight,
-            purchasePrice: it.purchasePrice,
-            salePrice: it.salePrice,
-            barcode: it.barcode,
-            barcodeSource: it.barcodeSource,
-            sector: it.sector,
-          })),
-          savedAt: new Date().toISOString(),
-        };
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
-        setLastBackupAt(new Date());
-      } catch {
-        // ignore (e.g. quota exceeded)
-      }
-    }, 2000);
-    return () => clearTimeout(handle);
-  }, [items, supplierId, warehouseId, docDate, notes, suppliers]);
 
   // Автопідстановка останньої ціни закупки
   async function fetchLastPrice(productId: string): Promise<number> {
@@ -569,10 +573,15 @@ export function ReceivingForm({
     }
     setSaving(true);
     try {
-      const url = isEdit
-        ? `/api/v1/manager/warehouse/receivings/${initial!.id}`
+      // Гасимо чергу autosave, щоб відкладений draft-PATCH не перезаписав
+      // проведений документ після цього запиту.
+      autosave.clearAll();
+      // Якщо чернетку вже створено (edit або autosave) — PATCH; інакше POST.
+      const usePatch = savedId != null;
+      const url = usePatch
+        ? `/api/v1/manager/warehouse/receivings/${savedId}`
         : "/api/v1/manager/warehouse/receivings";
-      const method = isEdit ? "PATCH" : "POST";
+      const method = usePatch ? "PATCH" : "POST";
       const res = await fetch(url, {
         method,
         headers: { "content-type": "application/json" },
@@ -598,7 +607,10 @@ export function ReceivingForm({
         setError(data.error ?? `HTTP ${res.status}`);
         return;
       }
-      const data = isEdit ? { id: initial!.id } : await res.json();
+      const data = usePatch
+        ? { id: savedId as string }
+        : ((await res.json()) as { id: string });
+      setSavedId(data.id);
       if (postAfter) {
         const postRes = await fetch(
           `/api/v1/manager/warehouse/receivings/${data.id}/post`,
@@ -613,12 +625,6 @@ export function ReceivingForm({
           return;
         }
       }
-      // Cleanup localStorage backup (Хвиля 2 — успішне збереження)
-      try {
-        localStorage.removeItem(STORAGE_KEY);
-      } catch {
-        // ignore
-      }
       router.push(`/manager/receivings/${data.id}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Помилка збереження");
@@ -629,31 +635,14 @@ export function ReceivingForm({
 
   return (
     <form onSubmit={(e) => e.preventDefault()} className="space-y-4">
-      {/* Restore-prompt — є збережений автосейв */}
-      {restorePrompt && (
-        <div className="flex items-center justify-between gap-2 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm">
-          <span className="text-amber-900">
-            💾 Знайдено незбережену чернетку від{" "}
-            {new Date(restorePrompt.backupTime).toLocaleString("uk-UA")} (
-            {restorePrompt.itemsCount} рядків). Відновити?
-          </span>
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={restoreBackup}
-              className="rounded-md bg-emerald-600 px-3 py-1 text-xs font-medium text-white hover:bg-emerald-700"
-            >
-              ✅ Відновити
-            </button>
-            <button
-              type="button"
-              onClick={dismissBackup}
-              className="rounded-md border border-gray-300 bg-white px-3 py-1 text-xs text-gray-700"
-            >
-              🗑 Скинути
-            </button>
-          </div>
-        </div>
+      {/* Банер відновлення незбереженого прогресу (localStorage-буфер). */}
+      {autosave.restoreData && (
+        <RestoreDraftBanner
+          onRestore={() =>
+            applyRestore(autosave.restoreData as ReceivingDraftData)
+          }
+          onDismiss={autosave.dismissRestore}
+        />
       )}
 
       {/* Datalist для autocomplete секторів */}
@@ -712,11 +701,10 @@ export function ReceivingForm({
             Рядки документа ({items.length})
           </h2>
           <div className="flex items-center gap-3 text-xs text-gray-500">
-            {lastBackupAt && (
-              <span className="text-emerald-600" title="Автозбережено локально">
-                💾 {lastBackupAt.toLocaleTimeString("uk-UA")}
-              </span>
-            )}
+            <AutosaveStatus
+              status={autosave.status}
+              savedAt={autosave.savedAt}
+            />
             <span>
               Σ {totalWeight().toFixed(1)} кг
               {canSeePrice && ` · Σ ${totalAmount().toFixed(2)} €`}

@@ -272,6 +272,206 @@ export async function createStockDoc(
 }
 
 /**
+ * Оновлює ЧЕРНЕТКУ документа руху товару (autosave, План
+ * AUTOSAVE_REALTIME_PLAN §2). Повна заміна шапки + рядків БЕЗ ефектів
+ * проведення (не пише StockMovement / повний цикл перепаковки / рух боргу) —
+ * облікові рухи з'являються ЛИШЕ при `postStockDoc`. Не змінює `docNumber`/
+ * `status`. Caller (endpoint) гарантує, що документ у стані `draft`.
+ */
+export async function updateStockDoc(
+  kind: StockDocKind,
+  id: string,
+  input: CreateDocInput,
+  db: PrismaClient = prisma,
+): Promise<{ id: string }> {
+  const totals = summarizeLines(input.lines);
+  const header = {
+    docDate: input.docDate,
+    warehouseId: input.warehouseId ?? null,
+    notes: input.notes ?? null,
+  };
+  const sums = {
+    totalWeight: totals.totalWeight,
+    totalQuantity: totals.totalQuantity,
+  };
+  const sumsEur = { ...sums, totalEur: totals.totalEur };
+  return db.$transaction(async (tx) => {
+    switch (kind) {
+      case "product-returns": {
+        await tx.productReturnFromCustomer.update({
+          where: { id },
+          data: {
+            ...header,
+            ...sumsEur,
+            customerId: input.customerId ?? null,
+            customerName: input.customerName ?? null,
+            saleId: input.saleId ?? null,
+            exchangeRate: input.exchangeRate ?? 1,
+            items: {
+              deleteMany: {},
+              create: input.lines.map((l) => ({
+                ...linePriced(l),
+                unitName: l.unitName ?? null,
+              })),
+            },
+          },
+        });
+        return { id };
+      }
+      case "warehouse-returns": {
+        await tx.warehouseReturn.update({
+          where: { id },
+          data: {
+            ...header,
+            ...sums,
+            items: { deleteMany: {}, create: input.lines.map(lineCommon) },
+          },
+        });
+        return { id };
+      }
+      case "supplier-returns": {
+        await tx.returnToSupplier.update({
+          where: { id },
+          data: {
+            ...header,
+            ...sumsEur,
+            supplierId: input.supplierId ?? null,
+            supplierName: input.supplierName ?? null,
+            exchangeRate: input.exchangeRate ?? 1,
+            items: { deleteMany: {}, create: input.lines.map(linePriced) },
+          },
+        });
+        return { id };
+      }
+      case "repackings": {
+        let inputWeight = 0;
+        let outputWeight = 0;
+        for (const l of input.lines) {
+          if (l.role === "assembled") outputWeight += l.weight;
+          else inputWeight += l.weight;
+        }
+        await tx.repacking.update({
+          where: { id },
+          data: {
+            ...header,
+            inputWeight: round2(inputWeight),
+            outputWeight: round2(outputWeight),
+            lossWeight: round2(inputWeight - outputWeight),
+            items: {
+              deleteMany: {},
+              create: input.lines.map((l) => ({
+                role: l.role ?? "disassembled",
+                ...linePriced(l),
+                sourceLotId: l.sourceLotId ?? null,
+                salePriceEur:
+                  l.salePriceEur != null && l.salePriceEur > 0
+                    ? l.salePriceEur
+                    : null,
+                qualityId: l.qualityId ?? null,
+                sector: l.sector ?? null,
+                sectorId: l.sectorId ?? null,
+              })),
+            },
+          },
+        });
+        return { id };
+      }
+      case "write-offs": {
+        await tx.writeOff.update({
+          where: { id },
+          data: {
+            ...header,
+            ...sumsEur,
+            reason: input.reason ?? null,
+            items: { deleteMany: {}, create: input.lines.map(linePriced) },
+          },
+        });
+        return { id };
+      }
+      case "stock-adjustments": {
+        await tx.stockAdjustment.update({
+          where: { id },
+          data: {
+            ...header,
+            ...sumsEur,
+            reason: input.reason ?? null,
+            items: { deleteMany: {}, create: input.lines.map(linePriced) },
+          },
+        });
+        return { id };
+      }
+      case "inventories": {
+        await tx.inventory.update({
+          where: { id },
+          data: {
+            ...header,
+            items: {
+              deleteMany: {},
+              create: input.lines.map((l) => {
+                const acc = l.qtyAccounting ?? 0;
+                const act = l.qtyActual ?? l.quantity;
+                return {
+                  productId: l.productId,
+                  charHex: l.charHex,
+                  barcode: l.barcode,
+                  qtyAccounting: acc,
+                  qtyActual: act,
+                  qtyDifference: round2(act - acc),
+                  priceEur: l.priceEur,
+                  notes: l.notes,
+                };
+              }),
+            },
+          },
+        });
+        return { id };
+      }
+      case "stock-transfers": {
+        await tx.stockTransfer.update({
+          where: { id },
+          data: {
+            ...header,
+            ...sums,
+            fromWarehouseId: input.fromWarehouseId ?? null,
+            toWarehouseId: input.toWarehouseId ?? null,
+            items: { deleteMany: {}, create: input.lines.map(lineCommon) },
+          },
+        });
+        return { id };
+      }
+    }
+  });
+}
+
+/** Статус документа (для гварда autosave — не оновлюємо проведений). */
+export async function getStockDocStatus(
+  kind: StockDocKind,
+  id: string,
+  db: PrismaClient = prisma,
+): Promise<string | null> {
+  const delegate = {
+    "product-returns": db.productReturnFromCustomer,
+    "warehouse-returns": db.warehouseReturn,
+    "supplier-returns": db.returnToSupplier,
+    repackings: db.repacking,
+    "write-offs": db.writeOff,
+    "stock-adjustments": db.stockAdjustment,
+    inventories: db.inventory,
+    "stock-transfers": db.stockTransfer,
+  }[kind] as unknown as {
+    findUnique(args: {
+      where: { id: string };
+      select: { status: true };
+    }): Promise<{ status: string } | null>;
+  };
+  const doc = await delegate.findUnique({
+    where: { id },
+    select: { status: true },
+  });
+  return doc?.status ?? null;
+}
+
+/**
  * Проводить документ: status draft→posted. Повернення від покупця → рух боргу
  * (best-effort, поза транзакцією). false якщо не знайдено / вже posted.
  */

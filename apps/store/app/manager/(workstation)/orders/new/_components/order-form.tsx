@@ -1,9 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { openManagerTab } from "../../../_components/open-manager-tab";
 import { useRouter } from "next/navigation";
 import { MessageSquare, ListPlus } from "lucide-react";
+import { isOrderLocked } from "@/lib/manager/order-status";
+import { useDocumentAutosave } from "@/lib/autosave/use-document-autosave";
+import {
+  AutosaveStatus,
+  RestoreDraftBanner,
+} from "../../../_components/autosave-status";
 import {
   Button,
   Textarea,
@@ -97,6 +103,14 @@ export function OrderForm({
   const isEdit = mode === "edit";
   const canForce = FORCE_ROLES.includes(currentUserRole ?? "");
 
+  /**
+   * Поточний id збереженого документа. `null` доки чернетку ще не створено
+   * (новий документ). Оновлюється або явним POST, або autosave (`onIdAssigned`).
+   * Використовується у `submit`: якщо є id → PATCH, інакше POST — щоб явне
+   * збереження не дублювало вже створену autosave-чернетку.
+   */
+  const [savedId, setSavedId] = useState<string | null>(orderId ?? null);
+
   const [clientId, setClientId] = useState<string | null>(
     initialClientId ?? null,
   );
@@ -135,6 +149,99 @@ export function OrderForm({
   );
   // Актуальність документа (1С «Статус заказа: Актуальне») — лише edit.
   const [isActual, setIsActual] = useState(initialOrder?.isActual ?? true);
+
+  // ─── Автозбереження чернетки (наскрізне, План AUTOSAVE_REALTIME_PLAN) ──────
+  // Дворівневий захист: рівень 1 (localStorage) + рівень 2 (жива чернетка в БД).
+  // Заблоковані (проведені) документи не автозберігаються — лише перегляд.
+  const autosaveEnabled = !isOrderLocked(initialOrder?.status ?? "draft");
+
+  const draftData = useMemo(
+    () => ({
+      clientId,
+      clientSummary,
+      items,
+      notes,
+      deliveryMethod,
+      sellingTypeCode,
+    }),
+    [clientId, clientSummary, items, notes, deliveryMethod, sellingTypeCode],
+  );
+
+  type OrderDraftData = typeof draftData;
+
+  /** Тіло draft-запиту зі знімка форми (спільне для POST/PATCH чернетки). */
+  const draftBody = useCallback(
+    (d: OrderDraftData): Record<string, unknown> => {
+      const wire = d.items
+        .map(draftToWire)
+        .filter((x): x is NonNullable<typeof x> => x !== null);
+      return {
+        draft: true,
+        items: wire,
+        notes: d.notes.trim() || null,
+        exchangeRate: exchangeRate > 0 ? exchangeRate : undefined,
+        priceTypeId: null,
+        deliveryMethod: d.deliveryMethod || null,
+      };
+    },
+    [exchangeRate],
+  );
+
+  const createDraftServer = useCallback(
+    async (d: OrderDraftData): Promise<string> => {
+      const res = await fetch("/api/v1/manager/orders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...draftBody(d), customerId: d.clientId }),
+      });
+      if (!res.ok) throw new Error(`draft create ${res.status}`);
+      const j = (await res.json()) as { id: string };
+      return j.id;
+    },
+    [draftBody],
+  );
+
+  const updateDraftServer = useCallback(
+    async (id: string, d: OrderDraftData): Promise<void> => {
+      const res = await fetch(`/api/v1/manager/orders/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(draftBody(d)),
+      });
+      if (!res.ok) throw new Error(`draft update ${res.status}`);
+    },
+    [draftBody],
+  );
+
+  const autosave = useDocumentAutosave<OrderDraftData>({
+    docType: "order",
+    existingId: orderId ?? null,
+    data: draftData,
+    enabled: autosaveEnabled,
+    // Новий документ: серверна чернетка можлива лише коли обрано клієнта
+    // (`Order.customerId` — обов'язковий FK) і немає невирішеного конфлікту
+    // «одне активне на клієнта». До того захищає localStorage.
+    canCreateDraft: clientId != null && activeConflict == null,
+    createDraft: createDraftServer,
+    updateDraft: updateDraftServer,
+    onIdAssigned: (id) => {
+      setSavedId(id);
+      // Міняємо URL без remount форми (рефреш відкриє чернетку з БД).
+      window.history.replaceState(null, "", `/manager/orders/${id}`);
+    },
+  });
+
+  /** Застосувати відновлені з localStorage дані у стан форми. */
+  function applyRestore(d: OrderDraftData): void {
+    setClientId(d.clientId);
+    setClientSummary(d.clientSummary);
+    setItems(d.items);
+    setNotes(d.notes);
+    setShowComment(!!d.notes.trim());
+    setDeliveryMethod(d.deliveryMethod);
+    setSellingTypeCode(d.sellingTypeCode);
+    autosave.acceptRestore();
+  }
 
   /**
    * Перерахунок цін усіх рядків під обраний тип цін (override, як у 1С):
@@ -287,39 +394,44 @@ export function OrderForm({
   const orderNumber = isEdit ? (initialOrder?.displayNumber ?? "") : "авто";
 
   /**
-   * Зберігає замовлення (POST у create, PATCH у edit).
+   * Зберігає замовлення. Якщо є `savedId` (edit-режим АБО autosave вже створив
+   * чернетку) — PATCH; інакше POST нового документа (щоб явне збереження не
+   * дублювало вже створену autosave-чернетку).
    *
-   * `post=true` → проводимо документ (статус `posted` + `archived`). Інакше
-   * зберігаємо як чернетку (create) / оновлюємо без зміни статусу (edit).
-   * Після успіху — перехід до списку замовлень.
+   * `post=true` → проводимо документ (статус `posted`). Після успіху — перехід
+   * до списку замовлень.
    */
   async function submit(force = false, post = false): Promise<void> {
-    if (!isEdit && !clientId) return;
-    if (isEdit && !orderId) return;
+    const effectiveId = savedId;
+    const usePatch = effectiveId != null;
+    if (!usePatch && !clientId) return;
     setSubmitting(true);
     setError(null);
     try {
-      const url = isEdit
-        ? `/api/v1/manager/orders/${orderId}`
+      // Перед явним записом — гасимо чергу autosave, щоб відкладений draft-PATCH
+      // не перезаписав проведений/збережений документ після цього запиту.
+      autosave.clearAll();
+      const url = usePatch
+        ? `/api/v1/manager/orders/${effectiveId}`
         : "/api/v1/manager/orders";
       const res = await fetch(url, {
-        method: isEdit ? "PATCH" : "POST",
+        method: usePatch ? "PATCH" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          ...(isEdit ? {} : { customerId: clientId }),
+          ...(usePatch ? {} : { customerId: clientId }),
           items: wireItems,
-          notes: notes.trim() || (isEdit ? null : undefined),
+          notes: notes.trim() || (usePatch ? null : undefined),
           // Тип цін відв'язаний від MgrPriceType (wholesale/akciya — НЕ id) —
           // менеджерська ціна фіксується у рядках. На документ пишемо null.
           priceTypeId: null,
           deliveryMethod: deliveryMethod || null,
-          ...(isEdit ? { isActual } : {}),
-          ...(force ? { force: true } : {}),
+          ...(usePatch ? { isActual } : {}),
+          ...(force && !usePatch ? { force: true } : {}),
           ...(post ? { post: true } : {}),
         }),
       });
       // 409 + active_order_exists — у клієнта вже є актуальне замовлення.
-      if (res.status === 409 && !isEdit) {
+      if (res.status === 409 && !usePatch) {
         const body = (await res.json().catch(() => ({}))) as {
           code?: string;
           existingOrderId?: string;
@@ -340,6 +452,10 @@ export function OrderForm({
         setError(errBody.error ?? `Помилка ${res.status}`);
         return;
       }
+      if (!usePatch) {
+        const created = (await res.json().catch(() => ({}))) as { id?: string };
+        if (created.id) setSavedId(created.id);
+      }
       router.push("/manager/orders");
     } catch (e) {
       setError((e as Error).message ?? "Невідома помилка");
@@ -350,6 +466,13 @@ export function OrderForm({
 
   return (
     <div className="space-y-4">
+      {autosave.restoreData && (
+        <RestoreDraftBanner
+          onRestore={() => applyRestore(autosave.restoreData as OrderDraftData)}
+          onDismiss={autosave.dismissRestore}
+        />
+      )}
+
       {/* ─── Секція: Контрагент ───────────────────────────────────────────── */}
       <section className="rounded-lg border bg-white p-4 shadow-sm">
         <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-gray-500">
@@ -625,14 +748,19 @@ export function OrderForm({
 
       {/* ─── Дії: зберегти (чернетка) / зберегти та провести ──────────────── */}
       <div className="flex flex-wrap items-center justify-end gap-3">
+        {autosaveEnabled && (
+          <AutosaveStatus
+            status={autosave.status}
+            savedAt={autosave.savedAt}
+            className="mr-auto"
+          />
+        )}
         <Button
           type="button"
           variant="outline"
           onClick={() =>
             router.push(
-              isEdit && orderId
-                ? `/manager/orders/${orderId}`
-                : "/manager/orders",
+              savedId ? `/manager/orders/${savedId}` : "/manager/orders",
             )
           }
           disabled={submitting}
