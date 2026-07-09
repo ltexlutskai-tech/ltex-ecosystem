@@ -53,7 +53,7 @@ describe("Bank payment draft — грошова безпека", () => {
   it("createBankPaymentIncomingDraft пише status='draft', amountEur зведено, БЕЗ рухів", async () => {
     const res = await createBankPaymentIncomingDraft(draft, "u1");
     expect(res.id).toBe("doc-1");
-    const data = mockPrisma.bankPaymentIncoming.create.mock.calls[0][0].data;
+    const data = mockPrisma.bankPaymentIncoming.create.mock.calls[0]![0].data;
     expect(data.status).toBe("draft");
     expect(data.amountEur).toBe(100); // 4300/43
     expect(data.createdByUserId).toBe("u1");
@@ -68,7 +68,7 @@ describe("Bank payment draft — грошова безпека", () => {
 
   it("createBankPaymentOutgoingDraft пише status='draft' без рухів", async () => {
     await createBankPaymentOutgoingDraft(draft, "u1");
-    const data = mockPrisma.bankPaymentOutgoing.create.mock.calls[0][0].data;
+    const data = mockPrisma.bankPaymentOutgoing.create.mock.calls[0]![0].data;
     expect(data.status).toBe("draft");
     expectNoMovements();
   });
@@ -80,7 +80,7 @@ describe("Cash transfer draft — грошова безпека", () => {
       { draft: true, amount: 1000, currency: "UAH", rateEur: 40 },
       "u1",
     );
-    const data = mockPrisma.cashTransfer.create.mock.calls[0][0].data;
+    const data = mockPrisma.cashTransfer.create.mock.calls[0]![0].data;
     expect(data.status).toBe("draft");
     expect(data.amountEur).toBe(25); // 1000/40
     expectNoMovements();
@@ -93,7 +93,7 @@ describe("Cash transfer draft — грошова безпека", () => {
       currency: "EUR",
       rateEur: 40,
     });
-    const data = mockPrisma.cashTransfer.update.mock.calls[0][0].data;
+    const data = mockPrisma.cashTransfer.update.mock.calls[0]![0].data;
     expect(data.amountEur).toBe(1000); // EUR → as-is
     expectNoMovements();
   });
