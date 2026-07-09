@@ -274,7 +274,7 @@ export function ClientRequisitesView({
             label="Ліцензія дійсна до"
             value={fmtDate(client.licenseExpiresAt)}
           />
-          <Row label="Оновлено з 1С" value={fmtDateTime(client.lastSyncedAt)} />
+          <Row label="Оновлено" value={fmtDateTime(client.lastSyncedAt)} />
 
           <div className="sm:col-span-2">
             <Row

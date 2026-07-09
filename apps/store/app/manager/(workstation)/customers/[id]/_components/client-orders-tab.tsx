@@ -30,8 +30,8 @@ export async function ClientOrdersTab({ clientId }: { clientId: string }) {
           <OrderCreateButton customerId={customerId ?? undefined} />
         </div>
         <EmptyState
-          message="Клієнт ще не синхронізований з 1С"
-          hint="Замовлення з 1С прив'язуються за кодом клієнта (code1C). Зачекайте на найближчий sync або зверніться до адміністратора."
+          message="У клієнта ще немає замовлень"
+          hint="Замовлення прив'язуються за кодом клієнта (code1C). У цього клієнта код ще не проставлено."
         />
       </div>
     );

@@ -374,7 +374,7 @@ export function ClientRequisitesEdit({
             value={fmtMoney(client.sessionRemainder)}
           />
           <ReadonlyRow
-            label="Оновлено з 1С"
+            label="Оновлено"
             value={fmtDateTime(client.lastSyncedAt)}
           />
 
