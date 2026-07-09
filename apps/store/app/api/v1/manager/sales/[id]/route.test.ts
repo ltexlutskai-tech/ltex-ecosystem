@@ -9,6 +9,7 @@ const {
   getCurrentUserMock,
   canViewSaleMock,
   updateSaleWithItemsMock,
+  updateSaleDraftMock,
   FakePrismaError,
 } = vi.hoisted(() => {
   class FakePrismaError extends Error {
@@ -27,6 +28,7 @@ const {
     getCurrentUserMock: vi.fn(),
     canViewSaleMock: vi.fn(),
     updateSaleWithItemsMock: vi.fn(),
+    updateSaleDraftMock: vi.fn(),
     recomputeDebtMock: vi.fn(),
     resolveClientIdMock: vi.fn(),
     FakePrismaError,
@@ -52,6 +54,7 @@ vi.mock("@/lib/manager/sale-ownership", () => ({
 }));
 vi.mock("@/lib/manager/sale-create", () => ({
   updateSaleWithItems: (...args: unknown[]) => updateSaleWithItemsMock(...args),
+  updateSaleDraft: (...args: unknown[]) => updateSaleDraftMock(...args),
 }));
 vi.mock("@/lib/manager/debt-register", () => ({
   recomputeDebtForClients: (...args: unknown[]) => recomputeDebtMock(...args),
@@ -365,6 +368,40 @@ describe("PATCH /api/v1/manager/sales/[id]", () => {
       params: Promise.resolve({ id: "sale1" }),
     });
     expect(res.status).toBe(200);
+  });
+});
+
+describe("PATCH /api/v1/manager/sales/[id] (draft mode)", () => {
+  it("draft із порожніми items оновлює чернетку без ефектів проведення", async () => {
+    mockPrisma.sale.findUnique.mockResolvedValueOnce({
+      id: "sale1",
+      status: "draft",
+    });
+    updateSaleDraftMock.mockResolvedValueOnce({
+      id: "sale1",
+      status: "draft",
+    });
+    const res = await PATCH(patchReq({ draft: true, items: [] }), {
+      params: Promise.resolve({ id: "sale1" }),
+    });
+    expect(res.status).toBe(200);
+    const json = (await res.json()) as { id: string; status: string };
+    expect(json.id).toBe("sale1");
+    // Draft-шлях — strict update НЕ викликається.
+    expect(updateSaleWithItemsMock).not.toHaveBeenCalled();
+    expect(updateSaleDraftMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("draft на проведеній реалізації → 409 (locked) без запису", async () => {
+    mockPrisma.sale.findUnique.mockResolvedValueOnce({
+      id: "sale1",
+      status: "posted",
+    });
+    const res = await PATCH(patchReq({ draft: true, items: [] }), {
+      params: Promise.resolve({ id: "sale1" }),
+    });
+    expect(res.status).toBe(409);
+    expect(updateSaleDraftMock).not.toHaveBeenCalled();
   });
 });
 

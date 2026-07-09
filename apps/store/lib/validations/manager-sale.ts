@@ -105,7 +105,42 @@ export const updateSaleSchema = z.object({
   status: z.enum(MANAGER_SALE_STATUSES).optional(),
 });
 
+/**
+ * Zod schema для **чернеткового** (draft) режиму реалізації (autosave).
+ *
+ * Послаблена версія strict-схем: усі поля опційні, `items` можуть бути порожні
+ * — щоб чернетка зберігалась «з першого символу», навіть напівпорожня.
+ * Використовується у POST/PATCH коли body містить `draft === true`.
+ *
+ * ⚠️ Грошова безпека: draft НЕ проводить документ (`post` тут відсутній) — рухи
+ * боргу/складу/собівартості пишуться ЛИШЕ при «Провести» (strict-схема + post).
+ *
+ * `customerId` тут опційний (для PATCH draft клієнт не потрібен), але POST draft
+ * все одно вимагає його на рівні endpoint — `Sale.customerId` є обов'язковим FK,
+ * тож draft-рядок не може існувати без клієнта (до вибору клієнта прогрес
+ * захищає локальна копія у localStorage — рівень 1 автозбереження).
+ */
+export const saleDraftSchema = z.object({
+  /** Прапорець draft-режиму — endpoint обирає цю схему коли `true`. */
+  draft: z.literal(true),
+  customerId: z.string().min(1).nullable().optional(),
+  notes: z.string().max(2000).nullable().optional(),
+  exchangeRateEur: z.number().positive().max(1000).optional(),
+  exchangeRateUsd: z.number().positive().max(1000).optional(),
+  /** Рядки повні (форма фільтрує неповні) — але масив може бути порожнім. */
+  items: z.array(saleItemInputSchema).max(200).optional(),
+  priceTypeId: z.string().min(1).nullable().optional(),
+  deliveryMethod: z.string().max(50).nullable().optional(),
+  novaPoshtaBranch: z.string().max(20).nullable().optional(),
+  cashOnDelivery: z.boolean().optional(),
+  assignedAgentUserId: z.string().min(1).nullable().optional(),
+  onTradeAgent: z.boolean().optional(),
+  expressWaybill: z.string().max(60).nullable().optional(),
+  routeSheetId: z.string().min(1).nullable().optional(),
+});
+
 export type SaleItemInput = z.infer<typeof saleItemInputSchema>;
+export type SaleDraftInput = z.infer<typeof saleDraftSchema>;
 export type CreateSaleInput = z.infer<typeof createSaleSchema>;
 /** Pre-parse shape (defaults optional) — приймається `createSaleWithItems`. */
 export type CreateSaleInputRaw = z.input<typeof createSaleSchema>;

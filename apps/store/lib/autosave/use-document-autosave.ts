@@ -43,6 +43,13 @@ export interface UseDocumentAutosaveOptions<T> {
   updateDraft: (id: string, data: T) => Promise<void>;
   /** Викликається один раз, коли новому документу присвоєно id (URL → /[id]). */
   onIdAssigned?: (id: string) => void;
+  /**
+   * Гейт створення draft-рядка (лише для НОВОГО документа, доки немає id).
+   * `false` → серверний запис пропускається (рівень 1/localStorage все одно
+   * буферизує), доки не з'являться обов'язкові поля (напр. `Sale.customerId` —
+   * обов'язковий FK). Для оновлення наявної чернетки не діє. Дефолт `true`.
+   */
+  canCreateDraft?: boolean;
   /** Debounce запису в БД, мс (дефолт 2000). */
   serverDebounceMs?: number;
 }
@@ -83,6 +90,7 @@ export function useDocumentAutosave<T>(
     createDraft,
     updateDraft,
     onIdAssigned,
+    canCreateDraft = true,
     serverDebounceMs = 2000,
   } = opts;
 
@@ -119,6 +127,9 @@ export function useDocumentAutosave<T>(
     const snapshot = dataRef.current;
     const snapStr = JSON.stringify(snapshot);
     if (snapStr === lastSavedSnapRef.current) return; // без змін
+    // Новий документ без обов'язкових полів (гейт) — серверний запис відкладено;
+    // рівень 1 (localStorage) уже збережений у change-ефекті. Статус не чіпаємо.
+    if (!draftIdRef.current && !canCreateDraft) return;
     setStatus("saving");
     try {
       let id = draftIdRef.current;
@@ -144,7 +155,7 @@ export function useDocumentAutosave<T>(
       // Не вдалось (офлайн/сервер) — дані лишаються в localStorage-буфері.
       setStatus("offline");
     }
-  }, [createDraft, updateDraft, onIdAssigned]);
+  }, [createDraft, updateDraft, onIdAssigned, canCreateDraft]);
 
   // ── Реакція на зміну data: буфер localStorage + дебаунс-запис у БД ──
   useEffect(() => {

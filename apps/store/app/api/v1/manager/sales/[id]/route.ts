@@ -8,8 +8,14 @@ import {
   isSaleLocked,
   isSaleTransitionAllowed,
 } from "@/lib/manager/sale-status";
-import { updateSaleSchema } from "@/lib/validations/manager-sale";
-import { updateSaleWithItems } from "@/lib/manager/sale-create";
+import {
+  saleDraftSchema,
+  updateSaleSchema,
+} from "@/lib/validations/manager-sale";
+import {
+  updateSaleDraft,
+  updateSaleWithItems,
+} from "@/lib/manager/sale-create";
 import {
   recomputeDebtForClients,
   resolveClientIdByCustomer,
@@ -133,6 +139,43 @@ export async function PATCH(
   }
 
   const body = await req.json().catch(() => null);
+
+  // ─── Автозбереження чернетки (draft) ──────────────────────────────────────
+  // Послаблена схема, оновлення БЕЗ ефектів проведення. Статус не змінюється.
+  if (body && typeof body === "object" && (body as { draft?: unknown }).draft) {
+    const parsedDraft = saleDraftSchema.safeParse(body);
+    if (!parsedDraft.success) {
+      return NextResponse.json(
+        {
+          error: "Невірні дані",
+          details: parsedDraft.error.issues.slice(0, 5),
+        },
+        { status: 400 },
+      );
+    }
+    try {
+      const sale = await updateSaleDraft(id, parsedDraft.data);
+      return NextResponse.json({ id: sale.id, status: sale.status });
+    } catch (err) {
+      if (err instanceof Prisma.PrismaClientKnownRequestError) {
+        if (err.code === "P2003" || err.code === "P2025") {
+          return NextResponse.json(
+            { error: "Невалідний product/lot у items" },
+            { status: 400 },
+          );
+        }
+      }
+      console.error("[L-TEX] Sale draft update failed", {
+        saleId: id,
+        error: err instanceof Error ? err.message : String(err),
+      });
+      return NextResponse.json(
+        { error: "Помилка збереження чернетки" },
+        { status: 500 },
+      );
+    }
+  }
+
   const parsed = updateSaleSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json(
