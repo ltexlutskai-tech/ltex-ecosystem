@@ -21,6 +21,7 @@ import {
   ScrollText,
   Settings,
   ShieldCheck,
+  Trash2,
   Truck,
   UserCog,
   Users,
@@ -135,6 +136,14 @@ export const ADMIN_PERMISSIONS_LINK: SidebarLink = {
   href: "/manager/admin/permissions",
   label: "Матриця прав",
   icon: ShieldCheck,
+};
+
+// ── ТЗ 8.0 «Позначка на вилучення» (2026-07-09) ─────────────────────────
+// Черга завдань на вилучення. Доступ — admin | owner (гейтиться у sidebar).
+export const ADMIN_DELETIONS_LINK: SidebarLink = {
+  href: "/manager/admin/deletions",
+  label: "Запити на вилучення",
+  icon: Trash2,
 };
 
 export const SETTINGS_LINK: SidebarLink = {

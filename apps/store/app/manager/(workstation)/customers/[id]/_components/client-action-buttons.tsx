@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { Button, useToast } from "@ltex/ui";
+import { ClientMarkDeletionButton } from "./client-mark-deletion-button";
 
 /**
  * `clientId` (MgrClient.id) і `customerId` (Customer.id) — різні namespace-и.
@@ -18,9 +19,12 @@ import { Button, useToast } from "@ltex/ui";
 export function ClientActionButtons({
   customerId,
   clientId,
+  canEdit = false,
 }: {
   customerId?: string | null;
   clientId?: string;
+  /** Право редагувати клієнта — гейт для кнопки «Позначити на вилучення». */
+  canEdit?: boolean;
 } = {}) {
   const { toast } = useToast();
   const orderHref = customerId
@@ -64,6 +68,7 @@ export function ClientActionButtons({
       >
         Повідомити про борг
       </Button>
+      {canEdit && clientId && <ClientMarkDeletionButton clientId={clientId} />}
     </div>
   );
 }

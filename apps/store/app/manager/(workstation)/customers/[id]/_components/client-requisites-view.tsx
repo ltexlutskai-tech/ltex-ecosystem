@@ -343,7 +343,11 @@ export function ClientRequisitesView({
 
       <FlagsBlock client={client} />
 
-      <ClientActionButtons clientId={client.id} customerId={customerId} />
+      <ClientActionButtons
+        clientId={client.id}
+        customerId={customerId}
+        canEdit={canEdit}
+      />
     </div>
   );
 }
