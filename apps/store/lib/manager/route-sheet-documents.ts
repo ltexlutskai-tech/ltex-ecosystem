@@ -200,14 +200,20 @@ export async function getRouteSheetDocuments(
 /** Рядок вкладки «Витрати» (1С таб. частина `Витрати`, VT7334). */
 export interface RouteSheetExpenseView {
   id: string;
-  /** Назва статті витрат (поки null — довідника статей з 1С ще нема). */
+  /** Довільна назва рядка (для авто-рядка пробігу — «Пальне/пробіг»). */
   articleName: string | null;
+  /** Стаття витрат з довідника (Блок Б). */
+  cashFlowArticleId: string | null;
+  cashFlowArticleName: string | null;
+  currency: string;
+  /** Авто-рядок «Пальне/пробіг» (рахується з кілометражу, не редагується вручну). */
+  isMileage: boolean;
   amount: number;
 }
 
 /**
- * Витрати маршрутного листа (read-only вкладка). Стаття витрат поки не
- * резолвиться (немає довідника) — `articleName` лишається null.
+ * Витрати маршрутного листа (вкладка «Витрати»). Стаття витрат резолвиться з
+ * довідника `MgrCashFlowArticle` (Блок Б).
  */
 export async function getRouteSheetExpenses(
   routeSheetId: string,
@@ -215,11 +221,23 @@ export async function getRouteSheetExpenses(
   const rows = await prisma.routeSheetExpense.findMany({
     where: { routeSheetId },
     orderBy: { id: "asc" },
-    select: { id: true, articleName: true, amount: true },
+    select: {
+      id: true,
+      articleName: true,
+      cashFlowArticleId: true,
+      currency: true,
+      isMileage: true,
+      amount: true,
+      cashFlowArticle: { select: { name: true } },
+    },
   });
   return rows.map((r) => ({
     id: r.id,
     articleName: r.articleName,
+    cashFlowArticleId: r.cashFlowArticleId,
+    cashFlowArticleName: r.cashFlowArticle?.name ?? null,
+    currency: r.currency ?? "UAH",
+    isMileage: r.isMileage,
     amount: r.amount,
   }));
 }

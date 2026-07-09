@@ -21,6 +21,10 @@ import {
   markRouteSheetOrdersInactive,
   releaseRouteSheetReservations,
 } from "@/lib/manager/route-sheet-actions";
+import {
+  applyRouteSheetExpensesSafe,
+  rebuildMileageExpenseSafe,
+} from "@/lib/manager/route-sheet-expenses";
 import { updateRouteSheetSchema } from "@/lib/validations/manager-route-sheet";
 
 /**
@@ -150,6 +154,7 @@ export async function GET(
       totalUah: sheet.totalUah,
       mileageStartKm: sheet.mileageStartKm,
       mileageEndKm: sheet.mileageEndKm,
+      pricePerKm: sheet.pricePerKm,
       gpsLat: sheet.gpsLat,
       gpsLng: sheet.gpsLng,
       mileageWarning,
@@ -222,6 +227,7 @@ const NON_STATUS_FIELDS = [
   "comment",
   "mileageStartKm",
   "mileageEndKm",
+  "pricePerKm",
 ] as const;
 
 export async function PATCH(
@@ -298,6 +304,7 @@ export async function PATCH(
     data.mileageStartKm = input.mileageStartKm;
   }
   if (input.mileageEndKm !== undefined) data.mileageEndKm = input.mileageEndKm;
+  if (input.pricePerKm !== undefined) data.pricePerKm = input.pricePerKm;
   // GPS — best-effort знімок (надсилається разом зі статус-переходом). Не у
   // NON_STATUS_FIELDS, тому captured-координати дозволено й на completed-листі.
   if (input.gpsLat !== undefined) data.gpsLat = input.gpsLat;
@@ -320,6 +327,20 @@ export async function PATCH(
     }
     return updated;
   });
+
+  // Блок Б: перебудувати авто-рядок витрат «Пальне/пробіг» під новий кілометраж/
+  // ціну за км (best-effort, після коміту).
+  if (
+    input.mileageStartKm !== undefined ||
+    input.mileageEndKm !== undefined ||
+    input.pricePerKm !== undefined
+  ) {
+    rebuildMileageExpenseSafe(id);
+  }
+  // Блок Б: при завершенні МЛ — рухи каси (розхід) по витратах маршруту.
+  if (triggersSideEffects && newStatus === "completed") {
+    applyRouteSheetExpensesSafe(id);
+  }
 
   return NextResponse.json({
     id: sheet.id,

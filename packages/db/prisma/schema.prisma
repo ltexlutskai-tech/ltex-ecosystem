@@ -527,6 +527,7 @@ model MgrCashFlowArticle {
   bankPaymentsIncoming BankPaymentIncoming[]
   bankPaymentsOutgoing BankPaymentOutgoing[]
   cashTransfers        CashTransfer[]
+  routeSheetExpenses   RouteSheetExpense[]
 
   @@map("mgr_cash_flow_articles")
 }
@@ -1378,6 +1379,8 @@ model RouteSheet {
   comment         String?
   mileageStartKm  Float?    @map("mileage_start_km")
   mileageEndKm    Float?    @map("mileage_end_km")
+  // Ціна за км (для авто-розрахунку витрат на пробіг ← 1С ЦенаЗаКМ). Блок Б.
+  pricePerKm      Float?    @map("price_per_km")
   gpsLat          Float?    @map("gps_lat")
   gpsLng          Float?    @map("gps_lng")
   archived        Boolean   @default(false)
@@ -1526,14 +1529,23 @@ model RouteSheetTask {
 }
 
 model RouteSheetExpense {
-  id           String  @id @default(cuid())
-  routeSheetId String  @map("route_sheet_id")
-  articleName  String? @map("article_name")
-  amount       Float   @default(0)
+  id                String  @id @default(cuid())
+  routeSheetId      String  @map("route_sheet_id")
+  articleName       String? @map("article_name")
+  // Стаття витрат (← 1С СтаттяВитрат). FK на довідник статей руху коштів. Блок Б.
+  cashFlowArticleId String? @map("cash_flow_article_id")
+  // Валюта суми витрати ("UAH" за замовч. — пальне купують у грн). Блок Б.
+  currency          String? @default("UAH")
+  // Ознака авто-рядка «Пальне/пробіг» (пробіг × pricePerKm) — щоб перебудовувати
+  // його при зміні кілометражу, не чіпаючи ручні рядки. Блок Б.
+  isMileage         Boolean @default(false) @map("is_mileage")
+  amount            Float   @default(0)
 
-  routeSheet RouteSheet @relation(fields: [routeSheetId], references: [id], onDelete: Cascade)
+  routeSheet      RouteSheet          @relation(fields: [routeSheetId], references: [id], onDelete: Cascade)
+  cashFlowArticle MgrCashFlowArticle? @relation(fields: [cashFlowArticleId], references: [id], onDelete: SetNull)
 
   @@index([routeSheetId])
+  @@index([cashFlowArticleId])
   @@map("mgr_route_sheet_expenses")
 }
 

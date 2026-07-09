@@ -43,6 +43,7 @@ function makeView(over: Partial<RouteSheetView> = {}): RouteSheetView {
     totalUah: 0,
     mileageStartKm: null,
     mileageEndKm: null,
+    pricePerKm: null,
     gpsLat: null,
     gpsLng: null,
     mileageWarning: null,
