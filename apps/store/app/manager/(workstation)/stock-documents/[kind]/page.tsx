@@ -11,6 +11,7 @@ import { StockDocStatusBadge } from "../_components/status-badge";
 export const dynamic = "force-dynamic";
 
 const WRITE_ROLES = ["manager", "admin", "owner", "warehouse"];
+const REPACK_ROLES = ["warehouse", "admin", "owner"];
 
 export async function generateMetadata({
   params,
@@ -53,7 +54,9 @@ export default async function StockDocListPage({
     q: q || undefined,
     page,
   });
-  const canCreate = WRITE_ROLES.includes(user.role);
+  const canCreate = (
+    kind === "repackings" ? REPACK_ROLES : WRITE_ROLES
+  ).includes(user.role);
   return (
     <div className="space-y-3">
       <div className="text-sm">

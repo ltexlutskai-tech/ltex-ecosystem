@@ -48,6 +48,13 @@ export type SupplierReturnInput = z.infer<typeof supplierReturnSchema>;
 
 const repackLineSchema = lineSchema.extend({
   role: z.enum(["disassembled", "assembled"]).default("disassembled"),
+  // РОЗБІР: конкретний джерельний лот (зі скану ШК).
+  sourceLotId: z.string().min(1).nullable().optional(),
+  // КОМПЛЕКТАЦІЯ: ЦінаПродажуВес €/кг, якість, сектор.
+  salePriceEur: z.number().min(0).nullable().optional(),
+  qualityId: z.string().min(1).nullable().optional(),
+  sector: z.string().max(120).nullable().optional(),
+  sectorId: z.string().min(1).nullable().optional(),
 });
 export const repackingSchema = baseHeader.extend({
   items: z.array(repackLineSchema).default([]),

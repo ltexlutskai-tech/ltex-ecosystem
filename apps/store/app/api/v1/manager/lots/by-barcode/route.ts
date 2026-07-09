@@ -62,6 +62,7 @@ export async function GET(req: NextRequest) {
       quantity: lot.quantity,
       status: lot.status,
       priceEur: lot.priceEur,
+      purchasePriceEur: lot.purchasePriceEur,
       reservedForClientId: lot.reservedForClientId,
       reservedForName: lot.reservedForName,
       reservedByUserId: lot.reservedByUserId,

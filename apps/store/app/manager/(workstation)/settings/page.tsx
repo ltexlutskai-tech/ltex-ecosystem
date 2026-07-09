@@ -8,11 +8,15 @@ import {
   MANAGER_REFRESH_COOKIE,
 } from "@/lib/auth/manager-auth";
 import { sha256 } from "@/lib/auth/jwt";
+import { getRepackWeightTolerance } from "@/lib/manager/mgr-settings";
 import { ProfileSection } from "./_components/profile-section";
 import { TelegramSection } from "./_components/telegram-section";
 import { NotifyChannelsSection } from "./_components/notify-channels-section";
 import { SessionsSection } from "./_components/sessions-section";
+import { RepackToleranceSection } from "./_components/repack-tolerance-section";
 import { LogoutButton } from "./_components/logout-button";
+
+const REPACK_EDIT_ROLES = ["warehouse", "admin", "owner"];
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Налаштування — L-TEX Manager" };
@@ -49,6 +53,8 @@ export default async function SettingsPage() {
     isCurrent: currentHash !== null && s.tokenHash === currentHash,
   }));
 
+  const repackTolerance = await getRepackWeightTolerance();
+
   return (
     <div className="mx-auto max-w-2xl space-y-6">
       <h1 className="text-2xl font-bold text-gray-800">Налаштування</h1>
@@ -59,6 +65,10 @@ export default async function SettingsPage() {
         telegramLinked={user.telegramLinked}
       />
       <SessionsSection sessions={sessions} />
+      <RepackToleranceSection
+        initial={repackTolerance}
+        canEdit={REPACK_EDIT_ROLES.includes(user.role)}
+      />
       {user.role === "admin" && (
         <section className="rounded-lg border bg-white p-4">
           <h2 className="text-sm font-semibold text-gray-700">Довідники</h2>

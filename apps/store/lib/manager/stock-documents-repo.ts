@@ -6,6 +6,8 @@ import {
   type StockDocKind,
 } from "./stock-documents";
 import { applyStockDocumentMovements } from "./stock-movement-hooks";
+import { applyRepackFullCycle } from "./repack-full-cycle";
+import { getRepackWeightTolerance } from "./mgr-settings";
 
 /**
  * Репозиторій документів руху товару (Фаза 5) — спільна CRUD-логіка 8 типів:
@@ -25,6 +27,12 @@ export interface NormLine {
   qtyAccounting?: number;
   qtyActual?: number;
   unitName?: string | null;
+  // ── Перепаковка повного циклу (поля рядків) ──
+  sourceLotId?: string | null;
+  salePriceEur?: number | null;
+  qualityId?: string | null;
+  sector?: string | null;
+  sectorId?: string | null;
 }
 
 export interface CreateDocInput {
@@ -61,6 +69,11 @@ export function normalizeLine(raw: {
   qtyAccounting?: number;
   qtyActual?: number;
   unitName?: string | null;
+  sourceLotId?: string | null;
+  salePriceEur?: number | null;
+  qualityId?: string | null;
+  sector?: string | null;
+  sectorId?: string | null;
 }): NormLine {
   const weight = raw.weight ?? 0;
   const quantity = raw.quantity ?? 1;
@@ -79,6 +92,11 @@ export function normalizeLine(raw: {
     qtyAccounting: raw.qtyAccounting,
     qtyActual: raw.qtyActual,
     unitName: raw.unitName ?? null,
+    sourceLotId: raw.sourceLotId ?? null,
+    salePriceEur: raw.salePriceEur ?? null,
+    qualityId: raw.qualityId ?? null,
+    sector: raw.sector ?? null,
+    sectorId: raw.sectorId ?? null,
   };
 }
 
@@ -177,6 +195,14 @@ export async function createStockDoc(
               create: input.lines.map((l) => ({
                 role: l.role ?? "disassembled",
                 ...linePriced(l),
+                sourceLotId: l.sourceLotId ?? null,
+                salePriceEur:
+                  l.salePriceEur != null && l.salePriceEur > 0
+                    ? l.salePriceEur
+                    : null,
+                qualityId: l.qualityId ?? null,
+                sector: l.sector ?? null,
+                sectorId: l.sectorId ?? null,
               })),
             },
           },
@@ -254,7 +280,7 @@ export async function postStockDoc(
   id: string,
   userId: string,
   db: PrismaClient = prisma,
-): Promise<{ ok: boolean; reason?: string }> {
+): Promise<{ ok: boolean; reason?: string; weightWarning?: boolean }> {
   const postedData = {
     status: "posted",
     postedAt: new Date(),
@@ -298,8 +324,29 @@ export async function postStockDoc(
     "stock-transfers": db.stockTransfer,
   }[kind] as unknown as SimpleDelegate;
   const result = await simplePost(delegate, id, postedData);
+  if (!result.ok) return result;
   // Рух складу при успішному проведенні (best-effort, не валить проведення).
-  if (result.ok) applyStockDocumentMovements(kind, id);
+  applyStockDocumentMovements(kind, id);
+  // Перепаковка повного циклу: списання джерела + створення лотів + собівартість.
+  // Виконується у своїй транзакції (усе-або-нічого); при помилці — відкат статусу.
+  if (kind === "repackings") {
+    try {
+      const tolerance = await getRepackWeightTolerance();
+      const r = await applyRepackFullCycle(id, tolerance, db);
+      return { ok: true, weightWarning: r.weightWarning };
+    } catch (e) {
+      await db.repacking
+        .update({
+          where: { id },
+          data: { status: "draft", postedAt: null, postedByUserId: null },
+        })
+        .catch(() => undefined);
+      return {
+        ok: false,
+        reason: e instanceof Error ? e.message : "repack_apply_failed",
+      };
+    }
+  }
   return result;
 }
 
