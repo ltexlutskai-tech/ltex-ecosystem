@@ -1,15 +1,22 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const { mockPrisma, getCurrentRateMock } = vi.hoisted(() => {
-  const tx = {
+  // Спільні делегати для `tx` (усередині $transaction) і singleton `prisma`:
+  // тепер `createSaleWithItems` теж працює у транзакції (щоб рух боргу був
+  // атомарним з документом), тож `sale.create` викликається на `tx`.
+  const delegates = {
+    sale: { create: vi.fn(), update: vi.fn(), findUnique: vi.fn() },
     saleItem: { deleteMany: vi.fn() },
-    sale: { update: vi.fn() },
+    customer: { findUnique: vi.fn() },
+    mgrClient: { findUnique: vi.fn(), update: vi.fn(), updateMany: vi.fn() },
+    mgrDebtMovement: { upsert: vi.fn(), groupBy: vi.fn() },
   };
   return {
     mockPrisma: {
-      sale: { create: vi.fn(), update: tx.sale.update },
-      saleItem: tx.saleItem,
-      $transaction: vi.fn(async (cb: (t: typeof tx) => unknown) => cb(tx)),
+      ...delegates,
+      $transaction: vi.fn(async (cb: (t: typeof delegates) => unknown) =>
+        cb(delegates),
+      ),
     },
     getCurrentRateMock: vi.fn(),
   };
