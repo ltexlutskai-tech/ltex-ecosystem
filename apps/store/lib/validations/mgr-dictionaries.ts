@@ -11,9 +11,13 @@ import { z } from "zod";
 
 // ─── Банк. рахунки ──────────────────────────────────────────────────────────
 
+/** Тип рахунку: account (банк-рахунок), card (картка), cash (готівкова каса). */
+export const BANK_ACCOUNT_KINDS = ["account", "card", "cash"] as const;
+
 export const createBankAccountSchema = z.object({
   name: z.string().trim().min(1, "Вкажіть назву").max(200),
   description: z.string().trim().max(500).optional(),
+  kind: z.enum(BANK_ACCOUNT_KINDS).optional().default("account"),
   hiddenInApp: z.boolean().optional().default(false),
 });
 
@@ -21,6 +25,7 @@ export const updateBankAccountSchema = z
   .object({
     name: z.string().trim().min(1).max(200).optional(),
     description: z.string().trim().max(500).nullable().optional(),
+    kind: z.enum(BANK_ACCOUNT_KINDS).optional(),
     hiddenInApp: z.boolean().optional(),
     archived: z.boolean().optional(),
   })
@@ -33,10 +38,18 @@ export type UpdateBankAccountInput = z.infer<typeof updateBankAccountSchema>;
 
 // ─── Статті руху коштів ───────────────────────────────────────────────────
 
+/** Напрям статті: income (прихід), expense (розхід), both (обидва). */
+export const CASH_FLOW_ARTICLE_DIRECTIONS = [
+  "income",
+  "expense",
+  "both",
+] as const;
+
 export const createCashFlowArticleSchema = z.object({
   name: z.string().trim().min(1, "Вкажіть назву").max(200),
   code: z.string().trim().max(50).optional(),
   parentId: z.string().trim().min(1).nullable().optional(),
+  direction: z.enum(CASH_FLOW_ARTICLE_DIRECTIONS).optional().default("both"),
 });
 
 export const updateCashFlowArticleSchema = z
@@ -44,6 +57,7 @@ export const updateCashFlowArticleSchema = z
     name: z.string().trim().min(1).max(200).optional(),
     code: z.string().trim().max(50).nullable().optional(),
     parentId: z.string().trim().min(1).nullable().optional(),
+    direction: z.enum(CASH_FLOW_ARTICLE_DIRECTIONS).optional(),
     archived: z.boolean().optional(),
   })
   .refine((v) => Object.keys(v).length > 0, {
