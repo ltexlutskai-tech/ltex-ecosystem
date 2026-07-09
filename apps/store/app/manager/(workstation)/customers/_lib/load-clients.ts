@@ -3,16 +3,6 @@ import { ownershipWhere } from "@/lib/manager/client-visibility";
 import type { CurrentManager } from "@/lib/auth/manager-auth";
 import type { ClientListItem } from "../_components/types";
 
-const TRASH_NAME_PREFIXES = [
-  "1111",
-  "2222",
-  "3333",
-  "5555",
-  "7777",
-  "8888",
-  "9999",
-];
-
 export interface LoadClientsParams {
   userId: string;
   /**
@@ -194,11 +184,13 @@ export async function loadClients(
       ],
     });
   }
+  // ТЗ 8.0: замість старого хака з numeric-префіксами імен — справжня позначка
+  // на вилучення. Позначені на вилучення ховаємо (за замовчуванням); архівні —
+  // завжди поза робочим списком (окремий перегляд «Архів» — окремо).
   if (p.hideTrash !== false) {
-    for (const prefix of TRASH_NAME_PREFIXES) {
-      andClauses.push({ NOT: { name: { startsWith: prefix } } });
-    }
+    andClauses.push({ markedForDeletion: false });
   }
+  andClauses.push({ archived: false });
 
   // M1.3f visibility scope. Admin → no filter; manager → лише свої.
   const ownership = ownershipWhere({ id: p.userId, role: p.userRole });

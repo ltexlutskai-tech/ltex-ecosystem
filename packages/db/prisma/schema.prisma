@@ -27,6 +27,9 @@ model Category {
   // Приховати категорію (та її піддерево) з сайту й від торгових агентів
   // (7.2). Товари лишаються в системі; змінити категорію → знову видимі.
   hiddenFromCatalog Boolean @default(false) @map("hidden_from_catalog")
+  // ТЗ 8.0 soft-delete (позначка на вилучення / архів). Вітрина ці поля не читає.
+  markedForDeletion Boolean @default(false) @map("marked_for_deletion")
+  archived          Boolean @default(false)
   createdAt      DateTime @default(now()) @map("created_at")
   updatedAt      DateTime @updatedAt @map("updated_at")
 
@@ -58,6 +61,9 @@ model Product {
   // Виробник (← 1С «Производитель»: VIVE, SOEX, Канада…). 7.2.
   producer      String?
   inStock       Boolean  @default(true) @map("in_stock")
+  // ТЗ 8.0 soft-delete (позначка на вилучення / архів). Вітрина ці поля не читає.
+  markedForDeletion Boolean @default(false) @map("marked_for_deletion")
+  archived          Boolean @default(false)
   gender        String?
   sizes         String?
   unitsPerKg    String?  @map("units_per_kg")
@@ -261,6 +267,7 @@ model Order {
   // Проведено в 1С (ставиться на етапі обмінів) + актуальність.
   archived            Boolean @default(false)
   isActual            Boolean @default(true) @map("is_actual")
+  markedForDeletion   Boolean @default(false) @map("marked_for_deletion") // ТЗ 8.0 soft-delete
   routeSheetId        String? @map("route_sheet_id") // зворотне посилання на МЛ (1С Заказ.МаршрутныйЛист)
 
   // ─── Закриття замовлень (Етап 3 блоку Замовлення, 2026-06-09) ────────────
@@ -376,6 +383,7 @@ model Sale {
   routeId             String?  @map("route_id")
   archived            Boolean  @default(false)
   isActual            Boolean  @default(true) @map("is_actual")
+  markedForDeletion   Boolean  @default(false) @map("marked_for_deletion") // ТЗ 8.0 soft-delete
   routeSheetId        String?  @map("route_sheet_id") // зворотне посилання на МЛ
   createdAt           DateTime @default(now()) @map("created_at")
   updatedAt           DateTime @updatedAt @map("updated_at")
@@ -430,6 +438,7 @@ model MgrCashOrder {
   uidEur            String?  @map("uid_eur")
   uidUsd            String?  @map("uid_usd")
   archived          Boolean  @default(false)
+  markedForDeletion Boolean  @default(false) @map("marked_for_deletion") // ТЗ 8.0 soft-delete
   routeSheetId      String?  @map("route_sheet_id") // зворотне посилання на МЛ
   comment           String?
   agentUserId       String?  @map("agent_user_id")
@@ -1246,6 +1255,9 @@ model MgrClientStatus {
   colorHex  String @map("color_hex")
   sortOrder Int    @default(0) @map("sort_order")
 
+  markedForDeletion Boolean @default(false) @map("marked_for_deletion") // ТЗ 8.0
+  archived          Boolean @default(false)
+
   clientsGeneral     MgrClient[] @relation("MgrClientStatusGeneral")
   clientsOperational MgrClient[] @relation("MgrClientStatusOperational")
 
@@ -1258,6 +1270,9 @@ model MgrSearchChannel {
   label     String
   sortOrder Int    @default(0) @map("sort_order")
 
+  markedForDeletion Boolean @default(false) @map("marked_for_deletion") // ТЗ 8.0
+  archived          Boolean @default(false)
+
   clients MgrClient[]
 
   @@map("mgr_search_channels")
@@ -1269,6 +1284,9 @@ model MgrCategoryTT {
   label     String
   sortOrder Int    @default(0) @map("sort_order")
 
+  markedForDeletion Boolean @default(false) @map("marked_for_deletion") // ТЗ 8.0
+  archived          Boolean @default(false)
+
   clients MgrClient[]
 
   @@map("mgr_categories_tt")
@@ -1279,6 +1297,9 @@ model MgrDeliveryMethod {
   code      String @unique
   label     String
   sortOrder Int    @default(0) @map("sort_order")
+
+  markedForDeletion Boolean @default(false) @map("marked_for_deletion") // ТЗ 8.0
+  archived          Boolean @default(false)
 
   clients MgrClient[]
 
@@ -1302,6 +1323,9 @@ model MgrRoute {
   name      String
   isActive  Boolean  @default(true) @map("is_active")
   createdAt DateTime @default(now()) @map("created_at")
+
+  markedForDeletion Boolean @default(false) @map("marked_for_deletion") // ТЗ 8.0
+  archived          Boolean @default(false)
 
   primaryForClients MgrClient[]                @relation("MgrClientPrimaryRoute")
   assignments       MgrClientRouteAssignment[]
@@ -1336,6 +1360,7 @@ model RouteSheet {
   gpsLat          Float?    @map("gps_lat")
   gpsLng          Float?    @map("gps_lng")
   archived        Boolean   @default(false)
+  markedForDeletion Boolean @default(false) @map("marked_for_deletion") // ТЗ 8.0 soft-delete
   exportTo1C      Boolean   @default(true) @map("export_to_1c")
   posted          Boolean   @default(false)
   createdAt       DateTime  @default(now()) @map("created_at")
@@ -1508,6 +1533,14 @@ model MgrClient {
   licenseExpiresAt DateTime? @map("license_expires_at")
   isOwn            Boolean   @default(false) @map("is_own")
   notDirectInput   Boolean   @default(false) @map("not_direct_input")
+
+  // ─── ТЗ 8.0 — «позначка на вилучення» (soft-delete у стилі 1С) ─────────────
+  // markedForDeletion — кандидат на видалення, чекає рішення адміна (зникає з
+  // робочих списків менеджера, зʼявляється у черзі /manager/admin/deletions).
+  // archived — остаточно приховано назавжди (коли фіз. стерти не можна через
+  // звʼязки/1С-історію); дані збережені, можна відновити. Деталі — DeletionRequest.
+  markedForDeletion Boolean @default(false) @map("marked_for_deletion")
+  archived          Boolean @default(false)
 
   debt                  Decimal   @default(0) @db.Decimal(12, 2)
   overdueDebt           Decimal   @default(0) @map("overdue_debt") @db.Decimal(12, 2)
@@ -1740,7 +1773,38 @@ model MgrProducer {
   label     String
   sortOrder Int    @default(0) @map("sort_order")
 
+  markedForDeletion Boolean @default(false) @map("marked_for_deletion") // ТЗ 8.0
+  archived          Boolean @default(false)
+
   @@map("mgr_producers")
+}
+
+// ─── ТЗ 8.0 — черга «позначок на вилучення» (1С «Видалення позначених») ──────
+// Полиморфна: одна таблиця для всіх типів обʼєктів (клієнти/документи/довідники).
+// Звичайний менеджер створює запит (status="pending") з обовʼязковою причиною →
+// обʼєкт зникає з його списків. Адміністратор у /manager/admin/deletions рішає:
+// approve (фіз. видалення, ЛИШЕ якщо 0 посилань і code1C=null; інакше авто-архів)
+// або reject (зняти позначку, повернути обʼєкт). Без FK — тримає лише entityId +
+// знімок назви, щоб черга пережила фізичне видалення обʼєкта.
+model DeletionRequest {
+  id                String    @id @default(cuid())
+  entityType        String    @map("entity_type") // client|order|sale|cash_order|route_sheet|dictionary|category|product
+  entityId          String    @map("entity_id")
+  entityLabel       String    @map("entity_label") // знімок назви/номера для черги
+  dictType          String?   @map("dict_type") // лише для entityType="dictionary"
+  reason            String    @db.Text // причина від користувача (обовʼязкова)
+  status            String    @default("pending") // pending|approved|rejected
+  outcome           String?   // при approve: "deleted" | "archived"
+  requestedByUserId String    @map("requested_by_user_id")
+  requestedByName   String?   @map("requested_by_name")
+  requestedAt       DateTime  @default(now()) @map("requested_at")
+  resolvedByUserId  String?   @map("resolved_by_user_id")
+  resolvedAt        DateTime? @map("resolved_at")
+  resolutionNote    String?   @map("resolution_note") @db.Text
+
+  @@index([status, requestedAt])
+  @@index([entityType, entityId])
+  @@map("deletion_requests")
 }
 
 // ─── Лічильник візитів сайту (7.2 Блок 4) ──────────────────────────────────
