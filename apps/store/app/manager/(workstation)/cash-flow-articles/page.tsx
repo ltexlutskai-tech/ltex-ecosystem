@@ -1,7 +1,10 @@
 import { redirect } from "next/navigation";
 import { prisma } from "@ltex/db";
 import { requireRole } from "@/lib/auth/manager-auth";
-import { CashFlowArticlesManager } from "./_components/cash-flow-articles-manager";
+import {
+  CashFlowArticlesManager,
+  type CashFlowArticleItem,
+} from "./_components/cash-flow-articles-manager";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Статті руху коштів — L-TEX Manager" };
@@ -17,6 +20,7 @@ export default async function CashFlowArticlesPage() {
       code: true,
       name: true,
       parentId: true,
+      direction: true,
       archived: true,
     },
   });
@@ -29,7 +33,7 @@ export default async function CashFlowArticlesPage() {
           Довідник статей для ордерів-розходу (← 1С Статті руху коштів).
         </p>
       </header>
-      <CashFlowArticlesManager initial={items} />
+      <CashFlowArticlesManager initial={items as CashFlowArticleItem[]} />
     </div>
   );
 }

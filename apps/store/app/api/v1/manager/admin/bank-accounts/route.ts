@@ -22,6 +22,7 @@ export async function GET(req: NextRequest) {
       id: true,
       name: true,
       description: true,
+      kind: true,
       hiddenInApp: true,
       archived: true,
     },
@@ -51,12 +52,14 @@ export async function POST(req: NextRequest) {
     data: {
       name: parsed.data.name,
       description: parsed.data.description ?? null,
+      kind: parsed.data.kind,
       hiddenInApp: parsed.data.hiddenInApp,
     },
     select: {
       id: true,
       name: true,
       description: true,
+      kind: true,
       hiddenInApp: true,
       archived: true,
     },

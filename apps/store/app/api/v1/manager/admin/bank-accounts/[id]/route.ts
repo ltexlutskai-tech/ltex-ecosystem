@@ -37,6 +37,7 @@ export async function PATCH(
         id: true,
         name: true,
         description: true,
+        kind: true,
         hiddenInApp: true,
         archived: true,
       },

@@ -1,7 +1,10 @@
 import { redirect } from "next/navigation";
 import { prisma } from "@ltex/db";
 import { requireRole } from "@/lib/auth/manager-auth";
-import { BankAccountsManager } from "./_components/bank-accounts-manager";
+import {
+  BankAccountsManager,
+  type BankAccountItem,
+} from "./_components/bank-accounts-manager";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Банк. рахунки — L-TEX Manager" };
@@ -16,6 +19,7 @@ export default async function BankAccountsPage() {
       id: true,
       name: true,
       description: true,
+      kind: true,
       hiddenInApp: true,
       archived: true,
     },
@@ -30,7 +34,7 @@ export default async function BankAccountsPage() {
           «Прихований» рахунок не можна вибрати при приході.
         </p>
       </header>
-      <BankAccountsManager initial={items} />
+      <BankAccountsManager initial={items as BankAccountItem[]} />
     </div>
   );
 }

@@ -5,15 +5,26 @@ import { useRouter } from "next/navigation";
 import { Plus, Check, Pencil } from "lucide-react";
 import { Button, Input, useToast } from "@ltex/ui";
 
+export type BankAccountKind = "account" | "card" | "cash";
+
 export interface BankAccountItem {
   id: string;
   name: string;
   description: string | null;
+  kind: BankAccountKind;
   hiddenInApp: boolean;
   archived: boolean;
 }
 
 const BASE = "/api/v1/manager/admin/bank-accounts";
+
+const KIND_LABELS: Record<BankAccountKind, string> = {
+  account: "Рахунок",
+  card: "Картка",
+  cash: "Каса",
+};
+
+const KIND_OPTIONS: BankAccountKind[] = ["account", "card", "cash"];
 
 export function BankAccountsManager({
   initial,
@@ -26,10 +37,12 @@ export function BankAccountsManager({
 
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
+  const [kind, setKind] = useState<BankAccountKind>("account");
   const [hiddenInApp, setHiddenInApp] = useState(false);
   const [busy, setBusy] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
+  const [editKind, setEditKind] = useState<BankAccountKind>("account");
 
   async function call(url: string, method: string, body: unknown) {
     setBusy(true);
@@ -56,18 +69,23 @@ export function BankAccountsManager({
     const ok = await call(BASE, "POST", {
       name: name.trim(),
       description: description.trim() || undefined,
+      kind,
       hiddenInApp,
     });
     if (ok) {
       setName("");
       setDescription("");
+      setKind("account");
       setHiddenInApp(false);
     }
   }
 
   async function saveEdit(id: string) {
     if (!editName.trim()) return;
-    const ok = await call(`${BASE}/${id}`, "PATCH", { name: editName.trim() });
+    const ok = await call(`${BASE}/${id}`, "PATCH", {
+      name: editName.trim(),
+      kind: editKind,
+    });
     if (ok) setEditingId(null);
   }
 
@@ -86,6 +104,18 @@ export function BankAccountsManager({
           onChange={(e) => setDescription(e.target.value)}
           placeholder="Опис (необов'язково)"
         />
+        <select
+          value={kind}
+          onChange={(e) => setKind(e.target.value as BankAccountKind)}
+          className="h-9 w-full rounded-md border border-gray-300 bg-white px-2 text-sm text-gray-700"
+          aria-label="Тип"
+        >
+          {KIND_OPTIONS.map((k) => (
+            <option key={k} value={k}>
+              {KIND_LABELS[k]}
+            </option>
+          ))}
+        </select>
         <label className="flex items-center gap-2 text-sm text-gray-700">
           <input
             type="checkbox"
@@ -93,7 +123,7 @@ export function BankAccountsManager({
             onChange={(e) => setHiddenInApp(e.target.checked)}
             className="h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
           />
-          Прихований (не пропонувати при приході)
+          Ліміт на отримання: приховати від менеджерів при приході
         </label>
         <Button
           type="button"
@@ -114,6 +144,7 @@ export function BankAccountsManager({
             <tr className="border-b bg-gray-50 text-left text-gray-500">
               <th className="px-4 py-2 font-medium">Назва</th>
               <th className="px-4 py-2 font-medium">Опис</th>
+              <th className="px-4 py-2 font-medium">Тип</th>
               <th className="px-4 py-2 text-center font-medium">Прихований</th>
               <th className="px-4 py-2 text-right font-medium">Дії</th>
             </tr>
@@ -121,7 +152,7 @@ export function BankAccountsManager({
           <tbody>
             {initial.length === 0 && (
               <tr>
-                <td colSpan={4} className="px-4 py-8 text-center text-gray-400">
+                <td colSpan={5} className="px-4 py-8 text-center text-gray-400">
                   Немає рахунків.
                 </td>
               </tr>
@@ -146,6 +177,28 @@ export function BankAccountsManager({
                 </td>
                 <td className="px-4 py-2 text-gray-600">
                   {b.description ?? "—"}
+                </td>
+                <td className="px-4 py-2">
+                  {editingId === b.id ? (
+                    <select
+                      value={editKind}
+                      onChange={(e) =>
+                        setEditKind(e.target.value as BankAccountKind)
+                      }
+                      className="h-8 rounded-md border border-gray-300 bg-white px-2 text-sm text-gray-700"
+                      aria-label="Тип"
+                    >
+                      {KIND_OPTIONS.map((k) => (
+                        <option key={k} value={k}>
+                          {KIND_LABELS[k]}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <span className="inline-flex rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">
+                      {KIND_LABELS[b.kind]}
+                    </span>
+                  )}
                 </td>
                 <td className="px-4 py-2 text-center">
                   <button
@@ -181,6 +234,7 @@ export function BankAccountsManager({
                         onClick={() => {
                           setEditingId(b.id);
                           setEditName(b.name);
+                          setEditKind(b.kind);
                         }}
                       >
                         <Pencil className="h-4 w-4" />

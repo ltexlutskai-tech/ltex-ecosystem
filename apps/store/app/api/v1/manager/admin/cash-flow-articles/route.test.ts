@@ -78,6 +78,7 @@ describe("POST /admin/cash-flow-articles", () => {
       code: "02",
       name: "Витрати",
       parentId: "cf1",
+      direction: "both",
       archived: false,
     });
     const res = await POST(
@@ -87,5 +88,33 @@ describe("POST /admin/cash-flow-articles", () => {
     const json = (await res.json()) as { id: string; parentId: string };
     expect(json.id).toBe("cf2");
     expect(json.parentId).toBe("cf1");
+    // Дефолтний напрям передається у create.
+    expect(mockPrisma.mgrCashFlowArticle.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ direction: "both" }),
+      }),
+    );
+  });
+
+  it("round-trips explicit direction on create", async () => {
+    mockPrisma.mgrCashFlowArticle.create.mockResolvedValueOnce({
+      id: "cf3",
+      code: null,
+      name: "Оплата від покупця",
+      parentId: null,
+      direction: "income",
+      archived: false,
+    });
+    const res = await POST(
+      req("POST", { name: "Оплата від покупця", direction: "income" }),
+    );
+    expect(res.status).toBe(201);
+    const json = (await res.json()) as { direction: string };
+    expect(json.direction).toBe("income");
+    expect(mockPrisma.mgrCashFlowArticle.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ direction: "income" }),
+      }),
+    );
   });
 });
