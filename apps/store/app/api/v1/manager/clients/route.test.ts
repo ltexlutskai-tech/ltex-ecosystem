@@ -100,12 +100,15 @@ describe("GET /api/v1/manager/clients — base behaviour", () => {
     expect(json.totalPages).toBe(1);
   });
 
-  it("applies hideTrash filter by default (excludes 7777-prefixed names)", async () => {
+  it("hides marked-for-deletion and archived clients by default (ТЗ 8.0)", async () => {
     await GET(makeReq());
     const callArgs = mockPrisma.mgrClient.findMany.mock.calls[0]?.[0];
-    const where = callArgs.where as { AND?: Array<{ NOT?: unknown }> };
-    const nots = (where.AND ?? []).filter((c) => "NOT" in c);
-    expect(nots.length).toBeGreaterThan(0);
+    const where = callArgs.where as {
+      AND?: Array<{ markedForDeletion?: boolean; archived?: boolean }>;
+    };
+    const and = where.AND ?? [];
+    expect(and.some((c) => c.markedForDeletion === false)).toBe(true);
+    expect(and.some((c) => c.archived === false)).toBe(true);
   });
 
   it("filters by legacy status code when query param given (back-compat)", async () => {

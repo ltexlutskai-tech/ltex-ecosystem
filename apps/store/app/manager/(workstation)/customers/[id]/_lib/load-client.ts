@@ -29,6 +29,7 @@ export async function loadClientDetail(
       assortmentItems: { orderBy: { lastOrderedAt: "desc" } },
       presentations: { orderBy: { lastPresentedAt: "desc" } },
       bankAccounts: { orderBy: { accountNumber: "asc" } },
+      contacts: { orderBy: { sortOrder: "asc" } },
       reminders: {
         orderBy: { remindAt: "asc" },
         include: { owner: { select: { id: true, fullName: true } } },
@@ -51,6 +52,30 @@ export async function loadClientDetail(
   const viewerOwnership: ViewerOwnership = user
     ? await getViewerOwnership(user, id)
     : "foreign";
+
+  // ТЗ 8.0 — Блок E1: дерево «головний клієнт → філії».
+  // parentClient — за `parentCode1C` (→ code1C головного клієнта);
+  // childClients — клієнти, що вказують на цього як на головного.
+  const [parentClient, childClients] = await Promise.all([
+    client.parentCode1C
+      ? prisma.mgrClient.findUnique({
+          where: { code1C: client.parentCode1C },
+          select: { id: true, name: true, code1C: true },
+        })
+      : Promise.resolve(null),
+    client.code1C
+      ? prisma.mgrClient.findMany({
+          where: {
+            parentCode1C: client.code1C,
+            archived: false,
+            markedForDeletion: false,
+            id: { not: client.id },
+          },
+          select: { id: true, name: true, code1C: true },
+          orderBy: { name: "asc" },
+        })
+      : Promise.resolve([]),
+  ]);
 
   const full: ClientDetail = {
     viewerOwnership,
@@ -196,6 +221,14 @@ export async function loadClientDetail(
       comment: b.comment,
       isHidden: b.isHidden,
     })),
+    contacts: client.contacts.map((c) => ({
+      id: c.id,
+      fullName: c.fullName,
+      position: c.position,
+      phone: c.phone,
+      email: c.email,
+      comment: c.comment,
+    })),
     reminders: client.reminders.map((r) => ({
       id: r.id,
       body: r.body,
@@ -221,6 +254,18 @@ export async function loadClientDetail(
           fullName: client.assignments[0].user.fullName,
         }
       : null,
+    parentClient: parentClient
+      ? {
+          id: parentClient.id,
+          name: parentClient.name,
+          code1C: parentClient.code1C,
+        }
+      : null,
+    childClients: childClients.map((c) => ({
+      id: c.id,
+      name: c.name,
+      code1C: c.code1C,
+    })),
   };
 
   return viewerOwnership === "foreign" ? maskClientForForeign(full) : full;

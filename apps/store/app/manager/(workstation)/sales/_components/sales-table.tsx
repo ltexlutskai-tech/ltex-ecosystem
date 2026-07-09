@@ -4,7 +4,7 @@ import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { SalesRow, type SalesRowData } from "./sales-row";
 import { SortableHeader } from "../../_components/sortable-header";
 import { useListContextMenu } from "../../_components/use-list-context-menu";
-import { useDocDelete } from "../../_components/use-doc-delete";
+import { useDocMarkDeletion } from "../../_components/use-doc-mark-deletion";
 import type { ContextMenuItem } from "../../_components/list-context-menu";
 import type { MenuContext } from "../../_components/use-list-context-menu";
 
@@ -31,7 +31,7 @@ export function SalesTable({ items }: { items: SalesRowData[] }) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const { requestDelete, dialog: deleteDialog } = useDocDelete();
+  const { requestMark, dialog: deleteDialog } = useDocMarkDeletion();
 
   function setSort(key: string, dir: "asc" | "desc") {
     const p = new URLSearchParams(searchParams);
@@ -95,19 +95,20 @@ export function SalesTable({ items }: { items: SalesRowData[] }) {
       label: "Оновити",
       onSelect: () => router.refresh(),
     });
-    // Видалення документа реалізації (ownership перевіряє сервер).
+    // Позначення реалізації на вилучення (ownership перевіряє сервер).
     const saleId = ctx.href.split("/").pop();
     if (saleId) {
       items.push({ type: "separator" });
       items.push({
         type: "action",
         danger: true,
-        label: "Видалити",
+        label: "Позначити на вилучення",
         onSelect: () =>
-          requestDelete({
-            endpoint: `/api/v1/manager/sales/${saleId}`,
+          requestMark({
+            entityType: "sale",
+            entityId: saleId,
             message:
-              "Видалити цю реалізацію? Дію не можна скасувати. Якщо документ проведено, борг клієнта буде перераховано.",
+              "Позначити цю реалізацію на вилучення? Якщо адміністратор підтвердить і документ проведено, борг клієнта буде перераховано.",
           }),
       });
     }

@@ -1,7 +1,7 @@
 import { prisma } from "@ltex/db";
 import { cookies } from "next/headers";
 import type { NextRequest } from "next/server";
-import { verifyAccessToken, type ManagerRole } from "./jwt";
+import { verifyAccessToken, type ManagerRole, ADMIN_ROLES } from "./jwt";
 
 export const MANAGER_ACCESS_COOKIE = "ltex_mgr_access";
 export const MANAGER_REFRESH_COOKIE = "ltex_mgr_refresh";
@@ -74,5 +74,25 @@ export async function requireRole(
   const user = await getCurrentUser(req);
   if (!user) return null;
   if (!roles.includes(user.role)) return null;
+  return user;
+}
+
+/**
+ * Єдине визначення «адміністратора» для всієї менеджерки (ТЗ 8.0 B3).
+ * admin і owner мають повний доступ (owner логується з isOwnerAction=true).
+ * Раніше перевірки були розкидані (ADMIN_ROLES / role==="admin" / requireRole);
+ * використовуй ці хелпери для будь-якої admin-only дії, зокрема черги видалень.
+ */
+export function isAdminRole(role: ManagerRole): boolean {
+  return ADMIN_ROLES.has(role);
+}
+
+/** Повертає користувача лише якщо він admin або owner, інакше null. */
+export async function requireAdmin(
+  req?: NextRequest,
+): Promise<CurrentManager | null> {
+  const user = await getCurrentUser(req);
+  if (!user) return null;
+  if (!isAdminRole(user.role)) return null;
   return user;
 }

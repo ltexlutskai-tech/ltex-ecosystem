@@ -1,6 +1,9 @@
 import { prisma } from "@ltex/db";
 import type { ChangeCurrency } from "@/lib/validations/manager-cash-order";
-import { applyDebtMovementSafe } from "@/lib/manager/debt-register";
+import {
+  applyDebtMovementTx,
+  recomputeDebtForClientsSafe,
+} from "@/lib/manager/debt-register";
 
 /**
  * Блок «Реалізація» — Етап 4. Касовий ордер (каса) + розрахунок здачі.
@@ -444,6 +447,9 @@ export async function createPaymentOrders(args: CreatePaymentArgs) {
   const documentSumEur = reduceToEur(paid, rates);
   const changeTotal = change.uah + change.eur + change.usd;
 
+  // Клієнт руху боргу — резолвиться у транзакції, для перерахунку кешу після.
+  let debtClientId: string | null = null;
+
   const result = await prisma.$transaction(async (tx) => {
     const income = await tx.mgrCashOrder.create({
       data: {
@@ -515,39 +521,44 @@ export async function createPaymentOrders(args: CreatePaymentArgs) {
       });
     }
 
+    // C1: рух боргу при оплаті (Приход) — погашення ЗМЕНШУЄ борг (−) — пишеться
+    // у ТІЙ САМІЙ транзакції, що й ордер (атомарно; ідемпотентно за income.id).
+    // Расход (standalone) НЕ обліковуємо — семантика боргу для нього неоднозначна.
+    // Здача (change) окремим рухом не йде — вона вже врахована у `settledEur`.
+    if (type === "income") {
+      let effectiveCustomerId: string | null = customerId ?? null;
+      if (!effectiveCustomerId && saleId) {
+        const sale = await tx.sale.findUnique({
+          where: { id: saleId },
+          select: { customerId: true },
+        });
+        effectiveCustomerId = sale?.customerId ?? null;
+      }
+
+      // Сума, що фактично пішла в погашення (здача не зменшує борг).
+      const settledEur =
+        reduceToEur(paid, rates) - reduceChangeToEur(change, rates);
+
+      if (effectiveCustomerId && settledEur !== 0) {
+        debtClientId = await applyDebtMovementTx(tx, {
+          customerId: effectiveCustomerId,
+          amountEur: -settledEur, // оплата ЗМЕНШУЄ борг
+          kind: "payment",
+          sourceType: "cash_order",
+          sourceId: income.id,
+          occurredAt: income.createdAt ?? new Date(),
+          note: "Оплата (касовий ордер)",
+          createdByUserId: agentUserId ?? null,
+        });
+      }
+    }
+
     return { income, change: changeOrder };
   });
 
-  // 5.4.5b: рух боргу при оплаті (Приход) — погашення ЗМЕНШУЄ борг (−).
-  // ПІСЛЯ коміту (потрібен income.id; fire-and-forget не тримає транзакцію).
-  // Расход (standalone) НЕ обліковуємо — семантика боргу для нього неоднозначна
-  // (TODO: окремо). Здача (change) окремим рухом не йде — вона вже у `settledEur`.
-  if (type === "income") {
-    let effectiveCustomerId: string | null = customerId ?? null;
-    if (!effectiveCustomerId && saleId) {
-      const sale = await prisma.sale.findUnique({
-        where: { id: saleId },
-        select: { customerId: true },
-      });
-      effectiveCustomerId = sale?.customerId ?? null;
-    }
-
-    // Сума, що фактично пішла в погашення (здача не зменшує борг).
-    const settledEur =
-      reduceToEur(paid, rates) - reduceChangeToEur(change, rates);
-
-    if (effectiveCustomerId && settledEur !== 0) {
-      applyDebtMovementSafe({
-        customerId: effectiveCustomerId,
-        amountEur: -settledEur, // оплата ЗМЕНШУЄ борг
-        kind: "payment",
-        sourceType: "cash_order",
-        sourceId: result.income.id,
-        occurredAt: result.income.createdAt ?? new Date(),
-        note: "Оплата (касовий ордер)",
-        createdByUserId: agentUserId ?? null,
-      });
-    }
+  // C1: перерахунок кешу боргу — ПІСЛЯ коміту (кеш похідний, поза транзакцією).
+  if (debtClientId) {
+    await recomputeDebtForClientsSafe([debtClientId]);
   }
 
   return result;

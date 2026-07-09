@@ -49,6 +49,6 @@ export const COLUMN_LABELS: Record<string, string> = {
   monthlyVolume: "Об'єм/міс",
   daysSinceLast: "Днів без покупки",
   licenseExpiresAt: "Ліцензія до",
-  lastSyncedAt: "Остання синхр.",
+  lastSyncedAt: "Оновлено",
   createdAt: "Створений",
 };

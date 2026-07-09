@@ -70,9 +70,12 @@ function baseClient(overrides: Partial<ClientDetail> = {}): ClientDetail {
     assortmentItems: [],
     presentations: [],
     bankAccounts: [],
+    contacts: [],
     reminders: [],
     timeline: [],
     assignedManager: null,
+    parentClient: null,
+    childClients: [],
     ...overrides,
   };
 }

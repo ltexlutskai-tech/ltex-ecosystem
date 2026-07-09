@@ -1,5 +1,14 @@
 import { prisma } from "@ltex/db";
 
+/**
+ * ТЗ 8.0 B7: у дропдаунах картки клієнта не показуємо заархівовані / позначені
+ * на вилучення значення довідників (лишаються лише у вже збережених картках).
+ */
+const DICT_SELECT_WHERE = {
+  archived: false,
+  markedForDeletion: false,
+} as const;
+
 export interface EditDictionaryOption {
   id: string;
   label: string;
@@ -27,14 +36,26 @@ export async function loadEditDictionaries(): Promise<EditDictionaries> {
     routes,
     agents,
   ] = await Promise.all([
-    prisma.mgrClientStatus.findMany({ orderBy: { sortOrder: "asc" } }),
-    prisma.mgrSearchChannel.findMany({ orderBy: { sortOrder: "asc" } }),
-    prisma.mgrCategoryTT.findMany({ orderBy: { sortOrder: "asc" } }),
-    prisma.mgrDeliveryMethod.findMany({ orderBy: { sortOrder: "asc" } }),
+    prisma.mgrClientStatus.findMany({
+      where: DICT_SELECT_WHERE,
+      orderBy: { sortOrder: "asc" },
+    }),
+    prisma.mgrSearchChannel.findMany({
+      where: DICT_SELECT_WHERE,
+      orderBy: { sortOrder: "asc" },
+    }),
+    prisma.mgrCategoryTT.findMany({
+      where: DICT_SELECT_WHERE,
+      orderBy: { sortOrder: "asc" },
+    }),
+    prisma.mgrDeliveryMethod.findMany({
+      where: DICT_SELECT_WHERE,
+      orderBy: { sortOrder: "asc" },
+    }),
     prisma.mgrAssortmentCode.findMany({ orderBy: { sortOrder: "asc" } }),
     prisma.mgrPriceType.findMany({ orderBy: { sortOrder: "asc" } }),
     prisma.mgrRoute.findMany({
-      where: { isActive: true },
+      where: { ...DICT_SELECT_WHERE, isActive: true },
       orderBy: { name: "asc" },
     }),
     prisma.user.findMany({

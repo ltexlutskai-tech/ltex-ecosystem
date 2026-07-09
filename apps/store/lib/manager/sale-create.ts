@@ -4,7 +4,10 @@ import {
   buildSaleEventBody,
   recordClientEventSafe,
 } from "@/lib/manager/client-timeline";
-import { applyDebtMovementSafe } from "@/lib/manager/debt-register";
+import {
+  applyDebtMovementTx,
+  recomputeDebtForClientsSafe,
+} from "@/lib/manager/debt-register";
 import { applySaleMovements } from "@/lib/manager/sale-movement-hooks";
 import { notifyOrdersClosedBySale } from "@/lib/manager/sale-order-close";
 import type {
@@ -106,9 +109,11 @@ function codAmountFor(
  * cashOnDelivery (+codAmountUah) / assignedAgentUserId (дефолт null —
  * призначає UI) / onTradeAgent / exportTo1C / expressWaybill.
  *
- * Після успіху — **fire-and-forget** enqueue до 1С (`enqueueSaleSyncSafe`).
- * Якщо enqueue падає — sale вже existing, користувач бачить успіх. Той самий
- * best-effort pattern як `createOrderWithItems`.
+ * Обмінів із 1С немає — лише локальна логіка. При проведенні (`post`) рух боргу
+ * (`MgrDebtMovement`) пишеться у ТІЙ САМІЙ транзакції, що й реалізація (Блок C1):
+ * документ і його борг-рух комітяться атомарно. Перерахунок кешу
+ * `MgrClient.debt` — після коміту (похідний), історія клієнта та нагадування —
+ * fire-and-forget, не блокують відповідь.
  */
 export async function createSaleWithItems(
   input: CreateSaleInputRaw,
@@ -124,30 +129,58 @@ export async function createSaleWithItems(
   // Проведення документа (кнопка «Зберегти та провести») → posted + archived.
   const post = input.post === true;
 
-  const sale = await prisma.sale.create({
-    data: {
-      customerId: customer.id,
-      status: post ? "posted" : "draft",
-      archived: post,
-      totalEur,
-      totalUah,
-      exchangeRateEur: rateEur,
-      exchangeRateUsd: rateUsd,
-      notes: input.notes,
-      priceTypeId: input.priceTypeId ?? null,
-      deliveryMethod: input.deliveryMethod ?? null,
-      novaPoshtaBranch: input.novaPoshtaBranch ?? null,
-      cashOnDelivery,
-      codAmountUah: codAmountFor(cashOnDelivery, totalUah),
-      assignedAgentUserId: input.assignedAgentUserId ?? null,
-      onTradeAgent: input.onTradeAgent ?? true,
-      exportTo1C: input.exportTo1C ?? true,
-      expressWaybill: input.expressWaybill ?? null,
-      routeSheetId: input.routeSheetId ?? null,
-      items: { create: itemRows },
-    },
-    include: SALE_INCLUDE,
+  // Клієнт руху боргу — резолвиться всередині транзакції; повертається назовні
+  // для перерахунку кешу боргу ПІСЛЯ коміту.
+  let debtClientId: string | null = null;
+
+  const sale = await prisma.$transaction(async (tx) => {
+    const created = await tx.sale.create({
+      data: {
+        customerId: customer.id,
+        status: post ? "posted" : "draft",
+        archived: post,
+        totalEur,
+        totalUah,
+        exchangeRateEur: rateEur,
+        exchangeRateUsd: rateUsd,
+        notes: input.notes,
+        priceTypeId: input.priceTypeId ?? null,
+        deliveryMethod: input.deliveryMethod ?? null,
+        novaPoshtaBranch: input.novaPoshtaBranch ?? null,
+        cashOnDelivery,
+        codAmountUah: codAmountFor(cashOnDelivery, totalUah),
+        assignedAgentUserId: input.assignedAgentUserId ?? null,
+        onTradeAgent: input.onTradeAgent ?? true,
+        exportTo1C: input.exportTo1C ?? true,
+        expressWaybill: input.expressWaybill ?? null,
+        routeSheetId: input.routeSheetId ?? null,
+        items: { create: itemRows },
+      },
+      include: SALE_INCLUDE,
+    });
+
+    // C1: рух боргу при проведенні (+totalEur — борг клієнта зростає) — АТОМАРНО
+    // з документом. Ідемпотентно за sourceType+sourceId; чернетка руху не створює.
+    if (post) {
+      debtClientId = await applyDebtMovementTx(tx, {
+        customerId: created.customerId,
+        amountEur: Number(created.totalEur),
+        kind: "sale",
+        sourceType: "sale",
+        sourceId: created.id,
+        occurredAt: created.createdAt ?? new Date(),
+        note: "Реалізація проведена",
+        createdByUserId: actor.userId,
+      });
+    }
+
+    return created;
   });
+
+  // C1: перерахунок кешу боргу — ПІСЛЯ коміту (кеш похідний, поза транзакцією).
+  if (debtClientId) {
+    await recomputeDebtForClientsSafe([debtClientId]);
+  }
 
   // Авто-запис історії клієнта (Фаза 4) — fire-and-forget, не блокує відповідь.
   recordClientEventSafe({
@@ -158,23 +191,11 @@ export async function createSaleWithItems(
     metadata: { saleId: sale.id },
   });
 
-  // 5.4.5b: рух боргу при проведенні (+totalEur — борг клієнта зростає).
-  // Ідемпотентно за sourceType+sourceId; чернетка (draft) рух НЕ створює.
+  // 7.3: нагадування менеджеру, якщо реалізація могла закрити замовлення.
   if (post) {
-    applyDebtMovementSafe({
-      customerId: sale.customerId,
-      amountEur: Number(sale.totalEur),
-      kind: "sale",
-      sourceType: "sale",
-      sourceId: sale.id,
-      occurredAt: sale.createdAt ?? new Date(),
-      note: "Реалізація проведена",
-      createdByUserId: actor.userId,
-    });
     // Рухи регістрів (склад/продажі/собівартість) при проведенні — best-effort,
     // ідемпотентно (delete-then-create за реєстратором sale.code1C ?? sale.id).
     applySaleMovements(sale.id);
-    // 7.3: нагадування менеджеру, якщо реалізація могла закрити замовлення.
     void notifyOrdersClosedBySale({
       saleId: sale.id,
       saleNumber1C: sale.number1C,
@@ -211,9 +232,12 @@ export async function updateSaleWithItems(
   // Проведення (`posted`) → документ архівується.
   const becomesArchived = options?.nextStatus === "posted";
 
+  // Клієнт руху боргу — резолвиться у транзакції, для перерахунку кешу після.
+  let debtClientId: string | null = null;
+
   const sale = await prisma.$transaction(async (tx) => {
     await tx.saleItem.deleteMany({ where: { saleId } });
-    return tx.sale.update({
+    const updated = await tx.sale.update({
       where: { id: saleId },
       data: {
         status: options?.nextStatus,
@@ -236,24 +260,35 @@ export async function updateSaleWithItems(
       },
       include: SALE_INCLUDE,
     });
+
+    // C1: рух боргу при переході у `posted` (проведення з картки реалізації) —
+    // АТОМАРНО з документом. Ідемпотентно за sourceType+sourceId (повторне
+    // проведення лише оновить суму).
+    if (becomesArchived) {
+      debtClientId = await applyDebtMovementTx(tx, {
+        customerId: updated.customerId,
+        amountEur: Number(updated.totalEur),
+        kind: "sale",
+        sourceType: "sale",
+        sourceId: updated.id,
+        occurredAt: updated.createdAt ?? new Date(),
+        note: "Реалізація проведена",
+        createdByUserId: _actor.userId,
+      });
+    }
+
+    return updated;
   });
 
-  // 5.4.5b: рух боргу при переході у `posted` (проведення з картки реалізації).
-  // Ідемпотентно за sourceType+sourceId — повторне проведення лише оновить суму.
+  // C1: перерахунок кешу боргу — ПІСЛЯ коміту (кеш похідний).
+  if (debtClientId) {
+    await recomputeDebtForClientsSafe([debtClientId]);
+  }
+
+  // 7.3: нагадування менеджеру, якщо реалізація могла закрити замовлення.
   if (becomesArchived) {
-    applyDebtMovementSafe({
-      customerId: sale.customerId,
-      amountEur: Number(sale.totalEur),
-      kind: "sale",
-      sourceType: "sale",
-      sourceId: sale.id,
-      occurredAt: sale.createdAt ?? new Date(),
-      note: "Реалізація проведена",
-      createdByUserId: _actor.userId,
-    });
     // Рухи регістрів (склад/продажі/собівартість) при проведенні з картки.
     applySaleMovements(sale.id);
-    // 7.3: нагадування менеджеру, якщо реалізація могла закрити замовлення.
     void notifyOrdersClosedBySale({
       saleId: sale.id,
       saleNumber1C: sale.number1C,

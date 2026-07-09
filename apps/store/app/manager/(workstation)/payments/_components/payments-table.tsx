@@ -4,7 +4,7 @@ import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { PaymentsRow, type PaymentsRowData } from "./payments-row";
 import { SortableHeader } from "../../_components/sortable-header";
 import { useListContextMenu } from "../../_components/use-list-context-menu";
-import { useDocDelete } from "../../_components/use-doc-delete";
+import { useDocMarkDeletion } from "../../_components/use-doc-mark-deletion";
 import type { ContextMenuItem } from "../../_components/list-context-menu";
 import type { MenuContext } from "../../_components/use-list-context-menu";
 
@@ -26,7 +26,7 @@ export function PaymentsTable({ items }: { items: PaymentsRowData[] }) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const { requestDelete, dialog: deleteDialog } = useDocDelete();
+  const { requestMark, dialog: deleteDialog } = useDocMarkDeletion();
 
   function setSort(key: string, dir: "asc" | "desc") {
     const p = new URLSearchParams(searchParams);
@@ -90,20 +90,21 @@ export function PaymentsTable({ items }: { items: PaymentsRowData[] }) {
       label: "Оновити",
       onSelect: () => router.refresh(),
     });
-    // Видалення касового ордера (ownership/права перевіряє сервер). `ctx.href`
-    // = /manager/payments/<id>, де <id> = id касового ордера.
+    // Позначення касового ордера на вилучення (ownership/права перевіряє
+    // сервер). `ctx.href` = /manager/payments/<id>, де <id> = id ордера.
     const cashOrderId = ctx.href.split("/").pop();
     if (cashOrderId) {
       items.push({ type: "separator" });
       items.push({
         type: "action",
         danger: true,
-        label: "Видалити",
+        label: "Позначити на вилучення",
         onSelect: () =>
-          requestDelete({
-            endpoint: `/api/v1/manager/cash-orders/${cashOrderId}`,
+          requestMark({
+            entityType: "cash_order",
+            entityId: cashOrderId,
             message:
-              "Видалити цей касовий ордер? Дію не можна скасувати. Борг клієнта буде перераховано, парний ордер-здача видалено.",
+              "Позначити цей касовий ордер на вилучення? Якщо адміністратор підтвердить, борг клієнта буде перераховано, а парний ордер-здача видалено.",
           }),
       });
     }

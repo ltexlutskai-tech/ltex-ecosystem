@@ -3,6 +3,8 @@ import { ClientStatusBadge } from "../../_components/client-status-badge";
 import { formatEur, parseDecimal } from "../../_components/format";
 import { ClientActionButtons } from "./client-action-buttons";
 import { ClientBankAccountRow } from "./client-bank-account-row";
+import { ClientContactsSection } from "./client-contacts-section";
+import { ClientHierarchySection } from "./client-hierarchy-section";
 import { ClientPhonesSection } from "./client-phones-section";
 import { ClientRoutesSection } from "./client-routes-section";
 import {
@@ -135,10 +137,22 @@ export function ClientRequisitesView({
 
   return (
     <div className="space-y-6">
+      <ClientHierarchySection
+        parentClient={client.parentClient}
+        childClients={client.childClients}
+      />
+
       <ClientPhonesSection
         clientId={client.id}
         phones={client.phones}
         phonePrimary={client.phonePrimary}
+        isForeign={isForeign}
+        canEdit={canEdit}
+      />
+
+      <ClientContactsSection
+        clientId={client.id}
+        contacts={client.contacts}
         isForeign={isForeign}
         canEdit={canEdit}
       />
@@ -274,7 +288,7 @@ export function ClientRequisitesView({
             label="Ліцензія дійсна до"
             value={fmtDate(client.licenseExpiresAt)}
           />
-          <Row label="Оновлено з 1С" value={fmtDateTime(client.lastSyncedAt)} />
+          <Row label="Оновлено" value={fmtDateTime(client.lastSyncedAt)} />
 
           <div className="sm:col-span-2">
             <Row
@@ -343,7 +357,11 @@ export function ClientRequisitesView({
 
       <FlagsBlock client={client} />
 
-      <ClientActionButtons clientId={client.id} customerId={customerId} />
+      <ClientActionButtons
+        clientId={client.id}
+        customerId={customerId}
+        canEdit={canEdit}
+      />
     </div>
   );
 }

@@ -3,15 +3,15 @@ import { ownershipWhere } from "@/lib/manager/client-visibility";
 import type { CurrentManager } from "@/lib/auth/manager-auth";
 import type { ClientListItem } from "../_components/types";
 
-const TRASH_NAME_PREFIXES = [
-  "1111",
-  "2222",
-  "3333",
-  "5555",
-  "7777",
-  "8888",
-  "9999",
-];
+/**
+ * ТЗ 8.0 B7: фільтр «активних» значень довідника для списків вибору —
+ * приховує заархівовані та позначені на вилучення записи (вони лишаються у вже
+ * збережених документах/клієнтах, але не пропонуються для нового вибору).
+ */
+const DICT_SELECT_WHERE = {
+  archived: false,
+  markedForDeletion: false,
+} as const;
 
 export interface LoadClientsParams {
   userId: string;
@@ -194,11 +194,13 @@ export async function loadClients(
       ],
     });
   }
+  // ТЗ 8.0: замість старого хака з numeric-префіксами імен — справжня позначка
+  // на вилучення. Позначені на вилучення ховаємо (за замовчуванням); архівні —
+  // завжди поза робочим списком (окремий перегляд «Архів» — окремо).
   if (p.hideTrash !== false) {
-    for (const prefix of TRASH_NAME_PREFIXES) {
-      andClauses.push({ NOT: { name: { startsWith: prefix } } });
-    }
+    andClauses.push({ markedForDeletion: false });
   }
+  andClauses.push({ archived: false });
 
   // M1.3f visibility scope. Admin → no filter; manager → лише свої.
   const ownership = ownershipWhere({ id: p.userId, role: p.userRole });
@@ -315,14 +317,34 @@ export async function loadDictionariesSnapshot() {
     routes,
     agents,
   ] = await Promise.all([
-    prisma.mgrClientStatus.findMany({ orderBy: { sortOrder: "asc" } }),
-    prisma.mgrClientStatus.findMany({ orderBy: { sortOrder: "asc" } }),
-    prisma.mgrSearchChannel.findMany({ orderBy: { sortOrder: "asc" } }),
-    prisma.mgrDeliveryMethod.findMany({ orderBy: { sortOrder: "asc" } }),
-    prisma.mgrCategoryTT.findMany({ orderBy: { sortOrder: "asc" } }),
+    // ТЗ 8.0 B7: у списках вибору не показуємо заархівовані / позначені
+    // на вилучення значення довідників.
+    prisma.mgrClientStatus.findMany({
+      where: DICT_SELECT_WHERE,
+      orderBy: { sortOrder: "asc" },
+    }),
+    prisma.mgrClientStatus.findMany({
+      where: DICT_SELECT_WHERE,
+      orderBy: { sortOrder: "asc" },
+    }),
+    prisma.mgrSearchChannel.findMany({
+      where: DICT_SELECT_WHERE,
+      orderBy: { sortOrder: "asc" },
+    }),
+    prisma.mgrDeliveryMethod.findMany({
+      where: DICT_SELECT_WHERE,
+      orderBy: { sortOrder: "asc" },
+    }),
+    prisma.mgrCategoryTT.findMany({
+      where: DICT_SELECT_WHERE,
+      orderBy: { sortOrder: "asc" },
+    }),
     prisma.mgrPriceType.findMany({ orderBy: { sortOrder: "asc" } }),
     prisma.mgrAssortmentCode.findMany({ orderBy: { sortOrder: "asc" } }),
-    prisma.mgrRoute.findMany({ orderBy: { name: "asc" } }),
+    prisma.mgrRoute.findMany({
+      where: DICT_SELECT_WHERE,
+      orderBy: { name: "asc" },
+    }),
     prisma.user.findMany({
       where: { role: { in: ["manager", "admin"] }, isActive: true },
       orderBy: { fullName: "asc" },

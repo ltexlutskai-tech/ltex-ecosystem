@@ -77,9 +77,10 @@ export function buildOrderTotals(
  * Менеджерські поля (Етап 1): priceTypeId / deliveryMethod / cashOnDelivery /
  * assignedAgentUserId (дефолт — поточний менеджер) / exportTo1C.
  *
- * Після успіху — **fire-and-forget** enqueue до 1С (M1.5 sync pattern).
- * Якщо enqueue падає — order вже existing, користувач бачить успіх.
- * Той самий best-effort pattern як PATCH /clients/[id] з M1.5.
+ * Обмінів із 1С немає — лише локальна логіка. Замовлення саме по собі не
+ * створює руху боргу (борг зростає при проведенні реалізації, а не замовлення);
+ * історія клієнта пишеться fire-and-forget через `recordClientEventSafe`
+ * (локальний логер таймлайну, не обмін) і не блокує відповідь.
  */
 export async function createOrderWithItems(
   input: CreateOrderInputRaw,

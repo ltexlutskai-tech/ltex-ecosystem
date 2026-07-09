@@ -4,7 +4,7 @@ import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { OrdersRow, type OrdersRowData } from "./orders-row";
 import { SortableHeader } from "../../_components/sortable-header";
 import { useListContextMenu } from "../../_components/use-list-context-menu";
-import { useDocDelete } from "../../_components/use-doc-delete";
+import { useDocMarkDeletion } from "../../_components/use-doc-mark-deletion";
 import type { ContextMenuItem } from "../../_components/list-context-menu";
 import type { MenuContext } from "../../_components/use-list-context-menu";
 
@@ -30,7 +30,7 @@ export function OrdersTable({ items }: { items: OrdersRowData[] }) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const { requestDelete, dialog: deleteDialog } = useDocDelete();
+  const { requestMark, dialog: deleteDialog } = useDocMarkDeletion();
 
   function setSort(key: string, dir: "asc" | "desc") {
     const p = new URLSearchParams(searchParams);
@@ -94,19 +94,20 @@ export function OrdersTable({ items }: { items: OrdersRowData[] }) {
       label: "Оновити",
       onSelect: () => router.refresh(),
     });
-    // Видалення замовлення (ownership/права перевіряє сервер).
+    // Позначення замовлення на вилучення (ownership/права перевіряє сервер).
     const orderId = ctx.href.split("/").pop();
     if (orderId) {
       items.push({ type: "separator" });
       items.push({
         type: "action",
         danger: true,
-        label: "Видалити",
+        label: "Позначити на вилучення",
         onSelect: () =>
-          requestDelete({
-            endpoint: `/api/v1/manager/orders/${orderId}`,
+          requestMark({
+            entityType: "order",
+            entityId: orderId,
             message:
-              "Видалити це замовлення? Дію не можна скасувати. Позиції замовлення буде видалено, реалізації-підстави — відв'язано.",
+              "Позначити це замовлення на вилучення? Остаточне рішення прийме адміністратор.",
           }),
       });
     }

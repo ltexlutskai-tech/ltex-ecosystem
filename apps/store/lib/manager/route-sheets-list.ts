@@ -60,6 +60,9 @@ export function buildRouteSheetsWhere(
     where.archived = false;
   }
 
+  // ТЗ 8.0 B6: позначені на вилучення завжди приховані зі списку.
+  where.markedForDeletion = false;
+
   // Пошук: № документа / назва маршруту (= `comment`).
   if (p.search && p.search.trim().length > 0) {
     const q = p.search.trim();

@@ -5,9 +5,11 @@ import { Menu } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@ltex/ui";
 import type { ManagerRole } from "@/lib/auth/jwt";
 import { ChatUnreadBadge } from "./chat-unread-badge";
+import { DeletionsBadge } from "./deletions-badge";
 import { SidebarNavLink } from "./sidebar-nav-link";
 import {
   ADMIN_AUDIT_LINK,
+  ADMIN_DELETIONS_LINK,
   ADMIN_PERMISSIONS_LINK,
   ADMIN_REGION_AGENTS_LINK,
   ADMIN_USERS_LINK,
@@ -116,6 +118,13 @@ export function SidebarMobileTrigger({ role }: { role: ManagerRole }) {
                 href={ADMIN_AUDIT_LINK.href}
                 label={ADMIN_AUDIT_LINK.label}
                 icon={iconFor(ADMIN_AUDIT_LINK)}
+                onNavigate={close}
+              />
+              <SidebarNavLink
+                href={ADMIN_DELETIONS_LINK.href}
+                label={ADMIN_DELETIONS_LINK.label}
+                icon={iconFor(ADMIN_DELETIONS_LINK)}
+                badgeSlot={<DeletionsBadge />}
                 onNavigate={close}
               />
             </>

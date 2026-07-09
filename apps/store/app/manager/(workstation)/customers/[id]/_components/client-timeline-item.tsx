@@ -50,7 +50,7 @@ const KIND_META: Record<
   viber: { icon: "📱", label: "Viber", color: "text-purple-700", auto: true },
   sync: {
     icon: "🔄",
-    label: "Синхронізація",
+    label: "Оновлення",
     color: "text-gray-500",
     auto: true,
   },

@@ -24,8 +24,8 @@ export async function ClientSalesHistoryTab({
       <div className="space-y-4">
         <h3 className="text-lg font-semibold text-gray-800">Історія продаж</h3>
         <EmptyState
-          message="Клієнт ще не синхронізований з 1С"
-          hint="Реалізації прив'язуються за кодом клієнта (code1C). Зачекайте на найближчий sync або зверніться до адміністратора."
+          message="У клієнта ще немає продажів"
+          hint="Реалізації прив'язуються за кодом клієнта (code1C). У цього клієнта код ще не проставлено."
         />
       </div>
     );

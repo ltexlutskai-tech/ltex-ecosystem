@@ -1,8 +1,10 @@
 import type { ManagerRole } from "@/lib/auth/jwt";
 import { ChatUnreadBadge } from "./chat-unread-badge";
+import { DeletionsBadge } from "./deletions-badge";
 import { SidebarNavLink } from "./sidebar-nav-link";
 import {
   ADMIN_AUDIT_LINK,
+  ADMIN_DELETIONS_LINK,
   ADMIN_PERMISSIONS_LINK,
   ADMIN_REGION_AGENTS_LINK,
   ADMIN_USERS_LINK,
@@ -96,6 +98,12 @@ export function ManagerSidebar({ role }: { role: ManagerRole }) {
             href={ADMIN_AUDIT_LINK.href}
             label={ADMIN_AUDIT_LINK.label}
             icon={renderLinkIcon(ADMIN_AUDIT_LINK)}
+          />
+          <SidebarNavLink
+            href={ADMIN_DELETIONS_LINK.href}
+            label={ADMIN_DELETIONS_LINK.label}
+            icon={renderLinkIcon(ADMIN_DELETIONS_LINK)}
+            badgeSlot={<DeletionsBadge />}
           />
         </>
       )}

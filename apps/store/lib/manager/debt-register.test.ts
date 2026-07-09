@@ -22,6 +22,7 @@ import {
   recomputeDebtForClients,
   resolveClientIdByCustomer,
   applyDebtMovementSafe,
+  applyDebtMovementTx,
 } from "./debt-register";
 
 // Фейковий prisma: лише методи, які торкає хелпер.
@@ -37,6 +38,7 @@ function makePrisma() {
     },
     mgrDebtMovement: {
       groupBy: vi.fn().mockResolvedValue([]),
+      upsert: vi.fn().mockResolvedValue({}),
     },
   };
 }
@@ -78,13 +80,14 @@ describe("recomputeDebtForClients", () => {
     ]);
 
     expect(updated).toBe(2);
+    // overdueDebt=0 бо другий (overdue) groupBy повертає [] за замовчуванням.
     expect(prisma.mgrClient.update).toHaveBeenCalledWith({
       where: { id: "c1" },
-      data: { debt: 150 },
+      data: { debt: 150, overdueDebt: 0 },
     });
     expect(prisma.mgrClient.update).toHaveBeenCalledWith({
       where: { id: "c2" },
-      data: { debt: -25.5 },
+      data: { debt: -25.5, overdueDebt: 0 },
     });
     // Точкова перебудова НЕ обнуляє всіх через updateMany.
     expect(prisma.mgrClient.updateMany).not.toHaveBeenCalled();
@@ -104,11 +107,11 @@ describe("recomputeDebtForClients", () => {
     expect(updated).toBe(2);
     expect(prisma.mgrClient.update).toHaveBeenCalledWith({
       where: { id: "c1" },
-      data: { debt: 100 },
+      data: { debt: 100, overdueDebt: 0 },
     });
     expect(prisma.mgrClient.update).toHaveBeenCalledWith({
       where: { id: "c2" },
-      data: { debt: 0 },
+      data: { debt: 0, overdueDebt: 0 },
     });
   });
 
@@ -120,15 +123,15 @@ describe("recomputeDebtForClients", () => {
     const updated = await recomputeDebtForClients(asPrisma(prisma));
 
     expect(prisma.mgrClient.updateMany).toHaveBeenCalledWith({
-      data: { debt: 0 },
+      data: { debt: 0, overdueDebt: 0 },
     });
-    // groupBy без where-фільтра (усі клієнти).
+    // Основний groupBy — без where-фільтра (усі клієнти).
     expect(prisma.mgrDebtMovement.groupBy).toHaveBeenCalledWith(
       expect.objectContaining({ where: undefined }),
     );
     expect(prisma.mgrClient.update).toHaveBeenCalledWith({
       where: { id: "c1" },
-      data: { debt: 42 },
+      data: { debt: 42, overdueDebt: 0 },
     });
     expect(updated).toBe(1);
   });
@@ -148,7 +151,67 @@ describe("recomputeDebtForClients", () => {
     await recomputeDebtForClients(asPrisma(prisma), ["c1"]);
     expect(prisma.mgrClient.update).toHaveBeenCalledWith({
       where: { id: "c1" },
-      data: { debt: 10.01 },
+      data: { debt: 10.01, overdueDebt: 0 },
+    });
+  });
+
+  describe("overdueDebt (прострочений борг)", () => {
+    it("overdue=0 коли всі рухи свіжі (немає старих за поріг)", async () => {
+      prisma.mgrDebtMovement.groupBy
+        // Основний groupBy: поточний борг = 100.
+        .mockResolvedValueOnce([{ clientId: "c1", _sum: { amountEur: 100 } }])
+        // Overdue groupBy (occurredAt < поріг): порожньо → історичний баланс 0.
+        .mockResolvedValueOnce([]);
+
+      await recomputeDebtForClients(asPrisma(prisma), ["c1"]);
+
+      expect(prisma.mgrClient.update).toHaveBeenCalledWith({
+        where: { id: "c1" },
+        data: { debt: 100, overdueDebt: 0 },
+      });
+    });
+
+    it("overdue>0 коли є старий непокритий борг", async () => {
+      prisma.mgrDebtMovement.groupBy
+        .mockResolvedValueOnce([{ clientId: "c1", _sum: { amountEur: 100 } }])
+        // Історичний баланс на момент порогу = 100 (старий непокритий борг).
+        .mockResolvedValueOnce([{ clientId: "c1", _sum: { amountEur: 100 } }]);
+
+      await recomputeDebtForClients(asPrisma(prisma), ["c1"]);
+
+      expect(prisma.mgrClient.update).toHaveBeenCalledWith({
+        where: { id: "c1" },
+        data: { debt: 100, overdueDebt: 100 },
+      });
+    });
+
+    it("свіжа оплата зменшує overdue (min з поточним боргом)", async () => {
+      prisma.mgrDebtMovement.groupBy
+        // Поточний борг = 60 (старий 100 мінус свіжа оплата 40).
+        .mockResolvedValueOnce([{ clientId: "c1", _sum: { amountEur: 60 } }])
+        // Історичний баланс на момент порогу = 100 (свіжа оплата ще після порогу).
+        .mockResolvedValueOnce([{ clientId: "c1", _sum: { amountEur: 100 } }]);
+
+      await recomputeDebtForClients(asPrisma(prisma), ["c1"]);
+
+      // overdue = min(60, 100) = 60.
+      expect(prisma.mgrClient.update).toHaveBeenCalledWith({
+        where: { id: "c1" },
+        data: { debt: 60, overdueDebt: 60 },
+      });
+    });
+
+    it("повне гасіння старого боргу → overdue=0 (min(0,100))", async () => {
+      prisma.mgrDebtMovement.groupBy
+        .mockResolvedValueOnce([{ clientId: "c1", _sum: { amountEur: 0 } }])
+        .mockResolvedValueOnce([{ clientId: "c1", _sum: { amountEur: 100 } }]);
+
+      await recomputeDebtForClients(asPrisma(prisma), ["c1"]);
+
+      expect(prisma.mgrClient.update).toHaveBeenCalledWith({
+        where: { id: "c1" },
+        data: { debt: 0, overdueDebt: 0 },
+      });
     });
   });
 });
@@ -268,5 +331,82 @@ describe("applyDebtMovementSafe", () => {
     await flush();
     // recompute не дійшов через помилку upsert.
     expect(mockDb.mgrDebtMovement.groupBy).not.toHaveBeenCalled();
+  });
+});
+
+describe("applyDebtMovementTx", () => {
+  it("резолвить клієнта → upsert руху у tx + повертає clientId (без recompute)", async () => {
+    prisma.customer.findUnique.mockResolvedValueOnce({ code1C: "ABC123" });
+    prisma.mgrClient.findUnique.mockResolvedValueOnce({ id: "mgr-1" });
+
+    const occurredAt = new Date("2026-06-16T10:00:00Z");
+    const clientId = await applyDebtMovementTx(asPrisma(prisma), {
+      customerId: "cust-1",
+      amountEur: 150.014, // round2 → 150.01
+      kind: "sale",
+      sourceType: "sale",
+      sourceId: "sale-1",
+      occurredAt,
+      note: "Реалізація проведена",
+      createdByUserId: "user-1",
+    });
+
+    expect(clientId).toBe("mgr-1");
+    expect(prisma.mgrDebtMovement.upsert).toHaveBeenCalledWith({
+      where: {
+        mgr_debt_movement_source: {
+          kind: "sale",
+          sourceType: "sale",
+          sourceId: "sale-1",
+        },
+      },
+      create: {
+        clientId: "mgr-1",
+        amountEur: 150.01,
+        kind: "sale",
+        sourceType: "sale",
+        sourceId: "sale-1",
+        occurredAt,
+        note: "Реалізація проведена",
+        createdByUserId: "user-1",
+      },
+      update: { amountEur: 150.01, clientId: "mgr-1" },
+    });
+    // Кеш перераховують ПІСЛЯ коміту — не тут.
+    expect(prisma.mgrDebtMovement.groupBy).not.toHaveBeenCalled();
+    expect(prisma.mgrClient.update).not.toHaveBeenCalled();
+  });
+
+  it("клієнт не резолвиться → null, upsert НЕ викликано", async () => {
+    prisma.customer.findUnique.mockResolvedValueOnce({ code1C: null });
+
+    const clientId = await applyDebtMovementTx(asPrisma(prisma), {
+      customerId: "cust-x",
+      amountEur: 99,
+      kind: "sale",
+      sourceType: "sale",
+      sourceId: "sale-2",
+      occurredAt: new Date(),
+    });
+
+    expect(clientId).toBeNull();
+    expect(prisma.mgrDebtMovement.upsert).not.toHaveBeenCalled();
+  });
+
+  it("КИДАЄ, якщо upsert падає (відкат транзакції документа)", async () => {
+    prisma.customer.findUnique.mockResolvedValueOnce({ code1C: "ABC123" });
+    prisma.mgrClient.findUnique.mockResolvedValueOnce({ id: "mgr-1" });
+    prisma.mgrDebtMovement.upsert.mockRejectedValueOnce(new Error("db down"));
+
+    await expect(
+      applyDebtMovementTx(asPrisma(prisma), {
+        customerId: "cust-1",
+        amountEur: 10,
+        kind: "sale",
+        sourceType: "sale",
+        sourceId: "sale-3",
+        occurredAt: new Date(),
+      }),
+    ).rejects.toThrow("db down");
   });
 });

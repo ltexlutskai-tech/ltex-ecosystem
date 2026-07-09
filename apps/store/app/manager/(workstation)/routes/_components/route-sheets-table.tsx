@@ -3,13 +3,13 @@
 import { useRouter } from "next/navigation";
 import { RouteSheetsRow, type RouteSheetsRowData } from "./route-sheets-row";
 import { useListContextMenu } from "../../_components/use-list-context-menu";
-import { useDocDelete } from "../../_components/use-doc-delete";
+import { useDocMarkDeletion } from "../../_components/use-doc-mark-deletion";
 import type { ContextMenuItem } from "../../_components/list-context-menu";
 import type { MenuContext } from "../../_components/use-list-context-menu";
 
 export function RouteSheetsTable({ items }: { items: RouteSheetsRowData[] }) {
   const router = useRouter();
-  const { requestDelete, dialog: deleteDialog } = useDocDelete();
+  const { requestMark, dialog: deleteDialog } = useDocMarkDeletion();
 
   const buildItems = (
     ctx: MenuContext,
@@ -34,20 +34,21 @@ export function RouteSheetsTable({ items }: { items: RouteSheetsRowData[] }) {
       label: "Оновити",
       onSelect: () => router.refresh(),
     });
-    // Видалення маршрутного листа (права перевіряє сервер). `ctx.href`
-    // = /manager/routes/<id>, де <id> = id маршрутного листа.
+    // Позначення маршрутного листа на вилучення (права перевіряє сервер).
+    // `ctx.href` = /manager/routes/<id>, де <id> = id маршрутного листа.
     const sheetId = ctx.href.split("/").pop();
     if (sheetId) {
       menuItems.push({ type: "separator" });
       menuItems.push({
         type: "action",
         danger: true,
-        label: "Видалити",
+        label: "Позначити на вилучення",
         onSelect: () =>
-          requestDelete({
-            endpoint: `/api/v1/manager/route-sheets/${sheetId}`,
+          requestMark({
+            entityType: "route_sheet",
+            entityId: sheetId,
             message:
-              "Видалити цей маршрутний лист? Дію не можна скасувати. Реалізації та оплати маршруту буде відв'язано (не видалено).",
+              "Позначити цей маршрутний лист на вилучення? Остаточне рішення прийме адміністратор.",
           }),
       });
     }

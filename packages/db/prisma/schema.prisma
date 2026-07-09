@@ -27,6 +27,9 @@ model Category {
   // Приховати категорію (та її піддерево) з сайту й від торгових агентів
   // (7.2). Товари лишаються в системі; змінити категорію → знову видимі.
   hiddenFromCatalog Boolean @default(false) @map("hidden_from_catalog")
+  // ТЗ 8.0 soft-delete (позначка на вилучення / архів). Вітрина ці поля не читає.
+  markedForDeletion Boolean @default(false) @map("marked_for_deletion")
+  archived          Boolean @default(false)
   createdAt      DateTime @default(now()) @map("created_at")
   updatedAt      DateTime @updatedAt @map("updated_at")
 
@@ -58,6 +61,9 @@ model Product {
   // Виробник (← 1С «Производитель»: VIVE, SOEX, Канада…). 7.2.
   producer      String?
   inStock       Boolean  @default(true) @map("in_stock")
+  // ТЗ 8.0 soft-delete (позначка на вилучення / архів). Вітрина ці поля не читає.
+  markedForDeletion Boolean @default(false) @map("marked_for_deletion")
+  archived          Boolean @default(false)
   gender        String?
   sizes         String?
   unitsPerKg    String?  @map("units_per_kg")
@@ -265,6 +271,7 @@ model Order {
   // Проведено в 1С (ставиться на етапі обмінів) + актуальність.
   archived            Boolean @default(false)
   isActual            Boolean @default(true) @map("is_actual")
+  markedForDeletion   Boolean @default(false) @map("marked_for_deletion") // ТЗ 8.0 soft-delete
   routeSheetId        String? @map("route_sheet_id") // зворотне посилання на МЛ (1С Заказ.МаршрутныйЛист)
 
   // ─── Закриття замовлень (Етап 3 блоку Замовлення, 2026-06-09) ────────────
@@ -380,6 +387,7 @@ model Sale {
   routeId             String?  @map("route_id")
   archived            Boolean  @default(false)
   isActual            Boolean  @default(true) @map("is_actual")
+  markedForDeletion   Boolean  @default(false) @map("marked_for_deletion") // ТЗ 8.0 soft-delete
   routeSheetId        String?  @map("route_sheet_id") // зворотне посилання на МЛ
   createdAt           DateTime @default(now()) @map("created_at")
   updatedAt           DateTime @updatedAt @map("updated_at")
@@ -434,6 +442,7 @@ model MgrCashOrder {
   uidEur            String?  @map("uid_eur")
   uidUsd            String?  @map("uid_usd")
   archived          Boolean  @default(false)
+  markedForDeletion Boolean  @default(false) @map("marked_for_deletion") // ТЗ 8.0 soft-delete
   routeSheetId      String?  @map("route_sheet_id") // зворотне посилання на МЛ
   comment           String?
   agentUserId       String?  @map("agent_user_id")
@@ -1253,6 +1262,9 @@ model MgrClientStatus {
   colorHex  String @map("color_hex")
   sortOrder Int    @default(0) @map("sort_order")
 
+  markedForDeletion Boolean @default(false) @map("marked_for_deletion") // ТЗ 8.0
+  archived          Boolean @default(false)
+
   clientsGeneral     MgrClient[] @relation("MgrClientStatusGeneral")
   clientsOperational MgrClient[] @relation("MgrClientStatusOperational")
 
@@ -1265,6 +1277,9 @@ model MgrSearchChannel {
   label     String
   sortOrder Int    @default(0) @map("sort_order")
 
+  markedForDeletion Boolean @default(false) @map("marked_for_deletion") // ТЗ 8.0
+  archived          Boolean @default(false)
+
   clients MgrClient[]
 
   @@map("mgr_search_channels")
@@ -1276,6 +1291,9 @@ model MgrCategoryTT {
   label     String
   sortOrder Int    @default(0) @map("sort_order")
 
+  markedForDeletion Boolean @default(false) @map("marked_for_deletion") // ТЗ 8.0
+  archived          Boolean @default(false)
+
   clients MgrClient[]
 
   @@map("mgr_categories_tt")
@@ -1286,6 +1304,9 @@ model MgrDeliveryMethod {
   code      String @unique
   label     String
   sortOrder Int    @default(0) @map("sort_order")
+
+  markedForDeletion Boolean @default(false) @map("marked_for_deletion") // ТЗ 8.0
+  archived          Boolean @default(false)
 
   clients MgrClient[]
 
@@ -1309,6 +1330,9 @@ model MgrRoute {
   name      String
   isActive  Boolean  @default(true) @map("is_active")
   createdAt DateTime @default(now()) @map("created_at")
+
+  markedForDeletion Boolean @default(false) @map("marked_for_deletion") // ТЗ 8.0
+  archived          Boolean @default(false)
 
   primaryForClients MgrClient[]                @relation("MgrClientPrimaryRoute")
   assignments       MgrClientRouteAssignment[]
@@ -1343,6 +1367,7 @@ model RouteSheet {
   gpsLat          Float?    @map("gps_lat")
   gpsLng          Float?    @map("gps_lng")
   archived        Boolean   @default(false)
+  markedForDeletion Boolean @default(false) @map("marked_for_deletion") // ТЗ 8.0 soft-delete
   exportTo1C      Boolean   @default(true) @map("export_to_1c")
   posted          Boolean   @default(false)
   createdAt       DateTime  @default(now()) @map("created_at")
@@ -1516,6 +1541,14 @@ model MgrClient {
   isOwn            Boolean   @default(false) @map("is_own")
   notDirectInput   Boolean   @default(false) @map("not_direct_input")
 
+  // ─── ТЗ 8.0 — «позначка на вилучення» (soft-delete у стилі 1С) ─────────────
+  // markedForDeletion — кандидат на видалення, чекає рішення адміна (зникає з
+  // робочих списків менеджера, зʼявляється у черзі /manager/admin/deletions).
+  // archived — остаточно приховано назавжди (коли фіз. стерти не можна через
+  // звʼязки/1С-історію); дані збережені, можна відновити. Деталі — DeletionRequest.
+  markedForDeletion Boolean @default(false) @map("marked_for_deletion")
+  archived          Boolean @default(false)
+
   debt                  Decimal   @default(0) @db.Decimal(12, 2)
   overdueDebt           Decimal   @default(0) @map("overdue_debt") @db.Decimal(12, 2)
   daysSinceLastPurchase Int?      @map("days_since_last_purchase")
@@ -1579,6 +1612,7 @@ model MgrClient {
   assortmentItems   MgrClientAssortmentItem[]
   presentations     MgrClientPresentationItem[]
   bankAccounts      MgrClientBankAccount[]
+  contacts          MgrClientContact[]
   reminders         MgrReminder[]
   timeline          MgrClientTimelineEntry[]
   debtMovements     MgrDebtMovement[]
@@ -1711,6 +1745,24 @@ model MgrClientBankAccount {
   @@map("mgr_client_bank_accounts")
 }
 
+// ─── Контактні особи (← 1С Catalog.КонтактныеЛицаКонтрагентов) — ТЗ 8.0 E2 ──
+// Окремі люди-контакти клієнта (ПІБ, посада), на відміну від просто телефонів.
+model MgrClientContact {
+  id        String  @id @default(cuid())
+  clientId  String  @map("client_id")
+  fullName  String  @map("full_name")
+  position  String?
+  phone     String?
+  email     String?
+  comment   String?
+  sortOrder Int     @default(0) @map("sort_order")
+
+  client MgrClient @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@index([clientId])
+  @@map("mgr_client_contacts")
+}
+
 // ─── Reminders (← 1С Catalog.Нагадування + own private extras) ─────────────
 // Етап 1 (блок «Нагадування», M3.0): clientId став опційним (звичайне
 // нагадування може бути без клієнта), додано періодичність + прапорці + плоскі
@@ -1747,7 +1799,38 @@ model MgrProducer {
   label     String
   sortOrder Int    @default(0) @map("sort_order")
 
+  markedForDeletion Boolean @default(false) @map("marked_for_deletion") // ТЗ 8.0
+  archived          Boolean @default(false)
+
   @@map("mgr_producers")
+}
+
+// ─── ТЗ 8.0 — черга «позначок на вилучення» (1С «Видалення позначених») ──────
+// Полиморфна: одна таблиця для всіх типів обʼєктів (клієнти/документи/довідники).
+// Звичайний менеджер створює запит (status="pending") з обовʼязковою причиною →
+// обʼєкт зникає з його списків. Адміністратор у /manager/admin/deletions рішає:
+// approve (фіз. видалення, ЛИШЕ якщо 0 посилань і code1C=null; інакше авто-архів)
+// або reject (зняти позначку, повернути обʼєкт). Без FK — тримає лише entityId +
+// знімок назви, щоб черга пережила фізичне видалення обʼєкта.
+model DeletionRequest {
+  id                String    @id @default(cuid())
+  entityType        String    @map("entity_type") // client|order|sale|cash_order|route_sheet|dictionary|category|product
+  entityId          String    @map("entity_id")
+  entityLabel       String    @map("entity_label") // знімок назви/номера для черги
+  dictType          String?   @map("dict_type") // лише для entityType="dictionary"
+  reason            String    @db.Text // причина від користувача (обовʼязкова)
+  status            String    @default("pending") // pending|approved|rejected
+  outcome           String?   // при approve: "deleted" | "archived"
+  requestedByUserId String    @map("requested_by_user_id")
+  requestedByName   String?   @map("requested_by_name")
+  requestedAt       DateTime  @default(now()) @map("requested_at")
+  resolvedByUserId  String?   @map("resolved_by_user_id")
+  resolvedAt        DateTime? @map("resolved_at")
+  resolutionNote    String?   @map("resolution_note") @db.Text
+
+  @@index([status, requestedAt])
+  @@index([entityType, entityId])
+  @@map("deletion_requests")
 }
 
 // ─── Лічильник візитів сайту (7.2 Блок 4) ──────────────────────────────────
@@ -2240,71 +2323,12 @@ model MgrUserViewPrefs {
   @@map("mgr_user_view_prefs")
 }
 
-// ─── Manager sync queue (M1.5) — outbound write-back to 1С ──────────────────
-// Кожна зміна картки клієнта / замовлення / оплати на стороні менеджера
-// створює row у цій черзі. Cron `/api/cron/process-sync-queue` періодично
-// дренує її викликаючи services/manager-sync proxy.
-//
-// Lifecycle: pending → retrying ⇄ pending → sent
-//                                ↘ failed (attempts ≥ maxAttempts)
-//
-// `idempotencyKey` — UUID; передається у SOAP-call щоб 1С міг dedup
-// duplicate retries. Backoff schedule: 1m / 5m / 30m / 2h / 6h.
-
-enum SyncJobStatus {
-  pending
-  retrying
-  sent
-  failed
-
-  @@map("mgr_sync_job_status")
-}
-
-enum SyncEntityType {
-  client
-  order
-  payment
-  realization
-  cash_order
-  route_sheet
-
-  @@map("mgr_sync_entity_type")
-}
-
-model MgrSyncJob {
-  id             String         @id @default(cuid())
-  entityType     SyncEntityType @map("entity_type")
-  entityId       String         @map("entity_id")
-  action         String
-  payload        Json
-  status         SyncJobStatus  @default(pending)
-  attempts       Int            @default(0)
-  maxAttempts    Int            @default(5) @map("max_attempts")
-  nextAttemptAt  DateTime       @default(now()) @map("next_attempt_at")
-  lastError      String?        @map("last_error")
-  idempotencyKey String         @unique @map("idempotency_key")
-  sentAt         DateTime?      @map("sent_at")
-  createdAt      DateTime       @default(now()) @map("created_at")
-  updatedAt      DateTime       @updatedAt @map("updated_at")
-
-  @@index([status, nextAttemptAt])
-  @@index([entityType, entityId])
-  @@map("mgr_sync_jobs")
-}
-
-// ─── Manager sync state (M3.3 — INBOUND polling) ────────────────────────────
-// Простий key/value store для збереження курсорів синхронізації pull-mode
-// (cron `/api/cron/pull-from-1c`). На сьогодні єдиний ключ —
-// `last_sync_cursor` (ISO-timestamp останнього успішного pull-у з 1С).
-// Cursor зсувається тільки коли всі inbound endpoints успішно прийняли дані.
-
-model MgrSyncState {
-  key       String   @id
-  value     String
-  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
-
-  @@map("mgr_sync_state")
-}
+// ─── ТЗ 8.0 Блок A: моделі живої 1С-синхронізації видалено ──────────────────
+// MgrSyncJob (черга вивантаження) + MgrSyncState (курсори pull-mode) + enum-и
+// SyncJobStatus/SyncEntityType прибрано разом із відмовою від живих обмінів
+// (жива синхронізація знесена ще в сесії 7.0; таблиці не мали жодного
+// runtime-споживача). Офлайн-імпорт історії з 1С — окремий інструмент, лишається.
+// Дроп таблиць — міграція 20260714_drop_sync_tables.
 
 // Key-value налаштування менеджерки (редаговані на сторінці «Налаштування»).
 // Наразі: `repack.weight_tolerance_kg` — допуск різниці ваги при перепаковці.

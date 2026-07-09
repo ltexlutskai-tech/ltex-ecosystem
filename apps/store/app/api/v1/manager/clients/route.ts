@@ -5,18 +5,6 @@ import { ownershipWhere } from "@/lib/manager/client-visibility";
 import { listQuerySchema } from "@/lib/validations/manager-clients";
 import { mgrClientCreateSchema } from "@/lib/validations/mgr-client";
 
-// Префікси імен сміттєвих контрагентів з 1С — "1111111 ()", "777777 ()" тощо.
-// Prisma не підтримує regex matches, тому вирізаємо найчастіші numeric-only префікси.
-const TRASH_NAME_PREFIXES = [
-  "1111",
-  "2222",
-  "3333",
-  "5555",
-  "7777",
-  "8888",
-  "9999",
-];
-
 export async function GET(req: NextRequest) {
   const user = await getCurrentUser(req);
   if (!user) {
@@ -174,11 +162,11 @@ export async function GET(req: NextRequest) {
       ],
     });
   }
+  // ТЗ 8.0: позначені на вилучення ховаємо (за замовчуванням), архівні — завжди.
   if (q.hideTrash) {
-    for (const prefix of TRASH_NAME_PREFIXES) {
-      andClauses.push({ NOT: { name: { startsWith: prefix } } });
-    }
+    andClauses.push({ markedForDeletion: false });
   }
+  andClauses.push({ archived: false });
 
   // ─── M1.3f visibility scope (server-enforced) ────────────────────────────
   // Manager — лише свої клієнти (agentUserId OR assignment). Admin — усі.

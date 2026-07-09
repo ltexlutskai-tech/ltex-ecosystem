@@ -150,6 +150,10 @@ export function buildOrdersWhere(
     where.archived = false;
   }
 
+  // ТЗ 8.0 B6: позначені на вилучення завжди приховані зі списку (чекають на
+  // рішення адміністратора у черзі `/manager/admin/deletions`).
+  where.markedForDeletion = false;
+
   // Актуальність документа (дефолт «actual» → лише isActual = true).
   const actuality = p.actuality ?? "actual";
   if (actuality === "actual") {
