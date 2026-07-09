@@ -4,6 +4,8 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, Tag, X } from "lucide-react";
 import { Button, Input, useToast } from "@ltex/ui";
+import { AutosaveStatus } from "../../../_components/autosave-status";
+import type { DocAutosaveStatus } from "@/lib/autosave/use-document-autosave";
 
 /** Розбиває рядок ключових слів (через кому) на масив тегів. */
 function parseKeywords(raw: string | null): string[] {
@@ -38,11 +40,15 @@ export function ClientKeywordsTab({
   const [tags, setTags] = useState<string[]>(() => parseKeywords(keywords));
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
+  // Індикатор автозбереження — теги зберігаються одразу при додаванні/видаленні.
+  const [saveStatus, setSaveStatus] = useState<DocAutosaveStatus>("idle");
+  const [savedAt, setSavedAt] = useState<Date | null>(null);
 
   const editable = canEdit && !isForeign;
 
   async function persist(next: string[]) {
     setBusy(true);
+    setSaveStatus("saving");
     try {
       const res = await fetch(`/api/v1/manager/clients/${clientId}`, {
         method: "PATCH",
@@ -54,12 +60,15 @@ export function ClientKeywordsTab({
       });
       if (!res.ok) {
         const err = (await res.json().catch(() => ({}))) as { error?: string };
+        setSaveStatus("offline");
         toast({
           description: err.error ?? "Помилка збереження",
           variant: "destructive",
         });
         return false;
       }
+      setSavedAt(new Date());
+      setSaveStatus("saved");
       router.refresh();
       return true;
     } finally {
@@ -98,9 +107,12 @@ export function ClientKeywordsTab({
   return (
     <div className="space-y-4">
       <div className="rounded-lg border bg-white p-5 shadow-sm">
-        <h3 className="mb-1 flex items-center gap-2 text-sm font-semibold text-gray-700">
-          <Tag className="h-4 w-4 text-gray-400" /> Ключові слова
-        </h3>
+        <div className="mb-1 flex items-center justify-between gap-2">
+          <h3 className="flex items-center gap-2 text-sm font-semibold text-gray-700">
+            <Tag className="h-4 w-4 text-gray-400" /> Ключові слова
+          </h3>
+          {editable && <AutosaveStatus status={saveStatus} savedAt={savedAt} />}
+        </div>
         <p className="mb-3 text-xs text-gray-500">
           Теги для пошуку/фільтра клієнтів у списку.
         </p>

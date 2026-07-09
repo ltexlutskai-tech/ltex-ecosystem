@@ -1,10 +1,19 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@ltex/ui";
-import { useClientEdit } from "../_hooks/use-client-edit";
+import {
+  useClientEdit,
+  extractEditableFields,
+  type EditableClientFields,
+} from "../_hooks/use-client-edit";
 import { useDiscardWarning } from "../_hooks/use-discard-warning";
+import { useRecordAutosave } from "@/lib/autosave/use-record-autosave";
+import {
+  AutosaveStatus,
+  RestoreDraftBanner,
+} from "../../../_components/autosave-status";
 import { patchClient } from "@/lib/manager/client-patch-fetch";
 import { formatEur, parseDecimal } from "../../_components/format";
 import type { EditDictionaries } from "../_lib/load-edit-dictionaries";
@@ -85,12 +94,47 @@ export function ClientRequisitesEdit({
 }: Props) {
   const router = useRouter();
   const { toast } = useToast();
-  const { values, isDirty, setField, reset, diff } = useClientEdit(client);
+  const { values, isDirty, setField, setAll, reset } = useClientEdit(client);
   const [saving, setSaving] = useState(false);
 
-  useDiscardWarning(isDirty);
-
   const isAdmin = currentUserRole === "admin";
+
+  // Знімок початкових значень (для обчислення діфу під час автозбереження).
+  const initialRef = useRef<EditableClientFields>(
+    extractEditableFields(client),
+  );
+
+  // Автозбереження одразу: зміна будь-якого поля пише diff через наявний PATCH
+  // (debounce ~800 мс) + буфер localStorage. Кнопка «Зберегти» лишається як
+  // явний flush. Редагування чужого клієнта вже заблоковане (форма недоступна).
+  const autosaveSave = useCallback(
+    async (snapshot: EditableClientFields): Promise<void> => {
+      const base = initialRef.current;
+      const payload: Partial<EditableClientFields> = {};
+      (Object.keys(snapshot) as (keyof EditableClientFields)[]).forEach((k) => {
+        const a = snapshot[k];
+        const b = base[k];
+        const equal = a === b || (a == null && b == null);
+        if (!equal) (payload as Record<string, unknown>)[k] = a;
+      });
+      if (Object.keys(payload).length === 0) return;
+      const res = await patchClient(client.id, payload);
+      if (!res.ok) throw new Error(res.error ?? "save_failed");
+    },
+    [client.id],
+  );
+
+  const autosave = useRecordAutosave<EditableClientFields>({
+    recordKey: `client-requisites:${client.id}`,
+    data: values,
+    save: autosaveSave,
+  });
+
+  // Попередження про незбережене лишаємо ЛИШЕ коли локальна копія ще не
+  // синхронізована з БД (офлайн) — інакше зміни вже в безпеці на сервері.
+  useDiscardWarning(
+    autosave.status === "offline" || autosave.status === "saving",
+  );
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
@@ -100,18 +144,16 @@ export function ClientRequisitesEdit({
     }
     setSaving(true);
     try {
-      const payload = diff();
-      const res = await patchClient(client.id, payload);
-      if (!res.ok) {
-        toast({
-          description: res.error ?? "Не вдалося зберегти",
-          variant: "destructive",
-        });
-        return;
-      }
+      await autosaveSave(values);
+      autosave.reset();
       toast({ description: "Збережено" });
       router.refresh();
       onSaved();
+    } catch {
+      toast({
+        description: "Не вдалося зберегти",
+        variant: "destructive",
+      });
     } finally {
       setSaving(false);
     }
@@ -129,7 +171,21 @@ export function ClientRequisitesEdit({
   return (
     <form onSubmit={handleSave} className="space-y-6">
       <section className="rounded-lg border bg-white p-5 shadow-sm">
+        {autosave.restoreData && (
+          <RestoreDraftBanner
+            onRestore={() => {
+              setAll(autosave.restoreData as EditableClientFields);
+              autosave.acceptRestore();
+            }}
+            onDismiss={autosave.dismissRestore}
+          />
+        )}
         <div className="mb-3 flex flex-wrap items-center justify-end gap-2">
+          <AutosaveStatus
+            status={autosave.status}
+            savedAt={autosave.savedAt}
+            className="mr-auto"
+          />
           <button
             type="button"
             onClick={handleCancel}
