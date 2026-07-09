@@ -56,10 +56,13 @@ export function useRecordAutosave<T>(
   dataRef.current = data;
 
   useEffect(() => {
+    // mountedRef має стати true незалежно від `enabled` — інакше секції, де
+    // редагування вмикається пізніше (рядок картки: `enabled` стартує false і
+    // перемикається на true при вході в режим правки), ніколи б не автозберігались.
+    mountedRef.current = true;
     if (!enabled) return;
     const env = readLocalDraft<T>(keyRef.current);
     if (env && env.data != null) setRestoreData(env.data);
-    mountedRef.current = true;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
 import { Button, Input } from "@ltex/ui";
 import {
   QUALITY_LEVELS,
@@ -13,6 +13,16 @@ import {
   CategoryCascader,
   type CascaderNode,
 } from "../../../_components/category-cascader";
+import { RestoreDraftBanner } from "../../../_components/autosave-status";
+import {
+  clearLocalDraft,
+  localDraftKey,
+  readLocalDraft,
+  writeLocalDraft,
+} from "@/lib/autosave/local-draft";
+
+type ProductDraft = Record<string, string>;
+const PRODUCT_DRAFT_KEY = localDraftKey("create-product", null);
 
 const inputCls =
   "w-full rounded-md border border-input bg-background px-3 py-2 text-sm";
@@ -31,8 +41,83 @@ export function ProductCreateForm({
     FormData
   >(createManagerProduct, {});
 
+  // Захист незбереженого вводу (localStorage). Форма uncontrolled (FormData),
+  // тому буферимо серіалізовану FormData на кожну зміну; при поверненні —
+  // пропонуємо відновити. Сам запис лишається кнопкою «Створити товар».
+  const formRef = useRef<HTMLFormElement>(null);
+  const bufferTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [restore, setRestore] = useState<ProductDraft | null>(null);
+  // Ключ для CategoryCascader — бампаємо, щоб перемонтувати з відновленим initialId.
+  const [cascaderKey, setCascaderKey] = useState(0);
+  const [categoryInitialId, setCategoryInitialId] = useState<string | null>(
+    null,
+  );
+
+  useEffect(() => {
+    const env = readLocalDraft<ProductDraft>(PRODUCT_DRAFT_KEY);
+    if (env && env.data && Object.values(env.data).some((v) => v)) {
+      setRestore(env.data);
+    }
+  }, []);
+
+  function serializeAndBuffer() {
+    const el = formRef.current;
+    if (!el) return;
+    const fd = new FormData(el);
+    const obj: ProductDraft = {};
+    fd.forEach((value, key) => {
+      if (typeof value === "string" && value !== "") obj[key] = value;
+    });
+    if (bufferTimer.current) clearTimeout(bufferTimer.current);
+    bufferTimer.current = setTimeout(() => {
+      if (Object.keys(obj).length > 0) {
+        writeLocalDraft(PRODUCT_DRAFT_KEY, obj, new Date().toISOString());
+      }
+    }, 500);
+  }
+
+  function applyRestore(data: ProductDraft) {
+    const el = formRef.current;
+    if (el) {
+      Object.entries(data).forEach(([key, value]) => {
+        if (key === "categoryId") return; // окремо через CategoryCascader
+        const field = el.elements.namedItem(key);
+        if (
+          field instanceof HTMLInputElement ||
+          field instanceof HTMLSelectElement ||
+          field instanceof HTMLTextAreaElement
+        ) {
+          field.value = value;
+        }
+      });
+    }
+    if (data.categoryId) {
+      setCategoryInitialId(data.categoryId);
+      setCascaderKey((k) => k + 1);
+    }
+    setRestore(null);
+  }
+
+  function dismissRestore() {
+    clearLocalDraft(PRODUCT_DRAFT_KEY);
+    setRestore(null);
+  }
+
   return (
-    <form action={formAction} className="space-y-4">
+    <form
+      ref={formRef}
+      action={formAction}
+      onInput={serializeAndBuffer}
+      onSubmit={() => clearLocalDraft(PRODUCT_DRAFT_KEY)}
+      className="space-y-4"
+    >
+      {restore && (
+        <RestoreDraftBanner
+          onRestore={() => applyRestore(restore)}
+          onDismiss={dismissRestore}
+        />
+      )}
+
       <div className="grid gap-4 sm:grid-cols-2">
         <div>
           <label className="mb-1 block text-sm font-medium">Назва *</label>
@@ -44,7 +129,12 @@ export function ProductCreateForm({
         </div>
         <div className="sm:col-span-2">
           <label className="mb-1 block text-sm font-medium">Категорія *</label>
-          <CategoryCascader nodes={categories} name="categoryId" />
+          <CategoryCascader
+            key={cascaderKey}
+            nodes={categories}
+            name="categoryId"
+            initialId={categoryInitialId}
+          />
         </div>
         <div>
           <label className="mb-1 block text-sm font-medium">Одиниця *</label>

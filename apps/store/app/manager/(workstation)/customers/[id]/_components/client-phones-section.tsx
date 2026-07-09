@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Lock, Pencil, Phone, Plus, Trash2, X } from "lucide-react";
 import {
@@ -10,6 +10,8 @@ import {
   phoneToWhatsAppUrl,
 } from "@ltex/shared";
 import { Button, Input, useToast } from "@ltex/ui";
+import { useRecordAutosave } from "@/lib/autosave/use-record-autosave";
+import { AutosaveStatus } from "../../../_components/autosave-status";
 import { BrandIcon } from "../../../_components/brand-icons";
 import type { ClientPhone } from "./types";
 
@@ -91,6 +93,33 @@ function PhoneRow({
   const [value, setValue] = useState(phone.phone);
   const [messenger, setMessenger] = useState(phone.messenger ?? "");
 
+  const autosaveSave = useCallback(
+    async (snap: { value: string; messenger: string }): Promise<void> => {
+      const trimmed = snap.value.trim();
+      if (!trimmed) return; // порожній номер не зберігаємо
+      const res = await fetch(
+        `/api/v1/manager/clients/${clientId}/phones/${phone.id}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({
+            phone: trimmed,
+            messenger: snap.messenger || null,
+          }),
+        },
+      );
+      if (!res.ok) throw new Error("save_failed");
+    },
+    [clientId, phone.id],
+  );
+  const autosave = useRecordAutosave<{ value: string; messenger: string }>({
+    recordKey: `client-phone:${phone.id}`,
+    data: { value, messenger },
+    enabled: editing && canEdit,
+    save: autosaveSave,
+  });
+
   async function save() {
     const trimmed = value.trim();
     if (!trimmed) return;
@@ -116,6 +145,7 @@ function PhoneRow({
         });
         return;
       }
+      autosave.reset();
       setEditing(false);
       onChanged();
     } finally {
@@ -178,6 +208,7 @@ function PhoneRow({
           <button
             type="button"
             onClick={() => {
+              autosave.reset();
               setEditing(false);
               setValue(phone.phone);
               setMessenger(phone.messenger ?? "");
@@ -188,6 +219,7 @@ function PhoneRow({
           >
             <X className="h-4 w-4" />
           </button>
+          <AutosaveStatus status={autosave.status} savedAt={autosave.savedAt} />
         </div>
       </div>
     );

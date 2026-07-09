@@ -4,6 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button, Input, Textarea } from "@ltex/ui";
+import { useLocalDraft } from "@/lib/autosave/use-local-draft";
+import { RestoreDraftBanner } from "../../../_components/autosave-status";
 
 type DictItem = { id: string; code?: string; label?: string };
 type AgentItem = { id: string; fullName: string };
@@ -63,6 +65,10 @@ export function CreateClientForm({
   function set<K extends keyof typeof form>(key: K, value: string) {
     setForm((f) => ({ ...f, [key]: value }));
   }
+
+  // Захист незбереженого вводу (localStorage): якщо вкладку закрили до
+  // «Створити», при поверненні пропонуємо відновити заповнене.
+  const draft = useLocalDraft({ recordKey: "create-client", data: form });
 
   // Дебаунсована перевірка телефону — якщо знайдено хоч одного клієнта зі
   // схожим номером (Code1C: 0978545991 збігається з +380978545991 тощо),
@@ -148,6 +154,7 @@ export function CreateClientForm({
         setSubmitting(false);
         return;
       }
+      draft.clear();
       router.push(`/manager/customers/${data.id}`);
       router.refresh();
     } catch (err) {
@@ -161,6 +168,16 @@ export function CreateClientForm({
       onSubmit={handleSubmit}
       className="space-y-4 rounded-lg border border-gray-200 bg-white p-6 shadow-sm"
     >
+      {draft.restoreData && (
+        <RestoreDraftBanner
+          onRestore={() => {
+            setForm(draft.restoreData as typeof form);
+            draft.acceptRestore();
+          }}
+          onDismiss={draft.dismissRestore}
+        />
+      )}
+
       <Field label="Назва" required>
         <Input
           value={form.name}

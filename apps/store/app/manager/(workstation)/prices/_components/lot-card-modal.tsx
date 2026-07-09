@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Button,
@@ -12,6 +12,11 @@ import {
   Textarea,
   useToast,
 } from "@ltex/ui";
+import { useRecordAutosave } from "@/lib/autosave/use-record-autosave";
+import {
+  AutosaveStatus,
+  RestoreDraftBanner,
+} from "../../_components/autosave-status";
 import { buildProductShareText } from "@/lib/manager/share-message";
 import { ClientPicker } from "../../orders/new/_components/client-picker";
 import { OrderVideoButton } from "./order-video-button";
@@ -295,6 +300,14 @@ export function LotCardModal({ lotId, onClose, rateUah, sellerName }: Props) {
 
         {lot && edit && (
           <div className="space-y-4 text-sm">
+            {/* ── Автозбереження менеджерських полів (свіжий baseline на лот) ── */}
+            <LotFieldsAutosave
+              key={lot.id}
+              lotId={lot.id}
+              edit={edit}
+              onRestore={setEdit}
+            />
+
             {/* ── Активні замовлення на товар (Етап 1 блоку Замовлень) ── */}
             {claim && claim.totalQuantity > 0 ? (
               <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
@@ -600,6 +613,63 @@ export function LotCardModal({ lotId, onClose, rateUah, sellerName }: Props) {
         )}
       </DialogContent>
     </Dialog>
+  );
+}
+
+/**
+ * Автозбереження менеджерських полів лоту. Виділено в окремий компонент і
+ * монтується з `key={lot.id}` — так `useRecordAutosave` отримує свіжий baseline
+ * (завантажений стан лоту) і не намагається зберігати одразу після відкриття,
+ * а також не плутає буфери різних лотів у персистентній модалці.
+ */
+function LotFieldsAutosave({
+  lotId,
+  edit,
+  onRestore,
+}: {
+  lotId: string;
+  edit: EditState;
+  onRestore: (next: EditState) => void;
+}) {
+  const save = useCallback(
+    async (snap: EditState): Promise<void> => {
+      const res = await fetch(`/api/v1/manager/lots/${lotId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sector: snap.sector,
+          isOpen: snap.isOpen,
+          comment: snap.comment,
+          description: snap.description,
+          isTarget: snap.isTarget,
+        }),
+      });
+      if (!res.ok) throw new Error("save_failed");
+    },
+    [lotId],
+  );
+
+  const autosave = useRecordAutosave<EditState>({
+    recordKey: `lot:${lotId}`,
+    data: edit,
+    save,
+  });
+
+  return (
+    <>
+      {autosave.restoreData && (
+        <RestoreDraftBanner
+          onRestore={() => {
+            onRestore(autosave.restoreData as EditState);
+            autosave.acceptRestore();
+          }}
+          onDismiss={autosave.dismissRestore}
+        />
+      )}
+      <div className="flex justify-end">
+        <AutosaveStatus status={autosave.status} savedAt={autosave.savedAt} />
+      </div>
+    </>
   );
 }
 
