@@ -18,9 +18,15 @@ import {
 } from "@/lib/manager/route-sheet-documents";
 import { getUnclosedMileageWarning } from "@/lib/manager/route-sheet-mileage";
 import {
+  dispatchRouteSheetLots,
   markRouteSheetOrdersInactive,
-  releaseRouteSheetReservations,
+  returnRouteSheetLotsToStock,
+  settleRouteSheetTransit,
 } from "@/lib/manager/route-sheet-actions";
+import {
+  applyCompleteTransitSafe,
+  applyDispatchTransitSafe,
+} from "@/lib/manager/route-sheet-transit";
 import {
   applyRouteSheetExpensesSafe,
   rebuildMileageExpenseSafe,
@@ -317,16 +323,29 @@ export async function PATCH(
   const triggersSideEffects =
     statusChanged && (newStatus === "dispatched" || newStatus === "completed");
 
-  // Транзакція: оновлюємо шапку + (на переході у dispatched/completed) дзеркалимо
-  // 1С — знімаємо бронь із завантажених лотів + позначаємо замовлення неактуальними.
+  // Транзакція: оновлюємо шапку + (на статус-переходах) дзеркалимо 1С.
+  //  - dispatched: завантажені лоти → in_transit (товар у дорозі) + замовлення
+  //    неактуальні;
+  //  - completed: лоти розводяться на sold (продані) / free (повернені на склад).
   const sheet = await prisma.$transaction(async (tx) => {
     const updated = await tx.routeSheet.update({ where: { id }, data });
-    if (triggersSideEffects) {
-      await releaseRouteSheetReservations(tx, id);
+    if (statusChanged && newStatus === "dispatched") {
+      await dispatchRouteSheetLots(tx, id);
       await markRouteSheetOrdersInactive(tx, id);
+    } else if (statusChanged && newStatus === "completed") {
+      await settleRouteSheetTransit(tx, id);
+    } else if (statusChanged && newStatus === "draft") {
+      await returnRouteSheetLotsToStock(tx, id);
     }
     return updated;
   });
+
+  // Блок А: рухи регістру «товар у дорозі» + складу (best-effort, після коміту).
+  if (statusChanged && newStatus === "dispatched") {
+    applyDispatchTransitSafe(id);
+  } else if (statusChanged && newStatus === "completed") {
+    applyCompleteTransitSafe(id);
+  }
 
   // Блок Б: перебудувати авто-рядок витрат «Пальне/пробіг» під новий кілометраж/
   // ціну за км (best-effort, після коміту).
