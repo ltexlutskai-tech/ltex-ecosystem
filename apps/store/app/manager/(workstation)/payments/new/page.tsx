@@ -67,14 +67,21 @@ export default async function NewPaymentPage({
   // Довідники (тільки активні) — для select-ів банк. рахунку / статті.
   const [bankRows, articleRows, fallbackEur, fallbackUsd] = await Promise.all([
     prisma.mgrBankAccount.findMany({
-      where: { archived: false },
+      // У безготівці показуємо ЛИШЕ банк-рахунки (не карти й не каси).
+      where: { archived: false, kind: "account" },
       orderBy: { name: "asc" },
       select: { id: true, name: true, hiddenInApp: true },
     }),
     prisma.mgrCashFlowArticle.findMany({
       where: { archived: false },
       orderBy: { name: "asc" },
-      select: { id: true, code: true, name: true, parentId: true },
+      select: {
+        id: true,
+        code: true,
+        name: true,
+        parentId: true,
+        direction: true,
+      },
     }),
     getCurrentRate(),
     getUsdRate(),
@@ -182,8 +189,8 @@ export default async function NewPaymentPage({
       <header>
         <h1 className="text-2xl font-bold text-gray-800">Оплата</h1>
         <p className="mt-1 text-sm text-gray-500">
-          Внесіть отримані суми у валютах та (за потреби) решту. Після
-          «Сформувати» створиться касовий ордер.
+          Внесіть отримані суми у валютах та (за потреби) решту. «Зберегти» —
+          чернетка без проведення; «Провести» — рух коштів + борг.
         </p>
       </header>
 
@@ -198,6 +205,7 @@ export default async function NewPaymentPage({
         clientDebtEur={clientDebtEur}
         bankAccounts={bankAccounts}
         cashFlowArticles={cashFlowArticles}
+        userRole={user.role}
         returnHref={returnHref}
         routeSheetId={routeSheetId}
       />

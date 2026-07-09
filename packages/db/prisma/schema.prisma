@@ -12,23 +12,23 @@ datasource db {
 // ─── Categories (self-relation: category → subcategory) ─────────────────────
 
 model Category {
-  id             String   @id @default(cuid())
-  slug           String   @unique
+  id                String   @id @default(cuid())
+  slug              String   @unique
   // hex(_IDRRef) групи 1С-Номенклатури (_Reference76, _Folder=0). Звʼязок для
   // переносу дерева категорій з 1С (сесія 5.7). NULL для курованих/Excel-категорій.
-  code1C         String?  @unique @map("code_1c")
-  name           String
-  parentId       String?  @map("parent_id")
-  position       Int      @default(0)
+  code1C            String?  @unique @map("code_1c")
+  name              String
+  parentId          String?  @map("parent_id")
+  position          Int      @default(0)
   // Deny-list ролей: товари у цій категорії (та її піддереві) приховані для цих
   // ролей у прайсі/картці/вітрині (серверний фільтр). Порожній = видно всім.
   // admin/owner завжди bypass. Правила user задасть пізніше — зараз каркас.
-  hiddenForRoles String[] @default([]) @map("hidden_for_roles")
+  hiddenForRoles    String[] @default([]) @map("hidden_for_roles")
   // Приховати категорію (та її піддерево) з сайту й від торгових агентів
   // (7.2). Товари лишаються в системі; змінити категорію → знову видимі.
-  hiddenFromCatalog Boolean @default(false) @map("hidden_from_catalog")
-  createdAt      DateTime @default(now()) @map("created_at")
-  updatedAt      DateTime @updatedAt @map("updated_at")
+  hiddenFromCatalog Boolean  @default(false) @map("hidden_from_catalog")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
 
   parent   Category?  @relation("CategoryTree", fields: [parentId], references: [id])
   children Category[] @relation("CategoryTree")
@@ -433,6 +433,9 @@ model MgrCashOrder {
   uidEur            String?  @map("uid_eur")
   uidUsd            String?  @map("uid_usd")
   archived          Boolean  @default(false)
+  // Життєвий цикл: "draft" (створено, БЕЗ впливу — не в ДДС, борг не чіпає) або
+  // "posted" (проведено — рухи ДДС + борг + архів). Історичні = "posted".
+  status            String   @default("posted")
   routeSheetId      String?  @map("route_sheet_id") // зворотне посилання на МЛ
   comment           String?
   agentUserId       String?  @map("agent_user_id")
@@ -470,6 +473,11 @@ model MgrBankAccount {
   code1C      String?  @unique @map("code_1c")
   name        String
   description String?
+  // Тип рахунку: "account" (банк-рахунок/IBAN — показується у безготівці),
+  // "card" (картка) або "cash" (готівкова каса). У безнал-дропдауні лише account.
+  kind        String   @default("account")
+  // Ліміт на отримання: рахунок приховано для МЕНЕДЖЕРІВ при Приході (адмін/
+  // власник бачать); для Розходу (списання) видно завжди.
   hiddenInApp Boolean  @default(false) @map("hidden_in_app")
   archived    Boolean  @default(false)
   createdAt   DateTime @default(now()) @map("created_at")
@@ -493,6 +501,9 @@ model MgrCashFlowArticle {
   code      String?
   name      String
   parentId  String?  @map("parent_id")
+  // Напрям статті: "income" (лише прихід), "expense" (лише розхід) або "both"
+  // (обидва). Форма оплати фільтрує список статей за поточним видом руху.
+  direction String   @default("both")
   archived  Boolean  @default(false)
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -2027,19 +2038,19 @@ model CashFlowMovement {
 /// 1С `AccumRg ТоварыНаСкладах` (_AccumRg5788) + вага `ТовариНаСкладахУВазі`
 /// (_AccumRg6608). Залишковий регістр: recordKind 0=прихід / 1=розхід.
 model StockMovement {
-  id             String   @id @default(cuid())
-  occurredAt     DateTime @map("occurred_at")
-  recorderCode1C String   @map("recorder_code_1c")
-  lineNo         Int      @map("line_no")
-  warehouseCode1C String? @map("warehouse_code_1c") // hex(Склад)
-  productCode1C  String   @map("product_code_1c") // hex(Номенклатура)
-  productId      String?  @map("product_id")
-  lotCode1C      String?  @map("lot_code_1c") // hex(ХарактеристикаНоменклатуры)
-  quality        String? // hex(Качество) або текст
-  qty            Decimal  @db.Decimal(15, 3) // Количество (шт)
-  weightKg       Decimal? @map("weight_kg") @db.Decimal(15, 3) // кг (з _AccumRg6608)
-  recordKind     Int      @map("record_kind") // 0=прихід / 1=розхід
-  createdAt      DateTime @default(now()) @map("created_at")
+  id              String   @id @default(cuid())
+  occurredAt      DateTime @map("occurred_at")
+  recorderCode1C  String   @map("recorder_code_1c")
+  lineNo          Int      @map("line_no")
+  warehouseCode1C String?  @map("warehouse_code_1c") // hex(Склад)
+  productCode1C   String   @map("product_code_1c") // hex(Номенклатура)
+  productId       String?  @map("product_id")
+  lotCode1C       String?  @map("lot_code_1c") // hex(ХарактеристикаНоменклатуры)
+  quality         String? // hex(Качество) або текст
+  qty             Decimal  @db.Decimal(15, 3) // Количество (шт)
+  weightKg        Decimal? @map("weight_kg") @db.Decimal(15, 3) // кг (з _AccumRg6608)
+  recordKind      Int      @map("record_kind") // 0=прихід / 1=розхід
+  createdAt       DateTime @default(now()) @map("created_at")
 
   @@unique([recorderCode1C, lineNo, productCode1C], name: "stock_movement_src")
   @@index([productCode1C, occurredAt])

@@ -78,12 +78,11 @@ export const processPaymentSchema = z
     changeUsd: amountField,
     /** Банківський рахунок (довідник) — для безналу. */
     bankAccountId: z.string().min(1).optional(),
-    /** Задача E — реквізити безготівки (для звірки з банком). */
-    paymentMethod: z.enum(["cash", "card", "bank"]).optional(),
-    paymentPurpose: z.string().max(500).optional(),
-    /** Стаття руху коштів (довідник) — обов'язкова для Расход. */
+    /** Стаття руху коштів (довідник) — обов'язкова для Приходу і Розходу. */
     cashFlowArticleId: z.string().min(1).optional(),
     comment: z.string().max(2000).optional(),
+    /** true = «Провести» (ДДС+борг+архів); false = «Зберегти» (чернетка). */
+    post: z.boolean().optional().default(true),
     /** Курси-знімок (грн за €/$). */
     rateEur: z.number().positive().max(MAX_AMOUNT),
     rateUsd: z.number().positive().max(MAX_AMOUNT),
@@ -112,8 +111,8 @@ export const processPaymentSchema = z
       path: ["amountUah"],
     },
   )
-  .refine((v) => v.type !== "expense" || Boolean(v.cashFlowArticleId), {
-    message: "Стаття руху коштів обов'язкова для Расход",
+  .refine((v) => Boolean(v.cashFlowArticleId), {
+    message: "Стаття руху коштів обов'язкова",
     path: ["cashFlowArticleId"],
   });
 

@@ -137,7 +137,9 @@ export default async function ManagerSaleDetailPage({
         })
       : Promise.resolve(null),
     prisma.mgrCashOrder.findMany({
-      where: { saleId: sale.id, archived: false },
+      // Усі ордери реалізації (чернетки + проведені); зведення все одно рахує
+      // лише проведені. Проведені тепер archived=true, тож фільтр прибрано.
+      where: { saleId: sale.id },
       orderBy: { createdAt: "asc" },
     }),
     getPaymentSummary(sale.id),

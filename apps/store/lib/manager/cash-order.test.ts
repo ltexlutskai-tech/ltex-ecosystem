@@ -560,4 +560,41 @@ describe("createPaymentOrders", () => {
     });
     expect(mockPrisma.sale.update).not.toHaveBeenCalled();
   });
+
+  it("проведення (дефолт post=true) → status=posted, archived=true", async () => {
+    mockPrisma.mgrCashOrder.create.mockResolvedValueOnce({ id: "co1" });
+    await createPaymentOrders({
+      saleId: null,
+      customerId: "cust1",
+      type: "income",
+      paid: { uah: 4300, eur: 0, usd: 0, uahCashless: 0 },
+      change: { uah: 0, eur: 0, usd: 0 },
+      rates,
+      sumToPayEur: 100,
+    });
+    const data = mockPrisma.mgrCashOrder.create.mock.calls[0]?.[0] as {
+      data: { status: string; archived: boolean };
+    };
+    expect(data.data.status).toBe("posted");
+    expect(data.data.archived).toBe(true);
+  });
+
+  it("чернетка (post=false) → status=draft, archived=false, БЕЗ впливу", async () => {
+    mockPrisma.mgrCashOrder.create.mockResolvedValueOnce({ id: "co1" });
+    await createPaymentOrders({
+      saleId: null,
+      customerId: "cust1",
+      type: "income",
+      paid: { uah: 4300, eur: 0, usd: 0, uahCashless: 0 },
+      change: { uah: 0, eur: 0, usd: 0 },
+      rates,
+      sumToPayEur: 100,
+      post: false,
+    });
+    const data = mockPrisma.mgrCashOrder.create.mock.calls[0]?.[0] as {
+      data: { status: string; archived: boolean };
+    };
+    expect(data.data.status).toBe("draft");
+    expect(data.data.archived).toBe(false);
+  });
 });

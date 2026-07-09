@@ -72,6 +72,7 @@ const validBody = {
   rateEur: 43,
   rateUsd: 40,
   sumToPayEur: 100,
+  cashFlowArticleId: "art1", // стаття тепер обов'язкова (Прихід і Розхід)
 };
 
 function fakeSale(code1C: string | null = "000001") {
@@ -144,6 +145,7 @@ describe("POST /api/v1/manager/cash-orders (Етап 2)", () => {
         rateEur: 43,
         rateUsd: 40,
         sumToPayEur: 100,
+        cashFlowArticleId: "art1",
       }),
     );
     expect(res.status).toBe(201);
@@ -168,6 +170,7 @@ describe("POST /api/v1/manager/cash-orders (Етап 2)", () => {
         rateEur: 43,
         rateUsd: 40,
         sumToPayEur: 100,
+        cashFlowArticleId: "art1",
       }),
     );
     expect(res.status).toBe(403);

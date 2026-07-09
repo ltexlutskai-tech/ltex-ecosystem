@@ -403,11 +403,14 @@ export interface CreatePaymentArgs {
   /** Ручна решта (здача) у 3 валютах. */
   change: ChangeChannels;
   bankAccountId?: string | null;
-  /** Задача E — реквізити безготівки (спосіб + призначення платежу). */
-  paymentMethod?: string | null;
-  paymentPurpose?: string | null;
   cashFlowArticleId?: string | null;
   comment?: string | null;
+  /**
+   * Провести одразу (true = «Провести»: статус posted, рухи ДДС + борг + архів)
+   * чи лише зберегти чернетку (false = «Зберегти»: статус draft, БЕЗ впливу).
+   * Дефолт true — зворотна сумісність зі старими викликами/тестами.
+   */
+  post?: boolean;
   /** Курси-знімок (грн за €/$) — для `documentSumEur`. */
   rates: CashRates;
   /** Сума «До оплати» у EUR (для перерахунку наложки на Sale). */
@@ -429,6 +432,86 @@ export interface CreatePaymentArgs {
  *
  * Повертає `{ income, change }` (`change` = null коли решти немає).
  */
+/** Мінімальна форма рядка касового ордера для запуску ефектів проведення. */
+type PostableCashOrder = {
+  id: string;
+  type: string;
+  amountUah: number;
+  amountEur: number;
+  amountUsd: number;
+  amountUahCashless: number;
+  rateEur: number;
+  rateUsd: number;
+  bankAccountId: string | null;
+  cashFlowArticleId: string | null;
+  customerId: string | null;
+  saleId: string | null;
+  documentSumEur: number;
+  paidAt: Date | null;
+  createdAt: Date | null;
+  agentUserId: string | null;
+};
+
+/**
+ * Ефекти ПРОВЕДЕННЯ касового ордера (не для чернетки): рухи ДДС для основного
+ * ордера + ордера-здачі та рух боргу (Приход — погашення ЗМЕНШУЄ борг).
+ * Fire-and-forget після коміту (потрібні id). Виноситься окремо, щоб і
+ * `createPaymentOrders(post=true)`, і `postCashOrder(id)` викликали те саме.
+ *
+ * Борг: `settledEur = income.documentSumEur − change.documentSumEur` (здача не
+ * зменшує борг). Розхід (standalone) боргу не обліковує.
+ */
+async function applyCashOrderPostingEffects(
+  income: PostableCashOrder,
+  changeOrder: PostableCashOrder | null,
+): Promise<void> {
+  // Рух боргу — лише для Приходу.
+  if (income.type === "income") {
+    let effectiveCustomerId: string | null = income.customerId ?? null;
+    if (!effectiveCustomerId && income.saleId) {
+      const sale = await prisma.sale.findUnique({
+        where: { id: income.saleId },
+        select: { customerId: true },
+      });
+      effectiveCustomerId = sale?.customerId ?? null;
+    }
+    const settledEur =
+      income.documentSumEur - (changeOrder?.documentSumEur ?? 0);
+    if (effectiveCustomerId && settledEur !== 0) {
+      applyDebtMovementSafe({
+        customerId: effectiveCustomerId,
+        amountEur: -settledEur,
+        kind: "payment",
+        sourceType: "cash_order",
+        sourceId: income.id,
+        occurredAt: income.paidAt ?? income.createdAt ?? new Date(),
+        note: "Оплата (касовий ордер)",
+        createdByUserId: income.agentUserId ?? null,
+      });
+    }
+  }
+
+  // Рухи ДДС (основний + здача).
+  for (const o of [income, changeOrder]) {
+    if (!o) continue;
+    applyCashFlowMovementsSafe({
+      id: o.id,
+      type: o.type,
+      amountUah: o.amountUah,
+      amountEur: o.amountEur,
+      amountUsd: o.amountUsd,
+      amountUahCashless: o.amountUahCashless,
+      rateEur: o.rateEur,
+      rateUsd: o.rateUsd,
+      bankAccountId: o.bankAccountId,
+      cashFlowArticleId: o.cashFlowArticleId,
+      customerId: o.customerId,
+      saleId: o.saleId,
+      occurredAt: o.paidAt ?? o.createdAt ?? new Date(),
+    });
+  }
+}
+
 export async function createPaymentOrders(args: CreatePaymentArgs) {
   const {
     saleId,
@@ -437,8 +520,6 @@ export async function createPaymentOrders(args: CreatePaymentArgs) {
     paid,
     change,
     bankAccountId,
-    paymentMethod,
-    paymentPurpose,
     cashFlowArticleId,
     comment,
     rates,
@@ -446,9 +527,13 @@ export async function createPaymentOrders(args: CreatePaymentArgs) {
     agentUserId,
     routeSheetId,
   } = args;
+  const post = args.post ?? true;
+  const status = post ? "posted" : "draft";
 
   const documentSumEur = reduceToEur(paid, rates);
   const changeTotal = change.uah + change.eur + change.usd;
+  // Реквізити безготівки фіксовані (спосіб = банк, призначення = «Оплата товару»).
+  const cashless = paid.uahCashless > 0;
 
   const result = await prisma.$transaction(async (tx) => {
     const income = await tx.mgrCashOrder.create({
@@ -456,14 +541,15 @@ export async function createPaymentOrders(args: CreatePaymentArgs) {
         saleId: saleId ?? null,
         customerId: customerId ?? null,
         type,
+        status,
+        archived: post,
         amountUah: paid.uah,
         amountEur: paid.eur,
         amountUsd: paid.usd,
         amountUahCashless: paid.uahCashless,
         bankAccountId: bankAccountId ?? null,
-        // Задача E — реквізити безготівки (лише коли є безнал).
-        paymentMethod: paid.uahCashless > 0 ? (paymentMethod ?? null) : null,
-        paymentPurpose: paid.uahCashless > 0 ? (paymentPurpose ?? null) : null,
+        paymentMethod: cashless ? "bank" : null,
+        paymentPurpose: cashless ? "Оплата товару" : null,
         cashFlowArticleId: cashFlowArticleId ?? null,
         rateEur: rates.eur,
         rateUsd: rates.usd,
@@ -481,6 +567,8 @@ export async function createPaymentOrders(args: CreatePaymentArgs) {
           saleId: saleId ?? null,
           customerId: customerId ?? null,
           type: "expense",
+          status,
+          archived: post,
           changeForId: income.id,
           amountUah: change.uah,
           amountEur: change.eur,
@@ -498,14 +586,14 @@ export async function createPaymentOrders(args: CreatePaymentArgs) {
       });
     }
 
-    // Перерахунок наложки на Sale (тільки коли документ — наложковий).
+    // Перерахунок наложки на Sale — рахуємо лише за ПРОВЕДЕНИМИ ордерами.
     if (saleId) {
       const sale = await tx.sale.findUnique({
         where: { id: saleId },
         select: { cashOnDelivery: true },
       });
       const orders = await tx.mgrCashOrder.findMany({
-        where: { saleId, archived: false },
+        where: { saleId, status: "posted" },
         select: {
           type: true,
           amountUah: true,
@@ -527,73 +615,65 @@ export async function createPaymentOrders(args: CreatePaymentArgs) {
     return { income, change: changeOrder };
   });
 
-  // 5.4.5b: рух боргу при оплаті (Приход) — погашення ЗМЕНШУЄ борг (−).
-  // ПІСЛЯ коміту (потрібен income.id; fire-and-forget не тримає транзакцію).
-  // Расход (standalone) НЕ обліковуємо — семантика боргу для нього неоднозначна
-  // (TODO: окремо). Здача (change) окремим рухом не йде — вона вже у `settledEur`.
-  if (type === "income") {
-    let effectiveCustomerId: string | null = customerId ?? null;
-    if (!effectiveCustomerId && saleId) {
-      const sale = await prisma.sale.findUnique({
-        where: { id: saleId },
-        select: { customerId: true },
-      });
-      effectiveCustomerId = sale?.customerId ?? null;
-    }
-
-    // Сума, що фактично пішла в погашення (здача не зменшує борг).
-    const settledEur =
-      reduceToEur(paid, rates) - reduceChangeToEur(change, rates);
-
-    if (effectiveCustomerId && settledEur !== 0) {
-      applyDebtMovementSafe({
-        customerId: effectiveCustomerId,
-        amountEur: -settledEur, // оплата ЗМЕНШУЄ борг
-        kind: "payment",
-        sourceType: "cash_order",
-        sourceId: result.income.id,
-        occurredAt: result.income.createdAt ?? new Date(),
-        note: "Оплата (касовий ордер)",
-        createdByUserId: agentUserId ?? null,
-      });
-    }
-  }
-
-  // Задача A: рухи в регістр ДДС `CashFlowMovement` (як проведення 1С). Пишемо і
-  // для основного ордера, і для ордера-здачі (розхід). Fire-and-forget після
-  // коміту; чиста корекція боргу (усі суми 0) рухів не створює.
-  applyCashFlowMovementsSafe({
-    id: result.income.id,
-    type: result.income.type,
-    amountUah: result.income.amountUah,
-    amountEur: result.income.amountEur,
-    amountUsd: result.income.amountUsd,
-    amountUahCashless: result.income.amountUahCashless,
-    rateEur: result.income.rateEur,
-    rateUsd: result.income.rateUsd,
-    bankAccountId: result.income.bankAccountId,
-    cashFlowArticleId: result.income.cashFlowArticleId,
-    customerId: result.income.customerId,
-    saleId: result.income.saleId,
-    occurredAt: result.income.paidAt ?? result.income.createdAt ?? new Date(),
-  });
-  if (result.change) {
-    applyCashFlowMovementsSafe({
-      id: result.change.id,
-      type: result.change.type,
-      amountUah: result.change.amountUah,
-      amountEur: result.change.amountEur,
-      amountUsd: result.change.amountUsd,
-      amountUahCashless: result.change.amountUahCashless,
-      rateEur: result.change.rateEur,
-      rateUsd: result.change.rateUsd,
-      bankAccountId: result.change.bankAccountId,
-      cashFlowArticleId: result.change.cashFlowArticleId,
-      customerId: result.change.customerId,
-      saleId: result.change.saleId,
-      occurredAt: result.change.paidAt ?? result.change.createdAt ?? new Date(),
-    });
+  // Ефекти проведення (ДДС + борг) — ЛИШЕ коли проводимо. Чернетка не впливає.
+  if (post) {
+    await applyCashOrderPostingEffects(result.income, result.change);
   }
 
   return result;
+}
+
+/**
+ * Проведення раніше збереженої ЧЕРНЕТКИ касового ордера (кнопка «Провести» на
+ * картці). draft→posted: статус + архів на основному й ордері-здачі, перерахунок
+ * наложки, потім ефекти проведення (ДДС + борг). Ідемпотентно за статусом.
+ *
+ * @returns `{ ok: false, error }` коли не знайдено / вже проведено.
+ */
+export async function postCashOrder(
+  id: string,
+): Promise<{ ok: boolean; error?: "not_found" | "not_draft" }> {
+  const income = await prisma.mgrCashOrder.findUnique({ where: { id } });
+  if (!income) return { ok: false, error: "not_found" };
+  if (income.status !== "draft") return { ok: false, error: "not_draft" };
+
+  const changeOrder = await prisma.mgrCashOrder.findFirst({
+    where: { changeForId: id },
+  });
+
+  await prisma.$transaction(async (tx) => {
+    await tx.mgrCashOrder.updateMany({
+      where: { OR: [{ id }, { changeForId: id }] },
+      data: { status: "posted", archived: true },
+    });
+
+    if (income.saleId) {
+      const sale = await tx.sale.findUnique({
+        where: { id: income.saleId },
+        select: { cashOnDelivery: true },
+      });
+      const orders = await tx.mgrCashOrder.findMany({
+        where: { saleId: income.saleId, status: "posted" },
+        select: {
+          type: true,
+          amountUah: true,
+          amountEur: true,
+          amountUsd: true,
+          amountUahCashless: true,
+        },
+      });
+      const rates: CashRates = { eur: income.rateEur, usd: income.rateUsd };
+      const dueUah = Math.round(income.documentSumEur * income.rateEur);
+      const { balanceUah } = computeCashSummary({ dueUah, orders, rates });
+      await tx.sale.update({
+        where: { id: income.saleId },
+        data: {
+          codAmountUah: sale?.cashOnDelivery ? Math.max(0, balanceUah) : null,
+        },
+      });
+    }
+  });
+
+  await applyCashOrderPostingEffects(income, changeOrder);
+  return { ok: true };
 }
