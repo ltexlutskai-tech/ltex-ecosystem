@@ -2,8 +2,10 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Check, Pencil } from "lucide-react";
+import { Plus, Pencil } from "lucide-react";
 import { Button, Input, useToast } from "@ltex/ui";
+import { useInlineRecordEdit } from "@/lib/autosave/use-inline-record-edit";
+import { InlineAutosaveControls } from "../../_components/inline-autosave-controls";
 
 export type BankAccountKind = "account" | "card" | "cash";
 
@@ -26,6 +28,11 @@ const KIND_LABELS: Record<BankAccountKind, string> = {
 
 const KIND_OPTIONS: BankAccountKind[] = ["account", "card", "cash"];
 
+interface BankEditFields extends Record<string, unknown> {
+  name: string;
+  kind: BankAccountKind;
+}
+
 export function BankAccountsManager({
   initial,
 }: {
@@ -41,8 +48,6 @@ export function BankAccountsManager({
   const [hiddenInApp, setHiddenInApp] = useState(false);
   const [busy, setBusy] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [editName, setEditName] = useState("");
-  const [editKind, setEditKind] = useState<BankAccountKind>("account");
 
   async function call(url: string, method: string, body: unknown) {
     setBusy(true);
@@ -78,15 +83,6 @@ export function BankAccountsManager({
       setKind("account");
       setHiddenInApp(false);
     }
-  }
-
-  async function saveEdit(id: string) {
-    if (!editName.trim()) return;
-    const ok = await call(`${BASE}/${id}`, "PATCH", {
-      name: editName.trim(),
-      kind: editKind,
-    });
-    if (ok) setEditingId(null);
   }
 
   return (
@@ -164,101 +160,180 @@ export function BankAccountsManager({
                   b.archived ? "bg-gray-50 text-gray-400" : ""
                 }`}
               >
-                <td className="px-4 py-2 font-medium text-gray-800">
-                  {editingId === b.id ? (
-                    <Input
-                      value={editName}
-                      onChange={(e) => setEditName(e.target.value)}
-                      className="h-8"
-                    />
-                  ) : (
-                    b.name
-                  )}
-                </td>
-                <td className="px-4 py-2 text-gray-600">
-                  {b.description ?? "—"}
-                </td>
-                <td className="px-4 py-2">
-                  {editingId === b.id ? (
-                    <select
-                      value={editKind}
-                      onChange={(e) =>
-                        setEditKind(e.target.value as BankAccountKind)
-                      }
-                      className="h-8 rounded-md border border-gray-300 bg-white px-2 text-sm text-gray-700"
-                      aria-label="Тип"
-                    >
-                      {KIND_OPTIONS.map((k) => (
-                        <option key={k} value={k}>
-                          {KIND_LABELS[k]}
-                        </option>
-                      ))}
-                    </select>
-                  ) : (
-                    <span className="inline-flex rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">
-                      {KIND_LABELS[b.kind]}
-                    </span>
-                  )}
-                </td>
-                <td className="px-4 py-2 text-center">
-                  <button
-                    type="button"
-                    disabled={busy}
-                    onClick={() =>
+                {editingId === b.id ? (
+                  <EditableBankRow
+                    item={b}
+                    busy={busy}
+                    onToggleHidden={() =>
                       call(`${BASE}/${b.id}`, "PATCH", {
                         hiddenInApp: !b.hiddenInApp,
                       })
                     }
-                    className="text-xs text-blue-600 hover:underline"
-                  >
-                    {b.hiddenInApp ? "Так" : "Ні"}
-                  </button>
-                </td>
-                <td className="px-4 py-2 text-right">
-                  <div className="flex items-center justify-end gap-2">
-                    {editingId === b.id ? (
-                      <Button
+                    onToggleArchived={() =>
+                      call(`${BASE}/${b.id}`, "PATCH", {
+                        archived: !b.archived,
+                      })
+                    }
+                    onDone={() => {
+                      setEditingId(null);
+                      startTransition(() => router.refresh());
+                    }}
+                  />
+                ) : (
+                  <>
+                    <td className="px-4 py-2 font-medium text-gray-800">
+                      {b.name}
+                    </td>
+                    <td className="px-4 py-2 text-gray-600">
+                      {b.description ?? "—"}
+                    </td>
+                    <td className="px-4 py-2">
+                      <span className="inline-flex rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">
+                        {KIND_LABELS[b.kind]}
+                      </span>
+                    </td>
+                    <td className="px-4 py-2 text-center">
+                      <button
                         type="button"
-                        size="sm"
-                        variant="outline"
                         disabled={busy}
-                        onClick={() => saveEdit(b.id)}
+                        onClick={() =>
+                          call(`${BASE}/${b.id}`, "PATCH", {
+                            hiddenInApp: !b.hiddenInApp,
+                          })
+                        }
+                        className="text-xs text-blue-600 hover:underline"
                       >
-                        <Check className="h-4 w-4" />
-                      </Button>
-                    ) : (
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => {
-                          setEditingId(b.id);
-                          setEditName(b.name);
-                          setEditKind(b.kind);
-                        }}
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                    )}
-                    <button
-                      type="button"
-                      disabled={busy}
-                      onClick={() =>
-                        call(`${BASE}/${b.id}`, "PATCH", {
-                          archived: !b.archived,
-                        })
-                      }
-                      className="text-xs text-gray-500 hover:text-gray-700"
-                    >
-                      {b.archived ? "Відновити" : "Архівувати"}
-                    </button>
-                  </div>
-                </td>
+                        {b.hiddenInApp ? "Так" : "Ні"}
+                      </button>
+                    </td>
+                    <td className="px-4 py-2 text-right">
+                      <div className="flex items-center justify-end gap-2">
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => setEditingId(b.id)}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <button
+                          type="button"
+                          disabled={busy}
+                          onClick={() =>
+                            call(`${BASE}/${b.id}`, "PATCH", {
+                              archived: !b.archived,
+                            })
+                          }
+                          className="text-xs text-gray-500 hover:text-gray-700"
+                        >
+                          {b.archived ? "Відновити" : "Архівувати"}
+                        </button>
+                      </div>
+                    </td>
+                  </>
+                )}
               </tr>
             ))}
           </tbody>
         </table>
       </div>
     </div>
+  );
+}
+
+/**
+ * Рядок рахунку в режимі редагування — назва й тип автозберігаються одразу
+ * (без кнопки «Зберегти») через PATCH.
+ */
+function EditableBankRow({
+  item,
+  busy,
+  onToggleHidden,
+  onToggleArchived,
+  onDone,
+}: {
+  item: BankAccountItem;
+  busy: boolean;
+  onToggleHidden: () => void;
+  onToggleArchived: () => void;
+  onDone: () => void;
+}) {
+  const edit = useInlineRecordEdit<BankEditFields>({
+    recordKey: `bank-account:${item.id}`,
+    initial: { name: item.name, kind: item.kind },
+    save: async (data) => {
+      if (!data.name.trim()) throw new Error("Вкажіть назву");
+      const res = await fetch(`${BASE}/${item.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: data.name.trim(), kind: data.kind }),
+      });
+      if (!res.ok) {
+        const j = (await res.json().catch(() => ({}))) as { error?: string };
+        throw new Error(j.error ?? "Помилка збереження");
+      }
+    },
+  });
+
+  return (
+    <>
+      <td className="px-4 py-2 font-medium text-gray-800">
+        <Input
+          value={edit.fields.name}
+          onChange={(e) => edit.setField("name", e.target.value)}
+          className="h-8"
+          autoFocus
+        />
+      </td>
+      <td className="px-4 py-2 text-gray-600">{item.description ?? "—"}</td>
+      <td className="px-4 py-2">
+        <select
+          value={edit.fields.kind}
+          onChange={(e) =>
+            edit.setField("kind", e.target.value as BankAccountKind)
+          }
+          className="h-8 rounded-md border border-gray-300 bg-white px-2 text-sm text-gray-700"
+          aria-label="Тип"
+        >
+          {KIND_OPTIONS.map((k) => (
+            <option key={k} value={k}>
+              {KIND_LABELS[k]}
+            </option>
+          ))}
+        </select>
+      </td>
+      <td className="px-4 py-2 text-center">
+        <button
+          type="button"
+          disabled={busy}
+          onClick={onToggleHidden}
+          className="text-xs text-blue-600 hover:underline"
+        >
+          {item.hiddenInApp ? "Так" : "Ні"}
+        </button>
+      </td>
+      <td className="px-4 py-2 text-right">
+        <div className="flex flex-col items-end gap-1">
+          <InlineAutosaveControls
+            status={edit.status}
+            savedAt={edit.savedAt}
+            hasRestore={edit.hasRestore}
+            onApplyRestore={edit.applyRestore}
+            onDismissRestore={edit.dismissRestore}
+            onDone={() => {
+              void edit.flush().finally(onDone);
+            }}
+          />
+          <button
+            type="button"
+            disabled={busy}
+            onClick={onToggleArchived}
+            className="text-xs text-gray-500 hover:text-gray-700"
+          >
+            {item.archived ? "Відновити" : "Архівувати"}
+          </button>
+        </div>
+      </td>
+    </>
   );
 }

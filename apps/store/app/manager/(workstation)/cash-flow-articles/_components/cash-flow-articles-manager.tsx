@@ -2,8 +2,10 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Check, Pencil } from "lucide-react";
+import { Plus, Pencil } from "lucide-react";
 import { Button, Input, useToast } from "@ltex/ui";
+import { useInlineRecordEdit } from "@/lib/autosave/use-inline-record-edit";
+import { InlineAutosaveControls } from "../../_components/inline-autosave-controls";
 
 export type CashFlowArticleDirection = "income" | "expense" | "both";
 
@@ -30,6 +32,11 @@ const DIRECTION_OPTIONS: CashFlowArticleDirection[] = [
   "both",
 ];
 
+interface ArticleEditFields extends Record<string, unknown> {
+  name: string;
+  direction: CashFlowArticleDirection;
+}
+
 export function CashFlowArticlesManager({
   initial,
 }: {
@@ -45,9 +52,6 @@ export function CashFlowArticlesManager({
   const [direction, setDirection] = useState<CashFlowArticleDirection>("both");
   const [busy, setBusy] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [editName, setEditName] = useState("");
-  const [editDirection, setEditDirection] =
-    useState<CashFlowArticleDirection>("both");
 
   // Тільки кореневі (без батька) — кандидати у батьки (2 рівні, як 1С).
   const parentOptions = initial.filter((a) => !a.parentId && !a.archived);
@@ -87,15 +91,6 @@ export function CashFlowArticlesManager({
       setParentId("");
       setDirection("both");
     }
-  }
-
-  async function saveEdit(id: string) {
-    if (!editName.trim()) return;
-    const ok = await call(`${BASE}/${id}`, "PATCH", {
-      name: editName.trim(),
-      direction: editDirection,
-    });
-    if (ok) setEditingId(null);
   }
 
   return (
@@ -183,92 +178,164 @@ export function CashFlowArticlesManager({
                   a.archived ? "bg-gray-50 text-gray-400" : ""
                 }`}
               >
-                <td className="px-4 py-2 font-mono text-gray-600">
-                  {a.code ?? "—"}
-                </td>
-                <td className="px-4 py-2 font-medium text-gray-800">
-                  {editingId === a.id ? (
-                    <Input
-                      value={editName}
-                      onChange={(e) => setEditName(e.target.value)}
-                      className="h-8"
-                    />
-                  ) : (
-                    a.name
-                  )}
-                </td>
-                <td className="px-4 py-2 text-gray-600">
-                  {a.parentId ? (nameById.get(a.parentId) ?? "—") : "—"}
-                </td>
-                <td className="px-4 py-2">
-                  {editingId === a.id ? (
-                    <select
-                      value={editDirection}
-                      onChange={(e) =>
-                        setEditDirection(
-                          e.target.value as CashFlowArticleDirection,
-                        )
-                      }
-                      className="h-8 rounded-md border border-gray-300 bg-white px-2 text-sm text-gray-700"
-                      aria-label="Напрям"
-                    >
-                      {DIRECTION_OPTIONS.map((d) => (
-                        <option key={d} value={d}>
-                          {DIRECTION_LABELS[d]}
-                        </option>
-                      ))}
-                    </select>
-                  ) : (
-                    <span className="inline-flex rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">
-                      {DIRECTION_LABELS[a.direction]}
-                    </span>
-                  )}
-                </td>
-                <td className="px-4 py-2 text-right">
-                  <div className="flex items-center justify-end gap-2">
-                    {editingId === a.id ? (
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        disabled={busy}
-                        onClick={() => saveEdit(a.id)}
-                      >
-                        <Check className="h-4 w-4" />
-                      </Button>
-                    ) : (
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => {
-                          setEditingId(a.id);
-                          setEditName(a.name);
-                          setEditDirection(a.direction);
-                        }}
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                    )}
-                    <button
-                      type="button"
-                      disabled={busy}
-                      onClick={() =>
-                        call(`${BASE}/${a.id}`, "PATCH", {
-                          archived: !a.archived,
-                        })
-                      }
-                      className="text-xs text-gray-500 hover:text-gray-700"
-                    >
-                      {a.archived ? "Відновити" : "Архівувати"}
-                    </button>
-                  </div>
-                </td>
+                {editingId === a.id ? (
+                  <EditableArticleRow
+                    item={a}
+                    parentName={
+                      a.parentId ? (nameById.get(a.parentId) ?? "—") : "—"
+                    }
+                    busy={busy}
+                    onToggleArchived={() =>
+                      call(`${BASE}/${a.id}`, "PATCH", {
+                        archived: !a.archived,
+                      })
+                    }
+                    onDone={() => {
+                      setEditingId(null);
+                      startTransition(() => router.refresh());
+                    }}
+                  />
+                ) : (
+                  <>
+                    <td className="px-4 py-2 font-mono text-gray-600">
+                      {a.code ?? "—"}
+                    </td>
+                    <td className="px-4 py-2 font-medium text-gray-800">
+                      {a.name}
+                    </td>
+                    <td className="px-4 py-2 text-gray-600">
+                      {a.parentId ? (nameById.get(a.parentId) ?? "—") : "—"}
+                    </td>
+                    <td className="px-4 py-2">
+                      <span className="inline-flex rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">
+                        {DIRECTION_LABELS[a.direction]}
+                      </span>
+                    </td>
+                    <td className="px-4 py-2 text-right">
+                      <div className="flex items-center justify-end gap-2">
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => setEditingId(a.id)}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <button
+                          type="button"
+                          disabled={busy}
+                          onClick={() =>
+                            call(`${BASE}/${a.id}`, "PATCH", {
+                              archived: !a.archived,
+                            })
+                          }
+                          className="text-xs text-gray-500 hover:text-gray-700"
+                        >
+                          {a.archived ? "Відновити" : "Архівувати"}
+                        </button>
+                      </div>
+                    </td>
+                  </>
+                )}
               </tr>
             ))}
           </tbody>
         </table>
       </div>
     </div>
+  );
+}
+
+/**
+ * Рядок статті ДДС у режимі редагування — назва й напрям автозберігаються одразу
+ * (без кнопки «Зберегти») через PATCH.
+ */
+function EditableArticleRow({
+  item,
+  parentName,
+  busy,
+  onToggleArchived,
+  onDone,
+}: {
+  item: CashFlowArticleItem;
+  parentName: string;
+  busy: boolean;
+  onToggleArchived: () => void;
+  onDone: () => void;
+}) {
+  const edit = useInlineRecordEdit<ArticleEditFields>({
+    recordKey: `cash-flow-article:${item.id}`,
+    initial: { name: item.name, direction: item.direction },
+    save: async (data) => {
+      if (!data.name.trim()) throw new Error("Вкажіть назву");
+      const res = await fetch(`${BASE}/${item.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: data.name.trim(),
+          direction: data.direction,
+        }),
+      });
+      if (!res.ok) {
+        const j = (await res.json().catch(() => ({}))) as { error?: string };
+        throw new Error(j.error ?? "Помилка збереження");
+      }
+    },
+  });
+
+  return (
+    <>
+      <td className="px-4 py-2 font-mono text-gray-600">{item.code ?? "—"}</td>
+      <td className="px-4 py-2 font-medium text-gray-800">
+        <Input
+          value={edit.fields.name}
+          onChange={(e) => edit.setField("name", e.target.value)}
+          className="h-8"
+          autoFocus
+        />
+      </td>
+      <td className="px-4 py-2 text-gray-600">{parentName}</td>
+      <td className="px-4 py-2">
+        <select
+          value={edit.fields.direction}
+          onChange={(e) =>
+            edit.setField(
+              "direction",
+              e.target.value as CashFlowArticleDirection,
+            )
+          }
+          className="h-8 rounded-md border border-gray-300 bg-white px-2 text-sm text-gray-700"
+          aria-label="Напрям"
+        >
+          {DIRECTION_OPTIONS.map((d) => (
+            <option key={d} value={d}>
+              {DIRECTION_LABELS[d]}
+            </option>
+          ))}
+        </select>
+      </td>
+      <td className="px-4 py-2 text-right">
+        <div className="flex flex-col items-end gap-1">
+          <InlineAutosaveControls
+            status={edit.status}
+            savedAt={edit.savedAt}
+            hasRestore={edit.hasRestore}
+            onApplyRestore={edit.applyRestore}
+            onDismissRestore={edit.dismissRestore}
+            onDone={() => {
+              void edit.flush().finally(onDone);
+            }}
+          />
+          <button
+            type="button"
+            disabled={busy}
+            onClick={onToggleArchived}
+            className="text-xs text-gray-500 hover:text-gray-700"
+          >
+            {item.archived ? "Відновити" : "Архівувати"}
+          </button>
+        </div>
+      </td>
+    </>
   );
 }

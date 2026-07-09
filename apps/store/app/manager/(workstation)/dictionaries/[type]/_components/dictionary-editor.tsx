@@ -2,16 +2,25 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Pencil, Trash2, Check, X, Plus } from "lucide-react";
+import { Pencil, Trash2, Plus } from "lucide-react";
 import {
   createDictEntry,
   updateDictEntry,
   deleteDictEntry,
 } from "@/lib/manager/simple-dict-actions";
 import type { DictRow } from "@/lib/manager/simple-dict-config";
+import { useInlineRecordEdit } from "@/lib/autosave/use-inline-record-edit";
+import { InlineAutosaveControls } from "../../../_components/inline-autosave-controls";
+import { usePortalConfirm } from "../../../_components/use-portal-confirm";
 
 const inputCls =
   "rounded-md border border-input bg-background px-3 py-1.5 text-sm";
+
+interface DictEditFields extends Record<string, unknown> {
+  label: string;
+  color: string;
+  active: boolean;
+}
 
 export function DictionaryEditor({
   type,
@@ -31,21 +40,23 @@ export function DictionaryEditor({
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
   const [editId, setEditId] = useState<string | null>(null);
+  const { confirm, dialog } = usePortalConfirm();
 
   // add form
   const [newLabel, setNewLabel] = useState("");
   const [newColor, setNewColor] = useState("#9ca3af");
-  // edit form
-  const [editLabel, setEditLabel] = useState("");
-  const [editColor, setEditColor] = useState("#9ca3af");
-  const [editActive, setEditActive] = useState(true);
 
-  function run(fn: () => Promise<void>) {
+  function add() {
+    if (!newLabel.trim()) return;
     setError(null);
     setInfo(null);
+    const fd = new FormData();
+    fd.set("label", newLabel.trim());
+    if (hasColor) fd.set("color", newColor);
     startTransition(async () => {
       try {
-        await fn();
+        await createDictEntry(type, fd);
+        setNewLabel("");
         router.refresh();
       } catch (e) {
         setError(e instanceof Error ? e.message : "Помилка");
@@ -53,47 +64,27 @@ export function DictionaryEditor({
     });
   }
 
-  function add() {
-    if (!newLabel.trim()) return;
-    const fd = new FormData();
-    fd.set("label", newLabel.trim());
-    if (hasColor) fd.set("color", newColor);
-    run(() => createDictEntry(type, fd));
-    setNewLabel("");
-  }
-
-  function startEdit(row: DictRow) {
-    setEditId(row.id);
-    setEditLabel(row.label);
-    setEditColor(row.color ?? "#9ca3af");
-    setEditActive(row.active ?? true);
-  }
-
-  function saveEdit(id: string) {
-    const fd = new FormData();
-    fd.set("label", editLabel.trim());
-    if (hasColor) fd.set("color", editColor);
-    if (isRoute) fd.set("active", String(editActive));
-    run(() => updateDictEntry(type, id, fd));
-    setEditId(null);
-  }
-
-  function remove(id: string) {
-    if (!window.confirm("Видалити значення з довідника?")) return;
-    setError(null);
-    setInfo(null);
-    startTransition(async () => {
-      try {
-        const res = await deleteDictEntry(type, id);
-        if (res.archived) {
-          setInfo(
-            "Значення використовується або належить 1С — його заархівовано (сховано зі списків вибору), а не стерто. Історія збережена.",
-          );
+  function remove(id: string, label: string) {
+    confirm({
+      title: "Видалити значення з довідника?",
+      message: `«${label}» буде прибрано зі списків вибору. Якщо значення вже використовується або належить 1С — його заархівуємо (історія збережеться), а не зітремо.`,
+      destructive: true,
+      confirmLabel: "Видалити",
+      onConfirm: async () => {
+        setError(null);
+        setInfo(null);
+        try {
+          const res = await deleteDictEntry(type, id);
+          if (res.archived) {
+            setInfo(
+              "Значення використовується або належить 1С — його заархівовано (сховано зі списків вибору), а не стерто. Історія збережена.",
+            );
+          }
+          router.refresh();
+        } catch (e) {
+          setError(e instanceof Error ? e.message : "Помилка");
         }
-        router.refresh();
-      } catch (e) {
-        setError(e instanceof Error ? e.message : "Помилка");
-      }
+      },
     });
   }
 
@@ -152,48 +143,16 @@ export function DictionaryEditor({
                 <tr key={row.id} className="border-b last:border-b-0">
                   {editId === row.id ? (
                     <td className="px-4 py-2">
-                      <div className="flex flex-wrap items-center gap-2">
-                        {hasColor && (
-                          <input
-                            type="color"
-                            value={editColor}
-                            onChange={(e) => setEditColor(e.target.value)}
-                            className="h-8 w-10 rounded border"
-                          />
-                        )}
-                        <input
-                          value={editLabel}
-                          onChange={(e) => setEditLabel(e.target.value)}
-                          className={`${inputCls} min-w-[220px] flex-1`}
-                        />
-                        {isRoute && (
-                          <label className="flex items-center gap-1.5 text-sm text-gray-700">
-                            <input
-                              type="checkbox"
-                              checked={editActive}
-                              onChange={(e) => setEditActive(e.target.checked)}
-                            />
-                            Активний
-                          </label>
-                        )}
-                        <button
-                          type="button"
-                          onClick={() => saveEdit(row.id)}
-                          disabled={pending}
-                          className="rounded-md bg-green-600 p-1.5 text-white hover:bg-green-700"
-                          aria-label="Зберегти"
-                        >
-                          <Check className="h-4 w-4" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setEditId(null)}
-                          className="rounded-md border p-1.5 text-gray-500 hover:bg-gray-50"
-                          aria-label="Скасувати"
-                        >
-                          <X className="h-4 w-4" />
-                        </button>
-                      </div>
+                      <EditableDictRow
+                        type={type}
+                        row={row}
+                        hasColor={hasColor}
+                        isRoute={isRoute}
+                        onDone={() => {
+                          setEditId(null);
+                          router.refresh();
+                        }}
+                      />
                     </td>
                   ) : (
                     <td className="px-4 py-2">
@@ -216,7 +175,7 @@ export function DictionaryEditor({
                           <span className="flex shrink-0 items-center gap-1">
                             <button
                               type="button"
-                              onClick={() => startEdit(row)}
+                              onClick={() => setEditId(row.id)}
                               className="rounded p-1 text-gray-400 hover:text-blue-600"
                               aria-label="Редагувати"
                             >
@@ -224,7 +183,7 @@ export function DictionaryEditor({
                             </button>
                             <button
                               type="button"
-                              onClick={() => remove(row.id)}
+                              onClick={() => remove(row.id, row.label)}
                               className="rounded p-1 text-gray-400 hover:text-red-600"
                               aria-label="Видалити"
                             >
@@ -241,6 +200,85 @@ export function DictionaryEditor({
           </tbody>
         </table>
       </div>
+
+      {dialog}
+    </div>
+  );
+}
+
+/**
+ * Рядок довідника у режимі редагування: будь-яка зміна поля автозберігається
+ * одразу (без кнопки «Зберегти») через server action `updateDictEntry`.
+ */
+function EditableDictRow({
+  type,
+  row,
+  hasColor,
+  isRoute,
+  onDone,
+}: {
+  type: string;
+  row: DictRow;
+  hasColor: boolean;
+  isRoute: boolean;
+  onDone: () => void;
+}) {
+  const edit = useInlineRecordEdit<DictEditFields>({
+    recordKey: `dict:${type}:${row.id}`,
+    initial: {
+      label: row.label,
+      color: row.color ?? "#9ca3af",
+      active: row.active ?? true,
+    },
+    save: async (data) => {
+      const label = data.label.trim();
+      if (!label) throw new Error("Вкажіть назву");
+      const fd = new FormData();
+      fd.set("label", label);
+      if (hasColor) fd.set("color", data.color);
+      if (isRoute) fd.set("active", String(data.active));
+      await updateDictEntry(type, row.id, fd);
+    },
+  });
+
+  return (
+    <div className="space-y-2">
+      <div className="flex flex-wrap items-center gap-2">
+        {hasColor && (
+          <input
+            type="color"
+            value={edit.fields.color}
+            onChange={(e) => edit.setField("color", e.target.value)}
+            className="h-8 w-10 rounded border"
+          />
+        )}
+        <input
+          value={edit.fields.label}
+          onChange={(e) => edit.setField("label", e.target.value)}
+          className={`${inputCls} min-w-[220px] flex-1`}
+          autoFocus
+        />
+        {isRoute && (
+          <label className="flex items-center gap-1.5 text-sm text-gray-700">
+            <input
+              type="checkbox"
+              checked={edit.fields.active}
+              onChange={(e) => edit.setField("active", e.target.checked)}
+            />
+            Активний
+          </label>
+        )}
+      </div>
+      <InlineAutosaveControls
+        status={edit.status}
+        savedAt={edit.savedAt}
+        hasRestore={edit.hasRestore}
+        onApplyRestore={edit.applyRestore}
+        onDismissRestore={edit.dismissRestore}
+        onDone={() => {
+          void edit.flush().finally(onDone);
+        }}
+      />
     </div>
   );
 }
