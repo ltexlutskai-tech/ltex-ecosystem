@@ -1605,6 +1605,7 @@ model MgrClient {
   assortmentItems   MgrClientAssortmentItem[]
   presentations     MgrClientPresentationItem[]
   bankAccounts      MgrClientBankAccount[]
+  contacts          MgrClientContact[]
   reminders         MgrReminder[]
   timeline          MgrClientTimelineEntry[]
   debtMovements     MgrDebtMovement[]
@@ -1735,6 +1736,24 @@ model MgrClientBankAccount {
 
   @@index([clientId])
   @@map("mgr_client_bank_accounts")
+}
+
+// ─── Контактні особи (← 1С Catalog.КонтактныеЛицаКонтрагентов) — ТЗ 8.0 E2 ──
+// Окремі люди-контакти клієнта (ПІБ, посада), на відміну від просто телефонів.
+model MgrClientContact {
+  id        String  @id @default(cuid())
+  clientId  String  @map("client_id")
+  fullName  String  @map("full_name")
+  position  String?
+  phone     String?
+  email     String?
+  comment   String?
+  sortOrder Int     @default(0) @map("sort_order")
+
+  client MgrClient @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@index([clientId])
+  @@map("mgr_client_contacts")
 }
 
 // ─── Reminders (← 1С Catalog.Нагадування + own private extras) ─────────────
