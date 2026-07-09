@@ -2,6 +2,7 @@ import { createElement, type ComponentType, type ReactElement } from "react";
 import {
   BarChart3,
   Bell,
+  Boxes,
   ClipboardList,
   Database,
   FileText,
@@ -122,6 +123,13 @@ export const WAREHOUSE_RECEIVINGS_LINK: SidebarLink = {
   href: "/manager/receivings",
   label: "Поступлення",
   icon: PackagePlus,
+};
+
+// ── Зміна стану мішка (2026-07-14) — склад + адмін/власник ────────────────
+export const BAG_STATE_LINK: SidebarLink = {
+  href: "/manager/bag-state-changes",
+  label: "Зміна стану мішка",
+  icon: Boxes,
 };
 
 // ── Тиждень 1 блоку Ролі (2026-06-03) ────────────────────────────────────

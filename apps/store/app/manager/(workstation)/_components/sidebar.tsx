@@ -6,6 +6,7 @@ import {
   ADMIN_PERMISSIONS_LINK,
   ADMIN_REGION_AGENTS_LINK,
   ADMIN_USERS_LINK,
+  BAG_STATE_LINK,
   CHAT_LINK,
   FINANCE_LINKS,
   PRIMARY_LINKS,
@@ -32,11 +33,18 @@ export function ManagerSidebar({ role }: { role: ManagerRole }) {
         badgeSlot={<ChatUnreadBadge />}
       />
       {(role === "warehouse" || role === "admin" || role === "owner") && (
-        <SidebarNavLink
-          href={WAREHOUSE_RECEIVINGS_LINK.href}
-          label={WAREHOUSE_RECEIVINGS_LINK.label}
-          icon={renderLinkIcon(WAREHOUSE_RECEIVINGS_LINK)}
-        />
+        <>
+          <SidebarNavLink
+            href={WAREHOUSE_RECEIVINGS_LINK.href}
+            label={WAREHOUSE_RECEIVINGS_LINK.label}
+            icon={renderLinkIcon(WAREHOUSE_RECEIVINGS_LINK)}
+          />
+          <SidebarNavLink
+            href={BAG_STATE_LINK.href}
+            label={BAG_STATE_LINK.label}
+            icon={renderLinkIcon(BAG_STATE_LINK)}
+          />
+        </>
       )}
       {role !== "warehouse" && role !== "expeditor" && (
         <SidebarNavLink
