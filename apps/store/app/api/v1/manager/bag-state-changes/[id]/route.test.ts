@@ -30,6 +30,7 @@ vi.mock("@/lib/auth/manager-auth", () => ({
 }));
 vi.mock("@/lib/manager/bag-state", () => ({
   updateBagStateChange: (...a: unknown[]) => updateBagStateChangeMock(...a),
+  BAG_STATE_WRITE_ROLES: ["warehouse", "admin", "owner"],
 }));
 vi.mock("@/lib/manager/bag-state-hooks", () => ({
   removeBagStateChange: (...a: unknown[]) => removeBagStateChangeMock(...a),

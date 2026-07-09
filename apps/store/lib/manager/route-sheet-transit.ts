@@ -2,20 +2,23 @@ import { prisma } from "@ltex/db";
 
 /**
  * Блок «Маршрут», доробка А — рухи регістру «товар у дорозі» (`TransitMovement`,
- * 1С ТоварыВДороге) + складу (`StockMovement`) при відправці/завершенні МЛ.
+ * 1С ТоварыВДороге) при відправці/завершенні МЛ.
  *
- * Модель (дзеркалить центральну 1С):
- *   • **Відправка** (dispatched): кожен завантажений лот
- *       – склад: розхід (лот залишає склад) → StockMovement recordKind=1;
- *       – дорога: прихід (лот у машині) → TransitMovement recordKind=0.
- *   • **Завершення** (completed): кожен лот, що був у дорозі
- *       – дорога: розхід (лот вибуває з дороги) → TransitMovement recordKind=1;
- *       – повернені (не продані) лоти: склад прихід (назад на склад) →
- *         StockMovement recordKind=0.
+ * Модель:
+ *   • **Відправка** (dispatched): кожен завантажений лот → дорога прихід
+ *     (TransitMovement recordKind=0) — лот фізично в машині.
+ *   • **Завершення** (completed): кожен лот → дорога розхід
+ *     (TransitMovement recordKind=1) — лот вибуває з дороги (проданий або
+ *     повернений на склад).
  *
- * Ключ реєстратора = локальний `RouteSheet.id`, lineNo по рядках завантаження.
- * StockMovement від продажу маршрутних реалізацій НЕ пишеться (Блок В його
- * свідомо пропускає для routeSheetId) — тут єдине джерело складських рухів МЛ.
+ * **Склад тут НЕ рухаємо.** Складський баланс веде хук реалізації
+ * (`sale-movement-hooks.ts`): продана реалізація (у т.ч. маршрутна) пише
+ * `StockMovement` розхід. Повернені (не продані) лоти зі складу не списуються
+ * взагалі — тож і повертати нічого. Транзит — окремий паралельний регістр
+ * «що зараз у машинах», без подвійного обліку зі складом.
+ *
+ * Ключ реєстратора = локальний `RouteSheet.id`; прихід — lineNo 1..N, розхід —
+ * lineNo 1001.. (окремий діапазон, щоб не конфліктувати з приходом).
  *
  * Best-effort ПІСЛЯ коміту: НІКОЛИ не валить статус-перехід. Пропускає
  * імпортовані з 1С МЛ (мають code1C — рухи вже з імпорту).
@@ -103,10 +106,44 @@ function resolveProductCode(
   return map.get(row.productId) || row.barcode || `rs-lot:${row.lotId}`;
 }
 
-/**
- * Відправка МЛ: рухи «склад → дорога». Для кожного завантаженого лота —
- * StockMovement розхід (склад) + TransitMovement прихід (дорога).
- */
+/** Спільний upsert руху «в дорозі». */
+async function upsertTransit(
+  routeSheetId: string,
+  lineNo: number,
+  row: LoadingLine,
+  productCode1C: string,
+  clientCode1C: string | null,
+  occurredAt: Date,
+  recordKind: 0 | 1,
+): Promise<void> {
+  const qty = round3(row.quantity || 1);
+  const weightKg = row.weight ? round3(row.weight) : null;
+  await prisma.transitMovement.upsert({
+    where: {
+      transit_movement_src: {
+        recorderCode1C: routeSheetId,
+        lineNo,
+        productCode1C,
+      },
+    },
+    create: {
+      occurredAt,
+      recorderCode1C: routeSheetId,
+      lineNo,
+      productCode1C,
+      productId: row.productId,
+      lotCode1C: row.barcode,
+      lotId: row.lotId,
+      clientCode1C,
+      qty,
+      weightKg,
+      recordKind,
+    },
+    update: { qty, weightKg, clientCode1C, recordKind },
+  });
+}
+
+/** Відправка МЛ: кожен завантажений лот → дорога прихід (recordKind=0). */
 export function applyDispatchTransitSafe(routeSheetId: string): void {
   void (async () => {
     const ctx = await loadContext(routeSheetId);
@@ -119,57 +156,15 @@ export function applyDispatchTransitSafe(routeSheetId: string): void {
       const clientCode1C = row.customerId
         ? (ctx.clientCodeById.get(row.customerId) ?? null)
         : null;
-      const qty = round3(row.quantity || 1);
-      const weightKg = row.weight ? round3(row.weight) : null;
-
-      // Склад: розхід (лот залишає склад).
-      await prisma.stockMovement.upsert({
-        where: {
-          stock_movement_src: {
-            recorderCode1C: routeSheetId,
-            lineNo,
-            productCode1C,
-          },
-        },
-        create: {
-          occurredAt: ctx.occurredAt,
-          recorderCode1C: routeSheetId,
-          lineNo,
-          warehouseCode1C: null,
-          productCode1C,
-          productId: row.productId,
-          lotCode1C: row.barcode,
-          qty,
-          weightKg,
-          recordKind: 1,
-        },
-        update: { qty, weightKg, recordKind: 1 },
-      });
-
-      // Дорога: прихід (лот у машині).
-      await prisma.transitMovement.upsert({
-        where: {
-          transit_movement_src: {
-            recorderCode1C: routeSheetId,
-            lineNo,
-            productCode1C,
-          },
-        },
-        create: {
-          occurredAt: ctx.occurredAt,
-          recorderCode1C: routeSheetId,
-          lineNo,
-          productCode1C,
-          productId: row.productId,
-          lotCode1C: row.barcode,
-          lotId: row.lotId,
-          clientCode1C,
-          qty,
-          weightKg,
-          recordKind: 0,
-        },
-        update: { qty, weightKg, clientCode1C, recordKind: 0 },
-      });
+      await upsertTransit(
+        routeSheetId,
+        lineNo,
+        row,
+        productCode1C,
+        clientCode1C,
+        ctx.occurredAt,
+        0,
+      );
     }
   })().catch((e: unknown) => {
     console.warn("[L-TEX] Failed to apply dispatch transit movements", {
@@ -179,30 +174,13 @@ export function applyDispatchTransitSafe(routeSheetId: string): void {
   });
 }
 
-/**
- * Завершення МЛ: кожен лот вибуває з дороги (TransitMovement розхід). Повернені
- * (не продані у реалізаціях цього МЛ) лоти повертаються на склад (StockMovement
- * прихід). Продані лоти зі складу вже списані при відправці — назад не додаються.
- */
+/** Завершення МЛ: кожен лот вибуває з дороги (recordKind=1). */
 export function applyCompleteTransitSafe(routeSheetId: string): void {
   void (async () => {
     const ctx = await loadContext(routeSheetId);
     if (!ctx || ctx.code1C || ctx.rows.length === 0) return;
 
-    // Лоти, продані у реалізаціях цього маршруту.
-    const soldItems = await prisma.saleItem.findMany({
-      where: {
-        sale: { routeSheetId },
-        lotId: { in: ctx.rows.map((r) => r.lotId) },
-      },
-      select: { lotId: true },
-    });
-    const soldLotIds = new Set(
-      soldItems.map((i) => i.lotId).filter((v): v is string => v != null),
-    );
-
-    // Розхід дороги пишемо з окремим діапазоном lineNo (щоб не конфліктувати з
-    // приходом при відправці, який має ті самі lineNo 1..N).
+    // Окремий діапазон lineNo (щоб не конфліктувати з приходом 1..N).
     let lineNo = 1000;
     for (const row of ctx.rows) {
       lineNo += 1;
@@ -210,60 +188,15 @@ export function applyCompleteTransitSafe(routeSheetId: string): void {
       const clientCode1C = row.customerId
         ? (ctx.clientCodeById.get(row.customerId) ?? null)
         : null;
-      const qty = round3(row.quantity || 1);
-      const weightKg = row.weight ? round3(row.weight) : null;
-      const returned = row.isReturn || !soldLotIds.has(row.lotId);
-
-      // Дорога: розхід (лот вибуває з дороги).
-      await prisma.transitMovement.upsert({
-        where: {
-          transit_movement_src: {
-            recorderCode1C: routeSheetId,
-            lineNo,
-            productCode1C,
-          },
-        },
-        create: {
-          occurredAt: ctx.occurredAt,
-          recorderCode1C: routeSheetId,
-          lineNo,
-          productCode1C,
-          productId: row.productId,
-          lotCode1C: row.barcode,
-          lotId: row.lotId,
-          clientCode1C,
-          qty,
-          weightKg,
-          recordKind: 1,
-        },
-        update: { qty, weightKg, clientCode1C, recordKind: 1 },
-      });
-
-      // Повернені лоти: склад прихід (назад на склад).
-      if (returned) {
-        await prisma.stockMovement.upsert({
-          where: {
-            stock_movement_src: {
-              recorderCode1C: routeSheetId,
-              lineNo,
-              productCode1C,
-            },
-          },
-          create: {
-            occurredAt: ctx.occurredAt,
-            recorderCode1C: routeSheetId,
-            lineNo,
-            warehouseCode1C: null,
-            productCode1C,
-            productId: row.productId,
-            lotCode1C: row.barcode,
-            qty,
-            weightKg,
-            recordKind: 0,
-          },
-          update: { qty, weightKg, recordKind: 0 },
-        });
-      }
+      await upsertTransit(
+        routeSheetId,
+        lineNo,
+        row,
+        productCode1C,
+        clientCode1C,
+        ctx.occurredAt,
+        1,
+      );
     }
   })().catch((e: unknown) => {
     console.warn("[L-TEX] Failed to apply complete transit movements", {
