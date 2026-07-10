@@ -30,6 +30,13 @@ vi.mock("@/lib/manager/debt-register", () => ({
   recomputeDebtForClients: vi.fn().mockResolvedValue(0),
 }));
 
+const reverseSpy = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
+const reapplySpy = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
+vi.mock("@/lib/manager/deletion-movements", () => ({
+  reverseDocMovements: reverseSpy,
+  reapplyDocMovements: reapplySpy,
+}));
+
 const findReferencesSpy = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/manager/reference-check", () => ({
   findReferences: findReferencesSpy,
@@ -39,6 +46,7 @@ import {
   markForDeletion,
   approveDeletion,
   rejectDeletion,
+  restoreDeletionRequest,
 } from "./deletion-queue";
 
 const user = {
@@ -200,5 +208,107 @@ describe("rejectDeletion", () => {
         data: expect.objectContaining({ status: "rejected" }),
       }),
     );
+  });
+
+  it("reapplies movements on reject (document doc types)", async () => {
+    mockDb.deletionRequest.findUnique.mockResolvedValue({
+      id: "req4b",
+      entityType: "sale",
+      entityId: "s4",
+      entityLabel: "Реалізація 1",
+      dictType: null,
+      status: "pending",
+    });
+    mockDb.sale.update.mockResolvedValue({});
+    mockDb.deletionRequest.update.mockResolvedValue({});
+
+    await rejectDeletion("req4b", admin, null);
+    expect(reapplySpy).toHaveBeenCalledWith("sale", "s4");
+  });
+});
+
+describe("reverse movements on mark", () => {
+  it("reverses movements immediately when marking a sale", async () => {
+    mockDb.sale.findUnique.mockResolvedValue({ number1C: "L1", docNumber: 1 });
+    mockDb.deletionRequest.findFirst.mockResolvedValue(null);
+    mockDb.sale.update.mockResolvedValue({});
+    mockDb.deletionRequest.create.mockResolvedValue({ id: "reqS" });
+
+    const res = await markForDeletion({
+      entityType: "sale",
+      entityId: "s1",
+      reason: "дублікат",
+      user,
+    });
+
+    expect(res.ok).toBe(true);
+    expect(reverseSpy).toHaveBeenCalledWith("sale", "s1");
+  });
+});
+
+describe("restoreDeletionRequest", () => {
+  const pendingReq = {
+    id: "reqR",
+    entityType: "sale",
+    entityId: "s5",
+    entityLabel: "Реалізація 5",
+    dictType: null,
+    status: "pending",
+    requestedByUserId: "u1",
+  };
+
+  it("restores own pending request: unmark + reapply + status rejected", async () => {
+    mockDb.deletionRequest.findUnique.mockResolvedValue(pendingReq);
+    mockDb.sale.update.mockResolvedValue({});
+    mockDb.deletionRequest.update.mockResolvedValue({});
+
+    const res = await restoreDeletionRequest("reqR", user, false);
+    expect(res.ok).toBe(true);
+    expect(mockDb.sale.update).toHaveBeenCalledWith({
+      where: { id: "s5" },
+      data: { markedForDeletion: false },
+    });
+    expect(reapplySpy).toHaveBeenCalledWith("sale", "s5");
+    expect(mockDb.deletionRequest.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          status: "rejected",
+          resolutionNote: "Повернено з кошика",
+        }),
+      }),
+    );
+  });
+
+  it("forbids restoring someone else's request (non-admin)", async () => {
+    mockDb.deletionRequest.findUnique.mockResolvedValue({
+      ...pendingReq,
+      requestedByUserId: "other",
+    });
+
+    const res = await restoreDeletionRequest("reqR", user, false);
+    expect(res.ok).toBe(false);
+    expect(reapplySpy).not.toHaveBeenCalled();
+  });
+
+  it("admin may restore any pending request", async () => {
+    mockDb.deletionRequest.findUnique.mockResolvedValue({
+      ...pendingReq,
+      requestedByUserId: "other",
+    });
+    mockDb.sale.update.mockResolvedValue({});
+    mockDb.deletionRequest.update.mockResolvedValue({});
+
+    const res = await restoreDeletionRequest("reqR", admin, true);
+    expect(res.ok).toBe(true);
+    expect(reapplySpy).toHaveBeenCalledWith("sale", "s5");
+  });
+
+  it("rejects an already-resolved request", async () => {
+    mockDb.deletionRequest.findUnique.mockResolvedValue({
+      ...pendingReq,
+      status: "approved",
+    });
+    const res = await restoreDeletionRequest("reqR", user, false);
+    expect(res.ok).toBe(false);
   });
 });

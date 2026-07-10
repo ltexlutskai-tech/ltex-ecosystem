@@ -154,6 +154,13 @@ export const ADMIN_DELETIONS_LINK: SidebarLink = {
   icon: Trash2,
 };
 
+// Кошик — власні позначені на вилучення документи (менеджер може повернути).
+export const TRASH_LINK: SidebarLink = {
+  href: "/manager/trash",
+  label: "Кошик",
+  icon: Trash2,
+};
+
 export const SETTINGS_LINK: SidebarLink = {
   href: "/manager/settings",
   label: "Налаштування",

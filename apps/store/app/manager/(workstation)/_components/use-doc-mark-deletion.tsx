@@ -100,7 +100,8 @@ export function useDocMarkDeletion(): {
         setBusy(false);
         setReason("");
         toast({
-          description: "Позначено на вилучення. Рішення прийме адміністратор.",
+          description:
+            "Позначено на вилучення. Рухи оновлено; повернути можна з «Кошика».",
         });
         router.refresh();
         return;
@@ -135,8 +136,10 @@ export function useDocMarkDeletion(): {
               </h2>
               <p className="mt-2 text-sm text-gray-600">{pending.message}</p>
               <p className="mt-2 text-sm text-gray-600">
-                Документ зникне з ваших списків. Остаточне рішення (видалити чи
-                повернути) прийме адміністратор. Вкажіть причину:
+                Рухи по регістрах (борг/каса/склад) оновляться одразу, документ
+                зникне зі списків. Повернути можна з «Кошика», поки
+                адміністратор не підтвердив остаточне видалення. Вкажіть
+                причину:
               </p>
               <textarea
                 value={reason}

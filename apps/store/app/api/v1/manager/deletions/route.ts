@@ -11,6 +11,7 @@ import { canDeleteManagerDoc } from "@/lib/manager/doc-delete-permission";
 import {
   markForDeletion,
   listDeletionRequests,
+  listMyPendingDeletions,
 } from "@/lib/manager/deletion-queue";
 import type { DeletableEntityType } from "@/lib/manager/reference-check";
 
@@ -82,11 +83,23 @@ export async function POST(req: NextRequest) {
 }
 
 export async function GET(req: NextRequest) {
+  const url = new URL(req.url);
+
+  // Режим «кошик» — власні pending-запити (будь-який авторизований менеджер).
+  if (url.searchParams.get("scope") === "mine") {
+    const user = await getCurrentUser(req);
+    if (!user)
+      return NextResponse.json({ error: "Не авторизовано" }, { status: 401 });
+    const page = Math.max(1, Number(url.searchParams.get("page") ?? 1) || 1);
+    const { items, total } = await listMyPendingDeletions(user.id, page);
+    return NextResponse.json({ items, total, page });
+  }
+
+  // Загальна черга — лише admin/owner.
   const admin = await requireAdmin(req);
   if (!admin)
     return NextResponse.json({ error: "Лише адміністратор" }, { status: 403 });
 
-  const url = new URL(req.url);
   const statusParam = url.searchParams.get("status") ?? "pending";
   const status =
     statusParam === "resolved" || statusParam === "all"

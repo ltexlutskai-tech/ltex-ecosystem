@@ -16,6 +16,7 @@ import {
   REPORTS_LINK,
   SECONDARY_LINKS,
   SETTINGS_LINK,
+  TRASH_LINK,
   WAREHOUSE_RECEIVINGS_LINK,
   renderLinkIcon,
   type SidebarLink,
@@ -106,6 +107,16 @@ export function ManagerSidebar({ role }: { role: ManagerRole }) {
             badgeSlot={<DeletionsBadge />}
           />
         </>
+      )}
+      {(role === "manager" ||
+        role === "senior_manager" ||
+        role === "admin" ||
+        role === "owner") && (
+        <SidebarNavLink
+          href={TRASH_LINK.href}
+          label={TRASH_LINK.label}
+          icon={renderLinkIcon(TRASH_LINK)}
+        />
       )}
       <SidebarNavLink
         href={SETTINGS_LINK.href}

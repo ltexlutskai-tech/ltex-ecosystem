@@ -5,6 +5,10 @@ import { logAuditEvent } from "@/lib/audit/audit-log";
 import { recordClientEventSafe } from "@/lib/manager/client-timeline";
 import { recomputeDebtForClients } from "@/lib/manager/debt-register";
 import {
+  reapplyDocMovements,
+  reverseDocMovements,
+} from "@/lib/manager/deletion-movements";
+import {
   findReferences,
   type DeletableEntityType,
   type ReferenceCheckResult,
@@ -216,6 +220,20 @@ export async function markForDeletion(
     },
   });
 
+  // Рішення user: рухи по регістрах відкочуємо ОДРАЗУ (борг/каса/склад/продажі
+  // оновлюються негайно), а «кошик» дозволяє повернути документ і рухи, поки
+  // адмін не відправив у архів / не видалив. Await — щоб борг був актуальний
+  // до відповіді; помилка руху не валить саму позначку (документ уже позначено).
+  try {
+    await reverseDocMovements(entityType, entityId);
+  } catch (e) {
+    console.warn("[L-TEX] reverseDocMovements failed on mark", {
+      entityType,
+      entityId,
+      error: e instanceof Error ? e.message : String(e),
+    });
+  }
+
   void logAuditEvent({
     user: { id: user.id, email: user.email, role: user.role },
     action: "update",
@@ -347,6 +365,17 @@ export async function rejectDeletion(
     markedForDeletion: false,
   });
 
+  // Повертаємо й рухи по регістрах (борг/каса/склад/продажі/транзит), які були
+  // відкочені при постановці на вилучення.
+  try {
+    await reapplyDocMovements(entityType, request.entityId);
+  } catch (e) {
+    console.warn("[L-TEX] reapplyDocMovements failed on reject", {
+      entityId: request.entityId,
+      error: e instanceof Error ? e.message : String(e),
+    });
+  }
+
   await prisma.deletionRequest.update({
     where: { id: requestId },
     data: {
@@ -378,6 +407,108 @@ export async function rejectDeletion(
   }
 
   return { ok: true };
+}
+
+/**
+ * Повернути документ із кошика (скасувати власний pending-запит). Доступно
+ * автору запиту або адміну. Знімає позначку, ВІДНОВЛЮЄ рухи по регістрах і
+ * закриває запит як «rejected» з поміткою про повернення.
+ */
+export async function restoreDeletionRequest(
+  requestId: string,
+  user: CurrentManager,
+  isAdmin: boolean,
+  req?: NextRequest | null,
+): Promise<ResolveResult> {
+  const request = await prisma.deletionRequest.findUnique({
+    where: { id: requestId },
+  });
+  if (!request) return { ok: false, error: "Запит не знайдено" };
+  if (request.status !== "pending") {
+    return { ok: false, error: "Запит уже оброблено" };
+  }
+  if (!isAdmin && request.requestedByUserId !== user.id) {
+    return { ok: false, error: "Можна повертати лише власні позначки" };
+  }
+
+  const entityType = request.entityType as DeletableEntityType;
+  await updateEntityFlags(entityType, request.entityId, request.dictType, {
+    markedForDeletion: false,
+  });
+
+  try {
+    await reapplyDocMovements(entityType, request.entityId);
+  } catch (e) {
+    console.warn("[L-TEX] reapplyDocMovements failed on restore", {
+      entityId: request.entityId,
+      error: e instanceof Error ? e.message : String(e),
+    });
+  }
+
+  await prisma.deletionRequest.update({
+    where: { id: requestId },
+    data: {
+      status: "rejected",
+      resolvedByUserId: user.id,
+      resolvedAt: new Date(),
+      resolutionNote: "Повернено з кошика",
+    },
+  });
+
+  void logAuditEvent({
+    user: { id: user.id, email: user.email, role: user.role },
+    action: "update",
+    resource: entityType,
+    resourceId: request.entityId,
+    summary: `Повернено з кошика: ${request.entityLabel}`,
+    req: req ?? null,
+  });
+
+  if (entityType === "client") {
+    recordClientEventSafe({
+      clientId: request.entityId,
+      kind: "comment",
+      body: "Повернено з кошика (знято позначку на вилучення)",
+      authorUserId: user.id,
+    });
+  }
+
+  return { ok: true };
+}
+
+/** Власні pending-запити користувача (для «кошика» менеджера). */
+export async function listMyPendingDeletions(
+  userId: string,
+  page = 1,
+  pageSize = 50,
+): Promise<{ items: DeletionRequestListItem[]; total: number }> {
+  const where = { status: "pending", requestedByUserId: userId };
+  const [total, rows] = await Promise.all([
+    prisma.deletionRequest.count({ where }),
+    prisma.deletionRequest.findMany({
+      where,
+      orderBy: { requestedAt: "desc" },
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+    }),
+  ]);
+  return {
+    total,
+    items: rows.map((r) => ({
+      id: r.id,
+      entityType: r.entityType,
+      entityId: r.entityId,
+      entityLabel: r.entityLabel,
+      dictType: r.dictType,
+      reason: r.reason,
+      status: r.status,
+      outcome: r.outcome,
+      requestedByName: r.requestedByName,
+      requestedAt: r.requestedAt.toISOString(),
+      resolvedAt: r.resolvedAt?.toISOString() ?? null,
+      resolutionNote: r.resolutionNote,
+    })),
+  };
 }
 
 /** Відновити обʼєкт з архіву (archived → false). */
