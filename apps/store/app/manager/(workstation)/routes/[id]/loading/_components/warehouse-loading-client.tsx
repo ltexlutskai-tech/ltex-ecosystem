@@ -63,9 +63,12 @@ export function WarehouseLoadingClient({
     setCounters(data.sheet.counters);
   }, [sheetId]);
 
-  async function scan(barcode: string) {
-    const code = barcode.trim();
-    if (!code) return;
+  /** Спільний POST у Загрузку (скан ШК або ручний рядок товару). */
+  async function postLoading(payload: {
+    barcode?: string;
+    productId?: string;
+    orderId?: string | null;
+  }) {
     setError(null);
     setBusy(true);
     try {
@@ -74,7 +77,10 @@ export function WarehouseLoadingClient({
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ barcode: code }),
+          body: JSON.stringify({
+            ...payload,
+            orderId: payload.orderId ?? undefined,
+          }),
         },
       );
       if (!res.ok) {
@@ -86,6 +92,16 @@ export function WarehouseLoadingClient({
     } finally {
       setBusy(false);
     }
+  }
+
+  async function scan(barcode: string, targetOrderId: string | null) {
+    const code = barcode.trim();
+    if (!code) return;
+    await postLoading({ barcode: code, orderId: targetOrderId });
+  }
+
+  async function addProduct(productId: string, targetOrderId: string | null) {
+    await postLoading({ productId, orderId: targetOrderId });
   }
 
   async function autoFill() {
@@ -201,13 +217,26 @@ export function WarehouseLoadingClient({
         loading={loading}
         counters={counters}
         locked={locked}
+        editable
         busy={busy}
         autoFilling={autoFilling}
         error={error}
-        onScan={(code) => void scan(code)}
+        onScan={(code, orderId) => void scan(code, orderId)}
+        onAddProduct={(productId, orderId) =>
+          void addProduct(productId, orderId)
+        }
         onAutoFill={() => void autoFill()}
         onRemoveLoading={(id) => void removeLoading(id)}
         onPatchLoading={(id, patch) => void patchLoading(id, patch)}
+        createSaleHrefFor={(g) =>
+          g.orderId
+            ? `/manager/sales/new?routeSheetId=${encodeURIComponent(sheetId)}${
+                g.customerId
+                  ? `&clientId=${encodeURIComponent(g.customerId)}`
+                  : ""
+              }&orderId=${encodeURIComponent(g.orderId)}`
+            : null
+        }
       />
 
       <div className="flex justify-end">

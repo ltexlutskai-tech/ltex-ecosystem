@@ -215,18 +215,32 @@ export async function recomputeQuantityLoaded(
  * чужої броні — та сама дефініція вільного лота, що й у Реалізації).
  * Повертає лише рядки з нестачею > 0, з резолвленими іменами товарів/замовлень.
  */
+/** Розкладка складського залишку товару: вільно (без броні) + заброньовано. */
+export interface StockBreakdown {
+  /** Вільні лоти `status='free'` БЕЗ активної броні (можна вантажити). */
+  free: number;
+  /** Лоти з активною бронню (чиясь бронь — у вільний залишок не входять). */
+  booked: number;
+}
+
 /**
- * Вільний складський залишок по товарах (реєстр-аналог 1С `ТоварыНаСкладах`):
- * к-сть лотів `status='free'` БЕЗ активної броні. Бронь (будь-чия) знімає лот з
- * доступних — рівно те, що бачить склад: заброньований мішок вантажити не можна
- * (і скан його блокує). Використовується і в «Бракує», і в дошці Завантаження.
+ * Розкладка залишку по товарах (реєстр-аналог 1С `ТоварыНаСкладах`
+ * − `ТоварыВРезервеНаСкладах` + бронь мішків): для кожного товару окремо
+ * «вільний залишок» і «бронь». Заброньований мішок вантажити не можна
+ * (і скан його блокує), тому у вільний залишок він не входить.
+ *
+ * @param bookedByAllowed — якщо передано set userId «агентів рейсу», бронь ЦИХ
+ *   агентів рахується як вільна (свій мішок можна вантажити); бронь сторонніх —
+ *   у `booked`. Без set будь-яка активна бронь → `booked`.
  */
-export async function computeAvailableStockByProduct(
+export async function computeStockBreakdownByProduct(
   productIds: string[],
   now: Date = new Date(),
-): Promise<Map<string, number>> {
-  const map = new Map<string, number>();
-  for (const productId of productIds) map.set(productId, 0);
+  bookedByAllowed?: Set<string>,
+): Promise<Map<string, StockBreakdown>> {
+  const map = new Map<string, StockBreakdown>();
+  for (const productId of productIds)
+    map.set(productId, { free: 0, booked: 0 });
   if (productIds.length === 0) return map;
 
   const lots = await prisma.lot.findMany({
@@ -239,13 +253,73 @@ export async function computeAvailableStockByProduct(
     },
   });
   for (const lot of lots) {
-    // `status='free'` уже виключає продані/зарезервовані; додатково
-    // відкидаємо лоти з активною бронню (денормалізована бронь може лишати
-    // status='free' до синку — звіряємо явно).
-    if (isActiveReservation(lot, now)) continue;
-    map.set(lot.productId, (map.get(lot.productId) ?? 0) + 1);
+    const entry = map.get(lot.productId);
+    if (!entry) continue;
+    // `status='free'` уже виключає продані/зарезервовані; активна бронь
+    // (денормалізована, може лишати status='free' до синку) — окремо.
+    if (isActiveReservation(lot, now)) {
+      const own =
+        bookedByAllowed != null &&
+        lot.reservedByUserId != null &&
+        bookedByAllowed.has(lot.reservedByUserId);
+      if (own) entry.free += 1;
+      else entry.booked += 1;
+    } else {
+      entry.free += 1;
+    }
   }
   return map;
+}
+
+/**
+ * Вільний складський залишок по товарах (лише число «вільно»). Обгортка над
+ * `computeStockBreakdownByProduct` для «Бракує» та інших місць.
+ */
+export async function computeAvailableStockByProduct(
+  productIds: string[],
+  now: Date = new Date(),
+): Promise<Map<string, number>> {
+  const breakdown = await computeStockBreakdownByProduct(productIds, now);
+  const map = new Map<string, number>();
+  for (const [productId, entry] of breakdown) map.set(productId, entry.free);
+  return map;
+}
+
+/**
+ * Множина «агентів рейсу» (userId) — тих, чия бронь мішка вважається «своєю»
+ * для цього маршрутного листа (1С `ТоварыЗагрузки`/`ТорговыеАгенты`). Береться
+ * автоматично: торгові агенти замовлень рейсу (`Order.assignedAgentUserId`) +
+ * експедитор + автор документа. Мішок, заброньований кимось поза цим набором,
+ * для складу — «чужа бронь» і його не можна вантажити.
+ */
+export async function getRouteSheetAllowedAgents(
+  routeSheetId: string,
+): Promise<Set<string>> {
+  const [sheet, rsOrders] = await Promise.all([
+    prisma.routeSheet.findUnique({
+      where: { id: routeSheetId },
+      select: { expeditorUserId: true, createdByUserId: true },
+    }),
+    prisma.routeSheetOrder.findMany({
+      where: { routeSheetId },
+      select: { orderId: true },
+    }),
+  ]);
+  const set = new Set<string>();
+  if (sheet?.expeditorUserId) set.add(sheet.expeditorUserId);
+  if (sheet?.createdByUserId) set.add(sheet.createdByUserId);
+
+  const orderIds = rsOrders.map((o) => o.orderId);
+  if (orderIds.length > 0) {
+    const orders = await prisma.order.findMany({
+      where: { id: { in: orderIds } },
+      select: { assignedAgentUserId: true },
+    });
+    for (const o of orders) {
+      if (o.assignedAgentUserId) set.add(o.assignedAgentUserId);
+    }
+  }
+  return set;
 }
 
 export async function computeRouteSheetShortage(
@@ -363,8 +437,12 @@ export interface LoadingBoardRow {
   loaded: number;
   /** Залишилось завантажити (max(0, ordered − loaded)). */
   remaining: number;
-  /** Вільний залишок товару на складі (реєстр-аналог, мінус завантажене тут). */
-  stock: number;
+  /** Вільний залишок товару на складі (без чужої броні, мінус завантажене тут). */
+  freeStock: number;
+  /** Заброньовано (чужі активні броні на цей товар) — інформаційно. */
+  booked: number;
+  /** Продано по цьому замовленню+товару (Σ реалізацій рейсу) — 1С `КоличествоПродано`. */
+  sold: number;
   price: number;
   sum: number;
   color: LoadingRowColor;
@@ -380,6 +458,7 @@ export interface LoadingBoardOrder {
   rows: LoadingBoardRow[];
   orderedQty: number;
   loadedQty: number;
+  soldQty: number;
   sum: number;
 }
 
@@ -394,7 +473,7 @@ export async function computeLoadingBoard(
   routeSheetId: string,
   now: Date = new Date(),
 ): Promise<LoadingBoardOrder[]> {
-  const [items, rsOrders, loadingRows] = await Promise.all([
+  const [items, rsOrders, loadingRows, saleItems] = await Promise.all([
     prisma.routeSheetItem.findMany({
       where: { routeSheetId },
       select: {
@@ -419,11 +498,27 @@ export async function computeLoadingBoard(
       where: { routeSheetId, loaded: true, isReturn: false },
       select: { productId: true, lotId: true },
     }),
+    prisma.routeSheetSaleItem.findMany({
+      where: { routeSheetId },
+      select: { orderId: true, productId: true, quantity: true },
+    }),
   ]);
   if (items.length === 0) return [];
 
+  // Продано по (замовлення|товар) — Σ рядків реалізацій рейсу (1С КоличествоПродано).
+  const soldByKey = new Map<string, number>();
+  for (const s of saleItems) {
+    const key = `${s.orderId ?? ""}|${s.productId}`;
+    soldByKey.set(key, (soldByKey.get(key) ?? 0) + s.quantity);
+  }
+
   const productIds = [...new Set(items.map((i) => i.productId))];
-  const freeByProduct = await computeAvailableStockByProduct(productIds, now);
+  const allowedAgents = await getRouteSheetAllowedAgents(routeSheetId);
+  const breakdownByProduct = await computeStockBreakdownByProduct(
+    productIds,
+    now,
+    allowedAgents,
+  );
 
   // Уже завантажені (унікальні) лоти на цьому МЛ — «пішли з полиці».
   const loadedLotsByProduct = new Map<string, Set<string>>();
@@ -432,11 +527,14 @@ export async function computeLoadingBoard(
     set.add(r.lotId);
     loadedLotsByProduct.set(r.productId, set);
   }
+  // Вільний залишок «на полиці» = вільно − уже завантажене на цей МЛ.
   const shelfByProduct = new Map<string, number>();
+  const bookedByProduct = new Map<string, number>();
   for (const productId of productIds) {
-    const free = freeByProduct.get(productId) ?? 0;
+    const b = breakdownByProduct.get(productId) ?? { free: 0, booked: 0 };
     const loadedHere = loadedLotsByProduct.get(productId)?.size ?? 0;
-    shelfByProduct.set(productId, Math.max(0, free - loadedHere));
+    shelfByProduct.set(productId, Math.max(0, b.free - loadedHere));
+    bookedByProduct.set(productId, b.booked);
   }
 
   // Резолв імен (замовлення / клієнти / товари).
@@ -494,6 +592,7 @@ export async function computeLoadingBoard(
         rows: [],
         orderedQty: 0,
         loadedQty: 0,
+        soldQty: 0,
         sum: 0,
       };
       groups.set(key, g);
@@ -511,7 +610,9 @@ export async function computeLoadingBoard(
     const ordered = it.quantity;
     const loaded = it.quantityLoaded;
     const remaining = Math.max(0, ordered - loaded);
-    const stock = shelfByProduct.get(it.productId) ?? 0;
+    const freeStock = shelfByProduct.get(it.productId) ?? 0;
+    const booked = bookedByProduct.get(it.productId) ?? 0;
+    const sold = soldByKey.get(`${it.orderId ?? ""}|${it.productId}`) ?? 0;
     g.rows.push({
       itemId: it.id,
       productId: it.productId,
@@ -521,13 +622,16 @@ export async function computeLoadingBoard(
       ordered,
       loaded,
       remaining,
-      stock,
+      freeStock,
+      booked,
+      sold,
       price: it.price,
       sum: it.sum,
-      color: loadingRowColor({ ordered, loaded, stock }),
+      color: loadingRowColor({ ordered, loaded, stock: freeStock }),
     });
     g.orderedQty += ordered;
     g.loadedQty += loaded;
+    g.soldQty += sold;
     g.sum += it.sum;
   }
 
@@ -566,7 +670,10 @@ export interface RouteSheetLoadingView {
  *  5. авто-прив'язка до замовлення за товаром(+лотом) із `RouteSheetItem`;
  *  6. створення `RouteSheetLoading` + перерахунок `quantityLoaded`.
  *
- * @param userId — поточний менеджер (для перевірки «чужої» броні).
+ * @param userId — поточний користувач (не використовується для «своєї» броні —
+ *   вона визначається агентами рейсу, див. `getRouteSheetAllowedAgents`).
+ * @param opts.targetOrderId — прив'язати рядок до конкретного замовлення
+ *   (режим 1С «Загрузка в заказ»); інакше авто-прив'язка за товаром.
  * Кидає `RouteSheetLoadingError` (404 не знайдено / 409 бронь чи дубль).
  */
 export async function addLoadingByBarcode(
@@ -574,6 +681,7 @@ export async function addLoadingByBarcode(
   barcode: string,
   userId: string,
   now: Date = new Date(),
+  opts: { targetOrderId?: string | null } = {},
 ): Promise<{ row: RouteSheetLoadingView }> {
   const code = barcode.trim();
   if (!code) {
@@ -582,29 +690,136 @@ export async function addLoadingByBarcode(
 
   const lot = await prisma.lot.findUnique({
     where: { barcode: code },
-    include: {
-      product: {
-        select: {
-          id: true,
-          name: true,
-          articleCode: true,
-          priceUnit: true,
-          prices: { select: { priceType: true, amount: true, currency: true } },
-        },
-      },
-    },
+    include: { product: { select: LOADING_PRODUCT_SELECT } },
   });
   if (!lot) {
     throw new RouteSheetLoadingError("Не знайдено товар за ШК", 404);
   }
 
-  // Гард чужої активної броні (1С `АктивнаБроньМішка`): бронь активна І не моя.
-  if (isActiveReservation(lot, now) && lot.reservedByUserId !== userId) {
+  return insertLoadingRow(routeSheetId, lot, now, opts.targetOrderId ?? null);
+}
+
+/**
+ * «Ручний рядок» Завантаження (1С — ручний рядок таблиці «Загрузка машины»):
+ * додати мішок під товар БЕЗ фізичного скану. Якщо `lotId` вказано — беремо
+ * саме той лот; інакше — перший вільний лот товару (без чужої броні, ще не в
+ * Загрузці). Прив'язка — до `targetOrderId` (виділене замовлення) або авто.
+ */
+export async function addLoadingManual(
+  routeSheetId: string,
+  args: {
+    productId: string;
+    lotId?: string | null;
+    targetOrderId?: string | null;
+  },
+  now: Date = new Date(),
+): Promise<{ row: RouteSheetLoadingView }> {
+  const allowedAgents = await getRouteSheetAllowedAgents(routeSheetId);
+
+  let lot: LoadingLot | null = null;
+  if (args.lotId) {
+    lot = await prisma.lot.findUnique({
+      where: { id: args.lotId },
+      include: { product: { select: LOADING_PRODUCT_SELECT } },
+    });
+    if (!lot) throw new RouteSheetLoadingError("Лот не знайдено", 404);
+    if (lot.productId !== args.productId) {
+      throw new RouteSheetLoadingError("Лот не відповідає товару", 400);
+    }
+  } else {
+    // Перший вільний лот товару, ще не в Загрузці цього МЛ, без чужої броні.
+    const already = await prisma.routeSheetLoading.findMany({
+      where: { routeSheetId },
+      select: { lotId: true },
+    });
+    const usedLotIds = new Set(already.map((r) => r.lotId));
+    const candidates = await prisma.lot.findMany({
+      where: { productId: args.productId, status: "free" },
+      include: { product: { select: LOADING_PRODUCT_SELECT } },
+      orderBy: { id: "asc" },
+    });
+    lot =
+      candidates.find(
+        (l) =>
+          !usedLotIds.has(l.id) &&
+          !(isActiveReservation(l, now) && !isOwnBooking(l, allowedAgents)),
+      ) ?? null;
+    if (!lot) {
+      throw new RouteSheetLoadingError(
+        "Немає вільного мішка цього товару на складі",
+        409,
+      );
+    }
+  }
+
+  return insertLoadingRow(
+    routeSheetId,
+    lot,
+    now,
+    args.targetOrderId ?? null,
+    allowedAgents,
+  );
+}
+
+/** Спільний select товару для рядків Завантаження. */
+const LOADING_PRODUCT_SELECT = {
+  id: true,
+  name: true,
+  articleCode: true,
+  priceUnit: true,
+  prices: { select: { priceType: true, amount: true, currency: true } },
+} as const;
+
+type LoadingLot = {
+  id: string;
+  productId: string;
+  barcode: string;
+  weight: number;
+  status: string;
+  reservedByUserId: string | null;
+  reservedUntil: Date | null;
+  product: {
+    id: string;
+    name: string;
+    articleCode: string | null;
+    priceUnit: string;
+    prices: Array<{ priceType: string; amount: unknown; currency: string }>;
+  };
+};
+
+/** Чи бронь лоту «своя» для рейсу — заброньована агентом рейсу. */
+function isOwnBooking(
+  lot: { reservedByUserId: string | null },
+  allowedAgents: Set<string>,
+): boolean {
+  return (
+    lot.reservedByUserId != null && allowedAgents.has(lot.reservedByUserId)
+  );
+}
+
+/**
+ * Спільна вставка рядка Завантаження для лота: гард чужої броні (за агентами
+ * рейсу), дедуплікація, вага/ціна з лота, прив'язка до замовлення (виділене
+ * `targetOrderId` або авто за товаром), tx-запис + перерахунок `quantityLoaded`.
+ */
+async function insertLoadingRow(
+  routeSheetId: string,
+  lot: LoadingLot,
+  now: Date,
+  targetOrderId: string | null,
+  allowedAgentsIn?: Set<string>,
+): Promise<{ row: RouteSheetLoadingView }> {
+  const allowedAgents =
+    allowedAgentsIn ?? (await getRouteSheetAllowedAgents(routeSheetId));
+
+  // Гард чужої активної броні (1С `АктивнаБроньМішка`): бронь активна І не
+  // належить жодному агенту рейсу.
+  if (isActiveReservation(lot, now) && !isOwnBooking(lot, allowedAgents)) {
     const until = lot.reservedUntil
       ? lot.reservedUntil.toLocaleDateString("uk-UA")
       : "";
     throw new RouteSheetLoadingError(
-      `Активна бронь мішка${until ? ` до ${until}` : ""}`,
+      `Активна бронь мішка (інший менеджер)${until ? ` до ${until}` : ""}`,
       409,
     );
   }
@@ -630,23 +845,19 @@ export async function addLoadingByBarcode(
   const price = pricePerKg * weight;
   const sum = quantity * price;
 
-  // Авто-прив'язка: спершу за товаром+лотом, далі лише за товаром.
-  const matchItem =
-    (await prisma.routeSheetItem.findFirst({
-      where: { routeSheetId, productId: lot.product.id, lotId: lot.id },
-      select: { orderId: true, customerId: true },
-    })) ??
-    (await prisma.routeSheetItem.findFirst({
-      where: { routeSheetId, productId: lot.product.id },
-      select: { orderId: true, customerId: true },
-    }));
+  const matchItem = await resolveLoadingMatch(
+    routeSheetId,
+    lot.product.id,
+    lot.id,
+    targetOrderId,
+  );
 
   const created = await prisma.$transaction(async (tx) => {
     const row = await tx.routeSheetLoading.create({
       data: {
         routeSheetId,
-        orderId: matchItem?.orderId ?? null,
-        customerId: matchItem?.customerId ?? null,
+        orderId: matchItem.orderId,
+        customerId: matchItem.customerId,
         productId: lot.product.id,
         lotId: lot.id,
         barcode: lot.barcode,
@@ -664,7 +875,6 @@ export async function addLoadingByBarcode(
     return row;
   });
 
-  // Резолв імен для відповіді.
   const customer = created.customerId
     ? await prisma.customer.findUnique({
         where: { id: created.customerId },
@@ -699,6 +909,49 @@ export async function addLoadingByBarcode(
       loaded: created.loaded,
       isReturn: created.isReturn,
     },
+  };
+}
+
+/**
+ * Визначення замовлення для рядка Завантаження. Якщо задано `targetOrderId`
+ * (режим «у виділене замовлення») — беремо позицію цього замовлення+товару
+ * (або хоча б клієнта цього замовлення). Інакше — авто: позиція за товаром+лотом,
+ * далі перше недовантажене замовлення за товаром, далі будь-яка позиція товару.
+ */
+async function resolveLoadingMatch(
+  routeSheetId: string,
+  productId: string,
+  lotId: string,
+  targetOrderId: string | null,
+): Promise<{ orderId: string | null; customerId: string | null }> {
+  if (targetOrderId) {
+    const item = await prisma.routeSheetItem.findFirst({
+      where: { routeSheetId, orderId: targetOrderId, productId },
+      select: { orderId: true, customerId: true },
+    });
+    if (item) return { orderId: item.orderId, customerId: item.customerId };
+    // Замовлення обране, але товару в його потребі немає — все одно прив'язуємо
+    // до нього (беремо клієнта із рядка Заказы).
+    const rsOrder = await prisma.routeSheetOrder.findFirst({
+      where: { routeSheetId, orderId: targetOrderId },
+      select: { customerId: true },
+    });
+    return { orderId: targetOrderId, customerId: rsOrder?.customerId ?? null };
+  }
+
+  const byLot = await prisma.routeSheetItem.findFirst({
+    where: { routeSheetId, productId, lotId },
+    select: { orderId: true, customerId: true },
+  });
+  if (byLot) return { orderId: byLot.orderId, customerId: byLot.customerId };
+
+  const byProduct = await prisma.routeSheetItem.findFirst({
+    where: { routeSheetId, productId },
+    select: { orderId: true, customerId: true },
+  });
+  return {
+    orderId: byProduct?.orderId ?? null,
+    customerId: byProduct?.customerId ?? null,
   };
 }
 
@@ -758,6 +1011,8 @@ export async function autoFillLoading(
     orderBy: { id: "asc" },
   });
 
+  const allowedAgents = await getRouteSheetAllowedAgents(routeSheetId);
+
   // Пул доступних лотів на товар (FIFO по id).
   const poolByProduct = new Map<
     string,
@@ -765,8 +1020,8 @@ export async function autoFillLoading(
   >();
   for (const lot of lots) {
     if (usedLotIds.has(lot.id)) continue;
-    if (isActiveReservation(lot, now) && lot.reservedByUserId !== userId) {
-      continue; // активна чужа бронь — не вільний
+    if (isActiveReservation(lot, now) && !isOwnBooking(lot, allowedAgents)) {
+      continue; // активна чужа бронь (не агента рейсу) — не вільний
     }
     const arr = poolByProduct.get(lot.productId) ?? [];
     arr.push({

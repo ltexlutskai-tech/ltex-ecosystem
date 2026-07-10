@@ -1,9 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const mockDb = vi.hoisted(() => ({
+  routeSheet: { findUnique: vi.fn() },
   routeSheetItem: { findMany: vi.fn() },
   routeSheetOrder: { findMany: vi.fn() },
   routeSheetLoading: { findMany: vi.fn() },
+  routeSheetSaleItem: { findMany: vi.fn() },
   lot: { findMany: vi.fn() },
   order: { findMany: vi.fn() },
   customer: { findMany: vi.fn() },
@@ -38,10 +40,39 @@ describe("loadingRowColor", () => {
   });
 });
 
-describe("computeLoadingBoard", () => {
-  beforeEach(() => vi.clearAllMocks());
+const freeLot = (over = {}) => ({
+  productId: "p1",
+  status: "free",
+  reservedByUserId: null,
+  reservedUntil: null,
+  ...over,
+});
 
-  it("групує по замовленню, рахує залишок складу (мінус завантажене) і колір", async () => {
+describe("computeLoadingBoard", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    // getRouteSheetAllowedAgents: без агентів рейсу.
+    mockDb.routeSheet.findUnique.mockResolvedValue({
+      expeditorUserId: null,
+      createdByUserId: null,
+    });
+    mockDb.routeSheetOrder.findMany.mockResolvedValue([
+      { orderId: "o1", customerId: "c1", city: "Луцьк" },
+    ]);
+    // order.findMany обслуговує і allowed-agents (assignedAgentUserId), і резолв
+    // імен (id/code1C) — даємо повний об'єкт.
+    mockDb.order.findMany.mockResolvedValue([
+      { id: "o1", code1C: "ORD-1", assignedAgentUserId: null },
+    ]);
+    mockDb.customer.findMany.mockResolvedValue([
+      { id: "c1", name: "Клієнт А", city: "Луцьк" },
+    ]);
+    mockDb.product.findMany.mockResolvedValue([
+      { id: "p1", name: "Куртки", articleCode: "ART-1" },
+    ]);
+  });
+
+  it("групує по замовленню, рахує вільний залишок (мінус завантажене), продано і колір", async () => {
     mockDb.routeSheetItem.findMany.mockResolvedValueOnce([
       {
         id: "it1",
@@ -55,48 +86,20 @@ describe("computeLoadingBoard", () => {
         quantityLoaded: 1,
       },
     ]);
-    mockDb.routeSheetOrder.findMany.mockResolvedValueOnce([
-      { orderId: "o1", customerId: "c1", city: "Луцьк" },
-    ]);
-    // 1 лот цього товару вже завантажений на цей МЛ.
+    // 1 лот уже завантажений на цей МЛ.
     mockDb.routeSheetLoading.findMany.mockResolvedValueOnce([
       { productId: "p1", lotId: "l1" },
     ]);
-    // 4 вільних лоти товару на складі → полиця = 4 − 1(завантажений) = 3.
+    // Продано 1 по цьому замовленню+товару.
+    mockDb.routeSheetSaleItem.findMany.mockResolvedValueOnce([
+      { orderId: "o1", productId: "p1", quantity: 1 },
+    ]);
+    // 4 вільні лоти → полиця = 4 − 1(завантажений) = 3.
     mockDb.lot.findMany.mockResolvedValueOnce([
-      {
-        productId: "p1",
-        status: "free",
-        reservedByUserId: null,
-        reservedUntil: null,
-      },
-      {
-        productId: "p1",
-        status: "free",
-        reservedByUserId: null,
-        reservedUntil: null,
-      },
-      {
-        productId: "p1",
-        status: "free",
-        reservedByUserId: null,
-        reservedUntil: null,
-      },
-      {
-        productId: "p1",
-        status: "free",
-        reservedByUserId: null,
-        reservedUntil: null,
-      },
-    ]);
-    mockDb.order.findMany.mockResolvedValueOnce([
-      { id: "o1", code1C: "ORD-1" },
-    ]);
-    mockDb.customer.findMany.mockResolvedValueOnce([
-      { id: "c1", name: "Клієнт А", city: "Луцьк" },
-    ]);
-    mockDb.product.findMany.mockResolvedValueOnce([
-      { id: "p1", name: "Куртки", articleCode: "ART-1" },
+      freeLot(),
+      freeLot(),
+      freeLot(),
+      freeLot(),
     ]);
 
     const board = await computeLoadingBoard("rs1");
@@ -104,18 +107,20 @@ describe("computeLoadingBoard", () => {
     const g = board[0]!;
     expect(g.orderNumber).toBe("ORD-1");
     expect(g.customerName).toBe("Клієнт А");
-    expect(g.city).toBe("Луцьк");
     expect(g.orderedQty).toBe(2);
     expect(g.loadedQty).toBe(1);
+    expect(g.soldQty).toBe(1);
     const row = g.rows[0]!;
     expect(row.ordered).toBe(2);
     expect(row.loaded).toBe(1);
     expect(row.remaining).toBe(1);
-    expect(row.stock).toBe(3); // 4 вільних − 1 завантажений
-    expect(row.color).toBe("yellow"); // частково, залишок є
+    expect(row.freeStock).toBe(3); // 4 вільних − 1 завантажений
+    expect(row.booked).toBe(0);
+    expect(row.sold).toBe(1);
+    expect(row.color).toBe("yellow");
   });
 
-  it("red коли вільного залишку немає", async () => {
+  it("бронь від стороннього менеджера йде в «booked», не у вільний залишок; колір red", async () => {
     mockDb.routeSheetItem.findMany.mockResolvedValueOnce([
       {
         id: "it1",
@@ -129,30 +134,31 @@ describe("computeLoadingBoard", () => {
         quantityLoaded: 0,
       },
     ]);
-    mockDb.routeSheetOrder.findMany.mockResolvedValueOnce([
-      { orderId: "o1", customerId: "c1", city: null },
-    ]);
     mockDb.routeSheetLoading.findMany.mockResolvedValueOnce([]);
-    mockDb.lot.findMany.mockResolvedValueOnce([]); // нема вільних лотів
-    mockDb.order.findMany.mockResolvedValueOnce([
-      { id: "o1", code1C: "ORD-1" },
-    ]);
-    mockDb.customer.findMany.mockResolvedValueOnce([
-      { id: "c1", name: "Клієнт А", city: null },
-    ]);
-    mockDb.product.findMany.mockResolvedValueOnce([
-      { id: "p1", name: "Куртки", articleCode: "ART-1" },
+    mockDb.routeSheetSaleItem.findMany.mockResolvedValueOnce([]);
+    // Єдиний лот заброньований стороннім → booked=1, free=0.
+    const { isActiveReservation } = await import("@/lib/manager/lot-booking");
+    (
+      isActiveReservation as unknown as ReturnType<typeof vi.fn>
+    ).mockReturnValue(true);
+    mockDb.lot.findMany.mockResolvedValueOnce([
+      freeLot({ reservedByUserId: "stranger" }),
     ]);
 
     const board = await computeLoadingBoard("rs1");
-    expect(board[0]!.rows[0]!.stock).toBe(0);
-    expect(board[0]!.rows[0]!.color).toBe("red");
+    const row = board[0]!.rows[0]!;
+    expect(row.freeStock).toBe(0);
+    expect(row.booked).toBe(1);
+    expect(row.color).toBe("red");
+    (
+      isActiveReservation as unknown as ReturnType<typeof vi.fn>
+    ).mockReturnValue(false);
   });
 
   it("порожньо коли немає позицій", async () => {
     mockDb.routeSheetItem.findMany.mockResolvedValueOnce([]);
-    mockDb.routeSheetOrder.findMany.mockResolvedValueOnce([]);
     mockDb.routeSheetLoading.findMany.mockResolvedValueOnce([]);
+    mockDb.routeSheetSaleItem.findMany.mockResolvedValueOnce([]);
     const board = await computeLoadingBoard("rs1");
     expect(board).toEqual([]);
   });

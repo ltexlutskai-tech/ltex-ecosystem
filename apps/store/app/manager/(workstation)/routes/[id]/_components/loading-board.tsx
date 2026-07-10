@@ -1,7 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { Trash2 } from "lucide-react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { Plus, Trash2, Receipt } from "lucide-react";
 import { Button } from "@ltex/ui";
 import type {
   LoadingBoardOrder,
@@ -37,19 +39,26 @@ export interface LoadingBoardProps {
   loading: LoadedLotRow[];
   counters: LoadingBoardCounters;
   locked: boolean;
-  busy: boolean;
-  autoFilling: boolean;
-  error: string | null;
-  onScan: (code: string) => void;
-  onAutoFill: () => void;
-  onRemoveLoading: (id: string) => void;
-  onPatchLoading: (
+  /** Редагований режим (екран складу). false → лише перегляд (у менеджера). */
+  editable?: boolean;
+  busy?: boolean;
+  autoFilling?: boolean;
+  error?: string | null;
+  /** Скан ШК → рядок Завантаження (targetOrderId = «у виділене замовлення»). */
+  onScan?: (code: string, targetOrderId: string | null) => void;
+  /** «+ Завантажити» на рядку товару → взяти вільний мішок у це замовлення. */
+  onAddProduct?: (productId: string, targetOrderId: string | null) => void;
+  onAutoFill?: () => void;
+  onRemoveLoading?: (id: string) => void;
+  onPatchLoading?: (
     id: string,
     patch: { loaded?: boolean; isReturn?: boolean },
   ) => void;
+  /** Побудова лінка «Створити реалізацію» для замовлення (1С «Продажи»); подвійний
+   *  клік по рядку замовлення теж веде сюди. Null → кнопки немає. */
+  createSaleHrefFor?: (g: LoadingBoardOrder) => string | null;
 }
 
-/** Колір рядка позиції → tailwind-фон + бейдж стану. */
 const COLOR_ROW: Record<LoadingRowColor, string> = {
   green: "bg-green-50",
   yellow: "bg-amber-50",
@@ -69,65 +78,95 @@ function num(n: number): string {
 
 /**
  * Дошка Завантаження (order-tree центральної бази 1С у нашій системі). Склад
- * бачить замовлення з переліком товару, «Замовлено / Завантажено / Залишок
- * складу» та підсвітку стану: зелене — завантажено повністю; жовте — прогрес;
- * червоне — треба вантажити, а вільного залишку немає. Залишок враховує чужі
- * броні (заброньований лот не вільний і скан його блокує).
+ * бачить замовлення з переліком товару та колонками Замовлено / Завантажено /
+ * Вільний залишок / Бронь + підсвітку стану (зелене — повністю; жовте —
+ * прогрес; червоне — треба вантажити, а вільного немає). У редагованому режимі
+ * (екран складу): скан ШК, «+ Завантажити» на рядку, авто-підбір, деталь лотів.
  */
 export function LoadingBoard({
   board,
   loading,
   counters,
   locked,
-  busy,
-  autoFilling,
-  error,
+  editable = false,
+  busy = false,
+  autoFilling = false,
+  error = null,
   onScan,
+  onAddProduct,
   onAutoFill,
   onRemoveLoading,
   onPatchLoading,
+  createSaleHrefFor,
 }: LoadingBoardProps) {
-  const [showLots, setShowLots] = useState(false);
+  const router = useRouter();
+  // Список завантажених товарів — у складському документі показуємо одразу.
+  const [showLots, setShowLots] = useState(editable);
+  // Куди зараховувати скан: null = авто (за товаром), або конкретне замовлення.
+  const [scanOrderId, setScanOrderId] = useState<string>("");
+
+  const canEdit = editable && !locked;
+  const scanTarget = scanOrderId || null;
 
   return (
     <div className="space-y-4">
-      {/* Скан + авто-підбір (склад). */}
-      {!locked && (
+      {/* Панель складу: скан + вибір замовлення + авто-підбір. */}
+      {canEdit && (
         <div className="space-y-3 rounded-lg border bg-white p-4 shadow-sm">
-          <p className="text-xs text-gray-500">
-            Відскануйте штрихкод мішка (поле, USB-сканер або камера) — рядок
-            автоматично зарахується у відповідне замовлення. Заброньований іншим
-            менеджером мішок вантажити не можна.
-          </p>
-          <BarcodeInput
-            onCode={(code) => onScan(code)}
-            error={error}
-            disabled={busy}
-          />
+          <div className="flex flex-wrap items-end gap-3">
+            <div className="min-w-[220px] flex-1">
+              <label className="mb-1 block text-xs font-medium text-gray-600">
+                Скан ШК мішка
+              </label>
+              <BarcodeInput
+                onCode={(code) => onScan?.(code, scanTarget)}
+                error={error}
+                disabled={busy}
+              />
+            </div>
+            <div className="min-w-[200px]">
+              <label className="mb-1 block text-xs font-medium text-gray-600">
+                Зараховувати у замовлення
+              </label>
+              <select
+                value={scanOrderId}
+                onChange={(e) => setScanOrderId(e.target.value)}
+                className="h-10 w-full rounded-md border border-gray-300 bg-white px-3 text-sm focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500"
+              >
+                <option value="">Автоматично (за товаром)</option>
+                {board.map((g) => (
+                  <option key={g.orderId ?? "none"} value={g.orderId ?? ""}>
+                    {g.customerName ?? "Без клієнта"}
+                    {g.orderNumber ? ` · №${g.orderNumber}` : ""}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
           <div className="flex flex-wrap items-center gap-2 border-t pt-2">
             <Button
               type="button"
               variant="outline"
               size="sm"
               disabled={autoFilling || busy}
-              onClick={() => onAutoFill()}
+              onClick={() => onAutoFill?.()}
             >
-              {autoFilling ? "Підбір…" : "Заповнити з вільних лотів"}
+              {autoFilling ? "Підбір…" : "Заповнити потребу з вільних лотів"}
             </Button>
             <span className="text-xs text-gray-400">
-              Авто-підбір вільних лотів під замовлені позиції (без сканування).
+              Або натисніть «+» на рядку товару, щоб додати один мішок.
             </span>
           </div>
         </div>
       )}
 
-      {locked && error && (
+      {!canEdit && error && (
         <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
           {error}
         </div>
       )}
 
-      {/* Лічильники (порт «Заказов: N; заказано: N; загружено: N»). */}
+      {/* Лічильники. */}
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-md bg-gray-50 px-4 py-2 text-sm text-gray-600">
         <span>
           Замовлень:{" "}
@@ -159,7 +198,7 @@ export function LoadingBoard({
         </span>
       </div>
 
-      {/* Легенда кольорів. */}
+      {/* Легенда. */}
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-500">
         <span className="inline-flex items-center gap-1">
           <span className={`h-2.5 w-2.5 rounded-full ${COLOR_DOT.green}`} />
@@ -167,7 +206,7 @@ export function LoadingBoard({
         </span>
         <span className="inline-flex items-center gap-1">
           <span className={`h-2.5 w-2.5 rounded-full ${COLOR_DOT.yellow}`} />
-          Частково (прогрес)
+          Частково
         </span>
         <span className="inline-flex items-center gap-1">
           <span className={`h-2.5 w-2.5 rounded-full ${COLOR_DOT.red}`} />
@@ -182,114 +221,178 @@ export function LoadingBoard({
         </div>
       ) : (
         <div className="space-y-4">
-          {board.map((g) => (
-            <div
-              key={g.orderId ?? "none"}
-              className="overflow-hidden rounded-lg border bg-white"
-            >
-              <div className="flex flex-wrap items-center justify-between gap-2 border-b bg-gray-50 px-4 py-2">
-                <div className="text-sm font-medium text-gray-800">
-                  {g.customerName ?? "Без клієнта"}
-                  {g.city && (
-                    <span className="ml-2 text-xs font-normal text-gray-400">
-                      {g.city}
-                    </span>
-                  )}
-                  {g.orderNumber && (
-                    <span className="ml-2 font-mono text-xs font-normal text-gray-400">
-                      №{g.orderNumber}
-                    </span>
-                  )}
-                </div>
-                <div className="text-xs text-gray-500">
-                  завантажено{" "}
-                  <span
-                    className={`font-semibold ${
-                      g.loadedQty >= g.orderedQty
-                        ? "text-green-700"
-                        : "text-gray-800"
-                    }`}
-                  >
-                    {num(g.loadedQty)}/{num(g.orderedQty)}
-                  </span>
-                </div>
-              </div>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b text-left text-gray-500">
-                      <th className="w-6 px-2 py-2" />
-                      <th className="px-3 py-2 font-medium">Артикул</th>
-                      <th className="px-3 py-2 font-medium">Товар</th>
-                      <th className="px-3 py-2 text-right font-medium">
-                        Замов&shy;лено
-                      </th>
-                      <th className="px-3 py-2 text-right font-medium">
-                        Заван&shy;тажено
-                      </th>
-                      <th className="px-3 py-2 text-right font-medium">
-                        Залишок складу
-                      </th>
-                      <th className="px-3 py-2 text-right font-medium">
-                        Сума, €
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {g.rows.map((r) => (
-                      <tr
-                        key={r.itemId}
-                        className={`border-b last:border-b-0 ${COLOR_ROW[r.color]}`}
+          {board.map((g) => {
+            const saleHref = createSaleHrefFor?.(g) ?? null;
+            return (
+              <div
+                key={g.orderId ?? "none"}
+                className="overflow-hidden rounded-lg border bg-white"
+              >
+                <div
+                  className={`flex flex-wrap items-center justify-between gap-2 border-b bg-gray-50 px-4 py-2 ${
+                    saleHref ? "cursor-pointer" : ""
+                  }`}
+                  onDoubleClick={
+                    saleHref ? () => router.push(saleHref) : undefined
+                  }
+                  title={saleHref ? "Подвійний клік — створити реалізацію" : ""}
+                >
+                  <div className="text-sm font-medium text-gray-800">
+                    {g.customerName ?? "Без клієнта"}
+                    {g.city && (
+                      <span className="ml-2 text-xs font-normal text-gray-400">
+                        {g.city}
+                      </span>
+                    )}
+                    {g.orderNumber && (
+                      <span className="ml-2 font-mono text-xs font-normal text-gray-400">
+                        №{g.orderNumber}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="text-xs text-gray-500">
+                      завантажено{" "}
+                      <span
+                        className={`font-semibold ${
+                          g.loadedQty >= g.orderedQty
+                            ? "text-green-700"
+                            : "text-gray-800"
+                        }`}
                       >
-                        <td className="px-2 py-2">
-                          <span
-                            className={`inline-block h-2.5 w-2.5 rounded-full ${COLOR_DOT[r.color]}`}
-                            aria-hidden
-                          />
-                        </td>
-                        <td className="px-3 py-2 font-mono text-gray-600">
-                          {r.articleCode ?? "—"}
-                        </td>
-                        <td className="px-3 py-2 text-gray-800">
-                          {r.productName ?? r.productId}
-                        </td>
-                        <td className="px-3 py-2 text-right text-gray-700">
-                          {num(r.ordered)}
-                        </td>
-                        <td className="px-3 py-2 text-right font-medium text-gray-800">
-                          {num(r.loaded)}
-                        </td>
-                        <td
-                          className={`px-3 py-2 text-right ${
-                            r.stock <= 0
-                              ? "font-semibold text-red-600"
-                              : "text-gray-700"
-                          }`}
-                        >
-                          {num(r.stock)}
-                        </td>
-                        <td className="px-3 py-2 text-right text-gray-700">
-                          {r.sum.toFixed(2)}
-                        </td>
+                        {num(g.loadedQty)}/{num(g.orderedQty)}
+                      </span>
+                      {g.soldQty > 0 && (
+                        <span className="ml-2 text-blue-600">
+                          продано {num(g.soldQty)}
+                        </span>
+                      )}
+                    </span>
+                    {saleHref && (
+                      <Link
+                        href={saleHref}
+                        onClick={(e) => e.stopPropagation()}
+                        className="inline-flex h-7 items-center gap-1 rounded-md bg-green-600 px-2 text-xs font-medium text-white hover:bg-green-700"
+                      >
+                        <Receipt className="h-3.5 w-3.5" />
+                        Реалізація
+                      </Link>
+                    )}
+                  </div>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b text-left text-gray-500">
+                        <th className="w-6 px-2 py-2" />
+                        <th className="px-3 py-2 font-medium">Артикул</th>
+                        <th className="px-3 py-2 font-medium">Товар</th>
+                        <th className="px-3 py-2 text-right font-medium">
+                          Замов&shy;лено
+                        </th>
+                        <th className="px-3 py-2 text-right font-medium">
+                          Заван&shy;тажено
+                        </th>
+                        <th className="px-3 py-2 text-right font-medium">
+                          Про&shy;дано
+                        </th>
+                        <th className="px-3 py-2 text-right font-medium">
+                          Вільний залишок
+                        </th>
+                        <th className="px-3 py-2 text-right font-medium">
+                          Бронь
+                        </th>
+                        {canEdit && <th className="w-24 px-2 py-2" />}
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {g.rows.map((r) => (
+                        <tr
+                          key={r.itemId}
+                          className={`border-b last:border-b-0 ${COLOR_ROW[r.color]}`}
+                        >
+                          <td className="px-2 py-2">
+                            <span
+                              className={`inline-block h-2.5 w-2.5 rounded-full ${COLOR_DOT[r.color]}`}
+                              aria-hidden
+                            />
+                          </td>
+                          <td className="px-3 py-2 font-mono text-gray-600">
+                            {r.articleCode ?? "—"}
+                          </td>
+                          <td className="px-3 py-2 text-gray-800">
+                            {r.productName ?? r.productId}
+                          </td>
+                          <td className="px-3 py-2 text-right text-gray-700">
+                            {num(r.ordered)}
+                          </td>
+                          <td className="px-3 py-2 text-right font-medium text-gray-800">
+                            {num(r.loaded)}
+                          </td>
+                          <td
+                            className={`px-3 py-2 text-right ${
+                              r.sold > 0 ? "text-blue-600" : "text-gray-400"
+                            }`}
+                          >
+                            {r.sold > 0 ? num(r.sold) : "—"}
+                          </td>
+                          <td
+                            className={`px-3 py-2 text-right ${
+                              r.freeStock <= 0
+                                ? "font-semibold text-red-600"
+                                : "text-gray-700"
+                            }`}
+                          >
+                            {num(r.freeStock)}
+                          </td>
+                          <td
+                            className={`px-3 py-2 text-right ${
+                              r.booked > 0 ? "text-amber-600" : "text-gray-400"
+                            }`}
+                          >
+                            {r.booked > 0 ? num(r.booked) : "—"}
+                          </td>
+                          {canEdit && (
+                            <td className="px-2 py-2 text-right">
+                              <button
+                                type="button"
+                                disabled={busy || r.freeStock <= 0}
+                                onClick={() =>
+                                  onAddProduct?.(r.productId, g.orderId)
+                                }
+                                className="inline-flex items-center gap-1 rounded-md border border-green-600 px-2 py-1 text-xs font-medium text-green-700 hover:bg-green-50 disabled:cursor-not-allowed disabled:border-gray-200 disabled:text-gray-300"
+                                aria-label="Завантажити мішок"
+                                title={
+                                  r.freeStock <= 0
+                                    ? "Немає вільного мішка"
+                                    : "Завантажити один мішок"
+                                }
+                              >
+                                <Plus className="h-3.5 w-3.5" />
+                                Мішок
+                              </button>
+                            </td>
+                          )}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
-      {/* Завантажені лоти (деталізація) — розгортна. */}
+      {/* Список завантажених товарів (у складі — одразу видно). */}
       {loading.length > 0 && (
         <div className="rounded-lg border bg-white">
           <button
             type="button"
             onClick={() => setShowLots((v) => !v)}
-            className="flex w-full items-center justify-between px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+            className="flex w-full items-center justify-between px-4 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-50"
           >
-            <span>Завантажені лоти ({loading.length})</span>
+            <span>Список завантажених товарів ({loading.length})</span>
             <span className="text-xs text-gray-400">
               {showLots ? "згорнути" : "розгорнути"}
             </span>
@@ -308,7 +411,7 @@ export function LoadingBoard({
                     <th className="px-3 py-2 text-center font-medium">
                       Повер&shy;нення
                     </th>
-                    {!locked && <th className="w-10 px-2 py-2" />}
+                    {canEdit && <th className="w-10 px-2 py-2" />}
                   </tr>
                 </thead>
                 <tbody>
@@ -339,57 +442,53 @@ export function LoadingBoard({
                         {row.weight.toFixed(1)}
                       </td>
                       <td className="px-3 py-2 text-center">
-                        {locked ? (
-                          row.loaded ? (
-                            <span className="inline-block rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">
-                              Так
-                            </span>
-                          ) : (
-                            <span className="text-xs text-gray-400">—</span>
-                          )
-                        ) : (
+                        {canEdit ? (
                           <input
                             type="checkbox"
                             checked={row.loaded}
                             aria-label="Завантажено"
                             onChange={(e) =>
-                              onPatchLoading(row.id, {
+                              onPatchLoading?.(row.id, {
                                 loaded: e.target.checked,
                               })
                             }
                             className="h-4 w-4"
                           />
+                        ) : row.loaded ? (
+                          <span className="inline-block rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">
+                            Так
+                          </span>
+                        ) : (
+                          <span className="text-xs text-gray-400">—</span>
                         )}
                       </td>
                       <td className="px-3 py-2 text-center">
-                        {locked ? (
-                          row.isReturn ? (
-                            <span className="inline-block rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">
-                              Повернення
-                            </span>
-                          ) : (
-                            <span className="text-xs text-gray-400">—</span>
-                          )
-                        ) : (
+                        {canEdit ? (
                           <input
                             type="checkbox"
                             checked={row.isReturn}
                             aria-label="Повернення"
                             onChange={(e) =>
-                              onPatchLoading(row.id, {
+                              onPatchLoading?.(row.id, {
                                 isReturn: e.target.checked,
                               })
                             }
                             className="h-4 w-4"
                           />
+                        ) : row.isReturn ? (
+                          <span className="inline-block rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">
+                            Повернення
+                          </span>
+                        ) : (
+                          <span className="text-xs text-gray-400">—</span>
                         )}
                       </td>
-                      {!locked && (
+                      {canEdit && (
                         <td className="px-2 py-2 text-right">
                           <button
                             type="button"
                             aria-label="Прибрати рядок завантаження"
-                            onClick={() => onRemoveLoading(row.id)}
+                            onClick={() => onRemoveLoading?.(row.id)}
                             className="text-gray-400 hover:text-red-600"
                           >
                             <Trash2 className="h-4 w-4" />

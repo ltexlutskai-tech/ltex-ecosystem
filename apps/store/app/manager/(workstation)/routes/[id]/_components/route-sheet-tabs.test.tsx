@@ -194,7 +194,7 @@ describe("RouteSheetForm — round-2 corrections", () => {
     expect(screen.queryByText("Коментар")).toBeNull();
   });
 
-  it("Загрузка — дошка складу (order-tree, підсвітка, скан) + деталь лотів", () => {
+  it("Загрузка — у менеджера read-only дошка (колонки + посилання на екран складу)", () => {
     render(
       <RouteSheetForm
         initial={makeView({
@@ -213,6 +213,7 @@ describe("RouteSheetForm — round-2 corrections", () => {
               city: "Луцьк",
               orderedQty: 2,
               loadedQty: 1,
+              soldQty: 1,
               sum: 200,
               rows: [
                 {
@@ -224,7 +225,9 @@ describe("RouteSheetForm — round-2 corrections", () => {
                   ordered: 2,
                   loaded: 1,
                   remaining: 1,
-                  stock: 3,
+                  freeStock: 3,
+                  booked: 0,
+                  sold: 1,
                   price: 100,
                   sum: 200,
                   color: "yellow",
@@ -262,23 +265,23 @@ describe("RouteSheetForm — round-2 corrections", () => {
 
     // Жодних згадок про 1С-обмін.
     expect(screen.queryByText(/надходить з 1С/)).toBeNull();
-    // Поле вводу ШК (скан складом).
+    // Read-only: НЕ показуємо поле скану у менеджера (лише на екрані складу).
     expect(
-      screen.getByPlaceholderText(/Відскануйте або введіть ШК/),
-    ).toBeDefined();
-    // Кнопка авто-підбору вільних лотів.
-    expect(screen.getByText(/Заповнити з вільних лотів/)).toBeDefined();
-    // Дошка: шапка замовлення + товар + колонка «Залишок складу».
+      screen.queryByPlaceholderText(/Відскануйте або введіть ШК/),
+    ).toBeNull();
+    // Дошка: шапка замовлення + товар + нові колонки.
     expect(screen.getByText("Клієнт А")).toBeDefined();
     expect(screen.getByText("Куртки")).toBeDefined();
-    expect(screen.getByText(/Залишок складу/)).toBeDefined();
+    expect(screen.getByText(/Вільний залишок/)).toBeDefined();
+    expect(screen.getByText(/Про­дано|Продано/)).toBeDefined();
     // Посилання на екран складу.
     expect(screen.getByRole("link", { name: /Екран складу/ })).toBeDefined();
+    // Кнопка «Реалізація» по замовленню (створення реалізації з дошки).
+    const saleLinks = screen.getAllByRole("link", { name: /Реалізація/ });
+    expect(saleLinks.length).toBeGreaterThanOrEqual(1);
 
-    // Деталь «Завантажені лоти» — згорнута; розгортаємо й перевіряємо рядок.
-    fireEvent.click(screen.getByText(/Завантажені лоти/));
+    // Список завантажених товарів — розгортаємо й перевіряємо рядок (read-only).
+    fireEvent.click(screen.getByText(/Список завантажених товарів/));
     expect(screen.getByText("BC-LOADING-1")).toBeDefined();
-    expect(screen.getAllByRole("checkbox").length).toBeGreaterThanOrEqual(2);
-    expect(screen.getByLabelText("Прибрати рядок завантаження")).toBeDefined();
   });
 });

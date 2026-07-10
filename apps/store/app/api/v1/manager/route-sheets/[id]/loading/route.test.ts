@@ -8,6 +8,7 @@ const {
   mockPrisma,
   getCurrentUserMock,
   addLoadingMock,
+  addManualMock,
   deleteLoadingMock,
   updateLoadingMock,
   countersMock,
@@ -25,6 +26,7 @@ const {
     mockPrisma: { routeSheet: { findUnique: vi.fn() } },
     getCurrentUserMock: vi.fn(),
     addLoadingMock: vi.fn(),
+    addManualMock: vi.fn(),
     deleteLoadingMock: vi.fn(),
     updateLoadingMock: vi.fn(),
     countersMock: vi.fn(),
@@ -40,6 +42,7 @@ vi.mock("@/lib/auth/manager-auth", () => ({
 }));
 vi.mock("@/lib/manager/route-sheet-loading", () => ({
   addLoadingByBarcode: (...args: unknown[]) => addLoadingMock(...args),
+  addLoadingManual: (...args: unknown[]) => addManualMock(...args),
   deleteLoadingRow: (...args: unknown[]) => deleteLoadingMock(...args),
   updateLoadingRow: (...args: unknown[]) => updateLoadingMock(...args),
   computeRouteSheetCounters: (...args: unknown[]) => countersMock(...args),
@@ -145,7 +148,36 @@ describe("POST .../loading", () => {
     };
     expect(json.row.id).toBe("ld1");
     expect(json.counters.shortageQty).toBe(1);
-    expect(addLoadingMock).toHaveBeenCalledWith("rs1", "123", "u1");
+    expect(addLoadingMock).toHaveBeenCalledWith(
+      "rs1",
+      "123",
+      "u1",
+      expect.any(Date),
+      {
+        targetOrderId: null,
+      },
+    );
+  });
+
+  it("ручний рядок (productId + orderId) → addLoadingManual", async () => {
+    addManualMock.mockResolvedValueOnce({ row: { id: "ld2" } });
+    const res = await POST(postReq({ productId: "p1", orderId: "o1" }), {
+      params,
+    });
+    expect(res.status).toBe(200);
+    expect(addLoadingMock).not.toHaveBeenCalled();
+    expect(addManualMock).toHaveBeenCalledWith("rs1", {
+      productId: "p1",
+      lotId: null,
+      targetOrderId: "o1",
+    });
+  });
+
+  it("400 коли ні ШК, ні товару", async () => {
+    const res = await POST(postReq({}), { params });
+    expect(res.status).toBe(400);
+    expect(addLoadingMock).not.toHaveBeenCalled();
+    expect(addManualMock).not.toHaveBeenCalled();
   });
 
   it("409 on foreign active reservation (booking guard)", async () => {

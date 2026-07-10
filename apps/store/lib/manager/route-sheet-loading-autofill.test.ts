@@ -1,9 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const mockDb = vi.hoisted(() => ({
+  routeSheet: { findUnique: vi.fn() },
+  routeSheetOrder: { findMany: vi.fn() },
   routeSheetItem: { findMany: vi.fn(), update: vi.fn() },
   routeSheetLoading: { findMany: vi.fn(), createMany: vi.fn() },
   lot: { findMany: vi.fn() },
+  order: { findMany: vi.fn() },
   $transaction: vi.fn(),
 }));
 vi.mock("@ltex/db", () => ({ prisma: mockDb, Prisma: {} }));
@@ -34,6 +37,13 @@ const lot = (id: string, productId: string, over = {}) => ({
 beforeEach(() => {
   vi.clearAllMocks();
   isActiveReservationSpy.mockReturnValue(false);
+  // getRouteSheetAllowedAgents — без агентів рейсу.
+  mockDb.routeSheet.findUnique.mockResolvedValue({
+    expeditorUserId: null,
+    createdByUserId: null,
+  });
+  mockDb.routeSheetOrder.findMany.mockResolvedValue([]);
+  mockDb.order.findMany.mockResolvedValue([]);
   // $transaction runs the callback with a tx whose recompute reads are empty.
   mockDb.$transaction.mockImplementation(
     async (cb: (tx: typeof mockDb) => Promise<unknown>) => {

@@ -58,9 +58,19 @@ export const addOrdersSchema = z.object({
 });
 
 /** POST /route-sheets/[id]/loading — додати рядок Загрузки скан/ручний ШК. */
-export const addLoadingSchema = z.object({
-  barcode: z.string().trim().min(1, "Не вказано ШК").max(64),
-});
+export const addLoadingSchema = z
+  .object({
+    // Скан ШК (режим сканера).
+    barcode: z.string().trim().min(1).max(64).optional(),
+    // Ручний рядок (режим підбору товару без скану).
+    productId: z.string().trim().min(1).optional(),
+    lotId: z.string().trim().min(1).optional(),
+    // Прив'язка до виділеного замовлення (1С «Загрузка в заказ»).
+    orderId: z.string().trim().min(1).optional(),
+  })
+  .refine((v) => Boolean(v.barcode) || Boolean(v.productId), {
+    message: "Вкажіть ШК або товар",
+  });
 
 /** PATCH /route-sheets/[id]/loading?loadingId= — редагування рядка Загрузки. */
 export const updateLoadingSchema = z

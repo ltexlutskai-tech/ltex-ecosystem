@@ -1189,18 +1189,26 @@ export function RouteSheetForm({
               Екран складу ↗
             </Link>
           </div>
+          <p className="text-xs text-gray-500">
+            Перегляд стану завантаження. Скан і додавання мішків — на «Екрані
+            складу».
+          </p>
           <LoadingBoard
             board={loadingBoard}
             loading={loading}
             counters={counters}
             locked={locked}
-            busy={saving}
-            autoFilling={autoFilling}
-            error={loadingError}
-            onScan={(code) => void addLoading(code)}
-            onAutoFill={() => void autoFillLoading()}
-            onRemoveLoading={(lid) => void removeLoading(lid)}
-            onPatchLoading={(lid, patch) => void patchLoading(lid, patch)}
+            createSaleHrefFor={(g) =>
+              g.orderId
+                ? `/manager/sales/new?routeSheetId=${encodeURIComponent(
+                    sheetId,
+                  )}${
+                    g.customerId
+                      ? `&clientId=${encodeURIComponent(g.customerId)}`
+                      : ""
+                  }&orderId=${encodeURIComponent(g.orderId)}`
+                : null
+            }
           />
         </section>
       )}
