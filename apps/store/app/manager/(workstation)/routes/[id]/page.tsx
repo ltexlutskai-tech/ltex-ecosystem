@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { ArrowLeft, Printer } from "lucide-react";
+import { ArrowLeft, Printer, Truck } from "lucide-react";
 import { prisma } from "@ltex/db";
 import { getCurrentUser } from "@/lib/auth/manager-auth";
 import {
+  computeLoadingBoard,
   computeRouteSheetCounters,
   computeRouteSheetShortage,
   getRouteSheetLoadingRows,
@@ -193,15 +194,23 @@ export default async function ManagerRouteSheetDetailPage({
 
   // Етап 2: Загрузка (резолвлені рядки) + Бракує + лічильники (обчислювані).
   // Етап 3: Реалізації / Продажи / Оплати — derived із зворотних посилань.
-  const [loading, shortage, counters, documents, expenses, mileageWarning] =
-    await Promise.all([
-      getRouteSheetLoadingRows(sheet.id),
-      computeRouteSheetShortage(sheet.id),
-      computeRouteSheetCounters(sheet.id),
-      getRouteSheetDocuments(sheet.id),
-      getRouteSheetExpenses(sheet.id),
-      getUnclosedMileageWarning(sheet.expeditorUserId, sheet.id),
-    ]);
+  const [
+    loading,
+    loadingBoard,
+    shortage,
+    counters,
+    documents,
+    expenses,
+    mileageWarning,
+  ] = await Promise.all([
+    getRouteSheetLoadingRows(sheet.id),
+    computeLoadingBoard(sheet.id),
+    computeRouteSheetShortage(sheet.id),
+    computeRouteSheetCounters(sheet.id),
+    getRouteSheetDocuments(sheet.id),
+    getRouteSheetExpenses(sheet.id),
+    getUnclosedMileageWarning(sheet.expeditorUserId, sheet.id),
+  ]);
 
   const initial: RouteSheetView = {
     id: sheet.id,
@@ -223,6 +232,7 @@ export default async function ManagerRouteSheetDetailPage({
     orders: orderViews,
     items: itemViews,
     loading,
+    loadingBoard,
     shortage,
     counters,
     sales: documents.sales,
@@ -256,13 +266,22 @@ export default async function ManagerRouteSheetDetailPage({
             Створено: {new Date(sheet.createdAt).toLocaleString("uk-UA")}
           </p>
         </div>
-        <Link
-          href={`/manager/routes/${id}/print`}
-          className="inline-flex items-center gap-1.5 rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
-        >
-          <Printer className="h-4 w-4" />
-          Друк
-        </Link>
+        <div className="flex flex-wrap items-center gap-2">
+          <Link
+            href={`/manager/routes/${id}/loading`}
+            className="inline-flex items-center gap-1.5 rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+          >
+            <Truck className="h-4 w-4" />
+            Завантаження складу
+          </Link>
+          <Link
+            href={`/manager/routes/${id}/print`}
+            className="inline-flex items-center gap-1.5 rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+          >
+            <Printer className="h-4 w-4" />
+            Друк
+          </Link>
+        </div>
       </header>
 
       <RouteSheetForm

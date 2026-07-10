@@ -19,7 +19,8 @@ import {
 import { RouteSheetStatusBadge } from "../../_components/route-sheet-status-badge";
 import { OrderPickerModal } from "./order-picker-modal";
 import { TaskClientPicker } from "./task-client-picker";
-import { BarcodeInput } from "../../../sales/new/_components/barcode-input";
+import { LoadingBoard } from "./loading-board";
+import type { LoadingBoardOrder } from "@/lib/manager/route-sheet-loading";
 
 /** Підписи на кнопках статус-переходів. */
 const TRANSITION_LABEL: Record<string, string> = {
@@ -188,6 +189,7 @@ export interface RouteSheetView {
   orders: RouteSheetOrderView[];
   items: RouteSheetItemView[];
   loading: RouteSheetLoadingView[];
+  loadingBoard: LoadingBoardOrder[];
   shortage: RouteSheetShortageView[];
   counters: RouteSheetCountersView;
   sales: RouteSheetSaleView[];
@@ -261,6 +263,9 @@ export function RouteSheetForm({
   const [items, setItems] = useState<RouteSheetItemView[]>(initial.items);
   const [loading, setLoading] = useState<RouteSheetLoadingView[]>(
     initial.loading,
+  );
+  const [loadingBoard, setLoadingBoard] = useState<LoadingBoardOrder[]>(
+    initial.loadingBoard,
   );
   const [shortage, setShortage] = useState<RouteSheetShortageView[]>(
     initial.shortage,
@@ -395,6 +400,7 @@ export function RouteSheetForm({
     setOrders(data.sheet.orders);
     setItems(data.sheet.items);
     setLoading(data.sheet.loading);
+    setLoadingBoard(data.sheet.loadingBoard);
     setShortage(data.sheet.shortage);
     setCounters(data.sheet.counters);
     setSales(data.sheet.sales);
@@ -1169,171 +1175,33 @@ export function RouteSheetForm({
         </section>
       )}
 
-      {/* ─── Загрузка (скан ШК складом — наша система) ────────────────────── */}
+      {/* ─── Загрузка (дошка складу — order-tree нашої системи) ───────────── */}
       {tab === "loading" && (
         <section className="space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h3 className="text-sm font-semibold text-gray-700">
-              Завантаження ({loading.length})
+              Завантаження
             </h3>
+            <Link
+              href={`/manager/routes/${sheetId}/loading`}
+              className="inline-flex h-8 items-center justify-center rounded-md border border-gray-300 bg-white px-3 text-xs font-medium text-gray-700 hover:bg-gray-50"
+            >
+              Екран складу ↗
+            </Link>
           </div>
-
-          {!locked && (
-            <div className="space-y-3 rounded-lg border bg-white p-4 shadow-sm">
-              <p className="text-xs text-gray-500">
-                Склад сканує мішки під замовлення: відскануйте штрихкод лота
-                (поле, USB-сканер або камера). Вага й ціна беруться з лота,
-                рядок прив&apos;язується до замовлення за товаром.
-              </p>
-              <BarcodeInput
-                onCode={(code) => void addLoading(code)}
-                error={loadingError}
-                disabled={saving}
-              />
-              <div className="flex items-center gap-2 border-t pt-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  disabled={autoFilling || saving}
-                  onClick={() => void autoFillLoading()}
-                >
-                  {autoFilling ? "Підбір…" : "Заповнити з вільних лотів"}
-                </Button>
-                <span className="text-xs text-gray-400">
-                  Авто-підбір вільних лотів під замовлені позиції (без
-                  сканування).
-                </span>
-              </div>
-            </div>
-          )}
-
-          {loading.length === 0 ? (
-            <div className="rounded-lg border border-dashed border-gray-200 bg-gray-50 px-6 py-8 text-center text-sm text-gray-500">
-              Лотів ще не завантажено. Відскануйте штрихкоди або натисніть
-              «Заповнити з вільних лотів».
-            </div>
-          ) : (
-            <div className="overflow-x-auto rounded-lg border bg-white">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b bg-gray-50 text-left text-gray-500">
-                    <th className="px-3 py-2 font-medium">Контрагент</th>
-                    <th className="px-3 py-2 font-medium">Замовлення</th>
-                    <th className="px-3 py-2 font-medium">Артикул</th>
-                    <th className="px-3 py-2 font-medium">Лот (ШК)</th>
-                    <th className="px-3 py-2 text-right font-medium">Вага</th>
-                    <th className="px-3 py-2 text-right font-medium">К-сть</th>
-                    <th className="px-3 py-2 text-right font-medium">
-                      Сума, €
-                    </th>
-                    <th className="px-3 py-2 text-center font-medium">
-                      Заванта&shy;жено
-                    </th>
-                    <th className="px-3 py-2 text-center font-medium">
-                      Повер&shy;нення
-                    </th>
-                    {!locked && <th className="w-10 px-2 py-2" />}
-                  </tr>
-                </thead>
-                <tbody>
-                  {loading.map((row) => (
-                    <tr
-                      key={row.id}
-                      className={`border-b last:border-b-0 ${
-                        row.isReturn ? "bg-amber-50" : ""
-                      }`}
-                    >
-                      <td className="px-3 py-2 text-gray-800">
-                        {row.customerName ?? "—"}
-                      </td>
-                      <td className="px-3 py-2 font-mono text-gray-600">
-                        {row.orderNumber ? `№${row.orderNumber}` : "—"}
-                      </td>
-                      <td className="px-3 py-2 font-mono text-gray-600">
-                        {row.articleCode ?? "—"}
-                      </td>
-                      <td className="min-w-0 px-3 py-2">
-                        <div className="break-all font-mono text-xs text-gray-900">
-                          {row.barcode}
-                        </div>
-                        <div className="truncate text-xs text-gray-400">
-                          {row.productName ?? row.productId}
-                        </div>
-                      </td>
-                      <td className="px-3 py-2 text-right text-gray-700">
-                        {row.weight.toFixed(1)}
-                      </td>
-                      <td className="px-3 py-2 text-right text-gray-700">
-                        {row.quantity}
-                      </td>
-                      <td className="px-3 py-2 text-right text-gray-700">
-                        {row.sum.toFixed(2)}
-                      </td>
-                      <td className="px-3 py-2 text-center">
-                        {locked ? (
-                          row.loaded ? (
-                            <span className="inline-block rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">
-                              Так
-                            </span>
-                          ) : (
-                            <span className="text-xs text-gray-400">—</span>
-                          )
-                        ) : (
-                          <input
-                            type="checkbox"
-                            checked={row.loaded}
-                            aria-label="Завантажено"
-                            onChange={(e) =>
-                              void patchLoading(row.id, {
-                                loaded: e.target.checked,
-                              })
-                            }
-                            className="h-4 w-4"
-                          />
-                        )}
-                      </td>
-                      <td className="px-3 py-2 text-center">
-                        {locked ? (
-                          row.isReturn ? (
-                            <span className="inline-block rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">
-                              Повернення
-                            </span>
-                          ) : (
-                            <span className="text-xs text-gray-400">—</span>
-                          )
-                        ) : (
-                          <input
-                            type="checkbox"
-                            checked={row.isReturn}
-                            aria-label="Повернення"
-                            onChange={(e) =>
-                              void patchLoading(row.id, {
-                                isReturn: e.target.checked,
-                              })
-                            }
-                            className="h-4 w-4"
-                          />
-                        )}
-                      </td>
-                      {!locked && (
-                        <td className="px-2 py-2 text-right">
-                          <button
-                            type="button"
-                            aria-label="Прибрати рядок завантаження"
-                            onClick={() => void removeLoading(row.id)}
-                            className="text-gray-400 hover:text-red-600"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
-                        </td>
-                      )}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+          <LoadingBoard
+            board={loadingBoard}
+            loading={loading}
+            counters={counters}
+            locked={locked}
+            busy={saving}
+            autoFilling={autoFilling}
+            error={loadingError}
+            onScan={(code) => void addLoading(code)}
+            onAutoFill={() => void autoFillLoading()}
+            onRemoveLoading={(lid) => void removeLoading(lid)}
+            onPatchLoading={(lid, patch) => void patchLoading(lid, patch)}
+          />
         </section>
       )}
 

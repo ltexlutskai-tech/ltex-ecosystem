@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, Truck } from "lucide-react";
 import { RouteSheetStatusBadge } from "./route-sheet-status-badge";
 import { formatDocNumber } from "@/lib/manager/order-number";
 import type { RowHandlers } from "../../_components/use-list-context-menu";
@@ -82,7 +82,15 @@ export function RouteSheetsRow({
           {Math.round(sheet.totalUah).toLocaleString("uk-UA")} ₴
         </div>
       </td>
-      <td className="px-2.5 py-1.5 text-right">
+      <td className="px-2.5 py-1.5 text-right whitespace-nowrap">
+        <Link
+          href={`/manager/routes/${sheet.id}/loading`}
+          className="mr-2 inline-flex items-center gap-1 text-sm text-gray-500 hover:text-green-700"
+          aria-label="Завантаження складу"
+          title="Завантаження складу"
+        >
+          <Truck className="h-4 w-4" />
+        </Link>
         <Link
           href={`/manager/routes/${sheet.id}`}
           className="inline-flex items-center gap-1 text-sm text-blue-600 hover:text-blue-700"

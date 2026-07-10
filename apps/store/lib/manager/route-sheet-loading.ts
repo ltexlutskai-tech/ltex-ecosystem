@@ -215,6 +215,39 @@ export async function recomputeQuantityLoaded(
  * чужої броні — та сама дефініція вільного лота, що й у Реалізації).
  * Повертає лише рядки з нестачею > 0, з резолвленими іменами товарів/замовлень.
  */
+/**
+ * Вільний складський залишок по товарах (реєстр-аналог 1С `ТоварыНаСкладах`):
+ * к-сть лотів `status='free'` БЕЗ активної броні. Бронь (будь-чия) знімає лот з
+ * доступних — рівно те, що бачить склад: заброньований мішок вантажити не можна
+ * (і скан його блокує). Використовується і в «Бракує», і в дошці Завантаження.
+ */
+export async function computeAvailableStockByProduct(
+  productIds: string[],
+  now: Date = new Date(),
+): Promise<Map<string, number>> {
+  const map = new Map<string, number>();
+  for (const productId of productIds) map.set(productId, 0);
+  if (productIds.length === 0) return map;
+
+  const lots = await prisma.lot.findMany({
+    where: { productId: { in: productIds }, status: "free" },
+    select: {
+      productId: true,
+      status: true,
+      reservedByUserId: true,
+      reservedUntil: true,
+    },
+  });
+  for (const lot of lots) {
+    // `status='free'` уже виключає продані/зарезервовані; додатково
+    // відкидаємо лоти з активною бронню (денормалізована бронь може лишати
+    // status='free' до синку — звіряємо явно).
+    if (isActiveReservation(lot, now)) continue;
+    map.set(lot.productId, (map.get(lot.productId) ?? 0) + 1);
+  }
+  return map;
+}
+
 export async function computeRouteSheetShortage(
   routeSheetId: string,
   now: Date = new Date(),
@@ -227,31 +260,10 @@ export async function computeRouteSheetShortage(
   if (items.length === 0) return [];
 
   const productIds = [...new Set(items.map((i) => i.productId))];
-
-  // Вільні лоти цих товарів (status='free'); активна чужа бронь знімає лот з
-  // доступних — звіряємо `reservedUntil`/`reservedByUserId` як у lot-booking.
-  const lots = await prisma.lot.findMany({
-    where: { productId: { in: productIds }, status: "free" },
-    select: {
-      productId: true,
-      status: true,
-      reservedByUserId: true,
-      reservedUntil: true,
-    },
-  });
-
-  const availableByProduct = new Map<string, number>();
-  for (const productId of productIds) availableByProduct.set(productId, 0);
-  for (const lot of lots) {
-    // `status='free'` уже виключає продані/зарезервовані; додатково
-    // відкидаємо лоти з активною бронню (денормалізована бронь може лишати
-    // status='free' до синку — звіряємо явно).
-    if (isActiveReservation(lot, now)) continue;
-    availableByProduct.set(
-      lot.productId,
-      (availableByProduct.get(lot.productId) ?? 0) + 1,
-    );
-  }
+  const availableByProduct = await computeAvailableStockByProduct(
+    productIds,
+    now,
+  );
 
   const allocated = allocateShortage(
     items.map((i) => ({
@@ -312,6 +324,215 @@ export async function computeRouteSheetCounters(
     computeRouteSheetShortage(routeSheetId, now),
   ]);
   return computeCounters({ ordersCount, items, shortage });
+}
+
+// ─── Дошка Завантаження (order-tree, порт центральної бази 1С) ────────────────
+
+/** Колір рядка позиції на дошці Завантаження. */
+export type LoadingRowColor = "green" | "yellow" | "red" | "none";
+
+/**
+ * Чиста функція кольору позиції (порт підсвітки центральної бази 1С):
+ *  • green  — завантажено повністю (замовлено>0 і завантажено ≥ замовлено);
+ *  • red    — ще потрібно вантажити, але вільного залишку на складі немає;
+ *  • yellow — прогрес (частково завантажено, залишок є);
+ *  • none   — не почато, товар на складі є (нейтральний рядок).
+ */
+export function loadingRowColor(args: {
+  ordered: number;
+  loaded: number;
+  stock: number;
+}): LoadingRowColor {
+  const remaining = Math.max(0, args.ordered - args.loaded);
+  if (args.ordered > 0 && remaining === 0) return "green";
+  if (remaining > 0 && args.stock <= 0) return "red";
+  if (args.loaded > 0 && remaining > 0) return "yellow";
+  return "none";
+}
+
+/** Позиція товару на дошці Завантаження (одне замовлення × товар). */
+export interface LoadingBoardRow {
+  itemId: string;
+  productId: string;
+  productName: string | null;
+  articleCode: string | null;
+  unit: string | null;
+  /** Замовлено (RouteSheetItem.quantity). */
+  ordered: number;
+  /** Завантажено (RouteSheetItem.quantityLoaded). */
+  loaded: number;
+  /** Залишилось завантажити (max(0, ordered − loaded)). */
+  remaining: number;
+  /** Вільний залишок товару на складі (реєстр-аналог, мінус завантажене тут). */
+  stock: number;
+  price: number;
+  sum: number;
+  color: LoadingRowColor;
+}
+
+/** Група замовлення на дошці Завантаження (шапка + позиції). */
+export interface LoadingBoardOrder {
+  orderId: string | null;
+  orderNumber: string | null;
+  customerId: string | null;
+  customerName: string | null;
+  city: string | null;
+  rows: LoadingBoardRow[];
+  orderedQty: number;
+  loadedQty: number;
+  sum: number;
+}
+
+/**
+ * Дошка Завантаження — order-tree центральної бази 1С у нашій системі: по кожному
+ * замовленню перелік товарів із «Замовлено / Завантажено / Залишок складу» та
+ * кольором стану. Залишок складу = вільні лоти товару (без активної броні) мінус
+ * уже завантажені на цей МЛ (тобто «скільки ще можна взяти з полиці»). Червоний
+ * рядок = треба вантажити, а вільного залишку немає (порт підсвітки 1С).
+ */
+export async function computeLoadingBoard(
+  routeSheetId: string,
+  now: Date = new Date(),
+): Promise<LoadingBoardOrder[]> {
+  const [items, rsOrders, loadingRows] = await Promise.all([
+    prisma.routeSheetItem.findMany({
+      where: { routeSheetId },
+      select: {
+        id: true,
+        orderId: true,
+        customerId: true,
+        productId: true,
+        unit: true,
+        quantity: true,
+        price: true,
+        sum: true,
+        quantityLoaded: true,
+      },
+      orderBy: { id: "asc" },
+    }),
+    prisma.routeSheetOrder.findMany({
+      where: { routeSheetId },
+      select: { orderId: true, customerId: true, city: true },
+      orderBy: { id: "asc" },
+    }),
+    prisma.routeSheetLoading.findMany({
+      where: { routeSheetId, loaded: true, isReturn: false },
+      select: { productId: true, lotId: true },
+    }),
+  ]);
+  if (items.length === 0) return [];
+
+  const productIds = [...new Set(items.map((i) => i.productId))];
+  const freeByProduct = await computeAvailableStockByProduct(productIds, now);
+
+  // Уже завантажені (унікальні) лоти на цьому МЛ — «пішли з полиці».
+  const loadedLotsByProduct = new Map<string, Set<string>>();
+  for (const r of loadingRows) {
+    const set = loadedLotsByProduct.get(r.productId) ?? new Set<string>();
+    set.add(r.lotId);
+    loadedLotsByProduct.set(r.productId, set);
+  }
+  const shelfByProduct = new Map<string, number>();
+  for (const productId of productIds) {
+    const free = freeByProduct.get(productId) ?? 0;
+    const loadedHere = loadedLotsByProduct.get(productId)?.size ?? 0;
+    shelfByProduct.set(productId, Math.max(0, free - loadedHere));
+  }
+
+  // Резолв імен (замовлення / клієнти / товари).
+  const orderIds = new Set<string>();
+  const customerIds = new Set<string>();
+  for (const o of rsOrders) {
+    orderIds.add(o.orderId);
+    if (o.customerId) customerIds.add(o.customerId);
+  }
+  for (const it of items) {
+    if (it.orderId) orderIds.add(it.orderId);
+    if (it.customerId) customerIds.add(it.customerId);
+  }
+  const [orders, customers, products] = await Promise.all([
+    orderIds.size > 0
+      ? prisma.order.findMany({
+          where: { id: { in: [...orderIds] } },
+          select: { id: true, code1C: true },
+        })
+      : Promise.resolve([]),
+    customerIds.size > 0
+      ? prisma.customer.findMany({
+          where: { id: { in: [...customerIds] } },
+          select: { id: true, name: true, city: true },
+        })
+      : Promise.resolve([]),
+    prisma.product.findMany({
+      where: { id: { in: productIds } },
+      select: { id: true, name: true, articleCode: true },
+    }),
+  ]);
+  const orderMap = new Map(orders.map((o) => [o.id, o]));
+  const customerMap = new Map(customers.map((c) => [c.id, c]));
+  const productMap = new Map(products.map((p) => [p.id, p]));
+
+  // Порядок груп: спершу замовлення в порядку `RouteSheetOrder`, далі решта.
+  const groups = new Map<string, LoadingBoardOrder>();
+  const groupKey = (orderId: string | null) => orderId ?? "__none__";
+  const ensureGroup = (
+    orderId: string | null,
+    customerId: string | null,
+    city: string | null,
+  ): LoadingBoardOrder => {
+    const key = groupKey(orderId);
+    let g = groups.get(key);
+    if (!g) {
+      const order = orderId ? orderMap.get(orderId) : null;
+      const customer = customerId ? customerMap.get(customerId) : null;
+      g = {
+        orderId,
+        orderNumber: order?.code1C ?? null,
+        customerId,
+        customerName: customer?.name ?? null,
+        city: city ?? customer?.city ?? null,
+        rows: [],
+        orderedQty: 0,
+        loadedQty: 0,
+        sum: 0,
+      };
+      groups.set(key, g);
+    }
+    return g;
+  };
+
+  // Заводимо групи в порядку RouteSheetOrder (навіть без позицій — не показуємо,
+  // але зберігаємо порядок для тих, що мають позиції).
+  for (const o of rsOrders) ensureGroup(o.orderId, o.customerId, o.city);
+
+  for (const it of items) {
+    const g = ensureGroup(it.orderId, it.customerId, null);
+    const product = productMap.get(it.productId);
+    const ordered = it.quantity;
+    const loaded = it.quantityLoaded;
+    const remaining = Math.max(0, ordered - loaded);
+    const stock = shelfByProduct.get(it.productId) ?? 0;
+    g.rows.push({
+      itemId: it.id,
+      productId: it.productId,
+      productName: product?.name ?? null,
+      articleCode: product?.articleCode ?? null,
+      unit: it.unit,
+      ordered,
+      loaded,
+      remaining,
+      stock,
+      price: it.price,
+      sum: it.sum,
+      color: loadingRowColor({ ordered, loaded, stock }),
+    });
+    g.orderedQty += ordered;
+    g.loadedQty += loaded;
+    g.sum += it.sum;
+  }
+
+  // Лише групи з позиціями, у вихідному порядку заведення.
+  return [...groups.values()].filter((g) => g.rows.length > 0);
 }
 
 /** Рядок Загрузки у формі для UI (з резолвленими іменами). */

@@ -8,6 +8,7 @@ import {
   isRouteSheetLocked,
 } from "@/lib/manager/route-sheet-status";
 import {
+  computeLoadingBoard,
   computeRouteSheetCounters,
   computeRouteSheetShortage,
   getRouteSheetLoadingRows,
@@ -135,15 +136,23 @@ export async function GET(
   // Етап 2: Загрузка + Бракує + лічильники (обчислювані / резолвлені окремо).
   // Етап 3: Реалізації / Продажи / Оплати — derived із зворотних посилань.
   // Етап 4: попередження про незакритий кілометраж попередньої зміни (м'яке).
-  const [loading, shortage, counters, documents, expenses, mileageWarning] =
-    await Promise.all([
-      getRouteSheetLoadingRows(sheet.id),
-      computeRouteSheetShortage(sheet.id),
-      computeRouteSheetCounters(sheet.id),
-      getRouteSheetDocuments(sheet.id),
-      getRouteSheetExpenses(sheet.id),
-      getUnclosedMileageWarning(sheet.expeditorUserId, sheet.id),
-    ]);
+  const [
+    loading,
+    loadingBoard,
+    shortage,
+    counters,
+    documents,
+    expenses,
+    mileageWarning,
+  ] = await Promise.all([
+    getRouteSheetLoadingRows(sheet.id),
+    computeLoadingBoard(sheet.id),
+    computeRouteSheetShortage(sheet.id),
+    computeRouteSheetCounters(sheet.id),
+    getRouteSheetDocuments(sheet.id),
+    getRouteSheetExpenses(sheet.id),
+    getUnclosedMileageWarning(sheet.expeditorUserId, sheet.id),
+  ]);
 
   return NextResponse.json({
     sheet: {
@@ -205,6 +214,7 @@ export async function GET(
         };
       }),
       loading,
+      loadingBoard,
       shortage,
       counters,
       sales: documents.sales,

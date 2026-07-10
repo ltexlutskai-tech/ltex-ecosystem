@@ -8,6 +8,7 @@ const {
   mockPrisma,
   getCurrentUserMock,
   loadingRowsMock,
+  loadingBoardMock,
   shortageMock,
   countersMock,
   documentsMock,
@@ -30,6 +31,7 @@ const {
   },
   getCurrentUserMock: vi.fn(),
   loadingRowsMock: vi.fn(),
+  loadingBoardMock: vi.fn(),
   shortageMock: vi.fn(),
   countersMock: vi.fn(),
   documentsMock: vi.fn(),
@@ -45,6 +47,7 @@ vi.mock("@/lib/auth/manager-auth", () => ({
 }));
 vi.mock("@/lib/manager/route-sheet-loading", () => ({
   getRouteSheetLoadingRows: (...args: unknown[]) => loadingRowsMock(...args),
+  computeLoadingBoard: (...args: unknown[]) => loadingBoardMock(...args),
   computeRouteSheetShortage: (...args: unknown[]) => shortageMock(...args),
   computeRouteSheetCounters: (...args: unknown[]) => countersMock(...args),
 }));
@@ -142,6 +145,7 @@ beforeEach(() => {
   mockPrisma.mgrCashOrder.updateMany.mockResolvedValue({ count: 0 });
   mockPrisma.routeSheet.delete.mockResolvedValue({ id: "rs1" });
   loadingRowsMock.mockResolvedValue([]);
+  loadingBoardMock.mockResolvedValue([]);
   shortageMock.mockResolvedValue([]);
   countersMock.mockResolvedValue({
     ordersCount: 0,
