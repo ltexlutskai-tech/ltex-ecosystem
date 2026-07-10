@@ -5,9 +5,13 @@ import { isRouteSheetLocked } from "@/lib/manager/route-sheet-status";
 import {
   addOrdersToRouteSheet,
   removeOrderFromRouteSheet,
+  reorderRouteSheetOrders,
   RouteSheetFillError,
 } from "@/lib/manager/route-sheet-fill";
-import { addOrdersSchema } from "@/lib/validations/manager-route-sheet";
+import {
+  addOrdersSchema,
+  reorderOrdersSchema,
+} from "@/lib/validations/manager-route-sheet";
 
 /** Перевіряє, що МЛ існує і не завершено (lock). Повертає NextResponse | null. */
 async function guardEditable(id: string): Promise<NextResponse | null> {
@@ -69,6 +73,33 @@ export async function POST(
       { status: 500 },
     );
   }
+}
+
+/** PATCH — новий порядок замовлень у рейсі. Body: `{ orderIds: string[] }`. */
+export async function PATCH(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  const user = await getCurrentUser(req);
+  if (!user) {
+    return NextResponse.json({ error: "Не авторизовано" }, { status: 401 });
+  }
+
+  const { id } = await params;
+  const guard = await guardEditable(id);
+  if (guard) return guard;
+
+  const body = await req.json().catch(() => null);
+  const parsed = reorderOrdersSchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: "Невірні дані", details: parsed.error.issues.slice(0, 5) },
+      { status: 400 },
+    );
+  }
+
+  await reorderRouteSheetOrders(id, parsed.data.orderIds);
+  return NextResponse.json({ ok: true });
 }
 
 /** DELETE — прибрати замовлення з МЛ. Query: `?orderId=`. */

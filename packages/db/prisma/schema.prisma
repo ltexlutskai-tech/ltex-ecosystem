@@ -1417,6 +1417,9 @@ model RouteSheetOrder {
   orderId      String  @map("order_id")
   customerId   String? @map("customer_id")
   city         String?
+  // Порядок замовлення в рейсі (визначає послідовність маршруту). Менеджер
+  // змінює його ↑↓; склад бачить у тому ж порядку.
+  position     Int     @default(0)
 
   routeSheet RouteSheet @relation(fields: [routeSheetId], references: [id], onDelete: Cascade)
 

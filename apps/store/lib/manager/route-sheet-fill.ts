@@ -175,6 +175,13 @@ export async function addOrdersToRouteSheet(
   // Уже на цьому МЛ — ідемпотентно пропускаємо.
   const toAdd = orders.filter((o) => o.routeSheetId !== routeSheetId);
 
+  // Нові замовлення додаються в кінець (position після наявного максимуму).
+  const maxPos = await prisma.routeSheetOrder.aggregate({
+    where: { routeSheetId },
+    _max: { position: true },
+  });
+  let nextPos = (maxPos._max.position ?? -1) + 1;
+
   const totals = await prisma.$transaction(async (tx) => {
     for (const o of toAdd) {
       await tx.routeSheetOrder.create({
@@ -183,6 +190,7 @@ export async function addOrdersToRouteSheet(
           orderId: o.id,
           customerId: o.customerId,
           city: o.customer?.city ?? null,
+          position: nextPos++,
         },
       });
       const aggregated = aggregateItemsFromOrders(
@@ -210,6 +218,45 @@ export async function addOrdersToRouteSheet(
   });
 
   return { ...totals, added: toAdd.length };
+}
+
+/**
+ * Зміна порядку замовлень у маршруті (послідовність рейсу). Приймає повний
+ * список `orderId` у бажаному порядку; виставляє `position` за індексом.
+ * Ігнорує id, яких немає на цьому МЛ; наявні, що не потрапили в список,
+ * лишаються після впорядкованих (їм дається position після хвоста).
+ */
+export async function reorderRouteSheetOrders(
+  routeSheetId: string,
+  orderIds: string[],
+): Promise<void> {
+  const links = await prisma.routeSheetOrder.findMany({
+    where: { routeSheetId },
+    select: { id: true, orderId: true },
+  });
+  const byOrderId = new Map(links.map((l) => [l.orderId, l.id]));
+
+  const seen = new Set<string>();
+  const sequence: string[] = [];
+  for (const oid of orderIds) {
+    if (byOrderId.has(oid) && !seen.has(oid)) {
+      seen.add(oid);
+      sequence.push(oid);
+    }
+  }
+  // Хвіст: наявні замовлення, яких не було у переданому списку.
+  for (const l of links) {
+    if (!seen.has(l.orderId)) sequence.push(l.orderId);
+  }
+
+  await prisma.$transaction(
+    sequence.map((oid, index) =>
+      prisma.routeSheetOrder.update({
+        where: { id: byOrderId.get(oid)! },
+        data: { position: index },
+      }),
+    ),
+  );
 }
 
 /**

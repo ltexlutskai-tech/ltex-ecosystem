@@ -44,7 +44,6 @@ export function WarehouseLoadingClient({
     initial.counters,
   );
   const [busy, setBusy] = useState(false);
-  const [autoFilling, setAutoFilling] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   /** Перечитати дошку/лоти/лічильники з сервера (GET). */
@@ -63,12 +62,10 @@ export function WarehouseLoadingClient({
     setCounters(data.sheet.counters);
   }, [sheetId]);
 
-  /** Спільний POST у Загрузку (скан ШК або ручний рядок товару). */
-  async function postLoading(payload: {
-    barcode?: string;
-    productId?: string;
-    orderId?: string | null;
-  }) {
+  /** Скан ШК → рядок Завантаження (POST). orderId — «у виділене замовлення». */
+  async function scan(barcode: string, targetOrderId: string | null) {
+    const code = barcode.trim();
+    if (!code) return;
     setError(null);
     setBusy(true);
     try {
@@ -78,8 +75,8 @@ export function WarehouseLoadingClient({
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            ...payload,
-            orderId: payload.orderId ?? undefined,
+            barcode: code,
+            orderId: targetOrderId ?? undefined,
           }),
         },
       );
@@ -91,35 +88,6 @@ export function WarehouseLoadingClient({
       await reload();
     } finally {
       setBusy(false);
-    }
-  }
-
-  async function scan(barcode: string, targetOrderId: string | null) {
-    const code = barcode.trim();
-    if (!code) return;
-    await postLoading({ barcode: code, orderId: targetOrderId });
-  }
-
-  async function addProduct(productId: string, targetOrderId: string | null) {
-    await postLoading({ productId, orderId: targetOrderId });
-  }
-
-  async function autoFill() {
-    setError(null);
-    setAutoFilling(true);
-    try {
-      const res = await fetch(
-        `/api/v1/manager/route-sheets/${sheetId}/loading/auto-fill`,
-        { method: "POST" },
-      );
-      if (!res.ok) {
-        const body = (await res.json().catch(() => ({}))) as { error?: string };
-        setError(body.error ?? `Помилка ${res.status}`);
-        return;
-      }
-      await reload();
-    } finally {
-      setAutoFilling(false);
     }
   }
 
@@ -219,13 +187,8 @@ export function WarehouseLoadingClient({
         locked={locked}
         editable
         busy={busy}
-        autoFilling={autoFilling}
         error={error}
         onScan={(code, orderId) => void scan(code, orderId)}
-        onAddProduct={(productId, orderId) =>
-          void addProduct(productId, orderId)
-        }
-        onAutoFill={() => void autoFill()}
         onRemoveLoading={(id) => void removeLoading(id)}
         onPatchLoading={(id, patch) => void patchLoading(id, patch)}
         createSaleHrefFor={(g) =>

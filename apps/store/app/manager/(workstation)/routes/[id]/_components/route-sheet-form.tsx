@@ -3,7 +3,14 @@
 import { useCallback, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Plus, Trash2, RefreshCw, MapPin } from "lucide-react";
+import {
+  Plus,
+  Trash2,
+  RefreshCw,
+  MapPin,
+  ArrowUp,
+  ArrowDown,
+} from "lucide-react";
 import { Button } from "@ltex/ui";
 import {
   ROUTE_SHEET_STATUS_META,
@@ -455,6 +462,39 @@ export function RouteSheetForm({
     }
   }
 
+  /** Перемістити замовлення в списку (↑/↓) — змінює порядок рейсу (PATCH). */
+  async function moveOrder(index: number, dir: -1 | 1) {
+    const target = index + dir;
+    if (target < 0 || target >= orders.length) return;
+    const next = [...orders];
+    const a = next[index];
+    const b = next[target];
+    if (!a || !b) return;
+    next[index] = b;
+    next[target] = a;
+    setOrders(next); // оптимістично
+    setError(null);
+    setSaving(true);
+    try {
+      const res = await fetch(
+        `/api/v1/manager/route-sheets/${sheetId}/orders`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ orderIds: next.map((o) => o.orderId) }),
+        },
+      );
+      if (!res.ok) {
+        const body = (await res.json().catch(() => ({}))) as { error?: string };
+        setError(body.error ?? `Помилка ${res.status}`);
+        await reloadSheet();
+        return;
+      }
+    } finally {
+      setSaving(false);
+    }
+  }
+
   async function refillItems() {
     setError(null);
     setSaving(true);
@@ -542,110 +582,6 @@ export function RouteSheetForm({
   async function saveArrivalDate(raw: string) {
     const value = raw.trim() === "" ? null : raw.trim();
     await patchHeader({ arrivalDate: value });
-  }
-
-  // ── Загрузка (скан ШК складом) ──────────────────────────────────────────
-  const [loadingError, setLoadingError] = useState<string | null>(null);
-  const [autoFilling, setAutoFilling] = useState(false);
-
-  /** Скан/ручний ввід ШК → рядок Загрузки (POST). */
-  async function addLoading(barcode: string) {
-    const code = barcode.trim();
-    if (!code) return;
-    setLoadingError(null);
-    setSaving(true);
-    try {
-      const res = await fetch(
-        `/api/v1/manager/route-sheets/${sheetId}/loading`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ barcode: code }),
-        },
-      );
-      if (!res.ok) {
-        const body = (await res.json().catch(() => ({}))) as { error?: string };
-        setLoadingError(body.error ?? `Помилка ${res.status}`);
-        return;
-      }
-      await reloadSheet();
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  /** Видалити рядок Загрузки (DELETE) + перерахунок. */
-  async function removeLoading(loadingId: string) {
-    setLoadingError(null);
-    setSaving(true);
-    try {
-      const res = await fetch(
-        `/api/v1/manager/route-sheets/${sheetId}/loading?loadingId=${encodeURIComponent(
-          loadingId,
-        )}`,
-        { method: "DELETE" },
-      );
-      if (!res.ok) {
-        const body = (await res.json().catch(() => ({}))) as { error?: string };
-        setLoadingError(body.error ?? `Помилка ${res.status}`);
-        return;
-      }
-      await reloadSheet();
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  /** Toggle «Завантажено»/«Повернення» рядка Загрузки (PATCH) + перерахунок. */
-  async function patchLoading(
-    loadingId: string,
-    patch: { loaded?: boolean; isReturn?: boolean },
-  ) {
-    setLoadingError(null);
-    setSaving(true);
-    try {
-      const res = await fetch(
-        `/api/v1/manager/route-sheets/${sheetId}/loading?loadingId=${encodeURIComponent(
-          loadingId,
-        )}`,
-        {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(patch),
-        },
-      );
-      if (!res.ok) {
-        const body = (await res.json().catch(() => ({}))) as { error?: string };
-        setLoadingError(body.error ?? `Помилка ${res.status}`);
-        return;
-      }
-      await reloadSheet();
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  /**
-   * «Заповнити з вільних лотів» — авто-підбір вільних лотів під замовлені позиції
-   * (порт 1С «Заповнити/Подбор» центральної бази, але у нашій системі).
-   */
-  async function autoFillLoading() {
-    setLoadingError(null);
-    setAutoFilling(true);
-    try {
-      const res = await fetch(
-        `/api/v1/manager/route-sheets/${sheetId}/loading/auto-fill`,
-        { method: "POST" },
-      );
-      if (!res.ok) {
-        const body = (await res.json().catch(() => ({}))) as { error?: string };
-        setLoadingError(body.error ?? `Помилка ${res.status}`);
-        return;
-      }
-      await reloadSheet();
-    } finally {
-      setAutoFilling(false);
-    }
   }
 
   // Чернетка нового ручного рядка витрат (вкладка Витрати).
@@ -1036,6 +972,7 @@ export function RouteSheetForm({
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b bg-gray-50 text-left text-gray-500">
+                    <th className="w-20 px-2 py-2 font-medium">Порядок</th>
                     <th className="px-4 py-2 font-medium">№</th>
                     <th className="px-4 py-2 font-medium">Клієнт</th>
                     <th className="px-4 py-2 font-medium">Місто</th>
@@ -1043,24 +980,44 @@ export function RouteSheetForm({
                   </tr>
                 </thead>
                 <tbody>
-                  {orders.map((o) => (
+                  {orders.map((o, idx) => (
                     <tr key={o.id} className="border-b last:border-b-0">
+                      <td className="px-2 py-2">
+                        <div className="flex items-center gap-1">
+                          <span className="w-5 text-right text-xs text-gray-400">
+                            {idx + 1}
+                          </span>
+                          <button
+                            type="button"
+                            disabled={locked || saving || idx === 0}
+                            onClick={() => void moveOrder(idx, -1)}
+                            className="rounded p-0.5 text-gray-500 hover:bg-gray-100 hover:text-gray-800 disabled:opacity-30"
+                            aria-label="Вгору"
+                            title="Вгору"
+                          >
+                            <ArrowUp className="h-4 w-4" />
+                          </button>
+                          <button
+                            type="button"
+                            disabled={
+                              locked || saving || idx === orders.length - 1
+                            }
+                            onClick={() => void moveOrder(idx, 1)}
+                            className="rounded p-0.5 text-gray-500 hover:bg-gray-100 hover:text-gray-800 disabled:opacity-30"
+                            aria-label="Вниз"
+                            title="Вниз"
+                          >
+                            <ArrowDown className="h-4 w-4" />
+                          </button>
+                        </div>
+                      </td>
                       <td className="px-4 py-2 font-mono text-gray-700">
-                        {o.orderNumber ? (
-                          <Link
-                            href={`/manager/orders/${o.orderId}`}
-                            className="hover:text-blue-600"
-                          >
-                            №{o.orderNumber}
-                          </Link>
-                        ) : (
-                          <Link
-                            href={`/manager/orders/${o.orderId}`}
-                            className="hover:text-blue-600"
-                          >
-                            Відкрити
-                          </Link>
-                        )}
+                        <Link
+                          href={`/manager/orders/${o.orderId}`}
+                          className="hover:text-blue-600"
+                        >
+                          {o.orderNumber ? `№${o.orderNumber}` : "Відкрити"}
+                        </Link>
                       </td>
                       <td className="px-4 py-2 text-gray-800">
                         {o.customerName ?? "—"}

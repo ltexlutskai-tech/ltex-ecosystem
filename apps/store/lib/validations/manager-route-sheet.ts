@@ -57,20 +57,20 @@ export const addOrdersSchema = z.object({
   orderIds: z.array(z.string().min(1)).min(1).max(200),
 });
 
-/** POST /route-sheets/[id]/loading — додати рядок Загрузки скан/ручний ШК. */
-export const addLoadingSchema = z
-  .object({
-    // Скан ШК (режим сканера).
-    barcode: z.string().trim().min(1).max(64).optional(),
-    // Ручний рядок (режим підбору товару без скану).
-    productId: z.string().trim().min(1).optional(),
-    lotId: z.string().trim().min(1).optional(),
-    // Прив'язка до виділеного замовлення (1С «Загрузка в заказ»).
-    orderId: z.string().trim().min(1).optional(),
-  })
-  .refine((v) => Boolean(v.barcode) || Boolean(v.productId), {
-    message: "Вкажіть ШК або товар",
-  });
+/** PATCH /route-sheets/[id]/orders — новий порядок замовлень у рейсі. */
+export const reorderOrdersSchema = z.object({
+  orderIds: z.array(z.string().min(1)).min(1).max(200),
+});
+
+/**
+ * POST /route-sheets/[id]/loading — додати рядок Загрузки скануванням ШК.
+ * Наповнення лише скануванням (беремо будь-який мішок і скануємо); `orderId` —
+ * прив'язка до конкретного замовлення (1С «Загрузка в заказ»), інакше авто.
+ */
+export const addLoadingSchema = z.object({
+  barcode: z.string().trim().min(1, "Не вказано ШК").max(64),
+  orderId: z.string().trim().min(1).optional(),
+});
 
 /** PATCH /route-sheets/[id]/loading?loadingId= — редагування рядка Загрузки. */
 export const updateLoadingSchema = z

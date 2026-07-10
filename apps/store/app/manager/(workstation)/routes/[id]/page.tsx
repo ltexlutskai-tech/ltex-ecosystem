@@ -59,7 +59,7 @@ export default async function ManagerRouteSheetDetailPage({
     include: {
       route: { select: { id: true, name: true } },
       expeditor: { select: { id: true, fullName: true } },
-      orders: true,
+      orders: { orderBy: { position: "asc" } },
       items: true,
       tasks: true,
     },

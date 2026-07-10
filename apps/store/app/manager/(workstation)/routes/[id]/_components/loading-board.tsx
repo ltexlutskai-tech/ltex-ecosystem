@@ -3,8 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Plus, Trash2, Receipt } from "lucide-react";
-import { Button } from "@ltex/ui";
+import { Trash2, Receipt, ScanLine } from "lucide-react";
 import type {
   LoadingBoardOrder,
   LoadingRowColor,
@@ -42,13 +41,9 @@ export interface LoadingBoardProps {
   /** Редагований режим (екран складу). false → лише перегляд (у менеджера). */
   editable?: boolean;
   busy?: boolean;
-  autoFilling?: boolean;
   error?: string | null;
   /** Скан ШК → рядок Завантаження (targetOrderId = «у виділене замовлення»). */
   onScan?: (code: string, targetOrderId: string | null) => void;
-  /** «+ Завантажити» на рядку товару → взяти вільний мішок у це замовлення. */
-  onAddProduct?: (productId: string, targetOrderId: string | null) => void;
-  onAutoFill?: () => void;
   onRemoveLoading?: (id: string) => void;
   onPatchLoading?: (
     id: string,
@@ -90,11 +85,8 @@ export function LoadingBoard({
   locked,
   editable = false,
   busy = false,
-  autoFilling = false,
   error = null,
   onScan,
-  onAddProduct,
-  onAutoFill,
   onRemoveLoading,
   onPatchLoading,
   createSaleHrefFor,
@@ -102,61 +94,29 @@ export function LoadingBoard({
   const router = useRouter();
   // Список завантажених товарів — у складському документі показуємо одразу.
   const [showLots, setShowLots] = useState(editable);
-  // Куди зараховувати скан: null = авто (за товаром), або конкретне замовлення.
-  const [scanOrderId, setScanOrderId] = useState<string>("");
+  // Замовлення, для якого відкрито окреме поле скану (кнопка «Сканувати сюди»).
+  const [openScanOrderId, setOpenScanOrderId] = useState<string | null>(null);
 
   const canEdit = editable && !locked;
-  const scanTarget = scanOrderId || null;
 
   return (
     <div className="space-y-4">
-      {/* Панель складу: скан + вибір замовлення + авто-підбір. */}
+      {/* Панель складу: загальний скан мішка у маршрутник (авто-прив'язка). */}
       {canEdit && (
-        <div className="space-y-3 rounded-lg border bg-white p-4 shadow-sm">
-          <div className="flex flex-wrap items-end gap-3">
-            <div className="min-w-[220px] flex-1">
-              <label className="mb-1 block text-xs font-medium text-gray-600">
-                Скан ШК мішка
-              </label>
-              <BarcodeInput
-                onCode={(code) => onScan?.(code, scanTarget)}
-                error={error}
-                disabled={busy}
-              />
-            </div>
-            <div className="min-w-[200px]">
-              <label className="mb-1 block text-xs font-medium text-gray-600">
-                Зараховувати у замовлення
-              </label>
-              <select
-                value={scanOrderId}
-                onChange={(e) => setScanOrderId(e.target.value)}
-                className="h-10 w-full rounded-md border border-gray-300 bg-white px-3 text-sm focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500"
-              >
-                <option value="">Автоматично (за товаром)</option>
-                {board.map((g) => (
-                  <option key={g.orderId ?? "none"} value={g.orderId ?? ""}>
-                    {g.customerName ?? "Без клієнта"}
-                    {g.orderNumber ? ` · №${g.orderNumber}` : ""}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-          <div className="flex flex-wrap items-center gap-2 border-t pt-2">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              disabled={autoFilling || busy}
-              onClick={() => onAutoFill?.()}
-            >
-              {autoFilling ? "Підбір…" : "Заповнити потребу з вільних лотів"}
-            </Button>
-            <span className="text-xs text-gray-400">
-              Або натисніть «+» на рядку товару, щоб додати один мішок.
-            </span>
-          </div>
+        <div className="space-y-2 rounded-lg border bg-white p-4 shadow-sm">
+          <label className="block text-xs font-medium text-gray-600">
+            Скан ШК мішка — додати у маршрутник
+          </label>
+          <BarcodeInput
+            onCode={(code) => onScan?.(code, null)}
+            error={openScanOrderId ? null : error}
+            disabled={busy}
+          />
+          <p className="text-xs text-gray-400">
+            Беріть будь-який мішок і скануйте — він зарахується у відповідне
+            замовлення за товаром. Щоб зарахувати у конкретне замовлення —
+            натисніть «Сканувати сюди» біля нього.
+          </p>
         </div>
       )}
 
@@ -268,6 +228,25 @@ export function LoadingBoard({
                         </span>
                       )}
                     </span>
+                    {canEdit && g.orderId && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setOpenScanOrderId((cur) =>
+                            cur === g.orderId ? null : g.orderId,
+                          );
+                        }}
+                        className={`inline-flex h-7 items-center gap-1 rounded-md border px-2 text-xs font-medium ${
+                          openScanOrderId === g.orderId
+                            ? "border-green-600 bg-green-50 text-green-700"
+                            : "border-gray-300 text-gray-700 hover:bg-gray-50"
+                        }`}
+                      >
+                        <ScanLine className="h-3.5 w-3.5" />
+                        Сканувати сюди
+                      </button>
+                    )}
                     {saleHref && (
                       <Link
                         href={saleHref}
@@ -280,6 +259,19 @@ export function LoadingBoard({
                     )}
                   </div>
                 </div>
+                {/* Окреме поле скану у це замовлення (1С «Загрузка в заказ»). */}
+                {canEdit && openScanOrderId === g.orderId && g.orderId && (
+                  <div className="border-b bg-green-50/40 px-4 py-3">
+                    <label className="mb-1 block text-xs font-medium text-gray-600">
+                      Скан ШК у замовлення «{g.customerName ?? "—"}»
+                    </label>
+                    <BarcodeInput
+                      onCode={(code) => onScan?.(code, g.orderId)}
+                      error={error}
+                      disabled={busy}
+                    />
+                  </div>
+                )}
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
@@ -302,7 +294,6 @@ export function LoadingBoard({
                         <th className="px-3 py-2 text-right font-medium">
                           Бронь
                         </th>
-                        {canEdit && <th className="w-24 px-2 py-2" />}
                       </tr>
                     </thead>
                     <tbody>
@@ -352,27 +343,6 @@ export function LoadingBoard({
                           >
                             {r.booked > 0 ? num(r.booked) : "—"}
                           </td>
-                          {canEdit && (
-                            <td className="px-2 py-2 text-right">
-                              <button
-                                type="button"
-                                disabled={busy || r.freeStock <= 0}
-                                onClick={() =>
-                                  onAddProduct?.(r.productId, g.orderId)
-                                }
-                                className="inline-flex items-center gap-1 rounded-md border border-green-600 px-2 py-1 text-xs font-medium text-green-700 hover:bg-green-50 disabled:cursor-not-allowed disabled:border-gray-200 disabled:text-gray-300"
-                                aria-label="Завантажити мішок"
-                                title={
-                                  r.freeStock <= 0
-                                    ? "Немає вільного мішка"
-                                    : "Завантажити один мішок"
-                                }
-                              >
-                                <Plus className="h-3.5 w-3.5" />
-                                Мішок
-                              </button>
-                            </td>
-                          )}
                         </tr>
                       ))}
                     </tbody>

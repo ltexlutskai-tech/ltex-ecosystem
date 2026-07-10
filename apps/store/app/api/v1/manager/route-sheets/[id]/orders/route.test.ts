@@ -9,6 +9,7 @@ const {
   getCurrentUserMock,
   addOrdersMock,
   removeOrderMock,
+  reorderMock,
   RouteSheetFillError,
 } = vi.hoisted(() => {
   class RouteSheetFillError extends Error {
@@ -24,6 +25,7 @@ const {
     getCurrentUserMock: vi.fn(),
     addOrdersMock: vi.fn(),
     removeOrderMock: vi.fn(),
+    reorderMock: vi.fn(),
     RouteSheetFillError,
   };
 });
@@ -37,10 +39,11 @@ vi.mock("@/lib/auth/manager-auth", () => ({
 vi.mock("@/lib/manager/route-sheet-fill", () => ({
   addOrdersToRouteSheet: (...args: unknown[]) => addOrdersMock(...args),
   removeOrderFromRouteSheet: (...args: unknown[]) => removeOrderMock(...args),
+  reorderRouteSheetOrders: (...args: unknown[]) => reorderMock(...args),
   RouteSheetFillError,
 }));
 
-import { POST, DELETE } from "./route";
+import { POST, DELETE, PATCH } from "./route";
 
 const MANAGER = {
   id: "u1",
@@ -70,6 +73,16 @@ function deleteReq(qs = "?orderId=o1"): NextRequest {
   return new NextRequest(
     `http://localhost/api/v1/manager/route-sheets/rs1/orders${qs}`,
     { method: "DELETE" },
+  );
+}
+function patchReq(body: unknown): NextRequest {
+  return new NextRequest(
+    "http://localhost/api/v1/manager/route-sheets/rs1/orders",
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    },
   );
 }
 
@@ -169,5 +182,30 @@ describe("DELETE .../orders", () => {
     const res = await DELETE(deleteReq("?orderId=o1"), { params });
     expect(res.status).toBe(200);
     expect(removeOrderMock).toHaveBeenCalledWith("rs1", "o1");
+  });
+});
+
+describe("PATCH .../orders (reorder)", () => {
+  it("409 when sheet completed", async () => {
+    mockPrisma.routeSheet.findUnique.mockResolvedValueOnce({
+      id: "rs1",
+      status: "completed",
+    });
+    const res = await PATCH(patchReq({ orderIds: ["o2", "o1"] }), { params });
+    expect(res.status).toBe(409);
+    expect(reorderMock).not.toHaveBeenCalled();
+  });
+
+  it("400 on empty orderIds", async () => {
+    const res = await PATCH(patchReq({ orderIds: [] }), { params });
+    expect(res.status).toBe(400);
+    expect(reorderMock).not.toHaveBeenCalled();
+  });
+
+  it("reorders (200)", async () => {
+    reorderMock.mockResolvedValueOnce(undefined);
+    const res = await PATCH(patchReq({ orderIds: ["o2", "o1"] }), { params });
+    expect(res.status).toBe(200);
+    expect(reorderMock).toHaveBeenCalledWith("rs1", ["o2", "o1"]);
   });
 });
