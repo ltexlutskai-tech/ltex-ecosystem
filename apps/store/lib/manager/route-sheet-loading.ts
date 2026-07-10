@@ -481,6 +481,125 @@ export async function addLoadingByBarcode(
   };
 }
 
+/**
+ * «Заповнити з вільних лотів» — авто-підбір вільних лотів під замовлені позиції
+ * (наш аналог 1С «Заповнити/Подбор» центральної бази, БЕЗ обміну). Для кожної
+ * позиції `RouteSheetItem` бере до (замовлено − вже завантажено) вільних лотів
+ * цього товару (`Lot.status='free'`, без активної чужої броні), яких ще немає у
+ * Загрузці цього МЛ, і створює рядки `RouteSheetLoading` (вага/ціна з лота,
+ * авто-прив'язка до замовлення). Спільний пул лотів на товар — один лот не
+ * призначається двічі. Повертає к-сть доданих рядків.
+ */
+export async function autoFillLoading(
+  routeSheetId: string,
+  userId: string,
+  now: Date = new Date(),
+): Promise<{ added: number }> {
+  const items = await prisma.routeSheetItem.findMany({
+    where: { routeSheetId },
+    select: {
+      orderId: true,
+      customerId: true,
+      productId: true,
+      quantity: true,
+      quantityLoaded: true,
+    },
+    orderBy: { id: "asc" },
+  });
+  if (items.length === 0) return { added: 0 };
+
+  const productIds = [...new Set(items.map((i) => i.productId))];
+
+  // Лоти вже у Загрузці цього МЛ — пропускаємо.
+  const already = await prisma.routeSheetLoading.findMany({
+    where: { routeSheetId },
+    select: { lotId: true },
+  });
+  const usedLotIds = new Set(already.map((r) => r.lotId));
+
+  // Вільні лоти цих товарів (без активної чужої броні, ще не в Загрузці).
+  const lots = await prisma.lot.findMany({
+    where: { productId: { in: productIds }, status: "free" },
+    select: {
+      id: true,
+      productId: true,
+      status: true,
+      barcode: true,
+      weight: true,
+      reservedByUserId: true,
+      reservedUntil: true,
+      product: {
+        select: {
+          prices: { select: { priceType: true, amount: true, currency: true } },
+        },
+      },
+    },
+    orderBy: { id: "asc" },
+  });
+
+  // Пул доступних лотів на товар (FIFO по id).
+  const poolByProduct = new Map<
+    string,
+    Array<{ id: string; barcode: string; weight: number; prices: PriceEntry[] }>
+  >();
+  for (const lot of lots) {
+    if (usedLotIds.has(lot.id)) continue;
+    if (isActiveReservation(lot, now) && lot.reservedByUserId !== userId) {
+      continue; // активна чужа бронь — не вільний
+    }
+    const arr = poolByProduct.get(lot.productId) ?? [];
+    arr.push({
+      id: lot.id,
+      barcode: lot.barcode,
+      weight: lot.weight,
+      prices: lot.product.prices as PriceEntry[],
+    });
+    poolByProduct.set(lot.productId, arr);
+  }
+
+  const rows: Prisma.RouteSheetLoadingCreateManyInput[] = [];
+  for (const item of items) {
+    const need = Math.max(0, item.quantity - item.quantityLoaded);
+    if (need <= 0) continue;
+    const pool = poolByProduct.get(item.productId);
+    if (!pool || pool.length === 0) continue;
+    const take = pool.splice(0, need); // забираємо з пулу (не призначаємо двічі)
+    for (const lot of take) {
+      const weight = lot.weight > 0 ? lot.weight : DEFAULT_BAG_WEIGHT;
+      const pricePerKg = Math.max(
+        0,
+        unitPriceForType(lot.prices, LOADING_PRICE_TYPE_CODE) ?? 0,
+      );
+      const price = pricePerKg * weight;
+      rows.push({
+        routeSheetId,
+        orderId: item.orderId,
+        customerId: item.customerId,
+        productId: item.productId,
+        lotId: lot.id,
+        barcode: lot.barcode,
+        unit: null,
+        quantity: 1,
+        weight,
+        price,
+        sum: price,
+        pricePerKg,
+        loaded: true,
+        isReturn: false,
+      });
+    }
+  }
+
+  if (rows.length === 0) return { added: 0 };
+
+  await prisma.$transaction(async (tx) => {
+    await tx.routeSheetLoading.createMany({ data: rows });
+    await recomputeQuantityLoaded(tx, routeSheetId);
+  });
+
+  return { added: rows.length };
+}
+
 /** Видалення рядка Загрузки + перерахунок `quantityLoaded`. */
 export async function deleteLoadingRow(
   routeSheetId: string,

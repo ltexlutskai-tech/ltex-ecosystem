@@ -18,6 +18,8 @@ vi.mock("@ltex/ui", async () => {
       React.createElement("button", props, children),
     Textarea: (props: React.TextareaHTMLAttributes<HTMLTextAreaElement>) =>
       React.createElement("textarea", props),
+    Input: (props: React.InputHTMLAttributes<HTMLInputElement>) =>
+      React.createElement("input", props),
   };
 });
 
@@ -191,7 +193,7 @@ describe("RouteSheetForm — round-2 corrections", () => {
     expect(screen.queryByText("Коментар")).toBeNull();
   });
 
-  it("Загрузка — read-only (без кнопок скану / видалення / редагування)", () => {
+  it("Загрузка — активний скан складом (поле ШК, чекбокси, видалення)", () => {
     render(
       <RouteSheetForm
         initial={makeView({
@@ -223,17 +225,19 @@ describe("RouteSheetForm — round-2 corrections", () => {
     );
     openTab("Загрузка");
 
-    // Примітка про 1С-обмін.
+    // Жодних згадок про 1С-обмін.
+    expect(screen.queryByText(/надходить з 1С/)).toBeNull();
+    // Поле вводу ШК (скан складом).
     expect(
-      screen.getByText(/Завантаження надходить з 1С при обміні/),
+      screen.getByPlaceholderText(/Відскануйте або введіть ШК/),
     ).toBeDefined();
+    // Кнопка авто-підбору вільних лотів.
+    expect(screen.getByText(/Заповнити з вільних лотів/)).toBeDefined();
     // Рядок видно (ШК).
     expect(screen.getByText("BC-LOADING-1")).toBeDefined();
-    // Жодних редагувань: чекбоксів немає (read-only бейджі замість них).
-    expect(screen.queryAllByRole("checkbox")).toHaveLength(0);
-    // «Завантажено» рендериться як read-only бейдж «Так».
-    expect(screen.getByText("Так")).toBeDefined();
-    // Кнопки прибрати рядок немає.
-    expect(screen.queryByLabelText("Прибрати рядок завантаження")).toBeNull();
+    // Редаговані чекбокси «Завантажено»/«Повернення».
+    expect(screen.getAllByRole("checkbox").length).toBeGreaterThanOrEqual(2);
+    // Кнопка прибрати рядок присутня.
+    expect(screen.getByLabelText("Прибрати рядок завантаження")).toBeDefined();
   });
 });

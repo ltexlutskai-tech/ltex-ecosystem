@@ -19,6 +19,7 @@ import {
 import { RouteSheetStatusBadge } from "../../_components/route-sheet-status-badge";
 import { OrderPickerModal } from "./order-picker-modal";
 import { TaskClientPicker } from "./task-client-picker";
+import { BarcodeInput } from "../../../sales/new/_components/barcode-input";
 
 /** Підписи на кнопках статус-переходів. */
 const TRANSITION_LABEL: Record<string, string> = {
@@ -248,9 +249,13 @@ export function RouteSheetForm({
     initial.expeditorUserId ?? "",
   );
 
-  // Read-only display (надходить з 1С при обміні).
+  // Дата складання — read-only показ (ставиться при створенні документа).
   const dateDisplay = formatDateDisplay(initial.date);
-  const arrivalDateDisplay = formatDateDisplay(initial.arrivalDate);
+
+  // Дата приїзду — редагована (планова дата візиту, задає менеджер).
+  const [arrivalDate, setArrivalDate] = useState<string>(
+    initial.arrivalDate ? initial.arrivalDate.slice(0, 10) : "",
+  );
 
   const [orders, setOrders] = useState<RouteSheetOrderView[]>(initial.orders);
   const [items, setItems] = useState<RouteSheetItemView[]>(initial.items);
@@ -278,7 +283,7 @@ export function RouteSheetForm({
   const [totalUah, setTotalUah] = useState(initial.totalUah);
 
   const [tasks, setTasks] = useState<RouteSheetTaskView[]>(initial.tasks);
-  // GPS — read-only знімок з 1С (офіс-застосунок свій GPS не штампує).
+  // GPS — best-effort знімок координат (за наявності).
   const gps =
     initial.gpsLat != null && initial.gpsLng != null
       ? { lat: initial.gpsLat, lng: initial.gpsLng }
@@ -364,10 +369,7 @@ export function RouteSheetForm({
     headerAutosave.acceptRestore();
   }
 
-  /**
-   * Статус-перехід. GPS/кілометраж надходять з 1С (офіс-застосунок свій GPS
-   * не штампує) — тут лише змінюємо статус.
-   */
+  /** Статус-перехід (Складається → Відправлений → Завершений). */
   async function doTransition(next: string) {
     const prev = status;
     setStatus(next);
@@ -528,6 +530,116 @@ export function RouteSheetForm({
     if (value != null && !Number.isFinite(value)) return;
     const ok = await patchHeader({ [field]: value });
     if (ok) await reloadSheet();
+  }
+
+  /** Зберегти дату приїзду (планова дата візиту) — PATCH (YYYY-MM-DD або null). */
+  async function saveArrivalDate(raw: string) {
+    const value = raw.trim() === "" ? null : raw.trim();
+    await patchHeader({ arrivalDate: value });
+  }
+
+  // ── Загрузка (скан ШК складом) ──────────────────────────────────────────
+  const [loadingError, setLoadingError] = useState<string | null>(null);
+  const [autoFilling, setAutoFilling] = useState(false);
+
+  /** Скан/ручний ввід ШК → рядок Загрузки (POST). */
+  async function addLoading(barcode: string) {
+    const code = barcode.trim();
+    if (!code) return;
+    setLoadingError(null);
+    setSaving(true);
+    try {
+      const res = await fetch(
+        `/api/v1/manager/route-sheets/${sheetId}/loading`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ barcode: code }),
+        },
+      );
+      if (!res.ok) {
+        const body = (await res.json().catch(() => ({}))) as { error?: string };
+        setLoadingError(body.error ?? `Помилка ${res.status}`);
+        return;
+      }
+      await reloadSheet();
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  /** Видалити рядок Загрузки (DELETE) + перерахунок. */
+  async function removeLoading(loadingId: string) {
+    setLoadingError(null);
+    setSaving(true);
+    try {
+      const res = await fetch(
+        `/api/v1/manager/route-sheets/${sheetId}/loading?loadingId=${encodeURIComponent(
+          loadingId,
+        )}`,
+        { method: "DELETE" },
+      );
+      if (!res.ok) {
+        const body = (await res.json().catch(() => ({}))) as { error?: string };
+        setLoadingError(body.error ?? `Помилка ${res.status}`);
+        return;
+      }
+      await reloadSheet();
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  /** Toggle «Завантажено»/«Повернення» рядка Загрузки (PATCH) + перерахунок. */
+  async function patchLoading(
+    loadingId: string,
+    patch: { loaded?: boolean; isReturn?: boolean },
+  ) {
+    setLoadingError(null);
+    setSaving(true);
+    try {
+      const res = await fetch(
+        `/api/v1/manager/route-sheets/${sheetId}/loading?loadingId=${encodeURIComponent(
+          loadingId,
+        )}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(patch),
+        },
+      );
+      if (!res.ok) {
+        const body = (await res.json().catch(() => ({}))) as { error?: string };
+        setLoadingError(body.error ?? `Помилка ${res.status}`);
+        return;
+      }
+      await reloadSheet();
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  /**
+   * «Заповнити з вільних лотів» — авто-підбір вільних лотів під замовлені позиції
+   * (порт 1С «Заповнити/Подбор» центральної бази, але у нашій системі).
+   */
+  async function autoFillLoading() {
+    setLoadingError(null);
+    setAutoFilling(true);
+    try {
+      const res = await fetch(
+        `/api/v1/manager/route-sheets/${sheetId}/loading/auto-fill`,
+        { method: "POST" },
+      );
+      if (!res.ok) {
+        const body = (await res.json().catch(() => ({}))) as { error?: string };
+        setLoadingError(body.error ?? `Помилка ${res.status}`);
+        return;
+      }
+      await reloadSheet();
+    } finally {
+      setAutoFilling(false);
+    }
   }
 
   // Чернетка нового ручного рядка витрат (вкладка Витрати).
@@ -729,14 +841,19 @@ export function RouteSheetForm({
             </p>
           </div>
 
-          {/* Дата приїзду — read-only (з 1С). */}
+          {/* Дата приїзду — редагована (планова дата візиту). */}
           <div className="min-w-0">
             <label className="mb-1 block text-sm font-medium text-gray-700">
               Дата приїзду
             </label>
-            <p className="flex h-10 items-center rounded-md border border-gray-200 bg-gray-50 px-3 text-sm text-gray-700">
-              {arrivalDateDisplay}
-            </p>
+            <input
+              type="date"
+              value={arrivalDate}
+              disabled={locked}
+              onChange={(e) => setArrivalDate(e.target.value)}
+              onBlur={(e) => void saveArrivalDate(e.target.value)}
+              className="h-10 w-full rounded-md border border-gray-300 px-3 text-sm disabled:bg-gray-50 disabled:text-gray-500"
+            />
           </div>
 
           {/* Кілометраж + ціна за км — редаговані (Блок Б). */}
@@ -1052,7 +1169,7 @@ export function RouteSheetForm({
         </section>
       )}
 
-      {/* ─── Загрузка (read-only — надходить з 1С) ───────────────────────── */}
+      {/* ─── Загрузка (скан ШК складом — наша система) ────────────────────── */}
       {tab === "loading" && (
         <section className="space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
@@ -1060,13 +1177,41 @@ export function RouteSheetForm({
               Завантаження ({loading.length})
             </h3>
           </div>
-          <p className="rounded-md bg-blue-50 px-3 py-2 text-xs text-blue-800">
-            Завантаження надходить з 1С при обміні (формується складом).
-          </p>
+
+          {!locked && (
+            <div className="space-y-3 rounded-lg border bg-white p-4 shadow-sm">
+              <p className="text-xs text-gray-500">
+                Склад сканує мішки під замовлення: відскануйте штрихкод лота
+                (поле, USB-сканер або камера). Вага й ціна беруться з лота,
+                рядок прив&apos;язується до замовлення за товаром.
+              </p>
+              <BarcodeInput
+                onCode={(code) => void addLoading(code)}
+                error={loadingError}
+                disabled={saving}
+              />
+              <div className="flex items-center gap-2 border-t pt-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={autoFilling || saving}
+                  onClick={() => void autoFillLoading()}
+                >
+                  {autoFilling ? "Підбір…" : "Заповнити з вільних лотів"}
+                </Button>
+                <span className="text-xs text-gray-400">
+                  Авто-підбір вільних лотів під замовлені позиції (без
+                  сканування).
+                </span>
+              </div>
+            </div>
+          )}
 
           {loading.length === 0 ? (
             <div className="rounded-lg border border-dashed border-gray-200 bg-gray-50 px-6 py-8 text-center text-sm text-gray-500">
-              Лотів ще не завантажено. Дані з&apos;являться після обміну з 1С.
+              Лотів ще не завантажено. Відскануйте штрихкоди або натисніть
+              «Заповнити з вільних лотів».
             </div>
           ) : (
             <div className="overflow-x-auto rounded-lg border bg-white">
@@ -1088,6 +1233,7 @@ export function RouteSheetForm({
                     <th className="px-3 py-2 text-center font-medium">
                       Повер&shy;нення
                     </th>
+                    {!locked && <th className="w-10 px-2 py-2" />}
                   </tr>
                 </thead>
                 <tbody>
@@ -1125,23 +1271,63 @@ export function RouteSheetForm({
                         {row.sum.toFixed(2)}
                       </td>
                       <td className="px-3 py-2 text-center">
-                        {row.loaded ? (
-                          <span className="inline-block rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">
-                            Так
-                          </span>
+                        {locked ? (
+                          row.loaded ? (
+                            <span className="inline-block rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">
+                              Так
+                            </span>
+                          ) : (
+                            <span className="text-xs text-gray-400">—</span>
+                          )
                         ) : (
-                          <span className="text-xs text-gray-400">—</span>
+                          <input
+                            type="checkbox"
+                            checked={row.loaded}
+                            aria-label="Завантажено"
+                            onChange={(e) =>
+                              void patchLoading(row.id, {
+                                loaded: e.target.checked,
+                              })
+                            }
+                            className="h-4 w-4"
+                          />
                         )}
                       </td>
                       <td className="px-3 py-2 text-center">
-                        {row.isReturn ? (
-                          <span className="inline-block rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">
-                            Повернення
-                          </span>
+                        {locked ? (
+                          row.isReturn ? (
+                            <span className="inline-block rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">
+                              Повернення
+                            </span>
+                          ) : (
+                            <span className="text-xs text-gray-400">—</span>
+                          )
                         ) : (
-                          <span className="text-xs text-gray-400">—</span>
+                          <input
+                            type="checkbox"
+                            checked={row.isReturn}
+                            aria-label="Повернення"
+                            onChange={(e) =>
+                              void patchLoading(row.id, {
+                                isReturn: e.target.checked,
+                              })
+                            }
+                            className="h-4 w-4"
+                          />
                         )}
                       </td>
+                      {!locked && (
+                        <td className="px-2 py-2 text-right">
+                          <button
+                            type="button"
+                            aria-label="Прибрати рядок завантаження"
+                            onClick={() => void removeLoading(row.id)}
+                            className="text-gray-400 hover:text-red-600"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </td>
+                      )}
                     </tr>
                   ))}
                 </tbody>
