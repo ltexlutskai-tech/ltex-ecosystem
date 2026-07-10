@@ -297,6 +297,13 @@ function formatDateShort(iso: string | null): string {
 
 /** Бронь-комірка: ім'я клієнта + дата «до» + бейдж «ваша»/«протермін.». */
 function BookingCell({ lot }: { lot: ProductLotVM }) {
+  if (lot.status === "in_transit") {
+    return (
+      <span className="inline-block rounded bg-blue-100 px-1.5 py-0.5 text-blue-700">
+        У дорозі
+      </span>
+    );
+  }
   if (!lot.isReserved && !lot.reservedForName) {
     return <span className="text-gray-400">Вільний</span>;
   }

@@ -16,6 +16,7 @@ import { getUnclosedMileageWarning } from "@/lib/manager/route-sheet-mileage";
 import { formatDocNumber } from "@/lib/manager/order-number";
 import {
   RouteSheetForm,
+  type CashFlowArticleOption,
   type ExpeditorOption,
   type RouteSheetItemView,
   type RouteSheetOrderView,
@@ -117,6 +118,16 @@ export default async function ManagerRouteSheetDetailPage({
     }),
   ]);
 
+  // Довідник статей витрат (для дропдауна у вкладці «Витрати», Блок Б).
+  const cashFlowArticleRows = await prisma.mgrCashFlowArticle.findMany({
+    where: { archived: false },
+    orderBy: { name: "asc" },
+    select: { id: true, name: true },
+  });
+  const cashFlowArticles: CashFlowArticleOption[] = cashFlowArticleRows.map(
+    (a) => ({ id: a.id, name: a.name }),
+  );
+
   const taskClients =
     taskClientIds.size > 0
       ? await prisma.mgrClient.findMany({
@@ -205,6 +216,7 @@ export default async function ManagerRouteSheetDetailPage({
     totalUah: sheet.totalUah,
     mileageStartKm: sheet.mileageStartKm,
     mileageEndKm: sheet.mileageEndKm,
+    pricePerKm: sheet.pricePerKm,
     gpsLat: sheet.gpsLat,
     gpsLng: sheet.gpsLng,
     mileageWarning,
@@ -253,7 +265,11 @@ export default async function ManagerRouteSheetDetailPage({
         </Link>
       </header>
 
-      <RouteSheetForm initial={initial} expeditors={expeditors} />
+      <RouteSheetForm
+        initial={initial}
+        expeditors={expeditors}
+        cashFlowArticles={cashFlowArticles}
+      />
     </div>
   );
 }

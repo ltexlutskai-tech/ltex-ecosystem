@@ -45,36 +45,36 @@ model Category {
 // ─── Products (← 1С Номенклатура) ───────────────────────────────────────────
 
 model Product {
-  id            String   @id @default(cuid())
-  code1C        String?  @unique @map("code_1c")
-  articleCode   String?  @map("article_code")
-  name          String
-  slug          String   @unique
-  categoryId    String   @map("category_id")
-  description   String   @default("")
-  quality       String
-  season        String   @default("")
-  country       String
-  priceUnit     String   @default("kg") @map("price_unit")
-  averageWeight Float?   @map("average_weight")
-  videoUrl      String?  @map("video_url")
+  id                String   @id @default(cuid())
+  code1C            String?  @unique @map("code_1c")
+  articleCode       String?  @map("article_code")
+  name              String
+  slug              String   @unique
+  categoryId        String   @map("category_id")
+  description       String   @default("")
+  quality           String
+  season            String   @default("")
+  country           String
+  priceUnit         String   @default("kg") @map("price_unit")
+  averageWeight     Float?   @map("average_weight")
+  videoUrl          String?  @map("video_url")
   // Виробник (← 1С «Производитель»: VIVE, SOEX, Канада…). 7.2.
-  producer      String?
-  inStock       Boolean  @default(true) @map("in_stock")
+  producer          String?
+  inStock           Boolean  @default(true) @map("in_stock")
   // ТЗ 8.0 soft-delete (позначка на вилучення / архів). Вітрина ці поля не читає.
-  markedForDeletion Boolean @default(false) @map("marked_for_deletion")
-  archived          Boolean @default(false)
-  gender        String?
-  sizes         String?
-  unitsPerKg    String?  @map("units_per_kg")
-  unitsPerKgMin Float?   @map("units_per_kg_min")
-  unitsPerKgMax Float?   @map("units_per_kg_max")
-  unitWeight    String?  @map("unit_weight")
-  unitWeightMin Float?   @map("unit_weight_min")
-  unitWeightMax Float?   @map("unit_weight_max")
-  isOversize    Boolean  @default(false) @map("is_oversize")
-  createdAt     DateTime @default(now()) @map("created_at")
-  updatedAt     DateTime @updatedAt @map("updated_at")
+  markedForDeletion Boolean  @default(false) @map("marked_for_deletion")
+  archived          Boolean  @default(false)
+  gender            String?
+  sizes             String?
+  unitsPerKg        String?  @map("units_per_kg")
+  unitsPerKgMin     Float?   @map("units_per_kg_min")
+  unitsPerKgMax     Float?   @map("units_per_kg_max")
+  unitWeight        String?  @map("unit_weight")
+  unitWeightMin     Float?   @map("unit_weight_min")
+  unitWeightMax     Float?   @map("unit_weight_max")
+  isOversize        Boolean  @default(false) @map("is_oversize")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
 
   category           Category            @relation(fields: [categoryId], references: [id])
   images             ProductImage[]
@@ -527,6 +527,7 @@ model MgrCashFlowArticle {
   bankPaymentsIncoming BankPaymentIncoming[]
   bankPaymentsOutgoing BankPaymentOutgoing[]
   cashTransfers        CashTransfer[]
+  routeSheetExpenses   RouteSheetExpense[]
 
   @@map("mgr_cash_flow_articles")
 }
@@ -1363,29 +1364,31 @@ model MgrRoute {
 // relations на спільних з магазином моделях; FK+cascade лише child→RouteSheet.
 
 model RouteSheet {
-  id              String    @id @default(cuid())
-  code1C          String?   @unique @map("code_1c")
-  number1C        String?   @map("number_1c") // 1С _Number, display-only
-  docNumber       Int       @default(autoincrement()) @map("doc_number")
-  date            DateTime  @default(now())
-  arrivalDate     DateTime? @map("arrival_date")
-  status          String    @default("draft") // draft|dispatched|completed
-  routeId         String?   @map("route_id")
-  expeditorUserId String?   @map("expeditor_user_id")
-  createdByUserId String?   @map("created_by_user_id")
-  totalUah        Float     @default(0) @map("total_uah")
-  totalEur        Float     @default(0) @map("total_eur")
-  comment         String?
-  mileageStartKm  Float?    @map("mileage_start_km")
-  mileageEndKm    Float?    @map("mileage_end_km")
-  gpsLat          Float?    @map("gps_lat")
-  gpsLng          Float?    @map("gps_lng")
-  archived        Boolean   @default(false)
-  markedForDeletion Boolean @default(false) @map("marked_for_deletion") // ТЗ 8.0 soft-delete
-  exportTo1C      Boolean   @default(true) @map("export_to_1c")
-  posted          Boolean   @default(false)
-  createdAt       DateTime  @default(now()) @map("created_at")
-  updatedAt       DateTime  @updatedAt @map("updated_at")
+  id                String    @id @default(cuid())
+  code1C            String?   @unique @map("code_1c")
+  number1C          String?   @map("number_1c") // 1С _Number, display-only
+  docNumber         Int       @default(autoincrement()) @map("doc_number")
+  date              DateTime  @default(now())
+  arrivalDate       DateTime? @map("arrival_date")
+  status            String    @default("draft") // draft|dispatched|completed
+  routeId           String?   @map("route_id")
+  expeditorUserId   String?   @map("expeditor_user_id")
+  createdByUserId   String?   @map("created_by_user_id")
+  totalUah          Float     @default(0) @map("total_uah")
+  totalEur          Float     @default(0) @map("total_eur")
+  comment           String?
+  mileageStartKm    Float?    @map("mileage_start_km")
+  mileageEndKm      Float?    @map("mileage_end_km")
+  // Ціна за км (для авто-розрахунку витрат на пробіг ← 1С ЦенаЗаКМ). Блок Б.
+  pricePerKm        Float?    @map("price_per_km")
+  gpsLat            Float?    @map("gps_lat")
+  gpsLng            Float?    @map("gps_lng")
+  archived          Boolean   @default(false)
+  markedForDeletion Boolean   @default(false) @map("marked_for_deletion") // ТЗ 8.0 soft-delete
+  exportTo1C        Boolean   @default(true) @map("export_to_1c")
+  posted            Boolean   @default(false)
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
 
   route     MgrRoute? @relation(fields: [routeId], references: [id], onDelete: SetNull)
   expeditor User?     @relation("RouteSheetExpeditor", fields: [expeditorUserId], references: [id], onDelete: SetNull)
@@ -1526,14 +1529,23 @@ model RouteSheetTask {
 }
 
 model RouteSheetExpense {
-  id           String  @id @default(cuid())
-  routeSheetId String  @map("route_sheet_id")
-  articleName  String? @map("article_name")
-  amount       Float   @default(0)
+  id                String  @id @default(cuid())
+  routeSheetId      String  @map("route_sheet_id")
+  articleName       String? @map("article_name")
+  // Стаття витрат (← 1С СтаттяВитрат). FK на довідник статей руху коштів. Блок Б.
+  cashFlowArticleId String? @map("cash_flow_article_id")
+  // Валюта суми витрати ("UAH" за замовч. — пальне купують у грн). Блок Б.
+  currency          String? @default("UAH")
+  // Ознака авто-рядка «Пальне/пробіг» (пробіг × pricePerKm) — щоб перебудовувати
+  // його при зміні кілометражу, не чіпаючи ручні рядки. Блок Б.
+  isMileage         Boolean @default(false) @map("is_mileage")
+  amount            Float   @default(0)
 
-  routeSheet RouteSheet @relation(fields: [routeSheetId], references: [id], onDelete: Cascade)
+  routeSheet      RouteSheet          @relation(fields: [routeSheetId], references: [id], onDelete: Cascade)
+  cashFlowArticle MgrCashFlowArticle? @relation(fields: [cashFlowArticleId], references: [id], onDelete: SetNull)
 
   @@index([routeSheetId])
+  @@index([cashFlowArticleId])
   @@map("mgr_route_sheet_expenses")
 }
 
@@ -1834,7 +1846,7 @@ model DeletionRequest {
   dictType          String?   @map("dict_type") // лише для entityType="dictionary"
   reason            String    @db.Text // причина від користувача (обовʼязкова)
   status            String    @default("pending") // pending|approved|rejected
-  outcome           String?   // при approve: "deleted" | "archived"
+  outcome           String? // при approve: "deleted" | "archived"
   requestedByUserId String    @map("requested_by_user_id")
   requestedByName   String?   @map("requested_by_name")
   requestedAt       DateTime  @default(now()) @map("requested_at")
@@ -2147,6 +2159,32 @@ model StockMovement {
   @@index([warehouseCode1C])
   @@index([occurredAt])
   @@map("stock_movements")
+}
+
+/// 1С `AccumRg ТоварыВДороге` — товари в дорозі (маршрут). Блок А.
+/// Лот при відправці МЛ списується зі складу «в дорогу» (прихід, recordKind=0);
+/// при продажу/поверненні — вибуває з дороги (розхід, recordKind=1). Баланс =
+/// що зараз фізично в машинах. recorder = локальний RouteSheet.id.
+model TransitMovement {
+  id             String   @id @default(cuid())
+  occurredAt     DateTime @map("occurred_at")
+  recorderCode1C String   @map("recorder_code_1c") // RouteSheet.id (локальний) / hex 1С
+  lineNo         Int      @map("line_no")
+  productCode1C  String   @map("product_code_1c") // hex(Номенклатура) або barcode/синтет.
+  productId      String?  @map("product_id")
+  lotCode1C      String?  @map("lot_code_1c") // barcode лота
+  lotId          String?  @map("lot_id")
+  clientCode1C   String?  @map("client_code_1c") // hex(Контрагент) — кому везуть
+  qty            Decimal  @db.Decimal(15, 3) // Количество (шт)
+  weightKg       Decimal? @map("weight_kg") @db.Decimal(15, 3) // кг
+  recordKind     Int      @map("record_kind") // 0=в дорогу / 1=з дороги
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  @@unique([recorderCode1C, lineNo, productCode1C], name: "transit_movement_src")
+  @@index([productCode1C, occurredAt])
+  @@index([lotId])
+  @@index([occurredAt])
+  @@map("transit_movements")
 }
 
 /// 1С `AccumRg ЗаказыПокупателей` (_AccumRg5374) — залишки замовлень.
@@ -2651,30 +2689,30 @@ model Repacking {
 }
 
 model RepackingItem {
-  id          String   @id @default(cuid())
-  repackingId String   @map("repacking_id")
-  role        String   @default("disassembled")
-  productId   String?  @map("product_id")
-  charHex     String?  @map("char_hex")
-  barcode     String?
-  weight      Float    @default(0)
-  quantity    Int      @default(1)
-  priceEur    Decimal  @default(0) @map("price_eur") @db.Decimal(12, 2)
-  amountEur   Decimal  @default(0) @map("amount_eur") @db.Decimal(12, 2)
-  notes       String?
-  createdAt   DateTime @default(now()) @map("created_at")
+  id               String   @id @default(cuid())
+  repackingId      String   @map("repacking_id")
+  role             String   @default("disassembled")
+  productId        String?  @map("product_id")
+  charHex          String?  @map("char_hex")
+  barcode          String?
+  weight           Float    @default(0)
+  quantity         Int      @default(1)
+  priceEur         Decimal  @default(0) @map("price_eur") @db.Decimal(12, 2)
+  amountEur        Decimal  @default(0) @map("amount_eur") @db.Decimal(12, 2)
+  notes            String?
+  createdAt        DateTime @default(now()) @map("created_at")
   // ── Перепаковка повного циклу (2026-07-13) — усі поля additive/nullable ──
   // РОЗБІР (disassembled): який лот розібрали + попередній статус для реверсу.
   sourceLotId      String?  @map("source_lot_id")
   sourcePrevStatus String?  @map("source_prev_status")
   // КОМПЛЕКТАЦІЯ (assembled): створений лот, ціна продажу €/кг, якість, сектор,
   // рознесена собівартість €/кг.
-  createdLotId String?  @map("created_lot_id")
-  salePriceEur Decimal? @map("sale_price_eur") @db.Decimal(12, 2)
-  qualityId    String?  @map("quality_id")
-  sector       String?
-  sectorId     String?  @map("sector_id")
-  costPerKgEur Decimal? @map("cost_per_kg_eur") @db.Decimal(12, 2)
+  createdLotId     String?  @map("created_lot_id")
+  salePriceEur     Decimal? @map("sale_price_eur") @db.Decimal(12, 2)
+  qualityId        String?  @map("quality_id")
+  sector           String?
+  sectorId         String?  @map("sector_id")
+  costPerKgEur     Decimal? @map("cost_per_kg_eur") @db.Decimal(12, 2)
 
   document Repacking @relation(fields: [repackingId], references: [id], onDelete: Cascade)
 

@@ -21,6 +21,7 @@ vi.mock("@/lib/auth/manager-auth", () => ({
 }));
 vi.mock("@/lib/manager/bag-state", () => ({
   createBagStateChange: (...a: unknown[]) => createBagStateChangeMock(...a),
+  BAG_STATE_WRITE_ROLES: ["warehouse", "admin", "owner"],
 }));
 
 import { GET, POST } from "./route";

@@ -40,6 +40,8 @@ export const updateRouteSheetSchema = z.object({
   /** Кілометраж (Етап 4). */
   mileageStartKm: z.number().nonnegative().max(9_999_999).nullable().optional(),
   mileageEndKm: z.number().nonnegative().max(9_999_999).nullable().optional(),
+  /** Ціна за км для авто-витрат на пробіг (Блок Б, ← 1С ЦенаЗаКМ). */
+  pricePerKm: z.number().nonnegative().max(1_000_000).nullable().optional(),
   /** GPS-знімок координат (Етап 4 — best-effort на статус-переходах). */
   gpsLat: z.number().min(-90).max(90).nullable().optional(),
   gpsLng: z.number().min(-180).max(180).nullable().optional(),
@@ -75,9 +77,18 @@ export const updateLoadingSchema = z
     { message: "Немає полів для оновлення" },
   );
 
+/** POST /route-sheets/[id]/expenses — додати/оновити рядок витрат (Блок Б). */
+export const routeSheetExpenseSchema = z.object({
+  articleName: z.string().max(200).nullable().optional(),
+  cashFlowArticleId: z.string().min(1).nullable().optional(),
+  currency: z.string().max(8).optional(),
+  amount: z.number().nonnegative().max(9_999_999),
+});
+
 export type CreateRouteSheetInput = z.infer<typeof createRouteSheetSchema>;
 export type UpdateRouteSheetInput = z.infer<typeof updateRouteSheetSchema>;
 export type AddOrdersInput = z.infer<typeof addOrdersSchema>;
 export type AddLoadingInput = z.infer<typeof addLoadingSchema>;
 export type UpdateLoadingInput = z.infer<typeof updateLoadingSchema>;
 export type AddTaskInput = z.infer<typeof addTaskSchema>;
+export type RouteSheetExpenseInput = z.infer<typeof routeSheetExpenseSchema>;

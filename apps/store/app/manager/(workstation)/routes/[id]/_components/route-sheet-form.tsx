@@ -141,11 +141,21 @@ export interface RouteSheetPaymentView {
   documentSumEur: number;
 }
 
-/** Рядок вкладки «Витрати» (1С таб. частина `Витрати`, read-only). */
+/** Рядок вкладки «Витрати» (1С таб. частина `Витрати`, VT7334). */
 export interface RouteSheetExpenseView {
   id: string;
   articleName: string | null;
+  cashFlowArticleId: string | null;
+  cashFlowArticleName: string | null;
+  currency: string;
+  isMileage: boolean;
   amount: number;
+}
+
+/** Опція довідника статей витрат (для дропдауна). */
+export interface CashFlowArticleOption {
+  id: string;
+  name: string;
 }
 
 /** Рядок вкладки «Завдання» (вільна нотатка клієнт+коментар). */
@@ -169,6 +179,7 @@ export interface RouteSheetView {
   totalUah: number;
   mileageStartKm: number | null;
   mileageEndKm: number | null;
+  pricePerKm: number | null;
   gpsLat: number | null;
   gpsLng: number | null;
   /** М'яке попередження про незакритий кілометраж попередньої зміни. */
@@ -215,20 +226,16 @@ function formatDateDisplay(iso: string | null): string {
   return d.toLocaleDateString("uk-UA");
 }
 
-/** Число → рядок для read-only показу; «—» коли null. */
-function formatNumberDisplay(n: number | null): string {
-  if (n == null) return "—";
-  return `${n.toLocaleString("uk-UA")} км`;
-}
-
 export function RouteSheetForm({
   initial,
   expeditors,
+  cashFlowArticles = [],
 }: {
   initial: RouteSheetView;
   /** @deprecated MgrRoute dropdown прибрано — «Маршрут» тепер вільний текст у `comment`. */
   routes?: RouteOption[];
   expeditors: ExpeditorOption[];
+  cashFlowArticles?: CashFlowArticleOption[];
 }) {
   const router = useRouter();
   const sheetId = initial.id;
@@ -244,8 +251,6 @@ export function RouteSheetForm({
   // Read-only display (надходить з 1С при обміні).
   const dateDisplay = formatDateDisplay(initial.date);
   const arrivalDateDisplay = formatDateDisplay(initial.arrivalDate);
-  const mileageStartDisplay = formatNumberDisplay(initial.mileageStartKm);
-  const mileageEndDisplay = formatNumberDisplay(initial.mileageEndKm);
 
   const [orders, setOrders] = useState<RouteSheetOrderView[]>(initial.orders);
   const [items, setItems] = useState<RouteSheetItemView[]>(initial.items);
@@ -265,8 +270,10 @@ export function RouteSheetForm({
   const [payments, setPayments] = useState<RouteSheetPaymentView[]>(
     initial.payments,
   );
-  // Витрати — read-only (імпортуються з 1С, VT7334).
-  const [expenses] = useState<RouteSheetExpenseView[]>(initial.expenses);
+  // Витрати (Блок Б) — редаговані ручні рядки + авто-рядок пробігу.
+  const [expenses, setExpenses] = useState<RouteSheetExpenseView[]>(
+    initial.expenses,
+  );
   const [totalEur, setTotalEur] = useState(initial.totalEur);
   const [totalUah, setTotalUah] = useState(initial.totalUah);
 
@@ -277,6 +284,18 @@ export function RouteSheetForm({
       ? { lat: initial.gpsLat, lng: initial.gpsLng }
       : null;
   const [mileageWarning] = useState<string | null>(initial.mileageWarning);
+
+  // Кілометраж + ціна за км (Блок Б) — редаговані; на blur → PATCH + reload
+  // (щоб авто-рядок витрат «Пальне/пробіг» перерахувався).
+  const [mileageStartKm, setMileageStartKm] = useState<string>(
+    initial.mileageStartKm != null ? String(initial.mileageStartKm) : "",
+  );
+  const [mileageEndKm, setMileageEndKm] = useState<string>(
+    initial.mileageEndKm != null ? String(initial.mileageEndKm) : "",
+  );
+  const [pricePerKm, setPricePerKm] = useState<string>(
+    initial.pricePerKm != null ? String(initial.pricePerKm) : "",
+  );
 
   // Чернетка нового завдання (вкладка Завдання).
   const [taskClientId, setTaskClientId] = useState<string | null>(null);
@@ -379,6 +398,7 @@ export function RouteSheetForm({
     setSales(data.sheet.sales);
     setSaleItems(data.sheet.saleItems);
     setPayments(data.sheet.payments);
+    setExpenses(data.sheet.expenses);
     setTotalEur(data.sheet.totalEur);
     setTotalUah(data.sheet.totalUah);
   }, [sheetId]);
@@ -494,6 +514,97 @@ export function RouteSheetForm({
       setSaving(false);
     }
   }
+
+  /**
+   * Зберегти поле кілометражу/ціни за км (Блок Б) — PATCH числа (або null коли
+   * порожньо) + reload (щоб авто-рядок витрат «Пальне/пробіг» перерахувався).
+   */
+  async function saveMileageField(
+    field: "mileageStartKm" | "mileageEndKm" | "pricePerKm",
+    raw: string,
+  ) {
+    const trimmed = raw.trim().replace(",", ".");
+    const value = trimmed === "" ? null : Number(trimmed);
+    if (value != null && !Number.isFinite(value)) return;
+    const ok = await patchHeader({ [field]: value });
+    if (ok) await reloadSheet();
+  }
+
+  // Чернетка нового ручного рядка витрат (вкладка Витрати).
+  const [expArticleId, setExpArticleId] = useState<string>("");
+  const [expAmount, setExpAmount] = useState<string>("");
+
+  /** Додати ручний рядок витрат. */
+  async function addExpense() {
+    const amount = Number(expAmount.trim().replace(",", "."));
+    if (!Number.isFinite(amount) || amount <= 0) return;
+    const article = cashFlowArticles.find((a) => a.id === expArticleId);
+    setError(null);
+    setSaving(true);
+    try {
+      const res = await fetch(
+        `/api/v1/manager/route-sheets/${sheetId}/expenses`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            cashFlowArticleId: expArticleId || null,
+            articleName: article?.name ?? null,
+            currency: "UAH",
+            amount,
+          }),
+        },
+      );
+      if (!res.ok) {
+        const body = (await res.json().catch(() => ({}))) as { error?: string };
+        setError(body.error ?? `Помилка ${res.status}`);
+        return;
+      }
+      const { expense } = (await res.json()) as {
+        expense: RouteSheetExpenseView;
+      };
+      setExpenses((prev) => [...prev, expense]);
+      setExpArticleId("");
+      setExpAmount("");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  /** Видалити ручний рядок витрат (авто-рядок пробігу не видаляється). */
+  async function removeExpense(expenseId: string) {
+    setError(null);
+    setSaving(true);
+    try {
+      const res = await fetch(
+        `/api/v1/manager/route-sheets/${sheetId}/expenses?expenseId=${encodeURIComponent(
+          expenseId,
+        )}`,
+        { method: "DELETE" },
+      );
+      if (!res.ok) {
+        const body = (await res.json().catch(() => ({}))) as { error?: string };
+        setError(body.error ?? `Помилка ${res.status}`);
+        return;
+      }
+      setExpenses((prev) => prev.filter((e) => e.id !== expenseId));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  // Пробіг + сума витрат (обчислювані для показу).
+  const mileageKm = useMemo(() => {
+    const s = Number(mileageStartKm.replace(",", "."));
+    const e = Number(mileageEndKm.replace(",", "."));
+    if (!Number.isFinite(s) || !Number.isFinite(e) || e < s) return 0;
+    return Math.round((e - s) * 100) / 100;
+  }, [mileageStartKm, mileageEndKm]);
+
+  const expensesTotal = useMemo(
+    () => expenses.reduce((acc, e) => acc + e.amount, 0),
+    [expenses],
+  );
 
   // Дерево товарів по замовленню (вкладка Товари).
   const itemsByOrder = useMemo(() => {
@@ -628,22 +739,70 @@ export function RouteSheetForm({
             </p>
           </div>
 
-          {/* Кілометраж — read-only (з 1С). */}
+          {/* Кілометраж + ціна за км — редаговані (Блок Б). */}
           <div className="min-w-0">
             <label className="mb-1 block text-sm font-medium text-gray-700">
               Кілометраж (початок)
             </label>
-            <p className="flex h-10 items-center rounded-md border border-gray-200 bg-gray-50 px-3 text-sm text-gray-700">
-              {mileageStartDisplay}
-            </p>
+            <input
+              type="number"
+              inputMode="decimal"
+              min={0}
+              value={mileageStartKm}
+              disabled={locked}
+              onChange={(e) => setMileageStartKm(e.target.value)}
+              onBlur={(e) =>
+                void saveMileageField("mileageStartKm", e.target.value)
+              }
+              className="h-10 w-full rounded-md border border-gray-300 px-3 text-sm disabled:bg-gray-50 disabled:text-gray-500"
+              placeholder="км"
+            />
           </div>
 
           <div className="min-w-0">
             <label className="mb-1 block text-sm font-medium text-gray-700">
               Кілометраж (кінець)
             </label>
+            <input
+              type="number"
+              inputMode="decimal"
+              min={0}
+              value={mileageEndKm}
+              disabled={locked}
+              onChange={(e) => setMileageEndKm(e.target.value)}
+              onBlur={(e) =>
+                void saveMileageField("mileageEndKm", e.target.value)
+              }
+              className="h-10 w-full rounded-md border border-gray-300 px-3 text-sm disabled:bg-gray-50 disabled:text-gray-500"
+              placeholder="км"
+            />
+          </div>
+
+          <div className="min-w-0">
+            <label className="mb-1 block text-sm font-medium text-gray-700">
+              Ціна за км, ₴
+            </label>
+            <input
+              type="number"
+              inputMode="decimal"
+              min={0}
+              value={pricePerKm}
+              disabled={locked}
+              onChange={(e) => setPricePerKm(e.target.value)}
+              onBlur={(e) =>
+                void saveMileageField("pricePerKm", e.target.value)
+              }
+              className="h-10 w-full rounded-md border border-gray-300 px-3 text-sm disabled:bg-gray-50 disabled:text-gray-500"
+              placeholder="₴/км"
+            />
+          </div>
+
+          <div className="min-w-0">
+            <label className="mb-1 block text-sm font-medium text-gray-700">
+              Пробіг
+            </label>
             <p className="flex h-10 items-center rounded-md border border-gray-200 bg-gray-50 px-3 text-sm text-gray-700">
-              {mileageEndDisplay}
+              {mileageKm > 0 ? `${mileageKm.toLocaleString("uk-UA")} км` : "—"}
             </p>
           </div>
         </div>
@@ -658,6 +817,15 @@ export function RouteSheetForm({
             <span />
           )}
           <span className="text-gray-500">
+            {expensesTotal > 0 && (
+              <>
+                Витрати:{" "}
+                <span className="font-semibold text-gray-800">
+                  {Math.round(expensesTotal).toLocaleString("uk-UA")} ₴
+                </span>{" "}
+                ·{" "}
+              </>
+            )}
             Сума:{" "}
             <span className="font-semibold text-gray-800">
               {totalEur.toFixed(2)} €
@@ -1285,12 +1453,56 @@ export function RouteSheetForm({
         </section>
       )}
 
-      {/* ─── Витрати (read-only, імпорт з 1С) ────────────────────────────── */}
+      {/* ─── Витрати (редаговані ручні рядки + авто-рядок пробігу) ─────────── */}
       {tab === "expenses" && (
         <section className="space-y-3">
           <h3 className="text-sm font-semibold text-gray-700">
             Витрати ({expenses.length})
           </h3>
+
+          {!locked && (
+            <div className="flex flex-wrap items-end gap-2 rounded-lg border bg-white p-4 shadow-sm">
+              <div className="min-w-[180px] flex-1">
+                <label className="mb-1 block text-xs font-medium text-gray-600">
+                  Стаття витрат
+                </label>
+                <select
+                  value={expArticleId}
+                  onChange={(e) => setExpArticleId(e.target.value)}
+                  className="h-10 w-full rounded-md border border-gray-300 px-2 text-sm"
+                >
+                  <option value="">— без статті —</option>
+                  {cashFlowArticles.map((a) => (
+                    <option key={a.id} value={a.id}>
+                      {a.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="w-32">
+                <label className="mb-1 block text-xs font-medium text-gray-600">
+                  Сума, ₴
+                </label>
+                <input
+                  type="number"
+                  inputMode="decimal"
+                  min={0}
+                  value={expAmount}
+                  onChange={(e) => setExpAmount(e.target.value)}
+                  className="h-10 w-full rounded-md border border-gray-300 px-3 text-sm"
+                  placeholder="0"
+                />
+              </div>
+              <button
+                type="button"
+                onClick={() => void addExpense()}
+                disabled={saving || !expAmount.trim()}
+                className="h-10 rounded-md bg-green-600 px-4 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50"
+              >
+                Додати
+              </button>
+            </div>
+          )}
 
           {expenses.length === 0 ? (
             <div className="rounded-lg border border-dashed border-gray-200 bg-gray-50 px-6 py-8 text-center text-sm text-gray-500">
@@ -1301,23 +1513,47 @@ export function RouteSheetForm({
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b bg-gray-50 text-left text-gray-500">
-                    <th className="px-4 py-2 font-medium">Назва</th>
+                    <th className="px-4 py-2 font-medium">Стаття</th>
                     <th className="px-4 py-2 text-right font-medium">
-                      Сума, €
+                      Сума, ₴
                     </th>
+                    <th className="w-10 px-2 py-2" />
                   </tr>
                 </thead>
                 <tbody>
                   {expenses.map((e) => (
                     <tr key={e.id} className="border-b last:border-b-0">
                       <td className="px-4 py-2 text-gray-800">
-                        {e.articleName ?? "—"}
+                        {e.cashFlowArticleName ?? e.articleName ?? "—"}
+                        {e.isMileage && (
+                          <span className="ml-2 rounded bg-blue-100 px-1.5 py-0.5 text-xs text-blue-700">
+                            авто · пробіг
+                          </span>
+                        )}
                       </td>
                       <td className="px-4 py-2 text-right text-gray-700">
-                        {e.amount.toFixed(2)}
+                        {Math.round(e.amount).toLocaleString("uk-UA")}
+                      </td>
+                      <td className="px-2 py-2 text-right">
+                        {!e.isMileage && !locked && (
+                          <button
+                            type="button"
+                            onClick={() => void removeExpense(e.id)}
+                            className="text-xs text-red-600 hover:underline"
+                          >
+                            Видалити
+                          </button>
+                        )}
                       </td>
                     </tr>
                   ))}
+                  <tr className="bg-gray-50 font-semibold">
+                    <td className="px-4 py-2 text-gray-700">Разом</td>
+                    <td className="px-4 py-2 text-right text-gray-800">
+                      {Math.round(expensesTotal).toLocaleString("uk-UA")}
+                    </td>
+                    <td />
+                  </tr>
                 </tbody>
               </table>
             </div>

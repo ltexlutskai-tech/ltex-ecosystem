@@ -42,6 +42,7 @@ export default async function PrintRouteSheetPage({
       expeditor: { select: { fullName: true } },
       orders: true,
       items: true,
+      expenses: { include: { cashFlowArticle: { select: { name: true } } } },
     },
   });
   if (!sheet) notFound();
@@ -93,6 +94,7 @@ export default async function PrintRouteSheetPage({
       : null;
 
   const totalItemsSum = sheet.items.reduce((s, i) => s + i.sum, 0);
+  const expensesTotal = sheet.expenses.reduce((s, e) => s + e.amount, 0);
 
   return (
     <div className="print-page">
@@ -195,6 +197,12 @@ export default async function PrintRouteSheetPage({
                 (mileageTotal != null ? ` (${mileageTotal} км)` : "")
               : "—"}
           </div>
+          {sheet.pricePerKm != null && (
+            <div>
+              <span>Ціна за км: </span>
+              {sheet.pricePerKm} ₴
+            </div>
+          )}
         </div>
 
         <h2>Замовлення / зупинки</h2>
@@ -276,6 +284,41 @@ export default async function PrintRouteSheetPage({
                 <tr className="total-row">
                   <td colSpan={4}>Разом:</td>
                   <td className="num">{money2(totalItemsSum)}</td>
+                </tr>
+              </tbody>
+            </table>
+          </>
+        )}
+
+        {sheet.expenses.length > 0 && (
+          <>
+            <h2>Витрати</h2>
+            <table>
+              <thead>
+                <tr>
+                  <th className="num" style={{ width: 30 }}>
+                    №
+                  </th>
+                  <th>Стаття</th>
+                  <th className="num" style={{ width: 100 }}>
+                    Сума, ₴
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {sheet.expenses.map((e, idx) => (
+                  <tr key={e.id}>
+                    <td className="num">{idx + 1}</td>
+                    <td>
+                      {e.cashFlowArticle?.name ?? e.articleName ?? "—"}
+                      {e.isMileage ? " (пробіг)" : ""}
+                    </td>
+                    <td className="num">{money2(e.amount)}</td>
+                  </tr>
+                ))}
+                <tr className="total-row">
+                  <td colSpan={2}>Разом:</td>
+                  <td className="num">{money2(expensesTotal)}</td>
                 </tr>
               </tbody>
             </table>
