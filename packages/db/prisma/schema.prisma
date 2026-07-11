@@ -3107,6 +3107,8 @@ model MessengerMessage {
   kind           MessengerMessageKind @default(text)
   text           String
   replyToId      String?              @map("reply_to_id")
+  forwardedFrom  String?              @map("forwarded_from")
+  docRef         Json?                @map("doc_ref")
   editedAt       DateTime?            @map("edited_at")
   deletedAt      DateTime?            @map("deleted_at")
   createdAt      DateTime             @default(now()) @map("created_at")

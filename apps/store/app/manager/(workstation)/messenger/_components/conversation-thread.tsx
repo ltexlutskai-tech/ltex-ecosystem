@@ -6,6 +6,7 @@ import {
   CornerUpLeft,
   Download,
   FileText,
+  Forward,
   Paperclip,
   Pencil,
   Send,
@@ -17,7 +18,9 @@ import { Button, Textarea, useToast } from "@ltex/ui";
 import { ALLOWED_REACTIONS } from "@/lib/messenger/reactions";
 import { formatRelativeShort } from "../../_components/format-relative";
 import { Avatar } from "./avatar";
+import { DocRefCard } from "./doc-ref-card";
 import { GroupInfoDialog } from "./group-info-dialog";
+import { PickConversationDialog } from "./pick-conversation-dialog";
 import { roleLabel } from "./role-label";
 import type {
   MessengerAttachmentItem,
@@ -68,6 +71,9 @@ export function ConversationThread({
     null,
   );
   const [editing, setEditing] = useState<MessengerMessageItem | null>(null);
+  const [forwardSource, setForwardSource] =
+    useState<MessengerMessageItem | null>(null);
+  const [forwarding, setForwarding] = useState(false);
   const { toast } = useToast();
 
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -225,6 +231,8 @@ export function ConversationThread({
       replyTo: replyPreview,
       attachments: [],
       reactions: [],
+      forwardedFrom: null,
+      docRef: null,
       editedAt: null,
       deletedAt: null,
       createdAt: new Date().toISOString(),
@@ -321,6 +329,34 @@ export function ConversationThread({
     [conversationId, toast],
   );
 
+  const doForward = useCallback(
+    async (targetConversationId: string) => {
+      if (!forwardSource || forwarding) return;
+      setForwarding(true);
+      try {
+        const r = await fetch(
+          `/api/v1/manager/messenger/conversations/${conversationId}/messages/${forwardSource.id}/forward`,
+          {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ toConversationId: targetConversationId }),
+          },
+        );
+        if (!r.ok) throw new Error(await errorFrom(r));
+        setForwardSource(null);
+        toast({ description: "Переслано ✓" });
+      } catch (e) {
+        toast({
+          description: e instanceof Error ? e.message : "Помилка",
+          variant: "destructive",
+        });
+      } finally {
+        setForwarding(false);
+      }
+    },
+    [forwardSource, forwarding, conversationId, toast],
+  );
+
   const uploadFiles = useCallback(
     async (fileList: FileList | null) => {
       if (!fileList || fileList.length === 0 || uploading) return;
@@ -381,6 +417,15 @@ export function ConversationThread({
           onLeft={onLeft}
         />
       )}
+      <PickConversationDialog
+        open={forwardSource !== null}
+        onOpenChange={(v) => {
+          if (!v) setForwardSource(null);
+        }}
+        title="Переслати повідомлення"
+        busy={forwarding}
+        onPick={doForward}
+      />
       <div
         ref={scrollRef}
         onScroll={onScroll}
@@ -402,6 +447,7 @@ export function ConversationThread({
               onEdit={startEdit}
               onDelete={doDelete}
               onReact={doReact}
+              onForward={setForwardSource}
             />
           ))
         )}
@@ -493,6 +539,7 @@ function MessageBubble({
   onEdit,
   onDelete,
   onReact,
+  onForward,
 }: {
   message: MessengerMessageItem;
   showAuthor: boolean;
@@ -502,6 +549,7 @@ function MessageBubble({
   onEdit: (m: MessengerMessageItem) => void;
   onDelete: (m: MessengerMessageItem) => void;
   onReact: (m: MessengerMessageItem, emoji: string) => void;
+  onForward: (m: MessengerMessageItem) => void;
 }) {
   if (message.kind === "system") {
     return (
@@ -516,6 +564,7 @@ function MessageBubble({
   const canEdit = isMine && !isDeleted;
   const canDelete = !isDeleted && (isMine || canManage || isOwner);
   const canReact = !isDeleted;
+  const canForward = !isDeleted;
 
   return (
     <div className={`group flex ${isMine ? "justify-end" : "justify-start"}`}>
@@ -527,10 +576,12 @@ function MessageBubble({
           canEdit={canEdit}
           canDelete={canDelete}
           canReact={canReact}
+          canForward={canForward}
           onReply={onReply}
           onEdit={onEdit}
           onDelete={onDelete}
           onReact={onReact}
+          onForward={onForward}
         />
       )}
       <div
@@ -544,6 +595,21 @@ function MessageBubble({
           <p className="mb-0.5 text-[11px] font-semibold text-green-700">
             {message.authorName}
           </p>
+        )}
+        {message.forwardedFrom && !isDeleted && (
+          <p
+            className={
+              isMine
+                ? "mb-0.5 flex items-center gap-1 text-[11px] italic text-green-100"
+                : "mb-0.5 flex items-center gap-1 text-[11px] italic text-gray-400"
+            }
+          >
+            <Forward className="h-3 w-3" />
+            Переслано від {message.forwardedFrom}
+          </p>
+        )}
+        {message.docRef && !isDeleted && (
+          <DocRefCard docRef={message.docRef} isMine={isMine} />
         )}
         {message.replyTo && (
           <div
@@ -613,10 +679,12 @@ function MessageBubble({
           canEdit={canEdit}
           canDelete={canDelete}
           canReact={canReact}
+          canForward={canForward}
           onReply={onReply}
           onEdit={onEdit}
           onDelete={onDelete}
           onReact={onReact}
+          onForward={onForward}
         />
       )}
     </div>
@@ -688,20 +756,24 @@ function BubbleActions({
   canEdit,
   canDelete,
   canReact,
+  canForward,
   onReply,
   onEdit,
   onDelete,
   onReact,
+  onForward,
 }: {
   message: MessengerMessageItem;
   canReply: boolean;
   canEdit: boolean;
   canDelete: boolean;
   canReact: boolean;
+  canForward: boolean;
   onReply: (m: MessengerMessageItem) => void;
   onEdit: (m: MessengerMessageItem) => void;
   onDelete: (m: MessengerMessageItem) => void;
   onReact: (m: MessengerMessageItem, emoji: string) => void;
+  onForward: (m: MessengerMessageItem) => void;
 }) {
   return (
     <div className="flex items-center gap-0.5 self-center px-1 opacity-0 transition group-hover:opacity-100">
@@ -709,6 +781,11 @@ function BubbleActions({
       {canReply && (
         <IconBtn label="Відповісти" onClick={() => onReply(message)}>
           <CornerUpLeft className="h-3.5 w-3.5" />
+        </IconBtn>
+      )}
+      {canForward && (
+        <IconBtn label="Переслати" onClick={() => onForward(message)}>
+          <Forward className="h-3.5 w-3.5" />
         </IconBtn>
       )}
       {canEdit && (

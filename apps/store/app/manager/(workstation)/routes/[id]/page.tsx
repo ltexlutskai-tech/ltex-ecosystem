@@ -15,6 +15,7 @@ import {
 } from "@/lib/manager/route-sheet-documents";
 import { getUnclosedMileageWarning } from "@/lib/manager/route-sheet-mileage";
 import { formatDocNumber } from "@/lib/manager/order-number";
+import { DiscussButton } from "../../messenger/_components/discuss-button";
 import {
   RouteSheetForm,
   type CashFlowArticleOption,
@@ -270,6 +271,13 @@ export default async function ManagerRouteSheetDetailPage({
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <DiscussButton
+            docRef={{
+              type: "route",
+              label: `Маршрутний лист ${displayNumber}`,
+              url: `/manager/routes/${id}`,
+            }}
+          />
           <Link
             href={`/manager/routes/${id}/loading`}
             className="inline-flex items-center gap-1.5 rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"

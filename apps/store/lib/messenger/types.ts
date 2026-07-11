@@ -46,6 +46,25 @@ export interface MessengerReactionSummary {
   mine: boolean;
 }
 
+export type MessengerDocRefType =
+  | "order"
+  | "sale"
+  | "route"
+  | "client"
+  | "product"
+  | "lot"
+  | "payment"
+  | "print";
+
+/** Посилання на внутрішній документ системи, вбудоване в повідомлення. */
+export interface MessengerDocRef {
+  type: MessengerDocRefType;
+  label: string;
+  subtitle?: string;
+  /** Внутрішній шлях (/manager/...). */
+  url: string;
+}
+
 export interface MessengerMessageItem {
   id: string;
   conversationId: string;
@@ -57,6 +76,8 @@ export interface MessengerMessageItem {
   replyTo: MessengerReplyPreview | null;
   attachments: MessengerAttachmentItem[];
   reactions: MessengerReactionSummary[];
+  forwardedFrom: string | null;
+  docRef: MessengerDocRef | null;
   editedAt: string | null;
   deletedAt: string | null;
   createdAt: string;

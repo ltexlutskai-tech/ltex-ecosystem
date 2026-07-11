@@ -4,6 +4,7 @@ import { ArrowLeft } from "lucide-react";
 import { prisma } from "@ltex/db";
 import { getCurrentUser } from "@/lib/auth/manager-auth";
 import { canEditClient } from "@/lib/permissions/mgr-client-edit";
+import { DiscussButton } from "../../messenger/_components/discuss-button";
 import { ClientAssortmentTab } from "./_components/client-assortment-tab";
 import { ClientDebtMovementsTab } from "./_components/client-debt-movements-tab";
 import { ClientHeader } from "./_components/client-header";
@@ -82,6 +83,17 @@ export default async function ClientDetailPage({
       </Link>
 
       <ClientHeader client={client} canAssign={canAssign} />
+
+      <div className="flex justify-end">
+        <DiscussButton
+          docRef={{
+            type: "client",
+            label: client.name,
+            subtitle: client.city ?? undefined,
+            url: `/manager/customers/${client.id}`,
+          }}
+        />
+      </div>
 
       <ClientTabs
         overdueRemindersCount={overdueCount}

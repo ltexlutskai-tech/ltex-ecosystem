@@ -1,3 +1,4 @@
+import { parseStoredDocRef } from "./doc-ref";
 import { summarizeReactions } from "./reactions";
 import type { MessengerMessageItem } from "./types";
 
@@ -30,6 +31,8 @@ export interface MessageRowLike {
   editedAt: Date | null;
   deletedAt: Date | null;
   createdAt: Date;
+  forwardedFrom?: string | null;
+  docRef?: unknown;
   replyTo?: ReplyRowLike | null;
   attachments?: AttachmentRowLike[];
   reactions?: { emoji: string; userId: string }[];
@@ -93,6 +96,8 @@ export function serializeMessage(
     replyTo: reply,
     attachments,
     reactions: summarizeReactions(row.reactions ?? [], opts.currentUserId),
+    forwardedFrom: hidden ? null : (row.forwardedFrom ?? null),
+    docRef: hidden ? null : parseStoredDocRef(row.docRef),
     editedAt: row.editedAt ? row.editedAt.toISOString() : null,
     deletedAt: row.deletedAt ? row.deletedAt.toISOString() : null,
     createdAt: row.createdAt.toISOString(),

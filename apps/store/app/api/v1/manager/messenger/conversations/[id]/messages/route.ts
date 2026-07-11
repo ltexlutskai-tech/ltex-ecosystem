@@ -3,13 +3,19 @@ import { z } from "zod";
 import { prisma } from "@ltex/db";
 import { getCurrentUser } from "@/lib/auth/manager-auth";
 import { getMessengerConversationForUser } from "@/lib/messenger/access";
+import { docRefSchema } from "@/lib/messenger/doc-ref";
 import { serializeMessage } from "@/lib/messenger/serialize";
 import { rateLimit, getClientIp } from "@/lib/rate-limit";
 
-const messageBodySchema = z.object({
-  text: z.string().trim().min(1, "Текст не може бути порожнім").max(4000),
-  replyToId: z.string().min(1).optional(),
-});
+const messageBodySchema = z
+  .object({
+    text: z.string().trim().max(4000).optional().default(""),
+    replyToId: z.string().min(1).optional(),
+    docRef: docRefSchema.optional(),
+  })
+  .refine((d) => d.text.length > 0 || d.docRef, {
+    message: "Порожнє повідомлення",
+  });
 
 /**
  * POST /api/v1/manager/messenger/conversations/[id]/messages
@@ -86,9 +92,11 @@ export async function POST(
       kind: "text",
       text: parsed.data.text,
       replyToId,
+      ...(parsed.data.docRef ? { docRef: parsed.data.docRef } : {}),
     },
     include: {
       attachments: true,
+      reactions: { select: { emoji: true, userId: true } },
       replyTo: {
         select: { id: true, authorId: true, text: true, deletedAt: true },
       },

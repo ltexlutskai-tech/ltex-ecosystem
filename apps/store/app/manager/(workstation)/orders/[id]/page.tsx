@@ -12,6 +12,7 @@ import {
   getDeliveryMethodOptions,
   getDeliveryLabelResolver,
 } from "@/lib/manager/delivery-methods";
+import { DiscussButton } from "../../messenger/_components/discuss-button";
 import { OrderForm } from "../new/_components/order-form";
 import { OrderCloseButton } from "./_components/order-close-button";
 import { OrderActualToggle } from "./_components/order-actual-toggle";
@@ -251,6 +252,14 @@ export default async function ManagerOrderDetailPage({
         </div>
         <div className="flex items-center gap-2">
           {!editable && <OrderStatusBadge status={order.status} />}
+          <DiscussButton
+            docRef={{
+              type: "order",
+              label: `Замовлення №${orderNumber}`,
+              subtitle: order.customer.name,
+              url: `/manager/orders/${order.id}`,
+            }}
+          />
           {locked && !order.closedAt && !order.archived && (
             <OrderActualToggle orderId={order.id} isActual={order.isActual} />
           )}
