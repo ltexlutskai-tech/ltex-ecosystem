@@ -22,11 +22,7 @@ import {
   type SaleGeneralPick,
   type SaleLotPick,
 } from "./sale-lot-picker";
-import {
-  unitPriceForType,
-  autoUnitPrice,
-  SELLING_PRICE_TYPES,
-} from "@/lib/manager/order-pricing";
+import { autoUnitPrice } from "@/lib/manager/order-pricing";
 import {
   classifyDelivery,
   findDeliveryCode,
@@ -50,10 +46,7 @@ import {
   type ManagerSaleStatus,
 } from "@/lib/manager/sale-status";
 import { useDocumentAutosave } from "@/lib/autosave/use-document-autosave";
-import {
-  AutosaveStatus,
-  RestoreDraftBanner,
-} from "../../../_components/autosave-status";
+import { AutosaveStatus } from "../../../_components/autosave-status";
 import {
   collectPriceDeviations,
   draftToWire,
@@ -82,7 +75,6 @@ interface SaleDraftData {
   cashOnDelivery: boolean;
   onTradeAgent: boolean;
   expressWaybill: string;
-  sellingTypeCode: string;
 }
 
 export interface SaleFormProps {
@@ -218,10 +210,9 @@ export function SaleForm({
   const [changeUsd, setChangeUsd] = useState(0);
 
   // ─── Менеджерські поля ──────────────────────────────────────────────────
-  // Тип цін — дві фіксовані опції (продажна / акційна), відв'язані від
-  // MgrPriceType. За замовчуванням «Ціна продажу» (wholesale); при додаванні
-  // товару ціна підставляється авто (акційна якщо є — `autoUnitPrice`).
-  const [sellingTypeCode, setSellingTypeCode] = useState<string>("wholesale");
+  // Тип цін як окреме поле прибрано (рішення user): при додаванні товару ціна
+  // підставляється авто (акційна якщо є — `autoUnitPrice`, інакше продажна) і
+  // редагується вручну у рядку.
   const [deliveryMethod, setDeliveryMethod] = useState<string>(
     initialSale?.deliveryMethod ??
       // Реалізації з маршрутного листа за замовчуванням «Доставка».
@@ -272,7 +263,6 @@ export function SaleForm({
       cashOnDelivery,
       onTradeAgent,
       expressWaybill,
-      sellingTypeCode,
     }),
     [
       clientId,
@@ -285,7 +275,6 @@ export function SaleForm({
       cashOnDelivery,
       onTradeAgent,
       expressWaybill,
-      sellingTypeCode,
     ],
   );
 
@@ -352,6 +341,9 @@ export function SaleForm({
     // Новий документ: серверна чернетка можлива лише коли обрано клієнта
     // (`Sale.customerId` — обов'язковий FK). До того захищає localStorage.
     canCreateDraft: clientId != null,
+    // Банер «Знайдено незбережені зміни» не показуємо — чернетки зберігаються у
+    // БД і доступні у списку реалізацій (рішення user).
+    enableRestore: false,
     createDraft: createDraftServer,
     updateDraft: updateDraftServer,
     onIdAssigned: (id) => {
@@ -360,58 +352,6 @@ export function SaleForm({
       window.history.replaceState(null, "", `/manager/sales/${id}`);
     },
   });
-
-  /** Застосувати відновлені з localStorage дані у стан форми. */
-  function applyRestore(d: SaleDraftData): void {
-    setClientId(d.clientId);
-    setClientSummary(d.clientSummary);
-    setItems(d.items);
-    setNotes(d.notes);
-    setShowComment(!!d.notes.trim());
-    setDeliveryMethod(d.deliveryMethod);
-    setNovaPoshtaBranch(d.novaPoshtaBranch);
-    setDeliveryAddress(d.deliveryAddress ?? "");
-    setCashOnDelivery(d.cashOnDelivery);
-    setOnTradeAgent(d.onTradeAgent);
-    setExpressWaybill(d.expressWaybill);
-    setSellingTypeCode(d.sellingTypeCode);
-    autosave.acceptRestore();
-  }
-
-  /**
-   * Перерахунок цін за кг усіх рядків під обраний тип цін (override, як у 1С):
-   *  - `wholesale` → форс продажної ціни кожного рядка (isAkciya=false);
-   *  - `akciya`    → акційна-де-є (`autoUnitPrice`), з прапором isAkciya.
-   */
-  function recalcAllRows(nextSellingCode: string): void {
-    setItems((prev) =>
-      prev.map((row) => {
-        if (!row.product) return row;
-        let unit: number | null;
-        let isAkciya: boolean;
-        if (nextSellingCode === "akciya") {
-          const auto = autoUnitPrice(row.product.prices);
-          unit = auto.unit;
-          isAkciya = auto.isAkciya;
-        } else {
-          unit = unitPriceForType(row.product.prices, "wholesale");
-          isAkciya = false;
-        }
-        if (unit === null) return row; // немає прайсу — лишаємо ручний ввід
-        return {
-          ...row,
-          pricePerKg: unit,
-          priceEur: lineTotalEur(unit, row.weight),
-          isAkciya,
-        };
-      }),
-    );
-  }
-
-  function onPriceTypeChange(nextCode: string): void {
-    setSellingTypeCode(nextCode);
-    recalcAllRows(nextCode);
-  }
 
   function onClientChange(
     id: string | null,
@@ -839,13 +779,6 @@ export function SaleForm({
 
   return (
     <div className="space-y-4">
-      {autosave.restoreData && (
-        <RestoreDraftBanner
-          onRestore={() => applyRestore(autosave.restoreData as SaleDraftData)}
-          onDismiss={autosave.dismissRestore}
-        />
-      )}
-
       {/* ─── Секція: Контрагент ──────────────────────────────────────────── */}
       <section className="rounded-lg border bg-white p-4 shadow-sm">
         <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-gray-500">
@@ -909,7 +842,7 @@ export function SaleForm({
                 minimumFractionDigits: 2,
                 maximumFractionDigits: 2,
               })}{" "}
-              ₴
+              €
             </span>
           </div>
         )}
@@ -922,31 +855,6 @@ export function SaleForm({
         </h2>
 
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {/* Тип цін */}
-          <div>
-            <label
-              htmlFor="sale-price-type"
-              className="mb-1 block text-sm font-medium text-gray-700"
-            >
-              Тип цін
-            </label>
-            <select
-              id="sale-price-type"
-              value={sellingTypeCode}
-              onChange={(e) => onPriceTypeChange(e.target.value)}
-              className="h-10 w-full rounded-md border border-gray-300 bg-white px-3 text-sm focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500"
-            >
-              {SELLING_PRICE_TYPES.map((pt) => (
-                <option key={pt.code} value={pt.code}>
-                  {pt.label}
-                </option>
-              ))}
-            </select>
-            <p className="mt-1 text-xs text-gray-400">
-              При зміні ціни рядків перераховуються.
-            </p>
-          </div>
-
           {/* Доставка */}
           <div>
             <label

@@ -29,6 +29,12 @@ export interface ProductSummary {
     totalWeight: number;
     ordersCount: number;
   } | null;
+  /** Складський залишок (вільні лоти): кг / шт / кількість лотів. */
+  stock?: {
+    lots: number;
+    weightKg: number;
+    quantityPcs: number;
+  } | null;
 }
 
 export interface LotSummary {
@@ -57,6 +63,8 @@ export interface ClientPickerItem {
   priceTypeId?: string | null;
   /** `MgrDeliveryMethod.code` клієнта (підтягується у select доставки). */
   deliveryMethodCode?: string | null;
+  /** № відділення Нової Пошти клієнта (префіл при способі «Пошта»). */
+  novaPoshtaBranch?: string | null;
   agent: { id: string; fullName: string } | null;
   isOwned: boolean;
 }
@@ -140,6 +148,10 @@ export interface OrderEditInitial {
   notes: string;
   priceTypeId: string | null;
   deliveryMethod: string | null;
+  novaPoshtaBranch: string | null;
+  deliveryAddress: string | null;
+  expressWaybill: string | null;
+  overdueDays: number | null;
   cashOnDelivery: boolean;
   assignedAgentUserId: string | null;
   items: OrderItemDraft[];

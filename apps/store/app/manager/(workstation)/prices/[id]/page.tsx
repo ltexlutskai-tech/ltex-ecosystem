@@ -10,6 +10,7 @@ import { loadCategoryNodes, resolveCategoryAccess } from "../_lib/load-prices";
 import { ProductCardView } from "../_components/product-card-view";
 import { ProductPhotoManager } from "./_components/product-photo-manager";
 import { ProductCategoryEditor } from "./_components/product-category-editor";
+import { ProductAverageWeightEditor } from "./_components/product-average-weight-editor";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Картка товару — L-TEX Manager" };
@@ -95,6 +96,12 @@ export default async function ProductCardPage({
         sellerName={user.fullName}
         isAdmin={user.role === "admin"}
       />
+      {canManage && (
+        <ProductAverageWeightEditor
+          productId={product.id}
+          currentValue={product.averageWeight ?? null}
+        />
+      )}
       {canManage && (
         <ProductCategoryEditor
           productId={product.id}

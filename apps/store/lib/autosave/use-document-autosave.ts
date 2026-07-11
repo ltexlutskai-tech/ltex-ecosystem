@@ -52,6 +52,12 @@ export interface UseDocumentAutosaveOptions<T> {
   canCreateDraft?: boolean;
   /** Debounce запису в БД, мс (дефолт 2000). */
   serverDebounceMs?: number;
+  /**
+   * Чи пропонувати відновлення з localStorage-буфера (банер «Знайдено
+   * незбережені зміни»). `false` → банер не показується (документи-чернетки й
+   * так зберігаються у БД і доступні у списку). Дефолт `true`.
+   */
+  enableRestore?: boolean;
 }
 
 export interface UseDocumentAutosaveResult<T> {
@@ -92,6 +98,7 @@ export function useDocumentAutosave<T>(
     onIdAssigned,
     canCreateDraft = true,
     serverDebounceMs = 2000,
+    enableRestore = true,
   } = opts;
 
   const [status, setStatus] = useState<DocAutosaveStatus>("idle");
@@ -115,6 +122,13 @@ export function useDocumentAutosave<T>(
   // ── Mount: перевірка буфера localStorage (незбережене з минулого разу) ──
   useEffect(() => {
     if (!enabled) return;
+    // Банер відновлення вимкнено (enableRestore=false) — чистимо буфер, щоб
+    // старі дані не накопичувались, і не пропонуємо відновлення.
+    if (!enableRestore) {
+      clearLocalDraft(keyRef.current);
+      mountedRef.current = true;
+      return;
+    }
     const env = readLocalDraft<T>(keyRef.current);
     if (env && env.data != null) {
       setRestoreData(env.data);

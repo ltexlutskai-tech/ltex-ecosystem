@@ -76,6 +76,8 @@ export interface ProductCardVM {
   categoryPath: string[];
   videoUrl: string | null;
   priceUnit: string;
+  /** Середня вага мішка (кг) — характеристика для розрахунку у замовленні. */
+  averageWeight: number | null;
   /** Коефіцієнт «одиниць у кг» для toggle «у штуках» (Float, може бути null). */
   unitsPerKg: number | null;
   images: ProductImageVM[];
@@ -117,6 +119,7 @@ export async function loadProductCard(
       createdAt: true,
       priceUnit: true,
       unitsPerKgMin: true,
+      averageWeight: true,
       gender: true,
       sizes: true,
       unitsPerKg: true,
@@ -258,6 +261,7 @@ export async function loadProductCard(
     categoryPath,
     videoUrl: product.videoUrl,
     priceUnit: product.priceUnit,
+    averageWeight: product.averageWeight,
     unitsPerKg: product.unitsPerKgMin,
     images: product.images.map((img) => ({ url: img.url, alt: img.alt })),
     basePrice: baseLine,

@@ -262,6 +262,13 @@ model Order {
   // бо order — спільна з магазином модель). Доставка — delivery|post|pickup.
   priceTypeId         String? @map("price_type_id")
   deliveryMethod      String? @map("delivery_method")
+  // Поля доставки за способом (як у Реалізації, блок «Маршрутний лист»):
+  //  • Нова Пошта (post) → № відділення + ТТН (expressWaybill);
+  //  • Доставка (delivery) → адреса доставки (з картки клієнта або вручну);
+  //  • Самовивіз (pickup) → без цих полів.
+  novaPoshtaBranch    String? @map("nova_poshta_branch")
+  deliveryAddress     String? @map("delivery_address")
+  expressWaybill      String? @map("express_waybill")
   cashOnDelivery      Boolean @default(false) @map("cash_on_delivery")
   assignedAgentUserId String? @map("assigned_agent_user_id")
   exportTo1C          Boolean @default(true) @map("export_to_1c")
@@ -281,6 +288,10 @@ model Order {
   closeNotes     String?   @map("close_notes")
 
   // ─── Auto-нагадування (Етап 3) ───────────────────────────────────────────
+  // «Термін до протермінування» — кількість днів від створення документа, по
+  // спливанню яких спрацьовує нагадування «замовлення протерміноване — закрити
+  // або переробити». Задає менеджер у формі. null = без авто-нагадування.
+  overdueDays             Int?      @map("overdue_days")
   lastReminderAt          DateTime? @map("last_reminder_at")
   remindersSentCount      Int       @default(0) @map("reminders_sent_count")
   escalatedToSupervisorAt DateTime? @map("escalated_to_supervisor_at")

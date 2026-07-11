@@ -8,6 +8,7 @@ const { mockPrisma, getCurrentUserMock } = vi.hoisted(() => ({
   mockPrisma: {
     product: { findMany: vi.fn() },
     orderItem: { findMany: vi.fn() },
+    lot: { findMany: vi.fn() },
   },
   getCurrentUserMock: vi.fn(),
 }));
@@ -39,6 +40,8 @@ beforeEach(() => {
   // За замовчуванням нема активних замовлень — щоб не змінювати поведінку
   // існуючих тестів. Окремий case нижче перевизначає mockResolvedValueOnce.
   mockPrisma.orderItem.findMany.mockResolvedValue([]);
+  // За замовчуванням нема лотів — складський залишок нульовий.
+  mockPrisma.lot.findMany.mockResolvedValue([]);
 });
 
 function req(qs: string): NextRequest {
@@ -155,5 +158,61 @@ describe("GET /api/v1/manager/products/search", () => {
       ordersCount: 2,
     });
     expect(json.items[1]?.activeClaim).toBeNull();
+  });
+
+  it("додає складський залишок (кг/шт/лотів) з вільних лотів", async () => {
+    mockPrisma.product.findMany.mockResolvedValueOnce([
+      {
+        id: "p1",
+        code1C: null,
+        articleCode: null,
+        name: "Прод 1",
+        slug: "p1",
+        priceUnit: "kg",
+        averageWeight: 20,
+        inStock: true,
+        prices: [],
+      },
+    ]);
+    // Два вільні лоти (без активної броні) + один заброньований активно.
+    const future = new Date(Date.now() + 86_400_000);
+    mockPrisma.lot.findMany.mockResolvedValueOnce([
+      {
+        productId: "p1",
+        status: "free",
+        weight: 18,
+        quantity: 40,
+        reservedByUserId: null,
+        reservedUntil: null,
+      },
+      {
+        productId: "p1",
+        status: "free",
+        weight: 22,
+        quantity: 50,
+        reservedByUserId: null,
+        reservedUntil: null,
+      },
+      {
+        productId: "p1",
+        status: "free",
+        weight: 15,
+        quantity: 30,
+        reservedByUserId: "u9",
+        reservedUntil: future,
+      },
+    ]);
+    const res = await GET(req("?q=Прод"));
+    const json = (await res.json()) as {
+      items: Array<{
+        stock: { lots: number; weightKg: number; quantityPcs: number };
+      }>;
+    };
+    // Активно заброньований лот у залишок не входить.
+    expect(json.items[0]?.stock).toEqual({
+      lots: 2,
+      weightKg: 40,
+      quantityPcs: 90,
+    });
   });
 });
