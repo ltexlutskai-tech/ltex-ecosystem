@@ -63,6 +63,7 @@ export async function GET(
     orderBy: { createdAt: "desc" },
     take: limit,
     include: {
+      attachments: true,
       replyTo: {
         select: { id: true, authorId: true, text: true, deletedAt: true },
       },

@@ -9,6 +9,17 @@ interface ReplyRowLike {
   deletedAt: Date | null;
 }
 
+interface AttachmentRowLike {
+  id: string;
+  kind: "image" | "file";
+  url: string;
+  name: string;
+  mimeType: string;
+  sizeBytes: number;
+  width: number | null;
+  height: number | null;
+}
+
 export interface MessageRowLike {
   id: string;
   conversationId: string;
@@ -19,6 +30,7 @@ export interface MessageRowLike {
   deletedAt: Date | null;
   createdAt: Date;
   replyTo?: ReplyRowLike | null;
+  attachments?: AttachmentRowLike[];
 }
 
 /** Короткий прев'ю тексту для цитати/списку розмов. */
@@ -53,6 +65,21 @@ export function serializeMessage(
       }
     : null;
 
+  // Видалене повідомлення не показує вкладення нікому, крім owner.
+  const attachments =
+    hidden || (row.deletedAt !== null && !opts.isOwner)
+      ? []
+      : (row.attachments ?? []).map((a) => ({
+          id: a.id,
+          kind: a.kind,
+          url: a.url,
+          name: a.name,
+          mimeType: a.mimeType,
+          sizeBytes: a.sizeBytes,
+          width: a.width,
+          height: a.height,
+        }));
+
   return {
     id: row.id,
     conversationId: row.conversationId,
@@ -62,6 +89,7 @@ export function serializeMessage(
     text: hidden ? DELETED_PLACEHOLDER : row.text,
     isMine: row.authorId === opts.currentUserId,
     replyTo: reply,
+    attachments,
     editedAt: row.editedAt ? row.editedAt.toISOString() : null,
     deletedAt: row.deletedAt ? row.deletedAt.toISOString() : null,
     createdAt: row.createdAt.toISOString(),

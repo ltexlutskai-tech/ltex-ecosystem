@@ -88,6 +88,7 @@ export async function POST(
       replyToId,
     },
     include: {
+      attachments: true,
       replyTo: {
         select: { id: true, authorId: true, text: true, deletedAt: true },
       },

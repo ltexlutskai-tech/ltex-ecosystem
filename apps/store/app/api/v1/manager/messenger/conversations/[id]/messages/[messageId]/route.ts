@@ -72,6 +72,7 @@ export async function PATCH(
     where: { id: messageId },
     data: { text: parsed.data.text, editedAt: new Date() },
     include: {
+      attachments: true,
       replyTo: {
         select: { id: true, authorId: true, text: true, deletedAt: true },
       },

@@ -4,6 +4,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ChevronRight,
   CornerUpLeft,
+  Download,
+  FileText,
+  Paperclip,
   Pencil,
   Send,
   Trash2,
@@ -15,11 +18,18 @@ import { Avatar } from "./avatar";
 import { GroupInfoDialog } from "./group-info-dialog";
 import { roleLabel } from "./role-label";
 import type {
+  MessengerAttachmentItem,
   MessengerMessageItem,
   MessengerReplyPreview,
   MessengerThreadResponse,
   SendMessageResponse,
 } from "./types";
+
+function formatBytes(n: number): string {
+  if (n < 1024) return `${n} Б`;
+  if (n < 1024 * 1024) return `${Math.round(n / 1024)} КБ`;
+  return `${(n / (1024 * 1024)).toFixed(1)} МБ`;
+}
 
 const POLL_INTERVAL_MS = 3_000;
 const MAX_MESSAGE_LEN = 4_000;
@@ -60,6 +70,8 @@ export function ConversationThread({
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const nearBottomRef = useRef(true);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
 
   const loadInitial = useCallback(async () => {
     setLoading(true);
@@ -209,6 +221,7 @@ export function ConversationThread({
       text,
       isMine: true,
       replyTo: replyPreview,
+      attachments: [],
       editedAt: null,
       deletedAt: null,
       createdAt: new Date().toISOString(),
@@ -275,6 +288,37 @@ export function ConversationThread({
     [conversationId, toast],
   );
 
+  const uploadFiles = useCallback(
+    async (fileList: FileList | null) => {
+      if (!fileList || fileList.length === 0 || uploading) return;
+      setUploading(true);
+      const fd = new FormData();
+      const caption = draft.trim();
+      if (caption) fd.append("caption", caption);
+      Array.from(fileList).forEach((f) => fd.append("files", f));
+      try {
+        const r = await fetch(
+          `/api/v1/manager/messenger/conversations/${conversationId}/attachments`,
+          { method: "POST", body: fd },
+        );
+        if (!r.ok) throw new Error(await errorFrom(r));
+        const data = (await r.json()) as SendMessageResponse;
+        setMessages((prev) => [...prev, data.message]);
+        nearBottomRef.current = true;
+        setDraft("");
+        setReplyTarget(null);
+      } catch (e) {
+        toast({
+          description: e instanceof Error ? e.message : "Помилка",
+          variant: "destructive",
+        });
+      } finally {
+        setUploading(false);
+      }
+    },
+    [conversationId, draft, uploading, toast],
+  );
+
   if (loading && !header) return <ThreadSkeleton />;
   if (!header) {
     return (
@@ -328,6 +372,17 @@ export function ConversationThread({
           ))
         )}
       </div>
+      <input
+        ref={fileInputRef}
+        type="file"
+        multiple
+        accept="image/*,.pdf,.xlsx,.xls,.docx,.doc,.csv,.txt"
+        className="hidden"
+        onChange={(e) => {
+          void uploadFiles(e.target.files);
+          e.target.value = "";
+        }}
+      />
       <Composer
         value={draft}
         onChange={setDraft}
@@ -336,6 +391,8 @@ export function ConversationThread({
         editing={editing !== null}
         replyTarget={replyTarget}
         onCancelMode={cancelComposerMode}
+        uploading={uploading}
+        onAttach={() => fileInputRef.current?.click()}
       />
     </div>
   );
@@ -463,15 +520,20 @@ function MessageBubble({
             <span className="ml-1 opacity-90">{message.replyTo.preview}</span>
           </div>
         )}
-        <p
-          className={
-            isDeleted
-              ? "whitespace-pre-wrap break-words italic opacity-70"
-              : "whitespace-pre-wrap break-words"
-          }
-        >
-          {message.text}
-        </p>
+        {message.attachments.length > 0 && (
+          <AttachmentList attachments={message.attachments} isMine={isMine} />
+        )}
+        {(message.text || isDeleted) && (
+          <p
+            className={
+              isDeleted
+                ? "whitespace-pre-wrap break-words italic opacity-70"
+                : "whitespace-pre-wrap break-words"
+            }
+          >
+            {message.text}
+          </p>
+        )}
         <p
           className={
             isMine
@@ -495,6 +557,65 @@ function MessageBubble({
           onDelete={onDelete}
         />
       )}
+    </div>
+  );
+}
+
+function AttachmentList({
+  attachments,
+  isMine,
+}: {
+  attachments: MessengerAttachmentItem[];
+  isMine: boolean;
+}) {
+  const images = attachments.filter((a) => a.kind === "image");
+  const files = attachments.filter((a) => a.kind === "file");
+  return (
+    <div className="mb-1 space-y-1">
+      {images.length > 0 && (
+        <div className="flex flex-wrap gap-1">
+          {images.map((a) => (
+            <a
+              key={a.id}
+              href={a.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="block overflow-hidden rounded-md"
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={a.url}
+                alt={a.name}
+                className="max-h-52 max-w-[220px] rounded-md object-cover"
+                loading="lazy"
+              />
+            </a>
+          ))}
+        </div>
+      )}
+      {files.map((a) => (
+        <a
+          key={a.id}
+          href={a.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          download={a.name}
+          className={
+            isMine
+              ? "flex items-center gap-2 rounded-md bg-green-700/40 px-2 py-1.5 text-xs hover:bg-green-700/60"
+              : "flex items-center gap-2 rounded-md bg-gray-100 px-2 py-1.5 text-xs hover:bg-gray-200"
+          }
+        >
+          <FileText className="h-5 w-5 shrink-0" />
+          <span className="min-w-0 flex-1">
+            <span className="block truncate font-medium">{a.name}</span>
+            <span className={isMine ? "text-green-100" : "text-gray-500"}>
+              {formatBytes(a.sizeBytes)}
+            </span>
+          </span>
+          <Download className="h-4 w-4 shrink-0 opacity-70" />
+        </a>
+      ))}
     </div>
   );
 }
@@ -567,6 +688,8 @@ function Composer({
   editing,
   replyTarget,
   onCancelMode,
+  uploading,
+  onAttach,
 }: {
   value: string;
   onChange: (v: string) => void;
@@ -575,6 +698,8 @@ function Composer({
   editing: boolean;
   replyTarget: MessengerMessageItem | null;
   onCancelMode: () => void;
+  uploading: boolean;
+  onAttach: () => void;
 }) {
   const canSend = value.trim().length > 0 && !sending;
   return (
@@ -602,6 +727,18 @@ function Composer({
         </div>
       )}
       <div className="flex items-end gap-2">
+        {!editing && (
+          <button
+            type="button"
+            onClick={onAttach}
+            disabled={uploading}
+            aria-label="Прикріпити файл"
+            title="Прикріпити фото або файл"
+            className="mb-0.5 rounded-md p-2 text-gray-500 hover:bg-gray-100 hover:text-green-700 disabled:opacity-50"
+          >
+            <Paperclip className="h-5 w-5" />
+          </button>
+        )}
         <Textarea
           value={value}
           onChange={(e) => onChange(e.target.value.slice(0, MAX_MESSAGE_LEN))}

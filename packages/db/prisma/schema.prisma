@@ -3050,6 +3050,13 @@ enum MessengerMessageKind {
   @@map("messenger_message_kind")
 }
 
+enum MessengerAttachmentKind {
+  image
+  file
+
+  @@map("messenger_attachment_kind")
+}
+
 // Розмова: direct (1-на-1) або group. Для direct — детермінований `directKey`
 // (відсортована пара user.id через ":") гарантує один чат на пару людей.
 model MessengerConversation {
@@ -3108,7 +3115,28 @@ model MessengerMessage {
   author       User?                 @relation("MessengerMessageAuthor", fields: [authorId], references: [id], onDelete: SetNull)
   replyTo      MessengerMessage?     @relation("MessengerReply", fields: [replyToId], references: [id], onDelete: SetNull)
   replies      MessengerMessage[]    @relation("MessengerReply")
+  attachments  MessengerAttachment[]
 
   @@index([conversationId, createdAt])
   @@map("mgr_messenger_messages")
+}
+
+// Вкладення повідомлення (Етап 4): фото (image) або файл (PDF/Excel/…).
+// Файли зберігаються self-hosted через lib/media/storage.ts.
+model MessengerAttachment {
+  id        String                  @id @default(cuid())
+  messageId String                  @map("message_id")
+  kind      MessengerAttachmentKind
+  url       String
+  name      String
+  mimeType  String                  @map("mime_type")
+  sizeBytes Int                     @map("size_bytes")
+  width     Int?
+  height    Int?
+  createdAt DateTime                @default(now()) @map("created_at")
+
+  message MessengerMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@index([messageId])
+  @@map("mgr_messenger_attachments")
 }

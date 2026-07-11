@@ -1,6 +1,7 @@
 export type {
   MessengerUserBrief,
   MessengerConversationListItem,
+  MessengerAttachmentItem,
   MessengerMessageItem,
   MessengerReplyPreview,
   MessengerThreadMember,

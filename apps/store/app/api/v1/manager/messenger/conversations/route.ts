@@ -47,7 +47,12 @@ export async function GET(req: NextRequest) {
           messages: {
             orderBy: { createdAt: "desc" },
             take: 1,
-            select: { text: true, deletedAt: true, kind: true },
+            select: {
+              text: true,
+              deletedAt: true,
+              kind: true,
+              attachments: { select: { kind: true }, take: 2 },
+            },
           },
         },
       },
@@ -74,11 +79,18 @@ export async function GET(req: NextRequest) {
           : null;
 
       const last = conv.messages[0];
-      const preview = last
-        ? last.deletedAt
-          ? "Повідомлення видалено"
-          : last.text
-        : null;
+      let preview: string | null = null;
+      if (last) {
+        if (last.deletedAt) {
+          preview = "Повідомлення видалено";
+        } else if (last.text) {
+          preview = last.text;
+        } else if (last.attachments.length > 0) {
+          preview = last.attachments.some((a) => a.kind === "image")
+            ? "📷 Фото"
+            : "📎 Файл";
+        }
+      }
 
       const unread = await countUnread(conv.id, user.id, m.lastReadAt);
 

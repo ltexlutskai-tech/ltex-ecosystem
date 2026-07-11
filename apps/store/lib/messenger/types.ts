@@ -28,6 +28,17 @@ export interface MessengerReplyPreview {
   preview: string;
 }
 
+export interface MessengerAttachmentItem {
+  id: string;
+  kind: "image" | "file";
+  url: string;
+  name: string;
+  mimeType: string;
+  sizeBytes: number;
+  width: number | null;
+  height: number | null;
+}
+
 export interface MessengerMessageItem {
   id: string;
   conversationId: string;
@@ -37,6 +48,7 @@ export interface MessengerMessageItem {
   text: string;
   isMine: boolean;
   replyTo: MessengerReplyPreview | null;
+  attachments: MessengerAttachmentItem[];
   editedAt: string | null;
   deletedAt: string | null;
   createdAt: string;
