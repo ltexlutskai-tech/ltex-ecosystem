@@ -16,11 +16,13 @@ export function ConversationList({
   selectedId,
   onSelect,
   onNewChat,
+  onOpenSearch,
   refreshKey,
 }: {
   selectedId: string | null;
   onSelect: (id: string) => void;
   onNewChat: () => void;
+  onOpenSearch: () => void;
   refreshKey: number;
 }) {
   const [items, setItems] = useState<MessengerConversationListItem[]>([]);
@@ -74,14 +76,25 @@ export function ConversationList({
   return (
     <div className="flex h-full w-full flex-col border-r bg-white lg:w-[340px]">
       <div className="space-y-2 border-b px-3 py-2">
-        <button
-          type="button"
-          onClick={onNewChat}
-          className="flex w-full items-center justify-center gap-1.5 rounded-md bg-green-600 px-3 py-2 text-sm font-medium text-white hover:bg-green-700"
-        >
-          <Plus className="h-4 w-4" />
-          Новий чат
-        </button>
+        <div className="flex gap-1.5">
+          <button
+            type="button"
+            onClick={onNewChat}
+            className="flex flex-1 items-center justify-center gap-1.5 rounded-md bg-green-600 px-3 py-2 text-sm font-medium text-white hover:bg-green-700"
+          >
+            <Plus className="h-4 w-4" />
+            Новий чат
+          </button>
+          <button
+            type="button"
+            onClick={onOpenSearch}
+            aria-label="Пошук у повідомленнях"
+            title="Пошук у повідомленнях"
+            className="flex items-center justify-center rounded-md border border-gray-200 px-3 text-gray-600 hover:bg-gray-50"
+          >
+            <Search className="h-4 w-4" />
+          </button>
+        </div>
         <div className="relative">
           <Search className="pointer-events-none absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
           <Input

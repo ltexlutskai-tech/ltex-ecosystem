@@ -33,6 +33,7 @@ export interface MessageRowLike {
   createdAt: Date;
   forwardedFrom?: string | null;
   docRef?: unknown;
+  pinnedAt?: Date | null;
   replyTo?: ReplyRowLike | null;
   attachments?: AttachmentRowLike[];
   reactions?: { emoji: string; userId: string }[];
@@ -98,6 +99,7 @@ export function serializeMessage(
     reactions: summarizeReactions(row.reactions ?? [], opts.currentUserId),
     forwardedFrom: hidden ? null : (row.forwardedFrom ?? null),
     docRef: hidden ? null : parseStoredDocRef(row.docRef),
+    pinnedAt: row.pinnedAt ? row.pinnedAt.toISOString() : null,
     editedAt: row.editedAt ? row.editedAt.toISOString() : null,
     deletedAt: row.deletedAt ? row.deletedAt.toISOString() : null,
     createdAt: row.createdAt.toISOString(),

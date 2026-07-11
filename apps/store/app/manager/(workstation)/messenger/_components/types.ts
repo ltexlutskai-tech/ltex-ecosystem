@@ -7,6 +7,7 @@ export type {
   MessengerMessageItem,
   MessengerReactionSummary,
   MessengerReplyPreview,
+  MessengerSearchHit,
   MessengerThreadMember,
   MessengerThreadResponse,
 } from "@/lib/messenger/types";

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { ConversationList } from "./conversation-list";
 import { ConversationThread } from "./conversation-thread";
+import { MessengerSearchDialog } from "./search-dialog";
 import { NewChatDialog } from "./new-chat-dialog";
 
 export function MessengerClient({
@@ -19,6 +20,7 @@ export function MessengerClient({
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [listBump, setListBump] = useState(0);
   const [newChatOpen, setNewChatOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
 
   // Дип-лінк із дзвіночка/меню: ?c=<id> відкриває конкретну розмову.
   const appliedParamRef = useRef<string | null>(null);
@@ -51,6 +53,7 @@ export function MessengerClient({
         selectedId={selectedId}
         onSelect={setSelectedId}
         onNewChat={() => setNewChatOpen(true)}
+        onOpenSearch={() => setSearchOpen(true)}
         refreshKey={listBump}
       />
       <div className="hidden flex-1 lg:flex">
@@ -98,6 +101,11 @@ export function MessengerClient({
         onOpenChange={setNewChatOpen}
         currentUserId={currentUserId}
         onOpened={openConversation}
+      />
+      <MessengerSearchDialog
+        open={searchOpen}
+        onOpenChange={setSearchOpen}
+        onOpenConversation={openConversation}
       />
     </div>
   );

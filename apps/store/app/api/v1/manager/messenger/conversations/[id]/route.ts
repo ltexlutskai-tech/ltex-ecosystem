@@ -77,6 +77,23 @@ export async function GET(
       serializeMessage(r, { currentUserId: user.id, isOwner, nameById }),
     );
 
+  // Закріплені повідомлення (найновіші зверху, не видалені).
+  const pinnedRows = await prisma.messengerMessage.findMany({
+    where: { conversationId: id, pinnedAt: { not: null }, deletedAt: null },
+    orderBy: { pinnedAt: "desc" },
+    take: 10,
+    include: {
+      attachments: true,
+      reactions: { select: { emoji: true, userId: true } },
+      replyTo: {
+        select: { id: true, authorId: true, text: true, deletedAt: true },
+      },
+    },
+  });
+  const pinned: MessengerMessageItem[] = pinnedRows.map((r) =>
+    serializeMessage(r, { currentUserId: user.id, isOwner, nameById }),
+  );
+
   const others = memberUsers.filter((u) => u.id !== user.id);
   const counterpart: MessengerUserBrief | null =
     access.conversation.type === "direct" && others[0]
@@ -112,6 +129,7 @@ export async function GET(
         access.conversation.type === "group" &&
         canManageGroup(myGroupRole, user.role),
       myGroupRole,
+      pinned,
     },
     messages,
   };

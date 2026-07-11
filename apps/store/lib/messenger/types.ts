@@ -78,6 +78,7 @@ export interface MessengerMessageItem {
   reactions: MessengerReactionSummary[];
   forwardedFrom: string | null;
   docRef: MessengerDocRef | null;
+  pinnedAt: string | null;
   editedAt: string | null;
   deletedAt: string | null;
   createdAt: string;
@@ -99,6 +100,17 @@ export interface MessengerThreadResponse {
     canManage: boolean;
     /** Роль поточного користувача в групі, або null якщо він не учасник. */
     myGroupRole: "member" | "admin" | null;
+    /** Закріплені повідомлення (найновіші зверху). */
+    pinned: MessengerMessageItem[];
   };
   messages: MessengerMessageItem[];
+}
+
+export interface MessengerSearchHit {
+  id: string;
+  conversationId: string;
+  conversationTitle: string;
+  authorName: string | null;
+  snippet: string;
+  createdAt: string;
 }

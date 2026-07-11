@@ -9,6 +9,8 @@ import {
   Forward,
   Paperclip,
   Pencil,
+  Pin,
+  PinOff,
   Send,
   Smile,
   Trash2,
@@ -233,6 +235,7 @@ export function ConversationThread({
       reactions: [],
       forwardedFrom: null,
       docRef: null,
+      pinnedAt: null,
       editedAt: null,
       deletedAt: null,
       createdAt: new Date().toISOString(),
@@ -329,6 +332,25 @@ export function ConversationThread({
     [conversationId, toast],
   );
 
+  const doPin = useCallback(
+    async (m: MessengerMessageItem) => {
+      try {
+        const r = await fetch(
+          `/api/v1/manager/messenger/conversations/${conversationId}/messages/${m.id}/pin`,
+          { method: "POST" },
+        );
+        if (!r.ok) throw new Error(await errorFrom(r));
+        await loadInitial();
+      } catch (e) {
+        toast({
+          description: e instanceof Error ? e.message : "Помилка",
+          variant: "destructive",
+        });
+      }
+    },
+    [conversationId, loadInitial, toast],
+  );
+
   const doForward = useCallback(
     async (targetConversationId: string) => {
       if (!forwardSource || forwarding) return;
@@ -406,6 +428,9 @@ export function ConversationThread({
         header={header}
         onOpenInfo={isGroup ? () => setInfoOpen(true) : undefined}
       />
+      {header.pinned.length > 0 && (
+        <PinnedBar pinned={header.pinned} onUnpin={doPin} />
+      )}
       {isGroup && (
         <GroupInfoDialog
           open={infoOpen}
@@ -448,6 +473,7 @@ export function ConversationThread({
               onDelete={doDelete}
               onReact={doReact}
               onForward={setForwardSource}
+              onPin={doPin}
             />
           ))
         )}
@@ -540,6 +566,7 @@ function MessageBubble({
   onDelete,
   onReact,
   onForward,
+  onPin,
 }: {
   message: MessengerMessageItem;
   showAuthor: boolean;
@@ -550,6 +577,7 @@ function MessageBubble({
   onDelete: (m: MessengerMessageItem) => void;
   onReact: (m: MessengerMessageItem, emoji: string) => void;
   onForward: (m: MessengerMessageItem) => void;
+  onPin: (m: MessengerMessageItem) => void;
 }) {
   if (message.kind === "system") {
     return (
@@ -565,6 +593,7 @@ function MessageBubble({
   const canDelete = !isDeleted && (isMine || canManage || isOwner);
   const canReact = !isDeleted;
   const canForward = !isDeleted;
+  const isPinned = message.pinnedAt !== null;
 
   return (
     <div className={`group flex ${isMine ? "justify-end" : "justify-start"}`}>
@@ -577,11 +606,13 @@ function MessageBubble({
           canDelete={canDelete}
           canReact={canReact}
           canForward={canForward}
+          isPinned={isPinned}
           onReply={onReply}
           onEdit={onEdit}
           onDelete={onDelete}
           onReact={onReact}
           onForward={onForward}
+          onPin={onPin}
         />
       )}
       <div
@@ -591,6 +622,18 @@ function MessageBubble({
             : "max-w-[78%] rounded-lg bg-white px-3 py-2 text-sm text-gray-800 shadow-sm"
         }
       >
+        {isPinned && !isDeleted && (
+          <p
+            className={
+              isMine
+                ? "mb-0.5 flex items-center gap-1 text-[10px] text-green-100"
+                : "mb-0.5 flex items-center gap-1 text-[10px] text-gray-400"
+            }
+          >
+            <Pin className="h-3 w-3" />
+            Закріплено
+          </p>
+        )}
         {showAuthor && !isMine && message.authorName && (
           <p className="mb-0.5 text-[11px] font-semibold text-green-700">
             {message.authorName}
@@ -680,11 +723,13 @@ function MessageBubble({
           canDelete={canDelete}
           canReact={canReact}
           canForward={canForward}
+          isPinned={isPinned}
           onReply={onReply}
           onEdit={onEdit}
           onDelete={onDelete}
           onReact={onReact}
           onForward={onForward}
+          onPin={onPin}
         />
       )}
     </div>
@@ -757,11 +802,13 @@ function BubbleActions({
   canDelete,
   canReact,
   canForward,
+  isPinned,
   onReply,
   onEdit,
   onDelete,
   onReact,
   onForward,
+  onPin,
 }: {
   message: MessengerMessageItem;
   canReply: boolean;
@@ -769,11 +816,13 @@ function BubbleActions({
   canDelete: boolean;
   canReact: boolean;
   canForward: boolean;
+  isPinned: boolean;
   onReply: (m: MessengerMessageItem) => void;
   onEdit: (m: MessengerMessageItem) => void;
   onDelete: (m: MessengerMessageItem) => void;
   onReact: (m: MessengerMessageItem, emoji: string) => void;
   onForward: (m: MessengerMessageItem) => void;
+  onPin: (m: MessengerMessageItem) => void;
 }) {
   return (
     <div className="flex items-center gap-0.5 self-center px-1 opacity-0 transition group-hover:opacity-100">
@@ -788,6 +837,16 @@ function BubbleActions({
           <Forward className="h-3.5 w-3.5" />
         </IconBtn>
       )}
+      <IconBtn
+        label={isPinned ? "Відкріпити" : "Закріпити"}
+        onClick={() => onPin(message)}
+      >
+        {isPinned ? (
+          <PinOff className="h-3.5 w-3.5" />
+        ) : (
+          <Pin className="h-3.5 w-3.5" />
+        )}
+      </IconBtn>
       {canEdit && (
         <IconBtn label="Редагувати" onClick={() => onEdit(message)}>
           <Pencil className="h-3.5 w-3.5" />
@@ -798,6 +857,50 @@ function BubbleActions({
           <Trash2 className="h-3.5 w-3.5" />
         </IconBtn>
       )}
+    </div>
+  );
+}
+
+function PinnedBar({
+  pinned,
+  onUnpin,
+}: {
+  pinned: MessengerMessageItem[];
+  onUnpin: (m: MessengerMessageItem) => void;
+}) {
+  const latest = pinned[0];
+  if (!latest) return null;
+  const preview =
+    latest.text ||
+    (latest.attachments.length > 0
+      ? latest.attachments.some((a) => a.kind === "image")
+        ? "📷 Фото"
+        : "📎 Файл"
+      : latest.docRef
+        ? `📎 ${latest.docRef.label}`
+        : "Повідомлення");
+  return (
+    <div className="flex items-center gap-2 border-b bg-amber-50 px-4 py-1.5 text-xs">
+      <Pin className="h-3.5 w-3.5 shrink-0 text-amber-600" />
+      <div className="min-w-0 flex-1">
+        <span className="font-medium text-amber-800">Закріплене</span>
+        {pinned.length > 1 && (
+          <span className="ml-1 text-amber-600">(+{pinned.length - 1})</span>
+        )}
+        <span className="ml-2 text-gray-600">
+          {latest.authorName ? `${latest.authorName}: ` : ""}
+          {preview}
+        </span>
+      </div>
+      <button
+        type="button"
+        onClick={() => onUnpin(latest)}
+        aria-label="Відкріпити"
+        title="Відкріпити"
+        className="rounded p-1 text-amber-600 hover:bg-amber-100"
+      >
+        <PinOff className="h-3.5 w-3.5" />
+      </button>
     </div>
   );
 }
