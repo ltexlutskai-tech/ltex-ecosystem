@@ -19,7 +19,12 @@ import {
   applyReturnFromCustomerDebt,
 } from "./stock-documents";
 import { normalizeLine, type NormLine } from "./stock-documents-repo";
-import { isStockDocKind, parseCreateBody } from "./stock-documents-api";
+import {
+  isStockDocKind,
+  parseCreateBody,
+  stockDocListSelect,
+  STOCK_DOC_KINDS,
+} from "./stock-documents-api";
 
 beforeEach(() => applyDebtMovementSafeMock.mockReset());
 
@@ -197,5 +202,37 @@ describe("parseCreateBody — draft-режим (autosave)", () => {
     );
     expect(r.ok).toBe(true);
     if (r.ok) expect(r.data.customerName).toBe("ТТ Іванов");
+  });
+});
+
+describe("stockDocListSelect", () => {
+  it("never selects total_weight/total_quantity for repackings/inventories (no such columns)", () => {
+    for (const kind of ["repackings", "inventories"] as const) {
+      const sel = stockDocListSelect(kind);
+      expect(sel).not.toHaveProperty("totalWeight");
+      expect(sel).not.toHaveProperty("totalQuantity");
+    }
+  });
+  it("selects inputWeight for repackings (header weight source)", () => {
+    expect(stockDocListSelect("repackings")).toHaveProperty(
+      "inputWeight",
+      true,
+    );
+  });
+  it("selects totals for other kinds", () => {
+    for (const kind of STOCK_DOC_KINDS) {
+      if (kind === "repackings" || kind === "inventories") continue;
+      const sel = stockDocListSelect(kind);
+      expect(sel).toHaveProperty("totalWeight", true);
+      expect(sel).toHaveProperty("totalQuantity", true);
+    }
+  });
+  it("always includes the base columns", () => {
+    for (const kind of STOCK_DOC_KINDS) {
+      const sel = stockDocListSelect(kind);
+      for (const col of ["id", "docNumber", "number1C", "docDate", "status"]) {
+        expect(sel).toHaveProperty(col, true);
+      }
+    }
   });
 });

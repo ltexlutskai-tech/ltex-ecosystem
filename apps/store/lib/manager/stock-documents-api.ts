@@ -177,6 +177,26 @@ export function parseCreateBody(
   }
 }
 
+/**
+ * Prisma-`select` для списку документа. Repacking/Inventory НЕ мають колонок
+ * `total_weight`/`total_quantity` (у перепаковки — input/output/loss_weight; в
+ * інвентаризації підсумків у шапці немає). Вибір неіснуючих полів кидав
+ * `PrismaClientValidationError` → падав список цих типів. Тут добираємо select
+ * під наявні колонки. Чистий (без I/O) — для регресійного тесту.
+ */
+export function stockDocListSelect(kind: StockDocKind): Record<string, true> {
+  const base = {
+    id: true,
+    docNumber: true,
+    number1C: true,
+    docDate: true,
+    status: true,
+  } as const;
+  if (kind === "repackings") return { ...base, inputWeight: true };
+  if (kind === "inventories") return { ...base };
+  return { ...base, totalWeight: true, totalQuantity: true };
+}
+
 export interface ListItem {
   id: string;
   docNumber: string;
@@ -207,22 +227,28 @@ export async function listStockDocs(
       { docNumber: { contains: q, mode: "insensitive" } },
       { number1C: { contains: q, mode: "insensitive" } },
     ];
-  const select = {
-    id: true,
-    docNumber: true,
-    number1C: true,
-    docDate: true,
-    status: true,
-    totalWeight: true,
-    totalQuantity: true,
-  } as const;
+  const select = stockDocListSelect(kind);
   const orderBy = { docDate: "desc" as const };
   const skip = (page - 1) * pageSize;
   const delegate = stockDocDelegate(kind);
-  const [total, items] = await Promise.all([
+  const [total, rows] = await Promise.all([
     delegate.count({ where }),
     delegate.findMany({ where, orderBy, skip, take: pageSize, select }),
   ]);
+  const items: ListItem[] = rows.map((r) => ({
+    id: r.id,
+    docNumber: r.docNumber,
+    number1C: r.number1C ?? null,
+    docDate: r.docDate,
+    status: r.status,
+    totalWeight:
+      typeof r.totalWeight === "number"
+        ? r.totalWeight
+        : typeof r.inputWeight === "number"
+          ? r.inputWeight
+          : 0,
+    totalQuantity: typeof r.totalQuantity === "number" ? r.totalQuantity : 0,
+  }));
   return {
     items,
     total,
@@ -230,6 +256,17 @@ export async function listStockDocs(
     pageSize,
     totalPages: Math.max(1, Math.ceil(total / pageSize)),
   };
+}
+
+interface StockDocListRow {
+  id: string;
+  docNumber: string;
+  number1C: string | null;
+  docDate: Date;
+  status: string;
+  totalWeight?: number;
+  totalQuantity?: number;
+  inputWeight?: number;
 }
 
 interface ListDelegate {
@@ -240,7 +277,7 @@ interface ListDelegate {
     skip: number;
     take: number;
     select: Record<string, true>;
-  }): Promise<ListItem[]>;
+  }): Promise<StockDocListRow[]>;
 }
 
 function stockDocDelegate(kind: StockDocKind): ListDelegate {
