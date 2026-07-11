@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@ltex/db";
 import { getCurrentUser } from "@/lib/auth/manager-auth";
 import { getProductClaimsSummaries } from "@/lib/manager/product-claims";
+import { computeStockSummaryByProduct } from "@/lib/manager/product-stock-summary";
 
 /**
  * GET /api/v1/manager/products/search?q=...
@@ -51,7 +52,11 @@ export async function GET(req: NextRequest) {
     },
   });
 
-  const claimMap = await getProductClaimsSummaries(products.map((p) => p.id));
+  const productIds = products.map((p) => p.id);
+  const [claimMap, stockMap] = await Promise.all([
+    getProductClaimsSummaries(productIds),
+    computeStockSummaryByProduct(productIds),
+  ]);
 
   return NextResponse.json({
     items: products.map((p) => ({
@@ -69,6 +74,7 @@ export async function GET(req: NextRequest) {
         currency: pr.currency,
       })),
       activeClaim: claimMap.get(p.id) ?? null,
+      stock: stockMap.get(p.id) ?? { lots: 0, weightKg: 0, quantityPcs: 0 },
     })),
   });
 }

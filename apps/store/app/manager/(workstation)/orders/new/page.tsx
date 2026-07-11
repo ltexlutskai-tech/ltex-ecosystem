@@ -130,6 +130,7 @@ export default async function NewOrderPage({
               phonePrimary: true,
               street: true,
               house: true,
+              novaPoshtaBranch: true,
               deliveryMethod: { select: { code: true } },
             },
           })
@@ -148,6 +149,7 @@ export default async function NewOrderPage({
         debt: mgr?.debt?.toString() ?? "0",
         priceTypeId: mgr?.priceTypeId ?? null,
         deliveryMethodCode: mgr?.deliveryMethod?.code ?? null,
+        novaPoshtaBranch: mgr?.novaPoshtaBranch ?? null,
         agent: null,
         isOwned: true,
       };

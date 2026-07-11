@@ -24,11 +24,8 @@ import { ClientPicker } from "./client-picker";
 import { ItemsEditor } from "./items-editor";
 import { OrderTotals } from "./order-totals";
 import { ProductPricePicker } from "./product-price-picker";
-import {
-  unitPriceForType,
-  autoUnitPrice,
-  SELLING_PRICE_TYPES,
-} from "@/lib/manager/order-pricing";
+import { autoUnitPrice } from "@/lib/manager/order-pricing";
+import { classifyDelivery } from "@/lib/manager/order-delivery";
 import { bagWeightForQuantity } from "@/lib/manager/order-bag-weight";
 import {
   draftToWire,
@@ -86,6 +83,45 @@ function newUid(): string {
   return `i-${Math.random().toString(36).slice(2, 10)}`;
 }
 
+/**
+ * Поля доставки для payload за способом (метод класифікуємо за кодом/лейблом):
+ *  • Пошта (post) → № відділення + ТТН, адресу не пишемо;
+ *  • Доставка (delivery) → адреса, НП/ТТН не пишемо;
+ *  • Самовивіз/інше → нічого.
+ */
+function deliveryPayload(
+  method: string,
+  options: OrderDeliveryOption[],
+  values: {
+    novaPoshtaBranch: string;
+    deliveryAddress: string;
+    expressWaybill: string;
+  },
+): {
+  novaPoshtaBranch: string | null;
+  deliveryAddress: string | null;
+  expressWaybill: string | null;
+} {
+  const kind = classifyDelivery(
+    method,
+    options.find((o) => o.code === method)?.label,
+  );
+  return {
+    novaPoshtaBranch:
+      kind === "post" ? values.novaPoshtaBranch.trim() || null : null,
+    deliveryAddress:
+      kind === "delivery" ? values.deliveryAddress.trim() || null : null,
+    expressWaybill:
+      kind === "post" ? values.expressWaybill.trim() || null : null,
+  };
+}
+
+/** Парсить рядок «Термін (днів)» у ціле > 0 або null. */
+function parseOverdueDays(raw: string): number | null {
+  const n = Number.parseInt(raw, 10);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
 export function OrderForm({
   mode = "create",
   orderId,
@@ -136,10 +172,9 @@ export function OrderForm({
   } | null>(null);
 
   // ─── Менеджерські поля (Етап 1) ───────────────────────────────────────────
-  // Тип цін — дві фіксовані опції (продажна / акційна), відв'язані від
-  // MgrPriceType. За замовчуванням «Ціна продажу» (wholesale); при додаванні
-  // товару ціна підставляється авто (акційна якщо є — `autoUnitPrice`).
-  const [sellingTypeCode, setSellingTypeCode] = useState<string>("wholesale");
+  // Тип цін як окреме поле прибрано (рішення user): при додаванні товару ціна
+  // підставляється авто (акційна якщо є — `autoUnitPrice`, інакше продажна) і
+  // редагується вручну у рядку.
   const [deliveryMethod, setDeliveryMethod] = useState<string>(
     initialOrder?.deliveryMethod ??
       mapClientDeliveryToOrder(
@@ -147,8 +182,29 @@ export function OrderForm({
         deliveryMethods,
       ),
   );
+  // Поля доставки за способом (як у Реалізації): № відділення НП + ТТН для
+  // «Пошти»; адреса для «Доставки»; нічого для «Самовивозу».
+  const [novaPoshtaBranch, setNovaPoshtaBranch] = useState<string>(
+    initialOrder?.novaPoshtaBranch ?? initialClient?.novaPoshtaBranch ?? "",
+  );
+  const [deliveryAddress, setDeliveryAddress] = useState<string>(
+    initialOrder?.deliveryAddress ?? initialClient?.address ?? "",
+  );
+  const [expressWaybill, setExpressWaybill] = useState<string>(
+    initialOrder?.expressWaybill ?? "",
+  );
+  // Термін до протермінування (днів) для авто-нагадування; порожньо = без нього.
+  const [overdueDays, setOverdueDays] = useState<string>(
+    initialOrder?.overdueDays != null ? String(initialOrder.overdueDays) : "",
+  );
   // Актуальність документа (1С «Статус заказа: Актуальне») — лише edit.
   const [isActual, setIsActual] = useState(initialOrder?.isActual ?? true);
+
+  // Категорія способу доставки → які поля показувати.
+  const deliveryKind = classifyDelivery(
+    deliveryMethod,
+    deliveryMethods.find((o) => o.code === deliveryMethod)?.label,
+  );
 
   // ─── Автозбереження чернетки (наскрізне, План AUTOSAVE_REALTIME_PLAN) ──────
   // Дворівневий захист: рівень 1 (localStorage) + рівень 2 (жива чернетка в БД).
@@ -162,9 +218,22 @@ export function OrderForm({
       items,
       notes,
       deliveryMethod,
-      sellingTypeCode,
+      novaPoshtaBranch,
+      deliveryAddress,
+      expressWaybill,
+      overdueDays,
     }),
-    [clientId, clientSummary, items, notes, deliveryMethod, sellingTypeCode],
+    [
+      clientId,
+      clientSummary,
+      items,
+      notes,
+      deliveryMethod,
+      novaPoshtaBranch,
+      deliveryAddress,
+      expressWaybill,
+      overdueDays,
+    ],
   );
 
   type OrderDraftData = typeof draftData;
@@ -182,9 +251,15 @@ export function OrderForm({
         exchangeRate: exchangeRate > 0 ? exchangeRate : undefined,
         priceTypeId: null,
         deliveryMethod: d.deliveryMethod || null,
+        ...deliveryPayload(d.deliveryMethod, deliveryMethods, {
+          novaPoshtaBranch: d.novaPoshtaBranch,
+          deliveryAddress: d.deliveryAddress,
+          expressWaybill: d.expressWaybill,
+        }),
+        overdueDays: parseOverdueDays(d.overdueDays),
       };
     },
-    [exchangeRate],
+    [exchangeRate, deliveryMethods],
   );
 
   const createDraftServer = useCallback(
@@ -239,40 +314,11 @@ export function OrderForm({
     setNotes(d.notes);
     setShowComment(!!d.notes.trim());
     setDeliveryMethod(d.deliveryMethod);
-    setSellingTypeCode(d.sellingTypeCode);
+    setNovaPoshtaBranch(d.novaPoshtaBranch);
+    setDeliveryAddress(d.deliveryAddress);
+    setExpressWaybill(d.expressWaybill);
+    setOverdueDays(d.overdueDays);
     autosave.acceptRestore();
-  }
-
-  /**
-   * Перерахунок цін усіх рядків під обраний тип цін (override, як у 1С):
-   *  - `wholesale` → форс продажної ціни кожного рядка (isAkciya=false);
-   *  - `akciya`    → акційна-де-є (`autoUnitPrice`: акційна якщо є, інакше
-   *                  продажна), з прапором isAkciya.
-   */
-  function recalcAllRows(nextSellingCode: string): void {
-    setItems((prev) =>
-      prev.map((row) => {
-        if (!row.product) return row;
-        let unit: number | null;
-        let isAkciya: boolean;
-        if (nextSellingCode === "akciya") {
-          const auto = autoUnitPrice(row.product.prices);
-          unit = auto.unit;
-          isAkciya = auto.isAkciya;
-        } else {
-          unit = unitPriceForType(row.product.prices, "wholesale");
-          isAkciya = false;
-        }
-        if (unit === null) return row; // немає прайсу — лишаємо ручний ввід
-        const priceEur = Math.round(unit * row.weight * 100) / 100;
-        return { ...row, unitPriceEur: unit, priceEur, isAkciya };
-      }),
-    );
-  }
-
-  function onPriceTypeChange(nextCode: string): void {
-    setSellingTypeCode(nextCode);
-    recalcAllRows(nextCode);
   }
 
   function onClientChange(
@@ -289,6 +335,10 @@ export function OrderForm({
         deliveryMethods,
       );
       if (mappedDelivery) setDeliveryMethod(mappedDelivery);
+      // Префіл адреси / № відділення НП з картки клієнта (перезаписуємо —
+      // менеджер за потреби скоригує вручну).
+      setDeliveryAddress(summary.address ?? "");
+      setNovaPoshtaBranch(summary.novaPoshtaBranch ?? "");
       // Ранній діалог (7.3): одразу перевіряємо, чи у клієнта вже є активне
       // замовлення — щоб не робити зайву роботу з позиціями (лише create).
       if (!isEdit) void checkActiveOrder(id);
@@ -421,10 +471,16 @@ export function OrderForm({
           ...(usePatch ? {} : { customerId: clientId }),
           items: wireItems,
           notes: notes.trim() || (usePatch ? null : undefined),
-          // Тип цін відв'язаний від MgrPriceType (wholesale/akciya — НЕ id) —
-          // менеджерська ціна фіксується у рядках. На документ пишемо null.
+          // Тип цін як поле прибрано — менеджерська ціна фіксується у рядках
+          // (акційна підставляється авто при додаванні). На документ — null.
           priceTypeId: null,
           deliveryMethod: deliveryMethod || null,
+          ...deliveryPayload(deliveryMethod, deliveryMethods, {
+            novaPoshtaBranch,
+            deliveryAddress,
+            expressWaybill,
+          }),
+          overdueDays: parseOverdueDays(overdueDays),
           ...(usePatch ? { isActual } : {}),
           ...(force && !usePatch ? { force: true } : {}),
           ...(post ? { post: true } : {}),
@@ -568,7 +624,7 @@ export function OrderForm({
                 minimumFractionDigits: 2,
                 maximumFractionDigits: 2,
               })}{" "}
-              ₴
+              €
             </span>
           </div>
         )}
@@ -581,31 +637,6 @@ export function OrderForm({
         </h2>
 
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {/* Тип цін */}
-          <div>
-            <label
-              htmlFor="order-price-type"
-              className="mb-1 block text-sm font-medium text-gray-700"
-            >
-              Тип цін
-            </label>
-            <select
-              id="order-price-type"
-              value={sellingTypeCode}
-              onChange={(e) => onPriceTypeChange(e.target.value)}
-              className="h-10 w-full rounded-md border border-gray-300 bg-white px-3 text-sm focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500"
-            >
-              {SELLING_PRICE_TYPES.map((pt) => (
-                <option key={pt.code} value={pt.code}>
-                  {pt.label}
-                </option>
-              ))}
-            </select>
-            <p className="mt-1 text-xs text-gray-400">
-              При зміні ціни рядків перераховуються.
-            </p>
-          </div>
-
           {/* Доставка */}
           <div>
             <label
@@ -627,6 +658,89 @@ export function OrderForm({
                 </option>
               ))}
             </select>
+          </div>
+
+          {/* № відділення НП — лише для «Пошти» */}
+          {deliveryKind === "post" && (
+            <div>
+              <label
+                htmlFor="order-np-branch"
+                className="mb-1 block text-sm font-medium text-gray-700"
+              >
+                № відділення НП
+              </label>
+              <input
+                id="order-np-branch"
+                value={novaPoshtaBranch}
+                onChange={(e) => setNovaPoshtaBranch(e.target.value)}
+                maxLength={50}
+                placeholder="напр. 12"
+                className="h-10 w-full rounded-md border border-gray-300 bg-white px-3 text-sm focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500"
+              />
+            </div>
+          )}
+
+          {/* ТТН — лише для «Пошти» */}
+          {deliveryKind === "post" && (
+            <div>
+              <label
+                htmlFor="order-ttn"
+                className="mb-1 block text-sm font-medium text-gray-700"
+              >
+                ТТН (експрес-накладна)
+              </label>
+              <input
+                id="order-ttn"
+                value={expressWaybill}
+                onChange={(e) => setExpressWaybill(e.target.value)}
+                maxLength={60}
+                placeholder="напр. 20450000000000"
+                className="h-10 w-full rounded-md border border-gray-300 bg-white px-3 text-sm focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500"
+              />
+            </div>
+          )}
+
+          {/* Адреса доставки — лише для «Доставки» */}
+          {deliveryKind === "delivery" && (
+            <div className="sm:col-span-2">
+              <label
+                htmlFor="order-delivery-address"
+                className="mb-1 block text-sm font-medium text-gray-700"
+              >
+                Адреса доставки
+              </label>
+              <input
+                id="order-delivery-address"
+                value={deliveryAddress}
+                onChange={(e) => setDeliveryAddress(e.target.value)}
+                maxLength={500}
+                placeholder="Місто, вулиця, будинок…"
+                className="h-10 w-full rounded-md border border-gray-300 bg-white px-3 text-sm focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500"
+              />
+            </div>
+          )}
+
+          {/* Термін до протермінування (днів) */}
+          <div>
+            <label
+              htmlFor="order-overdue-days"
+              className="mb-1 block text-sm font-medium text-gray-700"
+            >
+              Термін (днів до нагадування)
+            </label>
+            <input
+              id="order-overdue-days"
+              type="number"
+              min="1"
+              step="1"
+              value={overdueDays}
+              onChange={(e) => setOverdueDays(e.target.value)}
+              placeholder="напр. 14"
+              className="h-10 w-full rounded-md border border-gray-300 bg-white px-3 text-sm focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500"
+            />
+            <p className="mt-1 text-xs text-gray-400">
+              Через стільки днів нагадає закрити/переробити замовлення.
+            </p>
           </div>
 
           {/* Номер + дата */}

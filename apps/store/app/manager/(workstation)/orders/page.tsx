@@ -11,6 +11,7 @@ import {
 } from "@/lib/manager/orders-list";
 import { getDeliveryLabelResolver } from "@/lib/manager/delivery-methods";
 import { EmptyState } from "../_components/empty-state";
+import { AutoRefresh } from "../_components/auto-refresh";
 import { ListPagination } from "../customers/_components/list-pagination";
 import { OrdersTable } from "./_components/orders-table";
 import { OrdersToolbar } from "./_components/orders-toolbar";
@@ -176,6 +177,7 @@ export default async function ManagerOrdersPage({
 
   return (
     <div className="max-w-none space-y-3">
+      <AutoRefresh />
       <header className="flex items-start justify-between gap-3">
         <div>
           <h1 className="text-xl font-bold text-gray-800">Замовлення</h1>

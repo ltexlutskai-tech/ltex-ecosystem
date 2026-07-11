@@ -13,6 +13,7 @@ import {
   getDeliveryLabelResolver,
 } from "@/lib/manager/delivery-methods";
 import { OrderForm } from "../new/_components/order-form";
+import { AutoRefresh } from "../../_components/auto-refresh";
 import { OrderCloseButton } from "./_components/order-close-button";
 import { OrderActualToggle } from "./_components/order-actual-toggle";
 import type {
@@ -142,6 +143,7 @@ export default async function ManagerOrderDetailPage({
             phonePrimary: true,
             street: true,
             house: true,
+            novaPoshtaBranch: true,
           },
         })
       : Promise.resolve(null),
@@ -173,6 +175,7 @@ export default async function ManagerOrderDetailPage({
     debt: mgr?.debt?.toString() ?? "0",
     priceTypeId: order.priceTypeId,
     deliveryMethodCode: order.deliveryMethod,
+    novaPoshtaBranch: mgr?.novaPoshtaBranch ?? null,
     agent: null,
     isOwned: true,
   };
@@ -215,6 +218,10 @@ export default async function ManagerOrderDetailPage({
     notes: order.notes ?? "",
     priceTypeId: order.priceTypeId,
     deliveryMethod: order.deliveryMethod,
+    novaPoshtaBranch: order.novaPoshtaBranch,
+    deliveryAddress: order.deliveryAddress,
+    expressWaybill: order.expressWaybill,
+    overdueDays: order.overdueDays,
     cashOnDelivery: order.cashOnDelivery,
     assignedAgentUserId: order.assignedAgentUserId,
     items: itemDrafts,
@@ -224,6 +231,8 @@ export default async function ManagerOrderDetailPage({
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">
+      {/* Read-only режим автооновлюємо; у режимі редагування — ні (не заважати). */}
+      {!editable && <AutoRefresh intervalMs={30_000} />}
       <Link
         href="/manager/orders"
         className="inline-flex items-center gap-1 text-sm text-gray-600 hover:text-gray-900"
@@ -367,7 +376,19 @@ function ReadOnlyOrder({
           <Field label="Телефон">{order.customer.phone ?? "—"}</Field>
           <Field label="Місто">{order.customer.city ?? "—"}</Field>
           <Field label="Доставка">{deliveryLabel}</Field>
+          {order.novaPoshtaBranch && (
+            <Field label="№ відділення НП">{order.novaPoshtaBranch}</Field>
+          )}
+          {order.expressWaybill && (
+            <Field label="ТТН">{order.expressWaybill}</Field>
+          )}
+          {order.deliveryAddress && (
+            <Field label="Адреса доставки">{order.deliveryAddress}</Field>
+          )}
           <Field label="Наложка">{order.cashOnDelivery ? "Так" : "Ні"}</Field>
+          {order.overdueDays != null && (
+            <Field label="Термін нагадування">{order.overdueDays} дн.</Field>
+          )}
         </dl>
       </section>
 
