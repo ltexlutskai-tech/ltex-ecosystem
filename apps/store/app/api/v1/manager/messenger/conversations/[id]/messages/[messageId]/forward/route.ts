@@ -3,6 +3,7 @@ import { z } from "zod";
 import { prisma } from "@ltex/db";
 import { getCurrentUser } from "@/lib/auth/manager-auth";
 import { getMessengerConversationForUser } from "@/lib/messenger/access";
+import { buildPushPreview, notifyNewMessage } from "@/lib/messenger/notify";
 import { serializeMessage } from "@/lib/messenger/serialize";
 
 const bodySchema = z.object({
@@ -117,6 +118,17 @@ export async function POST(
     currentUserId: user.id,
     isOwner: user.role === "owner",
     nameById: new Map([[user.id, user.fullName]]),
+  });
+
+  void notifyNewMessage({
+    conversationId: targetId,
+    authorId: user.id,
+    authorName: user.fullName,
+    preview: buildPushPreview({
+      text: source.text,
+      hasImage: source.attachments.some((a) => a.kind === "image"),
+      hasFile: source.attachments.some((a) => a.kind === "file"),
+    }),
   });
 
   return NextResponse.json(

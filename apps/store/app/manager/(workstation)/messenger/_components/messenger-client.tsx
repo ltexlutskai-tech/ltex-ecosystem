@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { ConversationList } from "./conversation-list";
 import { ConversationThread } from "./conversation-thread";
 import { NewChatDialog } from "./new-chat-dialog";
@@ -14,9 +15,20 @@ export function MessengerClient({
   currentUserRole: string;
   currentUserName: string;
 }) {
+  const searchParams = useSearchParams();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [listBump, setListBump] = useState(0);
   const [newChatOpen, setNewChatOpen] = useState(false);
+
+  // Дип-лінк із дзвіночка/меню: ?c=<id> відкриває конкретну розмову.
+  const appliedParamRef = useRef<string | null>(null);
+  useEffect(() => {
+    const c = searchParams.get("c");
+    if (c && appliedParamRef.current !== c) {
+      appliedParamRef.current = c;
+      setSelectedId(c);
+    }
+  }, [searchParams]);
 
   const bumpList = useCallback(() => setListBump((v) => v + 1), []);
 

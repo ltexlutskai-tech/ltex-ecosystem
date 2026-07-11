@@ -7,6 +7,7 @@ import {
   MAX_ATTACHMENTS_PER_MESSAGE,
   saveMessengerAttachment,
 } from "@/lib/messenger/attachments";
+import { buildPushPreview, notifyNewMessage } from "@/lib/messenger/notify";
 import { serializeMessage } from "@/lib/messenger/serialize";
 import { rateLimit, getClientIp } from "@/lib/rate-limit";
 
@@ -129,6 +130,17 @@ export async function POST(
     currentUserId: user.id,
     isOwner: user.role === "owner",
     nameById: new Map([[user.id, user.fullName]]),
+  });
+
+  void notifyNewMessage({
+    conversationId: id,
+    authorId: user.id,
+    authorName: user.fullName,
+    preview: buildPushPreview({
+      text: caption,
+      hasImage: saved.some((a) => a.kind === "image"),
+      hasFile: saved.some((a) => a.kind === "file"),
+    }),
   });
 
   return NextResponse.json({ message }, { status: 201 });

@@ -4,6 +4,7 @@ import { prisma } from "@ltex/db";
 import { getCurrentUser } from "@/lib/auth/manager-auth";
 import { getMessengerConversationForUser } from "@/lib/messenger/access";
 import { docRefSchema } from "@/lib/messenger/doc-ref";
+import { buildPushPreview, notifyNewMessage } from "@/lib/messenger/notify";
 import { serializeMessage } from "@/lib/messenger/serialize";
 import { rateLimit, getClientIp } from "@/lib/rate-limit";
 
@@ -130,6 +131,16 @@ export async function POST(
     currentUserId: user.id,
     isOwner: user.role === "owner",
     nameById,
+  });
+
+  void notifyNewMessage({
+    conversationId: id,
+    authorId: user.id,
+    authorName: user.fullName,
+    preview: buildPushPreview({
+      text: parsed.data.text,
+      docRefLabel: parsed.data.docRef?.label ?? null,
+    }),
   });
 
   return NextResponse.json({ message }, { status: 201 });

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { ManagerRole } from "@/lib/auth/jwt";
 import { HeaderBarcode } from "./header-barcode";
+import { HeaderMessengerBell } from "./header-messenger-bell";
 import { HeaderNotificationsBell } from "./header-notifications-bell";
 import { HeaderProfileMenu } from "./header-profile-menu";
 import { HeaderSearch } from "./header-search";
@@ -26,6 +27,7 @@ export function ManagerHeader({
         <HeaderSearch />
         <HeaderBarcode />
       </div>
+      <HeaderMessengerBell />
       <HeaderNotificationsBell />
       <HeaderProfileMenu fullName={fullName} role={role} />
     </header>
