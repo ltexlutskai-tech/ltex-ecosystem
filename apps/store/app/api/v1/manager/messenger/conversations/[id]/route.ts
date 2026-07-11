@@ -4,13 +4,12 @@ import { prisma } from "@ltex/db";
 import { getCurrentUser } from "@/lib/auth/manager-auth";
 import { getMessengerConversationForUser } from "@/lib/messenger/access";
 import { canManageGroup, renameGroup } from "@/lib/messenger/group";
+import { serializeMessage } from "@/lib/messenger/serialize";
 import type {
   MessengerMessageItem,
   MessengerThreadResponse,
   MessengerUserBrief,
 } from "@/lib/messenger/types";
-
-const DELETED_PLACEHOLDER = "Повідомлення видалено";
 
 /**
  * GET /api/v1/manager/messenger/conversations/[id]
@@ -63,23 +62,18 @@ export async function GET(
     },
     orderBy: { createdAt: "desc" },
     take: limit,
+    include: {
+      replyTo: {
+        select: { id: true, authorId: true, text: true, deletedAt: true },
+      },
+    },
   });
 
-  const messages: MessengerMessageItem[] = [...rows].reverse().map((r) => {
-    const hidden = r.deletedAt !== null && !isOwner;
-    return {
-      id: r.id,
-      conversationId: r.conversationId,
-      authorId: r.authorId,
-      authorName: r.authorId ? (nameById.get(r.authorId) ?? null) : null,
-      kind: r.kind,
-      text: hidden ? DELETED_PLACEHOLDER : r.text,
-      isMine: r.authorId === user.id,
-      editedAt: r.editedAt ? r.editedAt.toISOString() : null,
-      deletedAt: r.deletedAt ? r.deletedAt.toISOString() : null,
-      createdAt: r.createdAt.toISOString(),
-    };
-  });
+  const messages: MessengerMessageItem[] = [...rows]
+    .reverse()
+    .map((r) =>
+      serializeMessage(r, { currentUserId: user.id, isOwner, nameById }),
+    );
 
   const others = memberUsers.filter((u) => u.id !== user.id);
   const counterpart: MessengerUserBrief | null =

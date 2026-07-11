@@ -22,6 +22,12 @@ export interface MessengerConversationListItem {
   unread: number;
 }
 
+export interface MessengerReplyPreview {
+  id: string;
+  authorName: string | null;
+  preview: string;
+}
+
 export interface MessengerMessageItem {
   id: string;
   conversationId: string;
@@ -30,6 +36,7 @@ export interface MessengerMessageItem {
   kind: "text" | "system";
   text: string;
   isMine: boolean;
+  replyTo: MessengerReplyPreview | null;
   editedAt: string | null;
   deletedAt: string | null;
   createdAt: string;

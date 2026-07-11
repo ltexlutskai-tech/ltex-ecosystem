@@ -2,6 +2,8 @@ export type {
   MessengerUserBrief,
   MessengerConversationListItem,
   MessengerMessageItem,
+  MessengerReplyPreview,
+  MessengerThreadMember,
   MessengerThreadResponse,
 } from "@/lib/messenger/types";
 

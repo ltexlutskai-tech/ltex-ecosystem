@@ -7,6 +7,7 @@ import { NewChatDialog } from "./new-chat-dialog";
 
 export function MessengerClient({
   currentUserId,
+  currentUserRole,
   currentUserName,
 }: {
   currentUserId: string;
@@ -46,6 +47,7 @@ export function MessengerClient({
             key={selectedId}
             conversationId={selectedId}
             currentUserId={currentUserId}
+            currentUserRole={currentUserRole}
             currentUserName={currentUserName}
             onReadCleared={bumpList}
             onLeft={leaveConversation}
@@ -70,6 +72,7 @@ export function MessengerClient({
               key={`m-${selectedId}`}
               conversationId={selectedId}
               currentUserId={currentUserId}
+              currentUserRole={currentUserRole}
               currentUserName={currentUserName}
               onReadCleared={bumpList}
               onLeft={leaveConversation}

@@ -1,7 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ChevronRight, Send } from "lucide-react";
+import {
+  ChevronRight,
+  CornerUpLeft,
+  Pencil,
+  Send,
+  Trash2,
+  X,
+} from "lucide-react";
 import { Button, Textarea, useToast } from "@ltex/ui";
 import { formatRelativeShort } from "../../_components/format-relative";
 import { Avatar } from "./avatar";
@@ -9,6 +16,7 @@ import { GroupInfoDialog } from "./group-info-dialog";
 import { roleLabel } from "./role-label";
 import type {
   MessengerMessageItem,
+  MessengerReplyPreview,
   MessengerThreadResponse,
   SendMessageResponse,
 } from "./types";
@@ -18,16 +26,23 @@ const MAX_MESSAGE_LEN = 4_000;
 
 type Header = MessengerThreadResponse["conversation"];
 
+async function errorFrom(r: Response): Promise<string> {
+  const data = (await r.json().catch(() => ({}))) as { error?: string };
+  return data.error ?? "Помилка";
+}
+
 export function ConversationThread({
   conversationId,
   currentUserId,
   currentUserName,
+  currentUserRole,
   onReadCleared,
   onLeft,
 }: {
   conversationId: string;
   currentUserId: string;
   currentUserName: string;
+  currentUserRole: string;
   onReadCleared: () => void;
   onLeft: () => void;
 }) {
@@ -37,6 +52,10 @@ export function ConversationThread({
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
   const [infoOpen, setInfoOpen] = useState(false);
+  const [replyTarget, setReplyTarget] = useState<MessengerMessageItem | null>(
+    null,
+  );
+  const [editing, setEditing] = useState<MessengerMessageItem | null>(null);
   const { toast } = useToast();
 
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -78,10 +97,9 @@ export function ConversationThread({
     void loadInitial();
   }, [loadInitial]);
 
-  // Polling нових повідомлень кожні 3с поки вкладка видима.
+  // Polling — оновлюємо весь набір (щоб бачити редагування/видалення інших).
   useEffect(() => {
     let cancelled = false;
-
     async function poll() {
       try {
         const r = await fetch(
@@ -92,21 +110,11 @@ export function ConversationThread({
         const json = (await r.json()) as MessengerThreadResponse;
         if (cancelled) return;
         setHeader(json.conversation);
-        const fresh = json.messages ?? [];
-        setMessages((prev) => {
-          // Оновлюємо, якщо змінилась кількість або останній id (нове/видалене).
-          const prevLast = prev[prev.length - 1]?.id;
-          const freshLast = fresh[fresh.length - 1]?.id;
-          if (prev.length === fresh.length && prevLast === freshLast) {
-            return prev;
-          }
-          return fresh;
-        });
+        setMessages(json.messages ?? []);
       } catch {
         // silent
       }
     }
-
     const id = window.setInterval(() => {
       if (document.visibilityState === "visible") void poll();
     }, POLL_INTERVAL_MS);
@@ -134,11 +142,64 @@ export function ConversationThread({
     nearBottomRef.current = dist < 80;
   }
 
-  const send = useCallback(async () => {
+  function startReply(m: MessengerMessageItem) {
+    setEditing(null);
+    setReplyTarget(m);
+  }
+  function startEdit(m: MessengerMessageItem) {
+    setReplyTarget(null);
+    setEditing(m);
+    setDraft(m.text);
+  }
+  function cancelComposerMode() {
+    setEditing(null);
+    setReplyTarget(null);
+    setDraft("");
+  }
+
+  const submit = useCallback(async () => {
     const text = draft.trim();
     if (!text || sending) return;
     setSending(true);
+
+    // Редагування наявного повідомлення.
+    if (editing) {
+      try {
+        const r = await fetch(
+          `/api/v1/manager/messenger/conversations/${conversationId}/messages/${editing.id}`,
+          {
+            method: "PATCH",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ text }),
+          },
+        );
+        if (!r.ok) throw new Error(await errorFrom(r));
+        const data = (await r.json()) as SendMessageResponse;
+        setMessages((prev) =>
+          prev.map((m) => (m.id === editing.id ? data.message : m)),
+        );
+        cancelComposerMode();
+      } catch (e) {
+        toast({
+          description: e instanceof Error ? e.message : "Помилка",
+          variant: "destructive",
+        });
+      } finally {
+        setSending(false);
+      }
+      return;
+    }
+
+    // Нове повідомлення (можливо — відповідь).
+    const replyToId = replyTarget?.id;
     const tempId = `tmp-${Date.now()}`;
+    const replyPreview: MessengerReplyPreview | null = replyTarget
+      ? {
+          id: replyTarget.id,
+          authorName: replyTarget.authorName,
+          preview: replyTarget.text,
+        }
+      : null;
     const optimistic: MessengerMessageItem = {
       id: tempId,
       conversationId,
@@ -147,6 +208,7 @@ export function ConversationThread({
       kind: "text",
       text,
       isMine: true,
+      replyTo: replyPreview,
       editedAt: null,
       deletedAt: null,
       createdAt: new Date().toISOString(),
@@ -154,6 +216,7 @@ export function ConversationThread({
     setMessages((prev) => [...prev, optimistic]);
     nearBottomRef.current = true;
     setDraft("");
+    setReplyTarget(null);
 
     try {
       const r = await fetch(
@@ -161,13 +224,10 @@ export function ConversationThread({
         {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ text }),
+          body: JSON.stringify({ text, ...(replyToId ? { replyToId } : {}) }),
         },
       );
-      if (!r.ok) {
-        const data = (await r.json().catch(() => ({}))) as { error?: string };
-        throw new Error(data.error ?? "Не вдалось надіслати");
-      }
+      if (!r.ok) throw new Error(await errorFrom(r));
       const data = (await r.json()) as SendMessageResponse;
       setMessages((prev) =>
         prev.map((m) => (m.id === tempId ? data.message : m)),
@@ -182,11 +242,40 @@ export function ConversationThread({
     } finally {
       setSending(false);
     }
-  }, [draft, sending, conversationId, currentUserName, toast]);
+  }, [
+    draft,
+    sending,
+    editing,
+    replyTarget,
+    conversationId,
+    currentUserName,
+    toast,
+  ]);
 
-  if (loading && !header) {
-    return <ThreadSkeleton />;
-  }
+  const doDelete = useCallback(
+    async (m: MessengerMessageItem) => {
+      try {
+        const r = await fetch(
+          `/api/v1/manager/messenger/conversations/${conversationId}/messages/${m.id}`,
+          { method: "DELETE" },
+        );
+        if (!r.ok) throw new Error(await errorFrom(r));
+        setMessages((prev) =>
+          prev.map((x) =>
+            x.id === m.id ? { ...x, deletedAt: new Date().toISOString() } : x,
+          ),
+        );
+      } catch (e) {
+        toast({
+          description: e instanceof Error ? e.message : "Помилка",
+          variant: "destructive",
+        });
+      }
+    },
+    [conversationId, toast],
+  );
+
+  if (loading && !header) return <ThreadSkeleton />;
   if (!header) {
     return (
       <div className="flex h-full flex-1 items-center justify-center text-sm text-gray-500">
@@ -196,6 +285,7 @@ export function ConversationThread({
   }
 
   const isGroup = header.type === "group";
+  const isOwner = currentUserRole === "owner";
 
   return (
     <div className="flex h-full flex-1 flex-col bg-gray-50">
@@ -225,15 +315,27 @@ export function ConversationThread({
           </p>
         ) : (
           messages.map((m) => (
-            <MessageBubble key={m.id} message={m} showAuthor={isGroup} />
+            <MessageBubble
+              key={m.id}
+              message={m}
+              showAuthor={isGroup}
+              canManage={header.canManage}
+              isOwner={isOwner}
+              onReply={startReply}
+              onEdit={startEdit}
+              onDelete={doDelete}
+            />
           ))
         )}
       </div>
-      <ReplyBox
+      <Composer
         value={draft}
         onChange={setDraft}
-        onSend={send}
+        onSend={submit}
         sending={sending}
+        editing={editing !== null}
+        replyTarget={replyTarget}
+        onCancelMode={cancelComposerMode}
       />
     </div>
   );
@@ -284,7 +386,6 @@ function ThreadHeader({
       </button>
     );
   }
-
   return (
     <div className="flex items-center gap-3 border-b bg-white px-4 py-2.5">
       {inner}
@@ -295,9 +396,19 @@ function ThreadHeader({
 function MessageBubble({
   message,
   showAuthor,
+  canManage,
+  isOwner,
+  onReply,
+  onEdit,
+  onDelete,
 }: {
   message: MessengerMessageItem;
   showAuthor: boolean;
+  canManage: boolean;
+  isOwner: boolean;
+  onReply: (m: MessengerMessageItem) => void;
+  onEdit: (m: MessengerMessageItem) => void;
+  onDelete: (m: MessengerMessageItem) => void;
 }) {
   if (message.kind === "system") {
     return (
@@ -308,8 +419,24 @@ function MessageBubble({
   }
   const isMine = message.isMine;
   const isDeleted = message.deletedAt !== null;
+  const canReply = !isDeleted;
+  const canEdit = isMine && !isDeleted;
+  const canDelete = !isDeleted && (isMine || canManage || isOwner);
+
   return (
-    <div className={isMine ? "flex justify-end" : "flex justify-start"}>
+    <div className={`group flex ${isMine ? "justify-end" : "justify-start"}`}>
+      {/* Дії (зліва для своїх, справа для чужих) */}
+      {isMine && !isDeleted && (
+        <BubbleActions
+          message={message}
+          canReply={canReply}
+          canEdit={canEdit}
+          canDelete={canDelete}
+          onReply={onReply}
+          onEdit={onEdit}
+          onDelete={onDelete}
+        />
+      )}
       <div
         className={
           isMine
@@ -321,6 +448,20 @@ function MessageBubble({
           <p className="mb-0.5 text-[11px] font-semibold text-green-700">
             {message.authorName}
           </p>
+        )}
+        {message.replyTo && (
+          <div
+            className={
+              isMine
+                ? "mb-1 border-l-2 border-green-200 pl-2 text-[11px] text-green-50"
+                : "mb-1 border-l-2 border-gray-300 pl-2 text-[11px] text-gray-500"
+            }
+          >
+            <span className="font-semibold">
+              {message.replyTo.authorName ?? "Повідомлення"}
+            </span>
+            <span className="ml-1 opacity-90">{message.replyTo.preview}</span>
+          </div>
         )}
         <p
           className={
@@ -339,28 +480,127 @@ function MessageBubble({
           }
           title={new Date(message.createdAt).toLocaleString("uk-UA")}
         >
-          {message.editedAt ? "змінено · " : ""}
+          {message.editedAt && !isDeleted ? "змінено · " : ""}
           {formatRelativeShort(message.createdAt)}
         </p>
       </div>
+      {!isMine && !isDeleted && (
+        <BubbleActions
+          message={message}
+          canReply={canReply}
+          canEdit={canEdit}
+          canDelete={canDelete}
+          onReply={onReply}
+          onEdit={onEdit}
+          onDelete={onDelete}
+        />
+      )}
     </div>
   );
 }
 
-function ReplyBox({
+function BubbleActions({
+  message,
+  canReply,
+  canEdit,
+  canDelete,
+  onReply,
+  onEdit,
+  onDelete,
+}: {
+  message: MessengerMessageItem;
+  canReply: boolean;
+  canEdit: boolean;
+  canDelete: boolean;
+  onReply: (m: MessengerMessageItem) => void;
+  onEdit: (m: MessengerMessageItem) => void;
+  onDelete: (m: MessengerMessageItem) => void;
+}) {
+  return (
+    <div className="flex items-center gap-0.5 self-center px-1 opacity-0 transition group-hover:opacity-100">
+      {canReply && (
+        <IconBtn label="Відповісти" onClick={() => onReply(message)}>
+          <CornerUpLeft className="h-3.5 w-3.5" />
+        </IconBtn>
+      )}
+      {canEdit && (
+        <IconBtn label="Редагувати" onClick={() => onEdit(message)}>
+          <Pencil className="h-3.5 w-3.5" />
+        </IconBtn>
+      )}
+      {canDelete && (
+        <IconBtn label="Видалити" onClick={() => onDelete(message)}>
+          <Trash2 className="h-3.5 w-3.5" />
+        </IconBtn>
+      )}
+    </div>
+  );
+}
+
+function IconBtn({
+  label,
+  onClick,
+  children,
+}: {
+  label: string;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={label}
+      title={label}
+      className="rounded p-1 text-gray-400 hover:bg-gray-200 hover:text-gray-700"
+    >
+      {children}
+    </button>
+  );
+}
+
+function Composer({
   value,
   onChange,
   onSend,
   sending,
+  editing,
+  replyTarget,
+  onCancelMode,
 }: {
   value: string;
   onChange: (v: string) => void;
   onSend: () => void;
   sending: boolean;
+  editing: boolean;
+  replyTarget: MessengerMessageItem | null;
+  onCancelMode: () => void;
 }) {
   const canSend = value.trim().length > 0 && !sending;
   return (
     <div className="border-t bg-white px-3 py-2">
+      {(editing || replyTarget) && (
+        <div className="mb-1.5 flex items-start gap-2 rounded bg-gray-100 px-2 py-1 text-xs">
+          <div className="min-w-0 flex-1">
+            <p className="font-semibold text-green-700">
+              {editing
+                ? "Редагування повідомлення"
+                : `Відповідь · ${replyTarget?.authorName ?? ""}`}
+            </p>
+            {replyTarget && (
+              <p className="truncate text-gray-500">{replyTarget.text}</p>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={onCancelMode}
+            aria-label="Скасувати"
+            className="rounded p-0.5 text-gray-400 hover:bg-gray-200 hover:text-gray-600"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      )}
       <div className="flex items-end gap-2">
         <Textarea
           value={value}
@@ -369,6 +609,9 @@ function ReplyBox({
             if (e.key === "Enter" && !e.shiftKey) {
               e.preventDefault();
               onSend();
+            }
+            if (e.key === "Escape" && (editing || replyTarget)) {
+              onCancelMode();
             }
           }}
           placeholder="Напишіть повідомлення… (Enter — надіслати, Shift+Enter — новий рядок)"
@@ -383,7 +626,7 @@ function ReplyBox({
           className="inline-flex items-center gap-1 bg-green-600 hover:bg-green-700"
         >
           <Send className="h-4 w-4" />
-          {sending ? "…" : "Надіслати"}
+          {sending ? "…" : editing ? "Зберегти" : "Надіслати"}
         </Button>
       </div>
     </div>

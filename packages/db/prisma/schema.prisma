@@ -3098,6 +3098,7 @@ model MessengerMessage {
   authorId       String?              @map("author_id")
   kind           MessengerMessageKind @default(text)
   text           String
+  replyToId      String?              @map("reply_to_id")
   editedAt       DateTime?            @map("edited_at")
   deletedAt      DateTime?            @map("deleted_at")
   createdAt      DateTime             @default(now()) @map("created_at")
@@ -3105,6 +3106,8 @@ model MessengerMessage {
 
   conversation MessengerConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   author       User?                 @relation("MessengerMessageAuthor", fields: [authorId], references: [id], onDelete: SetNull)
+  replyTo      MessengerMessage?     @relation("MessengerReply", fields: [replyToId], references: [id], onDelete: SetNull)
+  replies      MessengerMessage[]    @relation("MessengerReply")
 
   @@index([conversationId, createdAt])
   @@map("mgr_messenger_messages")

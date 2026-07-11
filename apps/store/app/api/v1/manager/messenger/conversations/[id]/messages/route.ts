@@ -3,11 +3,12 @@ import { z } from "zod";
 import { prisma } from "@ltex/db";
 import { getCurrentUser } from "@/lib/auth/manager-auth";
 import { getMessengerConversationForUser } from "@/lib/messenger/access";
+import { serializeMessage } from "@/lib/messenger/serialize";
 import { rateLimit, getClientIp } from "@/lib/rate-limit";
-import type { MessengerMessageItem } from "@/lib/messenger/types";
 
 const messageBodySchema = z.object({
   text: z.string().trim().min(1, "Текст не може бути порожнім").max(4000),
+  replyToId: z.string().min(1).optional(),
 });
 
 /**
@@ -61,6 +62,22 @@ export async function POST(
     );
   }
 
+  // Перевірка цитати: батьківське повідомлення має бути з цієї ж розмови.
+  let replyToId: string | null = null;
+  if (parsed.data.replyToId) {
+    const parent = await prisma.messengerMessage.findFirst({
+      where: { id: parsed.data.replyToId, conversationId: id },
+      select: { id: true },
+    });
+    if (!parent) {
+      return NextResponse.json(
+        { error: "Повідомлення для відповіді не знайдено" },
+        { status: 400 },
+      );
+    }
+    replyToId = parent.id;
+  }
+
   const now = new Date();
   const created = await prisma.messengerMessage.create({
     data: {
@@ -68,6 +85,12 @@ export async function POST(
       authorId: user.id,
       kind: "text",
       text: parsed.data.text,
+      replyToId,
+    },
+    include: {
+      replyTo: {
+        select: { id: true, authorId: true, text: true, deletedAt: true },
+      },
     },
   });
 
@@ -83,18 +106,22 @@ export async function POST(
     }),
   ]);
 
-  const message: MessengerMessageItem = {
-    id: created.id,
-    conversationId: created.conversationId,
-    authorId: created.authorId,
-    authorName: user.fullName,
-    kind: created.kind,
-    text: created.text,
-    isMine: true,
-    editedAt: null,
-    deletedAt: null,
-    createdAt: created.createdAt.toISOString(),
-  };
+  // Імена для цитати: автор (я) + автор батьківського повідомлення.
+  const nameById = new Map<string, string>([[user.id, user.fullName]]);
+  const replyAuthorId = created.replyTo?.authorId;
+  if (replyAuthorId && !nameById.has(replyAuthorId)) {
+    const a = await prisma.user.findUnique({
+      where: { id: replyAuthorId },
+      select: { fullName: true },
+    });
+    if (a) nameById.set(replyAuthorId, a.fullName);
+  }
+
+  const message = serializeMessage(created, {
+    currentUserId: user.id,
+    isOwner: user.role === "owner",
+    nameById,
+  });
 
   return NextResponse.json({ message }, { status: 201 });
 }
