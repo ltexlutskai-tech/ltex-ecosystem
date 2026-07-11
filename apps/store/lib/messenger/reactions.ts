@@ -1,9 +1,12 @@
 import type { MessengerReactionSummary } from "./types";
 
+/** Швидка реакція «сердечко» (як у Viber) — подвійний клік/тап. */
+export const HEART_REACTION = "❤️";
+
 /** Дозволені emoji-реакції (обмежений набір проти зловживань). */
 export const ALLOWED_REACTIONS = [
   "👍",
-  "❤️",
+  HEART_REACTION,
   "🔥",
   "😂",
   "✅",

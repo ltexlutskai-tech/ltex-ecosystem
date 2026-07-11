@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ChevronRight,
+  Copy,
   CornerUpLeft,
   Download,
   FileText,
@@ -12,16 +13,16 @@ import {
   Pin,
   PinOff,
   Send,
-  Smile,
   Trash2,
   X,
 } from "lucide-react";
 import { Button, Textarea, useToast } from "@ltex/ui";
-import { ALLOWED_REACTIONS } from "@/lib/messenger/reactions";
+import { ALLOWED_REACTIONS, HEART_REACTION } from "@/lib/messenger/reactions";
 import { formatRelativeShort } from "../../_components/format-relative";
 import { Avatar } from "./avatar";
 import { DocRefCard } from "./doc-ref-card";
 import { GroupInfoDialog } from "./group-info-dialog";
+import { linkify } from "./linkify";
 import { PickConversationDialog } from "./pick-conversation-dialog";
 import { roleLabel } from "./role-label";
 import type {
@@ -76,6 +77,7 @@ export function ConversationThread({
   const [forwardSource, setForwardSource] =
     useState<MessengerMessageItem | null>(null);
   const [forwarding, setForwarding] = useState(false);
+  const [menu, setMenu] = useState<ContextMenuState | null>(null);
   const { toast } = useToast();
 
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -332,6 +334,16 @@ export function ConversationThread({
     [conversationId, toast],
   );
 
+  const openMenu = useCallback(
+    (m: MessengerMessageItem, x: number, y: number) =>
+      setMenu({ message: m, x, y }),
+    [],
+  );
+  const quickHeart = useCallback(
+    (m: MessengerMessageItem) => void doReact(m, HEART_REACTION),
+    [doReact],
+  );
+
   const doPin = useCallback(
     async (m: MessengerMessageItem) => {
       try {
@@ -380,13 +392,15 @@ export function ConversationThread({
   );
 
   const uploadFiles = useCallback(
-    async (fileList: FileList | null) => {
-      if (!fileList || fileList.length === 0 || uploading) return;
+    async (fileList: FileList | File[] | null) => {
+      if (!fileList || uploading) return;
+      const files = Array.from(fileList as ArrayLike<File>);
+      if (files.length === 0) return;
       setUploading(true);
       const fd = new FormData();
       const caption = draft.trim();
       if (caption) fd.append("caption", caption);
-      Array.from(fileList).forEach((f) => fd.append("files", f));
+      files.forEach((f) => fd.append("files", f));
       try {
         const r = await fetch(
           `/api/v1/manager/messenger/conversations/${conversationId}/attachments`,
@@ -408,6 +422,26 @@ export function ConversationThread({
       }
     },
     [conversationId, draft, uploading, toast],
+  );
+
+  // Вставка фото з буфера обміну (Ctrl+V / вставка на мобільному).
+  const handlePaste = useCallback(
+    (e: React.ClipboardEvent) => {
+      const items = e.clipboardData?.items;
+      if (!items) return;
+      const files: File[] = [];
+      for (const it of Array.from(items)) {
+        if (it.kind === "file" && it.type.startsWith("image/")) {
+          const f = it.getAsFile();
+          if (f) files.push(f);
+        }
+      }
+      if (files.length > 0) {
+        e.preventDefault();
+        void uploadFiles(files);
+      }
+    },
+    [uploadFiles],
   );
 
   if (loading && !header) return <ThreadSkeleton />;
@@ -466,14 +500,9 @@ export function ConversationThread({
               key={m.id}
               message={m}
               showAuthor={isGroup}
-              canManage={header.canManage}
-              isOwner={isOwner}
-              onReply={startReply}
-              onEdit={startEdit}
-              onDelete={doDelete}
               onReact={doReact}
-              onForward={setForwardSource}
-              onPin={doPin}
+              onOpenMenu={openMenu}
+              onQuickHeart={quickHeart}
             />
           ))
         )}
@@ -499,7 +528,22 @@ export function ConversationThread({
         onCancelMode={cancelComposerMode}
         uploading={uploading}
         onAttach={() => fileInputRef.current?.click()}
+        onPaste={handlePaste}
       />
+      {menu && (
+        <MessageContextMenu
+          menu={menu}
+          canManage={header.canManage}
+          isOwner={isOwner}
+          onClose={() => setMenu(null)}
+          onReact={doReact}
+          onReply={startReply}
+          onForward={setForwardSource}
+          onPin={doPin}
+          onEdit={startEdit}
+          onDelete={doDelete}
+        />
+      )}
     </div>
   );
 }
@@ -559,26 +603,19 @@ function ThreadHeader({
 function MessageBubble({
   message,
   showAuthor,
-  canManage,
-  isOwner,
-  onReply,
-  onEdit,
-  onDelete,
   onReact,
-  onForward,
-  onPin,
+  onOpenMenu,
+  onQuickHeart,
 }: {
   message: MessengerMessageItem;
   showAuthor: boolean;
-  canManage: boolean;
-  isOwner: boolean;
-  onReply: (m: MessengerMessageItem) => void;
-  onEdit: (m: MessengerMessageItem) => void;
-  onDelete: (m: MessengerMessageItem) => void;
   onReact: (m: MessengerMessageItem, emoji: string) => void;
-  onForward: (m: MessengerMessageItem) => void;
-  onPin: (m: MessengerMessageItem) => void;
+  onOpenMenu: (m: MessengerMessageItem, x: number, y: number) => void;
+  onQuickHeart: (m: MessengerMessageItem) => void;
 }) {
+  const touchTimer = useRef<number | null>(null);
+  const lastTapRef = useRef(0);
+
   if (message.kind === "system") {
     return (
       <p className="my-1 text-center text-[11px] text-gray-400">
@@ -588,34 +625,56 @@ function MessageBubble({
   }
   const isMine = message.isMine;
   const isDeleted = message.deletedAt !== null;
-  const canReply = !isDeleted;
-  const canEdit = isMine && !isDeleted;
-  const canDelete = !isDeleted && (isMine || canManage || isOwner);
-  const canReact = !isDeleted;
-  const canForward = !isDeleted;
   const isPinned = message.pinnedAt !== null;
+  const interactive = !isDeleted;
+
+  function openMenuAt(x: number, y: number) {
+    if (interactive) onOpenMenu(message, x, y);
+  }
+  function onContextMenu(e: React.MouseEvent) {
+    if (!interactive) return;
+    e.preventDefault();
+    openMenuAt(e.clientX, e.clientY);
+  }
+  function onDoubleClick() {
+    if (interactive) onQuickHeart(message);
+  }
+  function clearTouch() {
+    if (touchTimer.current) {
+      window.clearTimeout(touchTimer.current);
+      touchTimer.current = null;
+    }
+  }
+  function onTouchStart(e: React.TouchEvent) {
+    const t = e.touches[0];
+    if (!t) return;
+    const { clientX, clientY } = t;
+    touchTimer.current = window.setTimeout(() => {
+      touchTimer.current = null;
+      openMenuAt(clientX, clientY);
+    }, 500);
+  }
+  function onTouchEnd() {
+    const wasLongPress = touchTimer.current === null;
+    clearTouch();
+    if (wasLongPress) return; // довге натискання вже відкрило меню
+    const now = Date.now();
+    if (now - lastTapRef.current < 300) {
+      lastTapRef.current = 0;
+      if (interactive) onQuickHeart(message);
+    } else {
+      lastTapRef.current = now;
+    }
+  }
 
   return (
-    <div className={`group flex ${isMine ? "justify-end" : "justify-start"}`}>
-      {/* Дії (зліва для своїх, справа для чужих) */}
-      {isMine && !isDeleted && (
-        <BubbleActions
-          message={message}
-          canReply={canReply}
-          canEdit={canEdit}
-          canDelete={canDelete}
-          canReact={canReact}
-          canForward={canForward}
-          isPinned={isPinned}
-          onReply={onReply}
-          onEdit={onEdit}
-          onDelete={onDelete}
-          onReact={onReact}
-          onForward={onForward}
-          onPin={onPin}
-        />
-      )}
+    <div className={`flex ${isMine ? "justify-end" : "justify-start"}`}>
       <div
+        onContextMenu={onContextMenu}
+        onDoubleClick={onDoubleClick}
+        onTouchStart={onTouchStart}
+        onTouchEnd={onTouchEnd}
+        onTouchMove={clearTouch}
         className={
           isMine
             ? "max-w-[78%] rounded-lg bg-green-600 px-3 py-2 text-sm text-white shadow-sm"
@@ -679,7 +738,7 @@ function MessageBubble({
                 : "whitespace-pre-wrap break-words"
             }
           >
-            {message.text}
+            {isDeleted ? message.text : linkify(message.text, isMine)}
           </p>
         )}
         {message.reactions.length > 0 && (
@@ -715,23 +774,6 @@ function MessageBubble({
           {formatRelativeShort(message.createdAt)}
         </p>
       </div>
-      {!isMine && !isDeleted && (
-        <BubbleActions
-          message={message}
-          canReply={canReply}
-          canEdit={canEdit}
-          canDelete={canDelete}
-          canReact={canReact}
-          canForward={canForward}
-          isPinned={isPinned}
-          onReply={onReply}
-          onEdit={onEdit}
-          onDelete={onDelete}
-          onReact={onReact}
-          onForward={onForward}
-          onPin={onPin}
-        />
-      )}
     </div>
   );
 }
@@ -795,69 +837,171 @@ function AttachmentList({
   );
 }
 
-function BubbleActions({
-  message,
-  canReply,
-  canEdit,
-  canDelete,
-  canReact,
-  canForward,
-  isPinned,
-  onReply,
-  onEdit,
-  onDelete,
+interface ContextMenuState {
+  message: MessengerMessageItem;
+  x: number;
+  y: number;
+}
+
+function MessageContextMenu({
+  menu,
+  canManage,
+  isOwner,
+  onClose,
   onReact,
+  onReply,
   onForward,
   onPin,
+  onEdit,
+  onDelete,
 }: {
-  message: MessengerMessageItem;
-  canReply: boolean;
-  canEdit: boolean;
-  canDelete: boolean;
-  canReact: boolean;
-  canForward: boolean;
-  isPinned: boolean;
-  onReply: (m: MessengerMessageItem) => void;
-  onEdit: (m: MessengerMessageItem) => void;
-  onDelete: (m: MessengerMessageItem) => void;
+  menu: ContextMenuState;
+  canManage: boolean;
+  isOwner: boolean;
+  onClose: () => void;
   onReact: (m: MessengerMessageItem, emoji: string) => void;
+  onReply: (m: MessengerMessageItem) => void;
   onForward: (m: MessengerMessageItem) => void;
   onPin: (m: MessengerMessageItem) => void;
+  onEdit: (m: MessengerMessageItem) => void;
+  onDelete: (m: MessengerMessageItem) => void;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState({ x: menu.x, y: menu.y });
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    let x = menu.x;
+    let y = menu.y;
+    if (x + rect.width > window.innerWidth - 8)
+      x = window.innerWidth - rect.width - 8;
+    if (y + rect.height > window.innerHeight - 8)
+      y = window.innerHeight - rect.height - 8;
+    setPos({ x: Math.max(8, x), y: Math.max(8, y) });
+  }, [menu.x, menu.y]);
+
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") onClose();
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  const m = menu.message;
+  const isMine = m.isMine;
+  const canEdit = isMine;
+  const canDelete = isMine || canManage || isOwner;
+  const isPinned = m.pinnedAt !== null;
+
+  const run = (fn: () => void) => {
+    onClose();
+    fn();
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-40"
+      onMouseDown={onClose}
+      onContextMenu={(e) => {
+        e.preventDefault();
+        onClose();
+      }}
+    >
+      <div
+        ref={ref}
+        style={{ top: pos.y, left: pos.x }}
+        onMouseDown={(e) => e.stopPropagation()}
+        className="fixed z-50 w-56 overflow-hidden rounded-lg border bg-white py-1 text-sm shadow-xl"
+      >
+        <div className="flex items-center justify-between border-b px-2 pb-1.5 pt-1">
+          {ALLOWED_REACTIONS.map((emoji) => (
+            <button
+              key={emoji}
+              type="button"
+              onClick={() => run(() => onReact(m, emoji))}
+              className="rounded-full px-1 text-lg leading-none transition hover:scale-125"
+            >
+              {emoji}
+            </button>
+          ))}
+        </div>
+        <MenuItem
+          icon={<CornerUpLeft className="h-4 w-4" />}
+          label="Відповісти"
+          onClick={() => run(() => onReply(m))}
+        />
+        {m.text && (
+          <MenuItem
+            icon={<Copy className="h-4 w-4" />}
+            label="Копіювати текст"
+            onClick={() =>
+              run(() => {
+                void navigator.clipboard?.writeText(m.text);
+              })
+            }
+          />
+        )}
+        <MenuItem
+          icon={<Forward className="h-4 w-4" />}
+          label="Переслати"
+          onClick={() => run(() => onForward(m))}
+        />
+        <MenuItem
+          icon={
+            isPinned ? (
+              <PinOff className="h-4 w-4" />
+            ) : (
+              <Pin className="h-4 w-4" />
+            )
+          }
+          label={isPinned ? "Відкріпити" : "Закріпити"}
+          onClick={() => run(() => onPin(m))}
+        />
+        {canEdit && (
+          <MenuItem
+            icon={<Pencil className="h-4 w-4" />}
+            label="Редагувати"
+            onClick={() => run(() => onEdit(m))}
+          />
+        )}
+        {canDelete && (
+          <MenuItem
+            icon={<Trash2 className="h-4 w-4" />}
+            label="Видалити"
+            danger
+            onClick={() => run(() => onDelete(m))}
+          />
+        )}
+      </div>
+    </div>
+  );
+}
+
+function MenuItem({
+  icon,
+  label,
+  onClick,
+  danger,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  onClick: () => void;
+  danger?: boolean;
 }) {
   return (
-    <div className="flex items-center gap-0.5 self-center px-1 opacity-0 transition group-hover:opacity-100">
-      {canReact && <ReactButton onPick={(emoji) => onReact(message, emoji)} />}
-      {canReply && (
-        <IconBtn label="Відповісти" onClick={() => onReply(message)}>
-          <CornerUpLeft className="h-3.5 w-3.5" />
-        </IconBtn>
-      )}
-      {canForward && (
-        <IconBtn label="Переслати" onClick={() => onForward(message)}>
-          <Forward className="h-3.5 w-3.5" />
-        </IconBtn>
-      )}
-      <IconBtn
-        label={isPinned ? "Відкріпити" : "Закріпити"}
-        onClick={() => onPin(message)}
-      >
-        {isPinned ? (
-          <PinOff className="h-3.5 w-3.5" />
-        ) : (
-          <Pin className="h-3.5 w-3.5" />
-        )}
-      </IconBtn>
-      {canEdit && (
-        <IconBtn label="Редагувати" onClick={() => onEdit(message)}>
-          <Pencil className="h-3.5 w-3.5" />
-        </IconBtn>
-      )}
-      {canDelete && (
-        <IconBtn label="Видалити" onClick={() => onDelete(message)}>
-          <Trash2 className="h-3.5 w-3.5" />
-        </IconBtn>
-      )}
-    </div>
+    <button
+      type="button"
+      onClick={onClick}
+      className={`flex w-full items-center gap-2.5 px-3 py-2 text-left hover:bg-gray-50 ${
+        danger ? "text-red-600" : "text-gray-700"
+      }`}
+    >
+      {icon}
+      {label}
+    </button>
   );
 }
 
@@ -905,63 +1049,6 @@ function PinnedBar({
   );
 }
 
-function ReactButton({ onPick }: { onPick: (emoji: string) => void }) {
-  const [open, setOpen] = useState(false);
-  return (
-    <div className="relative">
-      <IconBtn label="Реакція" onClick={() => setOpen((v) => !v)}>
-        <Smile className="h-3.5 w-3.5" />
-      </IconBtn>
-      {open && (
-        <>
-          <div
-            className="fixed inset-0 z-10"
-            onClick={() => setOpen(false)}
-            aria-hidden="true"
-          />
-          <div className="absolute bottom-full z-20 mb-1 flex gap-0.5 rounded-full border bg-white px-1.5 py-1 shadow-md">
-            {ALLOWED_REACTIONS.map((emoji) => (
-              <button
-                key={emoji}
-                type="button"
-                onClick={() => {
-                  onPick(emoji);
-                  setOpen(false);
-                }}
-                className="rounded-full px-1 text-base leading-none hover:bg-gray-100"
-              >
-                {emoji}
-              </button>
-            ))}
-          </div>
-        </>
-      )}
-    </div>
-  );
-}
-
-function IconBtn({
-  label,
-  onClick,
-  children,
-}: {
-  label: string;
-  onClick: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-label={label}
-      title={label}
-      className="rounded p-1 text-gray-400 hover:bg-gray-200 hover:text-gray-700"
-    >
-      {children}
-    </button>
-  );
-}
-
 function Composer({
   value,
   onChange,
@@ -972,6 +1059,7 @@ function Composer({
   onCancelMode,
   uploading,
   onAttach,
+  onPaste,
 }: {
   value: string;
   onChange: (v: string) => void;
@@ -982,6 +1070,7 @@ function Composer({
   onCancelMode: () => void;
   uploading: boolean;
   onAttach: () => void;
+  onPaste: (e: React.ClipboardEvent) => void;
 }) {
   const canSend = value.trim().length > 0 && !sending;
   return (
@@ -1024,6 +1113,7 @@ function Composer({
         <Textarea
           value={value}
           onChange={(e) => onChange(e.target.value.slice(0, MAX_MESSAGE_LEN))}
+          onPaste={onPaste}
           onKeyDown={(e) => {
             if (e.key === "Enter" && !e.shiftKey) {
               e.preventDefault();
@@ -1033,7 +1123,7 @@ function Composer({
               onCancelMode();
             }
           }}
-          placeholder="Напишіть повідомлення… (Enter — надіслати, Shift+Enter — новий рядок)"
+          placeholder="Напишіть повідомлення… (Enter — надіслати, Shift+Enter — новий рядок, вставка фото з буфера)"
           rows={2}
           className="flex-1 resize-none"
           maxLength={MAX_MESSAGE_LEN}
