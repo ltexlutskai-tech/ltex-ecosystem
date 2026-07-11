@@ -4,6 +4,7 @@ import { ArrowLeft, Printer } from "lucide-react";
 import { prisma } from "@ltex/db";
 import { getCurrentUser } from "@/lib/auth/manager-auth";
 import { formatDocNumber } from "@/lib/manager/order-number";
+import { DiscussButton } from "../../messenger/_components/discuss-button";
 import { PostCashOrderButton } from "./_components/post-cash-order-button";
 
 export const dynamic = "force-dynamic";
@@ -78,6 +79,14 @@ export default async function ManagerCashOrderDetailPage({
           <p className="mt-1 text-sm text-gray-500">{date}</p>
         </div>
         <div className="flex items-center gap-3">
+          <DiscussButton
+            docRef={{
+              type: "payment",
+              label: `Касовий ордер ${displayNumber}`,
+              subtitle: order.customer?.name ?? undefined,
+              url: `/manager/payments/${id}`,
+            }}
+          />
           {isDraft && <PostCashOrderButton id={id} />}
           <Link
             href={`/manager/payments/${id}/print`}

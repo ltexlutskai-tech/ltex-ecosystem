@@ -5,6 +5,7 @@ import { getCurrentUser } from "@/lib/auth/manager-auth";
 import { getCurrentRate } from "@/lib/exchange-rate";
 import { buildProductShareText } from "@/lib/manager/share-message";
 import { canManageCatalog } from "@/lib/manager/catalog-permissions";
+import { DiscussButton } from "../../messenger/_components/discuss-button";
 import { loadProductCard } from "../_lib/load-product";
 import { loadCategoryNodes, resolveCategoryAccess } from "../_lib/load-prices";
 import { ProductCardView } from "../_components/product-card-view";
@@ -81,13 +82,21 @@ export default async function ProductCardPage({
 
   return (
     <div className="mx-auto max-w-5xl space-y-4">
-      <div className="text-sm">
+      <div className="flex items-center justify-between text-sm">
         <Link
           href="/manager/prices"
           className="text-gray-500 hover:text-gray-800 hover:underline"
         >
           ← Назад до прайсу
         </Link>
+        <DiscussButton
+          docRef={{
+            type: "product",
+            label: product.name,
+            subtitle: product.articleCode ?? undefined,
+            url: `/manager/prices/${product.id}`,
+          }}
+        />
       </div>
       <ProductCardView
         product={product}

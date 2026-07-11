@@ -14,6 +14,14 @@ const CONTENT_TYPES: Record<string, string> = {
   svg: "image/svg+xml",
   mp4: "video/mp4",
   webm: "video/webm",
+  // Документи (вкладення месенджера — Етап 4)
+  pdf: "application/pdf",
+  xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  xls: "application/vnd.ms-excel",
+  docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  doc: "application/msword",
+  csv: "text/csv",
+  txt: "text/plain; charset=utf-8",
 };
 
 function contentTypeFor(rel: string): string {

@@ -11,6 +11,7 @@ import {
   getDeliveryLabelResolver,
 } from "@/lib/manager/delivery-methods";
 import { formatDocNumber, formatOrderNumber } from "@/lib/manager/order-number";
+import { DiscussButton } from "../../messenger/_components/discuss-button";
 import { SaleForm } from "../new/_components/sale-form";
 import type {
   ClientPickerItem,
@@ -273,6 +274,14 @@ export default async function ManagerSaleDetailPage({
         </div>
         <div className="flex items-center gap-2">
           {!editable && <OrderStatusBadge status={sale.status} />}
+          <DiscussButton
+            docRef={{
+              type: "sale",
+              label: `Реалізація ${displayNumber}`,
+              subtitle: sale.customer.name,
+              url: `/manager/sales/${id}`,
+            }}
+          />
           <Link
             href={`/manager/sales/${id}/print`}
             target="_blank"

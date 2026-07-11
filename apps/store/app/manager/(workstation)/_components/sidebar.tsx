@@ -1,6 +1,7 @@
 import type { ManagerRole } from "@/lib/auth/jwt";
 import { ChatUnreadBadge } from "./chat-unread-badge";
 import { DeletionsBadge } from "./deletions-badge";
+import { MessengerUnreadBadge } from "./messenger-unread-badge";
 import { SidebarNavLink } from "./sidebar-nav-link";
 import {
   ADMIN_AUDIT_LINK,
@@ -11,6 +12,7 @@ import {
   BAG_STATE_LINK,
   CHAT_LINK,
   FINANCE_LINKS,
+  MESSENGER_LINK,
   PRIMARY_LINKS,
   REGISTRY_LINK,
   REPORTS_LINK,
@@ -34,6 +36,12 @@ export function ManagerSidebar({ role }: { role: ManagerRole }) {
         label={CHAT_LINK.label}
         icon={renderLinkIcon(CHAT_LINK)}
         badgeSlot={<ChatUnreadBadge />}
+      />
+      <SidebarNavLink
+        href={MESSENGER_LINK.href}
+        label={MESSENGER_LINK.label}
+        icon={renderLinkIcon(MESSENGER_LINK)}
+        badgeSlot={<MessengerUnreadBadge />}
       />
       {(role === "warehouse" || role === "admin" || role === "owner") && (
         <>

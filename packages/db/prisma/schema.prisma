@@ -1201,6 +1201,12 @@ model User {
   ordersClosed         Order[]                  @relation("OrderClosedBy")
   tradeAgents          MgrTradeAgent[]          @relation("MgrTradeAgentUser")
 
+  // Внутрішній месенджер (2026-07-11)
+  messengerConversationsCreated MessengerConversation[] @relation("MessengerConversationCreator")
+  messengerMemberships          MessengerMember[]       @relation("MessengerMembership")
+  messengerMessages             MessengerMessage[]      @relation("MessengerMessageAuthor")
+  messengerReactions            MessengerReaction[]     @relation("MessengerReactionUser")
+
   @@map("users")
 }
 
@@ -3024,4 +3030,146 @@ model ProductMerge {
 
   @@index([targetProductId])
   @@map("product_merges")
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ВНУТРІШНІЙ КОРПОРАТИВНИЙ МЕСЕНДЖЕР (2026-07-11)
+// Спілкування співробітників (User) між собою — окреме від клієнтського
+// чат-inbox (ChatConversation). План: docs/INTERNAL_MESSENGER_PLAN.md.
+// Етап 1: особисті чати 1-на-1 + текст + «прочитано».
+// Поля kind/editedAt/deletedAt (Message) і role/leftAt (Member) додані наперед
+// під Етапи 2-3 (групи, редагування/видалення), щоб не плодити міграції.
+// ═══════════════════════════════════════════════════════════════════════════
+
+enum MessengerConversationType {
+  direct
+  group
+
+  @@map("messenger_conversation_type")
+}
+
+enum MessengerMemberRole {
+  member
+  admin
+
+  @@map("messenger_member_role")
+}
+
+enum MessengerMessageKind {
+  text
+  system
+
+  @@map("messenger_message_kind")
+}
+
+enum MessengerAttachmentKind {
+  image
+  file
+
+  @@map("messenger_attachment_kind")
+}
+
+// Розмова: direct (1-на-1) або group. Для direct — детермінований `directKey`
+// (відсортована пара user.id через ":") гарантує один чат на пару людей.
+model MessengerConversation {
+  id            String                    @id @default(cuid())
+  type          MessengerConversationType @default(direct)
+  title         String? // назва групи (для group; direct — null, показуємо ім'я співрозмовника)
+  directKey     String?                   @unique @map("direct_key")
+  createdById   String?                   @map("created_by_id")
+  lastMessageAt DateTime                  @default(now()) @map("last_message_at")
+  createdAt     DateTime                  @default(now()) @map("created_at")
+  updatedAt     DateTime                  @updatedAt @map("updated_at")
+
+  createdBy User?              @relation("MessengerConversationCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  members   MessengerMember[]
+  messages  MessengerMessage[]
+
+  @@index([lastMessageAt(sort: Desc)])
+  @@map("mgr_messenger_conversations")
+}
+
+// Учасник розмови. `lastReadAt` — межа прочитаного (непрочитані = повідомлення
+// інших авторів після цієї мітки). `leftAt` — вихід із групи (Етап 2).
+model MessengerMember {
+  id             String              @id @default(cuid())
+  conversationId String              @map("conversation_id")
+  userId         String              @map("user_id")
+  role           MessengerMemberRole @default(member)
+  lastReadAt     DateTime?           @map("last_read_at")
+  joinedAt       DateTime            @default(now()) @map("joined_at")
+  leftAt         DateTime?           @map("left_at")
+
+  conversation MessengerConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  user         User                  @relation("MessengerMembership", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([conversationId, userId])
+  @@index([userId])
+  @@map("mgr_messenger_members")
+}
+
+// Повідомлення. `deletedAt` — м'яке видалення (зникає у співрозмовників, owner
+// бачить в архіві). `editedAt` — позначка «змінено». `kind=system` — службові
+// записи («X додав Y») для Етапу 2.
+model MessengerMessage {
+  id             String               @id @default(cuid())
+  conversationId String               @map("conversation_id")
+  authorId       String?              @map("author_id")
+  kind           MessengerMessageKind @default(text)
+  text           String
+  replyToId      String?              @map("reply_to_id")
+  forwardedFrom  String?              @map("forwarded_from")
+  docRef         Json?                @map("doc_ref")
+  pinnedAt       DateTime?            @map("pinned_at")
+  editedAt       DateTime?            @map("edited_at")
+  deletedAt      DateTime?            @map("deleted_at")
+  createdAt      DateTime             @default(now()) @map("created_at")
+  updatedAt      DateTime             @updatedAt @map("updated_at")
+
+  conversation MessengerConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  author       User?                 @relation("MessengerMessageAuthor", fields: [authorId], references: [id], onDelete: SetNull)
+  replyTo      MessengerMessage?     @relation("MessengerReply", fields: [replyToId], references: [id], onDelete: SetNull)
+  replies      MessengerMessage[]    @relation("MessengerReply")
+  attachments  MessengerAttachment[]
+  reactions    MessengerReaction[]
+
+  @@index([conversationId, createdAt])
+  @@map("mgr_messenger_messages")
+}
+
+// Реакції-emoji на повідомлення (Етап 5). Один запис = одна реакція одного
+// користувача. Унікальність (messageId, userId, emoji) не дає дублів.
+model MessengerReaction {
+  id        String   @id @default(cuid())
+  messageId String   @map("message_id")
+  userId    String   @map("user_id")
+  emoji     String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  message MessengerMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  user    User             @relation("MessengerReactionUser", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, userId, emoji])
+  @@index([messageId])
+  @@map("mgr_messenger_reactions")
+}
+
+// Вкладення повідомлення (Етап 4): фото (image) або файл (PDF/Excel/…).
+// Файли зберігаються self-hosted через lib/media/storage.ts.
+model MessengerAttachment {
+  id        String                  @id @default(cuid())
+  messageId String                  @map("message_id")
+  kind      MessengerAttachmentKind
+  url       String
+  name      String
+  mimeType  String                  @map("mime_type")
+  sizeBytes Int                     @map("size_bytes")
+  width     Int?
+  height    Int?
+  createdAt DateTime                @default(now()) @map("created_at")
+
+  message MessengerMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@index([messageId])
+  @@map("mgr_messenger_attachments")
 }
