@@ -15,6 +15,7 @@ import {
   SALE_PRICE_TYPE,
   newProductCutoff,
 } from "@/lib/manager/prices";
+import { isInStockStatus } from "@/lib/manager/lots-list";
 import {
   getProductClaims,
   type ProductClaims,
@@ -218,34 +219,39 @@ export async function loadProductCard(
     })),
   );
 
-  // Показуємо УСІ лоти товару (вільні + заброньовані + продані тощо) — менеджеру
-  // потрібно бачити кожен мішок, не лише ті, що з залишком чи з відео.
-  const lots: ProductLotVM[] = product.lots.map((l) => {
-    const isActive =
-      l.reservedUntil !== null && l.reservedUntil.getTime() >= now.getTime();
-    return {
-      id: l.id,
-      barcode: l.barcode,
-      weight: l.weight,
-      quantity: l.quantity,
-      status: l.status,
-      priceEur: l.priceEur,
-      hasVideo: l.videoUrl !== null,
-      isTarget: l.isTarget,
-      arrivalIso: (l.arrivalDate ?? l.createdAt).toISOString(),
-      sector: l.sector,
-      isOpen: l.isOpen,
-      videoDateIso: l.videoDate ? l.videoDate.toISOString() : null,
-      isReserved: l.status === "reserved",
-      reservedForName: l.reservedForName,
-      reservedUntilIso: l.reservedUntil ? l.reservedUntil.toISOString() : null,
-      isActiveReservation: isActive,
-      isMineReservation:
-        isActive &&
-        viewerUserId !== undefined &&
-        l.reservedByUserId === viewerUserId,
-    };
-  });
+  // Показуємо ЛИШЕ наявні на складі лоти (вільні + заброньовані, із залишком).
+  // Архівні/продані/розібрані/у-дорозі мішки прибрано з таблиці картки товару
+  // (рішення user 2026-07-11) — вони не мають фігурувати у списку наявності.
+  const lots: ProductLotVM[] = product.lots
+    .filter((l) => l.weight > 0 && isInStockStatus(l.status))
+    .map((l) => {
+      const isActive =
+        l.reservedUntil !== null && l.reservedUntil.getTime() >= now.getTime();
+      return {
+        id: l.id,
+        barcode: l.barcode,
+        weight: l.weight,
+        quantity: l.quantity,
+        status: l.status,
+        priceEur: l.priceEur,
+        hasVideo: l.videoUrl !== null,
+        isTarget: l.isTarget,
+        arrivalIso: (l.arrivalDate ?? l.createdAt).toISOString(),
+        sector: l.sector,
+        isOpen: l.isOpen,
+        videoDateIso: l.videoDate ? l.videoDate.toISOString() : null,
+        isReserved: l.status === "reserved",
+        reservedForName: l.reservedForName,
+        reservedUntilIso: l.reservedUntil
+          ? l.reservedUntil.toISOString()
+          : null,
+        isActiveReservation: isActive,
+        isMineReservation:
+          isActive &&
+          viewerUserId !== undefined &&
+          l.reservedByUserId === viewerUserId,
+      };
+    });
 
   // Повний шлях категорії: розгортаємо ланцюг parent → корінь, тоді reverse.
   const categoryPath = buildCategoryPath(product.category);
@@ -279,7 +285,8 @@ export async function loadProductCard(
     }),
     lotStats,
     lots,
-    totalLotsCount: product.lots.length,
+    // Кількість наявних лотів (після фільтра) — для заголовка «Лоти в наявності (N)».
+    totalLotsCount: lots.length,
     claims,
   };
 }

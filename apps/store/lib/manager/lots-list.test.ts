@@ -3,25 +3,31 @@ import {
   buildLotsOrderBy,
   buildLotsWhere,
   groupLotsByProduct,
+  isInStockStatus,
   serializeLotRow,
   type LotListItem,
   type RawLotRow,
 } from "./lots-list";
 
+/** Базовий фільтр наявності на складі (завжди присутній, коли onlyInStock ≠ false). */
+const IN_STOCK_CLAUSE = { status: { in: ["free", "reserved"] } };
+
 describe("buildLotsWhere", () => {
-  it("за замовчуванням фільтрує лише лоти із залишком (weight > 0)", () => {
+  it("за замовчуванням фільтрує лише наявні лоти (weight > 0 + status free/reserved)", () => {
     const w = buildLotsWhere({}) as { AND: unknown[] };
     expect(w.AND).toContainEqual({ weight: { gt: 0 } });
+    expect(w.AND).toContainEqual(IN_STOCK_CLAUSE);
   });
 
-  it("onlyInStock=false вимикає базовий фільтр залишку", () => {
+  it("onlyInStock=false вимикає базовий фільтр наявності", () => {
     expect(buildLotsWhere({ onlyInStock: false })).toEqual({});
   });
 
-  it("onlyInStock=true лишає базовий фільтр залишку", () => {
+  it("onlyInStock=true лишає базовий фільтр наявності (залишок + статус)", () => {
     const w = buildLotsWhere({ onlyInStock: true }) as { AND: unknown[] };
     expect(w.AND).toContainEqual({ weight: { gt: 0 } });
-    expect(w.AND).toHaveLength(1);
+    expect(w.AND).toContainEqual(IN_STOCK_CLAUSE);
+    expect(w.AND).toHaveLength(2);
   });
 
   it("пошук додає OR по barcode + product.name + product.articleCode + reservedByName", () => {
@@ -36,9 +42,9 @@ describe("buildLotsWhere", () => {
     expect(orClause?.[3]).toHaveProperty("reservedByName");
   });
 
-  it("ігнорує порожній q (лише базовий фільтр)", () => {
+  it("ігнорує порожній q (лише базовий фільтр наявності)", () => {
     const w = buildLotsWhere({ q: "   " }) as { AND: unknown[] };
-    expect(w.AND).toEqual([{ weight: { gt: 0 } }]);
+    expect(w.AND).toEqual([{ weight: { gt: 0 } }, IN_STOCK_CLAUSE]);
   });
 
   it("productId фільтрує по конкретному товару", () => {
@@ -71,11 +77,11 @@ describe("buildLotsWhere", () => {
     expect(w.AND).toContainEqual({ status: "reserved" });
   });
 
-  it("статус all не додає фільтр статусу", () => {
+  it("статус all не додає фільтр броні (лишається базова наявність)", () => {
     const w = buildLotsWhere({ status: "all" }) as { AND: unknown[] };
     expect(w.AND).not.toContainEqual({ status: "free" });
     expect(w.AND).not.toContainEqual({ status: "reserved" });
-    expect(w.AND).toEqual([{ weight: { gt: 0 } }]);
+    expect(w.AND).toEqual([{ weight: { gt: 0 } }, IN_STOCK_CLAUSE]);
   });
 
   it("статус my фільтрує мою активну бронь (reservedByUserId + reservedUntil ≥ now)", () => {
@@ -114,8 +120,22 @@ describe("buildLotsWhere", () => {
       hasVideo: true,
       status: "free",
     }) as { AND: unknown[] };
-    // weight + q + productId + target + hasVideo + status === 6
-    expect(w.AND).toHaveLength(6);
+    // weight + in-stock + q + productId + target + hasVideo + status === 7
+    expect(w.AND).toHaveLength(7);
+  });
+});
+
+describe("isInStockStatus", () => {
+  it("free/reserved вважаються наявними", () => {
+    expect(isInStockStatus("free")).toBe(true);
+    expect(isInStockStatus("reserved")).toBe(true);
+  });
+
+  it("sold/archived/repacked_out/in_transit — НЕ наявні", () => {
+    expect(isInStockStatus("sold")).toBe(false);
+    expect(isInStockStatus("archived")).toBe(false);
+    expect(isInStockStatus("repacked_out")).toBe(false);
+    expect(isInStockStatus("in_transit")).toBe(false);
   });
 });
 

@@ -43,6 +43,8 @@ interface Row {
   // ── Перепаковка ──
   sourceLotId: string | null;
   purchasePriceEur: number | null;
+  /** Постачальник (для розбору — з джерельного лота; read-only показ). */
+  supplierName: string | null;
   salePriceEur: string;
   qualityId: string;
   /** "" | <sectorId> | "__new__" */
@@ -81,6 +83,7 @@ function emptyRow(role: Row["role"] = "disassembled"): Row {
     qtyActual: "",
     sourceLotId: null,
     purchasePriceEur: null,
+    supplierName: null,
     salePriceEur: "",
     qualityId: "",
     sectorId: "",
@@ -169,6 +172,7 @@ export function StockDocForm(props: StockDocFormProps) {
             ? String(data.lot.weight)
             : rowWeight(rowKey),
         purchasePriceEur: data.lot?.purchasePriceEur ?? null,
+        supplierName: data.lot?.supplierName ?? null,
         lookupError: null,
       });
     } catch {
@@ -421,6 +425,53 @@ export function StockDocForm(props: StockDocFormProps) {
     }
   }
 
+  // Перепаковка рендериться двома окремими блоками (як у 1С): Розпаковка
+  // (disassembled) і Комплектація (assembled). Постачальник комплектації
+  // успадковується з першого джерельного мішка (показ read-only).
+  const disassembledRows = rows.filter((r) => r.role === "disassembled");
+  const assembledRows = rows.filter((r) => r.role === "assembled");
+  const inheritedSupplier =
+    disassembledRows.map((r) => r.supplierName).find(Boolean) ?? null;
+
+  /** Поле пошуку товару з випадаючим списком (спільне для всіх рядків). */
+  function productSearchField(r: Row) {
+    return (
+      <div className="relative min-w-[180px] flex-1">
+        <input
+          value={r.productName}
+          onChange={(e) => {
+            updateRow(r.key, {
+              productName: e.target.value,
+              productId: null,
+            });
+            void searchProducts(r.key, e.target.value);
+          }}
+          placeholder="Товар (назва/артикул)…"
+          className="w-full rounded-md border border-gray-300 px-2 py-1 text-sm"
+        />
+        {searchKey === r.key && hits.length > 0 && (
+          <div className="absolute z-10 mt-1 max-h-48 w-full overflow-auto rounded-md border bg-white shadow">
+            {hits.map((h) => (
+              <button
+                key={h.id}
+                type="button"
+                onClick={() => pickProduct(r.key, h)}
+                className="block w-full px-2 py-1.5 text-left text-sm hover:bg-emerald-50"
+              >
+                {h.name}
+                {h.articleCode ? (
+                  <span className="ml-1 text-xs text-gray-400">
+                    {h.articleCode}
+                  </span>
+                ) : null}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4">
       {autosave.restoreData && (
@@ -490,184 +541,371 @@ export function StockDocForm(props: StockDocFormProps) {
         )}
       </div>
 
-      <div className="rounded-md border bg-white p-4">
-        <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-sm font-medium">Рядки ({rows.length})</h2>
-          <div className="flex gap-2">
-            {props.isRepacking && (
-              <>
-                <button
-                  type="button"
-                  onClick={() =>
-                    setRows((rs) => [...rs, emptyRow("disassembled")])
-                  }
-                  className="rounded-md border border-gray-300 bg-white px-2.5 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50"
-                >
-                  ➕ Розбір
-                </button>
-                <button
-                  type="button"
-                  onClick={() =>
-                    setRows((rs) => [...rs, emptyRow("assembled")])
-                  }
-                  className="rounded-md border border-emerald-300 bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-800 hover:bg-emerald-100"
-                >
-                  ➕ Комплектація
-                </button>
-              </>
-            )}
-            {!props.isRepacking && (
+      {props.isRepacking ? (
+        <>
+          {/* ── Блок 1: Розпаковка (джерельні мішки) ── */}
+          <div className="rounded-md border bg-white p-4">
+            <div className="mb-3 flex items-center justify-between">
+              <h2 className="text-sm font-medium">
+                Розпаковка ({disassembledRows.length})
+              </h2>
               <button
                 type="button"
-                onClick={() => setRows((rs) => [...rs, emptyRow()])}
+                onClick={() =>
+                  setRows((rs) => [...rs, emptyRow("disassembled")])
+                }
+                className="rounded-md border border-gray-300 bg-white px-2.5 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50"
+              >
+                ➕ Додати рядок
+              </button>
+            </div>
+            <div className="space-y-2">
+              {disassembledRows.length === 0 && (
+                <p className="text-xs text-gray-400">
+                  Додайте джерельні мішки (скан ШК підтягне товар, вагу,
+                  постачальника та собівартість).
+                </p>
+              )}
+              {disassembledRows.map((r) => {
+                const num = rows.indexOf(r) + 1;
+                return (
+                  <div
+                    key={r.key}
+                    className="rounded-md border border-gray-200 p-2"
+                  >
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="w-5 shrink-0 text-xs text-gray-400">
+                        №{num}
+                      </span>
+                      {productSearchField(r)}
+                      <input
+                        value={r.barcode}
+                        onChange={(e) =>
+                          updateRow(r.key, { barcode: e.target.value })
+                        }
+                        onBlur={(e) =>
+                          void lookupSourceLot(r.key, e.target.value)
+                        }
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            void lookupSourceLot(r.key, r.barcode);
+                          }
+                        }}
+                        placeholder="ШК джерела"
+                        className="w-36 rounded-md border border-gray-300 px-2 py-1 text-sm"
+                      />
+                      <input
+                        value={r.supplierName ?? ""}
+                        readOnly
+                        placeholder="Постачальник"
+                        title="Постачальник (з джерельного мішка)"
+                        className="w-32 rounded-md border border-gray-200 bg-gray-50 px-2 py-1 text-sm text-gray-600"
+                      />
+                      <input
+                        type="number"
+                        step="0.1"
+                        value={r.weight}
+                        onChange={(e) =>
+                          updateRow(r.key, { weight: e.target.value })
+                        }
+                        placeholder="Вага, кг"
+                        className="w-24 rounded-md border border-gray-300 px-2 py-1 text-sm"
+                      />
+                      {props.showPrice && (
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={r.priceEur}
+                          onChange={(e) =>
+                            updateRow(r.key, { priceEur: e.target.value })
+                          }
+                          placeholder="Ціна €"
+                          className="w-24 rounded-md border border-gray-300 px-2 py-1 text-sm"
+                        />
+                      )}
+                      {rows.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setRows((rs) => rs.filter((x) => x.key !== r.key))
+                          }
+                          className="ml-auto text-xs text-red-500 hover:text-red-700"
+                        >
+                          Видалити
+                        </button>
+                      )}
+                    </div>
+                    {r.lookupError && (
+                      <p className="mt-1 text-xs text-red-500">
+                        {r.lookupError}
+                      </p>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* ── Блок 2: Комплектація (нові мішки) ── */}
+          <div className="rounded-md border border-emerald-200 bg-emerald-50/40 p-4">
+            <div className="mb-3 flex items-center justify-between">
+              <h2 className="text-sm font-medium text-emerald-900">
+                Комплектація ({assembledRows.length})
+              </h2>
+              <button
+                type="button"
+                onClick={() => setRows((rs) => [...rs, emptyRow("assembled")])}
                 className="rounded-md border border-emerald-300 bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-800 hover:bg-emerald-100"
               >
                 ➕ Додати рядок
               </button>
-            )}
-          </div>
-        </div>
-
-        <div className="space-y-3">
-          {rows.map((r, idx) => (
-            <div
-              key={r.key}
-              className={`rounded-md border p-2 ${
-                props.isRepacking && r.role === "assembled"
-                  ? "border-emerald-200 bg-emerald-50/40"
-                  : "border-gray-200"
-              }`}
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-xs text-gray-400">
-                  № {idx + 1}
-                  {props.isRepacking && (
-                    <span className="ml-1 font-medium text-gray-500">
-                      · {r.role === "assembled" ? "Комплектація" : "Розбір"}
-                    </span>
-                  )}
-                </span>
-                {rows.length > 1 && (
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setRows((rs) => rs.filter((x) => x.key !== r.key))
-                    }
-                    className="text-xs text-red-500 hover:text-red-700"
+            </div>
+            <div className="space-y-2">
+              {assembledRows.length === 0 && (
+                <p className="text-xs text-emerald-800/70">
+                  Додайте зібрані мішки. Постачальник успадкується з розпаковки
+                  {inheritedSupplier ? ` (${inheritedSupplier})` : ""}.
+                </p>
+              )}
+              {assembledRows.map((r) => {
+                const num = rows.indexOf(r) + 1;
+                return (
+                  <div
+                    key={r.key}
+                    className="rounded-md border border-emerald-200 bg-white p-2"
                   >
-                    Видалити
-                  </button>
-                )}
-              </div>
-
-              <div className="relative mt-1">
-                <input
-                  value={r.productName}
-                  onChange={(e) => {
-                    updateRow(r.key, {
-                      productName: e.target.value,
-                      productId: null,
-                    });
-                    void searchProducts(r.key, e.target.value);
-                  }}
-                  placeholder="Товар (пошук за назвою/артикулом)…"
-                  className="w-full rounded-md border border-gray-300 px-2 py-1.5 text-sm"
-                />
-                {searchKey === r.key && hits.length > 0 && (
-                  <div className="absolute z-10 mt-1 max-h-48 w-full overflow-auto rounded-md border bg-white shadow">
-                    {hits.map((h) => (
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="w-5 shrink-0 text-xs text-gray-400">
+                        №{num}
+                      </span>
+                      {productSearchField(r)}
+                      <input
+                        value={r.barcode}
+                        onChange={(e) =>
+                          updateRow(r.key, { barcode: e.target.value })
+                        }
+                        placeholder="ШК (авто)"
+                        className="w-32 rounded-md border border-gray-300 px-2 py-1 text-sm"
+                      />
                       <button
-                        key={h.id}
                         type="button"
-                        onClick={() => pickProduct(r.key, h)}
-                        className="block w-full px-2 py-1.5 text-left text-sm hover:bg-emerald-50"
+                        onClick={() => void generateBarcode(r.key)}
+                        className="shrink-0 rounded-md border border-gray-300 bg-white px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50"
                       >
-                        {h.name}
-                        {h.articleCode ? (
-                          <span className="ml-1 text-xs text-gray-400">
-                            {h.articleCode}
-                          </span>
-                        ) : null}
+                        Згенерувати ШК
                       </button>
-                    ))}
+                      <input
+                        value={inheritedSupplier ?? ""}
+                        readOnly
+                        placeholder="Постачальник"
+                        title="Постачальник (успадковано з розпаковки)"
+                        className="w-32 rounded-md border border-gray-200 bg-gray-50 px-2 py-1 text-sm text-gray-600"
+                      />
+                      <input
+                        type="number"
+                        step="0.1"
+                        value={r.weight}
+                        onChange={(e) =>
+                          updateRow(r.key, { weight: e.target.value })
+                        }
+                        placeholder="Вага, кг"
+                        className="w-24 rounded-md border border-gray-300 px-2 py-1 text-sm"
+                      />
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={r.salePriceEur}
+                        onChange={(e) =>
+                          updateRow(r.key, { salePriceEur: e.target.value })
+                        }
+                        placeholder="Ціна продажу €/кг"
+                        className="w-32 rounded-md border border-gray-300 px-2 py-1 text-sm"
+                      />
+                      <select
+                        value={r.qualityId}
+                        onChange={(e) =>
+                          updateRow(r.key, { qualityId: e.target.value })
+                        }
+                        className="w-28 rounded-md border border-gray-300 px-2 py-1 text-sm"
+                      >
+                        <option value="">— Якість —</option>
+                        {qualities.map((q) => (
+                          <option key={q.id} value={q.id}>
+                            {q.name}
+                          </option>
+                        ))}
+                      </select>
+                      <select
+                        value={r.sectorId}
+                        onChange={(e) =>
+                          updateRow(r.key, { sectorId: e.target.value })
+                        }
+                        className="w-28 rounded-md border border-gray-300 px-2 py-1 text-sm"
+                      >
+                        <option value="">— Сектор —</option>
+                        {sectors.map((s) => (
+                          <option key={s.id} value={s.id}>
+                            {s.name}
+                          </option>
+                        ))}
+                        <option value="__new__">+ Новий…</option>
+                      </select>
+                      {r.sectorId === "__new__" && (
+                        <input
+                          value={r.sectorNew}
+                          onChange={(e) =>
+                            updateRow(r.key, { sectorNew: e.target.value })
+                          }
+                          placeholder="Назва сектора"
+                          className="w-32 rounded-md border border-gray-300 px-2 py-1 text-sm"
+                        />
+                      )}
+                      {rows.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setRows((rs) => rs.filter((x) => x.key !== r.key))
+                          }
+                          className="ml-auto text-xs text-red-500 hover:text-red-700"
+                        >
+                          Видалити
+                        </button>
+                      )}
+                    </div>
+                    {r.lookupError && (
+                      <p className="mt-1 text-xs text-red-500">
+                        {r.lookupError}
+                      </p>
+                    )}
                   </div>
-                )}
-              </div>
+                );
+              })}
+            </div>
+          </div>
+        </>
+      ) : (
+        <div className="rounded-md border bg-white p-4">
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="text-sm font-medium">Рядки ({rows.length})</h2>
+            <button
+              type="button"
+              onClick={() => setRows((rs) => [...rs, emptyRow()])}
+              className="rounded-md border border-emerald-300 bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-800 hover:bg-emerald-100"
+            >
+              ➕ Додати рядок
+            </button>
+          </div>
 
-              <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
-                {props.isRepacking && r.role === "disassembled" ? (
-                  <input
-                    value={r.barcode}
-                    onChange={(e) =>
-                      updateRow(r.key, { barcode: e.target.value })
-                    }
-                    onBlur={(e) => void lookupSourceLot(r.key, e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        e.preventDefault();
-                        void lookupSourceLot(r.key, r.barcode);
+          <div className="space-y-3">
+            {rows.map((r, idx) => (
+              <div
+                key={r.key}
+                className="rounded-md border border-gray-200 p-2"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-gray-400">№ {idx + 1}</span>
+                  {rows.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setRows((rs) => rs.filter((x) => x.key !== r.key))
                       }
+                      className="text-xs text-red-500 hover:text-red-700"
+                    >
+                      Видалити
+                    </button>
+                  )}
+                </div>
+
+                <div className="relative mt-1">
+                  <input
+                    value={r.productName}
+                    onChange={(e) => {
+                      updateRow(r.key, {
+                        productName: e.target.value,
+                        productId: null,
+                      });
+                      void searchProducts(r.key, e.target.value);
                     }}
-                    placeholder="ШК джерельного мішка"
-                    className="rounded-md border border-gray-300 px-2 py-1 text-sm"
+                    placeholder="Товар (пошук за назвою/артикулом)…"
+                    className="w-full rounded-md border border-gray-300 px-2 py-1.5 text-sm"
                   />
-                ) : (
+                  {searchKey === r.key && hits.length > 0 && (
+                    <div className="absolute z-10 mt-1 max-h-48 w-full overflow-auto rounded-md border bg-white shadow">
+                      {hits.map((h) => (
+                        <button
+                          key={h.id}
+                          type="button"
+                          onClick={() => pickProduct(r.key, h)}
+                          className="block w-full px-2 py-1.5 text-left text-sm hover:bg-emerald-50"
+                        >
+                          {h.name}
+                          {h.articleCode ? (
+                            <span className="ml-1 text-xs text-gray-400">
+                              {h.articleCode}
+                            </span>
+                          ) : null}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
                   <input
                     value={r.barcode}
                     onChange={(e) =>
                       updateRow(r.key, { barcode: e.target.value })
                     }
-                    placeholder={
-                      props.isRepacking ? "ШК (авто якщо порожньо)" : "Штрихкод"
-                    }
+                    placeholder="Штрихкод"
                     className="rounded-md border border-gray-300 px-2 py-1 text-sm"
                   />
-                )}
-                <input
-                  type="number"
-                  step="0.1"
-                  value={r.weight}
-                  onChange={(e) => updateRow(r.key, { weight: e.target.value })}
-                  placeholder="Вага, кг"
-                  className="rounded-md border border-gray-300 px-2 py-1 text-sm"
-                />
-                {props.isInventory ? (
-                  <>
-                    <input
-                      type="number"
-                      step="0.001"
-                      value={r.qtyAccounting}
-                      onChange={(e) =>
-                        updateRow(r.key, { qtyAccounting: e.target.value })
-                      }
-                      placeholder="Облік"
-                      className="rounded-md border border-gray-300 px-2 py-1 text-sm"
-                    />
-                    <input
-                      type="number"
-                      step="0.001"
-                      value={r.qtyActual}
-                      onChange={(e) =>
-                        updateRow(r.key, { qtyActual: e.target.value })
-                      }
-                      placeholder="Факт"
-                      className="rounded-md border border-gray-300 px-2 py-1 text-sm"
-                    />
-                  </>
-                ) : (
                   <input
                     type="number"
-                    value={r.quantity}
+                    step="0.1"
+                    value={r.weight}
                     onChange={(e) =>
-                      updateRow(r.key, { quantity: e.target.value })
+                      updateRow(r.key, { weight: e.target.value })
                     }
-                    placeholder="К-сть"
+                    placeholder="Вага, кг"
                     className="rounded-md border border-gray-300 px-2 py-1 text-sm"
                   />
-                )}
-                {props.showPrice &&
-                  !props.isInventory &&
-                  !(props.isRepacking && r.role === "assembled") && (
+                  {props.isInventory ? (
+                    <>
+                      <input
+                        type="number"
+                        step="0.001"
+                        value={r.qtyAccounting}
+                        onChange={(e) =>
+                          updateRow(r.key, { qtyAccounting: e.target.value })
+                        }
+                        placeholder="Облік"
+                        className="rounded-md border border-gray-300 px-2 py-1 text-sm"
+                      />
+                      <input
+                        type="number"
+                        step="0.001"
+                        value={r.qtyActual}
+                        onChange={(e) =>
+                          updateRow(r.key, { qtyActual: e.target.value })
+                        }
+                        placeholder="Факт"
+                        className="rounded-md border border-gray-300 px-2 py-1 text-sm"
+                      />
+                    </>
+                  ) : (
+                    <input
+                      type="number"
+                      value={r.quantity}
+                      onChange={(e) =>
+                        updateRow(r.key, { quantity: e.target.value })
+                      }
+                      placeholder="К-сть"
+                      className="rounded-md border border-gray-300 px-2 py-1 text-sm"
+                    />
+                  )}
+                  {props.showPrice && !props.isInventory && (
                     <input
                       type="number"
                       step="0.01"
@@ -679,76 +917,15 @@ export function StockDocForm(props: StockDocFormProps) {
                       className="rounded-md border border-gray-300 px-2 py-1 text-sm"
                     />
                   )}
-              </div>
-
-              {/* Додаткові поля рядка комплектації перепаковки. */}
-              {props.isRepacking && r.role === "assembled" && (
-                <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={r.salePriceEur}
-                    onChange={(e) =>
-                      updateRow(r.key, { salePriceEur: e.target.value })
-                    }
-                    placeholder="Ціна продажу €/кг"
-                    className="rounded-md border border-gray-300 px-2 py-1 text-sm"
-                  />
-                  <select
-                    value={r.qualityId}
-                    onChange={(e) =>
-                      updateRow(r.key, { qualityId: e.target.value })
-                    }
-                    className="rounded-md border border-gray-300 px-2 py-1 text-sm"
-                  >
-                    <option value="">— Якість —</option>
-                    {qualities.map((q) => (
-                      <option key={q.id} value={q.id}>
-                        {q.name}
-                      </option>
-                    ))}
-                  </select>
-                  <select
-                    value={r.sectorId}
-                    onChange={(e) =>
-                      updateRow(r.key, { sectorId: e.target.value })
-                    }
-                    className="rounded-md border border-gray-300 px-2 py-1 text-sm"
-                  >
-                    <option value="">— Сектор —</option>
-                    {sectors.map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {s.name}
-                      </option>
-                    ))}
-                    <option value="__new__">+ Новий сектор…</option>
-                  </select>
-                  <button
-                    type="button"
-                    onClick={() => void generateBarcode(r.key)}
-                    className="rounded-md border border-gray-300 bg-white px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50"
-                  >
-                    Згенерувати ШК
-                  </button>
-                  {r.sectorId === "__new__" && (
-                    <input
-                      value={r.sectorNew}
-                      onChange={(e) =>
-                        updateRow(r.key, { sectorNew: e.target.value })
-                      }
-                      placeholder="Назва нового сектора"
-                      className="rounded-md border border-gray-300 px-2 py-1 text-sm sm:col-span-2"
-                    />
-                  )}
                 </div>
-              )}
-              {r.lookupError && (
-                <p className="mt-1 text-xs text-red-500">{r.lookupError}</p>
-              )}
-            </div>
-          ))}
+                {r.lookupError && (
+                  <p className="mt-1 text-xs text-red-500">{r.lookupError}</p>
+                )}
+              </div>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Панель зведення перепаковки. */}
       {props.isRepacking && (

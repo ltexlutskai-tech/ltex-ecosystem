@@ -19,6 +19,7 @@ import {
 } from "../../_components/autosave-status";
 import { buildProductShareText } from "@/lib/manager/share-message";
 import { ClientPicker } from "../../orders/new/_components/client-picker";
+import { CopyBarcode } from "./copy-barcode";
 import { OrderVideoButton } from "./order-video-button";
 import { ShareSheet } from "./share-sheet";
 
@@ -532,10 +533,11 @@ export function LotCardModal({ lotId, onClose, rateUah, sellerName }: Props) {
                 {lot.barcodes.map((b) => (
                   <li
                     key={b.id}
-                    className="rounded border bg-gray-50 px-2 py-1 font-mono text-xs text-gray-700"
+                    className="flex items-center gap-2 rounded border bg-gray-50 px-2 py-1 font-mono text-xs text-gray-700"
                   >
-                    {b.code}
-                    <span className="ml-2 text-gray-400">{b.type}</span>
+                    <CopyBarcode value={b.code} />
+                    <span>{b.code}</span>
+                    <span className="text-gray-400">{b.type}</span>
                   </li>
                 ))}
               </ul>

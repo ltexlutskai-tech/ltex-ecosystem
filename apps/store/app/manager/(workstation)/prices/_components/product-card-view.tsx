@@ -8,6 +8,7 @@ import {
   priceTypeLabel,
 } from "@/lib/manager/product-card";
 import type { ProductCardVM, ProductLotVM } from "../_lib/load-product";
+import { CopyBarcode } from "./copy-barcode";
 import { LotCardModal } from "./lot-card-modal";
 import { OrderVideoButton } from "./order-video-button";
 import { ProductClaimsPanel } from "./product-claims-panel";
@@ -237,22 +238,22 @@ export function ProductCardView({
         </EmptyHint>
       </CollapsibleBlock>
 
-      {/* ── Лоти товару (усі) + таблиця (Етап 3a) ──────────────── */}
-      <div className="rounded-lg border bg-white p-4 shadow-sm">
-        <h2 className="mb-3 text-sm font-semibold text-gray-700">
-          Лоти ({product.totalLotsCount})
-        </h2>
+      {/* ── Лоти товару в наявності + таблиця (Етап 3a) ─────────── */}
+      {/* Згортаний блок (за замовчуванням закритий) — щоб довгий список лотів
+          не розтягував картку. Показуємо ЛИШЕ наявні на складі (архівні/продані
+          відфільтровано у loadProductCard). */}
+      <CollapsibleBlock title={`Лоти в наявності (${product.totalLotsCount})`}>
         {product.lots.length > 0 ? (
           <LotsTable lots={product.lots} onOpen={setOpenLotId} />
         ) : (
-          <EmptyHint>Лотів немає.</EmptyHint>
+          <EmptyHint>Наявних лотів немає.</EmptyHint>
         )}
         <p className="mt-2 text-xs text-gray-400">
           Натисніть рядок щоб відкрити картку лоту — редагувати менеджерські
           поля та бронювати лот на клієнта. Вага, залишок, дата приходу та
           штрихкоди — лише перегляд (дані з 1С).
         </p>
-      </div>
+      </CollapsibleBlock>
 
       <LotCardModal
         lotId={openLotId}
@@ -377,7 +378,10 @@ function LotsTable({
                   {lot.isTarget ? "✔" : "—"}
                 </td>
                 <td className="px-3 py-2 font-mono text-xs text-gray-600">
-                  {lot.barcode}
+                  <span className="inline-flex items-center gap-1.5">
+                    <CopyBarcode value={lot.barcode} />
+                    {lot.barcode}
+                  </span>
                 </td>
                 <td className="px-3 py-2 text-xs">
                   <BookingCell lot={lot} />
@@ -403,11 +407,15 @@ function LotsTable({
       {/* Mobile — картки */}
       <div className="space-y-2 sm:hidden">
         {lots.map((lot) => (
-          <button
+          <div
             key={lot.id}
-            type="button"
+            role="button"
+            tabIndex={0}
             onClick={() => onOpen(lot.id)}
-            className={`block w-full rounded-md border p-3 text-left ${rowClass(lot)}`}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") onOpen(lot.id);
+            }}
+            className={`block w-full cursor-pointer rounded-md border p-3 text-left ${rowClass(lot)}`}
           >
             <div className="flex items-center justify-between">
               <span className="font-semibold text-gray-800">
@@ -439,10 +447,11 @@ function LotsTable({
                 </span>
               )}
             </div>
-            <div className="mt-1 font-mono text-[11px] text-gray-500">
+            <div className="mt-1 flex items-center gap-1.5 font-mono text-[11px] text-gray-500">
+              <CopyBarcode value={lot.barcode} />
               {lot.barcode}
             </div>
-          </button>
+          </div>
         ))}
       </div>
     </>

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import type { LotGroup, LotListItem } from "@/lib/manager/lots-list";
+import { CopyBarcode } from "./copy-barcode";
 import { LotCardModal } from "./lot-card-modal";
 
 interface Props {
@@ -105,30 +106,77 @@ export function AllLotsList({ groups, rateUah, sellerName }: Props) {
   return (
     <div className="space-y-4">
       {groups.map((group) => (
-        <section
+        <LotGroupSection
           key={group.productId}
-          className="overflow-hidden rounded-lg border bg-white shadow-sm"
-        >
-          {/* Заголовок групи — товар (артикул + назва) */}
-          <div className="flex flex-wrap items-center justify-between gap-2 border-b bg-gray-50 px-4 py-2">
-            <div className="min-w-0">
-              <Link
-                href={`/manager/prices/${group.productId}`}
-                className="font-medium text-gray-900 hover:underline"
-              >
-                {group.productName}
-              </Link>
-              {group.articleCode && (
-                <span className="ml-2 text-xs text-gray-500">
-                  Арт. {group.articleCode}
-                </span>
-              )}
-            </div>
-            <span className="text-xs text-gray-400">
-              лотів: {group.lots.length}
-            </span>
-          </div>
+          group={group}
+          onOpen={setOpenLotId}
+        />
+      ))}
 
+      {/* Картка лоту (Етап 3a) — перевикористана. */}
+      <LotCardModal
+        lotId={openLotId}
+        onClose={() => setOpenLotId(null)}
+        rateUah={rateUah}
+        sellerName={sellerName}
+      />
+    </div>
+  );
+}
+
+/**
+ * Секція одного товару у глобальному списку — згортана (клік по шапці ховає
+ * таблицю лотів). За замовчуванням розгорнута. Клік по назві товару веде на
+ * картку (не згортає — `stopPropagation`).
+ */
+function LotGroupSection({
+  group,
+  onOpen,
+}: {
+  group: LotGroup;
+  onOpen: (id: string) => void;
+}) {
+  const [open, setOpen] = useState(true);
+
+  return (
+    <section className="overflow-hidden rounded-lg border bg-white shadow-sm">
+      {/* Заголовок групи — товар (артикул + назва). Клік по шапці — згорнути. */}
+      <div
+        role="button"
+        tabIndex={0}
+        onClick={() => setOpen((o) => !o)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") setOpen((o) => !o);
+        }}
+        className="flex cursor-pointer flex-wrap items-center justify-between gap-2 border-b bg-gray-50 px-4 py-2 hover:bg-gray-100"
+      >
+        <div className="min-w-0">
+          <Link
+            href={`/manager/prices/${group.productId}`}
+            onClick={(e) => e.stopPropagation()}
+            className="font-medium text-gray-900 hover:underline"
+          >
+            {group.productName}
+          </Link>
+          {group.articleCode && (
+            <span className="ml-2 text-xs text-gray-500">
+              Арт. {group.articleCode}
+            </span>
+          )}
+        </div>
+        <span className="flex items-center gap-2 text-xs text-gray-400">
+          лотів: {group.lots.length}
+          <span
+            className={`transition-transform ${open ? "rotate-180" : ""}`}
+            aria-hidden
+          >
+            ▾
+          </span>
+        </span>
+      </div>
+
+      {open && (
+        <>
           {/* Desktop / tablet — таблиця */}
           <div className="hidden overflow-x-auto sm:block">
             <table className="min-w-full divide-y divide-gray-200 text-sm">
@@ -150,11 +198,14 @@ export function AllLotsList({ groups, rateUah, sellerName }: Props) {
                 {group.lots.map((lot) => (
                   <tr
                     key={lot.id}
-                    onClick={() => setOpenLotId(lot.id)}
+                    onClick={() => onOpen(lot.id)}
                     className={`cursor-pointer ${rowClass(lot)}`}
                   >
                     <td className="px-2.5 py-1.5 font-mono text-xs text-gray-600">
-                      {lot.barcode}
+                      <span className="inline-flex items-center gap-1.5">
+                        <CopyBarcode value={lot.barcode} />
+                        {lot.barcode}
+                      </span>
                     </td>
                     <td className="px-2.5 py-1.5 whitespace-nowrap text-gray-800">
                       {lot.weight.toLocaleString("uk-UA")}
@@ -192,11 +243,15 @@ export function AllLotsList({ groups, rateUah, sellerName }: Props) {
           {/* Mobile — картки */}
           <div className="space-y-2 p-3 sm:hidden">
             {group.lots.map((lot) => (
-              <button
+              <div
                 key={lot.id}
-                type="button"
-                onClick={() => setOpenLotId(lot.id)}
-                className={`block w-full rounded-md border p-3 text-left ${rowClass(lot)}`}
+                role="button"
+                tabIndex={0}
+                onClick={() => onOpen(lot.id)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") onOpen(lot.id);
+                }}
+                className={`block w-full cursor-pointer rounded-md border p-3 text-left ${rowClass(lot)}`}
               >
                 <div className="flex items-center justify-between">
                   <span className="font-semibold text-gray-800">
@@ -234,22 +289,15 @@ export function AllLotsList({ groups, rateUah, sellerName }: Props) {
                     </span>
                   )}
                 </div>
-                <div className="mt-1 font-mono text-[11px] text-gray-500">
+                <div className="mt-1 flex items-center gap-1.5 font-mono text-[11px] text-gray-500">
+                  <CopyBarcode value={lot.barcode} />
                   {lot.barcode}
                 </div>
-              </button>
+              </div>
             ))}
           </div>
-        </section>
-      ))}
-
-      {/* Картка лоту (Етап 3a) — перевикористана. */}
-      <LotCardModal
-        lotId={openLotId}
-        onClose={() => setOpenLotId(null)}
-        rateUah={rateUah}
-        sellerName={sellerName}
-      />
-    </div>
+        </>
+      )}
+    </section>
   );
 }

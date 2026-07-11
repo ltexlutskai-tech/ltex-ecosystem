@@ -251,6 +251,12 @@ export async function applyRepackFullCycle(
   // 1. Резолв джерельних лотів (для пулу собівартості + фізичного списання).
   const resolved = await resolveSourceLots(db, disassembled);
 
+  // Постачальник джерела успадковується на нові (зібрані) мішки — як у 1С
+  // (Упаковка бере постачальника з Розпаковки), для звітів «продажі за
+  // постачальниками». Беремо перший непорожній серед джерельних лотів.
+  const sourceSupplierId =
+    resolved.map((r) => r.supplierId).find(Boolean) ?? null;
+
   // 2. Резолв Product.code1C для рядків комплектації (для CostMovement).
   const productIds = [
     ...new Set(assembled.map((a) => a.productId).filter(Boolean) as string[]),
@@ -356,6 +362,7 @@ export async function applyRepackFullCycle(
           purchasePriceEur: np.costPerKgEur,
           arrivalDate: doc.docDate,
           sector: sectorName,
+          supplierId: sourceSupplierId,
         },
         select: { id: true },
       });
@@ -407,6 +414,7 @@ interface ResolvedSource {
   prevStatus: string;
   weight: number;
   purchasePriceEur: number | null;
+  supplierId: string | null;
 }
 
 /** Резолвить джерельні лоти за `sourceLotId` (пріоритет) або `barcode`. */
@@ -435,6 +443,7 @@ async function resolveSourceLots(
       status: true,
       weight: true,
       purchasePriceEur: true,
+      supplierId: true,
     },
   });
   const lotById = new Map(lots.map((l) => [l.id, l]));
@@ -455,6 +464,7 @@ async function resolveSourceLots(
       // Вага з рядка документа (комірник міг ввести фактичну), fallback — лот.
       weight: item.weight || lot.weight,
       purchasePriceEur: lot.purchasePriceEur,
+      supplierId: lot.supplierId,
     });
   }
   return out;

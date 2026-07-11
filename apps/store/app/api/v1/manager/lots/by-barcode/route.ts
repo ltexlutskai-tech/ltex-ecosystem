@@ -30,6 +30,7 @@ export async function GET(req: NextRequest) {
   const lot = await prisma.lot.findUnique({
     where: { barcode: code },
     include: {
+      supplier: { select: { id: true, name: true } },
       product: {
         select: {
           id: true,
@@ -63,6 +64,8 @@ export async function GET(req: NextRequest) {
       status: lot.status,
       priceEur: lot.priceEur,
       purchasePriceEur: lot.purchasePriceEur,
+      supplierId: lot.supplierId,
+      supplierName: lot.supplier?.name ?? null,
       reservedForClientId: lot.reservedForClientId,
       reservedForName: lot.reservedForName,
       reservedByUserId: lot.reservedByUserId,

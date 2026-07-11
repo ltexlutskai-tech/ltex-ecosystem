@@ -19,6 +19,18 @@ import { Prisma } from "@ltex/db";
  *  • expired  — протермінована бронь (reserved, але reservedUntil < now).
  */
 
+/**
+ * Статуси лоту, що вважаються «в наявності на складі» (фізично на полиці).
+ * Усе інше — продані (`sold`), розібрані перепаковкою (`repacked_out`),
+ * архівні (`archived`), у дорозі (`in_transit`) — у списках лотів не показуємо.
+ */
+export const IN_STOCK_LOT_STATUSES = ["free", "reserved"] as const;
+
+/** true коли лот фізично на складі (наявний). Чиста функція. */
+export function isInStockStatus(status: string): boolean {
+  return (IN_STOCK_LOT_STATUSES as readonly string[]).includes(status);
+}
+
 /** Статус-фільтр броні. */
 export type LotsListStatus = "all" | "free" | "reserved" | "my" | "expired";
 
@@ -65,10 +77,13 @@ export interface BuildLotsWhereParams {
 export function buildLotsWhere(p: BuildLotsWhereParams): Prisma.LotWhereInput {
   const and: Prisma.LotWhereInput[] = [];
 
-  // Базовий жорсткий фільтр — залишок є. onlyInStock=false вимикає його явно
-  // (напр. адмін хоче побачити порожні мішки), інакше завжди true.
+  // Базовий жорсткий фільтр наявності: залишок є (`weight > 0`) І лот фізично
+  // на складі (`status ∈ free|reserved`) — архівні/продані/розібрані/у-дорозі
+  // мішки не показуємо навіть при `status="all"`. `onlyInStock=false` вимикає
+  // обидва (адмін-escape для перегляду порожніх/архівних мішків).
   if (p.onlyInStock !== false) {
     and.push({ weight: { gt: 0 } });
+    and.push({ status: { in: [...IN_STOCK_LOT_STATUSES] } });
   }
 
   if (p.q && p.q.trim().length > 0) {
