@@ -46,10 +46,7 @@ import {
   type ManagerSaleStatus,
 } from "@/lib/manager/sale-status";
 import { useDocumentAutosave } from "@/lib/autosave/use-document-autosave";
-import {
-  AutosaveStatus,
-  RestoreDraftBanner,
-} from "../../../_components/autosave-status";
+import { AutosaveStatus } from "../../../_components/autosave-status";
 import {
   collectPriceDeviations,
   draftToWire,
@@ -344,6 +341,9 @@ export function SaleForm({
     // Новий документ: серверна чернетка можлива лише коли обрано клієнта
     // (`Sale.customerId` — обов'язковий FK). До того захищає localStorage.
     canCreateDraft: clientId != null,
+    // Банер «Знайдено незбережені зміни» не показуємо — чернетки зберігаються у
+    // БД і доступні у списку реалізацій (рішення user).
+    enableRestore: false,
     createDraft: createDraftServer,
     updateDraft: updateDraftServer,
     onIdAssigned: (id) => {
@@ -352,22 +352,6 @@ export function SaleForm({
       window.history.replaceState(null, "", `/manager/sales/${id}`);
     },
   });
-
-  /** Застосувати відновлені з localStorage дані у стан форми. */
-  function applyRestore(d: SaleDraftData): void {
-    setClientId(d.clientId);
-    setClientSummary(d.clientSummary);
-    setItems(d.items);
-    setNotes(d.notes);
-    setShowComment(!!d.notes.trim());
-    setDeliveryMethod(d.deliveryMethod);
-    setNovaPoshtaBranch(d.novaPoshtaBranch);
-    setDeliveryAddress(d.deliveryAddress ?? "");
-    setCashOnDelivery(d.cashOnDelivery);
-    setOnTradeAgent(d.onTradeAgent);
-    setExpressWaybill(d.expressWaybill);
-    autosave.acceptRestore();
-  }
 
   function onClientChange(
     id: string | null,
@@ -795,13 +779,6 @@ export function SaleForm({
 
   return (
     <div className="space-y-4">
-      {autosave.restoreData && (
-        <RestoreDraftBanner
-          onRestore={() => applyRestore(autosave.restoreData as SaleDraftData)}
-          onDismiss={autosave.dismissRestore}
-        />
-      )}
-
       {/* ─── Секція: Контрагент ──────────────────────────────────────────── */}
       <section className="rounded-lg border bg-white p-4 shadow-sm">
         <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-gray-500">

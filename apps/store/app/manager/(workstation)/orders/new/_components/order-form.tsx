@@ -6,10 +6,7 @@ import { useRouter } from "next/navigation";
 import { MessageSquare, ListPlus } from "lucide-react";
 import { isOrderLocked } from "@/lib/manager/order-status";
 import { useDocumentAutosave } from "@/lib/autosave/use-document-autosave";
-import {
-  AutosaveStatus,
-  RestoreDraftBanner,
-} from "../../../_components/autosave-status";
+import { AutosaveStatus } from "../../../_components/autosave-status";
 import {
   Button,
   Textarea,
@@ -297,6 +294,9 @@ export function OrderForm({
     // (`Order.customerId` — обов'язковий FK) і немає невирішеного конфлікту
     // «одне активне на клієнта». До того захищає localStorage.
     canCreateDraft: clientId != null && activeConflict == null,
+    // Банер «Знайдено незбережені зміни» не показуємо — чернетки зберігаються у
+    // БД і доступні у списку замовлень (рішення user).
+    enableRestore: false,
     createDraft: createDraftServer,
     updateDraft: updateDraftServer,
     onIdAssigned: (id) => {
@@ -305,21 +305,6 @@ export function OrderForm({
       window.history.replaceState(null, "", `/manager/orders/${id}`);
     },
   });
-
-  /** Застосувати відновлені з localStorage дані у стан форми. */
-  function applyRestore(d: OrderDraftData): void {
-    setClientId(d.clientId);
-    setClientSummary(d.clientSummary);
-    setItems(d.items);
-    setNotes(d.notes);
-    setShowComment(!!d.notes.trim());
-    setDeliveryMethod(d.deliveryMethod);
-    setNovaPoshtaBranch(d.novaPoshtaBranch);
-    setDeliveryAddress(d.deliveryAddress);
-    setExpressWaybill(d.expressWaybill);
-    setOverdueDays(d.overdueDays);
-    autosave.acceptRestore();
-  }
 
   function onClientChange(
     id: string | null,
@@ -522,13 +507,6 @@ export function OrderForm({
 
   return (
     <div className="space-y-4">
-      {autosave.restoreData && (
-        <RestoreDraftBanner
-          onRestore={() => applyRestore(autosave.restoreData as OrderDraftData)}
-          onDismiss={autosave.dismissRestore}
-        />
-      )}
-
       {/* ─── Секція: Контрагент ───────────────────────────────────────────── */}
       <section className="rounded-lg border bg-white p-4 shadow-sm">
         <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-gray-500">
