@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
   Plus,
@@ -27,6 +27,7 @@ import { RouteSheetStatusBadge } from "../../_components/route-sheet-status-badg
 import { OrderPickerModal } from "./order-picker-modal";
 import { TaskClientPicker } from "./task-client-picker";
 import { LoadingBoard } from "./loading-board";
+import { SearchableSelect } from "../../../_components/searchable-select";
 import type { LoadingBoardOrder } from "@/lib/manager/route-sheet-loading";
 
 /** Підписи на кнопках статус-переходів. */
@@ -172,6 +173,8 @@ export interface RouteSheetTaskView {
   id: string;
   customerId: string | null;
   customerName: string | null;
+  customerPhone: string | null;
+  customerCity: string | null;
   comment: string;
 }
 
@@ -183,6 +186,7 @@ export interface RouteSheetView {
   status: string;
   routeId: string | null;
   expeditorUserId: string | null;
+  managerUserId: string | null;
   comment: string | null;
   totalEur: number;
   totalUah: number;
@@ -239,23 +243,47 @@ function formatDateDisplay(iso: string | null): string {
 export function RouteSheetForm({
   initial,
   expeditors,
+  managers = [],
   cashFlowArticles = [],
 }: {
   initial: RouteSheetView;
   /** @deprecated MgrRoute dropdown прибрано — «Маршрут» тепер вільний текст у `comment`. */
   routes?: RouteOption[];
   expeditors: ExpeditorOption[];
+  /** Список для дропдауна «Менеджер» (активні користувачі). */
+  managers?: ExpeditorOption[];
   cashFlowArticles?: CashFlowArticleOption[];
 }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const sheetId = initial.id;
 
-  const [tab, setTab] = useState<TabId>("orders");
+  // Активна вкладка синхронізується з URL (?tab=) — щоб кнопка «Назад» браузера
+  // повертала на ту саму вкладку (список реалізацій/замовлень/…), а не на початок.
+  const urlTab = searchParams.get("tab");
+  const initialTab: TabId = TABS.some((t) => t.id === urlTab)
+    ? (urlTab as TabId)
+    : "orders";
+  const [tab, setTab] = useState<TabId>(initialTab);
+
+  /** Змінити вкладку + відобразити її в URL (без перезавантаження сторінки). */
+  const changeTab = useCallback((id: TabId) => {
+    setTab(id);
+    if (typeof window !== "undefined") {
+      const url = new URL(window.location.href);
+      url.searchParams.set("tab", id);
+      window.history.replaceState(null, "", url.toString());
+    }
+  }, []);
   const [status, setStatus] = useState(initial.status);
   // «Маршрут» — вільнотекстова назва маршруту (1С: документ = `Комментарий`).
   const [routeName, setRouteName] = useState(initial.comment ?? "");
   const [expeditorUserId, setExpeditorUserId] = useState(
     initial.expeditorUserId ?? "",
+  );
+  // Відповідальний менеджер рейсу (визначає, чиї броні «свої» на складі).
+  const [managerUserId, setManagerUserId] = useState(
+    initial.managerUserId ?? "",
   );
 
   // Дата складання — read-only показ (ставиться при створенні документа).
@@ -359,8 +387,9 @@ export function RouteSheetForm({
     () => ({
       comment: routeName.trim() ? routeName : null,
       expeditorUserId: expeditorUserId || null,
+      managerUserId: managerUserId || null,
     }),
-    [routeName, expeditorUserId],
+    [routeName, expeditorUserId, managerUserId],
   );
   type HeaderDraft = typeof headerDraft;
 
@@ -378,6 +407,7 @@ export function RouteSheetForm({
   function applyHeaderRestore(d: HeaderDraft): void {
     setRouteName(d.comment ?? "");
     setExpeditorUserId(d.expeditorUserId ?? "");
+    setManagerUserId(d.managerUserId ?? "");
     headerAutosave.acceptRestore();
   }
 
@@ -773,6 +803,26 @@ export function RouteSheetForm({
             </select>
           </div>
 
+          {/* Менеджер — визначає, чиї броні «свої» на складі. */}
+          <div className="min-w-0">
+            <label className="mb-1 block text-sm font-medium text-gray-700">
+              Менеджер
+            </label>
+            <select
+              value={managerUserId}
+              disabled={locked}
+              onChange={(e) => setManagerUserId(e.target.value)}
+              className="h-10 w-full rounded-md border border-gray-300 bg-white px-3 text-sm focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500 disabled:bg-gray-50 disabled:text-gray-500"
+            >
+              <option value="">— Не вибрано —</option>
+              {managers.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.fullName}
+                </option>
+              ))}
+            </select>
+          </div>
+
           {/* Дата — read-only (присвоюється при створенні). */}
           <div className="min-w-0">
             <label className="mb-1 block text-sm font-medium text-gray-700">
@@ -923,7 +973,7 @@ export function RouteSheetForm({
             <button
               key={t.id}
               type="button"
-              onClick={() => setTab(t.id)}
+              onClick={() => changeTab(t.id)}
               className={`whitespace-nowrap border-b-2 px-3 py-2 text-sm font-medium transition-colors ${
                 tab === t.id
                   ? "border-green-600 text-green-700"
@@ -1481,22 +1531,20 @@ export function RouteSheetForm({
 
           {!locked && (
             <div className="flex flex-wrap items-end gap-2 rounded-lg border bg-white p-4 shadow-sm">
-              <div className="min-w-[180px] flex-1">
+              <div className="min-w-[220px] flex-1">
                 <label className="mb-1 block text-xs font-medium text-gray-600">
                   Стаття витрат
                 </label>
-                <select
+                <SearchableSelect
+                  options={cashFlowArticles.map((a) => ({
+                    id: a.id,
+                    label: a.name,
+                  }))}
                   value={expArticleId}
-                  onChange={(e) => setExpArticleId(e.target.value)}
-                  className="h-10 w-full rounded-md border border-gray-300 px-2 text-sm"
-                >
-                  <option value="">— без статті —</option>
-                  {cashFlowArticles.map((a) => (
-                    <option key={a.id} value={a.id}>
-                      {a.name}
-                    </option>
-                  ))}
-                </select>
+                  onChange={setExpArticleId}
+                  placeholder="Почніть вводити назву статті…"
+                  emptyLabel="— без статті —"
+                />
               </div>
               <div className="w-32">
                 <label className="mb-1 block text-xs font-medium text-gray-600">
@@ -1648,7 +1696,20 @@ export function RouteSheetForm({
                   {tasks.map((t) => (
                     <tr key={t.id} className="border-b last:border-b-0">
                       <td className="px-4 py-2 text-gray-800">
-                        {t.customerName ?? "—"}
+                        <div>{t.customerName ?? "—"}</div>
+                        {(t.customerPhone || t.customerCity) && (
+                          <div className="mt-0.5 text-xs text-gray-500">
+                            {t.customerCity && <span>{t.customerCity}</span>}
+                            {t.customerPhone && (
+                              <a
+                                href={`tel:${t.customerPhone}`}
+                                className="ml-2 text-blue-600 hover:text-blue-800"
+                              >
+                                {t.customerPhone}
+                              </a>
+                            )}
+                          </div>
+                        )}
                       </td>
                       <td className="whitespace-pre-wrap px-4 py-2 text-gray-700">
                         {t.comment}

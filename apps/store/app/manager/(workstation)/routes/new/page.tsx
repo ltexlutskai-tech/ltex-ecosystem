@@ -16,7 +16,12 @@ export default async function NewRouteSheetPage() {
   if (!user) redirect("/manager/login");
 
   const sheet = await prisma.routeSheet.create({
-    data: { status: "draft", createdByUserId: user.id },
+    // Менеджер рейсу за замовчуванням = автор (його броні — «свої»).
+    data: {
+      status: "draft",
+      createdByUserId: user.id,
+      managerUserId: user.id,
+    },
     select: { id: true },
   });
 

@@ -372,6 +372,8 @@ model Sale {
   priceTypeId         String?  @map("price_type_id")
   deliveryMethod      String?  @map("delivery_method") // delivery|post|pickup
   novaPoshtaBranch    String?  @map("nova_poshta_branch")
+  // Адреса доставки (для способу «Доставка»): з картки клієнта або вручну.
+  deliveryAddress     String?  @map("delivery_address")
   cashOnDelivery      Boolean  @default(false) @map("cash_on_delivery")
   // Per-document debt deferral («днів до закриття»). null = глобальний дефолт зі
   // звіту. Наложка (cashOnDelivery=true) ігнорує це поле (без відстрочки).
@@ -1176,6 +1178,7 @@ model User {
   reminders            MgrReminder[]            @relation("UserReminders")
   viewPrefs            MgrUserViewPrefs[]
   routeSheetsExpedited RouteSheet[]             @relation("RouteSheetExpeditor")
+  routeSheetsManaged   RouteSheet[]             @relation("RouteSheetManager")
   routeSheetsCreated   RouteSheet[]             @relation("RouteSheetCreatedBy")
   chatConversations    ChatConversation[]       @relation("ChatConversationAgent")
   chatInboxMessages    ChatInboxMessage[]       @relation("ChatInboxMessageAuthor")
@@ -1373,6 +1376,9 @@ model RouteSheet {
   status            String    @default("draft") // draft|dispatched|completed
   routeId           String?   @map("route_id")
   expeditorUserId   String?   @map("expeditor_user_id")
+  // Відповідальний менеджер рейсу — його броні вважаються «своїми» при
+  // розрахунку вільного залишку на складі (чужа бронь = не цей менеджер).
+  managerUserId     String?   @map("manager_user_id")
   createdByUserId   String?   @map("created_by_user_id")
   totalUah          Float     @default(0) @map("total_uah")
   totalEur          Float     @default(0) @map("total_eur")
@@ -1392,6 +1398,7 @@ model RouteSheet {
 
   route     MgrRoute? @relation(fields: [routeId], references: [id], onDelete: SetNull)
   expeditor User?     @relation("RouteSheetExpeditor", fields: [expeditorUserId], references: [id], onDelete: SetNull)
+  manager   User?     @relation("RouteSheetManager", fields: [managerUserId], references: [id], onDelete: SetNull)
   createdBy User?     @relation("RouteSheetCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
 
   orders    RouteSheetOrder[]

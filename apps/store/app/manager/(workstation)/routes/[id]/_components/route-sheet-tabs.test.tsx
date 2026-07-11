@@ -4,7 +4,8 @@ import { RouteSheetForm, type RouteSheetView } from "./route-sheet-form";
 
 // next/navigation — useRouter заглушка (push/refresh).
 vi.mock("next/navigation", () => ({
-  useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
+  useRouter: () => ({ push: vi.fn(), refresh: vi.fn(), back: vi.fn() }),
+  useSearchParams: () => new URLSearchParams(""),
 }));
 
 // @ltex/ui — мінімальні Button/Textarea.
@@ -40,6 +41,7 @@ function makeView(over: Partial<RouteSheetView> = {}): RouteSheetView {
     status: "draft",
     routeId: null,
     expeditorUserId: null,
+    managerUserId: null,
     comment: null,
     totalEur: 0,
     totalUah: 0,

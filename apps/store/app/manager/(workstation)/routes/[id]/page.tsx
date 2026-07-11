@@ -133,7 +133,7 @@ export default async function ManagerRouteSheetDetailPage({
     taskClientIds.size > 0
       ? await prisma.mgrClient.findMany({
           where: { id: { in: [...taskClientIds] } },
-          select: { id: true, name: true },
+          select: { id: true, name: true, phonePrimary: true, city: true },
         })
       : [];
 
@@ -149,6 +149,8 @@ export default async function ManagerRouteSheetDetailPage({
       id: t.id,
       customerId: t.customerId,
       customerName: client?.name ?? null,
+      customerPhone: client?.phonePrimary ?? null,
+      customerCity: client?.city ?? null,
       comment: t.comment,
     };
   });
@@ -220,6 +222,7 @@ export default async function ManagerRouteSheetDetailPage({
     status: sheet.status,
     routeId: sheet.routeId,
     expeditorUserId: sheet.expeditorUserId,
+    managerUserId: sheet.managerUserId,
     comment: sheet.comment,
     totalEur: sheet.totalEur,
     totalUah: sheet.totalUah,
@@ -287,6 +290,7 @@ export default async function ManagerRouteSheetDetailPage({
       <RouteSheetForm
         initial={initial}
         expeditors={expeditors}
+        managers={expeditors}
         cashFlowArticles={cashFlowArticles}
       />
     </div>

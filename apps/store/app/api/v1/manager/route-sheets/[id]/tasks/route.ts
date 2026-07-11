@@ -66,7 +66,7 @@ export async function POST(
   const client = task.customerId
     ? await prisma.mgrClient.findUnique({
         where: { id: task.customerId },
-        select: { name: true },
+        select: { name: true, phonePrimary: true, city: true },
       })
     : null;
 
@@ -75,6 +75,8 @@ export async function POST(
       id: task.id,
       customerId: task.customerId,
       customerName: client?.name ?? null,
+      customerPhone: client?.phonePrimary ?? null,
+      customerCity: client?.city ?? null,
       comment: task.comment,
     },
   });

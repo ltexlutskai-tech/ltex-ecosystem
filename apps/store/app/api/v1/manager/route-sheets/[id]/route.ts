@@ -123,7 +123,7 @@ export async function GET(
     taskClientIds.size > 0
       ? await prisma.mgrClient.findMany({
           where: { id: { in: [...taskClientIds] } },
-          select: { id: true, name: true },
+          select: { id: true, name: true, phonePrimary: true, city: true },
         })
       : [];
 
@@ -164,6 +164,7 @@ export async function GET(
       status: sheet.status,
       routeId: sheet.routeId,
       expeditorUserId: sheet.expeditorUserId,
+      managerUserId: sheet.managerUserId,
       comment: sheet.comment,
       totalEur: sheet.totalEur,
       totalUah: sheet.totalUah,
@@ -227,6 +228,8 @@ export async function GET(
           id: t.id,
           customerId: t.customerId,
           customerName: client?.name ?? null,
+          customerPhone: client?.phonePrimary ?? null,
+          customerCity: client?.city ?? null,
           comment: t.comment,
         };
       }),
@@ -240,6 +243,7 @@ const NON_STATUS_FIELDS = [
   "arrivalDate",
   "routeId",
   "expeditorUserId",
+  "managerUserId",
   "comment",
   "mileageStartKm",
   "mileageEndKm",
@@ -313,6 +317,9 @@ export async function PATCH(
   if (input.routeId !== undefined) data.routeId = input.routeId;
   if (input.expeditorUserId !== undefined) {
     data.expeditorUserId = input.expeditorUserId;
+  }
+  if (input.managerUserId !== undefined) {
+    data.managerUserId = input.managerUserId;
   }
   if (input.status !== undefined) data.status = input.status;
   if (input.comment !== undefined) data.comment = input.comment;

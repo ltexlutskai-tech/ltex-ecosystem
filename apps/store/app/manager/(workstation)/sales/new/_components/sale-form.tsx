@@ -27,6 +27,10 @@ import {
   autoUnitPrice,
   SELLING_PRICE_TYPES,
 } from "@/lib/manager/order-pricing";
+import {
+  classifyDelivery,
+  findDeliveryCode,
+} from "@/lib/manager/order-delivery";
 import { bagWeightForQuantity } from "@/lib/manager/order-bag-weight";
 import { buildPaymentReceiptText } from "@/lib/manager/payment-message";
 import {
@@ -74,6 +78,7 @@ interface SaleDraftData {
   notes: string;
   deliveryMethod: string;
   novaPoshtaBranch: string;
+  deliveryAddress: string;
   cashOnDelivery: boolean;
   onTradeAgent: boolean;
   expressWaybill: string;
@@ -219,10 +224,20 @@ export function SaleForm({
   const [sellingTypeCode, setSellingTypeCode] = useState<string>("wholesale");
   const [deliveryMethod, setDeliveryMethod] = useState<string>(
     initialSale?.deliveryMethod ??
-      mapClientDelivery(initialClient?.deliveryMethodCode, deliveryMethods),
+      // Реалізації з маршрутного листа за замовчуванням «Доставка».
+      (routeSheetId
+        ? (findDeliveryCode(deliveryMethods) ?? "delivery")
+        : mapClientDelivery(
+            initialClient?.deliveryMethodCode,
+            deliveryMethods,
+          )),
   );
   const [novaPoshtaBranch, setNovaPoshtaBranch] = useState(
     initialSale?.novaPoshtaBranch ?? "",
+  );
+  // Адреса доставки (спосіб «Доставка») — з картки клієнта або вручну.
+  const [deliveryAddress, setDeliveryAddress] = useState(
+    initialSale?.deliveryAddress ?? initialClient?.address ?? "",
   );
   const [cashOnDelivery, setCashOnDelivery] = useState(
     initialSale?.cashOnDelivery ?? false,
@@ -232,6 +247,12 @@ export function SaleForm({
   );
   const [expressWaybill, setExpressWaybill] = useState(
     initialSale?.expressWaybill ?? "",
+  );
+
+  // Категорія доставки → які поля показувати (НП/ТТН — пошта; Адреса — доставка).
+  const deliveryKind = classifyDelivery(
+    deliveryMethod,
+    deliveryMethods.find((o) => o.code === deliveryMethod)?.label,
   );
 
   // ─── Автозбереження чернетки (наскрізне, План AUTOSAVE_REALTIME_PLAN) ──────
@@ -247,6 +268,7 @@ export function SaleForm({
       notes,
       deliveryMethod,
       novaPoshtaBranch,
+      deliveryAddress,
       cashOnDelivery,
       onTradeAgent,
       expressWaybill,
@@ -259,6 +281,7 @@ export function SaleForm({
       notes,
       deliveryMethod,
       novaPoshtaBranch,
+      deliveryAddress,
       cashOnDelivery,
       onTradeAgent,
       expressWaybill,
@@ -281,6 +304,7 @@ export function SaleForm({
         priceTypeId: null,
         deliveryMethod: d.deliveryMethod || null,
         novaPoshtaBranch: d.novaPoshtaBranch.trim() || null,
+        deliveryAddress: d.deliveryAddress.trim() || null,
         cashOnDelivery: d.cashOnDelivery,
         assignedAgentUserId: d.onTradeAgent ? null : currentUserId,
         onTradeAgent: d.onTradeAgent,
@@ -346,6 +370,7 @@ export function SaleForm({
     setShowComment(!!d.notes.trim());
     setDeliveryMethod(d.deliveryMethod);
     setNovaPoshtaBranch(d.novaPoshtaBranch);
+    setDeliveryAddress(d.deliveryAddress ?? "");
     setCashOnDelivery(d.cashOnDelivery);
     setOnTradeAgent(d.onTradeAgent);
     setExpressWaybill(d.expressWaybill);
@@ -617,11 +642,16 @@ export function SaleForm({
           // менеджерська ціна фіксується у рядках. На документ пишемо null.
           priceTypeId: null,
           deliveryMethod: deliveryMethod || null,
-          novaPoshtaBranch: novaPoshtaBranch.trim() || null,
+          // НП/ТТН зберігаємо лише для «Пошта», адресу — лише для «Доставка».
+          novaPoshtaBranch:
+            deliveryKind === "post" ? novaPoshtaBranch.trim() || null : null,
+          deliveryAddress:
+            deliveryKind === "delivery" ? deliveryAddress.trim() || null : null,
           cashOnDelivery,
           assignedAgentUserId: payloadAgent,
           onTradeAgent,
-          expressWaybill: expressWaybill.trim() || null,
+          expressWaybill:
+            deliveryKind === "post" ? expressWaybill.trim() || null : null,
           ...(usePatch ? {} : { routeSheetId: routeSheetId ?? undefined }),
           ...(usePatch && nextStatus ? { status: nextStatus } : {}),
           ...(post ? { post: true } : {}),
@@ -940,23 +970,45 @@ export function SaleForm({
             </select>
           </div>
 
-          {/* № відділення НП */}
-          <div>
-            <label
-              htmlFor="sale-np-branch"
-              className="mb-1 block text-sm font-medium text-gray-700"
-            >
-              № відділення НП
-            </label>
-            <input
-              id="sale-np-branch"
-              value={novaPoshtaBranch}
-              onChange={(e) => setNovaPoshtaBranch(e.target.value)}
-              maxLength={20}
-              placeholder="напр. 12"
-              className="h-10 w-full rounded-md border border-gray-300 bg-white px-3 text-sm focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500"
-            />
-          </div>
+          {/* № відділення НП — лише для «Пошта». */}
+          {deliveryKind === "post" && (
+            <div>
+              <label
+                htmlFor="sale-np-branch"
+                className="mb-1 block text-sm font-medium text-gray-700"
+              >
+                № відділення НП
+              </label>
+              <input
+                id="sale-np-branch"
+                value={novaPoshtaBranch}
+                onChange={(e) => setNovaPoshtaBranch(e.target.value)}
+                maxLength={20}
+                placeholder="напр. 12"
+                className="h-10 w-full rounded-md border border-gray-300 bg-white px-3 text-sm focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500"
+              />
+            </div>
+          )}
+
+          {/* Адреса доставки — лише для «Доставка». */}
+          {deliveryKind === "delivery" && (
+            <div className="sm:col-span-2">
+              <label
+                htmlFor="sale-delivery-address"
+                className="mb-1 block text-sm font-medium text-gray-700"
+              >
+                Адреса доставки
+              </label>
+              <input
+                id="sale-delivery-address"
+                value={deliveryAddress}
+                onChange={(e) => setDeliveryAddress(e.target.value)}
+                maxLength={500}
+                placeholder="місто, вулиця, будинок (з картки клієнта або вручну)"
+                className="h-10 w-full rounded-md border border-gray-300 bg-white px-3 text-sm focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500"
+              />
+            </div>
+          )}
 
           {/* Номер + дата */}
           <div>
@@ -981,23 +1033,25 @@ export function SaleForm({
             />
           </div>
 
-          {/* ТТН */}
-          <div>
-            <label
-              htmlFor="sale-ttn"
-              className="mb-1 block text-sm font-medium text-gray-700"
-            >
-              ТТН (експрес-накладна)
-            </label>
-            <input
-              id="sale-ttn"
-              value={expressWaybill}
-              onChange={(e) => setExpressWaybill(e.target.value)}
-              maxLength={60}
-              placeholder="номер накладної"
-              className="h-10 w-full rounded-md border border-gray-300 bg-white px-3 text-sm focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500"
-            />
-          </div>
+          {/* ТТН — лише для «Пошта». */}
+          {deliveryKind === "post" && (
+            <div>
+              <label
+                htmlFor="sale-ttn"
+                className="mb-1 block text-sm font-medium text-gray-700"
+              >
+                ТТН (експрес-накладна)
+              </label>
+              <input
+                id="sale-ttn"
+                value={expressWaybill}
+                onChange={(e) => setExpressWaybill(e.target.value)}
+                maxLength={60}
+                placeholder="номер накладної"
+                className="h-10 w-full rounded-md border border-gray-300 bg-white px-3 text-sm focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500"
+              />
+            </div>
+          )}
         </div>
 
         {/* Курс EUR/USD (read-only знімок) */}

@@ -47,6 +47,7 @@ export const createSaleSchema = z.object({
   deliveryMethod: z.string().max(50).nullable().optional(),
   /** № відділення Нової Пошти. */
   novaPoshtaBranch: z.string().max(20).nullable().optional(),
+  deliveryAddress: z.string().max(500).nullable().optional(),
   /** Наложка (післяплата). */
   cashOnDelivery: z.boolean().optional().default(false),
   /** Торговий агент, кому зараховано продаж (`User.id`). */
@@ -91,6 +92,7 @@ export const updateSaleSchema = z.object({
   priceTypeId: z.string().min(1).nullable().optional(),
   deliveryMethod: z.string().max(50).nullable().optional(),
   novaPoshtaBranch: z.string().max(20).nullable().optional(),
+  deliveryAddress: z.string().max(500).nullable().optional(),
   cashOnDelivery: z.boolean().optional().default(false),
   assignedAgentUserId: z.string().min(1).nullable().optional(),
   onTradeAgent: z.boolean().optional().default(true),
@@ -132,6 +134,7 @@ export const saleDraftSchema = z.object({
   priceTypeId: z.string().min(1).nullable().optional(),
   deliveryMethod: z.string().max(50).nullable().optional(),
   novaPoshtaBranch: z.string().max(20).nullable().optional(),
+  deliveryAddress: z.string().max(500).nullable().optional(),
   cashOnDelivery: z.boolean().optional(),
   assignedAgentUserId: z.string().min(1).nullable().optional(),
   onTradeAgent: z.boolean().optional(),

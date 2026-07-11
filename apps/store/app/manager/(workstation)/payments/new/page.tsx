@@ -1,6 +1,4 @@
-import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { ArrowLeft } from "lucide-react";
 import { prisma } from "@ltex/db";
 import { getCurrentUser } from "@/lib/auth/manager-auth";
 import { getCurrentRate } from "@/lib/exchange-rate";
@@ -12,6 +10,7 @@ import {
   type CashFlowArticleOption,
   type PaymentFormMode,
 } from "./_components/payment-form";
+import { BackButton } from "../../_components/back-button";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Нова оплата — L-TEX Manager" };
@@ -178,13 +177,10 @@ export default async function NewPaymentPage({
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
-      <Link
-        href={returnHref ?? "/manager/payments"}
-        className="inline-flex items-center gap-1 text-sm text-gray-600 hover:text-gray-900"
-      >
-        <ArrowLeft className="h-4 w-4" />
-        {routeSheetId ? "Назад до маршруту" : "Назад до списку"}
-      </Link>
+      <BackButton
+        label={routeSheetId ? "Назад до маршруту" : "Назад до списку"}
+        fallbackHref={returnHref ?? "/manager/payments"}
+      />
 
       <header>
         <h1 className="text-2xl font-bold text-gray-800">Оплата</h1>

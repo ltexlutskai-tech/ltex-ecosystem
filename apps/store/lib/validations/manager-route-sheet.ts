@@ -35,6 +35,7 @@ export const updateRouteSheetSchema = z.object({
   arrivalDate: isoDate.nullable().optional(),
   routeId: z.string().min(1).nullable().optional(),
   expeditorUserId: z.string().min(1).nullable().optional(),
+  managerUserId: z.string().min(1).nullable().optional(),
   status: z.enum(ROUTE_SHEET_STATUS_LIST as [string, ...string[]]).optional(),
   comment: z.string().max(2000).nullable().optional(),
   /** Кілометраж (Етап 4). */

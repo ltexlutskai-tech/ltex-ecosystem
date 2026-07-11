@@ -287,28 +287,36 @@ export async function computeAvailableStockByProduct(
 
 /**
  * Множина «агентів рейсу» (userId) — тих, чия бронь мішка вважається «своєю»
- * для цього маршрутного листа (1С `ТоварыЗагрузки`/`ТорговыеАгенты`). Береться
- * автоматично: торгові агенти замовлень рейсу (`Order.assignedAgentUserId`) +
- * експедитор + автор документа. Мішок, заброньований кимось поза цим набором,
- * для складу — «чужа бронь» і його не можна вантажити.
+ * для цього маршрутного листа. Якщо у шапці вказано **менеджера рейсу**
+ * (`managerUserId`) — «своя» лише його бронь (рішення user). Якщо менеджера не
+ * вказано — fallback на автоматичний набір: торгові агенти замовлень рейсу
+ * (`Order.assignedAgentUserId`) + експедитор + автор (щоб старі МЛ працювали).
+ * Мішок, заброньований кимось поза цим набором, для складу — «чужа бронь».
  */
 export async function getRouteSheetAllowedAgents(
   routeSheetId: string,
 ): Promise<Set<string>> {
-  const [sheet, rsOrders] = await Promise.all([
-    prisma.routeSheet.findUnique({
-      where: { id: routeSheetId },
-      select: { expeditorUserId: true, createdByUserId: true },
-    }),
-    prisma.routeSheetOrder.findMany({
-      where: { routeSheetId },
-      select: { orderId: true },
-    }),
-  ]);
+  const sheet = await prisma.routeSheet.findUnique({
+    where: { id: routeSheetId },
+    select: {
+      managerUserId: true,
+      expeditorUserId: true,
+      createdByUserId: true,
+    },
+  });
+
+  // Вказаний менеджер — єдиний власник «своїх» броней.
+  if (sheet?.managerUserId) return new Set([sheet.managerUserId]);
+
+  // Fallback (менеджер не заданий): експедитор + автор + агенти замовлень.
   const set = new Set<string>();
   if (sheet?.expeditorUserId) set.add(sheet.expeditorUserId);
   if (sheet?.createdByUserId) set.add(sheet.createdByUserId);
 
+  const rsOrders = await prisma.routeSheetOrder.findMany({
+    where: { routeSheetId },
+    select: { orderId: true },
+  });
   const orderIds = rsOrders.map((o) => o.orderId);
   if (orderIds.length > 0) {
     const orders = await prisma.order.findMany({

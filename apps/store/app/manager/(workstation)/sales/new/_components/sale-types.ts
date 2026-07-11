@@ -235,6 +235,7 @@ export interface SaleEditInitial {
   priceTypeId: string | null;
   deliveryMethod: string | null;
   novaPoshtaBranch: string | null;
+  deliveryAddress: string | null;
   cashOnDelivery: boolean;
   assignedAgentUserId: string | null;
   onTradeAgent: boolean;

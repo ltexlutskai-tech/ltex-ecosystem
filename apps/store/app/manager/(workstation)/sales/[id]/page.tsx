@@ -211,6 +211,7 @@ export default async function ManagerSaleDetailPage({
     priceTypeId: sale.priceTypeId,
     deliveryMethod: sale.deliveryMethod,
     novaPoshtaBranch: sale.novaPoshtaBranch,
+    deliveryAddress: sale.deliveryAddress,
     cashOnDelivery: sale.cashOnDelivery,
     assignedAgentUserId: sale.assignedAgentUserId,
     onTradeAgent: sale.onTradeAgent,
