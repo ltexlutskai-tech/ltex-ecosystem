@@ -64,25 +64,24 @@ export interface LoadingMatchRow {
 }
 
 /**
- * Ключ матчингу рядка Загрузки до позиції замовлення:
- * `(orderId | productId | lotId)`. Той самий ключ, що й авто-прив'язка скану.
+ * Ключ зіставлення завантаження ↔ позиція замовлення: `(orderId | productId)`.
+ * Лот НЕ входить у ключ — під позицію замовлення вантажать БУДЬ-ЯКИЙ мішок
+ * цього товару (позиція має `lotId=null`, а рядок завантаження — конкретний
+ * штрихкод), тому зіставляємо лише за замовленням+товаром.
  */
-export function loadingMatchKey(row: {
+export function loadedGroupKey(row: {
   orderId: string | null;
   productId: string;
-  lotId: string | null;
 }): string {
-  return `${row.orderId ?? ""}|${row.productId}|${row.lotId ?? ""}`;
+  return `${row.orderId ?? ""}|${row.productId}`;
 }
 
+/** @deprecated Використовуй `loadedGroupKey` — завантаження зіставляється без лота. */
+export const loadingMatchKey = loadedGroupKey;
+
 /**
- * Чиста агрегація `quantityLoaded` для кожної позиції замовлення.
- *
- * Для кожного `RouteSheetItem` рахує Σ `RouteSheetLoading.quantity` де
- * співпадають `orderId`+`productId`+`lotId` І рядок Загрузки `loaded=true` І
- * `isReturn=false` (повернені/невантажені рядки не зараховуються).
- *
- * Повертає Map(itemKey → loadedQty); ключ — `loadingMatchKey(item)`.
+ * Чиста агрегація завантаженого по (замовлення+товар): Σ `quantity` рядків
+ * Загрузки де `loaded=true` І `isReturn=false`. Ключ — `loadedGroupKey`.
  */
 export function computeLoadedQuantities(
   loading: LoadingMatchRow[],
@@ -90,7 +89,7 @@ export function computeLoadedQuantities(
   const map = new Map<string, number>();
   for (const row of loading) {
     if (!row.loaded || row.isReturn) continue;
-    const key = loadingMatchKey(row);
+    const key = loadedGroupKey(row);
     map.set(key, (map.get(key) ?? 0) + row.quantity);
   }
   return map;
@@ -183,7 +182,13 @@ export async function recomputeQuantityLoaded(
   const [items, loading] = await Promise.all([
     tx.routeSheetItem.findMany({
       where: { routeSheetId },
-      select: { id: true, orderId: true, productId: true, lotId: true },
+      select: {
+        id: true,
+        orderId: true,
+        productId: true,
+        lotId: true,
+        quantity: true,
+      },
     }),
     tx.routeSheetLoading.findMany({
       where: { routeSheetId },
@@ -198,13 +203,32 @@ export async function recomputeQuantityLoaded(
     }),
   ]);
 
+  // Завантажено по (замовлення+товар); розподіляємо між позиціями цього
+  // ключа (зазвичай одна позиція на товар → їй уся сума; якщо кілька — набиваємо
+  // по черзі до `quantity`, залишок/надлишок — останній позиції).
   const loadedByKey = computeLoadedQuantities(loading);
+  const groups = new Map<string, typeof items>();
   for (const item of items) {
-    const qty = loadedByKey.get(loadingMatchKey(item)) ?? 0;
-    await tx.routeSheetItem.update({
-      where: { id: item.id },
-      data: { quantityLoaded: qty },
-    });
+    const k = loadedGroupKey(item);
+    const arr = groups.get(k);
+    if (arr) arr.push(item);
+    else groups.set(k, [item]);
+  }
+
+  for (const [k, group] of groups) {
+    let remaining = loadedByKey.get(k) ?? 0;
+    for (let i = 0; i < group.length; i++) {
+      const item = group[i]!;
+      const isLast = i === group.length - 1;
+      const assign = isLast
+        ? Math.max(0, remaining)
+        : Math.min(remaining, item.quantity);
+      remaining = Math.max(0, remaining - assign);
+      await tx.routeSheetItem.update({
+        where: { id: item.id },
+        data: { quantityLoaded: assign },
+      });
+    }
   }
 }
 
@@ -705,6 +729,119 @@ export async function addLoadingByBarcode(
   }
 
   return insertLoadingRow(routeSheetId, lot, now, opts.targetOrderId ?? null);
+}
+
+/**
+ * Додати заброньований мішок за `lotId` (без скану) — для кнопки «Додати
+ * заброньовані»: працівник обирає мішок зі списку заброньованих на клієнта.
+ * insertLoadingRow гарантує гард (свій/чужий) і дедуплікацію.
+ */
+export async function addLoadingByLotId(
+  routeSheetId: string,
+  lotId: string,
+  now: Date = new Date(),
+  opts: { targetOrderId?: string | null } = {},
+): Promise<{ row: RouteSheetLoadingView }> {
+  const lot = await prisma.lot.findUnique({
+    where: { id: lotId },
+    include: { product: { select: LOADING_PRODUCT_SELECT } },
+  });
+  if (!lot) {
+    throw new RouteSheetLoadingError("Лот не знайдено", 404);
+  }
+  return insertLoadingRow(routeSheetId, lot, now, opts.targetOrderId ?? null);
+}
+
+/** Заброньований мішок для списку «Додати заброньовані» (деталі як у прайсі). */
+export interface ReservedBagView {
+  lotId: string;
+  barcode: string;
+  productId: string;
+  productName: string | null;
+  articleCode: string | null;
+  weight: number;
+  quantity: number;
+  videoUrl: string | null;
+  sector: string | null;
+  comment: string | null;
+  reservedUntil: string | null;
+}
+
+/**
+ * Заброньовані мішки на клієнта цього замовлення (для кнопки «Додати
+ * заброньовані»): лоти з активною бронню `reservedForClientId` = MgrClient
+ * клієнта замовлення, ще не завантажені на цей МЛ. Резолв Customer→MgrClient
+ * за `code1C`. Повертає деталі мішка (ШК, вага, к-сть, відео, сектор, комент).
+ */
+export async function getReservedBagsForOrder(
+  routeSheetId: string,
+  orderId: string,
+  now: Date = new Date(),
+): Promise<ReservedBagView[]> {
+  const rsOrder = await prisma.routeSheetOrder.findFirst({
+    where: { routeSheetId, orderId },
+    select: { customerId: true },
+  });
+  if (!rsOrder?.customerId) return [];
+
+  const customer = await prisma.customer.findUnique({
+    where: { id: rsOrder.customerId },
+    select: { code1C: true, phone: true },
+  });
+  if (!customer) return [];
+
+  // Customer → MgrClient (бронь зберігає MgrClient.id).
+  const mgrClient = await prisma.mgrClient.findFirst({
+    where: {
+      OR: [
+        ...(customer.code1C ? [{ code1C: customer.code1C }] : []),
+        ...(customer.phone ? [{ phonePrimary: customer.phone }] : []),
+      ],
+    },
+    select: { id: true },
+  });
+  if (!mgrClient) return [];
+
+  const already = await prisma.routeSheetLoading.findMany({
+    where: { routeSheetId },
+    select: { lotId: true },
+  });
+  const used = new Set(already.map((r) => r.lotId));
+
+  const lots = await prisma.lot.findMany({
+    where: { reservedForClientId: mgrClient.id, status: "free" },
+    select: {
+      id: true,
+      barcode: true,
+      productId: true,
+      weight: true,
+      quantity: true,
+      videoUrl: true,
+      sector: true,
+      comment: true,
+      status: true,
+      reservedByUserId: true,
+      reservedUntil: true,
+      product: { select: { name: true, articleCode: true } },
+    },
+    orderBy: { id: "asc" },
+  });
+
+  return lots
+    .filter((l) => !used.has(l.id) && isActiveReservation(l, now))
+    .map((l) => ({
+      lotId: l.id,
+      barcode: l.barcode,
+      productId: l.productId,
+      productName: l.product?.name ?? null,
+      articleCode: l.product?.articleCode ?? null,
+      weight: l.weight,
+      quantity: l.quantity,
+      videoUrl: l.videoUrl,
+      sector: l.sector,
+      comment: l.comment,
+      reservedUntil: l.reservedUntil ? l.reservedUntil.toISOString() : null,
+    }));
 }
 
 /** Спільний select товару для рядків Завантаження. */

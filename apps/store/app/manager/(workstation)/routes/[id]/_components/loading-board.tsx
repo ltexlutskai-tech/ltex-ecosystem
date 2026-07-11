@@ -3,10 +3,11 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Trash2, Receipt, ScanLine } from "lucide-react";
+import { Trash2, Receipt, ScanLine, PackagePlus, X } from "lucide-react";
 import type {
   LoadingBoardOrder,
   LoadingRowColor,
+  ReservedBagView,
 } from "@/lib/manager/route-sheet-loading";
 import { BarcodeInput } from "../../../sales/new/_components/barcode-input";
 
@@ -52,6 +53,10 @@ export interface LoadingBoardProps {
   /** Побудова лінка «Створити реалізацію» для замовлення (1С «Продажи»); подвійний
    *  клік по рядку замовлення теж веде сюди. Null → кнопки немає. */
   createSaleHrefFor?: (g: LoadingBoardOrder) => string | null;
+  /** id маршрутного листа — для завантаження списку заброньованих мішків. */
+  sheetId?: string;
+  /** Завантажити заброньований мішок зі списку (без скану). */
+  onAddReserved?: (lotId: string, orderId: string) => void;
 }
 
 const COLOR_ROW: Record<LoadingRowColor, string> = {
@@ -90,14 +95,52 @@ export function LoadingBoard({
   onRemoveLoading,
   onPatchLoading,
   createSaleHrefFor,
+  sheetId,
+  onAddReserved,
 }: LoadingBoardProps) {
   const router = useRouter();
   // Список завантажених товарів — у складському документі показуємо одразу.
   const [showLots, setShowLots] = useState(editable);
   // Замовлення, для якого відкрито окреме поле скану (кнопка «Сканувати сюди»).
   const [openScanOrderId, setOpenScanOrderId] = useState<string | null>(null);
+  // Модалка «Додати заброньовані»: замовлення + завантажений список мішків.
+  const [reservedFor, setReservedFor] = useState<{
+    orderId: string;
+    customerName: string | null;
+  } | null>(null);
+  const [reservedBags, setReservedBags] = useState<ReservedBagView[]>([]);
+  const [reservedLoading, setReservedLoading] = useState(false);
 
   const canEdit = editable && !locked;
+  const canReserved = canEdit && Boolean(sheetId) && Boolean(onAddReserved);
+
+  /** Відкрити список заброньованих мішків на клієнта замовлення (GET). */
+  async function openReserved(g: LoadingBoardOrder) {
+    if (!g.orderId || !sheetId) return;
+    setReservedFor({ orderId: g.orderId, customerName: g.customerName });
+    setReservedBags([]);
+    setReservedLoading(true);
+    try {
+      const res = await fetch(
+        `/api/v1/manager/route-sheets/${sheetId}/reserved-bags?orderId=${encodeURIComponent(
+          g.orderId,
+        )}`,
+      );
+      if (res.ok) {
+        const data = (await res.json()) as { bags?: ReservedBagView[] };
+        setReservedBags(data.bags ?? []);
+      }
+    } finally {
+      setReservedLoading(false);
+    }
+  }
+
+  /** Завантажити мішок зі списку → прибрати його з локального списку. */
+  function addReserved(lotId: string) {
+    if (!reservedFor) return;
+    onAddReserved?.(lotId, reservedFor.orderId);
+    setReservedBags((cur) => cur.filter((b) => b.lotId !== lotId));
+  }
 
   return (
     <div className="space-y-4">
@@ -245,6 +288,19 @@ export function LoadingBoard({
                       >
                         <ScanLine className="h-3.5 w-3.5" />
                         Сканувати сюди
+                      </button>
+                    )}
+                    {canReserved && g.orderId && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          void openReserved(g);
+                        }}
+                        className="inline-flex h-7 items-center gap-1 rounded-md border border-amber-300 bg-amber-50 px-2 text-xs font-medium text-amber-700 hover:bg-amber-100"
+                      >
+                        <PackagePlus className="h-3.5 w-3.5" />
+                        Додати заброньовані
                       </button>
                     )}
                     {saleHref && (
@@ -471,6 +527,100 @@ export function LoadingBoard({
               </table>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Модалка «Додати заброньовані» — деталі мішків як у прайсі. */}
+      {reservedFor && (
+        <div
+          className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-4"
+          onClick={() => setReservedFor(null)}
+        >
+          <div
+            className="mt-10 w-full max-w-2xl rounded-lg bg-white shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b px-4 py-3">
+              <h3 className="text-sm font-semibold text-gray-800">
+                Заброньовані мішки — {reservedFor.customerName ?? "клієнт"}
+              </h3>
+              <button
+                type="button"
+                aria-label="Закрити"
+                onClick={() => setReservedFor(null)}
+                className="text-gray-400 hover:text-gray-700"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="max-h-[60vh] overflow-y-auto p-4">
+              {reservedLoading ? (
+                <p className="py-6 text-center text-sm text-gray-500">
+                  Завантаження…
+                </p>
+              ) : reservedBags.length === 0 ? (
+                <p className="py-6 text-center text-sm text-gray-500">
+                  Немає заброньованих мішків на цього клієнта (або їх уже
+                  завантажено).
+                </p>
+              ) : (
+                <ul className="space-y-2">
+                  {reservedBags.map((b) => (
+                    <li
+                      key={b.lotId}
+                      className="flex items-start justify-between gap-3 rounded-md border bg-gray-50 p-3"
+                    >
+                      <div className="min-w-0 text-sm">
+                        <div className="font-mono text-xs text-gray-900">
+                          {b.barcode}
+                        </div>
+                        <div className="truncate text-gray-700">
+                          {b.articleCode ? `${b.articleCode} · ` : ""}
+                          {b.productName ?? b.productId}
+                        </div>
+                        <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-gray-500">
+                          <span>Вага: {b.weight.toFixed(1)} кг</span>
+                          <span>К-сть: {b.quantity}</span>
+                          {b.sector && <span>Сектор: {b.sector}</span>}
+                          {b.reservedUntil && (
+                            <span>
+                              Бронь до:{" "}
+                              {new Date(b.reservedUntil).toLocaleDateString(
+                                "uk-UA",
+                              )}
+                            </span>
+                          )}
+                        </div>
+                        {b.comment && (
+                          <div className="mt-1 text-xs text-gray-400">
+                            {b.comment}
+                          </div>
+                        )}
+                        {b.videoUrl && (
+                          <a
+                            href={b.videoUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="mt-1 inline-block text-xs text-blue-600 hover:underline"
+                          >
+                            Відео огляд →
+                          </a>
+                        )}
+                      </div>
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() => addReserved(b.lotId)}
+                        className="shrink-0 rounded-md bg-green-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-green-700 disabled:opacity-50"
+                      >
+                        Додати
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </div>
         </div>
       )}
     </div>

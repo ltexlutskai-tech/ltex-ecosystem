@@ -91,6 +91,30 @@ export function WarehouseLoadingClient({
     }
   }
 
+  /** Додати заброньований мішок зі списку (POST lotId). */
+  async function addReserved(lotId: string, targetOrderId: string) {
+    setError(null);
+    setBusy(true);
+    try {
+      const res = await fetch(
+        `/api/v1/manager/route-sheets/${sheetId}/loading`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ lotId, orderId: targetOrderId }),
+        },
+      );
+      if (!res.ok) {
+        const body = (await res.json().catch(() => ({}))) as { error?: string };
+        setError(body.error ?? `Помилка ${res.status}`);
+        return;
+      }
+      await reload();
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function removeLoading(loadingId: string) {
     setError(null);
     setBusy(true);
@@ -191,6 +215,8 @@ export function WarehouseLoadingClient({
         onScan={(code, orderId) => void scan(code, orderId)}
         onRemoveLoading={(id) => void removeLoading(id)}
         onPatchLoading={(id, patch) => void patchLoading(id, patch)}
+        sheetId={sheetId}
+        onAddReserved={(lotId, orderId) => void addReserved(lotId, orderId)}
         createSaleHrefFor={(g) =>
           g.orderId
             ? `/manager/sales/new?routeSheetId=${encodeURIComponent(sheetId)}${
@@ -206,11 +232,11 @@ export function WarehouseLoadingClient({
         <Button
           type="button"
           size="sm"
-          variant="outline"
           disabled={busy}
-          onClick={() => router.refresh()}
+          onClick={() => router.push(`/manager/routes/${sheetId}`)}
+          className="bg-green-600 text-white hover:bg-green-700"
         >
-          Готово
+          Готово — до маршрутного листа
         </Button>
       </div>
     </div>

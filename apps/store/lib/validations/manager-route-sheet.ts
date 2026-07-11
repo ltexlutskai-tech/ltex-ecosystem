@@ -68,10 +68,17 @@ export const reorderOrdersSchema = z.object({
  * Наповнення лише скануванням (беремо будь-який мішок і скануємо); `orderId` —
  * прив'язка до конкретного замовлення (1С «Загрузка в заказ»), інакше авто.
  */
-export const addLoadingSchema = z.object({
-  barcode: z.string().trim().min(1, "Не вказано ШК").max(64),
-  orderId: z.string().trim().min(1).optional(),
-});
+export const addLoadingSchema = z
+  .object({
+    // Скан ШК (основний спосіб) АБО конкретний лот зі списку заброньованих.
+    barcode: z.string().trim().min(1).max(64).optional(),
+    lotId: z.string().trim().min(1).optional(),
+    // Прив'язка до виділеного замовлення (1С «Загрузка в заказ»).
+    orderId: z.string().trim().min(1).optional(),
+  })
+  .refine((v) => Boolean(v.barcode) || Boolean(v.lotId), {
+    message: "Вкажіть ШК або лот",
+  });
 
 /** PATCH /route-sheets/[id]/loading?loadingId= — редагування рядка Загрузки. */
 export const updateLoadingSchema = z

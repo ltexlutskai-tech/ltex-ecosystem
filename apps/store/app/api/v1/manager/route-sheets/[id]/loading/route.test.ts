@@ -8,6 +8,7 @@ const {
   mockPrisma,
   getCurrentUserMock,
   addLoadingMock,
+  addLoadingByLotIdMock,
   deleteLoadingMock,
   updateLoadingMock,
   countersMock,
@@ -25,6 +26,7 @@ const {
     mockPrisma: { routeSheet: { findUnique: vi.fn() } },
     getCurrentUserMock: vi.fn(),
     addLoadingMock: vi.fn(),
+    addLoadingByLotIdMock: vi.fn(),
     deleteLoadingMock: vi.fn(),
     updateLoadingMock: vi.fn(),
     countersMock: vi.fn(),
@@ -40,6 +42,7 @@ vi.mock("@/lib/auth/manager-auth", () => ({
 }));
 vi.mock("@/lib/manager/route-sheet-loading", () => ({
   addLoadingByBarcode: (...args: unknown[]) => addLoadingMock(...args),
+  addLoadingByLotId: (...args: unknown[]) => addLoadingByLotIdMock(...args),
   deleteLoadingRow: (...args: unknown[]) => deleteLoadingMock(...args),
   updateLoadingRow: (...args: unknown[]) => updateLoadingMock(...args),
   computeRouteSheetCounters: (...args: unknown[]) => countersMock(...args),
@@ -171,10 +174,24 @@ describe("POST .../loading", () => {
     );
   });
 
-  it("400 коли без ШК", async () => {
+  it("400 коли без ШК і без лоту", async () => {
     const res = await POST(postReq({}), { params });
     expect(res.status).toBe(400);
     expect(addLoadingMock).not.toHaveBeenCalled();
+    expect(addLoadingByLotIdMock).not.toHaveBeenCalled();
+  });
+
+  it("додати заброньований мішок за lotId (без скану) → addLoadingByLotId", async () => {
+    addLoadingByLotIdMock.mockResolvedValueOnce({ row: { id: "ld3" } });
+    const res = await POST(postReq({ lotId: "l9", orderId: "o1" }), { params });
+    expect(res.status).toBe(200);
+    expect(addLoadingMock).not.toHaveBeenCalled();
+    expect(addLoadingByLotIdMock).toHaveBeenCalledWith(
+      "rs1",
+      "l9",
+      expect.any(Date),
+      { targetOrderId: "o1" },
+    );
   });
 
   it("409 on foreign active reservation (booking guard)", async () => {

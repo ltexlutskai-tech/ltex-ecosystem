@@ -28,6 +28,7 @@ import { OrderPickerModal } from "./order-picker-modal";
 import { TaskClientPicker } from "./task-client-picker";
 import { LoadingBoard } from "./loading-board";
 import { SearchableSelect } from "../../../_components/searchable-select";
+import { reportTabUrl } from "../../../_components/tabs/tab-url-reporter";
 import type { LoadingBoardOrder } from "@/lib/manager/route-sheet-loading";
 
 /** Підписи на кнопках статус-переходів. */
@@ -273,6 +274,8 @@ export function RouteSheetForm({
       const url = new URL(window.location.href);
       url.searchParams.set("tab", id);
       window.history.replaceState(null, "", url.toString());
+      // Синхронізувати URL вкладки в shell (щоб refresh відновив цю вкладку).
+      reportTabUrl();
     }
   }, []);
   const [status, setStatus] = useState(initial.status);

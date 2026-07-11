@@ -4,6 +4,7 @@ import { getCurrentUser } from "@/lib/auth/manager-auth";
 import { isRouteSheetLocked } from "@/lib/manager/route-sheet-status";
 import {
   addLoadingByBarcode,
+  addLoadingByLotId,
   computeRouteSheetCounters,
   deleteLoadingRow,
   RouteSheetLoadingError,
@@ -71,16 +72,14 @@ export async function POST(
   }
 
   try {
-    const { barcode, orderId } = parsed.data;
-    const { row } = await addLoadingByBarcode(
-      id,
-      barcode,
-      user.id,
-      new Date(),
-      {
-        targetOrderId: orderId ?? null,
-      },
-    );
+    const { barcode, lotId, orderId } = parsed.data;
+    const { row } = barcode
+      ? await addLoadingByBarcode(id, barcode, user.id, new Date(), {
+          targetOrderId: orderId ?? null,
+        })
+      : await addLoadingByLotId(id, lotId as string, new Date(), {
+          targetOrderId: orderId ?? null,
+        });
     const counters = await computeRouteSheetCounters(id);
     return NextResponse.json({ row, counters });
   } catch (err) {

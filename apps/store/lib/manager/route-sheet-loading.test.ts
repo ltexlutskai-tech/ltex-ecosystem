@@ -3,24 +3,20 @@ import {
   allocateShortage,
   computeCounters,
   computeLoadedQuantities,
-  loadingMatchKey,
+  loadedGroupKey,
   type LoadingMatchRow,
   type ShortageOrderedRow,
 } from "./route-sheet-loading";
 
-describe("loadingMatchKey", () => {
-  it("builds (orderId|productId|lotId) key with empty for nulls", () => {
-    expect(
-      loadingMatchKey({ orderId: "o1", productId: "p1", lotId: "l1" }),
-    ).toBe("o1|p1|l1");
-    expect(
-      loadingMatchKey({ orderId: null, productId: "p1", lotId: null }),
-    ).toBe("|p1|");
+describe("loadedGroupKey", () => {
+  it("builds (orderId|productId) key — лот не входить", () => {
+    expect(loadedGroupKey({ orderId: "o1", productId: "p1" })).toBe("o1|p1");
+    expect(loadedGroupKey({ orderId: null, productId: "p1" })).toBe("|p1");
   });
 });
 
 describe("computeLoadedQuantities", () => {
-  it("sums quantity per (order+product+lot) for loaded non-return rows", () => {
+  it("сумує різні лоти одного товару під одну позицію (o1|p1)", () => {
     const rows: LoadingMatchRow[] = [
       {
         orderId: "o1",
@@ -40,9 +36,8 @@ describe("computeLoadedQuantities", () => {
       },
     ];
     const map = computeLoadedQuantities(rows);
-    // Different lots → distinct keys, each 1.
-    expect(map.get("o1|p1|l1")).toBe(1);
-    expect(map.get("o1|p1|l2")).toBe(1);
+    // Різні лоти того самого товару → один ключ, сума = 2 (це і був баг).
+    expect(map.get("o1|p1")).toBe(2);
   });
 
   it("aggregates rows sharing the same key", () => {
@@ -64,7 +59,7 @@ describe("computeLoadedQuantities", () => {
         isReturn: false,
       },
     ];
-    expect(computeLoadedQuantities(rows).get("o1|p1|")).toBe(5);
+    expect(computeLoadedQuantities(rows).get("o1|p1")).toBe(5);
   });
 
   it("excludes rows that are not loaded or are returns", () => {

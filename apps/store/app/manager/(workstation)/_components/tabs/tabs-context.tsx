@@ -49,6 +49,7 @@ export type TabsAction =
   | { type: "closeOthers"; id: string }
   | { type: "rename"; id: string; label: string }
   | { type: "setSplit"; id: string | null }
+  | { type: "syncUrl"; id: string; url: string }
   | { type: "hydrate"; state: TabsState };
 
 const DASHBOARD_URL = "/manager";
@@ -143,6 +144,22 @@ export function tabsReducer(state: TabsState, action: TabsAction): TabsState {
       return { ...state, splitId: action.id };
     }
 
+    case "syncUrl": {
+      // Оновлюємо збережений URL вкладки при навігації всередині iframe —
+      // щоб оновлення сторінки браузера відновило поточне місце, а не початок
+      // блоку. Ярлик лишаємо (уточнюється з <title>). Лише /manager-URL.
+      if (!action.url.startsWith("/manager")) return state;
+      let changed = false;
+      const tabs = state.tabs.map((t) => {
+        if (t.id === action.id && t.url !== action.url) {
+          changed = true;
+          return { ...t, url: action.url };
+        }
+        return t;
+      });
+      return changed ? { ...state, tabs } : state;
+    }
+
     default:
       return state;
   }
@@ -168,6 +185,8 @@ export interface TabsContextValue {
   setSplitTab: (id: string | null) => void;
   /** Винести вкладку в окреме вікно браузера (як у 1С) і закрити її тут. */
   detachTab: (id: string) => void;
+  /** Оновити збережений URL вкладки (при навігації всередині iframe). */
+  syncTabUrl: (id: string, url: string) => void;
 }
 
 const TabsContext = createContext<TabsContextValue | null>(null);
@@ -274,6 +293,7 @@ export function TabsProvider({ children }: { children: ReactNode }) {
         type?: unknown;
         url?: unknown;
         label?: unknown;
+        tabId?: unknown;
       } | null;
       if (
         data &&
@@ -287,6 +307,17 @@ export function TabsProvider({ children }: { children: ReactNode }) {
           label: typeof data.label === "string" ? data.label : undefined,
           id: newId(),
         });
+      }
+      // Навігація всередині iframe → оновити збережений URL вкладки (для
+      // коректного відновлення при оновленні сторінки браузера).
+      if (
+        data &&
+        data.type === "ltex:tab-url" &&
+        typeof data.url === "string" &&
+        typeof data.tabId === "string" &&
+        data.url.startsWith("/manager")
+      ) {
+        dispatch({ type: "syncUrl", id: data.tabId, url: data.url });
       }
     }
     window.addEventListener("message", onMessage);
@@ -326,6 +357,10 @@ export function TabsProvider({ children }: { children: ReactNode }) {
     dispatch({ type: "setSplit", id });
   }, []);
 
+  const syncTabUrl = useCallback((id: string, url: string) => {
+    dispatch({ type: "syncUrl", id, url });
+  }, []);
+
   const detachTab = useCallback(
     (id: string) => {
       const tab = state.tabs.find((t) => t.id === id);
@@ -357,6 +392,7 @@ export function TabsProvider({ children }: { children: ReactNode }) {
       renameTab,
       setSplitTab,
       detachTab,
+      syncTabUrl,
     };
   }, [
     state,
@@ -367,6 +403,7 @@ export function TabsProvider({ children }: { children: ReactNode }) {
     renameTab,
     setSplitTab,
     detachTab,
+    syncTabUrl,
   ]);
 
   return <TabsContext.Provider value={value}>{children}</TabsContext.Provider>;

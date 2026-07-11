@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { Toaster } from "@ltex/ui";
 import { IframeHost } from "./tabs/iframe-host";
 import { TabStrip } from "./tabs/tab-strip";
+import { TabUrlReporter } from "./tabs/tab-url-reporter";
 import { DETACHED_WINDOW_PREFIX, TabsProvider } from "./tabs/tabs-context";
 
 /**
@@ -58,7 +59,12 @@ export function WorkstationShell({
   // Всередині iframe — лише контент поточної сторінки (без shell),
   // обгорнутий у центральні відступи (контент не торкається країв iframe).
   if (framed) {
-    return <div className="min-h-screen bg-gray-50 p-3 sm:p-4">{children}</div>;
+    return (
+      <div className="min-h-screen bg-gray-50 p-3 sm:p-4">
+        <TabUrlReporter />
+        {children}
+      </div>
+    );
   }
 
   // Top-вікно — повний shell з вкладками. {children} (server-рендер

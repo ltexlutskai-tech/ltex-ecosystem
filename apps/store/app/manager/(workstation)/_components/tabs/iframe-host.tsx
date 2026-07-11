@@ -1,6 +1,6 @@
 "use client";
 
-import type { SyntheticEvent } from "react";
+import { useRef, type SyntheticEvent } from "react";
 import { X } from "lucide-react";
 import { useTabs } from "./tabs-context";
 
@@ -19,7 +19,7 @@ function cleanTitle(raw: string): string {
  * показується одна на всю ширину.
  */
 export function IframeHost() {
-  const { tabs, activeId, splitId, renameTab, setSplitTab } = useTabs();
+  const { tabs, activeId, splitId, setSplitTab } = useTabs();
 
   if (tabs.length === 0) return null;
 
@@ -64,29 +64,55 @@ export function IframeHost() {
                 </button>
               </div>
             )}
-            <iframe
-              src={tab.url}
-              title={tab.label}
-              className="w-full flex-1 border-0"
-              onLoad={(e: SyntheticEvent<HTMLIFrameElement>) => {
-                // Best-effort уточнення назви вкладки з <title> embedded-сторінки.
-                // same-origin → доступно; обгортаємо у try/catch на випадок
-                // cross-origin навігації всередині iframe.
-                try {
-                  const doc = e.currentTarget.contentDocument;
-                  const raw = doc?.title;
-                  if (raw) {
-                    const cleaned = cleanTitle(raw);
-                    if (cleaned) renameTab(tab.id, cleaned);
-                  }
-                } catch {
-                  // ignore — cross-origin / недоступний документ
-                }
-              }}
-            />
+            <TabFrame tabId={tab.id} label={tab.label} url={tab.url} />
           </div>
         );
       })}
     </div>
+  );
+}
+
+/**
+ * Один iframe вкладки. `src` фіксується на момент монтування (useRef) — щоб
+ * подальші синхронізації URL (persist) НЕ перезавантажували iframe. На кожному
+ * завантаженні уточнюємо назву з `<title>` та синхронізуємо поточний
+ * `location` вкладки (для відновлення при оновленні сторінки браузера).
+ */
+function TabFrame({
+  tabId,
+  label,
+  url,
+}: {
+  tabId: string;
+  label: string;
+  url: string;
+}) {
+  const { renameTab, syncTabUrl } = useTabs();
+  // URL монтування — не змінюється при syncUrl (інакше iframe перезавантажувався б).
+  const mountUrl = useRef(url).current;
+  return (
+    <iframe
+      name={tabId}
+      src={mountUrl}
+      title={label}
+      className="w-full flex-1 border-0"
+      onLoad={(e: SyntheticEvent<HTMLIFrameElement>) => {
+        try {
+          const win = e.currentTarget.contentWindow;
+          const doc = e.currentTarget.contentDocument;
+          const raw = doc?.title;
+          if (raw) {
+            const cleaned = cleanTitle(raw);
+            if (cleaned) renameTab(tabId, cleaned);
+          }
+          const loc = win?.location;
+          if (loc && loc.pathname.startsWith("/manager")) {
+            syncTabUrl(tabId, loc.pathname + loc.search);
+          }
+        } catch {
+          // ignore — cross-origin / недоступний документ
+        }
+      }}
+    />
   );
 }
