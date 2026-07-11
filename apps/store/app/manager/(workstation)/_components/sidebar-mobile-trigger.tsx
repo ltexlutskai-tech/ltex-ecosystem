@@ -6,6 +6,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@ltex/ui";
 import type { ManagerRole } from "@/lib/auth/jwt";
 import { ChatUnreadBadge } from "./chat-unread-badge";
 import { DeletionsBadge } from "./deletions-badge";
+import { MessengerUnreadBadge } from "./messenger-unread-badge";
 import { SidebarNavLink } from "./sidebar-nav-link";
 import {
   ADMIN_AUDIT_LINK,
@@ -14,6 +15,7 @@ import {
   ADMIN_REGION_AGENTS_LINK,
   ADMIN_USERS_LINK,
   CHAT_LINK,
+  MESSENGER_LINK,
   PRIMARY_LINKS,
   REGISTRY_LINK,
   REPORTS_LINK,
@@ -59,6 +61,13 @@ export function SidebarMobileTrigger({ role }: { role: ManagerRole }) {
             label={CHAT_LINK.label}
             icon={iconFor(CHAT_LINK)}
             badgeSlot={<ChatUnreadBadge />}
+            onNavigate={close}
+          />
+          <SidebarNavLink
+            href={MESSENGER_LINK.href}
+            label={MESSENGER_LINK.label}
+            icon={iconFor(MESSENGER_LINK)}
+            badgeSlot={<MessengerUnreadBadge />}
             onNavigate={close}
           />
           {(role === "warehouse" || role === "admin" || role === "owner") && (

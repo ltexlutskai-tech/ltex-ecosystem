@@ -13,6 +13,7 @@ import {
   Map,
   MapPin,
   MessageCircle,
+  MessagesSquare,
   ArrowDownToLine,
   ArrowUpFromLine,
   ArrowLeftRight,
@@ -70,6 +71,14 @@ export const CHAT_LINK: SidebarLink = {
   href: "/manager/chat",
   label: "Чат",
   icon: MessageCircle,
+};
+
+// ── Внутрішній корпоративний месенджер (2026-07-11) ──────────────────────
+// Спілкування співробітників між собою. Доступний усім ролям.
+export const MESSENGER_LINK: SidebarLink = {
+  href: "/manager/messenger",
+  label: "Месенджер",
+  icon: MessagesSquare,
 };
 
 export const ADMIN_USERS_LINK: SidebarLink = {
