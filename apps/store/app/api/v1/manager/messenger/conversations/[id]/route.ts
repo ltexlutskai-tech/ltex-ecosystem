@@ -64,6 +64,7 @@ export async function GET(
     take: limit,
     include: {
       attachments: true,
+      reactions: { select: { emoji: true, userId: true } },
       replyTo: {
         select: { id: true, authorId: true, text: true, deletedAt: true },
       },

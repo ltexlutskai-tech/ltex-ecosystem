@@ -73,6 +73,7 @@ export async function PATCH(
     data: { text: parsed.data.text, editedAt: new Date() },
     include: {
       attachments: true,
+      reactions: { select: { emoji: true, userId: true } },
       replyTo: {
         select: { id: true, authorId: true, text: true, deletedAt: true },
       },

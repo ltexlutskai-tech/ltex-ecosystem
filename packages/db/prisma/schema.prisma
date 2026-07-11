@@ -1194,6 +1194,7 @@ model User {
   messengerConversationsCreated MessengerConversation[] @relation("MessengerConversationCreator")
   messengerMemberships          MessengerMember[]       @relation("MessengerMembership")
   messengerMessages             MessengerMessage[]      @relation("MessengerMessageAuthor")
+  messengerReactions            MessengerReaction[]     @relation("MessengerReactionUser")
 
   @@map("users")
 }
@@ -3116,9 +3117,27 @@ model MessengerMessage {
   replyTo      MessengerMessage?     @relation("MessengerReply", fields: [replyToId], references: [id], onDelete: SetNull)
   replies      MessengerMessage[]    @relation("MessengerReply")
   attachments  MessengerAttachment[]
+  reactions    MessengerReaction[]
 
   @@index([conversationId, createdAt])
   @@map("mgr_messenger_messages")
+}
+
+// Реакції-emoji на повідомлення (Етап 5). Один запис = одна реакція одного
+// користувача. Унікальність (messageId, userId, emoji) не дає дублів.
+model MessengerReaction {
+  id        String   @id @default(cuid())
+  messageId String   @map("message_id")
+  userId    String   @map("user_id")
+  emoji     String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  message MessengerMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  user    User             @relation("MessengerReactionUser", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, userId, emoji])
+  @@index([messageId])
+  @@map("mgr_messenger_reactions")
 }
 
 // Вкладення повідомлення (Етап 4): фото (image) або файл (PDF/Excel/…).

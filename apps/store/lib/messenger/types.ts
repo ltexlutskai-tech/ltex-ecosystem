@@ -39,6 +39,13 @@ export interface MessengerAttachmentItem {
   height: number | null;
 }
 
+export interface MessengerReactionSummary {
+  emoji: string;
+  count: number;
+  /** Чи поставив цю реакцію поточний користувач. */
+  mine: boolean;
+}
+
 export interface MessengerMessageItem {
   id: string;
   conversationId: string;
@@ -49,6 +56,7 @@ export interface MessengerMessageItem {
   isMine: boolean;
   replyTo: MessengerReplyPreview | null;
   attachments: MessengerAttachmentItem[];
+  reactions: MessengerReactionSummary[];
   editedAt: string | null;
   deletedAt: string | null;
   createdAt: string;

@@ -1,3 +1,4 @@
+import { summarizeReactions } from "./reactions";
 import type { MessengerMessageItem } from "./types";
 
 export const DELETED_PLACEHOLDER = "Повідомлення видалено";
@@ -31,6 +32,7 @@ export interface MessageRowLike {
   createdAt: Date;
   replyTo?: ReplyRowLike | null;
   attachments?: AttachmentRowLike[];
+  reactions?: { emoji: string; userId: string }[];
 }
 
 /** Короткий прев'ю тексту для цитати/списку розмов. */
@@ -90,6 +92,7 @@ export function serializeMessage(
     isMine: row.authorId === opts.currentUserId,
     replyTo: reply,
     attachments,
+    reactions: summarizeReactions(row.reactions ?? [], opts.currentUserId),
     editedAt: row.editedAt ? row.editedAt.toISOString() : null,
     deletedAt: row.deletedAt ? row.deletedAt.toISOString() : null,
     createdAt: row.createdAt.toISOString(),

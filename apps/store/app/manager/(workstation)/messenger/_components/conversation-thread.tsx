@@ -9,10 +9,12 @@ import {
   Paperclip,
   Pencil,
   Send,
+  Smile,
   Trash2,
   X,
 } from "lucide-react";
 import { Button, Textarea, useToast } from "@ltex/ui";
+import { ALLOWED_REACTIONS } from "@/lib/messenger/reactions";
 import { formatRelativeShort } from "../../_components/format-relative";
 import { Avatar } from "./avatar";
 import { GroupInfoDialog } from "./group-info-dialog";
@@ -222,6 +224,7 @@ export function ConversationThread({
       isMine: true,
       replyTo: replyPreview,
       attachments: [],
+      reactions: [],
       editedAt: null,
       deletedAt: null,
       createdAt: new Date().toISOString(),
@@ -276,6 +279,36 @@ export function ConversationThread({
         setMessages((prev) =>
           prev.map((x) =>
             x.id === m.id ? { ...x, deletedAt: new Date().toISOString() } : x,
+          ),
+        );
+      } catch (e) {
+        toast({
+          description: e instanceof Error ? e.message : "Помилка",
+          variant: "destructive",
+        });
+      }
+    },
+    [conversationId, toast],
+  );
+
+  const doReact = useCallback(
+    async (m: MessengerMessageItem, emoji: string) => {
+      try {
+        const r = await fetch(
+          `/api/v1/manager/messenger/conversations/${conversationId}/messages/${m.id}/reactions`,
+          {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ emoji }),
+          },
+        );
+        if (!r.ok) throw new Error(await errorFrom(r));
+        const data = (await r.json()) as {
+          reactions: MessengerMessageItem["reactions"];
+        };
+        setMessages((prev) =>
+          prev.map((x) =>
+            x.id === m.id ? { ...x, reactions: data.reactions } : x,
           ),
         );
       } catch (e) {
@@ -368,6 +401,7 @@ export function ConversationThread({
               onReply={startReply}
               onEdit={startEdit}
               onDelete={doDelete}
+              onReact={doReact}
             />
           ))
         )}
@@ -458,6 +492,7 @@ function MessageBubble({
   onReply,
   onEdit,
   onDelete,
+  onReact,
 }: {
   message: MessengerMessageItem;
   showAuthor: boolean;
@@ -466,6 +501,7 @@ function MessageBubble({
   onReply: (m: MessengerMessageItem) => void;
   onEdit: (m: MessengerMessageItem) => void;
   onDelete: (m: MessengerMessageItem) => void;
+  onReact: (m: MessengerMessageItem, emoji: string) => void;
 }) {
   if (message.kind === "system") {
     return (
@@ -479,6 +515,7 @@ function MessageBubble({
   const canReply = !isDeleted;
   const canEdit = isMine && !isDeleted;
   const canDelete = !isDeleted && (isMine || canManage || isOwner);
+  const canReact = !isDeleted;
 
   return (
     <div className={`group flex ${isMine ? "justify-end" : "justify-start"}`}>
@@ -489,9 +526,11 @@ function MessageBubble({
           canReply={canReply}
           canEdit={canEdit}
           canDelete={canDelete}
+          canReact={canReact}
           onReply={onReply}
           onEdit={onEdit}
           onDelete={onDelete}
+          onReact={onReact}
         />
       )}
       <div
@@ -534,6 +573,27 @@ function MessageBubble({
             {message.text}
           </p>
         )}
+        {message.reactions.length > 0 && (
+          <div className="mt-1 flex flex-wrap gap-1">
+            {message.reactions.map((rx) => (
+              <button
+                key={rx.emoji}
+                type="button"
+                onClick={() => onReact(message, rx.emoji)}
+                className={
+                  rx.mine
+                    ? "inline-flex items-center gap-0.5 rounded-full border border-white/40 bg-white/25 px-1.5 py-0.5 text-[11px]"
+                    : isMine
+                      ? "inline-flex items-center gap-0.5 rounded-full bg-white/15 px-1.5 py-0.5 text-[11px]"
+                      : "inline-flex items-center gap-0.5 rounded-full bg-gray-100 px-1.5 py-0.5 text-[11px] text-gray-700"
+                }
+              >
+                <span>{rx.emoji}</span>
+                <span>{rx.count}</span>
+              </button>
+            ))}
+          </div>
+        )}
         <p
           className={
             isMine
@@ -552,9 +612,11 @@ function MessageBubble({
           canReply={canReply}
           canEdit={canEdit}
           canDelete={canDelete}
+          canReact={canReact}
           onReply={onReply}
           onEdit={onEdit}
           onDelete={onDelete}
+          onReact={onReact}
         />
       )}
     </div>
@@ -625,20 +687,25 @@ function BubbleActions({
   canReply,
   canEdit,
   canDelete,
+  canReact,
   onReply,
   onEdit,
   onDelete,
+  onReact,
 }: {
   message: MessengerMessageItem;
   canReply: boolean;
   canEdit: boolean;
   canDelete: boolean;
+  canReact: boolean;
   onReply: (m: MessengerMessageItem) => void;
   onEdit: (m: MessengerMessageItem) => void;
   onDelete: (m: MessengerMessageItem) => void;
+  onReact: (m: MessengerMessageItem, emoji: string) => void;
 }) {
   return (
     <div className="flex items-center gap-0.5 self-center px-1 opacity-0 transition group-hover:opacity-100">
+      {canReact && <ReactButton onPick={(emoji) => onReact(message, emoji)} />}
       {canReply && (
         <IconBtn label="Відповісти" onClick={() => onReply(message)}>
           <CornerUpLeft className="h-3.5 w-3.5" />
@@ -653,6 +720,41 @@ function BubbleActions({
         <IconBtn label="Видалити" onClick={() => onDelete(message)}>
           <Trash2 className="h-3.5 w-3.5" />
         </IconBtn>
+      )}
+    </div>
+  );
+}
+
+function ReactButton({ onPick }: { onPick: (emoji: string) => void }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="relative">
+      <IconBtn label="Реакція" onClick={() => setOpen((v) => !v)}>
+        <Smile className="h-3.5 w-3.5" />
+      </IconBtn>
+      {open && (
+        <>
+          <div
+            className="fixed inset-0 z-10"
+            onClick={() => setOpen(false)}
+            aria-hidden="true"
+          />
+          <div className="absolute bottom-full z-20 mb-1 flex gap-0.5 rounded-full border bg-white px-1.5 py-1 shadow-md">
+            {ALLOWED_REACTIONS.map((emoji) => (
+              <button
+                key={emoji}
+                type="button"
+                onClick={() => {
+                  onPick(emoji);
+                  setOpen(false);
+                }}
+                className="rounded-full px-1 text-base leading-none hover:bg-gray-100"
+              >
+                {emoji}
+              </button>
+            ))}
+          </div>
+        </>
       )}
     </div>
   );
