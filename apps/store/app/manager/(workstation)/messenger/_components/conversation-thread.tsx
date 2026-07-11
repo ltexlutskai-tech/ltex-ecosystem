@@ -1,10 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Send } from "lucide-react";
+import { ChevronRight, Send } from "lucide-react";
 import { Button, Textarea, useToast } from "@ltex/ui";
 import { formatRelativeShort } from "../../_components/format-relative";
 import { Avatar } from "./avatar";
+import { GroupInfoDialog } from "./group-info-dialog";
 import { roleLabel } from "./role-label";
 import type {
   MessengerMessageItem,
@@ -19,18 +20,23 @@ type Header = MessengerThreadResponse["conversation"];
 
 export function ConversationThread({
   conversationId,
+  currentUserId,
   currentUserName,
   onReadCleared,
+  onLeft,
 }: {
   conversationId: string;
+  currentUserId: string;
   currentUserName: string;
   onReadCleared: () => void;
+  onLeft: () => void;
 }) {
   const [header, setHeader] = useState<Header | null>(null);
   const [messages, setMessages] = useState<MessengerMessageItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
+  const [infoOpen, setInfoOpen] = useState(false);
   const { toast } = useToast();
 
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -193,7 +199,21 @@ export function ConversationThread({
 
   return (
     <div className="flex h-full flex-1 flex-col bg-gray-50">
-      <ThreadHeader header={header} />
+      <ThreadHeader
+        header={header}
+        onOpenInfo={isGroup ? () => setInfoOpen(true) : undefined}
+      />
+      {isGroup && (
+        <GroupInfoDialog
+          open={infoOpen}
+          onOpenChange={setInfoOpen}
+          conversationId={conversationId}
+          header={header}
+          currentUserId={currentUserId}
+          onChanged={() => void loadInitial()}
+          onLeft={onLeft}
+        />
+      )}
       <div
         ref={scrollRef}
         onScroll={onScroll}
@@ -219,7 +239,13 @@ export function ConversationThread({
   );
 }
 
-function ThreadHeader({ header }: { header: Header }) {
+function ThreadHeader({
+  header,
+  onOpenInfo,
+}: {
+  header: Header;
+  onOpenInfo?: () => void;
+}) {
   const online =
     header.counterpart?.lastSeenAt != null &&
     Date.now() - new Date(header.counterpart.lastSeenAt).getTime() < 5 * 60_000;
@@ -232,15 +258,36 @@ function ThreadHeader({ header }: { header: Header }) {
         : roleLabel(header.counterpart.role)
     : `Учасників: ${header.members.length}`;
 
-  return (
-    <div className="flex items-center gap-3 border-b bg-white px-4 py-2.5">
+  const inner = (
+    <>
       <Avatar name={header.title} size="md" />
-      <div className="min-w-0 flex-1">
+      <div className="min-w-0 flex-1 text-left">
         <p className="truncate text-sm font-semibold text-gray-800">
           {header.title}
         </p>
         <p className="truncate text-xs text-gray-500">{subtitle}</p>
       </div>
+      {onOpenInfo && (
+        <ChevronRight className="h-4 w-4 shrink-0 text-gray-400" />
+      )}
+    </>
+  );
+
+  if (onOpenInfo) {
+    return (
+      <button
+        type="button"
+        onClick={onOpenInfo}
+        className="flex w-full items-center gap-3 border-b bg-white px-4 py-2.5 hover:bg-gray-50"
+      >
+        {inner}
+      </button>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-3 border-b bg-white px-4 py-2.5">
+      {inner}
     </div>
   );
 }

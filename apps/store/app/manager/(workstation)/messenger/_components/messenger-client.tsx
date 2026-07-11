@@ -27,6 +27,11 @@ export function MessengerClient({
     [bumpList],
   );
 
+  const leaveConversation = useCallback(() => {
+    setSelectedId(null);
+    bumpList();
+  }, [bumpList]);
+
   return (
     <div className="relative flex h-[calc(100vh-7rem)] overflow-hidden rounded-lg border bg-white">
       <ConversationList
@@ -40,8 +45,10 @@ export function MessengerClient({
           <ConversationThread
             key={selectedId}
             conversationId={selectedId}
+            currentUserId={currentUserId}
             currentUserName={currentUserName}
             onReadCleared={bumpList}
+            onLeft={leaveConversation}
           />
         ) : (
           <EmptyThread />
@@ -62,8 +69,10 @@ export function MessengerClient({
             <ConversationThread
               key={`m-${selectedId}`}
               conversationId={selectedId}
+              currentUserId={currentUserId}
               currentUserName={currentUserName}
               onReadCleared={bumpList}
+              onLeft={leaveConversation}
             />
           </div>
         </div>

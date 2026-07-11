@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import { prisma } from "@ltex/db";
 import { getCurrentUser } from "@/lib/auth/manager-auth";
 import { getMessengerConversationForUser } from "@/lib/messenger/access";
+import { canManageGroup, renameGroup } from "@/lib/messenger/group";
 import type {
   MessengerMessageItem,
   MessengerThreadResponse,
@@ -92,6 +94,11 @@ export async function GET(
         }
       : null;
 
+  const groupRoleByUserId = new Map(
+    access.conversation.members.map((m) => [m.userId, m.role]),
+  );
+  const myGroupRole = access.membership?.role ?? null;
+
   const response: MessengerThreadResponse = {
     conversation: {
       id: access.conversation.id,
@@ -103,10 +110,74 @@ export async function GET(
         fullName: u.fullName,
         role: u.role,
         lastSeenAt: u.lastSeenAt ? u.lastSeenAt.toISOString() : null,
+        groupRole: groupRoleByUserId.get(u.id) ?? "member",
       })),
+      canManage:
+        access.conversation.type === "group" &&
+        canManageGroup(myGroupRole, user.role),
+      myGroupRole,
     },
     messages,
   };
 
   return NextResponse.json(response);
+}
+
+const renameSchema = z.object({
+  title: z.string().trim().min(1, "Вкажіть назву групи").max(100),
+});
+
+/**
+ * PATCH /api/v1/manager/messenger/conversations/[id]
+ *
+ * Перейменувати групу. Дозволено адміну групи або глобальному admin/owner.
+ */
+export async function PATCH(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  const user = await getCurrentUser(req);
+  if (!user) {
+    return NextResponse.json({ error: "Не авторизовано" }, { status: 401 });
+  }
+
+  const { id } = await params;
+  const access = await getMessengerConversationForUser(user, id);
+  if (access.status === 404) {
+    return NextResponse.json({ error: "Розмову не знайдено" }, { status: 404 });
+  }
+  if (access.status === 403 || !access.membership) {
+    return NextResponse.json({ error: "Доступ заборонено" }, { status: 403 });
+  }
+  if (access.conversation.type !== "group") {
+    return NextResponse.json(
+      { error: "Перейменувати можна лише групу" },
+      { status: 400 },
+    );
+  }
+  if (!canManageGroup(access.membership.role, user.role)) {
+    return NextResponse.json(
+      { error: "Лише адміністратор групи може перейменувати" },
+      { status: 403 },
+    );
+  }
+
+  const body = await req.json().catch(() => null);
+  const parsed = renameSchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json(
+      {
+        error: parsed.error.issues[0]?.message ?? "Невірні дані",
+        details: parsed.error.issues.slice(0, 5),
+      },
+      { status: 400 },
+    );
+  }
+
+  await renameGroup(
+    id,
+    { id: user.id, fullName: user.fullName },
+    parsed.data.title,
+  );
+  return NextResponse.json({ ok: true });
 }

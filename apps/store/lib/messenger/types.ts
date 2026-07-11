@@ -35,13 +35,22 @@ export interface MessengerMessageItem {
   createdAt: string;
 }
 
+export interface MessengerThreadMember extends MessengerUserBrief {
+  /** Роль у групі (для direct — завжди "member"). */
+  groupRole: "member" | "admin";
+}
+
 export interface MessengerThreadResponse {
   conversation: {
     id: string;
     type: "direct" | "group";
     title: string;
     counterpart: MessengerUserBrief | null;
-    members: MessengerUserBrief[];
+    members: MessengerThreadMember[];
+    /** Чи може поточний користувач керувати групою (перейм./склад). */
+    canManage: boolean;
+    /** Роль поточного користувача в групі, або null якщо він не учасник. */
+    myGroupRole: "member" | "admin" | null;
   };
   messages: MessengerMessageItem[];
 }
