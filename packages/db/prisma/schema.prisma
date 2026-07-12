@@ -2958,6 +2958,18 @@ model InventoryItem {
   productId     String?  @map("product_id")
   charHex       String?  @map("char_hex")
   barcode       String?
+  // ── Інвентаризація по мішках (2026-07-12) — знімок мішка на момент звірки.
+  //    Плоскі скаляри (як RepackingItem): БЕЗ FK на Lot, щоб не зав'язувати
+  //    менеджерський документ на життєвий цикл лота (лот може стати sold/архів).
+  //    lotId — м'яке посилання для follow-up документів (списання нестач /
+  //    оприбуткування надлишків «на підставі інвентаризації»).
+  lotId         String?  @map("lot_id")
+  productName   String?  @map("product_name")
+  articleCode   String?  @map("article_code")
+  weight        Float    @default(0)
+  sector        String?
+  unitName      String?  @map("unit_name")
+  quality       String?
   qtyAccounting Float    @default(0) @map("qty_accounting")
   qtyActual     Float    @default(0) @map("qty_actual")
   qtyDifference Float    @default(0) @map("qty_difference")

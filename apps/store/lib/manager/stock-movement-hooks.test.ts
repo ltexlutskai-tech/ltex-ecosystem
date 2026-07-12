@@ -73,20 +73,17 @@ describe("buildStockMovementRows — signs per document type", () => {
     expect(rows[1]?.recordKind).toBe(0);
   });
 
-  it("inventories: надлишок → прихід, нестача → розхід, нуль → пропуск", () => {
+  it("inventories: документ звірки — рухів складу НЕ пише", () => {
     const rows = run(
       "inventories",
       doc([
-        { qtyAccounting: 3, qtyActual: 5, qtyDifference: 2 }, // +2 прихід
-        { qtyAccounting: 8, qtyActual: 5, qtyDifference: -3 }, // -3 розхід
-        { qtyAccounting: 4, qtyActual: 4, qtyDifference: 0 }, // 0 пропуск
+        { qtyAccounting: 3, qtyActual: 5, qtyDifference: 2 }, // надлишок
+        { qtyAccounting: 8, qtyActual: 5, qtyDifference: -3 }, // нестача
+        { qtyAccounting: 4, qtyActual: 4, qtyDifference: 0 }, // збіг
       ]),
     );
-    expect(rows).toHaveLength(2);
-    expect(rows[0]?.recordKind).toBe(0);
-    expect(rows[0]?.qty).toBe(2);
-    expect(rows[1]?.recordKind).toBe(1);
-    expect(rows[1]?.qty).toBe(3);
+    // Коригування залишків роблять окремі документи (Списання / Оприбуткування).
+    expect(rows).toHaveLength(0);
   });
 
   it("stock-transfers: два рухи на рядок (відправник розхід + одержувач прихід)", () => {

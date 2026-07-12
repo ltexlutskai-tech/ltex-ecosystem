@@ -75,6 +75,13 @@ export type StockAdjustmentInput = z.infer<typeof stockAdjustmentSchema>;
 const inventoryLineSchema = lineSchema.extend({
   qtyAccounting: z.number().min(0).default(0),
   qtyActual: z.number().min(0).default(0),
+  // ── Знімок мішка (інвентаризація по ШК) ──
+  lotId: z.string().min(1).max(64).nullable().optional(),
+  productName: z.string().max(500).nullable().optional(),
+  articleCode: z.string().max(120).nullable().optional(),
+  sector: z.string().max(120).nullable().optional(),
+  unitName: z.string().max(32).nullable().optional(),
+  quality: z.string().max(120).nullable().optional(),
 });
 export const inventorySchema = baseHeader.extend({
   items: z.array(inventoryLineSchema).default([]),

@@ -6,6 +6,7 @@ import { isStockDocKind } from "@/lib/manager/stock-documents-api";
 import { getStockDocMeta } from "@/lib/manager/stock-documents";
 import { getRepackWeightTolerance } from "@/lib/manager/mgr-settings";
 import { StockDocForm } from "../../_components/stock-doc-form";
+import { InventoryForm } from "../../_components/inventory-form";
 
 export const dynamic = "force-dynamic";
 
@@ -34,6 +35,24 @@ export default async function NewStockDocPage({
   const isRepacking = kind === "repackings";
   if (isRepacking && !REPACK_ROLES.includes(user.role)) notFound();
   const meta = getStockDocMeta(kind);
+
+  // Інвентаризація — окрема щільна таблична форма (по мішках).
+  if (kind === "inventories") {
+    return (
+      <div className="mx-auto max-w-none space-y-4">
+        <div className="text-sm">
+          <Link
+            href={`/manager/stock-documents/${meta.slug}`}
+            className="text-gray-500 hover:text-gray-800 hover:underline"
+          >
+            ← Назад до списку
+          </Link>
+        </div>
+        <h1 className="text-xl font-semibold">Новий: {meta.label}</h1>
+        <InventoryForm />
+      </div>
+    );
+  }
 
   // Довідники якості/секторів/постачальників + допуск ваги — лише перепаковці.
   const [qualities, sectors, suppliers, weightTolerance] = isRepacking
@@ -76,7 +95,7 @@ export default async function NewStockDocPage({
         showPrice={kind !== "warehouse-returns" && kind !== "stock-transfers"}
         showReason={kind === "write-offs" || kind === "stock-adjustments"}
         isRepacking={isRepacking}
-        isInventory={kind === "inventories"}
+        isInventory={false}
         showCustomer={kind === "product-returns"}
         showSupplier={kind === "supplier-returns"}
         qualities={qualities as { id: string; name: string }[]}

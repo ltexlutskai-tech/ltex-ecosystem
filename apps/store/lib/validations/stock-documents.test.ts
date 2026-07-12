@@ -58,6 +58,34 @@ describe("inventorySchema", () => {
       }).success,
     ).toBe(true);
   });
+
+  it("accepts per-bag snapshot fields (lotId/name/sector/quality/unit)", () => {
+    const parsed = inventorySchema.safeParse({
+      docDate: "2026-07-12",
+      notes: "Інвентаризація 2025/2026",
+      items: [
+        {
+          lotId: "L1",
+          productId: "P1",
+          barcode: "2000999396403",
+          productName: "Кросівки мікс демісезон",
+          articleCode: "HOKA C-",
+          sector: "Струмівка",
+          unitName: "шт",
+          quality: "Новий",
+          weight: 18.5,
+          priceEur: 42,
+          qtyAccounting: 1,
+          qtyActual: 0,
+        },
+      ],
+    });
+    expect(parsed.success).toBe(true);
+    if (parsed.success) {
+      expect(parsed.data.items[0]?.lotId).toBe("L1");
+      expect(parsed.data.items[0]?.sector).toBe("Струмівка");
+    }
+  });
 });
 
 describe("writeOffSchema", () => {
