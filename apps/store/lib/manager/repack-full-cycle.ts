@@ -485,11 +485,12 @@ async function resolveSourceLots(
         ? lotByBarcode.get(item.barcode)
         : undefined;
     if (!lot) continue; // джерело не знайдено — пропускаємо (best-effort)
-    // Собівартість €/кг: з лота, а якщо його немає (старі 1С-лоти без ціни
-    // закупівлі) — з ручного поля «Собівартість €/кг» рядка розбору.
-    const manualCost = Number(item.priceEur);
+    // Собівартість €/кг: авторитетне — поле «Ціна закупки €/кг» рядка (воно
+    // авто-заповнюється при скані з лота/довідника, але менеджер міг
+    // відкоригувати); fallback — ціна закупівлі самого лота.
+    const rowCost = Number(item.priceEur);
     const purchasePriceEur =
-      lot.purchasePriceEur ?? (manualCost > 0 ? manualCost : null);
+      rowCost > 0 ? rowCost : (lot.purchasePriceEur ?? null);
     out.push({
       itemId: item.id,
       lotId: lot.id,

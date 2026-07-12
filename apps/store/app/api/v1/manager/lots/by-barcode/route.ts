@@ -55,6 +55,18 @@ export async function GET(req: NextRequest) {
     );
   }
 
+  // Собівартість €/кг: з лота (purchasePriceEur), а якщо його немає (старі
+  // 1С-лоти) — остання закупівельна ціна товару з довідника PurchasePrice.
+  let costPerKgEur: number | null = lot.purchasePriceEur;
+  if (costPerKgEur == null) {
+    const lastPurchase = await prisma.purchasePrice.findFirst({
+      where: { productId: lot.productId },
+      orderBy: { validFrom: "desc" },
+      select: { priceEur: true },
+    });
+    costPerKgEur = lastPurchase?.priceEur ?? null;
+  }
+
   return NextResponse.json({
     lot: {
       id: lot.id,
@@ -64,6 +76,8 @@ export async function GET(req: NextRequest) {
       status: lot.status,
       priceEur: lot.priceEur,
       purchasePriceEur: lot.purchasePriceEur,
+      /** Резолвлена собівартість €/кг (лот або остання закупка товару). */
+      costPerKgEur,
       supplierId: lot.supplierId,
       supplierName: lot.supplier?.name ?? null,
       reservedForClientId: lot.reservedForClientId,

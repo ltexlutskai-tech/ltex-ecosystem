@@ -206,6 +206,8 @@ export function StockDocForm(props: StockDocFormProps) {
         return;
       }
       const data = await res.json();
+      // Собівартість €/кг: резолвлена сервером (лот або остання закупка товару).
+      const costPerKg: number | null = data.lot?.costPerKgEur ?? null;
       updateRow(rowKey, {
         productId: data.product?.id ?? null,
         productName: data.product?.name ?? "",
@@ -214,7 +216,9 @@ export function StockDocForm(props: StockDocFormProps) {
           data.lot?.weight != null
             ? String(data.lot.weight)
             : rowWeight(rowKey),
-        purchasePriceEur: data.lot?.purchasePriceEur ?? null,
+        purchasePriceEur: costPerKg,
+        // Поле «Ціна закупки €/кг» заповнюємо авто (лот вже має вартість).
+        priceEur: costPerKg != null ? String(costPerKg) : "",
         supplierName: data.lot?.supplierName ?? null,
         lookupError: null,
       });
@@ -275,9 +279,10 @@ export function StockDocForm(props: StockDocFormProps) {
       if (r.role === "assembled") outW += w;
       else {
         inW += w;
-        // Собівартість €/кг: з лота (авто при скані), а якщо його немає —
-        // з ручного поля «Собівартість €/кг» рядка розбору.
-        const perKg = r.purchasePriceEur ?? (Number(r.priceEur) || 0);
+        // Собівартість €/кг береться з редагованого поля «Ціна закупки €/кг»
+        // (авто-заповнюється при скані з лота/довідника, але менеджер може
+        // відкоригувати). Це джерело правди для розрахунку.
+        const perKg = Number(r.priceEur) || 0;
         sourceCost += perKg * w;
       }
     }
@@ -685,10 +690,21 @@ export function StockDocForm(props: StockDocFormProps) {
                           onChange={(e) =>
                             updateRow(r.key, { priceEur: e.target.value })
                           }
-                          placeholder="Собівартість €/кг"
-                          title="Собівартість €/кг (авто з лота при скані; або введіть вручну)"
-                          className="w-32 rounded-md border border-gray-300 px-2 py-1 text-sm"
+                          placeholder="Ціна закупки €/кг"
+                          title="Ціна закупки €/кг (авто з лота/довідника при скані; можна відкоригувати)"
+                          className="w-28 rounded-md border border-gray-300 px-2 py-1 text-sm"
                         />
+                      )}
+                      {props.showPrice && (
+                        <span
+                          className="w-24 shrink-0 rounded-md border border-gray-200 bg-gray-50 px-2 py-1 text-right text-sm text-gray-700"
+                          title="Собівартість рядка = ціна закупки €/кг × вага"
+                        >
+                          {(
+                            (Number(r.priceEur) || 0) * (Number(r.weight) || 0)
+                          ).toFixed(2)}{" "}
+                          €
+                        </span>
                       )}
                       {rows.length > 1 && (
                         <button

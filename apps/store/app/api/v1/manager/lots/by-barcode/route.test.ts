@@ -8,6 +8,7 @@ const { mockPrisma, getCurrentUserMock } = vi.hoisted(() => {
   return {
     mockPrisma: {
       lot: { findUnique: vi.fn() },
+      purchasePrice: { findFirst: vi.fn() },
     },
     getCurrentUserMock: vi.fn(),
   };
@@ -43,11 +44,15 @@ function req(qs: string): NextRequest {
 function fakeLot() {
   return {
     id: "lot1",
+    productId: "p1",
     barcode: "B0001",
     weight: 22.5,
     quantity: 1,
     status: "free",
     priceEur: 90,
+    purchasePriceEur: null,
+    supplierId: null,
+    supplier: null,
     reservedForClientId: null,
     reservedForName: null,
     reservedByUserId: null,
@@ -72,6 +77,7 @@ function fakeLot() {
 beforeEach(() => {
   vi.clearAllMocks();
   getCurrentUserMock.mockResolvedValue(MANAGER);
+  mockPrisma.purchasePrice.findFirst.mockResolvedValue(null);
 });
 
 describe("GET /api/v1/manager/lots/by-barcode", () => {
@@ -108,6 +114,28 @@ describe("GET /api/v1/manager/lots/by-barcode", () => {
     expect(json.lot.weight).toBe(22.5);
     expect(json.product.name).toBe("Куртки зимові");
     expect(json.prices).toHaveLength(2);
+  });
+
+  it("costPerKgEur = lot.purchasePriceEur коли є", async () => {
+    mockPrisma.lot.findUnique.mockResolvedValueOnce({
+      ...fakeLot(),
+      purchasePriceEur: 3.5,
+    });
+    const res = await GET(req("?code=B0001"));
+    const json = (await res.json()) as { lot: { costPerKgEur: number } };
+    expect(json.lot.costPerKgEur).toBe(3.5);
+    expect(mockPrisma.purchasePrice.findFirst).not.toHaveBeenCalled();
+  });
+
+  it("costPerKgEur fallback на останню закупівельну ціну товару", async () => {
+    mockPrisma.lot.findUnique.mockResolvedValueOnce(fakeLot()); // purchasePriceEur=null
+    mockPrisma.purchasePrice.findFirst.mockResolvedValueOnce({
+      priceEur: 2.75,
+    });
+    const res = await GET(req("?code=B0001"));
+    const json = (await res.json()) as { lot: { costPerKgEur: number } };
+    expect(json.lot.costPerKgEur).toBe(2.75);
+    expect(mockPrisma.purchasePrice.findFirst).toHaveBeenCalled();
   });
 
   it("trims whitespace from code before lookup", async () => {
