@@ -18,6 +18,11 @@ export interface StockDocLineView {
   qtyAccounting?: number;
   qtyActual?: number;
   qtyDifference?: number;
+  // ── Інвентаризація по мішках (знімок рядка) ──
+  lotId?: string | null;
+  articleCode?: string | null;
+  unitName?: string | null;
+  quality?: string | null;
   // ── Перепаковка — для редагування чернетки ──
   sourceLotId?: string | null;
   salePriceEur?: number | null;
@@ -106,7 +111,9 @@ async function attachProductNames(view: StockDocView): Promise<void> {
     ]),
   );
   for (const l of view.lines) {
-    if (l.productId) l.productName = byId.get(l.productId) ?? null;
+    // Знімкова назва (інвентаризація) має пріоритет — не перетираємо її.
+    if (l.productId && !l.productName)
+      l.productName = byId.get(l.productId) ?? null;
   }
 }
 
@@ -269,12 +276,18 @@ async function buildStockDocView(
         lines: d.items.map((it) => ({
           id: it.id,
           productId: it.productId,
+          productName: it.productName,
+          articleCode: it.articleCode,
           barcode: it.barcode,
-          weight: 0,
+          lotId: it.lotId,
+          weight: it.weight,
           quantity: it.qtyActual,
           priceEur: Number(it.priceEur),
-          amountEur: 0,
+          amountEur: Number(it.priceEur) * it.qtyActual,
           notes: it.notes,
+          sector: it.sector,
+          unitName: it.unitName,
+          quality: it.quality,
           qtyAccounting: it.qtyAccounting,
           qtyActual: it.qtyActual,
           qtyDifference: it.qtyDifference,

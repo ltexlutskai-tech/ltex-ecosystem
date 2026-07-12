@@ -11,6 +11,10 @@ import {
   type StockDocInitial,
   type StockDocInitialRow,
 } from "../../../_components/stock-doc-form";
+import {
+  InventoryForm,
+  type InventoryFormInitial,
+} from "../../../_components/inventory-form";
 
 export const dynamic = "force-dynamic";
 
@@ -38,6 +42,45 @@ export default async function EditStockDocPage({
   // Редагувати можна лише чернетку. Проведений — спершу «Розпровести».
   if (doc.status !== "draft") {
     redirect(`/manager/stock-documents/${meta.slug}/${id}`);
+  }
+
+  // Інвентаризація — окрема щільна таблична форма (по мішках).
+  if (kind === "inventories") {
+    const initial: InventoryFormInitial = {
+      id: doc.id,
+      docDate: doc.docDate.toISOString().slice(0, 10),
+      notes: doc.notes ?? "",
+      rows: doc.lines.map((l) => ({
+        lotId: l.lotId ?? null,
+        productId: l.productId,
+        productName: l.productName ?? "",
+        articleCode: l.articleCode ?? "",
+        barcode: l.barcode ?? "",
+        sector: l.sector ?? "",
+        quality: l.quality ?? "",
+        weight: l.weight ?? 0,
+        unitName: l.unitName ?? "",
+        priceEur: l.priceEur ?? 0,
+        qtyAccounting: l.qtyAccounting ?? 0,
+        qtyActual: l.qtyActual ?? 0,
+      })),
+    };
+    return (
+      <div className="mx-auto max-w-none space-y-4">
+        <div className="text-sm">
+          <Link
+            href={`/manager/stock-documents/${meta.slug}/${id}`}
+            className="text-gray-500 hover:text-gray-800 hover:underline"
+          >
+            ← Назад до документа
+          </Link>
+        </div>
+        <h1 className="text-xl font-semibold">
+          Редагування: {doc.number1C ?? doc.docNumber}
+        </h1>
+        <InventoryForm initial={initial} />
+      </div>
+    );
   }
 
   const [qualities, sectors, suppliers, weightTolerance] = isRepacking
@@ -108,7 +151,7 @@ export default async function EditStockDocPage({
         showPrice={kind !== "warehouse-returns" && kind !== "stock-transfers"}
         showReason={kind === "write-offs" || kind === "stock-adjustments"}
         isRepacking={isRepacking}
-        isInventory={kind === "inventories"}
+        isInventory={false}
         showCustomer={kind === "product-returns"}
         showSupplier={kind === "supplier-returns"}
         qualities={qualities as { id: string; name: string }[]}

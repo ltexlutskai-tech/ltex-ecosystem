@@ -34,6 +34,11 @@ export interface NormLine {
   qtyAccounting?: number;
   qtyActual?: number;
   unitName?: string | null;
+  // ── Інвентаризація по мішках (знімок рядка) ──
+  lotId?: string | null;
+  productName?: string | null;
+  articleCode?: string | null;
+  quality?: string | null;
   // ── Перепаковка повного циклу (поля рядків) ──
   sourceLotId?: string | null;
   salePriceEur?: number | null;
@@ -77,6 +82,10 @@ export function normalizeLine(raw: {
   qtyAccounting?: number;
   qtyActual?: number;
   unitName?: string | null;
+  lotId?: string | null;
+  productName?: string | null;
+  articleCode?: string | null;
+  quality?: string | null;
   sourceLotId?: string | null;
   salePriceEur?: number | null;
   qualityId?: string | null;
@@ -101,6 +110,10 @@ export function normalizeLine(raw: {
     qtyAccounting: raw.qtyAccounting,
     qtyActual: raw.qtyActual,
     unitName: raw.unitName ?? null,
+    lotId: raw.lotId ?? null,
+    productName: raw.productName ?? null,
+    articleCode: raw.articleCode ?? null,
+    quality: raw.quality ?? null,
     sourceLotId: raw.sourceLotId ?? null,
     salePriceEur: raw.salePriceEur ?? null,
     qualityId: raw.qualityId ?? null,
@@ -123,6 +136,33 @@ const linePriced = (l: NormLine) => ({
   priceEur: l.priceEur,
   amountEur: l.amountEur,
 });
+
+/**
+ * Рядок інвентаризації (по мішках): облік/факт + знімок мішка (назва/артикул/
+ * вага/сектор/од./якість/lotId). `qtyDifference` = факт − облік
+ * (+ надлишок / − нестача / 0 збіг).
+ */
+const inventoryItemCreate = (l: NormLine) => {
+  const acc = l.qtyAccounting ?? 0;
+  const act = l.qtyActual ?? l.quantity;
+  return {
+    productId: l.productId,
+    charHex: l.charHex,
+    barcode: l.barcode,
+    lotId: l.lotId ?? null,
+    productName: l.productName ?? null,
+    articleCode: l.articleCode ?? null,
+    weight: l.weight ?? 0,
+    sector: l.sector ?? null,
+    unitName: l.unitName ?? null,
+    quality: l.quality ?? null,
+    qtyAccounting: acc,
+    qtyActual: act,
+    qtyDifference: round2(act - acc),
+    priceEur: l.priceEur,
+    notes: l.notes,
+  };
+};
 
 export async function createStockDoc(
   kind: StockDocKind,
@@ -246,22 +286,7 @@ export async function createStockDoc(
         const doc = await tx.inventory.create({
           data: {
             ...h,
-            items: {
-              create: input.lines.map((l) => {
-                const acc = l.qtyAccounting ?? 0;
-                const act = l.qtyActual ?? l.quantity;
-                return {
-                  productId: l.productId,
-                  charHex: l.charHex,
-                  barcode: l.barcode,
-                  qtyAccounting: acc,
-                  qtyActual: act,
-                  qtyDifference: round2(act - acc),
-                  priceEur: l.priceEur,
-                  notes: l.notes,
-                };
-              }),
-            },
+            items: { create: input.lines.map(inventoryItemCreate) },
           },
         });
         return { id: doc.id, docNumber };
@@ -419,20 +444,7 @@ export async function updateStockDoc(
             ...header,
             items: {
               deleteMany: {},
-              create: input.lines.map((l) => {
-                const acc = l.qtyAccounting ?? 0;
-                const act = l.qtyActual ?? l.quantity;
-                return {
-                  productId: l.productId,
-                  charHex: l.charHex,
-                  barcode: l.barcode,
-                  qtyAccounting: acc,
-                  qtyActual: act,
-                  qtyDifference: round2(act - acc),
-                  priceEur: l.priceEur,
-                  notes: l.notes,
-                };
-              }),
+              create: input.lines.map(inventoryItemCreate),
             },
           },
         });

@@ -55,7 +55,10 @@ export interface UseDocumentAutosaveOptions<T> {
   /**
    * Чи пропонувати відновлення з localStorage-буфера (банер «Знайдено
    * незбережені зміни»). `false` → банер не показується (документи-чернетки й
-   * так зберігаються у БД і доступні у списку). Дефолт `true`.
+   * так зберігаються у БД і доступні у списку). **Дефолт `false`** — за рішенням
+   * user банер відновлення прибрано всюди: незавершені документи просто лежать
+   * чернеткою у списку, окремо «відновлювати» їх не треба. localStorage-буфер
+   * усе одно веде рівень 1 (офлайн-стійкість) — просто без банера-запиту.
    */
   enableRestore?: boolean;
 }
@@ -98,7 +101,7 @@ export function useDocumentAutosave<T>(
     onIdAssigned,
     canCreateDraft = true,
     serverDebounceMs = 2000,
-    enableRestore = true,
+    enableRestore = false,
   } = opts;
 
   const [status, setStatus] = useState<DocAutosaveStatus>("idle");
