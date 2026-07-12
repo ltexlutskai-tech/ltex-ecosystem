@@ -48,6 +48,46 @@ export interface WarehouseLot {
 
 export type RowStatus = "matched" | "missing" | "surplus" | "empty";
 
+/** Сектор складу (довідник) з опційним ШК. */
+export interface SectorRef {
+  id: string;
+  name: string;
+  barcode: string | null;
+}
+
+/**
+ * Рядок інвентаризації у server-authoritative режимі (спільна робота).
+ * Пласка серіалізовна форма — спільна для клієнта й сервера (без Prisma).
+ */
+export interface LiveItem {
+  id: string;
+  lotId: string | null;
+  productId: string | null;
+  productName: string;
+  articleCode: string;
+  barcode: string;
+  sector: string;
+  sectorId: string | null;
+  weight: number;
+  unitName: string;
+  priceEur: number;
+  qtyAccounting: number;
+  qtyActual: number;
+  foundByName: string | null;
+  updatedAt: string;
+}
+
+export interface LiveDoc {
+  id: string;
+  docNumber: string;
+  number1C: string | null;
+  docDate: string;
+  notes: string;
+  status: string;
+  items: LiveItem[];
+  serverTime: string;
+}
+
 /** Людська назва одиниці виміру за `Product.priceUnit`. */
 export function unitLabel(priceUnit: string | null | undefined): string {
   switch (priceUnit) {

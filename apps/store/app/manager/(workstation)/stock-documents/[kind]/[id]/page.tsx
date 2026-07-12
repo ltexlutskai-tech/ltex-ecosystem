@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { prisma } from "@ltex/db";
 import { requireRole } from "@/lib/auth/manager-auth";
 import { isStockDocKind } from "@/lib/manager/stock-documents-api";
 import { getStockDocMeta } from "@/lib/manager/stock-documents";
@@ -47,6 +48,20 @@ export default async function StockDocDetailPage({
   const wide = kind === "repackings" || kind === "inventories";
   const isInventory = kind === "inventories";
   const invSummary = isInventory ? summarizeInventoryLines(doc.lines) : null;
+  const invLogs = isInventory
+    ? await prisma.inventoryLog.findMany({
+        where: { inventoryId: id },
+        orderBy: { createdAt: "desc" },
+        take: 200,
+        select: {
+          id: true,
+          userName: true,
+          action: true,
+          message: true,
+          createdAt: true,
+        },
+      })
+    : [];
   return (
     <div className={`mx-auto space-y-4 ${wide ? "max-w-none" : "max-w-5xl"}`}>
       <div className="text-sm">
@@ -147,7 +162,10 @@ export default async function StockDocDetailPage({
         )}
       </div>
       {isInventory ? (
-        <InventoryLinesTable lines={doc.lines} />
+        <>
+          <InventoryLinesTable lines={doc.lines} />
+          <InventoryLogCard logs={invLogs} />
+        </>
       ) : (
         <div className="rounded-md border bg-white p-4">
           <h2 className="mb-3 text-sm font-medium">
@@ -305,7 +323,6 @@ function InventoryLinesTable({ lines }: { lines: StockDocLineView[] }) {
               <th className="px-2 py-1.5">Номенклатура</th>
               <th className="px-2 py-1.5">ШК</th>
               <th className="px-2 py-1.5">Сектор</th>
-              <th className="px-2 py-1.5">Якість</th>
               <th className="px-2 py-1.5 text-right">Вага</th>
               <th className="px-2 py-1.5">Ед</th>
               <th className="px-2 py-1.5 text-right">Облік</th>
@@ -319,7 +336,7 @@ function InventoryLinesTable({ lines }: { lines: StockDocLineView[] }) {
             {lines.map((it, idx) => {
               const acc = it.qtyAccounting ?? 0;
               const act = it.qtyActual ?? 0;
-              const diff = it.qtyDifference ?? act - acc;
+              const diff = act - acc;
               const st = rowStatus({ qtyAccounting: acc, qtyActual: act });
               return (
                 <tr key={it.id} className={INV_ROW_CLASS[st]}>
@@ -348,9 +365,6 @@ function InventoryLinesTable({ lines }: { lines: StockDocLineView[] }) {
                     {it.barcode ?? "—"}
                   </td>
                   <td className="px-2 py-1">{it.sector || "—"}</td>
-                  <td className="px-2 py-1 text-gray-600">
-                    {it.quality || "—"}
-                  </td>
                   <td className="px-2 py-1 text-right">
                     {it.weight ? it.weight.toFixed(1) : "—"}
                   </td>
@@ -390,6 +404,78 @@ function InventoryLinesTable({ lines }: { lines: StockDocLineView[] }) {
       </div>
     </div>
   );
+}
+
+const LOG_ACTION_LABEL: Record<string, string> = {
+  fill: "Заповнення",
+  found: "Знайдено",
+  surplus: "Надлишок",
+  unknown: "Невідомий ШК",
+  edit: "Зміна",
+  remove: "Видалення",
+  header: "Шапка",
+  post: "Проведення",
+  reopen: "Розпроведення",
+};
+
+function InventoryLogCard({
+  logs,
+}: {
+  logs: {
+    id: string;
+    userName: string | null;
+    action: string;
+    message: string;
+    createdAt: Date;
+  }[];
+}) {
+  return (
+    <div className="rounded-md border bg-white">
+      <div className="border-b px-4 py-2 text-sm font-medium">
+        Журнал змін ({logs.length})
+      </div>
+      {logs.length === 0 ? (
+        <p className="px-4 py-4 text-sm text-gray-400">Журнал порожній.</p>
+      ) : (
+        <div className="max-h-96 overflow-y-auto">
+          <table className="w-full text-xs">
+            <thead className="sticky top-0 bg-gray-50 text-left uppercase tracking-wide text-gray-500">
+              <tr>
+                <th className="px-3 py-1.5">Час</th>
+                <th className="px-3 py-1.5">Користувач</th>
+                <th className="px-3 py-1.5">Дія</th>
+                <th className="px-3 py-1.5">Деталі</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {logs.map((l) => (
+                <tr key={l.id}>
+                  <td className="whitespace-nowrap px-3 py-1 text-gray-500">
+                    {formatDateTime(l.createdAt)}
+                  </td>
+                  <td className="px-3 py-1 text-gray-700">
+                    {l.userName || "—"}
+                  </td>
+                  <td className="px-3 py-1">
+                    {LOG_ACTION_LABEL[l.action] ?? l.action}
+                  </td>
+                  <td className="px-3 py-1 text-gray-600">{l.message}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function formatDateTime(d: Date): string {
+  const dd = String(d.getUTCDate()).padStart(2, "0");
+  const mm = String(d.getUTCMonth() + 1).padStart(2, "0");
+  const hh = String(d.getUTCHours()).padStart(2, "0");
+  const mi = String(d.getUTCMinutes()).padStart(2, "0");
+  return `${dd}.${mm} ${hh}:${mi}`;
 }
 
 function InvChip({

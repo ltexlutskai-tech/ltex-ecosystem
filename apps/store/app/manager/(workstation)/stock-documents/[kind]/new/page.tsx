@@ -6,7 +6,7 @@ import { isStockDocKind } from "@/lib/manager/stock-documents-api";
 import { getStockDocMeta } from "@/lib/manager/stock-documents";
 import { getRepackWeightTolerance } from "@/lib/manager/mgr-settings";
 import { StockDocForm } from "../../_components/stock-doc-form";
-import { InventoryForm } from "../../_components/inventory-form";
+import { InventoryBoard } from "../../_components/inventory-board";
 
 export const dynamic = "force-dynamic";
 
@@ -49,7 +49,7 @@ export default async function NewStockDocPage({
           </Link>
         </div>
         <h1 className="text-xl font-semibold">Новий: {meta.label}</h1>
-        <InventoryForm />
+        <InventoryBoard initialDoc={null} />
       </div>
     );
   }
