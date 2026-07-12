@@ -38,7 +38,9 @@ describe("jwt", () => {
   it("verifyAccessToken returns null on expired token", async () => {
     const { signAccessToken, verifyAccessToken } = await import("./jwt");
     const realNow = Date.now();
-    vi.spyOn(Date, "now").mockReturnValue(realNow - 60 * 60 * 1000);
+    // Підписуємо токен «у минулому» на строк, який завідомо більший за TTL
+    // access-токена (31 день), щоб тест лишався валідним незалежно від TTL.
+    vi.spyOn(Date, "now").mockReturnValue(realNow - 31 * 24 * 60 * 60 * 1000);
     const token = signAccessToken("user_123", "manager");
     vi.spyOn(Date, "now").mockReturnValue(realNow);
     expect(verifyAccessToken(token)).toBeNull();

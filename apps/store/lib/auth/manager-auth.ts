@@ -1,10 +1,53 @@
 import { prisma } from "@ltex/db";
 import { cookies } from "next/headers";
-import type { NextRequest } from "next/server";
+import type { NextRequest, NextResponse } from "next/server";
 import { verifyAccessToken, type ManagerRole, ADMIN_ROLES } from "./jwt";
 
 export const MANAGER_ACCESS_COOKIE = "ltex_mgr_access";
 export const MANAGER_REFRESH_COOKIE = "ltex_mgr_refresh";
+
+// Обидві кукі живуть на шляху "/" (раніше refresh була прив'язана до
+// /api/v1/manager/auth). Це потрібно, щоб middleware на сторінках /manager/*
+// міг прочитати refresh-токен і тихо оновити короткоживучий access-токен —
+// інакше браузер просто не надсилав би refresh-куку на сторінкові запити.
+export const MANAGER_COOKIE_PATH = "/";
+
+/**
+ * Виставляє сесійні кукі авторизації менеджера.
+ *
+ * Це СЕСІЙНІ кукі (без maxAge/expires): браузер тримає їх, доки відкритий, і
+ * прибирає при закритті браузера. Короткий access-токен (15 хв) при цьому
+ * непомітно поновлюється middleware через refresh-токен, тож користувача НЕ
+ * викидає на екран входу під час роботи. Повторний вхід потрібен лише після
+ * закриття браузера/компʼютера.
+ */
+export function setManagerAuthCookies(
+  res: NextResponse,
+  accessToken: string,
+  refreshToken: string,
+): void {
+  const base = {
+    httpOnly: true as const,
+    sameSite: "lax" as const,
+    secure: process.env.NODE_ENV === "production",
+    path: MANAGER_COOKIE_PATH,
+  };
+  res.cookies.set(MANAGER_ACCESS_COOKIE, accessToken, base);
+  res.cookies.set(MANAGER_REFRESH_COOKIE, refreshToken, base);
+}
+
+/** Прибирає обидві кукі авторизації (вихід із системи). */
+export function clearManagerAuthCookies(res: NextResponse): void {
+  const base = {
+    httpOnly: true as const,
+    sameSite: "lax" as const,
+    secure: process.env.NODE_ENV === "production",
+    maxAge: 0,
+    path: MANAGER_COOKIE_PATH,
+  };
+  res.cookies.set(MANAGER_ACCESS_COOKIE, "", base);
+  res.cookies.set(MANAGER_REFRESH_COOKIE, "", base);
+}
 
 export interface CurrentManager {
   id: string;

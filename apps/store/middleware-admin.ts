@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyAccessToken, ADMIN_ROLES } from "@/lib/auth/jwt";
 import { MANAGER_ACCESS_COOKIE } from "@/lib/auth/manager-auth";
+import { tryRefreshSession } from "@/lib/auth/session-refresh";
 
 const PUBLIC_PATHS = ["/admin/login"] as const;
 
@@ -36,8 +37,12 @@ export async function adminGuard(req: NextRequest): Promise<NextResponse> {
     return NextResponse.next();
   }
 
-  // No session at all → login.
+  // No valid session → спробувати тихо поновити access-токен через refresh-куку
+  // (access живе 15 хв). Лише якщо не вдалось — редірект на вхід.
   if (!payload) {
+    const refreshed = await tryRefreshSession(req);
+    if (refreshed) return refreshed;
+
     const url = req.nextUrl.clone();
     url.pathname = "/admin/login";
     url.search = "";

@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@ltex/db";
 import { sha256 } from "@/lib/auth/jwt";
 import {
-  MANAGER_ACCESS_COOKIE,
   MANAGER_REFRESH_COOKIE,
+  clearManagerAuthCookies,
   getCurrentUser,
 } from "@/lib/auth/manager-auth";
 
@@ -36,19 +36,6 @@ export async function POST(req: NextRequest) {
   }
 
   const res = NextResponse.json({ ok: true });
-  res.cookies.set(MANAGER_ACCESS_COOKIE, "", {
-    httpOnly: true,
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
-    maxAge: 0,
-    path: "/",
-  });
-  res.cookies.set(MANAGER_REFRESH_COOKIE, "", {
-    httpOnly: true,
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
-    maxAge: 0,
-    path: "/api/v1/manager/auth",
-  });
+  clearManagerAuthCookies(res);
   return res;
 }
