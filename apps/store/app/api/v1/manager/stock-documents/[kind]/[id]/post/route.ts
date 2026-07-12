@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
+import { prisma } from "@ltex/db";
 import { getCurrentUser } from "@/lib/auth/manager-auth";
 import { isStockDocKind } from "@/lib/manager/stock-documents-api";
 import { postStockDoc } from "@/lib/manager/stock-documents-repo";
+import { logInventory } from "@/lib/manager/inventory-live";
 
 /** POST /api/v1/manager/stock-documents/[kind]/[id]/post — провести документ. */
 
@@ -26,6 +28,15 @@ export async function POST(
   if (!allowed.includes(user.role))
     return NextResponse.json({ error: "Нема доступу" }, { status: 403 });
   const result = await postStockDoc(kind, id, user.id);
+  if (result.ok && kind === "inventories") {
+    await logInventory(
+      prisma,
+      id,
+      { id: user.id, fullName: user.fullName },
+      "post",
+      "Документ проведено",
+    );
+  }
   if (!result.ok) {
     const status = result.reason === "not_found" ? 404 : 409;
     return NextResponse.json(

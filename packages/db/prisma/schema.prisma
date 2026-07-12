@@ -1011,6 +1011,9 @@ model WarehouseSector {
   // Стабільний ключ для find-or-create за назвою (перепаковка). Nullable для
   // сумісності з наявними записами.
   code        String?  @unique
+  // Штрихкод сектора (для швидкого «активного сектора» при скануванні
+  // інвентаризації). Кожному сектору можна присвоїти власний ШК.
+  barcode     String?  @unique
   isActive    Boolean  @default(true) @map("is_active")
   createdAt   DateTime @default(now()) @map("created_at")
 
@@ -2946,6 +2949,7 @@ model Inventory {
   updatedAt       DateTime  @updatedAt @map("updated_at")
 
   items InventoryItem[]
+  logs  InventoryLog[]
 
   @@index([status])
   @@index([docDate(sort: Desc)])
@@ -2968,6 +2972,7 @@ model InventoryItem {
   articleCode   String?  @map("article_code")
   weight        Float    @default(0)
   sector        String?
+  sectorId      String?  @map("sector_id")
   unitName      String?  @map("unit_name")
   quality       String?
   qtyAccounting Float    @default(0) @map("qty_accounting")
@@ -2975,12 +2980,40 @@ model InventoryItem {
   qtyDifference Float    @default(0) @map("qty_difference")
   priceEur      Decimal  @default(0) @map("price_eur") @db.Decimal(12, 2)
   notes         String?
+  // ── Спільна робота (хто/коли підтвердив факт) ──
+  foundByUserId String?  @map("found_by_user_id")
+  foundByName   String?  @map("found_by_name")
+  foundAt       DateTime? @map("found_at")
   createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @default(now()) @updatedAt @map("updated_at")
 
   document Inventory @relation(fields: [inventoryId], references: [id], onDelete: Cascade)
 
   @@index([inventoryId])
+  @@index([inventoryId, barcode])
   @@map("mgr_inventory_items")
+}
+
+/**
+ * Журнал змін документа інвентаризації («папка з логами» по документу).
+ * Кожна дія (заповнення / скан / зміна сектора / видалення / проведення)
+ * пише запис — щоб відстежити зміни й виправити, якщо щось пішло не так,
+ * зокрема при спільній роботі кількох користувачів.
+ */
+model InventoryLog {
+  id          String   @id @default(cuid())
+  inventoryId String   @map("inventory_id")
+  userId      String?  @map("user_id")
+  userName    String?  @map("user_name")
+  action      String
+  message     String
+  barcode     String?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  document Inventory @relation(fields: [inventoryId], references: [id], onDelete: Cascade)
+
+  @@index([inventoryId, createdAt])
+  @@map("mgr_inventory_logs")
 }
 
 model StockTransfer {

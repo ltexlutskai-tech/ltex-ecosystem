@@ -11,10 +11,8 @@ import {
   type StockDocInitial,
   type StockDocInitialRow,
 } from "../../../_components/stock-doc-form";
-import {
-  InventoryForm,
-  type InventoryFormInitial,
-} from "../../../_components/inventory-form";
+import { InventoryBoard } from "../../../_components/inventory-board";
+import { getInventoryLive } from "@/lib/manager/inventory-live";
 
 export const dynamic = "force-dynamic";
 
@@ -44,27 +42,9 @@ export default async function EditStockDocPage({
     redirect(`/manager/stock-documents/${meta.slug}/${id}`);
   }
 
-  // Інвентаризація — окрема щільна таблична форма (по мішках).
+  // Інвентаризація — жива спільна дошка (по мішках).
   if (kind === "inventories") {
-    const initial: InventoryFormInitial = {
-      id: doc.id,
-      docDate: doc.docDate.toISOString().slice(0, 10),
-      notes: doc.notes ?? "",
-      rows: doc.lines.map((l) => ({
-        lotId: l.lotId ?? null,
-        productId: l.productId,
-        productName: l.productName ?? "",
-        articleCode: l.articleCode ?? "",
-        barcode: l.barcode ?? "",
-        sector: l.sector ?? "",
-        quality: l.quality ?? "",
-        weight: l.weight ?? 0,
-        unitName: l.unitName ?? "",
-        priceEur: l.priceEur ?? 0,
-        qtyAccounting: l.qtyAccounting ?? 0,
-        qtyActual: l.qtyActual ?? 0,
-      })),
-    };
+    const liveDoc = await getInventoryLive(id);
     return (
       <div className="mx-auto max-w-none space-y-4">
         <div className="text-sm">
@@ -78,7 +58,7 @@ export default async function EditStockDocPage({
         <h1 className="text-xl font-semibold">
           Редагування: {doc.number1C ?? doc.docNumber}
         </h1>
-        <InventoryForm initial={initial} />
+        <InventoryBoard initialDoc={liveDoc} />
       </div>
     );
   }

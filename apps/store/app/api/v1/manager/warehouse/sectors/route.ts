@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@ltex/db";
 import { getCurrentUser } from "@/lib/auth/manager-auth";
+import { generateSectorBarcode } from "@/lib/warehouse/sector-barcode";
 
 /**
  * GET  /api/v1/manager/warehouse/sectors[?q=&warehouseId=]
@@ -33,11 +34,12 @@ export async function GET(req: NextRequest) {
   const sectors = await prisma.warehouseSector.findMany({
     where,
     orderBy: { name: "asc" },
-    take: 50,
+    take: 500,
     select: {
       id: true,
       name: true,
       warehouseId: true,
+      barcode: true,
     },
   });
   return NextResponse.json({ items: sectors });
@@ -46,6 +48,8 @@ export async function GET(req: NextRequest) {
 const createSchema = z.object({
   name: z.string().trim().min(1).max(64),
   warehouseId: z.string().optional().nullable(),
+  // Власний ШК (скан наявної етикетки). Порожньо → згенерувати автоматично.
+  barcode: z.string().trim().max(64).optional().nullable(),
 });
 
 export async function POST(req: NextRequest) {
@@ -65,7 +69,7 @@ export async function POST(req: NextRequest) {
   if (!parsed.success) {
     return NextResponse.json({ error: "Невірні дані" }, { status: 400 });
   }
-  // Idempotent: повертаємо існуючий якщо є
+  // Idempotent: повертаємо існуючий якщо є (та добираємо ШК, якщо його бракує).
   const existing = await prisma.warehouseSector.findFirst({
     where: {
       name: parsed.data.name,
@@ -73,13 +77,35 @@ export async function POST(req: NextRequest) {
     },
   });
   if (existing) {
+    if (!existing.barcode) {
+      const barcode = parsed.data.barcode || (await generateSectorBarcode());
+      const updated = await prisma.warehouseSector
+        .update({ where: { id: existing.id }, data: { barcode } })
+        .catch(() => existing);
+      return NextResponse.json({ sector: updated });
+    }
     return NextResponse.json({ sector: existing });
   }
-  const created = await prisma.warehouseSector.create({
-    data: {
-      name: parsed.data.name,
-      warehouseId: parsed.data.warehouseId ?? null,
-    },
-  });
+  // Новий сектор — власний ШК або авто-генерація (з повтором на випадок гонки).
+  const wantBarcode = parsed.data.barcode || null;
+  let created = null;
+  for (let attempt = 0; attempt < 3 && !created; attempt++) {
+    const barcode = wantBarcode || (await generateSectorBarcode());
+    created = await prisma.warehouseSector
+      .create({
+        data: {
+          name: parsed.data.name,
+          warehouseId: parsed.data.warehouseId ?? null,
+          barcode,
+        },
+      })
+      .catch(() => null);
+    if (wantBarcode) break; // власний ШК не перегенеровуємо
+  }
+  if (!created)
+    return NextResponse.json(
+      { error: "Не вдалося створити сектор (ШК зайнятий)" },
+      { status: 409 },
+    );
   return NextResponse.json({ sector: created }, { status: 201 });
 }

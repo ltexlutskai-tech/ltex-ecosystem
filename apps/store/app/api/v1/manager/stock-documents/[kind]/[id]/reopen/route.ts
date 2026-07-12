@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
+import { prisma } from "@ltex/db";
 import { getCurrentUser } from "@/lib/auth/manager-auth";
 import { isStockDocKind } from "@/lib/manager/stock-documents-api";
 import { reopenStockDoc } from "@/lib/manager/stock-documents-repo";
+import { logInventory } from "@/lib/manager/inventory-live";
 
 /**
  * POST /api/v1/manager/stock-documents/[kind]/[id]/reopen — розпровести
@@ -41,6 +43,15 @@ export async function POST(
       return NextResponse.json(
         { error: msg },
         { status: r.reason === "not_found" ? 404 : 409 },
+      );
+    }
+    if (kind === "inventories") {
+      await logInventory(
+        prisma,
+        id,
+        { id: user.id, fullName: user.fullName },
+        "reopen",
+        "Документ розпроведено",
       );
     }
     return NextResponse.json({ id });
