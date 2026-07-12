@@ -2,21 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@ltex/db";
 import { loginSchema } from "@/lib/validations/manager-auth";
 import { verifyPassword } from "@/lib/auth/password";
-import {
-  signAccessToken,
-  generateRefreshToken,
-  ACCESS_TOKEN_TTL_SEC,
-  REFRESH_TOKEN_TTL_SEC,
-} from "@/lib/auth/jwt";
+import { signAccessToken, generateRefreshToken } from "@/lib/auth/jwt";
 import {
   isLocked,
   recordFailedLogin,
   clearFailedLogins,
 } from "@/lib/auth/lockout";
-import {
-  MANAGER_ACCESS_COOKIE,
-  MANAGER_REFRESH_COOKIE,
-} from "@/lib/auth/manager-auth";
+import { setManagerAuthCookies } from "@/lib/auth/manager-auth";
 import { rateLimit, getClientIp } from "@/lib/rate-limit";
 import { logAuditEvent } from "@/lib/audit/audit-log";
 
@@ -123,19 +115,6 @@ export async function POST(req: NextRequest) {
       telegramLinked: user.telegramChatId !== null,
     },
   });
-  res.cookies.set(MANAGER_ACCESS_COOKIE, accessToken, {
-    httpOnly: true,
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
-    maxAge: ACCESS_TOKEN_TTL_SEC,
-    path: "/",
-  });
-  res.cookies.set(MANAGER_REFRESH_COOKIE, refresh.plain, {
-    httpOnly: true,
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
-    maxAge: REFRESH_TOKEN_TTL_SEC,
-    path: "/api/v1/manager/auth",
-  });
+  setManagerAuthCookies(res, accessToken, refresh.plain);
   return res;
 }
