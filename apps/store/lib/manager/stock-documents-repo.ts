@@ -3,10 +3,17 @@ import {
   generateStockDocNumber,
   summarizeLines,
   applyReturnFromCustomerDebt,
+  revertReturnFromCustomerDebt,
   type StockDocKind,
 } from "./stock-documents";
-import { applyStockDocumentMovements } from "./stock-movement-hooks";
-import { applyRepackFullCycle } from "./repack-full-cycle";
+import {
+  applyStockDocumentMovements,
+  removeStockDocumentMovements,
+} from "./stock-movement-hooks";
+import {
+  applyRepackFullCycle,
+  removeRepackFullCycle,
+} from "./repack-full-cycle";
 import { getRepackWeightTolerance } from "./mgr-settings";
 
 /**
@@ -33,6 +40,7 @@ export interface NormLine {
   qualityId?: string | null;
   sector?: string | null;
   sectorId?: string | null;
+  supplierName?: string | null;
 }
 
 export interface CreateDocInput {
@@ -74,6 +82,7 @@ export function normalizeLine(raw: {
   qualityId?: string | null;
   sector?: string | null;
   sectorId?: string | null;
+  supplierName?: string | null;
 }): NormLine {
   const weight = raw.weight ?? 0;
   const quantity = raw.quantity ?? 1;
@@ -97,6 +106,7 @@ export function normalizeLine(raw: {
     qualityId: raw.qualityId ?? null,
     sector: raw.sector ?? null,
     sectorId: raw.sectorId ?? null,
+    supplierName: raw.supplierName ?? null,
   };
 }
 
@@ -203,6 +213,7 @@ export async function createStockDoc(
                 qualityId: l.qualityId ?? null,
                 sector: l.sector ?? null,
                 sectorId: l.sectorId ?? null,
+                supplierName: l.supplierName ?? null,
               })),
             },
           },
@@ -370,6 +381,7 @@ export async function updateStockDoc(
                 qualityId: l.qualityId ?? null,
                 sector: l.sector ?? null,
                 sectorId: l.sectorId ?? null,
+                supplierName: l.supplierName ?? null,
               })),
             },
           },
@@ -548,6 +560,51 @@ export async function postStockDoc(
     }
   }
   return result;
+}
+
+/**
+ * Розпроводить документ (posted → draft) для повторного редагування.
+ * Реверсує ефекти проведення наявними best-effort хелперами:
+ *  - усі типи: `removeStockDocumentMovements` (рухи складу);
+ *  - перепаковка: `removeRepackFullCycle` (видаляє створені лоти, відновлює
+ *    джерельні, прибирає собівартість);
+ *  - повернення від покупця: `revertReturnFromCustomerDebt` (рух боргу).
+ * Потім status→draft. Далі документ редагується як звичайна чернетка.
+ */
+export async function reopenStockDoc(
+  kind: StockDocKind,
+  id: string,
+  db: PrismaClient = prisma,
+): Promise<{ ok: boolean; reason?: string }> {
+  const status = await getStockDocStatus(kind, id, db);
+  if (status === null) return { ok: false, reason: "not_found" };
+  if (status !== "posted") return { ok: false, reason: "not_posted" };
+
+  // Реверс доменних ефектів (best-effort — хелпери не кидають).
+  removeStockDocumentMovements(id);
+  if (kind === "repackings") removeRepackFullCycle(id, db);
+  if (kind === "product-returns") revertReturnFromCustomerDebt(id);
+
+  const delegate = {
+    "product-returns": db.productReturnFromCustomer,
+    "warehouse-returns": db.warehouseReturn,
+    "supplier-returns": db.returnToSupplier,
+    repackings: db.repacking,
+    "write-offs": db.writeOff,
+    "stock-adjustments": db.stockAdjustment,
+    inventories: db.inventory,
+    "stock-transfers": db.stockTransfer,
+  }[kind] as unknown as {
+    update(args: {
+      where: { id: string };
+      data: { status: string; postedAt: null; postedByUserId: null };
+    }): Promise<unknown>;
+  };
+  await delegate.update({
+    where: { id },
+    data: { status: "draft", postedAt: null, postedByUserId: null },
+  });
+  return { ok: true };
 }
 
 interface SimpleDelegate {

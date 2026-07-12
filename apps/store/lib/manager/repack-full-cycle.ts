@@ -172,6 +172,7 @@ interface LoadedRepackItem {
   qualityId: string | null;
   sector: string | null;
   sectorId: string | null;
+  supplierName: string | null;
 }
 
 export interface RepackApplyResult {
@@ -198,6 +199,28 @@ async function findOrCreateSector(
   if (existing) return existing.id;
   const created = await tx.warehouseSector.create({
     data: { name: code, code },
+    select: { id: true },
+  });
+  return created.id;
+}
+
+/**
+ * Find-or-create постачальника за назвою (для рядка комплектації, коли обрано з
+ * довідника або вписано вручну). Порожня назва → null. Повертає id або null.
+ */
+async function findOrCreateSupplier(
+  tx: Prisma.TransactionClient,
+  name: string | null | undefined,
+): Promise<string | null> {
+  const n = (name ?? "").trim();
+  if (!n) return null;
+  const existing = await tx.supplier.findFirst({
+    where: { name: n },
+    select: { id: true },
+  });
+  if (existing) return existing.id;
+  const created = await tx.supplier.create({
+    data: { name: n },
     select: { id: true },
   });
   return created.id;
@@ -234,6 +257,7 @@ export async function applyRepackFullCycle(
           qualityId: true,
           sector: true,
           sectorId: true,
+          supplierName: true,
         },
       },
     },
@@ -351,6 +375,10 @@ export async function applyRepackFullCycle(
         sectorName = s?.name ?? null;
       }
 
+      // Постачальник рядка комплектації (з довідника/вручну) має пріоритет над
+      // успадкованим з джерела.
+      const rowSupplierId = await findOrCreateSupplier(tx, a.supplierName);
+
       const created = await tx.lot.create({
         data: {
           productId: a.productId as string,
@@ -362,7 +390,7 @@ export async function applyRepackFullCycle(
           purchasePriceEur: np.costPerKgEur,
           arrivalDate: doc.docDate,
           sector: sectorName,
-          supplierId: sourceSupplierId,
+          supplierId: rowSupplierId ?? sourceSupplierId,
         },
         select: { id: true },
       });
@@ -457,13 +485,18 @@ async function resolveSourceLots(
         ? lotByBarcode.get(item.barcode)
         : undefined;
     if (!lot) continue; // джерело не знайдено — пропускаємо (best-effort)
+    // Собівартість €/кг: з лота, а якщо його немає (старі 1С-лоти без ціни
+    // закупівлі) — з ручного поля «Собівартість €/кг» рядка розбору.
+    const manualCost = Number(item.priceEur);
+    const purchasePriceEur =
+      lot.purchasePriceEur ?? (manualCost > 0 ? manualCost : null);
     out.push({
       itemId: item.id,
       lotId: lot.id,
       prevStatus: lot.status,
       // Вага з рядка документа (комірник міг ввести фактичну), fallback — лот.
       weight: item.weight || lot.weight,
-      purchasePriceEur: lot.purchasePriceEur,
+      purchasePriceEur,
       supplierId: lot.supplierId,
     });
   }

@@ -4,24 +4,29 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 
 /**
- * Кнопка проведення документа (draft → posted).
- *
- * ⚠️ БЕЗ `window.confirm` — він блокується у вкладках-iframe менеджерки (клік
- * «Провести» нічого не робив). Підтвердження — портальний inline-діалог.
+ * Кнопка «Розпровести» (posted → draft) для редагування проведеного документа.
+ * Реверсує ефекти проведення на сервері, після чого веде на сторінку
+ * редагування. БЕЗ `window.confirm` (блокується в iframe) — портальний діалог.
  */
-export function StockDocPostButton({ kind, id }: { kind: string; id: string }) {
+export function StockDocReopenButton({
+  kind,
+  id,
+}: {
+  kind: string;
+  id: string;
+}) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
 
-  async function doPost() {
+  async function doReopen() {
     setConfirmOpen(false);
     setBusy(true);
     setError(null);
     try {
       const res = await fetch(
-        `/api/v1/manager/stock-documents/${kind}/${id}/post`,
+        `/api/v1/manager/stock-documents/${kind}/${id}/reopen`,
         { method: "POST" },
       );
       if (!res.ok) {
@@ -30,6 +35,7 @@ export function StockDocPostButton({ kind, id }: { kind: string; id: string }) {
         setBusy(false);
         return;
       }
+      router.push(`/manager/stock-documents/${kind}/${id}/edit`);
       router.refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Помилка");
@@ -43,9 +49,9 @@ export function StockDocPostButton({ kind, id }: { kind: string; id: string }) {
         type="button"
         disabled={busy}
         onClick={() => setConfirmOpen(true)}
-        className="rounded-md bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
+        className="rounded-md border border-amber-300 bg-amber-50 px-3 py-1.5 text-sm font-medium text-amber-800 hover:bg-amber-100 disabled:opacity-50"
       >
-        {busy ? "Проведення…" : "✅ Провести"}
+        {busy ? "Розпроведення…" : "↩ Розпровести"}
       </button>
       {error && <span className="text-xs text-red-600">{error}</span>}
 
@@ -62,11 +68,12 @@ export function StockDocPostButton({ kind, id }: { kind: string; id: string }) {
             onMouseDown={(e) => e.stopPropagation()}
           >
             <h2 className="text-base font-semibold text-gray-900">
-              Провести документ?
+              Розпровести документ?
             </h2>
             <p className="mt-2 text-sm text-gray-600">
-              Після проведення документ вплине на склад/собівартість. За потреби
-              його можна буде розпровести й відредагувати.
+              Ефекти проведення будуть скасовані (для перепаковки — створені
+              мішки видаляться, джерельні повернуться), документ стане чернеткою
+              й відкриється для редагування.
             </p>
             <div className="mt-5 flex justify-end gap-2">
               <button
@@ -78,10 +85,10 @@ export function StockDocPostButton({ kind, id }: { kind: string; id: string }) {
               </button>
               <button
                 type="button"
-                onClick={() => void doPost()}
-                className="rounded-md bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-700"
+                onClick={() => void doReopen()}
+                className="rounded-md bg-amber-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-amber-700"
               >
-                Провести
+                Розпровести
               </button>
             </div>
           </div>

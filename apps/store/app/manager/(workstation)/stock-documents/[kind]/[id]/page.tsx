@@ -6,10 +6,12 @@ import { getStockDocMeta } from "@/lib/manager/stock-documents";
 import { fetchStockDoc } from "@/lib/manager/stock-documents-fetch";
 import { StockDocStatusBadge } from "../../_components/status-badge";
 import { StockDocPostButton } from "../../_components/post-button";
+import { StockDocReopenButton } from "../../_components/reopen-button";
 
 export const dynamic = "force-dynamic";
 
 const POST_ROLES = ["manager", "admin", "owner", "warehouse"];
+const REPACK_WRITE_ROLES = ["warehouse", "admin", "owner"];
 
 export default async function StockDocDetailPage({
   params,
@@ -33,9 +35,14 @@ export default async function StockDocDetailPage({
   const meta = getStockDocMeta(kind);
   const doc = await fetchStockDoc(kind, id);
   if (!doc) notFound();
-  const canPost = POST_ROLES.includes(user.role) && doc.status === "draft";
+  const writeRoles = kind === "repackings" ? REPACK_WRITE_ROLES : POST_ROLES;
+  const canWrite = writeRoles.includes(user.role);
+  const canPost = canWrite && doc.status === "draft";
+  const canEdit = canWrite && doc.status === "draft";
+  const canReopen = canWrite && doc.status === "posted";
+  const wide = kind === "repackings";
   return (
-    <div className="mx-auto max-w-5xl space-y-4">
+    <div className={`mx-auto space-y-4 ${wide ? "max-w-none" : "max-w-5xl"}`}>
       <div className="text-sm">
         <Link
           href={`/manager/stock-documents/${meta.slug}`}
@@ -55,7 +62,18 @@ export default async function StockDocDetailPage({
               <StockDocStatusBadge status={doc.status} />
             </p>
           </div>
-          {canPost && <StockDocPostButton kind={meta.kind} id={doc.id} />}
+          <div className="flex flex-wrap items-center gap-2">
+            {canEdit && (
+              <Link
+                href={`/manager/stock-documents/${meta.slug}/${doc.id}/edit`}
+                className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+              >
+                ✏️ Редагувати
+              </Link>
+            )}
+            {canReopen && <StockDocReopenButton kind={meta.kind} id={doc.id} />}
+            {canPost && <StockDocPostButton kind={meta.kind} id={doc.id} />}
+          </div>
         </div>
         <div className="mt-4 grid gap-2 text-sm text-gray-700 sm:grid-cols-2 lg:grid-cols-3">
           {doc.customerName != null && (
@@ -133,11 +151,16 @@ export default async function StockDocDetailPage({
                         href={`/manager/prices/${it.productId}`}
                         className="hover:underline"
                       >
-                        {it.productId}
+                        {it.productName ?? it.productId}
                       </Link>
                     ) : (
                       <span className="font-mono text-xs">
                         {it.barcode ?? "—"}
+                      </span>
+                    )}
+                    {it.productId && it.barcode && (
+                      <span className="ml-2 font-mono text-xs text-gray-400">
+                        {it.barcode}
                       </span>
                     )}
                   </td>

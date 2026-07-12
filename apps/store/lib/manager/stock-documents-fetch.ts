@@ -6,6 +6,8 @@ import type { StockDocKind } from "./stock-documents";
 export interface StockDocLineView {
   id: string;
   productId: string | null;
+  /** Назва товару (резолвиться батчем) — щоб не показувати cuid. */
+  productName?: string | null;
   barcode: string | null;
   weight: number;
   quantity: number;
@@ -16,6 +18,13 @@ export interface StockDocLineView {
   qtyAccounting?: number;
   qtyActual?: number;
   qtyDifference?: number;
+  // ── Перепаковка — для редагування чернетки ──
+  sourceLotId?: string | null;
+  salePriceEur?: number | null;
+  qualityId?: string | null;
+  sectorId?: string | null;
+  sector?: string | null;
+  supplierName?: string | null;
 }
 
 export interface StockDocView {
@@ -69,6 +78,39 @@ function headerCommon(
 }
 
 export async function fetchStockDoc(
+  kind: StockDocKind,
+  id: string,
+): Promise<StockDocView | null> {
+  const view = await buildStockDocView(kind, id);
+  if (!view) return null;
+  await attachProductNames(view);
+  return view;
+}
+
+/** Резолвить назви товарів для рядків (батч) — щоб не показувати cuid. */
+async function attachProductNames(view: StockDocView): Promise<void> {
+  const ids = [
+    ...new Set(
+      view.lines.map((l) => l.productId).filter((x): x is string => !!x),
+    ),
+  ];
+  if (ids.length === 0) return;
+  const products = await prisma.product.findMany({
+    where: { id: { in: ids } },
+    select: { id: true, name: true, articleCode: true },
+  });
+  const byId = new Map(
+    products.map((p) => [
+      p.id,
+      p.articleCode ? `(${p.articleCode}) ${p.name}` : p.name,
+    ]),
+  );
+  for (const l of view.lines) {
+    if (l.productId) l.productName = byId.get(l.productId) ?? null;
+  }
+}
+
+async function buildStockDocView(
   kind: StockDocKind,
   id: string,
 ): Promise<StockDocView | null> {
@@ -160,6 +202,13 @@ export async function fetchStockDoc(
           amountEur: Number(it.amountEur),
           notes: it.notes,
           role: it.role,
+          sourceLotId: it.sourceLotId,
+          salePriceEur:
+            it.salePriceEur != null ? Number(it.salePriceEur) : null,
+          qualityId: it.qualityId,
+          sectorId: it.sectorId,
+          sector: it.sector,
+          supplierName: it.supplierName,
         })),
       };
     }

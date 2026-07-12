@@ -2740,6 +2740,9 @@ model RepackingItem {
   sector           String?
   sectorId         String?  @map("sector_id")
   costPerKgEur     Decimal? @map("cost_per_kg_eur") @db.Decimal(12, 2)
+  // Постачальник рядка комплектації (вибір з довідника або вручну) — назвою;
+  // при проведенні резолвиться у Supplier (find-or-create) і пишеться на лот.
+  supplierName     String?  @map("supplier_name")
 
   document Repacking @relation(fields: [repackingId], references: [id], onDelete: Cascade)
 

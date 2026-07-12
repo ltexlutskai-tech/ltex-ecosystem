@@ -1,41 +1,45 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { prisma } from "@ltex/db";
 import { requireRole } from "@/lib/auth/manager-auth";
 import { isStockDocKind } from "@/lib/manager/stock-documents-api";
 import { getStockDocMeta } from "@/lib/manager/stock-documents";
+import { fetchStockDoc } from "@/lib/manager/stock-documents-fetch";
 import { getRepackWeightTolerance } from "@/lib/manager/mgr-settings";
-import { StockDocForm } from "../../_components/stock-doc-form";
+import {
+  StockDocForm,
+  type StockDocInitial,
+  type StockDocInitialRow,
+} from "../../../_components/stock-doc-form";
 
 export const dynamic = "force-dynamic";
 
-// Перепаковка (повний цикл) — лише склад + адмін/власник.
 const REPACK_ROLES = ["warehouse", "admin", "owner"];
 
-export async function generateMetadata({
-  params,
-}: {
-  params: Promise<{ kind: string }>;
-}) {
-  const { kind } = await params;
-  if (!isStockDocKind(kind)) return { title: "Новий документ | L-TEX Manager" };
-  return { title: `Новий: ${getStockDocMeta(kind).label} | L-TEX Manager` };
+function num(n: number | null | undefined): string {
+  return n == null || n === 0 ? "" : String(n);
 }
 
-export default async function NewStockDocPage({
+export default async function EditStockDocPage({
   params,
 }: {
-  params: Promise<{ kind: string }>;
+  params: Promise<{ kind: string; id: string }>;
 }) {
-  const { kind } = await params;
+  const { kind, id } = await params;
   if (!isStockDocKind(kind)) notFound();
   const user = await requireRole(["manager", "admin", "owner", "warehouse"]);
   if (!user) notFound();
   const isRepacking = kind === "repackings";
   if (isRepacking && !REPACK_ROLES.includes(user.role)) notFound();
-  const meta = getStockDocMeta(kind);
 
-  // Довідники якості/секторів/постачальників + допуск ваги — лише перепаковці.
+  const meta = getStockDocMeta(kind);
+  const doc = await fetchStockDoc(kind, id);
+  if (!doc) notFound();
+  // Редагувати можна лише чернетку. Проведений — спершу «Розпровести».
+  if (doc.status !== "draft") {
+    redirect(`/manager/stock-documents/${meta.slug}/${id}`);
+  }
+
   const [qualities, sectors, suppliers, weightTolerance] = isRepacking
     ? await Promise.all([
         prisma.quality.findMany({
@@ -57,19 +61,47 @@ export default async function NewStockDocPage({
       ])
     : [[], [], [], 2];
 
+  const rows: StockDocInitialRow[] = doc.lines.map((l) => ({
+    productId: l.productId,
+    productName: l.productName ?? "",
+    barcode: l.barcode ?? "",
+    weight: num(l.weight),
+    quantity: l.quantity ? String(l.quantity) : "1",
+    priceEur: num(l.priceEur),
+    role: l.role === "assembled" ? "assembled" : "disassembled",
+    qtyAccounting: num(l.qtyAccounting),
+    qtyActual: num(l.qtyActual),
+    sourceLotId: l.sourceLotId ?? null,
+    supplierName: l.supplierName ?? null,
+    salePriceEur: num(l.salePriceEur),
+    sectorId: l.sectorId ?? "",
+  }));
+
+  const initial: StockDocInitial = {
+    id: doc.id,
+    docDate: doc.docDate.toISOString().slice(0, 10),
+    notes: doc.notes ?? "",
+    customerName: doc.customerName ?? "",
+    supplierName: doc.supplierName ?? "",
+    reason: doc.reason ?? "",
+    rows,
+  };
+
   return (
     <div
       className={`mx-auto space-y-4 ${isRepacking ? "max-w-none" : "max-w-4xl"}`}
     >
       <div className="text-sm">
         <Link
-          href={`/manager/stock-documents/${meta.slug}`}
+          href={`/manager/stock-documents/${meta.slug}/${id}`}
           className="text-gray-500 hover:text-gray-800 hover:underline"
         >
-          ← Назад до списку
+          ← Назад до документа
         </Link>
       </div>
-      <h1 className="text-xl font-semibold">Новий: {meta.label}</h1>
+      <h1 className="text-xl font-semibold">
+        Редагування: {doc.number1C ?? doc.docNumber}
+      </h1>
       <StockDocForm
         kind={meta.kind}
         label={meta.label}
@@ -83,6 +115,7 @@ export default async function NewStockDocPage({
         sectors={sectors as { id: string; name: string }[]}
         suppliers={suppliers as { id: string; name: string }[]}
         weightTolerance={weightTolerance as number}
+        initial={initial}
       />
     </div>
   );

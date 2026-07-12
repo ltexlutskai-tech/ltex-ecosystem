@@ -7,6 +7,7 @@ import {
   AutosaveStatus,
   RestoreDraftBanner,
 } from "../../_components/autosave-status";
+import { BarcodeInput } from "../../sales/new/_components/barcode-input";
 
 /**
  * Універсальна форма створення документа руху товару (Фаза 5).
@@ -53,6 +54,34 @@ interface Row {
   lookupError: string | null;
 }
 
+/** Рядок для попереднього заповнення форми при редагуванні наявного документа. */
+export interface StockDocInitialRow {
+  productId: string | null;
+  productName: string;
+  barcode: string;
+  weight: string;
+  quantity: string;
+  priceEur: string;
+  role: "disassembled" | "assembled";
+  qtyAccounting: string;
+  qtyActual: string;
+  sourceLotId: string | null;
+  supplierName: string | null;
+  salePriceEur: string;
+  sectorId: string;
+}
+
+/** Початкові дані для редагування (edit-режим). */
+export interface StockDocInitial {
+  id: string;
+  docDate: string;
+  notes: string;
+  customerName: string;
+  supplierName: string;
+  reason: string;
+  rows: StockDocInitialRow[];
+}
+
 export interface StockDocFormProps {
   kind: string;
   label: string;
@@ -64,7 +93,11 @@ export interface StockDocFormProps {
   showSupplier: boolean;
   qualities?: DictItem[];
   sectors?: DictItem[];
+  /** Довідник постачальників (для комплектації перепаковки). */
+  suppliers?: DictItem[];
   weightTolerance?: number;
+  /** Наявний документ для редагування (edit-режим). */
+  initial?: StockDocInitial;
 }
 
 let rowSeq = 0;
@@ -96,17 +129,27 @@ function round2(n: number): number {
   return Math.round(n * 100) / 100;
 }
 
+/** Перетворює initial-рядок у повний Row (edit-режим). */
+function initialToRow(r: StockDocInitialRow): Row {
+  return { ...emptyRow(r.role), ...r, sectorNew: "", lookupError: null };
+}
+
 export function StockDocForm(props: StockDocFormProps) {
   const router = useRouter();
   const tolerance = props.weightTolerance ?? 2;
-  const qualities = props.qualities ?? [];
   const sectors = props.sectors ?? [];
-  const [docDate, setDocDate] = useState(new Date().toISOString().slice(0, 10));
-  const [notes, setNotes] = useState("");
-  const [customerName, setCustomerName] = useState("");
-  const [supplierName, setSupplierName] = useState("");
-  const [reason, setReason] = useState("");
-  const [rows, setRows] = useState<Row[]>([emptyRow()]);
+  const suppliers = props.suppliers ?? [];
+  const init = props.initial;
+  const [docDate, setDocDate] = useState(
+    init ? init.docDate : new Date().toISOString().slice(0, 10),
+  );
+  const [notes, setNotes] = useState(init?.notes ?? "");
+  const [customerName, setCustomerName] = useState(init?.customerName ?? "");
+  const [supplierName, setSupplierName] = useState(init?.supplierName ?? "");
+  const [reason, setReason] = useState(init?.reason ?? "");
+  const [rows, setRows] = useState<Row[]>(
+    init && init.rows.length > 0 ? init.rows.map(initialToRow) : [emptyRow()],
+  );
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [searchKey, setSearchKey] = useState<string | null>(null);
@@ -117,7 +160,7 @@ export function StockDocForm(props: StockDocFormProps) {
    * явним POST або autosave (`onIdAssigned`) — щоб явне збереження PATCH-ило
    * вже створену чернетку, а не дублювало документ.
    */
-  const [savedId, setSavedId] = useState<string | null>(null);
+  const [savedId, setSavedId] = useState<string | null>(init?.id ?? null);
 
   async function searchProducts(rowKey: string, q: string) {
     setSearchKey(rowKey);
@@ -184,6 +227,19 @@ export function StockDocForm(props: StockDocFormProps) {
     return rows.find((r) => r.key === rowKey)?.weight ?? "";
   }
 
+  /**
+   * Скан ШК (USB-сканер або камера) у блоці Розпаковка → додає рядок розбору
+   * і одразу підтягує товар/вагу/постачальника/собівартість за штрихкодом.
+   */
+  async function addScannedSourceRow(code: string) {
+    const trimmed = code.trim();
+    if (!trimmed) return;
+    const row = emptyRow("disassembled");
+    row.barcode = trimmed;
+    setRows((rs) => [...rs, row]);
+    await lookupSourceLot(row.key, trimmed);
+  }
+
   async function generateBarcode(rowKey: string) {
     const row = rows.find((r) => r.key === rowKey);
     if (!row?.productId) {
@@ -219,7 +275,10 @@ export function StockDocForm(props: StockDocFormProps) {
       if (r.role === "assembled") outW += w;
       else {
         inW += w;
-        if (r.purchasePriceEur != null) sourceCost += r.purchasePriceEur * w;
+        // Собівартість €/кг: з лота (авто при скані), а якщо його немає —
+        // з ручного поля «Собівартість €/кг» рядка розбору.
+        const perKg = r.purchasePriceEur ?? (Number(r.priceEur) || 0);
+        sourceCost += perKg * w;
       }
     }
     const diff = round2(inW - outW);
@@ -264,7 +323,9 @@ export function StockDocForm(props: StockDocFormProps) {
           base.role = r.role;
           if (r.role === "assembled") {
             base.salePriceEur = Number(r.salePriceEur) || 0;
-            base.qualityId = r.qualityId || null;
+            // Постачальник рядка комплектації (з довідника/вручну). Порожній →
+            // сервер успадкує постачальника з джерела.
+            base.supplierName = r.supplierName?.trim() || null;
             if (r.sectorId === "__new__") {
               base.sector = r.sectorNew.trim() || null;
               base.sectorId = null;
@@ -347,7 +408,7 @@ export function StockDocForm(props: StockDocFormProps) {
 
   const autosave = useDocumentAutosave<DocDraftData>({
     docType: `stock-${props.kind}`,
-    existingId: null,
+    existingId: init?.id ?? null,
     data: draftData,
     canCreateDraft: hasContent,
     createDraft: createDraftServer,
@@ -559,11 +620,15 @@ export function StockDocForm(props: StockDocFormProps) {
                 ➕ Додати рядок
               </button>
             </div>
+            {/* Скан ШК (USB-сканер + камера телефона) → додає рядок розбору. */}
+            <div className="mb-3 rounded-md border border-dashed border-gray-300 bg-gray-50 p-2">
+              <BarcodeInput onCode={(code) => void addScannedSourceRow(code)} />
+            </div>
             <div className="space-y-2">
               {disassembledRows.length === 0 && (
                 <p className="text-xs text-gray-400">
-                  Додайте джерельні мішки (скан ШК підтягне товар, вагу,
-                  постачальника та собівартість).
+                  Скануйте ШК (сканером чи камерою) або додайте рядок вручну —
+                  скан підтягне товар, вагу, постачальника та собівартість.
                 </p>
               )}
               {disassembledRows.map((r) => {
@@ -620,8 +685,9 @@ export function StockDocForm(props: StockDocFormProps) {
                           onChange={(e) =>
                             updateRow(r.key, { priceEur: e.target.value })
                           }
-                          placeholder="Ціна €"
-                          className="w-24 rounded-md border border-gray-300 px-2 py-1 text-sm"
+                          placeholder="Собівартість €/кг"
+                          title="Собівартість €/кг (авто з лота при скані; або введіть вручну)"
+                          className="w-32 rounded-md border border-gray-300 px-2 py-1 text-sm"
                         />
                       )}
                       {rows.length > 1 && (
@@ -691,16 +757,25 @@ export function StockDocForm(props: StockDocFormProps) {
                       <button
                         type="button"
                         onClick={() => void generateBarcode(r.key)}
-                        className="shrink-0 rounded-md border border-gray-300 bg-white px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50"
+                        disabled={!(Number(r.weight) > 0)}
+                        title={
+                          Number(r.weight) > 0
+                            ? "Згенерувати штрихкод"
+                            : "Спершу введіть вагу лота"
+                        }
+                        className="shrink-0 rounded-md border border-gray-300 bg-white px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
                       >
                         Згенерувати ШК
                       </button>
                       <input
-                        value={inheritedSupplier ?? ""}
-                        readOnly
-                        placeholder="Постачальник"
-                        title="Постачальник (успадковано з розпаковки)"
-                        className="w-32 rounded-md border border-gray-200 bg-gray-50 px-2 py-1 text-sm text-gray-600"
+                        value={r.supplierName ?? ""}
+                        onChange={(e) =>
+                          updateRow(r.key, { supplierName: e.target.value })
+                        }
+                        list="repack-suppliers"
+                        placeholder={inheritedSupplier ?? "Постачальник"}
+                        title="Постачальник — оберіть з довідника або впишіть вручну (порожньо = успадкувати з розпаковки)"
+                        className="w-36 rounded-md border border-gray-300 px-2 py-1 text-sm"
                       />
                       <input
                         type="number"
@@ -722,20 +797,6 @@ export function StockDocForm(props: StockDocFormProps) {
                         placeholder="Ціна продажу €/кг"
                         className="w-32 rounded-md border border-gray-300 px-2 py-1 text-sm"
                       />
-                      <select
-                        value={r.qualityId}
-                        onChange={(e) =>
-                          updateRow(r.key, { qualityId: e.target.value })
-                        }
-                        className="w-28 rounded-md border border-gray-300 px-2 py-1 text-sm"
-                      >
-                        <option value="">— Якість —</option>
-                        {qualities.map((q) => (
-                          <option key={q.id} value={q.id}>
-                            {q.name}
-                          </option>
-                        ))}
-                      </select>
                       <select
                         value={r.sectorId}
                         onChange={(e) =>
@@ -783,6 +844,13 @@ export function StockDocForm(props: StockDocFormProps) {
               })}
             </div>
           </div>
+
+          {/* Довідник постачальників для datalist-полів комплектації. */}
+          <datalist id="repack-suppliers">
+            {suppliers.map((s) => (
+              <option key={s.id} value={s.name} />
+            ))}
+          </datalist>
         </>
       ) : (
         <div className="rounded-md border bg-white p-4">
