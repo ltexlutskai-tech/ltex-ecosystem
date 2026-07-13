@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/manager-auth";
 import { getInventoryLive } from "@/lib/manager/inventory-live";
 
+// Динамічно — жива синхронізація (без кешування відповіді).
+export const dynamic = "force-dynamic";
+
 /**
  * GET /api/v1/manager/stock-documents/inventories/[id]/live
  *

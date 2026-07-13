@@ -116,7 +116,14 @@ export function InventoryBoard({ initialDoc }: Props) {
   const [newSector, setNewSector] = useState("");
   const [logsOpen, setLogsOpen] = useState(false);
   const [logs, setLogs] = useState<LogEntry[]>([]);
+  const [logsError, setLogsError] = useState<string | null>(null);
+  const [logsLoaded, setLogsLoaded] = useState(false);
   const [summaryOpen, setSummaryOpen] = useState(false);
+
+  // logsOpen у ref — щоб дії (fill/scan/patch) могли рефрешити журнал без
+  // потрапляння logsOpen у їхні залежності (уникаємо застарілих колбеків).
+  const logsOpenRef = useRef(logsOpen);
+  logsOpenRef.current = logsOpen;
 
   const {
     widths,
@@ -183,16 +190,43 @@ export function InventoryBoard({ initialDoc }: Props) {
   // ── Журнал документа ──
   const loadLogs = useCallback(async () => {
     const id = docIdRef.current;
-    if (!id) return;
+    if (!id) {
+      setLogsError(null);
+      setLogsLoaded(true);
+      return;
+    }
     try {
-      const res = await fetch(`${BASE}/${id}/logs`, { cache: "no-store" });
-      if (!res.ok) return;
+      const res = await fetch(`${BASE}/${id}/logs`, {
+        cache: "no-store",
+        credentials: "same-origin",
+      });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        setLogsError(
+          `Не вдалося завантажити журнал (HTTP ${res.status}${
+            d.error ? `: ${d.error}` : ""
+          })`,
+        );
+        setLogsLoaded(true);
+        return;
+      }
       const data = await res.json();
       setLogs(Array.isArray(data.logs) ? data.logs : []);
-    } catch {
-      /* ignore */
+      setLogsError(null);
+      setLogsLoaded(true);
+    } catch (e) {
+      setLogsError(
+        `Помилка мережі під час завантаження журналу: ${
+          e instanceof Error ? e.message : String(e)
+        }`,
+      );
+      setLogsLoaded(true);
     }
   }, []);
+  const refreshLogs = useCallback(() => {
+    if (logsOpenRef.current) void loadLogs();
+  }, [loadLogs]);
+
   useEffect(() => {
     if (!logsOpen) return;
     void loadLogs();
@@ -273,11 +307,12 @@ export function InventoryBoard({ initialDoc }: Props) {
         else if (outcome === "surplus")
           showFlash("sky", `➕ Надлишок: ${item.productName || trimmed}`);
         else showFlash("amber", `➕ Невідомий ШК: ${trimmed}`);
+        refreshLogs();
       } catch {
         setError("Помилка мережі при скані");
       }
     },
-    [sectors, activeSector, ensureDoc, mergeItem, showFlash],
+    [sectors, activeSector, ensureDoc, mergeItem, showFlash, refreshLogs],
   );
 
   // ── Заповнення / додавання ──
@@ -302,6 +337,7 @@ export function InventoryBoard({ initialDoc }: Props) {
         } else {
           if (data.doc) setItems((data.doc as LiveDoc).items);
           showFlash("emerald", `Додано мішків: ${data.added}`);
+          refreshLogs();
         }
       } catch {
         setError("Помилка мережі");
@@ -309,7 +345,7 @@ export function InventoryBoard({ initialDoc }: Props) {
         setBusy(false);
       }
     },
-    [ensureDoc, showFlash],
+    [ensureDoc, showFlash, refreshLogs],
   );
 
   // ── Дії над рядком ──
@@ -349,11 +385,12 @@ export function InventoryBoard({ initialDoc }: Props) {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(patch),
         });
+        refreshLogs();
       } catch {
         void pollNow();
       }
     },
-    [pollNow],
+    [pollNow, refreshLogs],
   );
 
   const removeItem = useCallback(
@@ -363,11 +400,12 @@ export function InventoryBoard({ initialDoc }: Props) {
       setItems((cur) => cur.filter((r) => r.id !== itemId));
       try {
         await fetch(`${BASE}/${id}/items/${itemId}`, { method: "DELETE" });
+        refreshLogs();
       } catch {
         void pollNow();
       }
     },
-    [pollNow],
+    [pollNow, refreshLogs],
   );
 
   const saveHeader = useCallback(async () => {
@@ -746,8 +784,14 @@ export function InventoryBoard({ initialDoc }: Props) {
               ↻ Оновити
             </button>
           </div>
-          {logs.length === 0 ? (
-            <p className="px-3 py-4 text-sm text-gray-400">Журнал порожній.</p>
+          {logsError ? (
+            <p className="px-3 py-4 text-sm text-red-600">{logsError}</p>
+          ) : logs.length === 0 ? (
+            <p className="px-3 py-4 text-sm text-gray-400">
+              {logsLoaded
+                ? "Журнал порожній (для цього документа ще не було дій)."
+                : "Завантаження…"}
+            </p>
           ) : (
             <div className="max-h-72 overflow-y-auto">
               <table className="w-full text-xs">
