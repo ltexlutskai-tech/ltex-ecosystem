@@ -138,7 +138,10 @@ export async function createSaleWithItems(
     const created = await tx.sale.create({
       data: {
         customerId: customer.id,
-        status: post ? "posted" : "draft",
+        // «Зберегти» → `not_posted` (створене, рухи по реєстрах ще не йдуть);
+        // «Зберегти та провести» → `posted` (+архів). Чернетка (`draft`)
+        // ставиться лише легким autosave-шляхом (`createSaleDraft`).
+        status: post ? "posted" : "not_posted",
         archived: post,
         totalEur,
         totalUah,

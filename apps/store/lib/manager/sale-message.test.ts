@@ -3,6 +3,7 @@ import {
   buildClientSaleMessage,
   buildGroupSaleMessage,
   buildPaymentRequisitesText,
+  buildPrepaymentRequisitesText,
   type SaleMessageInput,
   type SaleMessageItem,
 } from "./sale-message";
@@ -263,5 +264,15 @@ describe("buildPaymentRequisitesText", () => {
   it("rounds fractional UAH", () => {
     const text = buildPaymentRequisitesText(11736.6);
     expect(text).toContain(`Сума : ${num0(11737)}грн`);
+  });
+});
+
+describe("buildPrepaymentRequisitesText", () => {
+  it("renders prepayment requisites with lot count and prepayment sum", () => {
+    const text = buildPrepaymentRequisitesText(1500, 3);
+    expect(text).toContain("Реквізити передоплати : ");
+    expect(text).toContain("Одержувач: ФОП КУЗЕНКО ТАРАС СТЕПАНОВИЧ");
+    expect(text).toContain("Кількість лотів: 3");
+    expect(text).toContain(`Сума передоплати : ${num0(1500)}грн`);
   });
 });

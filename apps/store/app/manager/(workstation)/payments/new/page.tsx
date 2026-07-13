@@ -97,6 +97,9 @@ export default async function NewPaymentPage({
   let presetRateUsd = fallbackUsd;
   let clientLabel: string | null = null;
   let clientDebtEur: number | null = null;
+  // Знаковий баланс клієнта (борг>0 / переплата<0) — зараховується у оплату на
+  // основі реалізації (щоб врахувати попередній борг чи переплату).
+  let clientBalanceEur: number | null = null;
   let returnHref: string | null = null;
 
   if (sp.saleId) {
@@ -109,7 +112,7 @@ export default async function NewPaymentPage({
         totalEur: true,
         exchangeRateEur: true,
         exchangeRateUsd: true,
-        customer: { select: { name: true } },
+        customer: { select: { name: true, code1C: true } },
       },
     });
     if (!sale) notFound();
@@ -121,6 +124,14 @@ export default async function NewPaymentPage({
     presetRateUsd =
       sale.exchangeRateUsd > 0 ? sale.exchangeRateUsd : fallbackUsd;
     clientLabel = sale.customer.name;
+    if (sale.customer.code1C) {
+      const mgr = await prisma.mgrClient.findUnique({
+        where: { code1C: sale.customer.code1C },
+        select: { debt: true },
+      });
+      const debt = mgr ? Number(mgr.debt) : 0;
+      clientBalanceEur = Number.isFinite(debt) ? debt : 0;
+    }
     returnHref = `/manager/sales/${sale.id}`;
   } else if (sp.clientId) {
     // У МЛ-контексті клієнт може приходити як `Customer.id` (рядок Оплати) —
@@ -199,6 +210,7 @@ export default async function NewPaymentPage({
         presetRateUsd={presetRateUsd}
         clientLabel={clientLabel}
         clientDebtEur={clientDebtEur}
+        clientBalanceEur={clientBalanceEur}
         bankAccounts={bankAccounts}
         cashFlowArticles={cashFlowArticles}
         userRole={user.role}

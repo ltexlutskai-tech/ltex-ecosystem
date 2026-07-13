@@ -99,7 +99,7 @@ describe("salesFilterToQueryString", () => {
   it("emits non-default values (round-trip)", () => {
     const qs = salesFilterToQueryString({
       search: "x",
-      status: "sent",
+      status: "not_posted",
       page: 2,
       pageSize: 50,
       showArchived: true,
@@ -108,7 +108,7 @@ describe("salesFilterToQueryString", () => {
       Object.fromEntries(new URLSearchParams(qs)),
     );
     expect(parsed.search).toBe("x");
-    expect(parsed.status).toBe("sent");
+    expect(parsed.status).toBe("not_posted");
     expect(parsed.page).toBe(2);
     expect(parsed.pageSize).toBe(50);
     expect(parsed.showArchived).toBe(true);

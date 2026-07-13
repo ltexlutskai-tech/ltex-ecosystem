@@ -4,6 +4,7 @@ import { useCallback, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   MessageSquare,
+  MessagesSquare,
   ListPlus,
   Send,
   Users,
@@ -11,9 +12,10 @@ import {
   Search,
   Receipt,
 } from "lucide-react";
-import { Button, Textarea } from "@ltex/ui";
+import { Button, Textarea, useToast } from "@ltex/ui";
 import { ClientPicker } from "../../../orders/new/_components/client-picker";
 import { ShareSheet } from "../../../prices/_components/share-sheet";
+import { PickConversationDialog } from "../../../messenger/_components/pick-conversation-dialog";
 import { SaleItemsEditor } from "./sale-items-editor";
 import { SaleTotals } from "./sale-totals";
 import { BarcodeInput } from "./barcode-input";
@@ -28,16 +30,11 @@ import {
   findDeliveryCode,
 } from "@/lib/manager/order-delivery";
 import { bagWeightForQuantity } from "@/lib/manager/order-bag-weight";
-import { buildPaymentReceiptText } from "@/lib/manager/payment-message";
-import {
-  reduceToEur,
-  reduceChangeToEur,
-  computeBalanceEur,
-} from "@/lib/manager/cash-order";
 import {
   buildClientSaleMessage,
   buildGroupSaleMessage,
   buildPaymentRequisitesText,
+  buildPrepaymentRequisitesText,
   type SaleMessageInput,
   type SaleMessageItem,
 } from "@/lib/manager/sale-message";
@@ -99,9 +96,15 @@ export interface SaleFormProps {
   routeSheetId?: string | null;
   /** Куди повертатись після створення (за замовч. список реалізацій). */
   returnHref?: string | null;
-  /** Активні банк. рахунки для блоку «Проект оплати» (безнал грн). */
-  bankAccounts?: { id: string; name: string }[];
+  /**
+   * Сума вже отриманих оплат по цій реалізації (грн) — для «Скинути реквізити»
+   * (фактична сума до оплати = сума документа − отримано). У режимі створення 0.
+   */
+  alreadyReceivedUah?: number;
 }
+
+/** Передоплата за один лот (мішок), грн. Мінімальна сума передоплати = 1 лот. */
+const PREPAYMENT_PER_LOT_UAH = 500;
 
 /** Зіставляє код способу доставки клієнта з кодом доставки документа. */
 function mapClientDelivery(
@@ -157,9 +160,10 @@ export function SaleForm({
   currentUserName,
   routeSheetId,
   returnHref,
-  bankAccounts = [],
+  alreadyReceivedUah = 0,
 }: SaleFormProps) {
   const router = useRouter();
+  const { toast } = useToast();
   const isEdit = mode === "edit";
   /** Куди повертатись після звичайного збереження (МЛ або список). */
   const successHref = returnHref ?? "/manager/sales";
@@ -196,18 +200,14 @@ export function SaleForm({
   const [shareTitle, setShareTitle] = useState("");
   const [shareText, setShareText] = useState("");
 
-  // ─── Проект оплати (preview, БЕЗ збереження в БД) ────────────────────────
-  const [showPaymentDraft, setShowPaymentDraft] = useState(false);
-  // Фактична оплата (готівка 3 валюти + безнал грн з рахунком).
-  const [payCashUah, setPayCashUah] = useState(0);
-  const [payCashlessUah, setPayCashlessUah] = useState(0);
-  const [payCashEur, setPayCashEur] = useState(0);
-  const [payCashUsd, setPayCashUsd] = useState(0);
-  const [payBankAccountId, setPayBankAccountId] = useState("");
-  // Решта (здача) — 3 валюти готівкою.
-  const [changeUah, setChangeUah] = useState(0);
-  const [changeEur, setChangeEur] = useState(0);
-  const [changeUsd, setChangeUsd] = useState(0);
+  // ─── Реквізити передоплати (500 грн/лот) ─────────────────────────────────
+  const [showPrepayment, setShowPrepayment] = useState(false);
+  // К-сть лотів для передоплати — редагована (дефолт = к-сть мішків реалізації).
+  const [prepayLotCountRaw, setPrepayLotCountRaw] = useState("");
+
+  // ─── Надсилання «У наш месенджер» (внутрішній чат, у групи) ───────────────
+  const [pickConvOpen, setPickConvOpen] = useState(false);
+  const [sendingToConv, setSendingToConv] = useState(false);
 
   // ─── Менеджерські поля ──────────────────────────────────────────────────
   // Тип цін як окреме поле прибрано (рішення user): при додаванні товару ціна
@@ -669,31 +669,33 @@ export function SaleForm({
     );
   }
 
-  // Сума післяплати (грн) — округлення повної суми (оплати у Етапі 4 → paid=0).
   const totalEur = items
     .filter((i) => i.product)
     .reduce((s, i) => s + (i.priceEur || 0), 0);
-  const codAmountUah = Math.round(totalEur * exchangeRateEur);
+  // Сума післяплати (грн) — округлення повної суми документа.
+  const totalUahRounded = Math.round(totalEur * exchangeRateEur);
+  const codAmountUah = totalUahRounded;
 
-  // ─── Проект оплати: live-зведення у EUR (порт 1С §B, без збереження) ──────
-  const draftPaidEur = reduceToEur(
-    {
-      uah: payCashUah,
-      eur: payCashEur,
-      usd: payCashUsd,
-      uahCashless: payCashlessUah,
-    },
-    { eur: exchangeRateEur, usd: exchangeRateUsd },
+  // Фактична сума до оплати (грн) з урахуванням уже отриманих оплат по цій
+  // реалізації (передоплати/оплати). У режимі створення отримано = 0.
+  const remainingUah = Math.max(0, totalUahRounded - alreadyReceivedUah);
+
+  // ─── Реквізити передоплати (500 грн/лот) ─────────────────────────────────
+  // К-сть мішків реалізації (дефолт для поля «кількість лотів»).
+  const totalBags = items
+    .filter((i) => i.product)
+    .reduce((s, i) => s + (i.quantity || 0), 0);
+  const prepayLotCount = (() => {
+    const raw = prepayLotCountRaw.trim();
+    if (raw === "") return Math.max(1, totalBags);
+    const n = Math.floor(Number(raw.replace(",", ".")));
+    return Number.isFinite(n) && n > 0 ? n : 1;
+  })();
+  // Мінімальна сума передоплати — 500 грн (щонайменше 1 лот).
+  const prepaymentUah = Math.max(
+    PREPAYMENT_PER_LOT_UAH,
+    prepayLotCount * PREPAYMENT_PER_LOT_UAH,
   );
-  const draftChangeEur = reduceChangeToEur(
-    { uah: changeUah, eur: changeEur, usd: changeUsd },
-    { eur: exchangeRateEur, usd: exchangeRateUsd },
-  );
-  const paymentBalanceEur = computeBalanceEur({
-    sumToPayEur: totalEur,
-    paidEur: draftPaidEur,
-    changeEur: draftChangeEur,
-  });
 
   // Чи можна відправити повідомлення (мають бути позиції).
   const hasItems = items.some((i) => i.product);
@@ -741,40 +743,57 @@ export function SaleForm({
     setShareOpen(true);
   }
 
-  /** Реквізити оплати (ФОП) з підсумковою сумою грн — без позицій. */
+  /**
+   * Реквізити оплати (ФОП) з ФАКТИЧНОЮ сумою до оплати — без позицій.
+   * Фактична сума = сума документа − уже отримані оплати (передоплати).
+   */
   function openRequisitesMessage(): void {
     setShareTitle("Реквізити оплати");
-    setShareText(buildPaymentRequisitesText(totalEur * exchangeRateEur));
+    setShareText(buildPaymentRequisitesText(remainingUah));
+    setShareOpen(true);
+  }
+
+  /** Реквізити ПЕРЕДОПЛАТИ (500 грн/лот) — сума = к-сть лотів × 500 грн. */
+  function openPrepaymentMessage(): void {
+    setShareTitle("Реквізити передоплати");
+    setShareText(buildPrepaymentRequisitesText(prepaymentUah, prepayLotCount));
     setShareOpen(true);
   }
 
   /**
-   * Проект оплати → текст-квитанція «Оплата» у ShareSheet. Нічого не зберігає
-   * в БД (preview-генератор); реальний запис оплати — окремий потік («Оплата»/
-   * «Історія оплат»).
+   * «У наш месенджер» — надсилає текст групового повідомлення у вибрану розмову
+   * (групу) внутрішнього месенджера L-TEX. Основний сценарій — закидати
+   * повідомлення у робочі групи.
    */
-  function openPaymentDraftMessage(): void {
-    const acct =
-      bankAccounts.find((a) => a.id === payBankAccountId)?.name ?? null;
-    setShareTitle("Оплата (проект)");
-    setShareText(
-      buildPaymentReceiptText({
-        clientName: clientSummary?.name ?? "",
-        paid: {
-          uah: payCashUah,
-          eur: payCashEur,
-          usd: payCashUsd,
-          uahCashless: payCashlessUah,
+  async function sendGroupToConversation(
+    conversationId: string,
+  ): Promise<void> {
+    if (sendingToConv) return;
+    setSendingToConv(true);
+    try {
+      const text = buildGroupSaleMessage(buildMessageInput());
+      const res = await fetch(
+        `/api/v1/manager/messenger/conversations/${conversationId}/messages`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text }),
         },
-        change: { uah: changeUah, eur: changeEur, usd: changeUsd },
-        bankAccountName: acct,
-        rates: { eur: exchangeRateEur, usd: exchangeRateUsd },
-        sumToPayEur: totalEur,
-        cashOnDelivery,
-        codAmountUah: cashOnDelivery ? codAmountUah : null,
-      }),
-    );
-    setShareOpen(true);
+      );
+      if (!res.ok) {
+        const body = (await res.json().catch(() => ({}))) as { error?: string };
+        throw new Error(body.error ?? `Помилка ${res.status}`);
+      }
+      setPickConvOpen(false);
+      toast({ description: "Надіслано у месенджер ✓" });
+    } catch (e) {
+      toast({
+        description: e instanceof Error ? e.message : "Не вдалось надіслати",
+        variant: "destructive",
+      });
+    } finally {
+      setSendingToConv(false);
+    }
   }
 
   return (
@@ -978,37 +997,18 @@ export function SaleForm({
           </span>
         </div>
 
-        {/* Чекбокси */}
+        {/* Чекбокси. «Наложку (післяплату)» винесено вниз до блоку оплати —
+            це супутній платіжний функціонал (рішення user). */}
         <div className="mt-4 flex flex-col gap-3 border-t pt-4">
-          <div className="flex flex-wrap items-center gap-x-8 gap-y-3">
-            <label className="inline-flex cursor-pointer items-center gap-2 text-sm text-gray-700">
-              <input
-                type="checkbox"
-                checked={cashOnDelivery}
-                onChange={(e) => setCashOnDelivery(e.target.checked)}
-                className="h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
-              />
-              <span>Наложка (післяплата)</span>
-            </label>
-            <label className="inline-flex cursor-pointer items-center gap-2 text-sm text-gray-700">
-              <input
-                type="checkbox"
-                checked={onTradeAgent}
-                onChange={(e) => setOnTradeAgent(e.target.checked)}
-                className="h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
-              />
-              <span>На торгового контрагента</span>
-            </label>
-          </div>
-
-          {cashOnDelivery && (
-            <p className="text-sm text-amber-700">
-              Сума післяплати:{" "}
-              <span className="font-semibold">
-                {codAmountUah.toLocaleString("uk-UA")} ₴
-              </span>
-            </p>
-          )}
+          <label className="inline-flex cursor-pointer items-center gap-2 text-sm text-gray-700">
+            <input
+              type="checkbox"
+              checked={onTradeAgent}
+              onChange={(e) => setOnTradeAgent(e.target.checked)}
+              className="h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
+            />
+            <span>На торгового контрагента</span>
+          </label>
 
           <p className="text-xs text-gray-400">
             {onTradeAgent
@@ -1105,6 +1105,15 @@ export function SaleForm({
             type="button"
             variant="outline"
             size="sm"
+            disabled={!hasItems || sendingToConv}
+            onClick={() => setPickConvOpen(true)}
+          >
+            <MessagesSquare className="mr-1 h-4 w-4" />У наш месенджер
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
             onClick={openRequisitesMessage}
           >
             <Receipt className="mr-1 h-4 w-4" />
@@ -1114,228 +1123,88 @@ export function SaleForm({
             type="button"
             variant="outline"
             size="sm"
-            onClick={() => setShowPaymentDraft((v) => !v)}
+            onClick={() => setShowPrepayment((v) => !v)}
           >
             <Wallet className="mr-1 h-4 w-4" />
-            Проект оплати
+            Реквізити передоплати
           </Button>
-          {/* "У чат" (бот-вихідні) — TODO M1.8 */}
         </div>
         <p className="mt-2 text-xs text-gray-400">
           Згенерувати текст і поділитися (Viber / Telegram / WhatsApp /
           копіювати).
         </p>
 
-        {/* ─── Проект оплати (preview, нічого не зберігає) ─────────────────── */}
-        {showPaymentDraft && (
+        {/* ─── Реквізити передоплати (500 грн/лот) ─────────────────────────── */}
+        {showPrepayment && (
           <div className="mt-4 rounded-lg border bg-gray-50 p-4 text-sm">
-            <div className="text-gray-700">
-              До сплати:{" "}
-              <span className="font-semibold text-gray-900">
-                {totalEur.toFixed(2)} €
-              </span>{" "}
-              <span className="text-gray-500">
-                ({(totalEur * exchangeRateEur).toFixed(2)} грн)
-              </span>
-            </div>
-
-            {/* Фактична оплата */}
-            <div className="mt-4">
-              <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">
-                Фактична оплата
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div>
+                <label
+                  htmlFor="prepay-lots"
+                  className="mb-1 block text-xs text-gray-500"
+                >
+                  Кількість лотів (мішків)
+                </label>
+                <input
+                  id="prepay-lots"
+                  type="number"
+                  min={1}
+                  step={1}
+                  value={prepayLotCountRaw}
+                  onChange={(e) => setPrepayLotCountRaw(e.target.value)}
+                  placeholder={String(Math.max(1, totalBags))}
+                  className="h-9 w-full rounded-md border border-gray-300 bg-white px-3 text-sm focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500"
+                />
+                <p className="mt-1 text-xs text-gray-400">
+                  По {PREPAYMENT_PER_LOT_UAH} грн за лот. За замовчуванням —
+                  к-сть мішків реалізації.
+                </p>
               </div>
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div>
-                  <label
-                    htmlFor="pay-cash-uah"
-                    className="mb-1 block text-xs text-gray-500"
-                  >
-                    Готівка грн
-                  </label>
-                  <input
-                    id="pay-cash-uah"
-                    type="number"
-                    min={0}
-                    step="0.01"
-                    value={payCashUah}
-                    onChange={(e) => setPayCashUah(Number(e.target.value) || 0)}
-                    className="h-9 w-full rounded-md border border-gray-300 bg-white px-3 text-sm focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500"
-                  />
-                </div>
-                <div>
-                  <label
-                    htmlFor="pay-cashless-uah"
-                    className="mb-1 block text-xs text-gray-500"
-                  >
-                    Безнал грн
-                  </label>
-                  <div className="flex gap-2">
-                    <input
-                      id="pay-cashless-uah"
-                      type="number"
-                      min={0}
-                      step="0.01"
-                      value={payCashlessUah}
-                      onChange={(e) =>
-                        setPayCashlessUah(Number(e.target.value) || 0)
-                      }
-                      className="h-9 w-full rounded-md border border-gray-300 bg-white px-3 text-sm focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500"
-                    />
-                    <select
-                      aria-label="Банк. рахунок"
-                      value={payBankAccountId}
-                      onChange={(e) => setPayBankAccountId(e.target.value)}
-                      className="h-9 w-full rounded-md border border-gray-300 bg-white px-2 text-sm focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500"
-                    >
-                      <option value="">— рахунок —</option>
-                      {bankAccounts.map((a) => (
-                        <option key={a.id} value={a.id}>
-                          {a.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-                <div>
-                  <label
-                    htmlFor="pay-cash-eur"
-                    className="mb-1 block text-xs text-gray-500"
-                  >
-                    Готівка €
-                  </label>
-                  <input
-                    id="pay-cash-eur"
-                    type="number"
-                    min={0}
-                    step="0.01"
-                    value={payCashEur}
-                    onChange={(e) => setPayCashEur(Number(e.target.value) || 0)}
-                    className="h-9 w-full rounded-md border border-gray-300 bg-white px-3 text-sm focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500"
-                  />
-                </div>
-                <div>
-                  <label
-                    htmlFor="pay-cash-usd"
-                    className="mb-1 block text-xs text-gray-500"
-                  >
-                    Готівка $
-                  </label>
-                  <input
-                    id="pay-cash-usd"
-                    type="number"
-                    min={0}
-                    step="0.01"
-                    value={payCashUsd}
-                    onChange={(e) => setPayCashUsd(Number(e.target.value) || 0)}
-                    className="h-9 w-full rounded-md border border-gray-300 bg-white px-3 text-sm focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500"
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Решта */}
-            <div className="mt-4">
-              <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">
-                Решта
-              </div>
-              <div className="grid gap-3 sm:grid-cols-3">
-                <div>
-                  <label
-                    htmlFor="change-uah"
-                    className="mb-1 block text-xs text-gray-500"
-                  >
-                    грн
-                  </label>
-                  <input
-                    id="change-uah"
-                    type="number"
-                    min={0}
-                    step="0.01"
-                    value={changeUah}
-                    onChange={(e) => setChangeUah(Number(e.target.value) || 0)}
-                    className="h-9 w-full rounded-md border border-gray-300 bg-white px-3 text-sm focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500"
-                  />
-                </div>
-                <div>
-                  <label
-                    htmlFor="change-eur"
-                    className="mb-1 block text-xs text-gray-500"
-                  >
-                    €
-                  </label>
-                  <input
-                    id="change-eur"
-                    type="number"
-                    min={0}
-                    step="0.01"
-                    value={changeEur}
-                    onChange={(e) => setChangeEur(Number(e.target.value) || 0)}
-                    className="h-9 w-full rounded-md border border-gray-300 bg-white px-3 text-sm focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500"
-                  />
-                </div>
-                <div>
-                  <label
-                    htmlFor="change-usd"
-                    className="mb-1 block text-xs text-gray-500"
-                  >
-                    $
-                  </label>
-                  <input
-                    id="change-usd"
-                    type="number"
-                    min={0}
-                    step="0.01"
-                    value={changeUsd}
-                    onChange={(e) => setChangeUsd(Number(e.target.value) || 0)}
-                    className="h-9 w-full rounded-md border border-gray-300 bg-white px-3 text-sm focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500"
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Live-зведення */}
-            <div className="mt-4 space-y-1 border-t pt-3">
-              <div className="text-gray-700">
-                Оплачено:{" "}
-                <span className="font-semibold text-gray-900">
-                  {draftPaidEur.toFixed(2)} €
-                </span>
-              </div>
-              {draftChangeEur > 0 && (
+              <div className="flex flex-col justify-center">
                 <div className="text-gray-700">
-                  Решта:{" "}
+                  Сума передоплати:{" "}
                   <span className="font-semibold text-gray-900">
-                    {draftChangeEur.toFixed(2)} €
+                    {prepaymentUah.toLocaleString("uk-UA")} грн
                   </span>
                 </div>
-              )}
-              {paymentBalanceEur > 0 ? (
-                <div className="font-semibold text-amber-700">
-                  Борг: {paymentBalanceEur.toFixed(2)} €
+                <div className="mt-0.5 text-xs text-gray-500">
+                  {prepayLotCount} × {PREPAYMENT_PER_LOT_UAH} грн
                 </div>
-              ) : paymentBalanceEur < 0 ? (
-                <div className="font-semibold text-green-700">
-                  Переплата: {(-paymentBalanceEur).toFixed(2)} €
-                </div>
-              ) : (
-                <div className="font-semibold text-green-700">
-                  Сплачено повністю
-                </div>
-              )}
+              </div>
             </div>
-
             <div className="mt-4">
               <Button
                 type="button"
                 variant="outline"
                 size="sm"
-                onClick={openPaymentDraftMessage}
+                onClick={openPrepaymentMessage}
               >
                 <Receipt className="mr-1 h-4 w-4" />
-                Скинути оплату
+                Скинути реквізити передоплати
               </Button>
             </div>
           </div>
+        )}
+      </section>
+
+      {/* ─── Наложка (перенесено вниз, поряд з оплатою — рішення user) ─────── */}
+      <section className="rounded-lg border bg-white p-4 shadow-sm">
+        <label className="inline-flex cursor-pointer items-center gap-2 text-sm text-gray-700">
+          <input
+            type="checkbox"
+            checked={cashOnDelivery}
+            onChange={(e) => setCashOnDelivery(e.target.checked)}
+            className="h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
+          />
+          <span className="font-medium">Наложка (післяплата)</span>
+        </label>
+        {cashOnDelivery && (
+          <p className="mt-2 text-sm text-amber-700">
+            Сума післяплати:{" "}
+            <span className="font-semibold">
+              {codAmountUah.toLocaleString("uk-UA")} ₴
+            </span>
+          </p>
         )}
       </section>
 
@@ -1416,6 +1285,17 @@ export function SaleForm({
         onOpenChange={setPickerOpen}
         onAddLot={onAddLotFromPicker}
         onAddGeneral={onAddGeneralFromPicker}
+      />
+
+      {/* «У наш месенджер» — вибір розмови/групи внутрішнього чату. */}
+      <PickConversationDialog
+        open={pickConvOpen}
+        onOpenChange={setPickConvOpen}
+        title="Надіслати у месенджер"
+        busy={sendingToConv}
+        onPick={(conversationId) =>
+          void sendGroupToConversation(conversationId)
+        }
       />
 
       <ShareSheet
