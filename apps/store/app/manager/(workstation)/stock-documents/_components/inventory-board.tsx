@@ -116,6 +116,7 @@ export function InventoryBoard({ initialDoc }: Props) {
   const [newSector, setNewSector] = useState("");
   const [logsOpen, setLogsOpen] = useState(false);
   const [logs, setLogs] = useState<LogEntry[]>([]);
+  const [summaryOpen, setSummaryOpen] = useState(false);
 
   const {
     widths,
@@ -485,6 +486,83 @@ export function InventoryBoard({ initialDoc }: Props) {
           {error}
         </div>
       )}
+
+      {/* Липка панель: підсумок + кнопки — завжди зверху, не заважає таблиці */}
+      <div className="sticky top-0 z-30 -mx-1 rounded-md border bg-white/95 px-3 py-2 shadow-sm backdrop-blur">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+          {!posted && (
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => void finish()}
+                className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+              >
+                Зберегти й вийти
+              </button>
+              <button
+                type="button"
+                disabled={busy || items.length === 0}
+                onClick={() => void post()}
+                className="rounded-md bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
+              >
+                Зберегти та провести
+              </button>
+            </div>
+          )}
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-600">
+            <MiniStat label="Найменувань" value={String(summary.rows)} />
+            <MiniStat
+              label="Знайдено"
+              value={String(summary.found)}
+              tone="emerald"
+            />
+            <MiniStat
+              label="Нестача"
+              value={`${summary.missing} · ${summary.missingWeight}кг`}
+              tone={summary.missing > 0 ? "amber" : undefined}
+            />
+            <MiniStat
+              label="Надлишки"
+              value={`${summary.surplus} · ${summary.surplusWeight}кг`}
+              tone={summary.surplus > 0 ? "sky" : undefined}
+            />
+            <MiniStat label="Сума" value={`${summary.actAmountEur}€`} />
+          </div>
+          <button
+            type="button"
+            onClick={() => setSummaryOpen((v) => !v)}
+            className="ml-auto rounded-md border border-gray-300 bg-white px-2.5 py-1 text-xs text-gray-600 hover:bg-gray-50"
+          >
+            {summaryOpen ? "▴ Згорнути" : "▾ Деталі"}
+          </button>
+        </div>
+        {summaryOpen && (
+          <div className="mt-2 grid gap-2 text-sm sm:grid-cols-3 lg:grid-cols-6">
+            <Cell label="Найменувань" value={String(summary.rows)} />
+            <Cell
+              label="Відскановано"
+              value={String(summary.found)}
+              tone="emerald"
+            />
+            <Cell
+              label="Нестача"
+              value={`${summary.missing} · ${summary.missingWeight} кг`}
+              tone={summary.missing > 0 ? "amber" : undefined}
+            />
+            <Cell
+              label="Надлишки"
+              value={`${summary.surplus} · ${summary.surplusWeight} кг`}
+              tone={summary.surplus > 0 ? "sky" : undefined}
+            />
+            <Cell
+              label="Вага облік / факт"
+              value={`${summary.accWeight} / ${summary.actWeight} кг`}
+            />
+            <Cell label="Сума факт" value={`${summary.actAmountEur} €`} />
+          </div>
+        )}
+      </div>
 
       {/* Шапка */}
       <div className="rounded-md border bg-white p-3">
@@ -875,57 +953,36 @@ export function InventoryBoard({ initialDoc }: Props) {
         </div>
       </div>
 
-      {/* Зведення */}
-      <div className="grid gap-2 rounded-md border bg-white p-3 text-sm sm:grid-cols-3 lg:grid-cols-6">
-        <Cell label="Найменувань" value={String(summary.rows)} />
-        <Cell
-          label="Відскановано"
-          value={String(summary.found)}
-          tone="emerald"
-        />
-        <Cell
-          label="Нестача"
-          value={`${summary.missing} · ${summary.missingWeight} кг`}
-          tone={summary.missing > 0 ? "amber" : undefined}
-        />
-        <Cell
-          label="Надлишки"
-          value={`${summary.surplus} · ${summary.surplusWeight} кг`}
-          tone={summary.surplus > 0 ? "sky" : undefined}
-        />
-        <Cell
-          label="Вага облік / факт"
-          value={`${summary.accWeight} / ${summary.actWeight} кг`}
-        />
-        <Cell label="Сума факт" value={`${summary.actAmountEur} €`} />
-      </div>
-
-      {/* Дії */}
-      {!posted && (
-        <div className="flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() => void finish()}
-            className="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
-          >
-            Зберегти й вийти
-          </button>
-          <button
-            type="button"
-            disabled={busy || items.length === 0}
-            onClick={() => void post()}
-            className="rounded-md bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
-          >
-            Зберегти та провести
-          </button>
-        </div>
-      )}
       <p className="text-xs text-gray-400">
         Документ лише звіряє облік і факт. Списання нестач та оприбуткування
         надлишків — окремими документами на підставі цієї інвентаризації.
       </p>
     </div>
+  );
+}
+
+function MiniStat({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: string;
+  tone?: "emerald" | "amber" | "sky";
+}) {
+  const toneClass =
+    tone === "emerald"
+      ? "text-emerald-700"
+      : tone === "amber"
+        ? "text-amber-700"
+        : tone === "sky"
+          ? "text-sky-700"
+          : "text-gray-800";
+  return (
+    <span className="inline-flex items-baseline gap-1">
+      <span className="text-gray-400">{label}:</span>
+      <span className={`font-semibold ${toneClass}`}>{value}</span>
+    </span>
   );
 }
 
