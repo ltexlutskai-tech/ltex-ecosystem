@@ -196,7 +196,7 @@ export function InventoryBoard({ initialDoc }: Props) {
       return;
     }
     try {
-      const res = await fetch(`${BASE}/${id}/logs`, {
+      const res = await fetch(`${BASE}/${id}/journal`, {
         cache: "no-store",
         credentials: "same-origin",
       });
