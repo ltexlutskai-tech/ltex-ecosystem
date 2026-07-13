@@ -215,23 +215,25 @@ describe("GET /api/v1/manager/orders", () => {
     mockPrisma.order.findMany.mockResolvedValueOnce([]);
     mockPrisma.order.count.mockResolvedValueOnce(0);
 
-    await GET(req("?status=sent"));
+    await GET(req("?status=not_posted"));
     const args = mockPrisma.order.findMany.mock.calls[0]?.[0] as {
       where: { status?: string };
     };
-    expect(args.where.status).toBe("sent");
+    expect(args.where.status).toBe("not_posted");
   });
 
-  it("ignores invalid status value", async () => {
+  it("ignores invalid status value (defaults to hiding posted)", async () => {
     getCurrentUserMock.mockResolvedValueOnce(ADMIN);
     mockPrisma.order.findMany.mockResolvedValueOnce([]);
     mockPrisma.order.count.mockResolvedValueOnce(0);
 
     await GET(req("?status=hacker"));
     const args = mockPrisma.order.findMany.mock.calls[0]?.[0] as {
-      where: { status?: string };
+      where: { status?: unknown };
     };
-    expect(args.where.status).toBeUndefined();
+    // Невалідний статус ігнорується; за замовчуванням головний список ховає
+    // проведені (8.1).
+    expect(args.where.status).toEqual({ not: "posted" });
   });
 
   it("applies date range filter", async () => {
@@ -320,6 +322,7 @@ describe("GET /api/v1/manager/orders", () => {
 describe("POST /api/v1/manager/orders", () => {
   const validBody = {
     customerId: "cust1",
+    overdueDays: 14,
     items: [{ productId: "p1", weight: 10, quantity: 1, priceEur: 100 }],
   };
 
@@ -439,7 +442,6 @@ describe("POST /api/v1/manager/orders", () => {
       postReq({
         ...validBody,
         priceTypeId: "pt-1",
-        deliveryMethod: "post",
         cashOnDelivery: true,
         exportTo1C: false,
       }),
@@ -448,14 +450,12 @@ describe("POST /api/v1/manager/orders", () => {
     const args = createOrderWithItemsMock.mock.calls[0] as [
       {
         priceTypeId?: string;
-        deliveryMethod?: string;
         cashOnDelivery?: boolean;
       },
       unknown,
       { userId: string },
     ];
     expect(args[0].priceTypeId).toBe("pt-1");
-    expect(args[0].deliveryMethod).toBe("post");
     expect(args[0].cashOnDelivery).toBe(true);
     expect(args[2].userId).toBe("u1");
   });
@@ -478,11 +478,11 @@ describe("POST /api/v1/manager/orders", () => {
     expect(args[0].post).toBe(true);
   });
 
-  it("відхиляє невалідний deliveryMethod (400)", async () => {
-    // 7.3: коди беруться з довідника (довільний рядок ≤50); задовгий — 400.
-    const res = await POST(
-      postReq({ ...validBody, deliveryMethod: "x".repeat(51) }),
-    );
+  it("вимагає overdueDays (обов'язкове поле) → 400", async () => {
+    // 8.1: спосіб доставки прибрано; термін нагадування обов'язковий.
+    const { overdueDays: _omit, ...noTerm } = validBody;
+    void _omit;
+    const res = await POST(postReq(noTerm));
     expect(res.status).toBe(400);
   });
 

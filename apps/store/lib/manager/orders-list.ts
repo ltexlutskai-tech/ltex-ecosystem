@@ -145,7 +145,7 @@ export function buildOrdersWhere(
     where.source = { not: "site" };
   }
 
-  // Архів: за замовчуванням приховуємо проведені (archived = true).
+  // Архів: за замовчуванням приховуємо історію 1С (`archived = true`).
   if (!p.showArchived) {
     where.archived = false;
   }
@@ -186,8 +186,14 @@ export function buildOrdersWhere(
     ];
   }
 
+  // Статус документа. Явний фільтр має пріоритет. Якщо статус не заданий і
+  // не показуємо архів — ховаємо проведені (`posted`) з головного списку: вони
+  // йдуть в архів (8.1); головний список лишає чернетки / не проведені /
+  // очікують підтвердження.
   if (p.status) {
     where.status = p.status;
+  } else if (!p.showArchived) {
+    where.status = { not: "posted" };
   }
 
   if (p.from || p.to) {
@@ -218,7 +224,6 @@ export interface RawOrderRow {
   source: string;
   agentName: string | null;
   assignedAgentUserId: string | null;
-  deliveryMethod: string | null;
   createdAt: Date;
   customer: {
     id: string;
@@ -247,8 +252,6 @@ export interface OrderListItem {
   assignedAgentUserId: string | null;
   /** Імʼя призначеного агента (batch-lookup у page.tsx за assignedAgentUserId). */
   assignedAgentName: string | null;
-  /** Спосіб доставки: `Order.deliveryMethod` (code → label у UI). */
-  deliveryMethod: string | null;
   itemCount: number;
   createdAt: Date;
   customer: {
@@ -286,7 +289,6 @@ export function serializeOrderRow(o: RawOrderRow): OrderListItem {
     assignedAgentUserId: o.assignedAgentUserId,
     // Імʼя призначеного агента підставляється у page.tsx (batch-lookup).
     assignedAgentName: null,
-    deliveryMethod: o.deliveryMethod,
     itemCount: o._count.items,
     createdAt: o.createdAt,
     customer: {

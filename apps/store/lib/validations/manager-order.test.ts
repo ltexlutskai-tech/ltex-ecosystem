@@ -63,9 +63,18 @@ describe("createOrderSchema", () => {
   it("accepts valid order з 1 item", () => {
     const result = createOrderSchema.safeParse({
       customerId: "c1",
+      overdueDays: 14,
       items: [{ productId: "p1", weight: 10, quantity: 1, priceEur: 0 }],
     });
     expect(result.success).toBe(true);
+  });
+
+  it("вимагає overdueDays (обов'язкове поле, 8.1)", () => {
+    const result = createOrderSchema.safeParse({
+      customerId: "c1",
+      items: [{ productId: "p1", weight: 10, priceEur: 0 }],
+    });
+    expect(result.success).toBe(false);
   });
 
   it("rejects empty items array", () => {
@@ -115,9 +124,9 @@ describe("createOrderSchema", () => {
   it("приймає менеджерські поля (Етап 1)", () => {
     const result = createOrderSchema.safeParse({
       customerId: "c1",
+      overdueDays: 14,
       items: [{ productId: "p1", weight: 10, priceEur: 0 }],
       priceTypeId: "pt-1",
-      deliveryMethod: "pickup",
       cashOnDelivery: true,
       assignedAgentUserId: "u-2",
       exportTo1C: false,
@@ -128,35 +137,11 @@ describe("createOrderSchema", () => {
   it("дефолти cashOnDelivery=false і exportTo1C=true", () => {
     const result = createOrderSchema.parse({
       customerId: "c1",
+      overdueDays: 14,
       items: [{ productId: "p1", weight: 10, priceEur: 0 }],
     });
     expect(result.cashOnDelivery).toBe(false);
     expect(result.exportTo1C).toBe(true);
-  });
-
-  it("приймає deliveryMethod null", () => {
-    const result = createOrderSchema.safeParse({
-      customerId: "c1",
-      items: [{ productId: "p1", weight: 10, priceEur: 0 }],
-      deliveryMethod: null,
-    });
-    expect(result.success).toBe(true);
-  });
-
-  it("приймає код доставки з довідника (7.3) та відхиляє задовгий", () => {
-    const ok = createOrderSchema.safeParse({
-      customerId: "c1",
-      items: [{ productId: "p1", weight: 10, priceEur: 0 }],
-      deliveryMethod: "nova-poshta",
-    });
-    expect(ok.success).toBe(true);
-
-    const tooLong = createOrderSchema.safeParse({
-      customerId: "c1",
-      items: [{ productId: "p1", weight: 10, priceEur: 0 }],
-      deliveryMethod: "x".repeat(51),
-    });
-    expect(tooLong.success).toBe(false);
   });
 });
 
@@ -164,19 +149,21 @@ describe("updateOrderSchema", () => {
   it("accepts valid edit body без customerId", () => {
     const result = updateOrderSchema.safeParse({
       items: [{ productId: "p1", weight: 10, priceEur: 50 }],
+      overdueDays: 14,
       notes: "оновлено",
     });
     expect(result.success).toBe(true);
   });
 
   it("rejects empty items array", () => {
-    const result = updateOrderSchema.safeParse({ items: [] });
+    const result = updateOrderSchema.safeParse({ items: [], overdueDays: 14 });
     expect(result.success).toBe(false);
   });
 
   it("accepts notes=null (clear comment)", () => {
     const result = updateOrderSchema.safeParse({
       items: [{ productId: "p1", weight: 10, priceEur: 0 }],
+      overdueDays: 14,
       notes: null,
     });
     expect(result.success).toBe(true);
@@ -185,7 +172,8 @@ describe("updateOrderSchema", () => {
   it("accepts canonical status value", () => {
     const result = updateOrderSchema.safeParse({
       items: [{ productId: "p1", weight: 10, priceEur: 0 }],
-      status: "sent",
+      overdueDays: 14,
+      status: "not_posted",
     });
     expect(result.success).toBe(true);
   });
@@ -193,6 +181,7 @@ describe("updateOrderSchema", () => {
   it("rejects non-canonical / legacy status", () => {
     const result = updateOrderSchema.safeParse({
       items: [{ productId: "p1", weight: 10, priceEur: 0 }],
+      overdueDays: 14,
       status: "delivered",
     });
     expect(result.success).toBe(false);
@@ -201,6 +190,7 @@ describe("updateOrderSchema", () => {
   it("дефолти cashOnDelivery=false і exportTo1C=true", () => {
     const result = updateOrderSchema.parse({
       items: [{ productId: "p1", weight: 10, priceEur: 0 }],
+      overdueDays: 14,
     });
     expect(result.cashOnDelivery).toBe(false);
     expect(result.exportTo1C).toBe(true);
@@ -224,7 +214,7 @@ describe("orderDraftSchema (relaxed draft mode для autosave)", () => {
     const result = orderDraftSchema.safeParse({
       draft: true,
       notes: "чернетка",
-      deliveryMethod: "post",
+      overdueDays: 14,
     });
     expect(result.success).toBe(true);
   });
@@ -235,7 +225,7 @@ describe("orderDraftSchema (relaxed draft mode для autosave)", () => {
       customerId: "c1",
       items: [minimalItem],
       cashOnDelivery: true,
-      deliveryMethod: "post",
+      overdueDays: 14,
     });
     expect(result.success).toBe(true);
   });

@@ -24,6 +24,8 @@ import {
   updateOrderWithItems,
 } from "@/lib/manager/order-create";
 import { completeSiteOrderReminders } from "@/lib/manager/site-order-reminders";
+import { removeSaleMovements } from "@/lib/manager/sale-movement-hooks";
+import { recomputeDebtForClientsSafe } from "@/lib/manager/debt-register";
 
 export async function GET(
   req: NextRequest,
@@ -290,8 +292,16 @@ export async function PATCH(
 
   // Якщо змінюється статус — перевіряємо дозволеність переходу.
   // Кнопка «Зберегти та провести» (`post=true`) ⇒ перехід у `posted`.
+  // Кнопка «Зберегти» (без post) для чернетки / сайтового замовлення
+  // (`draft`/`pending`) ⇒ перехід у `not_posted` (створене, ще не проведене).
+  let requestedStatus = input.post ? "posted" : input.status;
+  if (
+    !requestedStatus &&
+    (existing.status === "draft" || existing.status === "pending")
+  ) {
+    requestedStatus = "not_posted";
+  }
   let nextStatus: string | undefined;
-  const requestedStatus = input.post ? "posted" : input.status;
   if (requestedStatus && requestedStatus !== existing.status) {
     if (!isTransitionAllowed(existing.status, requestedStatus)) {
       return NextResponse.json(
@@ -321,9 +331,9 @@ export async function PATCH(
       { userId: user.id },
       { nextStatus },
     );
-    // Сайтове замовлення оброблене (проведене/скасоване) → закриваємо
-    // авто-нагадування «обробити сайтове замовлення» (7.2 Блок 1).
-    if (nextStatus === "posted" || nextStatus === "cancelled") {
+    // Сайтове замовлення оброблене (збережене/проведене менеджером) →
+    // закриваємо авто-нагадування «обробити сайтове замовлення» (7.2 Блок 1).
+    if (nextStatus === "posted" || nextStatus === "not_posted") {
       await completeSiteOrderReminders(id);
     }
     return NextResponse.json({
@@ -377,11 +387,15 @@ export async function PATCH(
  * Ownership — як у GET/PATCH (`canViewOrder`): менеджер видаляє лише свої, admin —
  * будь-яке. Працює і для проведених (`posted`/`archived`) замовлень.
  *
- * Реверс сліду документа:
+ * Реверс сліду документа (8.1 — «щоб все було актуально й не впливало на
+ * потреби по товару»):
  *   - `OrderItem` / `Shipment` / `Payment` видаляються каскадом (`onDelete: Cascade`);
- *   - `Sale.orderId` обнуляється автоматично (`onDelete: SetNull`) — реалізації-
- *     підстави зберігаються, лише відв'язуються.
- *   - Замовлення НЕ пишуть рухів боргу, тому перерахунок боргу не потрібен.
+ *   - пов'язані реалізації (`Sale.orderId`) — авто-створені з сайтового
+ *     замовлення — видаляються РАЗОМ із замовленням; їхні рухи по реєстрах
+ *     (склад / продажі / собівартість / борг) реверсуються, щоб облік лишався
+ *     коректним;
+ *   - конкретні лоти замовлення, зарезервовані під нього, звільняються
+ *     (`reserved → free`), щоб замовлення не «висіло» на складі.
  */
 export async function DELETE(
   req: NextRequest,
@@ -411,7 +425,13 @@ export async function DELETE(
 
   const existing = await prisma.order.findUnique({
     where: { id },
-    select: { id: true },
+    select: {
+      id: true,
+      // Пов'язані реалізації — реверсуємо їхні рухи й видаляємо разом.
+      sales: { select: { id: true, code1C: true, customerId: true } },
+      // Конкретні лоти замовлення — звільняємо, якщо ще зарезервовані під нього.
+      items: { select: { lotId: true } },
+    },
   });
   if (!existing) {
     return NextResponse.json(
@@ -420,8 +440,51 @@ export async function DELETE(
     );
   }
 
+  const saleIds = existing.sales.map((s) => s.id);
+  const lotIds = existing.items
+    .map((i) => i.lotId)
+    .filter((l): l is string => l != null);
+
   try {
-    await prisma.order.delete({ where: { id } });
+    // Клієнти, чий борг перерахуємо після реверсу рухів пов'язаних реалізацій.
+    const affectedClientIds = new Set<string>();
+    if (saleIds.length > 0) {
+      const debtMovements = await prisma.mgrDebtMovement.findMany({
+        where: { sourceType: "sale", sourceId: { in: saleIds } },
+        select: { clientId: true },
+      });
+      for (const m of debtMovements) affectedClientIds.add(m.clientId);
+    }
+
+    await prisma.$transaction(async (tx) => {
+      if (saleIds.length > 0) {
+        // Реверс руху боргу пов'язаних реалізацій + видалення самих реалізацій
+        // (SaleItem каскадом). Регістри склад/продажі/собівартість — нижче.
+        await tx.mgrDebtMovement.deleteMany({
+          where: { sourceType: "sale", sourceId: { in: saleIds } },
+        });
+        await tx.sale.deleteMany({ where: { id: { in: saleIds } } });
+      }
+      // Звільняємо зарезервовані під це замовлення лоти.
+      if (lotIds.length > 0) {
+        await tx.lot.updateMany({
+          where: { id: { in: lotIds }, status: "reserved" },
+          data: { status: "free" },
+        });
+      }
+      await tx.order.delete({ where: { id } });
+    });
+
+    // Реверс рухів регістрів реалізацій (склад/продажі/собівартість) —
+    // best-effort, за реєстратором `code1C ?? id` (як пише `applySaleMovements`).
+    for (const sale of existing.sales) {
+      removeSaleMovements(sale.code1C ?? sale.id);
+    }
+    // Перерахунок кешу боргу зачеплених клієнтів — похідний, поза транзакцією.
+    if (affectedClientIds.size > 0) {
+      await recomputeDebtForClientsSafe([...affectedClientIds]);
+    }
+
     revalidatePath("/manager/orders");
     return NextResponse.json({ ok: true });
   } catch (err) {

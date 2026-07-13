@@ -5,9 +5,11 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 const h = vi.hoisted(() => {
   const txOrderCreate = vi.fn();
   const txLotUpdateMany = vi.fn();
+  const txSaleCreate = vi.fn();
   return {
     txOrderCreate,
     txLotUpdateMany,
+    txSaleCreate,
     mockResolveOrCreateSiteClient: vi.fn(),
     mockCreateSiteOrderReminders: vi.fn().mockResolvedValue(undefined),
     mockPrisma: {
@@ -21,6 +23,7 @@ const h = vi.hoisted(() => {
         cb({
           order: { create: txOrderCreate },
           lot: { updateMany: txLotUpdateMany },
+          sale: { create: txSaleCreate },
           // Нумерація 7.3 (nextOrderNumber1C).
           $queryRaw: vi.fn(async () => [{ max_num: null }]),
         }),
@@ -31,6 +34,7 @@ const h = vi.hoisted(() => {
 const {
   txOrderCreate,
   txLotUpdateMany,
+  txSaleCreate,
   mockResolveOrCreateSiteClient,
   mockCreateSiteOrderReminders,
   mockPrisma,
@@ -234,8 +238,9 @@ describe("Order API", () => {
       // free-check → barcode-fetch
       mockPrisma.lot.findMany
         .mockResolvedValueOnce([{ id: "lot-1", status: "free" }])
-        .mockResolvedValueOnce([{ barcode: "L-123" }]);
+        .mockResolvedValueOnce([{ id: "lot-1", barcode: "L-123" }]);
       txOrderCreate.mockResolvedValue({ id: "order-abc123" });
+      txSaleCreate.mockResolvedValue({ id: "sale-abc123" });
     });
 
     it("recognized client → routes to their agent, draft+site, reserves lot, barcode in notes", async () => {
@@ -249,7 +254,7 @@ describe("Order API", () => {
       expect(res.status).toBe(201);
 
       const data = txOrderCreate.mock.calls[0]![0].data;
-      expect(data.status).toBe("draft");
+      expect(data.status).toBe("pending");
       expect(data.source).toBe("site");
       expect(data.assignedAgentUserId).toBe("agent-9");
       expect(data.notes).toContain("L-123");

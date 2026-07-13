@@ -16,9 +16,6 @@ export interface OrdersRowData {
   source: string;
   agentName: string | null;
   assignedAgentName: string | null;
-  deliveryMethod: string | null;
-  /** Лейбл способу доставки — резолвиться на сервері (довідник, 7.3). */
-  deliveryLabel: string;
   itemCount: number;
   createdAt: Date;
   customer: {
@@ -128,13 +125,6 @@ export function OrdersRow({
         className={`px-2.5 py-1.5 text-sm ${dimmed ? "text-gray-400" : "text-gray-700"}`}
       >
         {order.agentName ?? order.assignedAgentName ?? "—"}
-      </td>
-      <td
-        data-col="delivery"
-        data-value={order.deliveryLabel}
-        className={`px-2.5 py-1.5 text-sm ${dimmed ? "text-gray-400" : "text-gray-600"}`}
-      >
-        {order.deliveryLabel}
       </td>
       <td
         data-col="positions"

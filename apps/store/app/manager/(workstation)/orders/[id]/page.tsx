@@ -8,10 +8,6 @@ import { canViewOrder } from "@/lib/manager/order-ownership";
 import { getOwnedClientIds } from "@/lib/manager/client-visibility";
 import { canEditOrder, isOrderLocked } from "@/lib/manager/order-status";
 import { formatOrderNumber } from "@/lib/manager/order-number";
-import {
-  getDeliveryMethodOptions,
-  getDeliveryLabelResolver,
-} from "@/lib/manager/delivery-methods";
 import { DiscussButton } from "../../messenger/_components/discuss-button";
 import { OrderForm } from "../new/_components/order-form";
 import { AutoRefresh } from "../../_components/auto-refresh";
@@ -144,7 +140,6 @@ export default async function ManagerOrderDetailPage({
             phonePrimary: true,
             street: true,
             house: true,
-            novaPoshtaBranch: true,
           },
         })
       : Promise.resolve(null),
@@ -159,12 +154,6 @@ export default async function ManagerOrderDetailPage({
     ? [mgr.street, mgr.house].filter(Boolean).join(", ") || null
     : null;
 
-  // Способи доставки — з редагованого довідника (7.3).
-  const [deliveryMethods, deliveryLabelOf] = await Promise.all([
-    getDeliveryMethodOptions(),
-    getDeliveryLabelResolver(),
-  ]);
-
   const clientSummary: ClientPickerItem = {
     id: order.customer.id,
     code1C: order.customer.code1C,
@@ -175,8 +164,6 @@ export default async function ManagerOrderDetailPage({
     address: mgrAddress,
     debt: mgr?.debt?.toString() ?? "0",
     priceTypeId: order.priceTypeId,
-    deliveryMethodCode: order.deliveryMethod,
-    novaPoshtaBranch: mgr?.novaPoshtaBranch ?? null,
     agent: null,
     isOwned: true,
   };
@@ -218,10 +205,6 @@ export default async function ManagerOrderDetailPage({
     isActual: order.isActual,
     notes: order.notes ?? "",
     priceTypeId: order.priceTypeId,
-    deliveryMethod: order.deliveryMethod,
-    novaPoshtaBranch: order.novaPoshtaBranch,
-    deliveryAddress: order.deliveryAddress,
-    expressWaybill: order.expressWaybill,
     overdueDays: order.overdueDays,
     cashOnDelivery: order.cashOnDelivery,
     assignedAgentUserId: order.assignedAgentUserId,
@@ -274,7 +257,6 @@ export default async function ManagerOrderDetailPage({
           )}
           <OrderCloseButton
             orderId={order.id}
-            status={order.status}
             isAlreadyClosed={!!order.closedAt}
             mgrClientId={mgrClientId}
           />
@@ -311,17 +293,11 @@ export default async function ManagerOrderDetailPage({
           exchangeRate={
             order.exchangeRate > 0 ? order.exchangeRate : exchangeRate
           }
-          deliveryMethods={deliveryMethods}
           currentUserId={user.id}
           currentUserName={user.fullName}
         />
       ) : (
-        <ReadOnlyOrder
-          order={order}
-          deliveryLabel={deliveryLabelOf(order.deliveryMethod)}
-          locked={locked}
-          soldMap={soldMap}
-        />
+        <ReadOnlyOrder order={order} locked={locked} soldMap={soldMap} />
       )}
     </div>
   );
@@ -349,12 +325,10 @@ async function loadOrderForView(id: string) {
 
 function ReadOnlyOrder({
   order,
-  deliveryLabel,
   locked,
   soldMap,
 }: {
   order: OrderForView;
-  deliveryLabel: string;
   locked: boolean;
   soldMap: Record<string, number>;
 }) {
@@ -363,8 +337,8 @@ function ReadOnlyOrder({
       <section className="rounded-lg border bg-white p-5">
         <p className="text-sm text-gray-500">
           {locked
-            ? "Замовлення проведено в 1С — редагування заборонено."
-            : "Замовлення скасовано — лише перегляд."}
+            ? "Замовлення проведено або закрите — лише перегляд."
+            : "Замовлення лише для перегляду."}
         </p>
       </section>
 
@@ -384,16 +358,6 @@ function ReadOnlyOrder({
           </Field>
           <Field label="Телефон">{order.customer.phone ?? "—"}</Field>
           <Field label="Місто">{order.customer.city ?? "—"}</Field>
-          <Field label="Доставка">{deliveryLabel}</Field>
-          {order.novaPoshtaBranch && (
-            <Field label="№ відділення НП">{order.novaPoshtaBranch}</Field>
-          )}
-          {order.expressWaybill && (
-            <Field label="ТТН">{order.expressWaybill}</Field>
-          )}
-          {order.deliveryAddress && (
-            <Field label="Адреса доставки">{order.deliveryAddress}</Field>
-          )}
           <Field label="Наложка">{order.cashOnDelivery ? "Так" : "Ні"}</Field>
           {order.overdueDays != null && (
             <Field label="Термін нагадування">{order.overdueDays} дн.</Field>

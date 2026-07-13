@@ -163,10 +163,7 @@ export async function listCustomers(
   const [sumAggregates, lastOrderAggregates] = await Promise.all([
     prisma.order.groupBy({
       by: ["customerId"],
-      where: {
-        customerId: { in: customerIds },
-        status: { not: "cancelled" },
-      },
+      where: { customerId: { in: customerIds } },
       _sum: { totalUah: true },
     }),
     prisma.order.groupBy({

@@ -18,27 +18,40 @@ describe("order-status meta", () => {
     expect(m.label).toBe("Проведено");
   });
 
-  it("falls back to raw status with gray color for unknown", () => {
+  it("new statuses have labels", () => {
+    expect(getOrderStatusMeta("not_posted").label).toBe("Не проведено");
+    expect(getOrderStatusMeta("pending").label).toBe("Очікує підтвердження");
+    expect(getOrderStatusMeta("draft").label).toBe("Чернетка");
+  });
+
+  it("legacy status shows a readable label (historical display only)", () => {
+    expect(getOrderStatusMeta("cancelled").label).toBe("Скасовано");
+    expect(getOrderStatusMeta("shipped").label).toBe("Відвантажено");
+  });
+
+  it("falls back to raw status with gray color for truly unknown", () => {
     const m = getOrderStatusMeta("unknown_status");
     expect(m.label).toBe("unknown_status");
     expect(m.color).toBe("gray");
   });
 
-  it("contains the 4 canonical statuses + legacy ones", () => {
-    expect(ORDER_STATUS_LIST).toContain("draft");
-    expect(ORDER_STATUS_LIST).toContain("sent");
-    expect(ORDER_STATUS_LIST).toContain("posted");
-    expect(ORDER_STATUS_LIST).toContain("cancelled");
-    // legacy preserved for back-compat display
-    expect(ORDER_STATUS_LIST).toContain("delivered");
+  it("contains exactly the 4 canonical statuses (no legacy)", () => {
+    expect(ORDER_STATUS_LIST).toEqual([
+      "draft",
+      "not_posted",
+      "posted",
+      "pending",
+    ]);
+    expect(ORDER_STATUS_LIST).not.toContain("cancelled");
+    expect(ORDER_STATUS_LIST).not.toContain("sent");
   });
 
-  it("MANAGER_ORDER_STATUSES — exactly 4 canonical", () => {
+  it("MANAGER_ORDER_STATUSES — the 4 canonical", () => {
     expect(MANAGER_ORDER_STATUSES).toEqual([
       "draft",
-      "sent",
+      "not_posted",
       "posted",
-      "cancelled",
+      "pending",
     ]);
   });
 });
@@ -46,75 +59,74 @@ describe("order-status meta", () => {
 describe("isManagerOrderStatus", () => {
   it("true for canonical statuses", () => {
     expect(isManagerOrderStatus("draft")).toBe(true);
+    expect(isManagerOrderStatus("not_posted")).toBe(true);
+    expect(isManagerOrderStatus("pending")).toBe(true);
     expect(isManagerOrderStatus("posted")).toBe(true);
   });
   it("false for legacy / unknown", () => {
-    expect(isManagerOrderStatus("delivered")).toBe(false);
+    expect(isManagerOrderStatus("cancelled")).toBe(false);
+    expect(isManagerOrderStatus("sent")).toBe(false);
     expect(isManagerOrderStatus("nope")).toBe(false);
   });
 });
 
 describe("isOrderLocked / canEditOrder", () => {
-  it("posted редагується лише поки «Актуальне» (7.3)", () => {
+  it("posted редагується лише поки «Актуальне»", () => {
     expect(isOrderLocked("posted")).toBe(true);
-    // posted + актуальне → редагується; posted + неактуальне → ні.
     expect(canEditOrder("posted", true)).toBe(true);
     expect(canEditOrder("posted", false)).toBe(false);
   });
-  it("cancelled is not locked but not editable", () => {
-    expect(isOrderLocked("cancelled")).toBe(false);
-    expect(canEditOrder("cancelled")).toBe(false);
-  });
-  it("draft and sent are editable", () => {
+  it("draft / not_posted / pending are editable", () => {
     expect(canEditOrder("draft")).toBe(true);
-    expect(canEditOrder("sent")).toBe(true);
+    expect(canEditOrder("not_posted")).toBe(true);
+    expect(canEditOrder("pending")).toBe(true);
+    expect(isOrderLocked("draft")).toBe(false);
   });
   it("legacy status editable (treated as draft)", () => {
-    expect(canEditOrder("delivered")).toBe(true);
-    expect(isOrderLocked("delivered")).toBe(false);
+    expect(canEditOrder("cancelled")).toBe(true);
+    expect(isOrderLocked("cancelled")).toBe(false);
   });
 });
 
 describe("status transitions", () => {
-  it("draft → sent / posted / cancelled", () => {
+  it("draft → not_posted / posted", () => {
     expect(getAllowedStatusTransitions("draft")).toEqual([
-      "sent",
+      "not_posted",
       "posted",
-      "cancelled",
     ]);
   });
-  it("sent → draft / posted / cancelled", () => {
-    expect(getAllowedStatusTransitions("sent")).toEqual([
-      "draft",
+  it("not_posted → posted / draft", () => {
+    expect(getAllowedStatusTransitions("not_posted")).toEqual([
       "posted",
-      "cancelled",
+      "draft",
+    ]);
+  });
+  it("pending → not_posted / posted", () => {
+    expect(getAllowedStatusTransitions("pending")).toEqual([
+      "not_posted",
+      "posted",
     ]);
   });
   it("posted is final — no transitions", () => {
     expect(getAllowedStatusTransitions("posted")).toEqual([]);
   });
-  it("cancelled → draft (return to work)", () => {
-    expect(getAllowedStatusTransitions("cancelled")).toEqual(["draft"]);
-  });
   it("legacy status treated as draft for transitions", () => {
-    expect(getAllowedStatusTransitions("delivered")).toEqual([
-      "sent",
+    expect(getAllowedStatusTransitions("cancelled")).toEqual([
+      "not_posted",
       "posted",
-      "cancelled",
     ]);
   });
 
   it("isTransitionAllowed honours the graph", () => {
-    expect(isTransitionAllowed("draft", "sent")).toBe(true);
-    expect(isTransitionAllowed("sent", "draft")).toBe(true);
-    expect(isTransitionAllowed("draft", "cancelled")).toBe(true);
-    // «Зберегти та провести» — draft/sent → posted дозволено.
+    expect(isTransitionAllowed("draft", "not_posted")).toBe(true);
     expect(isTransitionAllowed("draft", "posted")).toBe(true);
-    expect(isTransitionAllowed("sent", "posted")).toBe(true);
-    // posted — фінальний; cancelled → posted заборонено.
+    expect(isTransitionAllowed("pending", "posted")).toBe(true);
+    expect(isTransitionAllowed("pending", "not_posted")).toBe(true);
+    expect(isTransitionAllowed("not_posted", "posted")).toBe(true);
+    // posted — фінальний.
     expect(isTransitionAllowed("posted", "draft")).toBe(false);
-    expect(isTransitionAllowed("cancelled", "posted")).toBe(false);
-    expect(isTransitionAllowed("draft", "delivered")).toBe(false);
+    // removed status is not a valid target.
+    expect(isTransitionAllowed("draft", "cancelled")).toBe(false);
     expect(isTransitionAllowed("draft", "bogus")).toBe(false);
   });
 });
