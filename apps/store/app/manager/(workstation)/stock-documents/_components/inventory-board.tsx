@@ -68,6 +68,32 @@ const STATUS_ROW: Record<RowStatus, string> = {
   empty: "",
 };
 
+interface LogEntry {
+  id: string;
+  userName: string | null;
+  action: string;
+  message: string;
+  createdAt: string;
+}
+
+const LOG_ACTION_LABEL: Record<string, string> = {
+  fill: "Заповнення",
+  found: "Знайдено",
+  surplus: "Надлишок",
+  unknown: "Невідомий ШК",
+  edit: "Зміна",
+  remove: "Видалення",
+  header: "Шапка",
+  post: "Проведення",
+  reopen: "Розпроведення",
+};
+
+function fmtTime(iso: string): string {
+  const d = new Date(iso);
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${p(d.getDate())}.${p(d.getMonth() + 1)} ${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+
 export function InventoryBoard({ initialDoc }: Props) {
   const router = useRouter();
   const [docId, setDocId] = useState<string | null>(initialDoc?.id ?? null);
@@ -88,6 +114,8 @@ export function InventoryBoard({ initialDoc }: Props) {
     null,
   );
   const [newSector, setNewSector] = useState("");
+  const [logsOpen, setLogsOpen] = useState(false);
+  const [logs, setLogs] = useState<LogEntry[]>([]);
 
   const {
     widths,
@@ -150,6 +178,26 @@ export function InventoryBoard({ initialDoc }: Props) {
     const t = setInterval(() => void loadSectors(), 15000);
     return () => clearInterval(t);
   }, [loadSectors]);
+
+  // ── Журнал документа ──
+  const loadLogs = useCallback(async () => {
+    const id = docIdRef.current;
+    if (!id) return;
+    try {
+      const res = await fetch(`${BASE}/${id}/logs`, { cache: "no-store" });
+      if (!res.ok) return;
+      const data = await res.json();
+      setLogs(Array.isArray(data.logs) ? data.logs : []);
+    } catch {
+      /* ignore */
+    }
+  }, []);
+  useEffect(() => {
+    if (!logsOpen) return;
+    void loadLogs();
+    const t = setInterval(() => void loadLogs(), 4000);
+    return () => clearInterval(t);
+  }, [logsOpen, loadLogs]);
 
   /** Створює чернетку на сервері (лінива), повертає id для спільної роботи. */
   const ensureDoc = useCallback(async (): Promise<string | null> => {
@@ -587,6 +635,19 @@ export function InventoryBoard({ initialDoc }: Props) {
             </button>
           ))}
         </div>
+        <button
+          type="button"
+          onClick={() => setLogsOpen((v) => !v)}
+          disabled={!docId}
+          className={`rounded-full px-3 py-1 text-xs font-medium ${
+            logsOpen
+              ? "bg-gray-800 text-white"
+              : "border border-gray-300 bg-white text-gray-600 hover:bg-gray-50"
+          } disabled:opacity-40`}
+          title={docId ? "Журнал змін документа" : "Доступно після першої дії"}
+        >
+          🕘 Журнал
+        </button>
         <input
           value={search}
           onChange={(e) => setSearch(e.target.value)}
@@ -594,6 +655,53 @@ export function InventoryBoard({ initialDoc }: Props) {
           className="ml-auto w-64 rounded-md border border-gray-300 px-2 py-1 text-sm"
         />
       </div>
+
+      {logsOpen && (
+        <div className="rounded-md border bg-white">
+          <div className="flex items-center justify-between border-b px-3 py-2 text-sm font-medium">
+            <span>Журнал змін ({logs.length})</span>
+            <button
+              type="button"
+              onClick={() => void loadLogs()}
+              className="text-xs font-normal text-gray-500 hover:text-gray-800"
+            >
+              ↻ Оновити
+            </button>
+          </div>
+          {logs.length === 0 ? (
+            <p className="px-3 py-4 text-sm text-gray-400">Журнал порожній.</p>
+          ) : (
+            <div className="max-h-72 overflow-y-auto">
+              <table className="w-full text-xs">
+                <thead className="sticky top-0 bg-gray-50 text-left uppercase tracking-wide text-gray-500">
+                  <tr>
+                    <th className="px-3 py-1.5">Час</th>
+                    <th className="px-3 py-1.5">Користувач</th>
+                    <th className="px-3 py-1.5">Дія</th>
+                    <th className="px-3 py-1.5">Деталі</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {logs.map((l) => (
+                    <tr key={l.id}>
+                      <td className="whitespace-nowrap px-3 py-1 text-gray-500">
+                        {fmtTime(l.createdAt)}
+                      </td>
+                      <td className="px-3 py-1 text-gray-700">
+                        {l.userName || "—"}
+                      </td>
+                      <td className="px-3 py-1">
+                        {LOG_ACTION_LABEL[l.action] ?? l.action}
+                      </td>
+                      <td className="px-3 py-1 text-gray-600">{l.message}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Таблиця з ресайзом колонок */}
       <div className="rounded-md border bg-white">
