@@ -41,6 +41,19 @@ export interface MarkDeletionRequest {
   message: string;
 }
 
+/**
+ * Стандартні причини вилучення (щоб не набирати щоразу вручну). Вибір із
+ * списку одразу заповнює редаговане поле — за потреби причину можна дописати.
+ */
+const STANDARD_DELETION_REASONS = [
+  "Дублікат документа",
+  "Помилковий запис",
+  "Створено помилково",
+  "Тестовий запис",
+  "Скасовано клієнтом",
+  "Неактуальне / застаріле",
+] as const;
+
 export function useDocMarkDeletion(): {
   requestMark: (req: MarkDeletionRequest) => void;
   dialog: JSX.Element | null;
@@ -141,13 +154,34 @@ export function useDocMarkDeletion(): {
                 адміністратор не підтвердив остаточне видалення. Вкажіть
                 причину:
               </p>
+              <select
+                value={
+                  (STANDARD_DELETION_REASONS as readonly string[]).includes(
+                    reason,
+                  )
+                    ? reason
+                    : ""
+                }
+                onChange={(e) => {
+                  if (e.target.value) setReason(e.target.value);
+                }}
+                aria-label="Оберіть стандартну причину"
+                className="mt-3 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-red-400 focus:outline-none focus:ring-1 focus:ring-red-400"
+              >
+                <option value="">— Оберіть причину зі списку —</option>
+                {STANDARD_DELETION_REASONS.map((r) => (
+                  <option key={r} value={r}>
+                    {r}
+                  </option>
+                ))}
+              </select>
               <textarea
                 value={reason}
                 onChange={(e) => setReason(e.target.value)}
-                rows={3}
+                rows={2}
                 autoFocus
-                placeholder="Наприклад: дублікат, помилковий запис…"
-                className="mt-3 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-red-400 focus:outline-none focus:ring-1 focus:ring-red-400"
+                placeholder="Або впишіть свою причину (можна дописати до обраної)…"
+                className="mt-2 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-red-400 focus:outline-none focus:ring-1 focus:ring-red-400"
               />
               {error && (
                 <p className="mt-3 rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
