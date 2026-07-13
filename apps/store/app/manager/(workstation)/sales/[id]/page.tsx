@@ -112,44 +112,33 @@ export default async function ManagerSaleDetailPage({
   const editable = canEditSale(sale.status);
   const locked = isSaleLocked(sale.status);
 
-  const [
-    exchangeRateEur,
-    exchangeRateUsd,
-    mgr,
-    cashOrders,
-    paymentSummary,
-    bankAccounts,
-  ] = await Promise.all([
-    // Задача B: живий курс — лише дефолт/fallback. Форма редагування існуючої
-    // реалізації нижче бере курс-знімок самого документа (sale.exchangeRateEur/
-    // Usd), інакше документ переоцінився б сьогоднішнім курсом.
-    getCurrentRate(),
-    getUsdRate(),
-    sale.customer.code1C
-      ? prisma.mgrClient.findUnique({
-          where: { code1C: sale.customer.code1C },
-          select: {
-            debt: true,
-            phonePrimary: true,
-            region: true,
-            street: true,
-            house: true,
-          },
-        })
-      : Promise.resolve(null),
-    prisma.mgrCashOrder.findMany({
-      // Усі ордери реалізації (чернетки + проведені); зведення все одно рахує
-      // лише проведені. Проведені тепер archived=true, тож фільтр прибрано.
-      where: { saleId: sale.id },
-      orderBy: { createdAt: "asc" },
-    }),
-    getPaymentSummary(sale.id),
-    prisma.mgrBankAccount.findMany({
-      where: { archived: false, hiddenInApp: false },
-      select: { id: true, name: true },
-      orderBy: { name: "asc" },
-    }),
-  ]);
+  const [exchangeRateEur, exchangeRateUsd, mgr, cashOrders, paymentSummary] =
+    await Promise.all([
+      // Задача B: живий курс — лише дефолт/fallback. Форма редагування існуючої
+      // реалізації нижче бере курс-знімок самого документа (sale.exchangeRateEur/
+      // Usd), інакше документ переоцінився б сьогоднішнім курсом.
+      getCurrentRate(),
+      getUsdRate(),
+      sale.customer.code1C
+        ? prisma.mgrClient.findUnique({
+            where: { code1C: sale.customer.code1C },
+            select: {
+              debt: true,
+              phonePrimary: true,
+              region: true,
+              street: true,
+              house: true,
+            },
+          })
+        : Promise.resolve(null),
+      prisma.mgrCashOrder.findMany({
+        // Усі ордери реалізації (чернетки + проведені); зведення все одно рахує
+        // лише проведені. Проведені тепер archived=true, тож фільтр прибрано.
+        where: { saleId: sale.id },
+        orderBy: { createdAt: "asc" },
+      }),
+      getPaymentSummary(sale.id),
+    ]);
 
   const mgrAddress = mgr
     ? [mgr.street, mgr.house].filter(Boolean).join(", ") || null
@@ -314,7 +303,7 @@ export default async function ManagerSaleDetailPage({
           deliveryMethods={deliveryMethods}
           currentUserId={user.id}
           currentUserName={user.fullName}
-          bankAccounts={bankAccounts}
+          alreadyReceivedUah={cashSummary.receivedUah}
         />
       ) : (
         <ReadOnlySale

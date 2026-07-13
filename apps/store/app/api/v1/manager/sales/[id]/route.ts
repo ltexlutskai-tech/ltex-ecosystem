@@ -187,8 +187,16 @@ export async function PATCH(
 
   // Якщо змінюється статус — перевіряємо дозволеність переходу.
   // Кнопка «Зберегти та провести» (`post=true`) ⇒ перехід у `posted`.
+  // Звичайне «Зберегти» (без статусу) для незбереженого документа
+  // (`draft`/`pending`) ⇒ авто-перехід у `not_posted` (створене, ще не проведене).
+  let requestedStatus = input.post ? "posted" : input.status;
+  if (
+    !requestedStatus &&
+    (existing.status === "draft" || existing.status === "pending")
+  ) {
+    requestedStatus = "not_posted";
+  }
   let nextStatus: string | undefined;
-  const requestedStatus = input.post ? "posted" : input.status;
   if (requestedStatus && requestedStatus !== existing.status) {
     if (!isSaleTransitionAllowed(existing.status, requestedStatus)) {
       return NextResponse.json(

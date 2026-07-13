@@ -10,6 +10,7 @@ import {
   serializeSaleRow,
 } from "@/lib/manager/sales-list";
 import { getDeliveryLabelResolver } from "@/lib/manager/delivery-methods";
+import { getSaleFilterOptions } from "@/lib/manager/sale-filter-options";
 import { EmptyState } from "../_components/empty-state";
 import { AutoRefresh } from "../_components/auto-refresh";
 import { ListPagination } from "../customers/_components/list-pagination";
@@ -62,7 +63,10 @@ export default async function ManagerSalesPage({
   const sp = await searchParams;
   const filter = parseSalesFilterFromSearchParams(sp);
 
-  const myCodes = await getMyClientCodes1C(user);
+  const [myCodes, filterOptions] = await Promise.all([
+    getMyClientCodes1C(user),
+    getSaleFilterOptions(),
+  ]);
 
   // Manager scope з 0 клієнтами / або filter по чужому клієнту → empty
   if (
@@ -70,7 +74,7 @@ export default async function ManagerSalesPage({
     (myCodes.length === 0 ||
       (filter.clientCode1C && !myCodes.includes(filter.clientCode1C)))
   ) {
-    return renderEmpty(filter.clientCode1C);
+    return renderEmpty(filter.clientCode1C, filterOptions);
   }
 
   const fromDate = filter.from ? new Date(filter.from) : undefined;
@@ -153,7 +157,10 @@ export default async function ManagerSalesPage({
         </Link>
       </header>
 
-      <SalesToolbar />
+      <SalesToolbar
+        cityOptions={filterOptions.cities}
+        agentOptions={filterOptions.agents}
+      />
 
       {rows.length === 0 ? (
         <EmptyState
@@ -170,7 +177,10 @@ export default async function ManagerSalesPage({
   );
 }
 
-function renderEmpty(clientCode1C: string): React.ReactElement {
+function renderEmpty(
+  clientCode1C: string,
+  filterOptions: { cities: string[]; agents: string[] },
+): React.ReactElement {
   return (
     <div className="max-w-none space-y-3">
       <header className="flex items-start justify-between gap-3">
@@ -183,7 +193,10 @@ function renderEmpty(clientCode1C: string): React.ReactElement {
           Додати
         </Link>
       </header>
-      <SalesToolbar />
+      <SalesToolbar
+        cityOptions={filterOptions.cities}
+        agentOptions={filterOptions.agents}
+      />
       <EmptyState
         message={
           clientCode1C

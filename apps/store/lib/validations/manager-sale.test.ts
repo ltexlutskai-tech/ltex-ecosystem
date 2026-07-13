@@ -197,7 +197,7 @@ describe("updateSaleSchema", () => {
   it("accepts canonical status value", () => {
     const result = updateSaleSchema.safeParse({
       items: [minimalItem],
-      status: "sent",
+      status: "not_posted",
     });
     expect(result.success).toBe(true);
   });

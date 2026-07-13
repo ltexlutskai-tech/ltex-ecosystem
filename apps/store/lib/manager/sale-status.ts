@@ -1,50 +1,66 @@
 /**
  * Блок «Реалізація» — статуси документа (← 1С Document.РеализацияТоваровУслуг).
  *
- * Канонічні статуси менеджерської реалізації (узгоджено з user, Етап 1):
- *   - `draft`     — Чернетка (редагується вільно);
- *   - `sent`      — Відправлено в 1С (черга обміну прийняла);
- *   - `posted`    — Проведено (архів) — проведено в 1С, документ заблоковано
- *                   для редагування (ставиться на етапі реальних обмінів);
- *   - `cancelled` — Скасовано.
+ * Канонічні статуси менеджерської реалізації (модель 8.1, узгоджено з
+ * «Замовленнями» — рішення user): ті самі 4 статуси, що й у `order-status.ts`.
+ *   - `draft`      — Чернетка: документ робили, але вийшли не зберігаючи
+ *                    (автозбереження). Лежить у списку як незавершений.
+ *   - `not_posted` — Не проведено: реалізація створена й збережена («Зберегти»),
+ *                    але рухи по реєстрах ще НЕ йдуть.
+ *   - `posted`     — Проведено: документ зафіксовано (ведуться рухи в реєстрах);
+ *                    відправляється в архів (прибирається з головного списку).
+ *   - `pending`    — Очікує підтвердження: реалізація, авто-створена з сайтового
+ *                    замовлення з конкретними лотами; чекає підтвердження й
+ *                    проведення менеджером.
  *
  * `archived=true` на рівні `Sale` відповідає статусу `posted`.
  *
- * Дзеркалить `order-status.ts` (граф переходів — Етап 2: редагування/
- * проведення; у Етапі 1 використовувалися лише label/color та allow-list).
+ * Дзеркалить `order-status.ts` (граф переходів + легасі-лейбли для історичних
+ * 1С-документів). Легасі `sent`/`cancelled` лишились лише для читабельного
+ * показу історичних документів — НЕ у фільтрах/переходах.
  */
 
 export const SALE_STATUS_META = {
   draft: { label: "Чернетка", color: "gray" },
-  sent: { label: "Відправлено в 1С", color: "blue" },
-  posted: { label: "Проведено (архів)", color: "green" },
-  cancelled: { label: "Скасовано", color: "red" },
-  // Реалізація, авто-створена з сайтового замовлення з конкретними лотами —
-  // чекає підтвердження й проведення менеджером (8.1). Рухи по реєстрах ще
-  // не йдуть (не проведена).
+  not_posted: { label: "Не проведено", color: "blue" },
+  posted: { label: "Проведено", color: "green" },
   pending: { label: "Очікує підтвердження", color: "yellow" },
 } as const;
 
 export type SaleStatus = keyof typeof SALE_STATUS_META;
 
-/** Повний список усіх відомих статусів — allow-list для фільтрів/валідації. */
+/**
+ * Легасі-лейбли для СТАРИХ документів (історичний 1С-імпорт), чиї статуси більше
+ * не пропонуються у системі. Використовуються ЛИШЕ для читабельного показу в
+ * архівному перегляді — не входять у allow-list фільтрів/валідації/переходів.
+ */
+const LEGACY_STATUS_LABELS: Record<string, string> = {
+  sent: "Відправлено в 1С",
+  cancelled: "Скасовано",
+  approved: "Підтверджено",
+  shipped: "Відвантажено",
+  delivered: "Доставлено",
+};
+
+/**
+ * Повний список канонічних статусів — allow-list для фільтрів списку та
+ * валідації. Легасі-статуси сюди НЕ входять (лишились лише в історичних даних).
+ */
 export const SALE_STATUS_LIST: SaleStatus[] = [
   "draft",
-  "sent",
+  "not_posted",
   "posted",
-  "cancelled",
   "pending",
 ];
 
 /**
- * Канонічні статуси менеджерської реалізації — пропонуються у UI зміни статусу
- * та беруть участь у графі дозволених переходів.
+ * Канонічні статуси менеджерської реалізації (4) — що пропонуються у UI зміни
+ * статусу та беруть участь у графі дозволених переходів.
  */
 export const MANAGER_SALE_STATUSES = [
   "draft",
-  "sent",
+  "not_posted",
   "posted",
-  "cancelled",
   "pending",
 ] as const;
 
@@ -54,29 +70,26 @@ export function getSaleStatusMeta(status: string): {
   label: string;
   color: string;
 } {
-  return (
-    SALE_STATUS_META[status as SaleStatus] ?? { label: status, color: "gray" }
-  );
+  const meta = SALE_STATUS_META[status as SaleStatus];
+  if (meta) return meta;
+  const legacy = LEGACY_STATUS_LABELS[status];
+  return { label: legacy ?? status, color: "gray" };
 }
 
 /**
  * Граф дозволених переходів статусу менеджерської реалізації (дзеркалить
  * замовлення):
  *
- *   draft   ↔ sent          (відправити в 1С / повернути в чернетку)
- *   draft   → cancelled
- *   sent    → cancelled
- *   posted  → (лок)         — проведено в 1С, переходів немає
- *   cancelled → draft       — повернути скасоване у роботу
+ *   draft      → not_posted | posted     (зберегти / зберегти й провести)
+ *   not_posted → posted | draft
+ *   pending    → not_posted | posted     (підтвердити / провести сайтове)
+ *   posted     → (лок)                   — проведено, переходів немає
  */
 const SALE_TRANSITIONS: Record<ManagerSaleStatus, ManagerSaleStatus[]> = {
-  draft: ["sent", "posted", "cancelled"],
-  sent: ["draft", "posted", "cancelled"],
+  draft: ["not_posted", "posted"],
+  not_posted: ["posted", "draft"],
+  pending: ["not_posted", "posted"],
   posted: [],
-  cancelled: ["draft"],
-  // Сайтова реалізація «Очікує підтвердження» → провести / повернути в чернетку
-  // / скасувати.
-  pending: ["posted", "draft", "cancelled"],
 };
 
 /** Чи є статус канонічним менеджерським (один з 4). */
@@ -87,25 +100,26 @@ export function isManagerSaleStatus(
 }
 
 /**
- * Реалізація «проведена» (заблокована для будь-яких змін — шапка/товари/статус).
- * Тільки `posted`.
+ * Реалізація «проведена» (`posted`) — заблокована для будь-яких змін
+ * (шапка/товари/статус).
  */
 export function isSaleLocked(status: string): boolean {
   return status === "posted";
 }
 
 /**
- * Чи можна редагувати шапку/товари реалізації у цьому статусі.
- * Заблоковані: `posted` (проведено в 1С) та `cancelled` (скасоване —
- * лише перегляд, поки не повернуть у чернетку).
+ * Чи можна редагувати шапку/товари реалізації.
+ *
+ * Заблоковані лише проведені (`posted`). Чернетка / Не проведено / Очікує
+ * підтвердження — редагуються завжди.
  */
 export function canEditSale(status: string): boolean {
-  return !isSaleLocked(status) && status !== "cancelled";
+  return !isSaleLocked(status);
 }
 
 /**
  * Повертає список дозволених наступних статусів для поточного.
- * Невідомий статус трактується як `draft`.
+ * Невідомий / легасі статус трактується як `draft`.
  */
 export function getAllowedSaleTransitions(
   current: string,

@@ -261,12 +261,14 @@ describe("PATCH /api/v1/manager/sales/[id]", () => {
     expect(res.status).toBe(400);
   });
 
-  it("updates header + items (no status change)", async () => {
+  it("updates header + items без зміни статусу (not_posted лишається)", async () => {
     mockPrisma.sale.findUnique.mockResolvedValueOnce({
       id: "sale1",
-      status: "draft",
+      status: "not_posted",
     });
-    updateSaleWithItemsMock.mockResolvedValueOnce(fakeUpdatedSale("draft"));
+    updateSaleWithItemsMock.mockResolvedValueOnce(
+      fakeUpdatedSale("not_posted"),
+    );
     const res = await PATCH(
       patchReq({
         ...VALID_PATCH_BODY,
@@ -279,7 +281,7 @@ describe("PATCH /api/v1/manager/sales/[id]", () => {
     expect(res.status).toBe(200);
     const json = (await res.json()) as { totalEur: number; status: string };
     expect(json.totalEur).toBe(40);
-    expect(json.status).toBe("draft");
+    expect(json.status).toBe("not_posted");
 
     const callArgs = updateSaleWithItemsMock.mock.calls[0] as [
       string,
@@ -290,16 +292,19 @@ describe("PATCH /api/v1/manager/sales/[id]", () => {
     expect(callArgs[0]).toBe("sale1");
     expect(callArgs[1].priceTypeId).toBe("pt-1");
     expect(callArgs[2].userId).toBe("u1");
+    // not_posted без явного статусу — жодного переходу.
     expect(callArgs[3].nextStatus).toBeUndefined();
   });
 
-  it("applies allowed status transition draft → sent", async () => {
+  it("авто-промоут: «Зберегти» чернетку (draft) → not_posted", async () => {
     mockPrisma.sale.findUnique.mockResolvedValueOnce({
       id: "sale1",
       status: "draft",
     });
-    updateSaleWithItemsMock.mockResolvedValueOnce(fakeUpdatedSale("sent"));
-    const res = await PATCH(patchReq({ ...VALID_PATCH_BODY, status: "sent" }), {
+    updateSaleWithItemsMock.mockResolvedValueOnce(
+      fakeUpdatedSale("not_posted"),
+    );
+    const res = await PATCH(patchReq({ ...VALID_PATCH_BODY }), {
       params: Promise.resolve({ id: "sale1" }),
     });
     expect(res.status).toBe(200);
@@ -309,16 +314,38 @@ describe("PATCH /api/v1/manager/sales/[id]", () => {
       unknown,
       { nextStatus?: string },
     ];
-    expect(callArgs[3].nextStatus).toBe("sent");
+    expect(callArgs[3].nextStatus).toBe("not_posted");
   });
 
-  it("returns 409 on disallowed status transition (cancelled → posted)", async () => {
+  it("applies allowed status transition not_posted → draft", async () => {
     mockPrisma.sale.findUnique.mockResolvedValueOnce({
       id: "sale1",
-      status: "cancelled",
+      status: "not_posted",
+    });
+    updateSaleWithItemsMock.mockResolvedValueOnce(fakeUpdatedSale("draft"));
+    const res = await PATCH(
+      patchReq({ ...VALID_PATCH_BODY, status: "draft" }),
+      {
+        params: Promise.resolve({ id: "sale1" }),
+      },
+    );
+    expect(res.status).toBe(200);
+    const callArgs = updateSaleWithItemsMock.mock.calls[0] as [
+      string,
+      unknown,
+      unknown,
+      { nextStatus?: string },
+    ];
+    expect(callArgs[3].nextStatus).toBe("draft");
+  });
+
+  it("returns 409 on disallowed status transition (not_posted → pending)", async () => {
+    mockPrisma.sale.findUnique.mockResolvedValueOnce({
+      id: "sale1",
+      status: "not_posted",
     });
     const res = await PATCH(
-      patchReq({ ...VALID_PATCH_BODY, status: "posted" }),
+      patchReq({ ...VALID_PATCH_BODY, status: "pending" }),
       { params: Promise.resolve({ id: "sale1" }) },
     );
     expect(res.status).toBe(409);
@@ -361,9 +388,11 @@ describe("PATCH /api/v1/manager/sales/[id]", () => {
     canViewSaleMock.mockResolvedValueOnce(true);
     mockPrisma.sale.findUnique.mockResolvedValueOnce({
       id: "sale1",
-      status: "sent",
+      status: "not_posted",
     });
-    updateSaleWithItemsMock.mockResolvedValueOnce(fakeUpdatedSale("sent"));
+    updateSaleWithItemsMock.mockResolvedValueOnce(
+      fakeUpdatedSale("not_posted"),
+    );
     const res = await PATCH(patchReq(VALID_PATCH_BODY), {
       params: Promise.resolve({ id: "sale1" }),
     });

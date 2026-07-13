@@ -19,7 +19,7 @@ describe("normalizeSaleStatus", () => {
   });
 
   it("trims whitespace", () => {
-    expect(normalizeSaleStatus("  sent  ")).toBe("sent");
+    expect(normalizeSaleStatus("  not_posted  ")).toBe("not_posted");
   });
 });
 
@@ -160,8 +160,8 @@ describe("buildSalesWhere — search (client + products + docNumber)", () => {
 
 describe("buildSalesWhere — status + date range", () => {
   it("applies status when present", () => {
-    expect(buildSalesWhere({ scope: null, status: "sent" }).status).toBe(
-      "sent",
+    expect(buildSalesWhere({ scope: null, status: "not_posted" }).status).toBe(
+      "not_posted",
     );
   });
 

@@ -79,18 +79,28 @@ function inputByLabelPrefix(prefix: string): HTMLInputElement {
   return input as HTMLInputElement;
 }
 
+const STANDALONE: PaymentFormProps = {
+  ...BASE,
+  mode: "standalone",
+  saleId: null,
+  presetSumToPayEur: null,
+};
+
 describe("PaymentForm", () => {
-  it("рендерить режим Приход з підсумками EUR", () => {
+  it("режим реалізації: Прихід + стаття «Оплата від покупця» зафіксовані (без вибору)", () => {
     render(<PaymentForm {...BASE} />);
-    expect(screen.getByText("Прихід")).toBeDefined();
-    expect(screen.getByText("Розхід")).toBeDefined();
+    // Замість перемикача — фіксований лейбл (виключає помилку виду руху).
+    expect(screen.getByText("Прихід · Оплата від покупця")).toBeDefined();
+    expect(screen.queryByText("Розхід")).toBeNull();
     expect(screen.getByText("Оплата (EUR)")).toBeDefined();
     // «До оплати» preset = 100, оплати немає → залишок (борг) = 100 €.
     expect(screen.getByText("Залишок (борг)")).toBeDefined();
   });
 
-  it("стаття руху коштів показується завжди; Розхід ховає решту", () => {
-    render(<PaymentForm {...BASE} />);
+  it("standalone: перемикач Прихід/Розхід + стаття; Розхід ховає решту", () => {
+    render(<PaymentForm {...STANDALONE} />);
+    expect(screen.getByText("Прихід")).toBeDefined();
+    expect(screen.getByText("Розхід")).toBeDefined();
     // Стаття обов'язкова і для Приходу, і для Розходу — секція є завжди.
     expect(screen.getByText("Стаття руху коштів")).toBeDefined();
     expect(screen.getByText("Решта (здача)")).toBeDefined();

@@ -32,7 +32,7 @@ interface PaymentDraftData {
   direction: CashFlowDirection;
   clientId: string | null;
   clientLabel: string | null;
-  clientDebtEur: number;
+  clientBalanceEur: number;
   sumToPayRaw: string;
   includeDebt: boolean;
   rateEurRaw: string;
@@ -84,6 +84,13 @@ export interface PaymentFormProps {
   clientLabel?: string | null;
   /** Борг клієнта (EUR) — для «Включити суму боргу». */
   clientDebtEur?: number | null;
+  /**
+   * Знаковий баланс клієнта (EUR): >0 — клієнт винен (борг), <0 — переплата
+   * (кредит). Дозволяє зарахувати попередній борг/переплату у фактичну оплату
+   * (напр. для оплати на основі реалізації). Коли переданий — переважає над
+   * `clientDebtEur` (який лише додатний).
+   */
+  clientBalanceEur?: number | null;
   bankAccounts: BankAccountOption[];
   cashFlowArticles: CashFlowArticleOption[];
   /** Роль користувача — для приховування лімітованих рахунків від менеджерів. */
@@ -136,6 +143,7 @@ export function PaymentForm({
   presetRateUsd,
   clientLabel,
   clientDebtEur,
+  clientBalanceEur,
   bankAccounts,
   cashFlowArticles,
   userRole,
@@ -146,6 +154,10 @@ export function PaymentForm({
   const { toast } = useToast();
 
   const isManagerRole = userRole !== "admin" && userRole !== "owner";
+
+  // Оплата на основі реалізації: тільки Прихід + стаття «Оплата від покупця»
+  // (без вибору — виключає можливість помилки, рішення user).
+  const lockSaleIncome = mode === "sale";
 
   // Дефолтна прихідна стаття для менеджера («Оплата від покупця» — за назвою).
   const defaultIncomeArticleId = useMemo(() => {
@@ -167,9 +179,9 @@ export function PaymentForm({
   const [pickedClientLabel, setPickedClientLabel] = useState<string | null>(
     clientLabel ?? null,
   );
-  // Борг обраного клієнта (EUR) — для «Включити суму боргу».
-  const [pickedClientDebtEur, setPickedClientDebtEur] = useState<number>(
-    clientDebtEur ?? 0,
+  // Баланс обраного клієнта (EUR, знаковий): >0 — борг, <0 — переплата (кредит).
+  const [pickedClientBalanceEur, setPickedClientBalanceEur] = useState<number>(
+    clientBalanceEur ?? clientDebtEur ?? 0,
   );
 
   const needsClientPicker = mode === "standalone" && !saleId && !clientId;
@@ -199,9 +211,10 @@ export function PaymentForm({
 
   // ─── Банк. рахунок / стаття / коментар ────────────────────────────────────
   const [bankAccountId, setBankAccountId] = useState("");
-  // Стаття руху коштів (обов'язкова). Менеджеру — дефолт «Оплата від покупця».
+  // Стаття руху коштів (обов'язкова). Менеджеру (та завжди для оплати на основі
+  // реалізації) — дефолт «Оплата від покупця».
   const [cashFlowArticleId, setCashFlowArticleId] = useState(
-    isManagerRole ? defaultIncomeArticleId : "",
+    lockSaleIncome || isManagerRole ? defaultIncomeArticleId : "",
   );
   const [comment, setComment] = useState("");
 
@@ -226,12 +239,13 @@ export function PaymentForm({
 
   const isExpense = direction === "expense";
 
-  // «До оплати» з урахуванням «Включити суму боргу».
+  // «До оплати» з урахуванням попереднього балансу клієнта (борг додається,
+  // переплата віднімається; не менше 0).
   const baseSumToPay = parseAmount(sumToPayRaw);
   const sumToPayEur = useMemo(() => {
-    const extra = includeDebt ? pickedClientDebtEur : 0;
-    return Math.round((baseSumToPay + extra) * 100) / 100;
-  }, [baseSumToPay, includeDebt, pickedClientDebtEur]);
+    const extra = includeDebt ? pickedClientBalanceEur : 0;
+    return Math.max(0, Math.round((baseSumToPay + extra) * 100) / 100);
+  }, [baseSumToPay, includeDebt, pickedClientBalanceEur]);
 
   const paid = useMemo(
     () => ({
@@ -290,7 +304,9 @@ export function PaymentForm({
     );
     if (!stillValid) {
       setCashFlowArticleId(
-        !isExpense && isManagerRole ? defaultIncomeArticleId : "",
+        !isExpense && (lockSaleIncome || isManagerRole)
+          ? defaultIncomeArticleId
+          : "",
       );
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -332,7 +348,7 @@ export function PaymentForm({
       direction,
       clientId: effectiveClientId,
       clientLabel: pickedClientLabel ?? clientLabel ?? null,
-      clientDebtEur: pickedClientDebtEur,
+      clientBalanceEur: pickedClientBalanceEur,
       sumToPayRaw,
       includeDebt,
       rateEurRaw,
@@ -353,7 +369,7 @@ export function PaymentForm({
       effectiveClientId,
       pickedClientLabel,
       clientLabel,
-      pickedClientDebtEur,
+      pickedClientBalanceEur,
       sumToPayRaw,
       includeDebt,
       rateEurRaw,
@@ -439,7 +455,7 @@ export function PaymentForm({
     setDirection(d.direction);
     setPickedClientId(d.clientId);
     setPickedClientLabel(d.clientLabel);
-    setPickedClientDebtEur(d.clientDebtEur);
+    setPickedClientBalanceEur(d.clientBalanceEur);
     setSumToPayRaw(d.sumToPayRaw);
     setIncludeDebt(d.includeDebt);
     setRateEurRaw(d.rateEurRaw);
@@ -464,22 +480,23 @@ export function PaymentForm({
     setPickedClientId(id);
     setPickedClientLabel(summary?.name ?? null);
     if (!id) {
-      setPickedClientDebtEur(0);
+      setPickedClientBalanceEur(0);
       return;
     }
-    // Підтягуємо борг клієнта → дефолт «До оплати».
+    // Підтягуємо баланс клієнта (знаковий: борг>0 / переплата<0) → дефолт «До
+    // оплати».
     fetch(`/api/v1/manager/clients/${id}`)
       .then((r) => (r.ok ? r.json() : null))
       .then((json: { client?: { debt?: string } } | null) => {
         const debt = json?.client?.debt ? Number(json.client.debt) : 0;
-        const debtEur = Number.isFinite(debt) && debt > 0 ? debt : 0;
-        setPickedClientDebtEur(debtEur);
-        if (debtEur > 0 && !sumToPayRaw) {
-          setSumToPayRaw(String(debtEur));
+        const balance = Number.isFinite(debt) ? debt : 0;
+        setPickedClientBalanceEur(balance);
+        if (balance > 0 && !sumToPayRaw) {
+          setSumToPayRaw(String(balance));
         }
       })
       .catch(() => {
-        /* борг — best-effort; форму це не блокує */
+        /* баланс — best-effort; форму це не блокує */
       });
   }
 
@@ -639,30 +656,36 @@ export function PaymentForm({
 
       {/* ─── Вид руху ──────────────────────────────────────────────────── */}
       <Section title="Вид руху коштів">
-        <div className="inline-flex overflow-hidden rounded-md border border-gray-300">
-          <button
-            type="button"
-            onClick={() => setDirection("income")}
-            className={`px-4 py-2 text-sm font-medium ${
-              !isExpense
-                ? "bg-green-600 text-white"
-                : "bg-white text-gray-700 hover:bg-gray-50"
-            }`}
-          >
-            Прихід
-          </button>
-          <button
-            type="button"
-            onClick={() => setDirection("expense")}
-            className={`px-4 py-2 text-sm font-medium ${
-              isExpense
-                ? "bg-red-600 text-white"
-                : "bg-white text-gray-700 hover:bg-gray-50"
-            }`}
-          >
-            Розхід
-          </button>
-        </div>
+        {lockSaleIncome ? (
+          <div className="inline-flex items-center rounded-md border border-green-200 bg-green-50 px-3 py-2 text-sm font-medium text-green-700">
+            Прихід · Оплата від покупця
+          </div>
+        ) : (
+          <div className="inline-flex overflow-hidden rounded-md border border-gray-300">
+            <button
+              type="button"
+              onClick={() => setDirection("income")}
+              className={`px-4 py-2 text-sm font-medium ${
+                !isExpense
+                  ? "bg-green-600 text-white"
+                  : "bg-white text-gray-700 hover:bg-gray-50"
+              }`}
+            >
+              Прихід
+            </button>
+            <button
+              type="button"
+              onClick={() => setDirection("expense")}
+              className={`px-4 py-2 text-sm font-medium ${
+                isExpense
+                  ? "bg-red-600 text-white"
+                  : "bg-white text-gray-700 hover:bg-gray-50"
+              }`}
+            >
+              Розхід
+            </button>
+          </div>
+        )}
       </Section>
 
       {/* ─── Клієнт ────────────────────────────────────────────────────── */}
@@ -690,7 +713,7 @@ export function PaymentForm({
               placeholder="0"
             />
           </Field>
-          {(saleId || effectiveClientId) && pickedClientDebtEur > 0 && (
+          {(saleId || effectiveClientId) && pickedClientBalanceEur !== 0 && (
             <label className="flex items-end gap-2 pb-2 text-sm text-gray-700">
               <input
                 type="checkbox"
@@ -698,7 +721,13 @@ export function PaymentForm({
                 onChange={(e) => setIncludeDebt(e.target.checked)}
                 className="h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
               />
-              <span>Включити суму боргу ({eur(pickedClientDebtEur)})</span>
+              <span>
+                {pickedClientBalanceEur > 0
+                  ? `Додати попередній борг (+${eur(pickedClientBalanceEur)})`
+                  : `Зарахувати переплату (−${eur(
+                      Math.abs(pickedClientBalanceEur),
+                    )})`}
+              </span>
             </label>
           )}
         </div>
@@ -811,19 +840,32 @@ export function PaymentForm({
         )}
       </Section>
 
-      {/* ─── Стаття руху коштів (обов'язкова для Приходу і Розходу) ───────── */}
+      {/* ─── Стаття руху коштів ──────────────────────────────────────────── */}
       <Section title="Стаття руху коштів">
-        <Field label="Стаття (обов'язково)">
-          <ArticleCombobox
-            items={articlesForDirection}
-            value={cashFlowArticleId}
-            onChange={setCashFlowArticleId}
-          />
-        </Field>
-        {!cashFlowArticleId && (
-          <p className="mt-1 text-xs text-amber-600">
-            Оберіть статтю руху коштів.
-          </p>
+        {lockSaleIncome ? (
+          <div className="rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700">
+            Оплата від покупця
+            {!cashFlowArticleId && (
+              <span className="ml-2 text-xs text-amber-600">
+                (у довіднику немає статті «Оплата від покупця» — додайте її)
+              </span>
+            )}
+          </div>
+        ) : (
+          <>
+            <Field label="Стаття (обов'язково)">
+              <ArticleCombobox
+                items={articlesForDirection}
+                value={cashFlowArticleId}
+                onChange={setCashFlowArticleId}
+              />
+            </Field>
+            {!cashFlowArticleId && (
+              <p className="mt-1 text-xs text-amber-600">
+                Оберіть статтю руху коштів.
+              </p>
+            )}
+          </>
         )}
       </Section>
 

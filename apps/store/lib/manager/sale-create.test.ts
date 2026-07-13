@@ -224,13 +224,13 @@ describe("createSaleWithItems", () => {
     expect(call.data.items.create[1]?.lotId).toBeNull();
   });
 
-  it("без post → status=draft, archived=false", async () => {
+  it("без post → status=not_posted, archived=false («Зберегти»)", async () => {
     mockPrisma.sale.create.mockResolvedValueOnce(fakeSale());
     await createSaleWithItems(baseInput, baseCustomer, actor);
     const call = mockPrisma.sale.create.mock.calls[0]?.[0] as {
       data: { status: string; archived: boolean };
     };
-    expect(call.data.status).toBe("draft");
+    expect(call.data.status).toBe("not_posted");
     expect(call.data.archived).toBe(false);
   });
 
@@ -268,12 +268,12 @@ describe("updateSaleWithItems", () => {
   it("застосовує nextStatus коли переданий", async () => {
     mockPrisma.sale.update.mockResolvedValueOnce(fakeSale());
     await updateSaleWithItems("sale1", baseInput, actor, {
-      nextStatus: "sent",
+      nextStatus: "not_posted",
     });
     const call = mockPrisma.sale.update.mock.calls[0]?.[0] as {
       data: { status?: string };
     };
-    expect(call.data.status).toBe("sent");
+    expect(call.data.status).toBe("not_posted");
   });
 
   it("nextStatus=posted → archived=true", async () => {

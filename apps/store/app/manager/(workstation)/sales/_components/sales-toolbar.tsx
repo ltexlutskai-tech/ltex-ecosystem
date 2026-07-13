@@ -5,8 +5,17 @@ import { useEffect, useState, useTransition } from "react";
 import { Search, SlidersHorizontal, X } from "lucide-react";
 import { Button, Input } from "@ltex/ui";
 import { SALE_STATUS_LIST, SALE_STATUS_META } from "@/lib/manager/sale-status";
+import { ClientFilterPicker } from "../../orders/_components/client-filter-picker";
 
-export function SalesToolbar() {
+export function SalesToolbar({
+  cityOptions = [],
+  agentOptions = [],
+}: {
+  /** Довідник міст для фільтра (щоб уникнути опечаток). */
+  cityOptions?: string[];
+  /** Довідник торгових агентів для фільтра. */
+  agentOptions?: string[];
+}) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -15,26 +24,20 @@ export function SalesToolbar() {
   const [search, setSearch] = useState(searchParams.get("search") ?? "");
   const [from, setFrom] = useState(searchParams.get("from") ?? "");
   const [to, setTo] = useState(searchParams.get("to") ?? "");
-  const [clientName, setClientName] = useState(
-    searchParams.get("clientName") ?? "",
-  );
-  const [city, setCity] = useState(searchParams.get("city") ?? "");
-  const [agent, setAgent] = useState(searchParams.get("agent") ?? "");
+  const clientName = searchParams.get("clientName") ?? "";
+  const city = searchParams.get("city") ?? "";
+  const agent = searchParams.get("agent") ?? "";
   const status = searchParams.get("status") ?? "";
   const clientCode1C = searchParams.get("clientCode1C") ?? "";
   const showArchived = searchParams.get("showArchived") === "true";
 
   // Розгорнути блок per-column фільтрів, якщо хоч один уже застосовано.
-  const hasColumnFilters = !!(clientName || city || agent);
+  const hasColumnFilters = !!(clientName || clientCode1C || city || agent);
   const [showFilters, setShowFilters] = useState(hasColumnFilters);
 
   useEffect(() => {
-    setSearch(searchParams.get("search") ?? "");
     setFrom(searchParams.get("from") ?? "");
     setTo(searchParams.get("to") ?? "");
-    setClientName(searchParams.get("clientName") ?? "");
-    setCity(searchParams.get("city") ?? "");
-    setAgent(searchParams.get("agent") ?? "");
   }, [searchParams]);
 
   function setParam(name: string, value: string | null) {
@@ -45,33 +48,29 @@ export function SalesToolbar() {
     startTransition(() => router.push(`${pathname}?${sp.toString()}`));
   }
 
-  function applyAll() {
+  /** Множинне оновлення URL-параметрів за один перехід. */
+  function setParams(patch: Record<string, string | null>) {
     const sp = new URLSearchParams(searchParams.toString());
-    if (search.trim()) sp.set("search", search.trim());
-    else sp.delete("search");
-    if (from) sp.set("from", from);
-    else sp.delete("from");
-    if (to) sp.set("to", to);
-    else sp.delete("to");
-    if (clientName.trim()) sp.set("clientName", clientName.trim());
-    else sp.delete("clientName");
-    if (city.trim()) sp.set("city", city.trim());
-    else sp.delete("city");
-    if (agent.trim()) sp.set("agent", agent.trim());
-    else sp.delete("agent");
+    for (const [name, value] of Object.entries(patch)) {
+      if (value === null || value === "") sp.delete(name);
+      else sp.set(name, value);
+    }
     sp.delete("page");
     startTransition(() => router.push(`${pathname}?${sp.toString()}`));
+  }
+
+  function applyDates() {
+    setParams({ from: from || null, to: to || null });
   }
 
   function clearAll() {
     setSearch("");
     setFrom("");
     setTo("");
-    setClientName("");
-    setCity("");
-    setAgent("");
     startTransition(() => router.push(pathname));
   }
+
+  const clientLabel = clientName || clientCode1C || null;
 
   return (
     <div className="space-y-3 rounded-lg border bg-white p-3">
@@ -79,7 +78,8 @@ export function SalesToolbar() {
         <form
           onSubmit={(e) => {
             e.preventDefault();
-            applyAll();
+            if (search.trim()) setParam("search", search.trim());
+            else setParam("search", null);
           }}
           className="flex min-w-[260px] flex-1 items-center gap-2"
         >
@@ -121,7 +121,7 @@ export function SalesToolbar() {
             type="date"
             value={from}
             onChange={(e) => setFrom(e.target.value)}
-            onBlur={() => setParam("from", from || null)}
+            onBlur={applyDates}
             className="h-9 w-[140px]"
           />
         </div>
@@ -135,7 +135,7 @@ export function SalesToolbar() {
             type="date"
             value={to}
             onChange={(e) => setTo(e.target.value)}
-            onBlur={() => setParam("to", to || null)}
+            onBlur={applyDates}
             className="h-9 w-[140px]"
           />
         </div>
@@ -162,7 +162,7 @@ export function SalesToolbar() {
           <SlidersHorizontal className="mr-1 h-4 w-4" />
           Фільтри
           {hasColumnFilters
-            ? ` (${[clientName, city, agent].filter(Boolean).length})`
+            ? ` (${[clientLabel, city, agent].filter(Boolean).length})`
             : ""}
         </Button>
 
@@ -189,26 +189,20 @@ export function SalesToolbar() {
       </div>
 
       {showFilters && (
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            applyAll();
-          }}
-          className="grid gap-3 border-t pt-3 sm:grid-cols-2 lg:grid-cols-4"
-        >
+        <div className="grid gap-3 border-t pt-3 sm:grid-cols-2 lg:grid-cols-3">
           <div>
-            <label
-              className="mb-1 block text-xs text-gray-500"
-              htmlFor="filter-client"
-            >
-              Клієнт
-            </label>
-            <Input
-              id="filter-client"
-              value={clientName}
-              onChange={(e) => setClientName(e.target.value)}
-              placeholder="Назва клієнта…"
-              className="h-9"
+            <label className="mb-1 block text-xs text-gray-500">Клієнт</label>
+            <ClientFilterPicker
+              currentLabel={clientLabel}
+              onSelect={(hit) =>
+                setParams({
+                  clientCode1C: hit.code1C ?? null,
+                  clientName: hit.name,
+                })
+              }
+              onClear={() =>
+                setParams({ clientCode1C: null, clientName: null })
+              }
             />
           </div>
           <div>
@@ -218,13 +212,19 @@ export function SalesToolbar() {
             >
               Місто
             </label>
-            <Input
+            <select
               id="filter-city"
               value={city}
-              onChange={(e) => setCity(e.target.value)}
-              placeholder="Місто…"
-              className="h-9"
-            />
+              onChange={(e) => setParam("city", e.target.value || null)}
+              className="h-9 w-full rounded-md border border-gray-300 bg-white px-2 text-sm text-gray-700"
+            >
+              <option value="">Усі міста</option>
+              {cityOptions.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </select>
           </div>
           <div>
             <label
@@ -233,20 +233,21 @@ export function SalesToolbar() {
             >
               Торговий агент
             </label>
-            <Input
+            <select
               id="filter-agent"
               value={agent}
-              onChange={(e) => setAgent(e.target.value)}
-              placeholder="Торговий агент…"
-              className="h-9"
-            />
+              onChange={(e) => setParam("agent", e.target.value || null)}
+              className="h-9 w-full rounded-md border border-gray-300 bg-white px-2 text-sm text-gray-700"
+            >
+              <option value="">Усі агенти</option>
+              {agentOptions.map((a) => (
+                <option key={a} value={a}>
+                  {a}
+                </option>
+              ))}
+            </select>
           </div>
-          <div className="flex items-end">
-            <Button type="submit" variant="outline" size="sm" className="h-9">
-              Застосувати фільтри
-            </Button>
-          </div>
-        </form>
+        </div>
       )}
 
       {clientCode1C && (
@@ -255,7 +256,7 @@ export function SalesToolbar() {
           <code className="font-mono">{clientCode1C}</code>
           <button
             type="button"
-            onClick={() => setParam("clientCode1C", null)}
+            onClick={() => setParams({ clientCode1C: null, clientName: null })}
             className="ml-auto inline-flex items-center text-blue-700 hover:text-blue-900"
             aria-label="Скинути фільтр клієнта"
           >

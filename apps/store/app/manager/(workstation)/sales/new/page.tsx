@@ -96,14 +96,9 @@ export default async function NewSalePage({
     }
   }
 
-  const [exchangeRateEur, exchangeRateUsd, bankAccounts] = await Promise.all([
+  const [exchangeRateEur, exchangeRateUsd] = await Promise.all([
     getCurrentRate(),
     getUsdRate(),
-    prisma.mgrBankAccount.findMany({
-      where: { archived: false, hiddenInApp: false },
-      select: { id: true, name: true },
-      orderBy: { name: "asc" },
-    }),
   ]);
 
   // Способи доставки — з редагованого довідника (7.3).
@@ -134,7 +129,6 @@ export default async function NewSalePage({
         currentUserName={user.fullName}
         routeSheetId={routeSheetId}
         returnHref={returnHref}
-        bankAccounts={bankAccounts}
       />
     </div>
   );
