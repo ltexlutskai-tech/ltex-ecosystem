@@ -11,6 +11,7 @@ import { rateLimit, getClientIp } from "@/lib/rate-limit";
 import { resolveOrCreateSiteClient } from "@/lib/manager/site-client";
 import { createSiteOrderReminders } from "@/lib/manager/site-order-reminders";
 import { nextOrderNumber1C } from "@/lib/manager/order-number-generator";
+import { createPendingSaleForOrderTx } from "@/lib/manager/sale-from-order";
 
 export async function POST(request: NextRequest) {
   // Rate limit: 5 orders per minute per IP
@@ -92,12 +93,14 @@ export async function POST(request: NextRequest) {
   // ─── Штрихкоди конкретних лотів для складу (рішення 2, гібрид) ────────────
   // Клієнт обрав конкретні лоти → дублюємо їхні штрихкоди у коментар, щоб на
   // складі чітко знали що відвантажувати (окрім того, лоти бронюються нижче).
+  const lotBarcodeById = new Map<string, string>();
   let warehouseNote = "";
   if (lotIds.length > 0) {
     const lotBarcodes = await prisma.lot.findMany({
       where: { id: { in: lotIds } },
-      select: { barcode: true },
+      select: { id: true, barcode: true },
     });
+    for (const l of lotBarcodes) lotBarcodeById.set(l.id, l.barcode);
     const codes = lotBarcodes.map((l) => l.barcode).filter(Boolean);
     if (codes.length > 0) {
       warehouseNote = `Склад — відвантажити лоти: ${codes.join(", ")}`;
@@ -125,7 +128,8 @@ export async function POST(request: NextRequest) {
         data: {
           customerId: dbCustomer.id,
           number1C,
-          status: "draft",
+          // Сайтове замовлення чекає підтвердження менеджером (8.1).
+          status: "pending",
           source: "site",
           assignedAgentUserId,
           totalEur,
@@ -150,6 +154,23 @@ export async function POST(request: NextRequest) {
           data: { status: "reserved" },
         });
       }
+
+      // Замовлення з конкретними лотами → авто-«Реалізація» (Очікує
+      // підтвердження), пов'язана з замовленням (8.1).
+      await createPendingSaleForOrderTx(tx, {
+        orderId: ord.id,
+        customerId: dbCustomer.id,
+        assignedAgentUserId,
+        exchangeRate: rate,
+        items: items.map((i) => ({
+          productId: i.productId,
+          lotId: i.lotId ?? null,
+          barcode: i.lotId ? (lotBarcodeById.get(i.lotId) ?? null) : null,
+          priceEur: i.priceEur,
+          weight: i.weight,
+          quantity: i.quantity,
+        })),
+      });
 
       return ord;
     });

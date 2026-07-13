@@ -9,6 +9,7 @@ const { mockPrisma, rateLimitMock, notifyMock, notifyLeadMock, sendEmailMock } =
       exchangeRate: { findFirst: vi.fn() },
       product: { findUnique: vi.fn() },
       order: { create: vi.fn() },
+      sale: { create: vi.fn() },
       $transaction: vi.fn(),
     },
     rateLimitMock: vi
@@ -81,6 +82,7 @@ describe("POST /api/quick-order", () => {
       async (cb: (tx: typeof mockPrisma) => Promise<unknown>) => cb(mockPrisma),
     );
     mockPrisma.order.create.mockResolvedValue({ id: "order-1" });
+    mockPrisma.sale.create.mockResolvedValue({ id: "sale-1" });
     mockPrisma.lot.update.mockResolvedValue({
       id: "lot-1",
       status: "reserved",

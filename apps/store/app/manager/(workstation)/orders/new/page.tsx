@@ -4,7 +4,6 @@ import { ArrowLeft } from "lucide-react";
 import { prisma } from "@ltex/db";
 import { getCurrentUser } from "@/lib/auth/manager-auth";
 import { getCurrentRate } from "@/lib/exchange-rate";
-import { getDeliveryMethodOptions } from "@/lib/manager/delivery-methods";
 import { OrderForm } from "./_components/order-form";
 import type { ClientPickerItem, OrderItemDraft } from "./_components/types";
 
@@ -120,7 +119,7 @@ export default async function NewOrderPage({
       select: { id: true, code1C: true, name: true, city: true, phone: true },
     });
     if (customer) {
-      // Підтягуємо тип цін / борг / доставку / контакти з дзеркала MgrClient.
+      // Підтягуємо тип цін / борг / контакти з дзеркала MgrClient.
       const mgr = customer.code1C
         ? await prisma.mgrClient.findUnique({
             where: { code1C: customer.code1C },
@@ -130,8 +129,6 @@ export default async function NewOrderPage({
               phonePrimary: true,
               street: true,
               house: true,
-              novaPoshtaBranch: true,
-              deliveryMethod: { select: { code: true } },
             },
           })
         : null;
@@ -148,8 +145,6 @@ export default async function NewOrderPage({
         address,
         debt: mgr?.debt?.toString() ?? "0",
         priceTypeId: mgr?.priceTypeId ?? null,
-        deliveryMethodCode: mgr?.deliveryMethod?.code ?? null,
-        novaPoshtaBranch: mgr?.novaPoshtaBranch ?? null,
         agent: null,
         isOwned: true,
       };
@@ -158,9 +153,6 @@ export default async function NewOrderPage({
 
   // Допоміжні дані для форми.
   const exchangeRate = await getCurrentRate();
-
-  // Способи доставки — з редагованого довідника (7.3).
-  const deliveryMethods = await getDeliveryMethodOptions();
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">
@@ -185,7 +177,6 @@ export default async function NewOrderPage({
         initialClient={initialClient}
         initialItems={carryItems}
         exchangeRate={exchangeRate}
-        deliveryMethods={deliveryMethods}
         currentUserId={user.id}
         currentUserName={user.fullName}
         currentUserRole={user.role}

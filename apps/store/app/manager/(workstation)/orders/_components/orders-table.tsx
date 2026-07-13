@@ -21,7 +21,6 @@ const COLS: Record<string, { sortKey?: string; filterParam?: string }> = {
   status: { sortKey: "status" },
   actual: { sortKey: "actual" },
   agent: { sortKey: "agent", filterParam: "agent" },
-  delivery: { sortKey: "delivery" },
   positions: { sortKey: "positions" },
   sum: { sortKey: "sum" },
 };
@@ -147,9 +146,6 @@ export function OrdersTable({ items }: { items: OrdersRowData[] }) {
             </th>
             <th className="px-2.5 py-1.5 font-medium">
               <SortableHeader sortKey="agent" label="Агент" />
-            </th>
-            <th className="px-2.5 py-1.5 font-medium">
-              <SortableHeader sortKey="delivery" label="Спосіб доставки" />
             </th>
             <th className="px-2.5 py-1.5 text-center font-medium">
               <SortableHeader

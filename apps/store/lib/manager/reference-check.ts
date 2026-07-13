@@ -128,15 +128,10 @@ async function checkOrder(id: string): Promise<ReferenceCheckResult> {
   });
   if (!order) return result(false, false, []);
 
-  const blockers: ReferenceBlocker[] = [];
-  const [sales, reminders] = await Promise.all([
-    prisma.sale.count({ where: { orderId: id } }),
-    prisma.mgrReminder.count({ where: { orderId: id } }),
-  ]);
-  pushIf(blockers, "Реалізації на основі замовлення", sales);
-  pushIf(blockers, "Нагадування", reminders);
-
-  return result(true, order.code1C != null, blockers);
+  // 8.1: пов'язані реалізації БІЛЬШЕ НЕ блокують видалення замовлення — вони
+  // видаляються каскадом разом із замовленням (з реверсом рухів по реєстрах),
+  // щоб облік/потреби лишались коректними. Нагадування відв'язуються (SetNull).
+  return result(true, order.code1C != null, []);
 }
 
 async function checkSale(id: string): Promise<ReferenceCheckResult> {

@@ -9,7 +9,8 @@ import { getMyClientCodes1C } from "@/lib/manager/order-ownership";
  * POST /api/v1/manager/orders/[id]/close
  *
  * Ручне закриття активного замовлення (Етап 3 блоку Замовлення).
- *   - status → 'cancelled' + closedAt + closedByUserId
+ *   - closedAt + closedByUserId + archived + isActual=false (стає «Неактуальне»)
+ *   - статус документа НЕ змінюється (окремого статусу «Скасовано» немає, 8.1)
  *   - закриваються пов'язані auto-нагадування про прострочку
  *
  * Доступ: admin / owner усі; manager — тільки свої замовлення
@@ -94,13 +95,12 @@ export async function POST(
     await tx.order.update({
       where: { id },
       data: {
-        status: "cancelled",
         closedAt: new Date(),
         closeReasonId: reason.id,
         closedByUserId: user.id,
         closeNotes: parsed.data.notes ?? null,
         archived: true,
-        // Інваріант: закрите/архівне замовлення = НЕ актуальне.
+        // Інваріант: закрите/архівне замовлення = НЕ актуальне («відпрацьоване»).
         isActual: false,
         version: { increment: 1 },
       },

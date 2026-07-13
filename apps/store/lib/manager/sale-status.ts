@@ -19,6 +19,10 @@ export const SALE_STATUS_META = {
   sent: { label: "Відправлено в 1С", color: "blue" },
   posted: { label: "Проведено (архів)", color: "green" },
   cancelled: { label: "Скасовано", color: "red" },
+  // Реалізація, авто-створена з сайтового замовлення з конкретними лотами —
+  // чекає підтвердження й проведення менеджером (8.1). Рухи по реєстрах ще
+  // не йдуть (не проведена).
+  pending: { label: "Очікує підтвердження", color: "yellow" },
 } as const;
 
 export type SaleStatus = keyof typeof SALE_STATUS_META;
@@ -29,18 +33,19 @@ export const SALE_STATUS_LIST: SaleStatus[] = [
   "sent",
   "posted",
   "cancelled",
+  "pending",
 ];
 
 /**
- * Канонічні статуси менеджерської реалізації (4) — пропонуються у UI зміни
- * статусу та беруть участь у графі дозволених переходів. (Тут збігається з
- * `SALE_STATUS_LIST`, бо у Реалізації немає legacy-статусів.)
+ * Канонічні статуси менеджерської реалізації — пропонуються у UI зміни статусу
+ * та беруть участь у графі дозволених переходів.
  */
 export const MANAGER_SALE_STATUSES = [
   "draft",
   "sent",
   "posted",
   "cancelled",
+  "pending",
 ] as const;
 
 export type ManagerSaleStatus = (typeof MANAGER_SALE_STATUSES)[number];
@@ -69,6 +74,9 @@ const SALE_TRANSITIONS: Record<ManagerSaleStatus, ManagerSaleStatus[]> = {
   sent: ["draft", "posted", "cancelled"],
   posted: [],
   cancelled: ["draft"],
+  // Сайтова реалізація «Очікує підтвердження» → провести / повернути в чернетку
+  // / скасувати.
+  pending: ["posted", "draft", "cancelled"],
 };
 
 /** Чи є статус канонічним менеджерським (один з 4). */

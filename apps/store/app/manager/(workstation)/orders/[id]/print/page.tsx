@@ -2,7 +2,6 @@ import { notFound } from "next/navigation";
 import { requireRole } from "@/lib/auth/manager-auth";
 import { prisma } from "@ltex/db";
 import { COMPANY_REQUISITES } from "@/lib/constants/company";
-import { getDeliveryLabelResolver } from "@/lib/manager/delivery-methods";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Рахунок-замовлення — друк | L-TEX" };
@@ -34,8 +33,6 @@ export default async function PrintOrderPage({
   ]);
   if (!user) notFound();
   const { id } = await params;
-
-  const deliveryLabelOf = await getDeliveryLabelResolver();
 
   const order = await prisma.order.findUnique({
     where: { id },
@@ -249,9 +246,6 @@ export default async function PrintOrderPage({
           </div>
           {order.exchangeRate > 0 && (
             <div>Курс: {money2(order.exchangeRate)} ₴/€</div>
-          )}
-          {order.deliveryMethod && (
-            <div>Доставка: {deliveryLabelOf(order.deliveryMethod)}</div>
           )}
           {order.cashOnDelivery && <div>Накладений платіж: так</div>}
           {order.notes && <div>Примітка: {order.notes}</div>}

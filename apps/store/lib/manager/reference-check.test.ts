@@ -79,13 +79,14 @@ describe("findReferences — client", () => {
 });
 
 describe("findReferences — order", () => {
-  it("blocks when sale references the order", async () => {
+  it("8.1: linked sales НЕ блокують — вони видаляються каскадом", async () => {
     mockDb.order.findUnique.mockResolvedValue({ code1C: null });
     mockDb.sale.count.mockResolvedValue(1);
     mockDb.mgrReminder.count.mockResolvedValue(0);
     const r = await findReferences("order", "o1");
-    expect(r.canHardDelete).toBe(false);
-    expect(r.blockers[0]?.label).toContain("Реалізації");
+    // Пов'язана реалізація більше не блокує hard-delete (каскад із реверсом).
+    expect(r.canHardDelete).toBe(true);
+    expect(r.blockers).toEqual([]);
   });
 
   it("allows delete for empty non-1C order", async () => {

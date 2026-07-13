@@ -61,9 +61,12 @@ export interface ClientPickerItem {
   debt: string;
   /** `MgrPriceType.id` клієнта (підтягується у select типу цін). */
   priceTypeId?: string | null;
-  /** `MgrDeliveryMethod.code` клієнта (підтягується у select доставки). */
+  /**
+   * `MgrDeliveryMethod.code` клієнта. У замовленні НЕ використовується (8.1 —
+   * доставку прибрано), лишається для форми Реалізації, що ділить цей тип.
+   */
   deliveryMethodCode?: string | null;
-  /** № відділення Нової Пошти клієнта (префіл при способі «Пошта»). */
+  /** № відділення Нової Пошти клієнта (використовується у Реалізації). */
   novaPoshtaBranch?: string | null;
   agent: { id: string; fullName: string } | null;
   isOwned: boolean;
@@ -82,7 +85,10 @@ export interface AgentOption {
   fullName: string;
 }
 
-/** Варіант доставки замовлення (delivery|post|pickup). */
+/**
+ * Варіант доставки (delivery|post|pickup). Використовується формою Реалізації,
+ * що ділить цей модуль типів; у замовленні доставку прибрано (8.1).
+ */
 export interface OrderDeliveryOption {
   code: string;
   label: string;
@@ -147,10 +153,6 @@ export interface OrderEditInitial {
   isActual: boolean;
   notes: string;
   priceTypeId: string | null;
-  deliveryMethod: string | null;
-  novaPoshtaBranch: string | null;
-  deliveryAddress: string | null;
-  expressWaybill: string | null;
   overdueDays: number | null;
   cashOnDelivery: boolean;
   assignedAgentUserId: string | null;

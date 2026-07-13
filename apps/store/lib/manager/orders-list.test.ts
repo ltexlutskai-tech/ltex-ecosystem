@@ -19,7 +19,7 @@ describe("normalizeOrderStatus", () => {
   });
 
   it("trims whitespace", () => {
-    expect(normalizeOrderStatus("  sent  ")).toBe("sent");
+    expect(normalizeOrderStatus("  not_posted  ")).toBe("not_posted");
   });
 });
 
@@ -220,14 +220,30 @@ describe("buildOrdersWhere — search (client + products)", () => {
 describe("buildOrdersWhere — status + date range", () => {
   it("applies status when present", () => {
     expect(
-      buildOrdersWhere({ customerCodes: null, status: "sent" }).status,
-    ).toBe("sent");
+      buildOrdersWhere({ customerCodes: null, status: "not_posted" }).status,
+    ).toBe("not_posted");
   });
 
-  it("omits status when empty", () => {
+  it("hides posted by default (main list = not archived)", () => {
     expect(
       buildOrdersWhere({ customerCodes: null, status: "" }).status,
+    ).toEqual({ not: "posted" });
+  });
+
+  it("shows all statuses when showArchived=true and no status filter", () => {
+    expect(
+      buildOrdersWhere({
+        customerCodes: null,
+        status: "",
+        showArchived: true,
+      }).status,
     ).toBeUndefined();
+  });
+
+  it("explicit posted filter is honoured (archive view)", () => {
+    expect(
+      buildOrdersWhere({ customerCodes: null, status: "posted" }).status,
+    ).toBe("posted");
   });
 
   it("applies date range (gte/lte)", () => {
@@ -257,7 +273,6 @@ describe("serializeOrderRow", () => {
     source: "manager",
     agentName: "Петренко П.",
     assignedAgentUserId: null,
-    deliveryMethod: "post",
     createdAt: new Date("2026-05-10T10:00:00Z"),
     customer: {
       id: "cust1",
@@ -290,12 +305,5 @@ describe("serializeOrderRow", () => {
   it("maps agentName", () => {
     expect(serializeOrderRow(raw).agentName).toBe("Петренко П.");
     expect(serializeOrderRow({ ...raw, agentName: null }).agentName).toBeNull();
-  });
-
-  it("maps deliveryMethod (incl. null)", () => {
-    expect(serializeOrderRow(raw).deliveryMethod).toBe("post");
-    expect(
-      serializeOrderRow({ ...raw, deliveryMethod: null }).deliveryMethod,
-    ).toBeNull();
   });
 });

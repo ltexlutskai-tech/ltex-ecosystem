@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@ltex/db";
 import { rateLimit, getClientIp } from "@/lib/rate-limit";
+import { createPendingSaleForOrderTx } from "@/lib/manager/sale-from-order";
 import { notifyNewOrder, notifyNewLead } from "@/lib/notifications";
 import {
   sendOrderConfirmationEmail,
@@ -110,6 +111,26 @@ export async function POST(request: NextRequest) {
         where: { id: lotId },
         data: { status: "reserved" },
       });
+
+      // Швидке замовлення завжди має конкретний лот → авто-«Реалізація»
+      // (Очікує підтвердження), пов'язана з замовленням (8.1).
+      await createPendingSaleForOrderTx(tx, {
+        orderId: ord.id,
+        customerId: dbCustomer.id,
+        assignedAgentUserId: null,
+        exchangeRate: rate,
+        items: [
+          {
+            productId,
+            lotId,
+            barcode: lot.barcode,
+            priceEur,
+            weight,
+            quantity,
+          },
+        ],
+      });
+
       return ord;
     });
   } catch {

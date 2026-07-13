@@ -10,6 +10,8 @@ const {
   canViewOrderMock,
   updateOrderWithItemsMock,
   findOtherActiveOrderMock,
+  removeSaleMovementsMock,
+  recomputeDebtForClientsSafeMock,
   FakePrismaError,
 } = vi.hoisted(() => {
   class FakePrismaError extends Error {
@@ -20,21 +22,35 @@ const {
     }
   }
   const orderUpdate = vi.fn();
+  const orderDelete = vi.fn();
+  const saleDeleteMany = vi.fn();
+  const lotUpdateMany = vi.fn();
+  const debtDeleteMany = vi.fn();
   return {
     mockPrisma: {
       order: {
         findUnique: vi.fn(),
-        delete: vi.fn(),
+        delete: orderDelete,
         update: orderUpdate,
       },
+      sale: { deleteMany: saleDeleteMany },
+      lot: { updateMany: lotUpdateMany },
+      mgrDebtMovement: { findMany: vi.fn().mockResolvedValue([]) },
       $transaction: vi.fn(async (cb: (tx: unknown) => unknown) =>
-        cb({ order: { update: orderUpdate } }),
+        cb({
+          order: { update: orderUpdate, delete: orderDelete },
+          sale: { deleteMany: saleDeleteMany },
+          lot: { updateMany: lotUpdateMany },
+          mgrDebtMovement: { deleteMany: debtDeleteMany },
+        }),
       ),
     },
     getCurrentUserMock: vi.fn(),
     canViewOrderMock: vi.fn(),
     updateOrderWithItemsMock: vi.fn(),
     findOtherActiveOrderMock: vi.fn(),
+    removeSaleMovementsMock: vi.fn(),
+    recomputeDebtForClientsSafeMock: vi.fn(),
     FakePrismaError,
   };
 });
@@ -65,6 +81,16 @@ vi.mock("@/lib/manager/order-active-guard", async () => {
       findOtherActiveOrderMock(...args),
   };
 });
+vi.mock("@/lib/manager/site-order-reminders", () => ({
+  completeSiteOrderReminders: vi.fn().mockResolvedValue(undefined),
+}));
+vi.mock("@/lib/manager/sale-movement-hooks", () => ({
+  removeSaleMovements: (...args: unknown[]) => removeSaleMovementsMock(...args),
+}));
+vi.mock("@/lib/manager/debt-register", () => ({
+  recomputeDebtForClientsSafe: (...args: unknown[]) =>
+    recomputeDebtForClientsSafeMock(...args),
+}));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 
 import { GET, PATCH, DELETE } from "./route";
@@ -102,6 +128,7 @@ function patchReq(body: unknown): NextRequest {
 
 const VALID_PATCH_BODY = {
   items: [{ productId: "p1", weight: 10, quantity: 1, priceEur: 50 }],
+  overdueDays: 14,
   notes: "оновлено",
 };
 
@@ -266,48 +293,51 @@ describe("PATCH /api/v1/manager/orders/[id]", () => {
     expect(res.status).toBe(400);
   });
 
-  it("updates header + items and recalculates totals (no status change)", async () => {
+  it("«Зберегти» чернетку → авто-перехід у not_posted (8.1)", async () => {
     mockPrisma.order.findUnique.mockResolvedValueOnce({
       id: "ord1",
       status: "draft",
     });
-    updateOrderWithItemsMock.mockResolvedValueOnce(fakeUpdatedOrder("draft"));
+    updateOrderWithItemsMock.mockResolvedValueOnce(
+      fakeUpdatedOrder("not_posted"),
+    );
     const res = await PATCH(
       patchReq({
         ...VALID_PATCH_BODY,
         priceTypeId: "pt-1",
-        deliveryMethod: "post",
         cashOnDelivery: true,
       }),
       { params: Promise.resolve({ id: "ord1" }) },
     );
     expect(res.status).toBe(200);
-    const json = (await res.json()) as { totalEur: number; status: string };
+    const json = (await res.json()) as { totalEur: number };
     expect(json.totalEur).toBe(50);
-    expect(json.status).toBe("draft");
 
     const callArgs = updateOrderWithItemsMock.mock.calls[0] as [
       string,
-      { priceTypeId?: string; deliveryMethod?: string },
+      { priceTypeId?: string },
       { userId: string },
       { nextStatus?: string },
     ];
     expect(callArgs[0]).toBe("ord1");
     expect(callArgs[1].priceTypeId).toBe("pt-1");
-    expect(callArgs[1].deliveryMethod).toBe("post");
     expect(callArgs[2].userId).toBe("u1");
-    expect(callArgs[3].nextStatus).toBeUndefined();
+    // Чернетка при явному збереженні стає «Не проведено».
+    expect(callArgs[3].nextStatus).toBe("not_posted");
   });
 
-  it("applies allowed status transition draft → sent", async () => {
+  it("applies allowed status transition draft → not_posted", async () => {
     mockPrisma.order.findUnique.mockResolvedValueOnce({
       id: "ord1",
       status: "draft",
     });
-    updateOrderWithItemsMock.mockResolvedValueOnce(fakeUpdatedOrder("sent"));
-    const res = await PATCH(patchReq({ ...VALID_PATCH_BODY, status: "sent" }), {
-      params: Promise.resolve({ id: "ord1" }),
-    });
+    updateOrderWithItemsMock.mockResolvedValueOnce(
+      fakeUpdatedOrder("not_posted"),
+    );
+    const res = await PATCH(
+      patchReq({ ...VALID_PATCH_BODY, status: "not_posted" }),
+      { params: Promise.resolve({ id: "ord1" }) },
+    );
     expect(res.status).toBe(200);
     const callArgs = updateOrderWithItemsMock.mock.calls[0] as [
       string,
@@ -315,16 +345,16 @@ describe("PATCH /api/v1/manager/orders/[id]", () => {
       unknown,
       { nextStatus?: string },
     ];
-    expect(callArgs[3].nextStatus).toBe("sent");
+    expect(callArgs[3].nextStatus).toBe("not_posted");
   });
 
-  it("returns 409 on disallowed status transition (cancelled → posted)", async () => {
+  it("returns 409 on disallowed status transition (draft → pending)", async () => {
     mockPrisma.order.findUnique.mockResolvedValueOnce({
       id: "ord1",
-      status: "cancelled",
+      status: "draft",
     });
     const res = await PATCH(
-      patchReq({ ...VALID_PATCH_BODY, status: "posted" }),
+      patchReq({ ...VALID_PATCH_BODY, status: "pending" }),
       { params: Promise.resolve({ id: "ord1" }) },
     );
     expect(res.status).toBe(409);
@@ -350,10 +380,11 @@ describe("PATCH /api/v1/manager/orders/[id]", () => {
     expect(callArgs[3].nextStatus).toBe("posted");
   });
 
-  it("post=true на cancelled → 409 (провести скасоване заборонено)", async () => {
+  it("post=true на проведеному-неактуальному → 409 (редагування заборонено)", async () => {
     mockPrisma.order.findUnique.mockResolvedValueOnce({
       id: "ord1",
-      status: "cancelled",
+      status: "posted",
+      isActual: false,
     });
     const res = await PATCH(patchReq({ ...VALID_PATCH_BODY, post: true }), {
       params: Promise.resolve({ id: "ord1" }),
@@ -512,9 +543,11 @@ describe("PATCH /api/v1/manager/orders/[id]", () => {
     canViewOrderMock.mockResolvedValueOnce(true);
     mockPrisma.order.findUnique.mockResolvedValueOnce({
       id: "ord1",
-      status: "sent",
+      status: "not_posted",
     });
-    updateOrderWithItemsMock.mockResolvedValueOnce(fakeUpdatedOrder("sent"));
+    updateOrderWithItemsMock.mockResolvedValueOnce(
+      fakeUpdatedOrder("not_posted"),
+    );
     const res = await PATCH(patchReq(VALID_PATCH_BODY), {
       params: Promise.resolve({ id: "ord1" }),
     });
@@ -552,8 +585,12 @@ describe("DELETE /api/v1/manager/orders/[id]", () => {
     expect(mockPrisma.order.delete).not.toHaveBeenCalled();
   });
 
-  it("deletes order on success (items cascade, no debt)", async () => {
-    mockPrisma.order.findUnique.mockResolvedValueOnce({ id: "ord1" });
+  it("deletes order on success (no linked sales / lots)", async () => {
+    mockPrisma.order.findUnique.mockResolvedValueOnce({
+      id: "ord1",
+      sales: [],
+      items: [],
+    });
     mockPrisma.order.delete.mockResolvedValueOnce({ id: "ord1" });
     const res = await DELETE(delReq(), {
       params: Promise.resolve({ id: "ord1" }),
@@ -564,6 +601,32 @@ describe("DELETE /api/v1/manager/orders/[id]", () => {
     expect(mockPrisma.order.delete).toHaveBeenCalledWith({
       where: { id: "ord1" },
     });
+  });
+
+  it("видаляє пов'язані реалізації + звільняє лоти + реверс рухів (8.1)", async () => {
+    mockPrisma.order.findUnique.mockResolvedValueOnce({
+      id: "ord1",
+      sales: [{ id: "sale1", code1C: null, customerId: "cust1" }],
+      items: [{ lotId: "lot1" }, { lotId: null }],
+    });
+    mockPrisma.mgrDebtMovement.findMany.mockResolvedValueOnce([
+      { clientId: "mgrc1" },
+    ]);
+    mockPrisma.order.delete.mockResolvedValueOnce({ id: "ord1" });
+    const res = await DELETE(delReq(), {
+      params: Promise.resolve({ id: "ord1" }),
+    });
+    expect(res.status).toBe(200);
+    // Пов'язана реалізація видалена, лот звільнено, рухи реверснуто.
+    expect(mockPrisma.sale.deleteMany).toHaveBeenCalledWith({
+      where: { id: { in: ["sale1"] } },
+    });
+    expect(mockPrisma.lot.updateMany).toHaveBeenCalledWith({
+      where: { id: { in: ["lot1"] }, status: "reserved" },
+      data: { status: "free" },
+    });
+    expect(removeSaleMovementsMock).toHaveBeenCalledWith("sale1");
+    expect(recomputeDebtForClientsSafeMock).toHaveBeenCalledWith(["mgrc1"]);
   });
 
   it("returns 404 when order missing", async () => {
@@ -577,7 +640,11 @@ describe("DELETE /api/v1/manager/orders/[id]", () => {
   it("admin can delete any order (ownership bypassed)", async () => {
     getCurrentUserMock.mockResolvedValueOnce(ADMIN);
     canViewOrderMock.mockResolvedValueOnce(true);
-    mockPrisma.order.findUnique.mockResolvedValueOnce({ id: "ord1" });
+    mockPrisma.order.findUnique.mockResolvedValueOnce({
+      id: "ord1",
+      sales: [],
+      items: [],
+    });
     mockPrisma.order.delete.mockResolvedValueOnce({ id: "ord1" });
     const res = await DELETE(delReq(), {
       params: Promise.resolve({ id: "ord1" }),

@@ -10,20 +10,18 @@ import { openManagerTab } from "../../../_components/open-manager-tab";
  * клієнта з позиціями, може перенести потрібні товари в нове замовлення і
  * закрити старі документи.
  *
- * Ховається для вже закритого / скасованого замовлення.
+ * Ховається для вже закритого замовлення.
  */
 export function OrderCloseButton({
-  status,
   isAlreadyClosed,
   mgrClientId,
 }: {
   orderId: string;
-  status: string;
   isAlreadyClosed: boolean;
   /** MgrClient.id — для префілу контрагента на екрані закриття. */
   mgrClientId?: string | null;
 }) {
-  if (isAlreadyClosed || status === "cancelled") {
+  if (isAlreadyClosed) {
     return null;
   }
 

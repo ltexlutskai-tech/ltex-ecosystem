@@ -9,7 +9,7 @@ import {
   orderRowInclude,
   serializeOrderRow,
 } from "@/lib/manager/orders-list";
-import { getDeliveryLabelResolver } from "@/lib/manager/delivery-methods";
+import { getOrderFilterOptions } from "@/lib/manager/order-filter-options";
 import { EmptyState } from "../_components/empty-state";
 import { AutoRefresh } from "../_components/auto-refresh";
 import { ListPagination } from "../customers/_components/list-pagination";
@@ -41,8 +41,6 @@ function buildOrderBy(
       return { isActual: dir };
     case "agent":
       return { agentName: dir };
-    case "delivery":
-      return { deliveryMethod: dir };
     case "date":
     default:
       return { createdAt: dir };
@@ -105,12 +103,10 @@ export default async function ManagerOrdersPage({
 
   const totalPages = Math.max(1, Math.ceil(total / filter.pageSize));
 
-  // Лейбл способу доставки — з довідника (7.3), резолвиться на сервері.
-  const deliveryLabelOf = await getDeliveryLabelResolver();
-  const rows = items.map((o) => ({
-    ...serializeOrderRow(o),
-    deliveryLabel: deliveryLabelOf(o.deliveryMethod),
-  }));
+  // Опції для фільтрів-довідників (міста / агенти) — щоб уникнути опечаток.
+  const filterOptions = await getOrderFilterOptions();
+
+  const rows = items.map((o) => serializeOrderRow(o));
 
   // Область клієнта — batch-lookup з MgrClient (Customer не має region).
   // За code1C, а для сайтових клієнтів без code1C — за телефоном (7.2 фікс).
@@ -195,7 +191,10 @@ export default async function ManagerOrdersPage({
         </Link>
       </header>
 
-      <OrdersToolbar />
+      <OrdersToolbar
+        cityOptions={filterOptions.cities}
+        agentOptions={filterOptions.agents}
+      />
 
       {rows.length === 0 ? (
         <EmptyState

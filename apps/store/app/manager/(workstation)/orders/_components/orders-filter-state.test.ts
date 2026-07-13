@@ -20,8 +20,8 @@ describe("parseOrdersFilterFromSearchParams", () => {
   });
 
   it("accepts whitelisted status", () => {
-    const s = parseOrdersFilterFromSearchParams({ status: "approved" });
-    expect(s.status).toBe("approved");
+    const s = parseOrdersFilterFromSearchParams({ status: "not_posted" });
+    expect(s.status).toBe("not_posted");
   });
 
   it("trims search whitespace", () => {
@@ -99,12 +99,12 @@ describe("ordersFilterToQueryString", () => {
   it("emits non-default values", () => {
     const qs = ordersFilterToQueryString({
       search: "x",
-      status: "approved",
+      status: "not_posted",
       page: 2,
       pageSize: 50,
     });
     expect(qs).toContain("search=x");
-    expect(qs).toContain("status=approved");
+    expect(qs).toContain("status=not_posted");
     expect(qs).toContain("page=2");
     expect(qs).toContain("pageSize=50");
   });

@@ -93,10 +93,10 @@ export async function createOrderWithItems(
   const items = (input.items ?? []) as OrderItemInput[];
   const { totalEur, totalUah, itemRows } = buildOrderTotals(items, rate);
 
-  // Проведення документа (кнопка «Зберегти та провести») → status `posted`.
-  // 7.3 (як у 1С «Заказ покупателя»): проведене замовлення ЛИШАЄТЬСЯ
-  // актуальним і видимим — воно в роботі (Потреби/маршрути), допоки його не
-  // закриють/скасують/відвантажать. Проведення лише блокує редагування.
+  // Проведення документа (кнопка «Зберегти та провести») → status `posted`
+  // (в архів). Явне збереження без проведення («Зберегти») → `not_posted`
+  // (створене, але рухи по реєстрах ще не йдуть). Чернетка (`draft`)
+  // створюється окремим легким шляхом autosave (`createOrderDraft`).
   const post = input.post === true;
 
   const order = await prisma.$transaction(async (tx) => {
@@ -121,7 +121,7 @@ export async function createOrderWithItems(
     const createData = {
       customerId: customer.id,
       number1C,
-      status: post ? "posted" : "draft",
+      status: post ? "posted" : "not_posted",
       archived: false,
       isActual: true,
       totalEur,
@@ -129,10 +129,6 @@ export async function createOrderWithItems(
       exchangeRate: rate,
       notes: input.notes,
       priceTypeId: input.priceTypeId ?? null,
-      deliveryMethod: input.deliveryMethod ?? null,
-      novaPoshtaBranch: input.novaPoshtaBranch ?? null,
-      deliveryAddress: input.deliveryAddress ?? null,
-      expressWaybill: input.expressWaybill ?? null,
       overdueDays: input.overdueDays ?? null,
       cashOnDelivery: input.cashOnDelivery ?? false,
       assignedAgentUserId: input.assignedAgentUserId ?? actor.userId,
@@ -174,16 +170,9 @@ export async function updateOrderWithItems(
   const items = (input.items ?? []) as OrderItemInput[];
   const { totalEur, totalUah, itemRows } = buildOrderTotals(items, rate);
 
-  // 7.3: проведення (posted) НЕ архівує — замовлення в роботі, актуальне.
-  // В архів іде лише скасоване (cancelled ⇒ archived + неактуальне).
-  const becomesArchived = options?.nextStatus === "cancelled";
-
-  // Актуальність: застосовуємо переданий `isActual`, якщо він є. Скасування
-  // форсує `isActual=false` і має пріоритет над переданим значенням.
+  // Актуальність: застосовуємо переданий `isActual`, якщо він є.
   const isActualUpdate =
-    typeof input.isActual === "boolean" && !becomesArchived
-      ? { isActual: input.isActual }
-      : {};
+    typeof input.isActual === "boolean" ? { isActual: input.isActual } : {};
 
   const order = await prisma.$transaction(async (tx) => {
     await tx.orderItem.deleteMany({ where: { orderId } });
@@ -196,10 +185,6 @@ export async function updateOrderWithItems(
         exchangeRate: rate,
         notes: input.notes ?? null,
         priceTypeId: input.priceTypeId ?? null,
-        deliveryMethod: input.deliveryMethod ?? null,
-        novaPoshtaBranch: input.novaPoshtaBranch ?? null,
-        deliveryAddress: input.deliveryAddress ?? null,
-        expressWaybill: input.expressWaybill ?? null,
         overdueDays: input.overdueDays ?? null,
         cashOnDelivery: input.cashOnDelivery ?? false,
         assignedAgentUserId: input.assignedAgentUserId ?? actor.userId,
@@ -208,7 +193,6 @@ export async function updateOrderWithItems(
         // Optimistic lock: інкрементуємо version при кожному PATCH.
         version: { increment: 1 },
         ...isActualUpdate,
-        ...(becomesArchived ? { archived: true, isActual: false } : {}),
       },
       include: ORDER_INCLUDE,
     });
@@ -255,10 +239,6 @@ export async function createOrderDraft(
         exchangeRate: rate,
         notes: input.notes ?? null,
         priceTypeId: input.priceTypeId ?? null,
-        deliveryMethod: input.deliveryMethod ?? null,
-        novaPoshtaBranch: input.novaPoshtaBranch ?? null,
-        deliveryAddress: input.deliveryAddress ?? null,
-        expressWaybill: input.expressWaybill ?? null,
         overdueDays: input.overdueDays ?? null,
         cashOnDelivery: input.cashOnDelivery ?? false,
         assignedAgentUserId: input.assignedAgentUserId ?? actor.userId,
@@ -292,10 +272,6 @@ export async function updateOrderDraft(
         exchangeRate: rate,
         notes: input.notes ?? null,
         priceTypeId: input.priceTypeId ?? null,
-        deliveryMethod: input.deliveryMethod ?? null,
-        novaPoshtaBranch: input.novaPoshtaBranch ?? null,
-        deliveryAddress: input.deliveryAddress ?? null,
-        expressWaybill: input.expressWaybill ?? null,
         overdueDays: input.overdueDays ?? null,
         cashOnDelivery: input.cashOnDelivery ?? false,
         version: { increment: 1 },

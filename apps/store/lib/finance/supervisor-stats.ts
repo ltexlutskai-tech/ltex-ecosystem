@@ -79,7 +79,7 @@ export async function getSupervisorStats(
   const activeOrdersAgg = await prisma.order.groupBy({
     by: ["assignedAgentUserId"],
     where: {
-      status: { in: ["draft", "sent", "pending", "approved", "shipped"] },
+      status: { in: ["draft", "not_posted", "pending"] },
       archived: false,
       assignedAgentUserId: { not: null },
     },

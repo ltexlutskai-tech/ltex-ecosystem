@@ -29,16 +29,12 @@ export const createOrderSchema = z.object({
   // ─── Manager order fields (← 1С Document.Заказ, Етап 1) ──────────────────
   /** Тип цін — `MgrPriceType.id` (рядки перераховуються за ним у UI). */
   priceTypeId: z.string().min(1).nullable().optional(),
-  /** Спосіб доставки — код запису довідника «Способи доставки» (7.3). */
-  deliveryMethod: z.string().max(50).nullable().optional(),
-  /** № відділення Нової Пошти (спосіб «Пошта»). */
-  novaPoshtaBranch: z.string().max(50).nullable().optional(),
-  /** Адреса доставки (спосіб «Доставка») — з картки клієнта або вручну. */
-  deliveryAddress: z.string().max(500).nullable().optional(),
-  /** ТТН / експрес-накладна (спосіб «Пошта»). */
-  expressWaybill: z.string().max(60).nullable().optional(),
-  /** Термін до протермінування (днів) для авто-нагадування. */
-  overdueDays: z.number().int().positive().max(3650).nullable().optional(),
+  /**
+   * Термін до нагадування (днів) — ОБОВ'ЯЗКОВЕ (8.1): менеджер задає, через
+   * скільки днів нагадати закрити/переробити замовлення. Спосіб доставки
+   * прибрано, авто-нагадування ведеться лише за цим полем.
+   */
+  overdueDays: z.number().int().positive().max(3650),
   /** Наложка (післяплата). */
   cashOnDelivery: z.boolean().optional().default(false),
   /** Торговий агент, кому зараховано продаж (`User.id`); дефолт — поточний. */
@@ -77,11 +73,8 @@ export const updateOrderSchema = z.object({
 
   // ─── Manager order fields (← 1С Document.Заказ, Етап 1) ──────────────────
   priceTypeId: z.string().min(1).nullable().optional(),
-  deliveryMethod: z.string().max(50).nullable().optional(),
-  novaPoshtaBranch: z.string().max(50).nullable().optional(),
-  deliveryAddress: z.string().max(500).nullable().optional(),
-  expressWaybill: z.string().max(60).nullable().optional(),
-  overdueDays: z.number().int().positive().max(3650).nullable().optional(),
+  /** Термін до нагадування (днів) — ОБОВ'ЯЗКОВЕ (8.1), як у createOrderSchema. */
+  overdueDays: z.number().int().positive().max(3650),
   cashOnDelivery: z.boolean().optional().default(false),
   assignedAgentUserId: z.string().min(1).nullable().optional(),
   /** Deprecated — див. createOrderSchema. Лишено опційним для back-compat. */
@@ -131,10 +124,7 @@ export const orderDraftSchema = z.object({
   /** Рядки повні (форма фільтрує неповні) — але масив може бути порожнім. */
   items: z.array(orderItemInputSchema).max(200).optional(),
   priceTypeId: z.string().min(1).nullable().optional(),
-  deliveryMethod: z.string().max(50).nullable().optional(),
-  novaPoshtaBranch: z.string().max(50).nullable().optional(),
-  deliveryAddress: z.string().max(500).nullable().optional(),
-  expressWaybill: z.string().max(60).nullable().optional(),
+  /** Термін до нагадування (днів) — у чернетці опційний (автозбереження). */
   overdueDays: z.number().int().positive().max(3650).nullable().optional(),
   cashOnDelivery: z.boolean().optional(),
   assignedAgentUserId: z.string().min(1).nullable().optional(),

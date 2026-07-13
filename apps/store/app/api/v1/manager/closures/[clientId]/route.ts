@@ -136,9 +136,9 @@ export async function GET(req: NextRequest, ctx: RouteContext) {
       orderDate: order.createdAt.toISOString(),
       status: order.status,
       isActual: order.isActual,
-      // Закрити можна незакрите й неархівне (усе, що потрапило у вибірку);
-      // скасоване сюди не потрапляє (archived).
-      closable: order.status !== "cancelled",
+      // Закрити можна незакрите (усе, що потрапило у вибірку); уже закриті
+      // (`closedAt`) сюди не потрапляють.
+      closable: order.closedAt == null,
       totalEur: Number(order.totalEur),
       items: order.items.map((item) => {
         const sold = soldMap.get(`${order.id}:${item.productId}`) ?? 0;

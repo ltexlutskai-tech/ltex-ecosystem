@@ -24,14 +24,27 @@ describe("getSaleStatusMeta", () => {
 });
 
 describe("status lists", () => {
-  it("SALE_STATUS_LIST + MANAGER_SALE_STATUSES = 4 канонічні", () => {
-    expect(SALE_STATUS_LIST).toEqual(["draft", "sent", "posted", "cancelled"]);
+  it("SALE_STATUS_LIST + MANAGER_SALE_STATUSES канонічні (incl. pending)", () => {
+    expect(SALE_STATUS_LIST).toEqual([
+      "draft",
+      "sent",
+      "posted",
+      "cancelled",
+      "pending",
+    ]);
     expect([...MANAGER_SALE_STATUSES]).toEqual([
       "draft",
       "sent",
       "posted",
       "cancelled",
+      "pending",
     ]);
+  });
+
+  it("pending — «Очікує підтвердження», редагується, не заблокований", () => {
+    expect(getSaleStatusMeta("pending").label).toBe("Очікує підтвердження");
+    expect(isSaleLocked("pending")).toBe(false);
+    expect(canEditSale("pending")).toBe(true);
   });
 
   it("isManagerSaleStatus розрізняє канонічні / ні", () => {

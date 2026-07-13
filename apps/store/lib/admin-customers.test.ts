@@ -190,13 +190,12 @@ describe("listCustomers", () => {
     expect(result.items[0]!.lastOrderAt).toEqual(
       new Date("2026-05-01T12:00:00Z"),
     );
-    // Verify cancelled orders are excluded from sum
+    // 8.1: статус «Скасовано» прибрано — сума рахується по всіх замовленнях
+    // клієнта (фільтр за customerId), без фільтра за статусом.
     expect(mockGroupBy).toHaveBeenNthCalledWith(
       1,
       expect.objectContaining({
-        where: expect.objectContaining({
-          status: { not: "cancelled" },
-        }),
+        where: { customerId: { in: ["c1"] } },
         _sum: { totalUah: true },
       }),
     );

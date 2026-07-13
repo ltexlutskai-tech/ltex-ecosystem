@@ -4,6 +4,7 @@ import type { CurrentManager } from "@/lib/auth/manager-auth";
 import { logAuditEvent } from "@/lib/audit/audit-log";
 import { recordClientEventSafe } from "@/lib/manager/client-timeline";
 import { recomputeDebtForClients } from "@/lib/manager/debt-register";
+import { removeSaleMovements } from "@/lib/manager/sale-movement-hooks";
 import {
   reapplyDocMovements,
   reverseDocMovements,
@@ -545,10 +546,55 @@ async function hardDeleteEntity(
       await prisma.mgrClient.delete({ where: { id: entityId } });
       return;
 
-    case "order":
-      // Замовлення не пишуть рухів боргу; каскади знімуть items/shipments/payments.
-      await prisma.order.delete({ where: { id: entityId } });
+    case "order": {
+      // 8.1: разом із замовленням видаляємо пов'язані реалізації (з реверсом
+      // рухів по реєстрах — борг/склад/продажі/собівартість) і звільняємо
+      // зарезервовані під нього лоти, щоб облік/потреби лишались коректними.
+      const order = await prisma.order.findUnique({
+        where: { id: entityId },
+        select: {
+          sales: { select: { id: true, code1C: true } },
+          items: { select: { lotId: true } },
+        },
+      });
+      const saleIds = order?.sales.map((s) => s.id) ?? [];
+      const lotIds = (order?.items ?? [])
+        .map((i) => i.lotId)
+        .filter((l): l is string => l != null);
+
+      const affectedClientIds = new Set<string>();
+      if (saleIds.length > 0) {
+        const moves = await prisma.mgrDebtMovement.findMany({
+          where: { sourceType: "sale", sourceId: { in: saleIds } },
+          select: { clientId: true },
+        });
+        for (const m of moves) affectedClientIds.add(m.clientId);
+      }
+
+      await prisma.$transaction(async (tx) => {
+        if (saleIds.length > 0) {
+          await tx.mgrDebtMovement.deleteMany({
+            where: { sourceType: "sale", sourceId: { in: saleIds } },
+          });
+          await tx.sale.deleteMany({ where: { id: { in: saleIds } } });
+        }
+        if (lotIds.length > 0) {
+          await tx.lot.updateMany({
+            where: { id: { in: lotIds }, status: "reserved" },
+            data: { status: "free" },
+          });
+        }
+        await tx.order.delete({ where: { id: entityId } });
+      });
+
+      for (const s of order?.sales ?? []) {
+        removeSaleMovements(s.code1C ?? s.id);
+      }
+      if (affectedClientIds.size > 0) {
+        await recomputeDebtForClients(prisma, [...affectedClientIds]);
+      }
       return;
+    }
 
     case "sale": {
       const moves = await prisma.mgrDebtMovement.findMany({

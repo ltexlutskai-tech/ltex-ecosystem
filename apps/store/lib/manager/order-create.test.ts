@@ -52,6 +52,7 @@ const actor = { userId: "mgr-1" };
 
 const baseInput = {
   customerId: "cust1",
+  overdueDays: 14,
   items: [
     { productId: "p1", lotId: "l1", weight: 25.5, quantity: 1, priceEur: 100 },
     { productId: "p2", lotId: null, weight: 10, quantity: 2, priceEur: 50 },
@@ -170,7 +171,6 @@ describe("createOrderWithItems", () => {
       {
         ...baseInput,
         priceTypeId: "pt-retail",
-        deliveryMethod: "post",
         cashOnDelivery: true,
         assignedAgentUserId: "mgr-2",
         exportTo1C: false,
@@ -181,14 +181,12 @@ describe("createOrderWithItems", () => {
     const call = mockPrisma.order.create.mock.calls[0]?.[0] as {
       data: {
         priceTypeId: string | null;
-        deliveryMethod: string | null;
         cashOnDelivery: boolean;
         assignedAgentUserId: string;
         exportTo1C: boolean;
       };
     };
     expect(call.data.priceTypeId).toBe("pt-retail");
-    expect(call.data.deliveryMethod).toBe("post");
     expect(call.data.cashOnDelivery).toBe(true);
     expect(call.data.assignedAgentUserId).toBe("mgr-2");
     expect(call.data.exportTo1C).toBe(false);
@@ -200,24 +198,22 @@ describe("createOrderWithItems", () => {
     const call = mockPrisma.order.create.mock.calls[0]?.[0] as {
       data: {
         priceTypeId: string | null;
-        deliveryMethod: string | null;
         cashOnDelivery: boolean;
         exportTo1C: boolean;
       };
     };
     expect(call.data.priceTypeId).toBeNull();
-    expect(call.data.deliveryMethod).toBeNull();
     expect(call.data.cashOnDelivery).toBe(false);
     expect(call.data.exportTo1C).toBe(true);
   });
 
-  it("без post → status=draft, archived=false, isActual=true", async () => {
+  it("без post → status=not_posted, archived=false, isActual=true", async () => {
     mockPrisma.order.create.mockResolvedValueOnce(fakeOrder());
     await createOrderWithItems(baseInput, baseCustomer, actor);
     const call = mockPrisma.order.create.mock.calls[0]?.[0] as {
       data: { status: string; archived: boolean; isActual: boolean };
     };
-    expect(call.data.status).toBe("draft");
+    expect(call.data.status).toBe("not_posted");
     expect(call.data.archived).toBe(false);
     expect(call.data.isActual).toBe(true);
   });
@@ -362,12 +358,12 @@ describe("updateOrderWithItems", () => {
   it("застосовує nextStatus коли переданий", async () => {
     mockPrisma.order.update.mockResolvedValueOnce(fakeUpdatedOrder());
     await updateOrderWithItems("ord1", baseInput, actor, {
-      nextStatus: "sent",
+      nextStatus: "not_posted",
     });
     const call = mockPrisma.order.update.mock.calls[0]?.[0] as {
       data: { status?: string };
     };
-    expect(call.data.status).toBe("sent");
+    expect(call.data.status).toBe("not_posted");
   });
 
   it("status undefined коли nextStatus не переданий (статус не чіпаємо)", async () => {
@@ -407,23 +403,6 @@ describe("updateOrderWithItems", () => {
     };
     expect(call.data.isActual).toBe(true);
     expect(call.data.archived).toBeUndefined();
-  });
-
-  it("скасування (cancelled) архівує і форсує isActual=false", async () => {
-    mockPrisma.order.update.mockResolvedValueOnce(fakeUpdatedOrder());
-    await updateOrderWithItems(
-      "ord1",
-      { ...baseInput, isActual: true },
-      actor,
-      {
-        nextStatus: "cancelled",
-      },
-    );
-    const call = mockPrisma.order.update.mock.calls[0]?.[0] as {
-      data: { isActual?: boolean; archived?: boolean };
-    };
-    expect(call.data.isActual).toBe(false);
-    expect(call.data.archived).toBe(true);
   });
 
   it("isActual не чіпається коли не переданий", async () => {

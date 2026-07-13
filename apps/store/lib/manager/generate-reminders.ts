@@ -29,18 +29,12 @@ export interface GenerateRemindersResult {
 }
 
 /**
- * Активні статуси замовлення для генерації нагадувань.
- * 7.3: `posted` — активний (проведене замовлення «в роботі», як у 1С);
- * виключаємо cancelled/delivered + archived/closed (фільтр у запиті).
+ * Активні статуси замовлення для генерації нагадувань (8.1).
+ * Нагадування «закрити/переробити» стосуються ще НЕ проведених документів:
+ * чернетка / не проведено / очікує підтвердження. Проведені (`posted`) йдуть
+ * в архів і не нагадують. archived/closed додатково відсіюються у запиті.
  */
-const ORDER_ACTIVE_STATUSES = [
-  "draft",
-  "sent",
-  "posted",
-  "pending",
-  "approved",
-  "shipped",
-] as const;
+const ORDER_ACTIVE_STATUSES = ["draft", "not_posted", "pending"] as const;
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
