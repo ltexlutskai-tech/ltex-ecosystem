@@ -39,6 +39,13 @@ interface Props {
   text: string;
 }
 
+/**
+ * Поріг довжини повідомлення, після якого Viber deep-link (`viber://forward`)
+ * може обрізати текст (кирилиця у %-кодуванні швидко роздуває URL). Довші
+ * повідомлення краще надсилати кнопкою «Скопіювати».
+ */
+const VIBER_SAFE_LEN = 300;
+
 /** Чи доступний Web Share API (мобільні браузери / частина десктопних). */
 function hasWebShare(): boolean {
   return (
@@ -107,6 +114,15 @@ export function ShareSheet({ open, onOpenChange, title, text }: Props) {
             onChange={(e) => setDraft(e.target.value)}
             className="font-mono text-sm"
           />
+
+          <div className="flex items-center justify-between text-xs">
+            <span className="text-gray-400">{draft.length} символів</span>
+            {draft.length > VIBER_SAFE_LEN && (
+              <span className="font-medium text-amber-600">
+                Довге повідомлення — Viber може обрізати. Краще «Скопіювати».
+              </span>
+            )}
+          </div>
 
           <div className="flex flex-wrap gap-2">
             <Button type="button" size="sm" onClick={handleCopy}>

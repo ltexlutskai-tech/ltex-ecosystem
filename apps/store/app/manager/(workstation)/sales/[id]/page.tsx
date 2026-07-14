@@ -10,6 +10,7 @@ import {
   getDeliveryMethodOptions,
   getDeliveryLabelResolver,
 } from "@/lib/manager/delivery-methods";
+import { getActivePaymentRequisites } from "@/lib/manager/payment-requisites";
 import { formatDocNumber, formatOrderNumber } from "@/lib/manager/order-number";
 import { DiscussButton } from "../../messenger/_components/discuss-button";
 import { SaleForm } from "../new/_components/sale-form";
@@ -25,6 +26,7 @@ import {
   type CashOrderView,
 } from "./_components/payments-panel";
 import { SaleDebtTerm } from "./_components/sale-debt-term";
+import { LinkedDocBanner } from "../../_components/linked-doc-banner";
 
 export const dynamic = "force-dynamic";
 
@@ -145,10 +147,12 @@ export default async function ManagerSaleDetailPage({
     : null;
 
   // Способи доставки — з редагованого довідника (7.3).
-  const [deliveryMethods, deliveryLabelOf] = await Promise.all([
-    getDeliveryMethodOptions(),
-    getDeliveryLabelResolver(),
-  ]);
+  const [deliveryMethods, deliveryLabelOf, paymentRequisites] =
+    await Promise.all([
+      getDeliveryMethodOptions(),
+      getDeliveryLabelResolver(),
+      getActivePaymentRequisites(),
+    ]);
 
   const clientSummary: ClientPickerItem = {
     id: sale.customer.id,
@@ -281,6 +285,14 @@ export default async function ManagerSaleDetailPage({
         </div>
       </header>
 
+      {sale.orderId && sale.order && (
+        <LinkedDocBanner
+          kind="order"
+          href={`/manager/orders/${sale.order.id}`}
+          number={`№${formatOrderNumber(sale.order)}`}
+        />
+      )}
+
       <SaleDebtTerm
         saleId={sale.id}
         cashOnDelivery={sale.cashOnDelivery}
@@ -301,6 +313,7 @@ export default async function ManagerSaleDetailPage({
             sale.exchangeRateUsd > 0 ? sale.exchangeRateUsd : exchangeRateUsd
           }
           deliveryMethods={deliveryMethods}
+          paymentRequisites={paymentRequisites}
           currentUserId={user.id}
           currentUserName={user.fullName}
           alreadyReceivedUah={cashSummary.receivedUah}
@@ -386,25 +399,6 @@ function ReadOnlySale({
           <Field label="Наложка">{sale.cashOnDelivery ? "Так" : "Ні"}</Field>
         </dl>
       </section>
-
-      {sale.orderId && sale.order && (
-        <section className="rounded-lg border bg-white p-5">
-          <h2 className="text-base font-semibold text-gray-800">
-            Замовлення-підстава
-          </h2>
-          <p className="mt-2 text-sm text-gray-700">
-            <Link
-              href={`/manager/orders/${sale.order.id}`}
-              className="text-blue-600 hover:text-blue-700"
-            >
-              {sale.order.number1C || sale.order.code1C
-                ? `№${formatOrderNumber(sale.order)}`
-                : `ID: ${sale.order.id.slice(0, 8)}…`}
-              {" →"}
-            </Link>
-          </p>
-        </section>
-      )}
 
       <section className="rounded-lg border bg-white p-5">
         <h2 className="text-base font-semibold text-gray-800">

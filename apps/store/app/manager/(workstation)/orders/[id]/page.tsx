@@ -7,7 +7,8 @@ import { getCurrentRate } from "@/lib/exchange-rate";
 import { canViewOrder } from "@/lib/manager/order-ownership";
 import { getOwnedClientIds } from "@/lib/manager/client-visibility";
 import { canEditOrder, isOrderLocked } from "@/lib/manager/order-status";
-import { formatOrderNumber } from "@/lib/manager/order-number";
+import { formatOrderNumber, formatDocNumber } from "@/lib/manager/order-number";
+import { LinkedDocBanner } from "../../_components/linked-doc-banner";
 import { DiscussButton } from "../../messenger/_components/discuss-button";
 import { OrderForm } from "../new/_components/order-form";
 import { AutoRefresh } from "../../_components/auto-refresh";
@@ -89,6 +90,14 @@ export default async function ManagerOrderDetailPage({
     },
   });
   if (!order) notFound();
+
+  // Пов'язана реалізація (авто-створена з сайтового замовлення). Показуємо
+  // банер-лінк над формою. Не показуємо soft-deleted (markedForDeletion).
+  const linkedSale = await prisma.sale.findFirst({
+    where: { orderId: order.id, markedForDeletion: false },
+    orderBy: { createdAt: "asc" },
+    select: { id: true, code1C: true, number1C: true, docNumber: true },
+  });
 
   // «Продано» — агрегат по SaleItem для реалізацій, прив'язаних до цього замовлення.
   const soldRows = await prisma.saleItem.groupBy({
@@ -280,6 +289,14 @@ export default async function ManagerOrderDetailPage({
             </div>
           )}
         </div>
+      )}
+
+      {linkedSale && (
+        <LinkedDocBanner
+          kind="sale"
+          href={`/manager/sales/${linkedSale.id}`}
+          number={formatDocNumber(linkedSale)}
+        />
       )}
 
       {editable ? (

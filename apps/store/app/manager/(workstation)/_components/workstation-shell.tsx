@@ -63,6 +63,11 @@ export function WorkstationShell({
       <div className="min-h-screen bg-gray-50 p-3 sm:p-4">
         <TabUrlReporter />
         {children}
+        {/* Toaster у КОЖНІЙ iframe-вкладці: toast-стор — module-singleton на
+            документ, тож toast, викликаний зсередини вкладки, рендериться лише
+            Toaster-ом цієї ж вкладки (у верхньому вікні його не видно). Без
+            цього підтвердження на кшталт «Надіслано у месенджер ✓» губились. */}
+        <Toaster />
       </div>
     );
   }

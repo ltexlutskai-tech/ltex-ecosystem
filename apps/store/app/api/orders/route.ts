@@ -96,14 +96,29 @@ export async function POST(request: NextRequest) {
   const lotBarcodeById = new Map<string, string>();
   let warehouseNote = "";
   if (lotIds.length > 0) {
-    const lotBarcodes = await prisma.lot.findMany({
+    const lotsForNote = await prisma.lot.findMany({
       where: { id: { in: lotIds } },
-      select: { id: true, barcode: true },
+      select: {
+        id: true,
+        barcode: true,
+        product: { select: { articleCode: true, name: true } },
+      },
     });
-    for (const l of lotBarcodes) lotBarcodeById.set(l.id, l.barcode);
-    const codes = lotBarcodes.map((l) => l.barcode).filter(Boolean);
-    if (codes.length > 0) {
-      warehouseNote = `Склад — відвантажити лоти: ${codes.join(", ")}`;
+    for (const l of lotsForNote) lotBarcodeById.set(l.id, l.barcode);
+    // Кожен рядок містить ШК + артикул + назву товару, щоб на складі було
+    // зрозуміло, який саме товар вантажити (не лише голий штрихкод).
+    const lines = lotsForNote
+      .filter((l) => l.barcode)
+      .map((l) => {
+        const art = l.product?.articleCode?.trim();
+        const name = l.product?.name?.trim();
+        const parts = [l.barcode];
+        if (art) parts.push(`арт. ${art}`);
+        if (name) parts.push(name);
+        return `• ${parts.join(" — ")}`;
+      });
+    if (lines.length > 0) {
+      warehouseNote = `Склад — відвантажити лоти:\n${lines.join("\n")}`;
     }
   }
   const orderNotes = [warehouseNote, notes?.trim()]

@@ -35,9 +35,13 @@ import {
   buildGroupSaleMessage,
   buildPaymentRequisitesText,
   buildPrepaymentRequisitesText,
+  DEFAULT_REQUISITE,
+  type RequisiteInfo,
   type SaleMessageInput,
   type SaleMessageItem,
 } from "@/lib/manager/sale-message";
+import type { PaymentRequisiteView } from "@/lib/manager/payment-requisites";
+import { PaymentHistoryDialog } from "../../[id]/_components/payment-history-dialog";
 import {
   isSaleLocked,
   type ManagerSaleStatus,
@@ -86,6 +90,8 @@ export interface SaleFormProps {
   /** Знімок курсу USD→UAH (для документа). */
   exchangeRateUsd: number;
   deliveryMethods: OrderDeliveryOption[];
+  /** Набори реквізитів оплати (селектор «Скинути реквізити»). */
+  paymentRequisites?: PaymentRequisiteView[];
   currentUserId: string;
   currentUserName: string;
   /**
@@ -156,6 +162,7 @@ export function SaleForm({
   exchangeRateEur,
   exchangeRateUsd,
   deliveryMethods,
+  paymentRequisites = [],
   currentUserId,
   currentUserName,
   routeSheetId,
@@ -204,6 +211,26 @@ export function SaleForm({
   const [showPrepayment, setShowPrepayment] = useState(false);
   // К-сть лотів для передоплати — редагована (дефолт = к-сть мішків реалізації).
   const [prepayLotCountRaw, setPrepayLotCountRaw] = useState("");
+
+  // ─── Вибір набору реквізитів (перед «Скинути реквізити») ──────────────────
+  const [selectedRequisiteId, setSelectedRequisiteId] = useState<string>(
+    () =>
+      paymentRequisites.find((r) => r.isDefault)?.id ??
+      paymentRequisites[0]?.id ??
+      "",
+  );
+
+  /** Обраний набір реквізитів (або дефолтний ФОП, коли довідник порожній). */
+  function selectedRequisite(): RequisiteInfo {
+    const r = paymentRequisites.find((x) => x.id === selectedRequisiteId);
+    return r ?? paymentRequisites[0] ?? DEFAULT_REQUISITE;
+  }
+
+  // ─── Історія оплат (діалог зі списком + видалення) ────────────────────────
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [historySaleId, setHistorySaleId] = useState<string | null>(
+    saleId ?? null,
+  );
 
   // ─── Надсилання «У наш месенджер» (внутрішній чат, у групи) ───────────────
   const [pickConvOpen, setPickConvOpen] = useState(false);
@@ -658,27 +685,42 @@ export function SaleForm({
     void submit(true);
   }
 
-  /** Зберегти й перейти до оплат на детальній сторінці (Fix 6). */
-  async function saveAndGoToPayments(mode: "pay" | "history"): Promise<void> {
+  /** Зберегти й перейти до форми оплати на детальній сторінці. */
+  async function saveAndGoToPayment(): Promise<void> {
     const id = await saveSale();
     if (id === null) return;
-    router.push(
-      mode === "pay"
-        ? `/manager/sales/${id}?pay=1`
-        : `/manager/sales/${id}#payments`,
-    );
+    router.push(`/manager/sales/${id}?pay=1`);
+  }
+
+  /**
+   * Відкрити «Історію оплат» — діалог зі списком касових ордерів цієї
+   * реалізації + можливістю видалити оплату. Спершу зберігаємо документ (щоб
+   * був id), потім відкриваємо діалог.
+   */
+  async function openPaymentHistory(): Promise<void> {
+    let id = savedId;
+    if (id === null) {
+      id = await saveSale();
+      if (id === null) return;
+    }
+    setHistorySaleId(id);
+    setHistoryOpen(true);
   }
 
   const totalEur = items
     .filter((i) => i.product)
     .reduce((s, i) => s + (i.priceEur || 0), 0);
-  // Сума післяплати (грн) — округлення повної суми документа.
+  // Повна сума документа у грн (округлено).
   const totalUahRounded = Math.round(totalEur * exchangeRateEur);
-  const codAmountUah = totalUahRounded;
 
-  // Фактична сума до оплати (грн) з урахуванням уже отриманих оплат по цій
+  // Фактична сума ДО оплати (грн) з урахуванням уже отриманих оплат по цій
   // реалізації (передоплати/оплати). У режимі створення отримано = 0.
   const remainingUah = Math.max(0, totalUahRounded - alreadyReceivedUah);
+  // Фактично сплачено (передоплата) — обмежуємо повною сумою для показу.
+  const prepaidUah = Math.min(alreadyReceivedUah, totalUahRounded);
+  // Сума післяплати (наложки) = залишок до сплати (сума − передоплата), а НЕ
+  // повна сума документа. Так наложка враховує фактичну передоплату.
+  const codAmountUah = remainingUah;
 
   // ─── Реквізити передоплати (500 грн/лот) ─────────────────────────────────
   // К-сть мішків реалізації (дефолт для поля «кількість лотів»).
@@ -744,19 +786,32 @@ export function SaleForm({
   }
 
   /**
-   * Реквізити оплати (ФОП) з ФАКТИЧНОЮ сумою до оплати — без позицій.
-   * Фактична сума = сума документа − уже отримані оплати (передоплати).
+   * Реквізити оплати (обраний набір) з ФАКТИЧНОЮ сумою до оплати — без позицій.
+   * Фактична сума = сума документа − уже отримані оплати (передоплати); коли є
+   * передоплата — у тексті показуємо розбивку «Сума / Передоплата / До сплати».
    */
   function openRequisitesMessage(): void {
     setShareTitle("Реквізити оплати");
-    setShareText(buildPaymentRequisitesText(remainingUah));
+    setShareText(
+      buildPaymentRequisitesText(remainingUah, {
+        requisite: selectedRequisite(),
+        prepaidUah: prepaidUah > 0 ? prepaidUah : undefined,
+        orderTotalUah: totalUahRounded,
+      }),
+    );
     setShareOpen(true);
   }
 
   /** Реквізити ПЕРЕДОПЛАТИ (500 грн/лот) — сума = к-сть лотів × 500 грн. */
   function openPrepaymentMessage(): void {
     setShareTitle("Реквізити передоплати");
-    setShareText(buildPrepaymentRequisitesText(prepaymentUah, prepayLotCount));
+    setShareText(
+      buildPrepaymentRequisitesText(
+        prepaymentUah,
+        prepayLotCount,
+        selectedRequisite(),
+      ),
+    );
     setShareOpen(true);
   }
 
@@ -1081,6 +1136,33 @@ export function SaleForm({
         <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-gray-500">
           Повідомлення
         </h2>
+
+        {/* Вибір набору реквізитів — застосовується до «Скинути реквізити» та
+            «Реквізити передоплати». */}
+        {paymentRequisites.length > 0 && (
+          <div className="mb-4 max-w-md">
+            <label
+              htmlFor="sale-requisite"
+              className="mb-1 block text-xs font-medium text-gray-500"
+            >
+              Реквізити для оплати
+            </label>
+            <select
+              id="sale-requisite"
+              value={selectedRequisiteId}
+              onChange={(e) => setSelectedRequisiteId(e.target.value)}
+              className="h-9 w-full rounded-md border border-gray-300 bg-white px-3 text-sm focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500"
+            >
+              {paymentRequisites.map((r) => (
+                <option key={r.id} value={r.id}>
+                  {r.name}
+                  {r.isDefault ? " (за замовчуванням)" : ""}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
         <div className="flex flex-wrap gap-2">
           <Button
             type="button"
@@ -1199,12 +1281,30 @@ export function SaleForm({
           <span className="font-medium">Наложка (післяплата)</span>
         </label>
         {cashOnDelivery && (
-          <p className="mt-2 text-sm text-amber-700">
-            Сума післяплати:{" "}
-            <span className="font-semibold">
-              {codAmountUah.toLocaleString("uk-UA")} ₴
-            </span>
-          </p>
+          <div className="mt-2 text-sm text-amber-700">
+            {prepaidUah > 0 && (
+              <div className="mb-1 space-y-0.5 text-gray-600">
+                <div>
+                  Сума замовлення:{" "}
+                  <span className="font-medium">
+                    {totalUahRounded.toLocaleString("uk-UA")} ₴
+                  </span>
+                </div>
+                <div>
+                  Передоплата (отримано):{" "}
+                  <span className="font-medium text-green-700">
+                    {prepaidUah.toLocaleString("uk-UA")} ₴
+                  </span>
+                </div>
+              </div>
+            )}
+            <p>
+              Сума післяплати:{" "}
+              <span className="font-semibold">
+                {codAmountUah.toLocaleString("uk-UA")} ₴
+              </span>
+            </p>
+          </div>
         )}
       </section>
 
@@ -1223,7 +1323,7 @@ export function SaleForm({
             type="button"
             variant="outline"
             disabled={!canSubmit}
-            onClick={() => void saveAndGoToPayments("pay")}
+            onClick={() => void saveAndGoToPayment()}
             title="Зберегти і створити оплату"
           >
             <Wallet className="mr-1 h-4 w-4" />
@@ -1232,9 +1332,9 @@ export function SaleForm({
           <Button
             type="button"
             variant="outline"
-            disabled={!canSubmit}
-            onClick={() => void saveAndGoToPayments("history")}
-            title="Зберегти і переглянути історію оплат"
+            disabled={!canSubmit && savedId === null}
+            onClick={() => void openPaymentHistory()}
+            title="Переглянути історію оплат по цій реалізації"
           >
             <Search className="mr-1 h-4 w-4" />
             Історія оплат
@@ -1303,6 +1403,14 @@ export function SaleForm({
         onOpenChange={setShareOpen}
         title={shareTitle}
         text={shareText}
+      />
+
+      {/* Історія оплат по реалізації — список + видалення документів оплати. */}
+      <PaymentHistoryDialog
+        open={historyOpen}
+        onOpenChange={setHistoryOpen}
+        saleId={historySaleId}
+        onChanged={() => router.refresh()}
       />
 
       {/* Діалог контролю відхилення ціни (без window.confirm — блокується в

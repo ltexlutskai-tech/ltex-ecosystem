@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Button } from "@ltex/ui";
 import type { PaymentSummary } from "@/lib/manager/payment-summary";
+import { PaymentDeleteButton } from "./payment-delete-button";
 
 export interface CashOrderView {
   id: string;
@@ -140,6 +141,7 @@ export function PaymentsPanel({
                   <th className="px-3 py-2 font-medium">Суми</th>
                   <th className="px-3 py-2 font-medium">Стаття</th>
                   <th className="px-3 py-2 font-medium">Дата</th>
+                  <th className="px-3 py-2 font-medium"></th>
                 </tr>
               </thead>
               <tbody>
@@ -164,6 +166,13 @@ export function PaymentsPanel({
                     </td>
                     <td className="px-3 py-2 text-gray-500">
                       {new Date(o.createdAt).toLocaleString("uk-UA")}
+                    </td>
+                    <td className="px-3 py-2 text-right">
+                      {/* Розхід-здача видаляється разом з приходом — кнопку
+                          показуємо лише на приході. */}
+                      {o.type !== "expense" && (
+                        <PaymentDeleteButton cashOrderId={o.id} />
+                      )}
                     </td>
                   </tr>
                 ))}

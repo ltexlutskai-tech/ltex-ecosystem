@@ -3,6 +3,7 @@ import { prisma } from "@ltex/db";
 import { getCurrentUser } from "@/lib/auth/manager-auth";
 import { getCurrentRate } from "@/lib/exchange-rate";
 import { getDeliveryMethodOptions } from "@/lib/manager/delivery-methods";
+import { getActivePaymentRequisites } from "@/lib/manager/payment-requisites";
 import { SaleForm } from "./_components/sale-form";
 import type { ClientPickerItem } from "./_components/sale-types";
 import { BackButton } from "../../_components/back-button";
@@ -103,6 +104,8 @@ export default async function NewSalePage({
 
   // Способи доставки — з редагованого довідника (7.3).
   const deliveryMethods = await getDeliveryMethodOptions();
+  // Набори реквізитів оплати (селектор «Скинути реквізити»).
+  const paymentRequisites = await getActivePaymentRequisites();
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">
@@ -125,6 +128,7 @@ export default async function NewSalePage({
         exchangeRateEur={exchangeRateEur}
         exchangeRateUsd={exchangeRateUsd}
         deliveryMethods={deliveryMethods}
+        paymentRequisites={paymentRequisites}
         currentUserId={user.id}
         currentUserName={user.fullName}
         routeSheetId={routeSheetId}

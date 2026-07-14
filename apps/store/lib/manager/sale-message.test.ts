@@ -265,6 +265,35 @@ describe("buildPaymentRequisitesText", () => {
     const text = buildPaymentRequisitesText(11736.6);
     expect(text).toContain(`Сума : ${num0(11737)}грн`);
   });
+
+  it("shows prepayment breakdown when prepaid > 0", () => {
+    const text = buildPaymentRequisitesText(3000, {
+      prepaidUah: 1000,
+      orderTotalUah: 4000,
+    });
+    expect(text).toContain(`Сума замовлення : ${num0(4000)}грн`);
+    expect(text).toContain(`Передоплата : ${num0(1000)}грн`);
+    expect(text).toContain(`До сплати : ${num0(3000)}грн`);
+    // Без окремого рядка «Сума :» коли є розбивка.
+    expect(text).not.toContain("Сума : ");
+  });
+
+  it("uses a custom requisite set", () => {
+    const text = buildPaymentRequisitesText(500, {
+      requisite: {
+        recipient: "ТОВ РОГА І КОПИТА",
+        edrpou: "99887766",
+        bankName: "Монобанк",
+        iban: "UA111111111111111111111111111",
+        purpose: "Передоплата",
+      },
+    });
+    expect(text).toContain("Одержувач: ТОВ РОГА І КОПИТА");
+    expect(text).toContain("Банк: Монобанк");
+    expect(text).toContain("UA111111111111111111111111111");
+    expect(text).toContain("Призначення платежу: Передоплата");
+    expect(text).not.toContain("ФОП КУЗЕНКО");
+  });
 });
 
 describe("buildPrepaymentRequisitesText", () => {

@@ -545,6 +545,28 @@ model MgrCashFlowArticle {
   @@map("mgr_cash_flow_articles")
 }
 
+// ─── Довідник реквізитів для оплати (реквізити, що скидаємо клієнту) ────────
+// Набори реквізитів одержувача (ФОП/картка/інший рахунок), які менеджер обирає
+// перед відправкою повідомлення «Скинути реквізити». `isDefault` — набір за
+// замовчуванням у селекторі. Редагується owner/admin.
+model MgrPaymentRequisite {
+  id        String   @id @default(cuid())
+  name      String // назва набору для селектора («ФОП Кузенко», «Картка ПриватБанк»)
+  recipient String // Одержувач
+  edrpou    String? // ЄДРПОУ/ІПН одержувача
+  bankName  String?  @map("bank_name") // назва банку
+  iban      String? // рахунок / IBAN / номер картки
+  purpose   String?  @default("Оплата товару") // призначення платежу
+  isDefault Boolean  @default(false) @map("is_default")
+  sortOrder Int      @default(0) @map("sort_order")
+  archived  Boolean  @default(false)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([archived, sortOrder])
+  @@map("mgr_payment_requisites")
+}
+
 model SaleItem {
   id         String  @id @default(cuid())
   saleId     String  @map("sale_id")

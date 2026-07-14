@@ -268,47 +268,100 @@ export function buildGroupSaleMessage(input: SaleMessageInput): string {
   return lines.join("\n");
 }
 
-/** Спільні рядки реквізитів ФОП КУЗЕНКО (без рядка суми). */
-const REQUISITES_LINES: string[] = [
-  "Одержувач: ФОП КУЗЕНКО ТАРАС СТЕПАНОВИЧ",
-  'Банк: АТ КБ "ПРИВАТБАНК"',
-  "ЄДРПОУ одержувача: 3351808816",
-  "Розрахунковий рахунок:",
-  "UA603052990000026003010807538",
-  "Призначення платежу: Оплата товару",
-];
+/**
+ * Реквізити одержувача — набір, який менеджер обирає перед відправкою (з
+ * довідника `MgrPaymentRequisite`). За замовчуванням — ФОП Кузенко.
+ */
+export interface RequisiteInfo {
+  recipient: string;
+  edrpou?: string | null;
+  bankName?: string | null;
+  /** Рахунок / IBAN / номер картки. */
+  iban?: string | null;
+  purpose?: string | null;
+}
+
+/** Дефолтний набір реквізитів (ФОП Кузенко) — коли не передано інший. */
+export const DEFAULT_REQUISITE: RequisiteInfo = {
+  recipient: "ФОП КУЗЕНКО ТАРАС СТЕПАНОВИЧ",
+  edrpou: "3351808816",
+  bankName: 'АТ КБ "ПРИВАТБАНК"',
+  iban: "UA603052990000026003010807538",
+  purpose: "Оплата товару",
+};
+
+/** Рядки реквізитів одержувача (без рядка суми) з обраного набору. */
+function requisiteLines(req: RequisiteInfo): string[] {
+  const lines: string[] = [`Одержувач: ${req.recipient.trim()}`];
+  if (req.bankName?.trim()) lines.push(`Банк: ${req.bankName.trim()}`);
+  if (req.edrpou?.trim()) lines.push(`ЄДРПОУ одержувача: ${req.edrpou.trim()}`);
+  if (req.iban?.trim()) {
+    lines.push("Розрахунковий рахунок:");
+    lines.push(req.iban.trim());
+  }
+  lines.push(`Призначення платежу: ${req.purpose?.trim() || "Оплата товару"}`);
+  return lines;
+}
+
+/** Додаткові параметри реквізитів оплати. */
+export interface PaymentRequisitesOptions {
+  /** Набір реквізитів одержувача (за замовч. ФОП Кузенко). */
+  requisite?: RequisiteInfo;
+  /** Уже сплачено (передоплата/оплата) на момент формування, грн. */
+  prepaidUah?: number;
+  /** Повна сума замовлення, грн (для розбивки, коли є передоплата). */
+  orderTotalUah?: number;
+}
 
 /**
- * Текст реквізитів оплати (ФОП КУЗЕНКО) з підсумковою сумою грн (округлено).
- * `totalUah` — фактична сума до оплати (з урахуванням передоплат/переплат).
- * Точний формат збережено навмисно (включно з пробілами після «:»).
+ * Текст реквізитів оплати з підсумковою сумою грн (округлено).
+ * `totalUah` — фактична сума ДО оплати (з урахуванням передоплат/переплат).
+ * Коли є передоплата (`prepaidUah > 0`) — показуємо розбивку
+ * «Сума замовлення / Передоплата / До сплати». Формат збережено навмисно.
  */
-export function buildPaymentRequisitesText(totalUah: number): string {
+export function buildPaymentRequisitesText(
+  totalUah: number,
+  opts?: PaymentRequisitesOptions,
+): string {
+  const req = opts?.requisite ?? DEFAULT_REQUISITE;
+  const prepaid = opts?.prepaidUah ?? 0;
+  const orderTotal = opts?.orderTotalUah ?? totalUah + prepaid;
+
+  const sumLines =
+    prepaid > 0
+      ? [
+          `Сума замовлення : ${num0(orderTotal)}грн`,
+          `Передоплата : ${num0(prepaid)}грн`,
+          `До сплати : ${num0(totalUah)}грн`,
+        ]
+      : [`Сума : ${num0(totalUah)}грн`];
+
   return [
     "Реквізити оплати : ",
     "",
-    ...REQUISITES_LINES,
+    ...requisiteLines(req),
     "",
     "Обов'язково скиньте скріншот, або фото чеку.",
     "Дякуємо за замовлення!;)",
     "",
-    `Сума : ${num0(totalUah)}грн`,
+    ...sumLines,
   ].join("\n");
 }
 
 /**
- * Текст реквізитів ПЕРЕДОПЛАТИ (ФОП КУЗЕНКО) з сумою передоплати за мішки.
+ * Текст реквізитів ПЕРЕДОПЛАТИ з сумою передоплати за мішки.
  * Передоплата = `lotCount × 500 грн` (мінімум 500 грн — рахує викликач). У тексті
  * показуємо к-сть лотів і суму. Формат реквізитів — той самий, що й у оплаті.
  */
 export function buildPrepaymentRequisitesText(
   prepaymentUah: number,
   lotCount: number,
+  requisite: RequisiteInfo = DEFAULT_REQUISITE,
 ): string {
   return [
     "Реквізити передоплати : ",
     "",
-    ...REQUISITES_LINES,
+    ...requisiteLines(requisite),
     "",
     "Обов'язково скиньте скріншот, або фото чеку.",
     "Дякуємо за замовлення!;)",
