@@ -1021,7 +1021,7 @@ export function PaymentForm({
           </Button>
         )}
         <Button type="button" variant="outline" onClick={openReceipt}>
-          Вайбер
+          Квитанція
         </Button>
         <Button
           type="button"

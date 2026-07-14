@@ -6,6 +6,7 @@ import { PaymentDeleteButton } from "./payment-delete-button";
 export interface CashOrderView {
   id: string;
   type: string; // income | expense
+  status: string; // draft | posted
   amountUah: number;
   amountEur: number;
   amountUsd: number;
@@ -55,6 +56,7 @@ export function PaymentsPanel({
   summary: PaymentSummary;
   orders: CashOrderView[];
 }) {
+  const draftCount = orders.filter((o) => o.status === "draft").length;
   const balance = summary.balanceUah;
   const balanceLabel =
     balance > 0
@@ -129,6 +131,16 @@ export function PaymentsPanel({
         </p>
       )}
 
+      {/* Непроведені (чернетки) не враховані в «Отримано» — підкажемо, що їх
+          треба провести (натиснути «Провести» на самій оплаті). */}
+      {draftCount > 0 && (
+        <p className="mt-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+          Є непроведені оплати (чернетки): <b>{draftCount}</b>. Вони{" "}
+          <b>не враховані</b> в «Отримано». Відкрийте оплату та натисніть
+          «Провести».
+        </p>
+      )}
+
       <div className="mt-4">
         {orders.length === 0 ? (
           <p className="text-sm text-gray-500">Оплат ще немає.</p>
@@ -138,6 +150,7 @@ export function PaymentsPanel({
               <thead>
                 <tr className="border-b text-left text-gray-500">
                   <th className="px-3 py-2 font-medium">Тип</th>
+                  <th className="px-3 py-2 font-medium">Статус</th>
                   <th className="px-3 py-2 font-medium">Суми</th>
                   <th className="px-3 py-2 font-medium">Стаття</th>
                   <th className="px-3 py-2 font-medium">Дата</th>
@@ -157,6 +170,21 @@ export function PaymentsPanel({
                       >
                         {o.type === "expense" ? "Розхід (здача)" : "Прихід"}
                       </span>
+                    </td>
+                    <td className="px-3 py-2">
+                      {o.status === "posted" ? (
+                        <span className="inline-flex rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">
+                          Проведено
+                        </span>
+                      ) : (
+                        <Link
+                          href={`/manager/payments/${o.id}`}
+                          className="inline-flex rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700 hover:bg-amber-200"
+                          title="Відкрити й провести"
+                        >
+                          Чернетка →
+                        </Link>
+                      )}
                     </td>
                     <td className="px-3 py-2 text-gray-800">
                       {amountParts(o)}

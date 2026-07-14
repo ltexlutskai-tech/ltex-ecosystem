@@ -139,72 +139,71 @@ export function SaleItemsEditor({
   }
 
   return (
-    <ul className="space-y-3">
-      {populated.map((draft, index) => {
-        // Чи є інші рядки того самого товару (показуємо «Повторити ціну»).
-        const sameProductCount = populated.filter(
-          (r) => r.product?.id === draft.product?.id,
-        ).length;
-        // Ціна = ціна/кг × вага одного мішка (read-only довідка).
-        const perBagWeight =
-          draft.quantity > 0 ? draft.weight / draft.quantity : draft.weight;
-        const pricePerBag =
-          Math.round(draft.pricePerKg * perBagWeight * 100) / 100;
-        return (
-          <li
-            key={draft.uid}
-            className="rounded-lg border bg-white p-4 transition-shadow hover:shadow-sm"
-          >
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-              {/* Назва + мета */}
-              <div className="min-w-0 flex-1">
-                <div className="flex items-baseline gap-2">
-                  <span className="text-xs text-gray-400">{index + 1}.</span>
-                  <span className="font-medium text-gray-900">
+    <div className="overflow-x-auto">
+      <table className="w-full min-w-[720px] text-sm">
+        <thead>
+          <tr className="border-b text-left text-xs uppercase tracking-wide text-gray-400">
+            <th className="w-8 px-2 py-2 font-medium">№</th>
+            <th className="px-2 py-2 font-medium">Товар</th>
+            <th className="w-24 px-2 py-2 text-right font-medium">Мішків</th>
+            <th className="w-32 px-2 py-2 text-right font-medium">
+              Ціна/кг, €
+            </th>
+            <th className="w-24 px-2 py-2 text-right font-medium">Ціна, €</th>
+            <th className="w-28 px-2 py-2 text-right font-medium">Сума, €</th>
+            <th className="w-10 px-2 py-2"></th>
+          </tr>
+        </thead>
+        <tbody>
+          {populated.map((draft, index) => {
+            // Чи є інші рядки того самого товару (показуємо «Повторити ціну»).
+            const sameProductCount = populated.filter(
+              (r) => r.product?.id === draft.product?.id,
+            ).length;
+            // Ціна = ціна/кг × вага одного мішка (read-only довідка).
+            const perBagWeight =
+              draft.quantity > 0 ? draft.weight / draft.quantity : draft.weight;
+            const pricePerBag =
+              Math.round(draft.pricePerKg * perBagWeight * 100) / 100;
+            return (
+              <tr
+                key={draft.uid}
+                className="border-b align-top last:border-b-0 hover:bg-gray-50"
+              >
+                <td className="px-2 py-2 text-xs text-gray-400">{index + 1}</td>
+                <td className="px-2 py-2">
+                  <div className="font-medium text-gray-900">
                     {draft.product?.name}
-                  </span>
-                </div>
-                <div className="mt-1 text-xs text-gray-500">
-                  {draft.product?.articleCode
-                    ? `Артикул: ${draft.product.articleCode}`
-                    : "Артикул: —"}
-                  <span className="mx-1.5 text-gray-300">·</span>≈{" "}
-                  {draft.weight.toFixed(1)} кг
-                  {draft.barcode ? (
-                    <>
-                      <span className="mx-1.5 text-gray-300">·</span>
-                      <span className="font-mono">ШК {draft.barcode}</span>
-                    </>
-                  ) : null}
-                </div>
-              </div>
-
-              {/* Контроли + видалення */}
-              <div className="flex flex-wrap items-end gap-4">
-                {/* Мішки */}
-                <div>
-                  <label className="mb-1 block text-xs text-gray-500">
-                    Мішків
-                  </label>
+                  </div>
+                  <div className="mt-0.5 text-xs text-gray-500">
+                    {draft.product?.articleCode
+                      ? `Арт. ${draft.product.articleCode}`
+                      : "Арт. —"}
+                    <span className="mx-1 text-gray-300">·</span>≈{" "}
+                    {draft.weight.toFixed(1)} кг
+                    {draft.barcode ? (
+                      <>
+                        <span className="mx-1 text-gray-300">·</span>
+                        <span className="font-mono">ШК {draft.barcode}</span>
+                      </>
+                    ) : null}
+                  </div>
+                </td>
+                <td className="px-2 py-2 text-right">
                   <NumericField
                     value={draft.quantity}
                     ariaLabel="Кількість мішків"
                     onValueChange={(n) => changeBags(draft, n)}
-                    className="h-9 w-20 rounded-md border border-gray-300 px-2 text-right text-sm focus:outline-none focus:ring-1 focus:ring-green-500"
+                    className="h-8 w-20 rounded-md border border-gray-300 px-2 text-right text-sm focus:outline-none focus:ring-1 focus:ring-green-500"
                   />
-                </div>
-
-                {/* Ціна за кг (вільний ввід — без кроку) */}
-                <div>
-                  <label className="mb-1 block text-xs text-gray-500">
-                    Ціна за кг, €
-                  </label>
-                  <div className="flex items-center gap-1">
+                </td>
+                <td className="px-2 py-2">
+                  <div className="flex items-center justify-end gap-1">
                     <NumericField
                       value={draft.pricePerKg}
                       ariaLabel="Ціна за кг"
                       onValueChange={(n) => changeUnitPrice(draft, n)}
-                      className="h-9 w-24 rounded-md border border-gray-300 px-2 text-right text-sm focus:outline-none focus:ring-1 focus:ring-green-500"
+                      className="h-8 w-20 rounded-md border border-gray-300 px-2 text-right text-sm focus:outline-none focus:ring-1 focus:ring-green-500"
                     />
                     {sameProductCount > 1 && (
                       <button
@@ -212,52 +211,45 @@ export function SaleItemsEditor({
                         onClick={() => repeatPrice(draft.uid)}
                         title="Повторити ціну для всіх рядків цього товару"
                         aria-label="Повторити ціну"
-                        className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-gray-200 text-gray-500 hover:border-green-400 hover:text-green-600"
+                        className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-gray-200 text-gray-500 hover:border-green-400 hover:text-green-600"
                       >
                         <Copy className="h-4 w-4" />
                       </button>
                     )}
                   </div>
-                </div>
-
-                {/* Ціна (read-only = ціна/кг × вага мішка) */}
-                <div className="min-w-[4.5rem] pb-1 text-right">
-                  <div className="text-xs text-gray-400">Ціна</div>
-                  <div className="text-sm text-gray-700">
-                    {pricePerBag.toFixed(2)} €
-                  </div>
-                </div>
-
-                {/* Сума (read-only = Ціна × мішки) */}
-                <div className="min-w-[5rem] pb-1 text-right">
-                  <div className="text-xs text-gray-400">Сума</div>
-                  <div
-                    className={`text-base font-semibold ${
+                </td>
+                <td className="px-2 py-2 text-right text-gray-700">
+                  {pricePerBag.toFixed(2)}
+                </td>
+                <td className="px-2 py-2 text-right">
+                  <span
+                    className={`font-semibold ${
                       draft.isAkciya ? "text-green-700" : "text-gray-900"
                     }`}
                   >
-                    {draft.priceEur.toFixed(2)} €
-                  </div>
+                    {draft.priceEur.toFixed(2)}
+                  </span>
                   {draft.isAkciya && (
-                    <span className="mt-0.5 inline-flex items-center rounded-sm bg-green-100 px-1.5 py-0.5 text-[11px] font-medium text-green-700">
+                    <span className="ml-1 inline-flex items-center rounded-sm bg-green-100 px-1 py-0.5 text-[10px] font-medium text-green-700">
                       Акція
                     </span>
                   )}
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => removeRow(draft.uid)}
-                  className="mb-1 inline-flex h-9 w-9 items-center justify-center rounded-md text-gray-400 hover:bg-red-50 hover:text-red-600"
-                  aria-label="Видалити позицію"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </button>
-              </div>
-            </div>
-          </li>
-        );
-      })}
-    </ul>
+                </td>
+                <td className="px-2 py-2 text-right">
+                  <button
+                    type="button"
+                    onClick={() => removeRow(draft.uid)}
+                    className="inline-flex h-8 w-8 items-center justify-center rounded-md text-gray-400 hover:bg-red-50 hover:text-red-600"
+                    aria-label="Видалити позицію"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
   );
 }

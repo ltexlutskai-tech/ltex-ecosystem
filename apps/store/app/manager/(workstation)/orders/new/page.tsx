@@ -155,7 +155,7 @@ export default async function NewOrderPage({
   const exchangeRate = await getCurrentRate();
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6">
+    <div className="mx-auto max-w-6xl space-y-6">
       <Link
         href="/manager/orders"
         className="inline-flex items-center gap-1 text-sm text-gray-600 hover:text-gray-900"

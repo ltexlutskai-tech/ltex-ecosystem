@@ -108,7 +108,7 @@ export default async function NewSalePage({
   const paymentRequisites = await getActivePaymentRequisites();
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6">
+    <div className="mx-auto max-w-6xl space-y-6">
       <BackButton
         label={routeSheetId ? "Назад до маршруту" : "Назад до списку"}
         fallbackHref={returnHref}

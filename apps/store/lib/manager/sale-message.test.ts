@@ -69,7 +69,7 @@ describe("buildClientSaleMessage", () => {
     // phone normalized to local 0XXXXXXXXX
     expect(text).toContain("0501112233");
     expect(text).not.toContain("+380501112233");
-    expect(text).toContain("Відділення пошти № 12");
+    expect(text).toContain("Нова Пошта, відділення № 12");
     // item line: [name] вагахціна = сума (40 × 3.5 = 140)
     expect(text).toContain(
       `[Куртки зимові мікс (1001)] ${num(40)}х${num(3.5)} = ${money2(140)}`,
@@ -181,7 +181,7 @@ describe("buildClientSaleMessage", () => {
       "Київська",
       "Луцьк",
       "0501234567",
-      "Відділення пошти № 1",
+      "Нова Пошта, відділення № 1",
       "",
       `[Товар (1)] ${num(21.9)}х${num(3.3)} = ${money2(21.9 * 3.3)}`,
       "",

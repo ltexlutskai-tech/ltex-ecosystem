@@ -9,7 +9,8 @@ describe("classifyDelivery", () => {
   });
   it("за лейблом довідника", () => {
     expect(classifyDelivery("d1", "Нова Пошта")).toBe("post");
-    expect(classifyDelivery("d2", "Укрпошта")).toBe("post");
+    expect(classifyDelivery("d2", "Укрпошта")).toBe("ukrposhta");
+    expect(classifyDelivery("ukrposhta")).toBe("ukrposhta");
     expect(classifyDelivery("d3", "Доставка")).toBe("delivery");
     expect(classifyDelivery("d4", "Кур'єр")).toBe("delivery");
     expect(classifyDelivery("d5", "Самовивіз")).toBe("pickup");

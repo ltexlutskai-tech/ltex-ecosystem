@@ -267,11 +267,20 @@ export function SaleForm({
     initialSale?.expressWaybill ?? "",
   );
 
-  // Категорія доставки → які поля показувати (НП/ТТН — пошта; Адреса — доставка).
+  // Категорія доставки → які поля показувати (НП/ТТН — пошта; індекс/трек —
+  // Укрпошта; Адреса — доставка).
   const deliveryKind = classifyDelivery(
     deliveryMethod,
     deliveryMethods.find((o) => o.code === deliveryMethod)?.label,
   );
+  // Пошта та Укрпошта показують ті самі поля (№ відділення + накладна), але з
+  // різними лейблами; зберігаються у ті самі колонки (novaPoshtaBranch/expressWaybill).
+  const isPostLike = deliveryKind === "post" || deliveryKind === "ukrposhta";
+  const isUkrposhta = deliveryKind === "ukrposhta";
+  const branchLabel = isUkrposhta
+    ? "Індекс / № відділення Укрпошти"
+    : "№ відділення НП";
+  const waybillLabel = isUkrposhta ? "Трек-номер" : "ТТН (експрес-накладна)";
 
   // ─── Автозбереження чернетки (наскрізне, План AUTOSAVE_REALTIME_PLAN) ──────
   // Дворівневий захист: рівень 1 (localStorage) + рівень 2 (жива чернетка в БД).
@@ -609,16 +618,15 @@ export function SaleForm({
           // менеджерська ціна фіксується у рядках. На документ пишемо null.
           priceTypeId: null,
           deliveryMethod: deliveryMethod || null,
-          // НП/ТТН зберігаємо лише для «Пошта», адресу — лише для «Доставка».
-          novaPoshtaBranch:
-            deliveryKind === "post" ? novaPoshtaBranch.trim() || null : null,
+          // № відділення/накладну зберігаємо для Пошти й Укрпошти, адресу — лише
+          // для «Доставка».
+          novaPoshtaBranch: isPostLike ? novaPoshtaBranch.trim() || null : null,
           deliveryAddress:
             deliveryKind === "delivery" ? deliveryAddress.trim() || null : null,
           cashOnDelivery,
           assignedAgentUserId: payloadAgent,
           onTradeAgent,
-          expressWaybill:
-            deliveryKind === "post" ? expressWaybill.trim() || null : null,
+          expressWaybill: isPostLike ? expressWaybill.trim() || null : null,
           ...(usePatch ? {} : { routeSheetId: routeSheetId ?? undefined }),
           ...(usePatch && nextStatus ? { status: nextStatus } : {}),
           ...(post ? { post: true } : {}),
@@ -685,11 +693,13 @@ export function SaleForm({
     void submit(true);
   }
 
-  /** Зберегти й перейти до форми оплати на детальній сторінці. */
+  /** Зберегти й перейти до форми оплати (напряму, з прив'язкою до реалізації). */
   async function saveAndGoToPayment(): Promise<void> {
     const id = await saveSale();
     if (id === null) return;
-    router.push(`/manager/sales/${id}?pay=1`);
+    // Напряму на форму оплати з saleId — щоб оплата гарантовано прив'язалась до
+    // цієї реалізації (без проміжного редіректу, який міг губити параметр).
+    router.push(`/manager/payments/new?saleId=${id}`);
   }
 
   /**
@@ -952,14 +962,14 @@ export function SaleForm({
             </select>
           </div>
 
-          {/* № відділення НП — лише для «Пошта». */}
-          {deliveryKind === "post" && (
+          {/* № відділення — для Нової Пошти та Укрпошти (лейбл змінюється). */}
+          {isPostLike && (
             <div>
               <label
                 htmlFor="sale-np-branch"
                 className="mb-1 block text-sm font-medium text-gray-700"
               >
-                № відділення НП
+                {branchLabel}
               </label>
               <input
                 id="sale-np-branch"
@@ -1015,14 +1025,14 @@ export function SaleForm({
             />
           </div>
 
-          {/* ТТН — лише для «Пошта». */}
-          {deliveryKind === "post" && (
+          {/* Накладна/трек — для Нової Пошти та Укрпошти (лейбл змінюється). */}
+          {isPostLike && (
             <div>
               <label
                 htmlFor="sale-ttn"
                 className="mb-1 block text-sm font-medium text-gray-700"
               >
-                ТТН (експрес-накладна)
+                {waybillLabel}
               </label>
               <input
                 id="sale-ttn"

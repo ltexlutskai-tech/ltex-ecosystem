@@ -11,22 +11,17 @@ import {
   Textarea,
   useToast,
 } from "@ltex/ui";
-import {
-  telegramShareUrl,
-  viberShareUrl,
-  whatsappShareUrl,
-} from "@/lib/manager/messenger-links";
 
 /**
- * Manager «Прайс» — Stage 5a єдине вікно «Поділитися».
+ * Manager — єдине вікно «Поділитися».
  *
  * Перевикористовуваний Dialog: показує редаговане textarea з готовим текстом +
- * кнопку «Скопіювати» (clipboard) + «Поділитися» (Web Share API — тільки коли
- * доступне) + кнопки месенджерів Viber / Telegram / WhatsApp (відкривають
- * месенджер з підставленим текстом). Працює і на телефоні, і на компʼютері.
+ * кнопку «Скопіювати» (clipboard) + «Поділитися» (Web Share API — коли доступне).
  *
- * Web Share / clipboard — клієнтське (browser API). Месенджер-лінки будуються
- * чистими функціями `lib/manager/messenger-links.ts`.
+ * Кнопки Viber / Telegram / WhatsApp прибрано: їхні deep-links (`viber://forward`
+ * тощо) обрізають довгі повідомлення (кирилиця у %-кодуванні швидко роздуває
+ * URL) → повідомлення приходило неповним. Надійний шлях — «Скопіювати» і
+ * вставити у месенджер, або системне «Поділитися».
  */
 
 interface Props {
@@ -38,13 +33,6 @@ interface Props {
   /** Готовий текст (initial) — користувач може редагувати перед відправкою. */
   text: string;
 }
-
-/**
- * Поріг довжини повідомлення, після якого Viber deep-link (`viber://forward`)
- * може обрізати текст (кирилиця у %-кодуванні швидко роздуває URL). Довші
- * повідомлення краще надсилати кнопкою «Скопіювати».
- */
-const VIBER_SAFE_LEN = 300;
 
 /** Чи доступний Web Share API (мобільні браузери / частина десктопних). */
 function hasWebShare(): boolean {
@@ -91,19 +79,14 @@ export function ShareSheet({ open, onOpenChange, title, text }: Props) {
     }
   }
 
-  function openMessenger(url: string) {
-    // _blank — відкриває web-версію / deep-link, не залишаючи менеджерську панель.
-    window.open(url, "_blank", "noopener,noreferrer");
-  }
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90vh] max-w-lg overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
           <DialogDescription>
-            Перевірте та за потреби відредагуйте текст, потім скопіюйте або
-            оберіть месенджер.
+            Перевірте та за потреби відредагуйте текст, потім натисніть
+            «Скопіювати» і вставте у месенджер (або «Поділитися»).
           </DialogDescription>
         </DialogHeader>
 
@@ -115,65 +98,17 @@ export function ShareSheet({ open, onOpenChange, title, text }: Props) {
             className="font-mono text-sm"
           />
 
-          <div className="flex items-center justify-between text-xs">
-            <span className="text-gray-400">{draft.length} символів</span>
-            {draft.length > VIBER_SAFE_LEN && (
-              <span className="font-medium text-amber-600">
-                Довге повідомлення — Viber може обрізати. Краще «Скопіювати».
-              </span>
-            )}
-          </div>
+          <div className="text-xs text-gray-400">{draft.length} символів</div>
 
           <div className="flex flex-wrap gap-2">
-            <Button type="button" size="sm" onClick={handleCopy}>
+            <Button type="button" onClick={handleCopy}>
               📋 Скопіювати
             </Button>
             {canShare && (
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={handleWebShare}
-              >
+              <Button type="button" variant="outline" onClick={handleWebShare}>
                 Поділитися…
               </Button>
             )}
-          </div>
-
-          <div>
-            <div className="mb-1 text-xs uppercase tracking-wide text-gray-400">
-              Месенджери
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => openMessenger(viberShareUrl(draft))}
-              >
-                Viber
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => openMessenger(telegramShareUrl(draft))}
-              >
-                Telegram
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => openMessenger(whatsappShareUrl(draft))}
-              >
-                WhatsApp
-              </Button>
-            </div>
-            <p className="mt-2 text-xs text-gray-400">
-              Viber на компʼютері відкриється лише з установленим Viber Desktop
-              — інакше скористайтесь кнопкою «Скопіювати».
-            </p>
           </div>
         </div>
       </DialogContent>

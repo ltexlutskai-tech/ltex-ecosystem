@@ -7,29 +7,39 @@
  */
 export const ORDER_DELIVERY_METHODS = [
   { code: "delivery", label: "Доставка" },
-  { code: "post", label: "Пошта" },
+  { code: "post", label: "Нова Пошта" },
+  { code: "ukrposhta", label: "Укрпошта" },
   { code: "pickup", label: "Самовивіз" },
 ] as const;
 
 /** Категорія способу доставки для показу полів у формі реалізації. */
-export type DeliveryKind = "post" | "delivery" | "pickup" | "other";
+export type DeliveryKind =
+  | "post"
+  | "ukrposhta"
+  | "delivery"
+  | "pickup"
+  | "other";
 
 /**
  * Класифікація способу доставки (за легасі-кодом або лейблом довідника):
- *  • post     — Нова Пошта → показуємо № відділення НП + ТТН;
- *  • delivery — Доставка (кур'єр/адреса) → показуємо «Адреса доставки»;
- *  • pickup   — Самовивіз → без полів доставки;
- *  • other    — інше (нічого не показуємо).
+ *  • post      — Нова Пошта → показуємо № відділення НП + ТТН;
+ *  • ukrposhta — Укрпошта → показуємо індекс/№ відділення + трек-номер;
+ *  • delivery  — Доставка (кур'єр/адреса) → показуємо «Адреса доставки»;
+ *  • pickup    — Самовивіз → без полів доставки;
+ *  • other     — інше (нічого не показуємо).
  */
 export function classifyDelivery(
   code: string | null | undefined,
   label?: string | null,
 ): DeliveryKind {
   if (code === "delivery") return "delivery";
+  if (code === "ukrposhta") return "ukrposhta";
   if (code === "post") return "post";
   if (code === "pickup") return "pickup";
   const l = (label ?? "").toLowerCase();
   if (l.includes("самовив")) return "pickup";
+  // Укрпошта — перевіряємо ДО загального «пошт», щоб не сплутати з Новою Поштою.
+  if (l.includes("укрпошт") || l.includes("укр пошт")) return "ukrposhta";
   if (l.includes("пошт") || l.includes("нова")) return "post";
   if (l.includes("достав") || l.includes("кур")) return "delivery";
   return "other";

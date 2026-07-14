@@ -190,7 +190,7 @@ describe("PaymentForm", () => {
     expect(screen.getByText("Дати знижку на залишок")).toBeDefined();
   });
 
-  it("кнопка «Вайбер» відкриває ShareSheet з текстом-квитанцією", () => {
+  it("кнопка «Квитанція» відкриває ShareSheet з текстом-квитанцією", () => {
     render(<PaymentForm {...BASE} />);
     expect(screen.queryByTestId("share-sheet")).toBeNull();
 
@@ -198,7 +198,7 @@ describe("PaymentForm", () => {
     fireEvent.change(inputByLabelPrefix("Готівка, грн"), {
       target: { value: "4300" },
     });
-    fireEvent.click(screen.getByText("Вайбер"));
+    fireEvent.click(screen.getByText("Квитанція"));
 
     const sheet = screen.getByTestId("share-sheet");
     expect(sheet.textContent).toContain("Оплата");

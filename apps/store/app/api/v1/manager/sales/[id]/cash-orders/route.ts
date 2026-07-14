@@ -70,6 +70,7 @@ export async function GET(
     orders: orders.map((o) => ({
       id: o.id,
       type: o.type,
+      status: o.status,
       amountUah: o.amountUah,
       amountEur: o.amountEur,
       amountUsd: o.amountUsd,

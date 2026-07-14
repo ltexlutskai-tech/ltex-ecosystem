@@ -237,6 +237,7 @@ export default async function ManagerSaleDetailPage({
   const cashOrderViews: CashOrderView[] = cashOrders.map((o) => ({
     id: o.id,
     type: o.type,
+    status: o.status,
     amountUah: o.amountUah,
     amountEur: o.amountEur,
     amountUsd: o.amountUsd,
@@ -249,7 +250,7 @@ export default async function ManagerSaleDetailPage({
   }));
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6">
+    <div className="mx-auto max-w-6xl space-y-6">
       <Link
         href="/manager/sales"
         className="inline-flex items-center gap-1 text-sm text-gray-600 hover:text-gray-900"

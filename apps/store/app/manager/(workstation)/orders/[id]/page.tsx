@@ -223,7 +223,7 @@ export default async function ManagerOrderDetailPage({
   const date = new Date(order.createdAt).toLocaleString("uk-UA");
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6">
+    <div className="mx-auto max-w-6xl space-y-6">
       {/* Read-only режим автооновлюємо; у режимі редагування — ні (не заважати). */}
       {!editable && <AutoRefresh intervalMs={30_000} />}
       <Link

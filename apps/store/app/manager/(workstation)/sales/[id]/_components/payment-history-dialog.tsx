@@ -15,6 +15,7 @@ import {
 interface CashOrderRow {
   id: string;
   type: string; // income | expense
+  status: string; // draft | posted
   amountUah: number;
   amountEur: number;
   amountUsd: number;
@@ -166,6 +167,11 @@ export function PaymentHistoryDialog({
                     <span className="font-medium text-gray-800">
                       {amountParts(o)}
                     </span>
+                    {o.status !== "posted" && (
+                      <span className="inline-flex rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">
+                        Чернетка
+                      </span>
+                    )}
                   </div>
                   <div className="mt-0.5 text-xs text-gray-500">
                     {new Date(o.createdAt).toLocaleString("uk-UA")}

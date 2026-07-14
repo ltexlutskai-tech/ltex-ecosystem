@@ -1,7 +1,9 @@
+import type { ReactNode } from "react";
 import type { ManagerRole } from "@/lib/auth/jwt";
 import { ChatUnreadBadge } from "./chat-unread-badge";
 import { DeletionsBadge } from "./deletions-badge";
 import { MessengerUnreadBadge } from "./messenger-unread-badge";
+import { PendingBadge } from "./pending-badge";
 import { SidebarNavLink } from "./sidebar-nav-link";
 import {
   ADMIN_AUDIT_LINK,
@@ -27,7 +29,13 @@ import {
 export function ManagerSidebar({ role }: { role: ManagerRole }) {
   return (
     <aside className="hidden w-60 shrink-0 flex-col gap-1 overflow-y-auto border-r bg-white p-3 lg:flex">
-      <NavSection links={PRIMARY_LINKS} />
+      <NavSection
+        links={PRIMARY_LINKS}
+        badges={{
+          "/manager/orders": <PendingBadge kind="orders" />,
+          "/manager/sales": <PendingBadge kind="sales" />,
+        }}
+      />
       <Separator />
       <NavSection links={SECONDARY_LINKS} />
       <Separator />
@@ -135,7 +143,14 @@ export function ManagerSidebar({ role }: { role: ManagerRole }) {
   );
 }
 
-function NavSection({ links }: { links: readonly SidebarLink[] }) {
+function NavSection({
+  links,
+  badges,
+}: {
+  links: readonly SidebarLink[];
+  /** Опційні бейджі за href (напр. лічильник pending для замовлень/реалізацій). */
+  badges?: Record<string, ReactNode>;
+}) {
   return (
     <nav className="space-y-1">
       {links.map((link) => (
@@ -144,6 +159,7 @@ function NavSection({ links }: { links: readonly SidebarLink[] }) {
           href={link.href}
           label={link.label}
           icon={renderLinkIcon(link)}
+          badgeSlot={badges?.[link.href]}
         />
       ))}
     </nav>

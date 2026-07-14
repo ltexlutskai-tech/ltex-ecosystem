@@ -108,7 +108,11 @@ function deliveryLine(
   switch (deliveryMethod) {
     case "post": {
       const branch = novaPoshtaBranch?.trim();
-      return branch ? `Відділення пошти № ${branch}` : "Нова Пошта";
+      return branch ? `Нова Пошта, відділення № ${branch}` : "Нова Пошта";
+    }
+    case "ukrposhta": {
+      const branch = novaPoshtaBranch?.trim();
+      return branch ? `Укрпошта, відділення № ${branch}` : "Укрпошта";
     }
     case "pickup":
       return "Самовивіз";
