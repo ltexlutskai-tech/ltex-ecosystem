@@ -169,6 +169,14 @@ export function PaymentForm({
     return match?.id ?? "";
   }, [cashFlowArticles]);
 
+  // Прихід від контрагента: лише дві статті на вибір — «Оплата від покупця»
+  // або «Оплата доставки» (рішення user 2026-07-14 — виключає помилковий вибір).
+  const isIncomeClientArticle = useCallback(
+    (a: CashFlowArticleOption): boolean =>
+      /покупц|покупател/i.test(a.name) || /доставк/i.test(a.name),
+    [],
+  );
+
   // ─── Вид руху ───────────────────────────────────────────────────────────
   const [direction, setDirection] = useState<CashFlowDirection>("income");
 
@@ -289,12 +297,18 @@ export function PaymentForm({
   const showBankAccount = paid.uahCashless > 0;
 
   // Статті, доступні для поточного виду руху (income/expense + both).
+  // При Приході з контрагентом — лише «Оплата від покупця» / «Оплата доставки».
   const articlesForDirection = useMemo(() => {
     const want = isExpense ? "expense" : "income";
-    return cashFlowArticles.filter(
+    const byDirection = cashFlowArticles.filter(
       (a) => a.direction === "both" || a.direction === want,
     );
-  }, [cashFlowArticles, isExpense]);
+    if (isExpense) return byDirection;
+    const restricted = byDirection.filter(isIncomeClientArticle);
+    // Якщо у довіднику немає жодної з двох статей — не залишаємо порожній список
+    // (краще показати всі прихідні, ніж заблокувати оплату).
+    return restricted.length > 0 ? restricted : byDirection;
+  }, [cashFlowArticles, isExpense, isIncomeClientArticle]);
 
   // Якщо обрана стаття не підходить під новий напрям — скидаємо (менеджеру на
   // Приході підставляємо дефолт «Оплата від покупця»).
@@ -661,9 +675,26 @@ export function PaymentForm({
             Прихід · Оплата від покупця
           </div>
         ) : (
-          <div className="inline-flex overflow-hidden rounded-md border border-gray-300">
+          <div
+            role="radiogroup"
+            aria-label="Вид руху коштів"
+            className="inline-flex overflow-hidden rounded-md border border-gray-300"
+            onKeyDown={(e) => {
+              // Стрілки перемикають вид руху (навігація без миші).
+              if (e.key === "ArrowRight" || e.key === "ArrowDown") {
+                e.preventDefault();
+                setDirection("expense");
+              } else if (e.key === "ArrowLeft" || e.key === "ArrowUp") {
+                e.preventDefault();
+                setDirection("income");
+              }
+            }}
+          >
             <button
               type="button"
+              role="radio"
+              aria-checked={!isExpense}
+              tabIndex={!isExpense ? 0 : -1}
               onClick={() => setDirection("income")}
               className={`px-4 py-2 text-sm font-medium ${
                 !isExpense
@@ -675,6 +706,9 @@ export function PaymentForm({
             </button>
             <button
               type="button"
+              role="radio"
+              aria-checked={isExpense}
+              tabIndex={isExpense ? 0 : -1}
               onClick={() => setDirection("expense")}
               className={`px-4 py-2 text-sm font-medium ${
                 isExpense
@@ -685,6 +719,35 @@ export function PaymentForm({
               Розхід
             </button>
           </div>
+        )}
+      </Section>
+
+      {/* ─── Стаття руху коштів (одразу після виду руху, рішення user) ────── */}
+      <Section title="Стаття руху коштів">
+        {lockSaleIncome ? (
+          <div className="rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700">
+            Оплата від покупця
+            {!cashFlowArticleId && (
+              <span className="ml-2 text-xs text-amber-600">
+                (у довіднику немає статті «Оплата від покупця» — додайте її)
+              </span>
+            )}
+          </div>
+        ) : (
+          <>
+            <Field label="Стаття (обов'язково)">
+              <ArticleCombobox
+                items={articlesForDirection}
+                value={cashFlowArticleId}
+                onChange={setCashFlowArticleId}
+              />
+            </Field>
+            {!cashFlowArticleId && (
+              <p className="mt-1 text-xs text-amber-600">
+                Оберіть статтю руху коштів.
+              </p>
+            )}
+          </>
         )}
       </Section>
 
@@ -837,35 +900,6 @@ export function PaymentForm({
               </p>
             )}
           </div>
-        )}
-      </Section>
-
-      {/* ─── Стаття руху коштів ──────────────────────────────────────────── */}
-      <Section title="Стаття руху коштів">
-        {lockSaleIncome ? (
-          <div className="rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700">
-            Оплата від покупця
-            {!cashFlowArticleId && (
-              <span className="ml-2 text-xs text-amber-600">
-                (у довіднику немає статті «Оплата від покупця» — додайте її)
-              </span>
-            )}
-          </div>
-        ) : (
-          <>
-            <Field label="Стаття (обов'язково)">
-              <ArticleCombobox
-                items={articlesForDirection}
-                value={cashFlowArticleId}
-                onChange={setCashFlowArticleId}
-              />
-            </Field>
-            {!cashFlowArticleId && (
-              <p className="mt-1 text-xs text-amber-600">
-                Оберіть статтю руху коштів.
-              </p>
-            )}
-          </>
         )}
       </Section>
 
