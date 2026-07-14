@@ -111,6 +111,56 @@ describe("PaymentForm", () => {
     expect(screen.queryByText("Решта (здача)")).toBeNull();
   });
 
+  it("Прихід з контрагентом: лише статті «Оплата від покупця»/«Оплата доставки»", () => {
+    const articles = [
+      {
+        id: "a1",
+        code: null,
+        name: "Оплата від покупця",
+        parentId: null,
+        direction: "income",
+      },
+      {
+        id: "a2",
+        code: null,
+        name: "Оплата доставки",
+        parentId: null,
+        direction: "income",
+      },
+      {
+        id: "a3",
+        code: null,
+        name: "Інша прихідна стаття",
+        parentId: null,
+        direction: "income",
+      },
+      {
+        id: "a4",
+        code: null,
+        name: "Розхідна стаття",
+        parentId: null,
+        direction: "expense",
+      },
+    ];
+    render(<PaymentForm {...STANDALONE} cashFlowArticles={articles} />);
+
+    // Відкриваємо список статей (фокус на combobox).
+    fireEvent.focus(
+      screen.getByPlaceholderText("Почніть вводити назву статті…"),
+    );
+    expect(screen.getByText("Оплата від покупця")).toBeDefined();
+    expect(screen.getByText("Оплата доставки")).toBeDefined();
+    // «Інша прихідна» не показується при Приході (обмеження двома статтями).
+    expect(screen.queryByText("Інша прихідна стаття")).toBeNull();
+
+    // При Розході — повний список розхідних статей.
+    fireEvent.click(screen.getByText("Розхід"));
+    fireEvent.focus(
+      screen.getByPlaceholderText("Почніть вводити назву статті…"),
+    );
+    expect(screen.getByText("Розхідна стаття")).toBeDefined();
+  });
+
   it("введення готівки оновлює зведення оплати у EUR", () => {
     render(<PaymentForm {...BASE} />);
     // 43 грн / курс 43 = 1.00 € → Оплата (EUR) = 1.00 €.
