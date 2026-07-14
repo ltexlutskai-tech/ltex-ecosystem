@@ -4,6 +4,7 @@ import { ChatUnreadBadge } from "./chat-unread-badge";
 import { DeletionsBadge } from "./deletions-badge";
 import { MessengerUnreadBadge } from "./messenger-unread-badge";
 import { PendingBadge } from "./pending-badge";
+import { WarehouseTasksBadge } from "./warehouse-tasks-badge";
 import { SidebarNavLink } from "./sidebar-nav-link";
 import {
   ADMIN_AUDIT_LINK,
@@ -22,6 +23,7 @@ import {
   SETTINGS_LINK,
   TRASH_LINK,
   WAREHOUSE_RECEIVINGS_LINK,
+  WAREHOUSE_TASKS_LINK,
   renderLinkIcon,
   type SidebarLink,
 } from "./sidebar-links";
@@ -53,6 +55,12 @@ export function ManagerSidebar({ role }: { role: ManagerRole }) {
       />
       {(role === "warehouse" || role === "admin" || role === "owner") && (
         <>
+          <SidebarNavLink
+            href={WAREHOUSE_TASKS_LINK.href}
+            label={WAREHOUSE_TASKS_LINK.label}
+            icon={renderLinkIcon(WAREHOUSE_TASKS_LINK)}
+            badgeSlot={<WarehouseTasksBadge />}
+          />
           <SidebarNavLink
             href={WAREHOUSE_RECEIVINGS_LINK.href}
             label={WAREHOUSE_RECEIVINGS_LINK.label}

@@ -10,6 +10,7 @@ import {
 } from "@/lib/manager/debt-register";
 import { applySaleMovements } from "@/lib/manager/sale-movement-hooks";
 import { notifyOrdersClosedBySale } from "@/lib/manager/sale-order-close";
+import { createWarehouseTaskForSale } from "@/lib/manager/warehouse-task";
 import type {
   CreateSaleInputRaw,
   SaleDraftInput,
@@ -201,6 +202,8 @@ export async function createSaleWithItems(
     // Рухи регістрів (склад/продажі/собівартість) при проведенні — best-effort,
     // ідемпотентно (delete-then-create за реєстратором sale.code1C ?? sale.id).
     applySaleMovements(sale.id);
+    // Завдання складу (підготувати лоти + ТТН) — при проведенні, fire-and-forget.
+    void createWarehouseTaskForSale(sale.id);
     void notifyOrdersClosedBySale({
       saleId: sale.id,
       saleNumber1C: sale.number1C,
@@ -295,6 +298,8 @@ export async function updateSaleWithItems(
   if (becomesArchived) {
     // Рухи регістрів (склад/продажі/собівартість) при проведенні з картки.
     applySaleMovements(sale.id);
+    // Завдання складу (підготувати лоти + ТТН) — при проведенні з картки.
+    void createWarehouseTaskForSale(sale.id);
     void notifyOrdersClosedBySale({
       saleId: sale.id,
       saleNumber1C: sale.number1C,

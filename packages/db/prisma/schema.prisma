@@ -405,10 +405,11 @@ model Sale {
   createdAt           DateTime @default(now()) @map("created_at")
   updatedAt           DateTime @updatedAt @map("updated_at")
 
-  customer   Customer       @relation(fields: [customerId], references: [id])
-  order      Order?         @relation("SaleOrder", fields: [orderId], references: [id], onDelete: SetNull)
-  items      SaleItem[]
-  cashOrders MgrCashOrder[]
+  customer      Customer       @relation(fields: [customerId], references: [id])
+  order         Order?         @relation("SaleOrder", fields: [orderId], references: [id], onDelete: SetNull)
+  items         SaleItem[]
+  cashOrders    MgrCashOrder[]
+  warehouseTask WarehouseTask?
 
   @@index([customerId])
   @@index([status])
@@ -505,6 +506,14 @@ model MgrBankAccount {
   // Ліміт на отримання: рахунок приховано для МЕНЕДЖЕРІВ при Приході (адмін/
   // власник бачать); для Розходу (списання) видно завжди.
   hiddenInApp Boolean  @default(false) @map("hidden_in_app")
+  // ── Реквізити для «Скинути реквізити» у реалізації (2026-07-14) ──
+  // Набір реквізитів одержувача, який менеджер обирає перед відправкою. Замість
+  // окремого довідника — тут, бо це той самий рахунок, на який приймають оплату.
+  recipientName  String? @map("recipient_name") // Одержувач (юр. назва; fallback — name)
+  edrpou         String? // ЄДРПОУ/ІПН одержувача
+  iban           String? // рахунок / IBAN / номер картки
+  bankName       String? @map("bank_name") // назва банку
+  paymentPurpose String? @map("payment_purpose") // призначення платежу
   archived    Boolean  @default(false)
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
@@ -545,28 +554,6 @@ model MgrCashFlowArticle {
   @@map("mgr_cash_flow_articles")
 }
 
-// ─── Довідник реквізитів для оплати (реквізити, що скидаємо клієнту) ────────
-// Набори реквізитів одержувача (ФОП/картка/інший рахунок), які менеджер обирає
-// перед відправкою повідомлення «Скинути реквізити». `isDefault` — набір за
-// замовчуванням у селекторі. Редагується owner/admin.
-model MgrPaymentRequisite {
-  id        String   @id @default(cuid())
-  name      String // назва набору для селектора («ФОП Кузенко», «Картка ПриватБанк»)
-  recipient String // Одержувач
-  edrpou    String? // ЄДРПОУ/ІПН одержувача
-  bankName  String?  @map("bank_name") // назва банку
-  iban      String? // рахунок / IBAN / номер картки
-  purpose   String?  @default("Оплата товару") // призначення платежу
-  isDefault Boolean  @default(false) @map("is_default")
-  sortOrder Int      @default(0) @map("sort_order")
-  archived  Boolean  @default(false)
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-
-  @@index([archived, sortOrder])
-  @@map("mgr_payment_requisites")
-}
-
 model SaleItem {
   id         String  @id @default(cuid())
   saleId     String  @map("sale_id")
@@ -588,6 +575,71 @@ model SaleItem {
 
   @@index([saleId])
   @@map("mgr_sale_items")
+}
+
+// ─── Завдання складу (підготувати відправлення) ────────────────────────────
+// Створюється при проведенні реалізації («Зберегти та провести»): склад бачить
+// детальне завдання — підготувати перелічені лоти й перевірити/створити ТТН.
+// Життєвий цикл: new (створено) → received (склад прийняв) → sent (запаковано +
+// ТТН, відправлено). На кожному переході менеджеру (Sale.assignedAgentUserId
+// або автор) йде сповіщення (MgrReminder). Фундамент під інтеграцію з Новою
+// Поштою — deliveryMethod/novaPoshtaBranch/expressWaybill зберігаються тут, щоб
+// пізніше авто-створювати ТТН з параметрів картки товару.
+model WarehouseTask {
+  id     String @id @default(cuid())
+  saleId String @unique @map("sale_id")
+  status String @default("new") // new | received | sent | cancelled
+
+  // Знімок для складу (щоб не залежати від змін реалізації).
+  customerName     String  @map("customer_name")
+  deliveryMethod   String? @map("delivery_method")
+  deliveryLabel    String? @map("delivery_label")
+  novaPoshtaBranch String? @map("nova_poshta_branch")
+  expressWaybill   String? @map("express_waybill")
+  deliveryAddress  String? @map("delivery_address")
+
+  // Кому сповіщати (менеджер реалізації) — плоскі скаляри.
+  managerUserId String? @map("manager_user_id")
+  managerName   String? @map("manager_name")
+
+  // Приймання складом.
+  receivedByUserId String?   @map("received_by_user_id")
+  receivedByName   String?   @map("received_by_name")
+  receivedAt       DateTime? @map("received_at")
+
+  // Відправлення (запаковано + ТТН).
+  sentByUserId String?   @map("sent_by_user_id")
+  sentByName   String?   @map("sent_by_name")
+  sentAt       DateTime? @map("sent_at")
+  ttnConfirmed Boolean   @default(false) @map("ttn_confirmed") // склад підтвердив ТТН
+
+  comment   String?
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  sale  Sale                @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  items WarehouseTaskItem[]
+
+  @@index([status])
+  @@map("warehouse_tasks")
+}
+
+model WarehouseTaskItem {
+  id          String  @id @default(cuid())
+  taskId      String  @map("task_id")
+  productName String  @map("product_name")
+  articleCode String? @map("article_code")
+  barcode     String?
+  lotId       String? @map("lot_id")
+  quantity    Int     @default(1)
+  weight      Float   @default(0)
+  sector      String? // сектор складу (якщо відомий) — куди йти по лот
+  packed      Boolean @default(false) // склад позначає, що позицію запаковано
+
+  task WarehouseTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@index([taskId])
+  @@map("warehouse_task_items")
 }
 
 // ─── Exchange Rates (← 1С КурсиВалют) ──────────────────────────────────────

@@ -14,11 +14,21 @@ import { z } from "zod";
 /** Тип рахунку: account (банк-рахунок), card (картка), cash (готівкова каса). */
 export const BANK_ACCOUNT_KINDS = ["account", "card", "cash"] as const;
 
+/** Поля реквізитів для «Скинути реквізити» (спільні для create/update). */
+const requisiteFields = {
+  recipientName: z.string().trim().max(200).nullable().optional(),
+  edrpou: z.string().trim().max(40).nullable().optional(),
+  iban: z.string().trim().max(60).nullable().optional(),
+  bankName: z.string().trim().max(200).nullable().optional(),
+  paymentPurpose: z.string().trim().max(200).nullable().optional(),
+};
+
 export const createBankAccountSchema = z.object({
   name: z.string().trim().min(1, "Вкажіть назву").max(200),
   description: z.string().trim().max(500).optional(),
   kind: z.enum(BANK_ACCOUNT_KINDS).optional().default("account"),
   hiddenInApp: z.boolean().optional().default(false),
+  ...requisiteFields,
 });
 
 export const updateBankAccountSchema = z
@@ -28,6 +38,7 @@ export const updateBankAccountSchema = z
     kind: z.enum(BANK_ACCOUNT_KINDS).optional(),
     hiddenInApp: z.boolean().optional(),
     archived: z.boolean().optional(),
+    ...requisiteFields,
   })
   .refine((v) => Object.keys(v).length > 0, {
     message: "Немає полів для оновлення",

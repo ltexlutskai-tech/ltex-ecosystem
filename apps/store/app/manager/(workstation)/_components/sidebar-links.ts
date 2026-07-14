@@ -17,6 +17,7 @@ import {
   ArrowDownToLine,
   ArrowUpFromLine,
   ArrowLeftRight,
+  PackageCheck,
   PackagePlus,
   PackageSearch,
   PieChart,
@@ -140,6 +141,13 @@ export const BAG_STATE_LINK: SidebarLink = {
   href: "/manager/bag-state-changes",
   label: "Зміна стану мішка",
   icon: Boxes,
+};
+
+// ── Завдання складу (2026-07-14) — підготувати відправлення + ТТН ──────────
+export const WAREHOUSE_TASKS_LINK: SidebarLink = {
+  href: "/manager/warehouse-tasks",
+  label: "Завдання",
+  icon: PackageCheck,
 };
 
 // ── Тиждень 1 блоку Ролі (2026-06-03) ────────────────────────────────────

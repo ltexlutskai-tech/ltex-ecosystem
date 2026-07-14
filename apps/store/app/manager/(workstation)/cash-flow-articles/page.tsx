@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 export const metadata = { title: "Статті руху коштів — L-TEX Manager" };
 
 export default async function CashFlowArticlesPage() {
-  const admin = await requireRole(["admin"]);
+  const admin = await requireRole(["admin", "owner"]);
   if (!admin) redirect("/manager");
 
   const items = await prisma.mgrCashFlowArticle.findMany({

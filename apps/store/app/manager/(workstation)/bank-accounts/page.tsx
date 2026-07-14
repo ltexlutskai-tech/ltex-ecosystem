@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 export const metadata = { title: "Банк. рахунки — L-TEX Manager" };
 
 export default async function BankAccountsPage() {
-  const admin = await requireRole(["admin"]);
+  const admin = await requireRole(["admin", "owner"]);
   if (!admin) redirect("/manager");
 
   const items = await prisma.mgrBankAccount.findMany({
@@ -22,6 +22,11 @@ export default async function BankAccountsPage() {
       kind: true,
       hiddenInApp: true,
       archived: true,
+      recipientName: true,
+      edrpou: true,
+      iban: true,
+      bankName: true,
+      paymentPurpose: true,
     },
   });
 
@@ -31,7 +36,9 @@ export default async function BankAccountsPage() {
         <h1 className="text-2xl font-bold text-gray-800">Банківські рахунки</h1>
         <p className="mt-1 text-sm text-gray-600">
           Довідник рахунків для прийому безготівки (← 1С Банк. рахунки).
-          «Прихований» рахунок не можна вибрати при приході.
+          «Прихований» рахунок не можна вибрати при приході. Поля реквізитів
+          (одержувач/IBAN/ЄДРПОУ) використовуються у «Скинути реквізити» в
+          реалізації.
         </p>
       </header>
       <BankAccountsManager initial={items as BankAccountItem[]} />

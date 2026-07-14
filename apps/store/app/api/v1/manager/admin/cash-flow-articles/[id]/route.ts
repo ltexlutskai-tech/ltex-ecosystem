@@ -11,7 +11,7 @@ export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const admin = await requireRole(["admin"], req);
+  const admin = await requireRole(["admin", "owner"], req);
   if (!admin) {
     return NextResponse.json({ error: "Не авторизовано" }, { status: 403 });
   }

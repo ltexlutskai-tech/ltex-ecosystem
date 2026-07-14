@@ -11,7 +11,7 @@ import { createBankAccountSchema } from "@/lib/validations/mgr-dictionaries";
  * POST — створити рахунок.
  */
 export async function GET(req: NextRequest) {
-  const admin = await requireRole(["admin"], req);
+  const admin = await requireRole(["admin", "owner"], req);
   if (!admin) {
     return NextResponse.json({ error: "Не авторизовано" }, { status: 403 });
   }
@@ -25,13 +25,18 @@ export async function GET(req: NextRequest) {
       kind: true,
       hiddenInApp: true,
       archived: true,
+      recipientName: true,
+      edrpou: true,
+      iban: true,
+      bankName: true,
+      paymentPurpose: true,
     },
   });
   return NextResponse.json({ items });
 }
 
 export async function POST(req: NextRequest) {
-  const admin = await requireRole(["admin"], req);
+  const admin = await requireRole(["admin", "owner"], req);
   if (!admin) {
     return NextResponse.json({ error: "Не авторизовано" }, { status: 403 });
   }
@@ -54,6 +59,11 @@ export async function POST(req: NextRequest) {
       description: parsed.data.description ?? null,
       kind: parsed.data.kind,
       hiddenInApp: parsed.data.hiddenInApp,
+      recipientName: parsed.data.recipientName ?? null,
+      edrpou: parsed.data.edrpou ?? null,
+      iban: parsed.data.iban ?? null,
+      bankName: parsed.data.bankName ?? null,
+      paymentPurpose: parsed.data.paymentPurpose ?? null,
     },
     select: {
       id: true,
@@ -62,6 +72,11 @@ export async function POST(req: NextRequest) {
       kind: true,
       hiddenInApp: true,
       archived: true,
+      recipientName: true,
+      edrpou: true,
+      iban: true,
+      bankName: true,
+      paymentPurpose: true,
     },
   });
   return NextResponse.json(created, { status: 201 });

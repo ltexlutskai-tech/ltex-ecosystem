@@ -11,7 +11,7 @@ import { createCashFlowArticleSchema } from "@/lib/validations/mgr-dictionaries"
  * POST — створити статтю (code/name/parentId).
  */
 export async function GET(req: NextRequest) {
-  const admin = await requireRole(["admin"], req);
+  const admin = await requireRole(["admin", "owner"], req);
   if (!admin) {
     return NextResponse.json({ error: "Не авторизовано" }, { status: 403 });
   }
@@ -31,7 +31,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const admin = await requireRole(["admin"], req);
+  const admin = await requireRole(["admin", "owner"], req);
   if (!admin) {
     return NextResponse.json({ error: "Не авторизовано" }, { status: 403 });
   }

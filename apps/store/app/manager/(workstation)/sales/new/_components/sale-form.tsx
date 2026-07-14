@@ -4,7 +4,6 @@ import { useCallback, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   MessageSquare,
-  MessagesSquare,
   ListPlus,
   Send,
   Users,
@@ -12,10 +11,9 @@ import {
   Search,
   Receipt,
 } from "lucide-react";
-import { Button, Textarea, useToast } from "@ltex/ui";
+import { Button, Textarea } from "@ltex/ui";
 import { ClientPicker } from "../../../orders/new/_components/client-picker";
 import { ShareSheet } from "../../../prices/_components/share-sheet";
-import { PickConversationDialog } from "../../../messenger/_components/pick-conversation-dialog";
 import { SaleItemsEditor } from "./sale-items-editor";
 import { SaleTotals } from "./sale-totals";
 import { BarcodeInput } from "./barcode-input";
@@ -170,7 +168,6 @@ export function SaleForm({
   alreadyReceivedUah = 0,
 }: SaleFormProps) {
   const router = useRouter();
-  const { toast } = useToast();
   const isEdit = mode === "edit";
   /** Куди повертатись після звичайного збереження (МЛ або список). */
   const successHref = returnHref ?? "/manager/sales";
@@ -231,10 +228,6 @@ export function SaleForm({
   const [historySaleId, setHistorySaleId] = useState<string | null>(
     saleId ?? null,
   );
-
-  // ─── Надсилання «У наш месенджер» (внутрішній чат, у групи) ───────────────
-  const [pickConvOpen, setPickConvOpen] = useState(false);
-  const [sendingToConv, setSendingToConv] = useState(false);
 
   // ─── Менеджерські поля ──────────────────────────────────────────────────
   // Тип цін як окреме поле прибрано (рішення user): при додаванні товару ціна
@@ -825,42 +818,6 @@ export function SaleForm({
     setShareOpen(true);
   }
 
-  /**
-   * «У наш месенджер» — надсилає текст групового повідомлення у вибрану розмову
-   * (групу) внутрішнього месенджера L-TEX. Основний сценарій — закидати
-   * повідомлення у робочі групи.
-   */
-  async function sendGroupToConversation(
-    conversationId: string,
-  ): Promise<void> {
-    if (sendingToConv) return;
-    setSendingToConv(true);
-    try {
-      const text = buildGroupSaleMessage(buildMessageInput());
-      const res = await fetch(
-        `/api/v1/manager/messenger/conversations/${conversationId}/messages`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ text }),
-        },
-      );
-      if (!res.ok) {
-        const body = (await res.json().catch(() => ({}))) as { error?: string };
-        throw new Error(body.error ?? `Помилка ${res.status}`);
-      }
-      setPickConvOpen(false);
-      toast({ description: "Надіслано у месенджер ✓" });
-    } catch (e) {
-      toast({
-        description: e instanceof Error ? e.message : "Не вдалось надіслати",
-        variant: "destructive",
-      });
-    } finally {
-      setSendingToConv(false);
-    }
-  }
-
   return (
     <div className="space-y-4">
       {/* ─── Секція: Контрагент ──────────────────────────────────────────── */}
@@ -1197,15 +1154,6 @@ export function SaleForm({
             type="button"
             variant="outline"
             size="sm"
-            disabled={!hasItems || sendingToConv}
-            onClick={() => setPickConvOpen(true)}
-          >
-            <MessagesSquare className="mr-1 h-4 w-4" />У наш месенджер
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
             onClick={openRequisitesMessage}
           >
             <Receipt className="mr-1 h-4 w-4" />
@@ -1395,17 +1343,6 @@ export function SaleForm({
         onOpenChange={setPickerOpen}
         onAddLot={onAddLotFromPicker}
         onAddGeneral={onAddGeneralFromPicker}
-      />
-
-      {/* «У наш месенджер» — вибір розмови/групи внутрішнього чату. */}
-      <PickConversationDialog
-        open={pickConvOpen}
-        onOpenChange={setPickConvOpen}
-        title="Надіслати у месенджер"
-        busy={sendingToConv}
-        onPick={(conversationId) =>
-          void sendGroupToConversation(conversationId)
-        }
       />
 
       <ShareSheet

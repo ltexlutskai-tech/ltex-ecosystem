@@ -274,7 +274,7 @@ export function buildGroupSaleMessage(input: SaleMessageInput): string {
 
 /**
  * Реквізити одержувача — набір, який менеджер обирає перед відправкою (з
- * довідника `MgrPaymentRequisite`). За замовчуванням — ФОП Кузенко.
+ * довідника «Банківські рахунки»). За замовчуванням — ФОП Кузенко.
  */
 export interface RequisiteInfo {
   recipient: string;
