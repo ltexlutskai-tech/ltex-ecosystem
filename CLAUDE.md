@@ -1,5 +1,28 @@
 # L-TEX Ecosystem — Project Context
 
+## ⚠️ ГОЛОВНЕ ПРАВИЛО — ЧИТАТИ ПЕРШИМ У КОЖНІЙ СЕСІЇ
+
+**УСЯ РОБОТА МЕРДЖИТЬСЯ В `main`.** Домовленість з user (закріплено 2026-07-14): будь-яку завершену задачу після коміту на робочу гілку ТРЕБА змерджити в `main` і запушити — НЕ залишати роботу висіти лише на feature-гілці. Це стосується і orchestrator-, і worker-сесій, і одноосібної роботи.
+
+**Протокол завершення задачі (робити ЗАВЖДИ, без нагадування user):**
+
+```bash
+git checkout main
+git fetch origin main && git merge --ff-only origin/main   # підтягнути свіжий main
+git merge --no-ff <робоча-гілка> -m "Merge: <опис>"
+git push origin main
+```
+
+Якщо push у main дає **HTTP 403** (періодичний баг sandbox-проксі) — fallback на сайд-гілку, і дати user команди на локальний ff-merge:
+
+```bash
+git push origin main:claude/<коротка-назва>-merge
+```
+
+Потім user локально: `git fetch origin && git checkout main && git merge --ff-only origin/claude/<...>-merge && git push origin main`.
+
+**Перед мерджем ЗАВЖДИ:** typecheck чистий + `vitest run` (store) зелений + prettier чистий. **Після мерджу** — сказати user команди на деплой (див. деплой-протокол у секції нижче), сам deploy НЕ запускати (немає SSH).
+
 ## Business Overview
 
 L-TEX is a Ukrainian wholesale business based in Піддубці, Луцький район, Волинська область.
