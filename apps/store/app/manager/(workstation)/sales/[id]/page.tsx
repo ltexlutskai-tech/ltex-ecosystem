@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { ArrowLeft } from "lucide-react";
 import { prisma } from "@ltex/db";
 import { getCurrentUser } from "@/lib/auth/manager-auth";
 import { getCurrentRate } from "@/lib/exchange-rate";
@@ -27,6 +26,7 @@ import {
 } from "./_components/payments-panel";
 import { SaleDebtTerm } from "./_components/sale-debt-term";
 import { LinkedDocBanner } from "../../_components/linked-doc-banner";
+import { BackButton } from "../../_components/back-button";
 
 export const dynamic = "force-dynamic";
 
@@ -251,13 +251,7 @@ export default async function ManagerSaleDetailPage({
 
   return (
     <div className="mx-auto max-w-6xl space-y-6">
-      <Link
-        href="/manager/sales"
-        className="inline-flex items-center gap-1 text-sm text-gray-600 hover:text-gray-900"
-      >
-        <ArrowLeft className="h-4 w-4" />
-        Назад до списку
-      </Link>
+      <BackButton fallbackHref="/manager/sales" />
 
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div>

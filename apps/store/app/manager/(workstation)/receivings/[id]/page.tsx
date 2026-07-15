@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireRole } from "@/lib/auth/manager-auth";
 import { prisma } from "@ltex/db";
+import { BackButton } from "../../_components/back-button";
 import { ReceivingActions } from "../_components/receiving-actions";
 
 export const dynamic = "force-dynamic";
@@ -54,12 +55,7 @@ export default async function ReceivingDetailPage({
   return (
     <div className="mx-auto max-w-5xl space-y-4">
       <div className="text-sm">
-        <Link
-          href="/manager/receivings"
-          className="text-gray-500 hover:text-gray-800 hover:underline"
-        >
-          ← Назад до списку
-        </Link>
+        <BackButton fallbackHref="/manager/receivings" />
       </div>
 
       <div className="rounded-md border bg-white p-4">

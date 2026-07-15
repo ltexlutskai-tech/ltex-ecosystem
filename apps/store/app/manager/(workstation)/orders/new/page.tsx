@@ -1,9 +1,8 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
-import { ArrowLeft } from "lucide-react";
 import { prisma } from "@ltex/db";
 import { getCurrentUser } from "@/lib/auth/manager-auth";
 import { getCurrentRate } from "@/lib/exchange-rate";
+import { BackButton } from "../../_components/back-button";
 import { OrderForm } from "./_components/order-form";
 import type { ClientPickerItem, OrderItemDraft } from "./_components/types";
 
@@ -156,13 +155,7 @@ export default async function NewOrderPage({
 
   return (
     <div className="mx-auto max-w-6xl space-y-6">
-      <Link
-        href="/manager/orders"
-        className="inline-flex items-center gap-1 text-sm text-gray-600 hover:text-gray-900"
-      >
-        <ArrowLeft className="h-4 w-4" />
-        Назад до списку
-      </Link>
+      <BackButton fallbackHref="/manager/orders" />
 
       <header>
         <h1 className="text-2xl font-bold text-gray-800">Нове замовлення</h1>

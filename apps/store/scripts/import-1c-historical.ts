@@ -99,6 +99,8 @@ const ENTITY_NAMES = [
   "cost-reg",
   "bankdocs",
   "cashtransfers",
+  // ── Картка клієнта — «Історія роботи з клієнтом» (ИсторияРаботыСКлиентом) ──
+  "client-timeline",
 ] as const;
 
 type EntityName = (typeof ENTITY_NAMES)[number];
@@ -4291,6 +4293,127 @@ async function importClientStatusHistory(ctx: ImportContext): Promise<Recon> {
   return recon;
 }
 
+// ─── Історія роботи з клієнтом → MgrClientTimelineEntry ─ _InfoRg7459 ─────────
+// 1С InformationRegister «ИсторияРаботыСКлиентом» (uuid 58e29ac7…, періодичність
+// Секунда). Фізична таблиця `_InfoRg7459`, колонки декодовано з
+// docs/1c-mssql-schema (dbnames.txt + columns.tsv):
+//   _Period        → occurredAt (дата-час запису)
+//   _Fld7460RRef   → Торговый (агент-автор, CatalogRef.ТорговыеАгенты) → User
+//   _Fld7461RRef   → Клиент (Контрагент, Master) → MgrClient
+//   _Fld7462       → Запись (текст нотатки, ntext) → body
+//   _Fld7463       → УИД_Записи (v8:UUID, binary16) → metadata.uid1C
+//   _Fld7682       → АвтоматичнийЗаписБезВзаємодіїЗКлієнтом (bool, binary1)
+// kind: manual → "note_1c", автоматичний → "note_1c_auto" (обидва read-only у
+// картці; ClientTimelineItem редагує лише kind="comment").
+const CLIENT_TIMELINE_COLS = [
+  "_Period",
+  "_Fld7460RRef", // Торговый (агент-автор)
+  "_Fld7461RRef", // Клиент (Контрагент)
+  "_Fld7462", // Запись (текст)
+  "_Fld7463", // УИД_Записи
+  "_Fld7682", // АвтоматичнийЗапис
+];
+
+interface ClientTimelineRowData {
+  clientId: string;
+  kind: string;
+  body: string;
+  occurredAt: Date;
+  authorUserId: string | null;
+  metadata: { uid1C: string | null; auto: boolean };
+}
+
+async function importClientTimeline(ctx: ImportContext): Promise<Recon> {
+  const recon = newRecon("client_timeline");
+  const sink = new ErrorSink(recon, "client_timeline");
+  const { args, src, prisma } = ctx;
+
+  // Карта агент(hex)→User.id для автора запису.
+  if (ctx.agentUserIdByHex.size === 0) {
+    await loadAgentUserIds(ctx);
+  }
+
+  // Карта Контрагент(hex = MgrClient.uid1C) → MgrClient.id.
+  const clientIdByHex = new Map<string, string>();
+  const clients = await prisma.mgrClient.findMany({
+    select: { id: true, uid1C: true },
+  });
+  for (const c of clients) {
+    if (c.uid1C) clientIdByHex.set(c.uid1C.toLowerCase(), c.id);
+  }
+  log(`client_timeline: mapped ${clientIdByHex.size} hex→MgrClient.id`);
+
+  recon.sourceRows = await countTable(src, "_InfoRg7459");
+  log(`client_timeline: source rows = ${recon.sourceRows}`);
+
+  // Ідемпотентність: прибираємо лише раніше імпортовані записи (наші app-події
+  // мають інші kind — comment/order/sale/… — і не чіпаються).
+  if (willWrite(ctx)) {
+    const deleted = await prisma.mgrClientTimelineEntry.deleteMany({
+      where: { kind: { in: ["note_1c", "note_1c_auto"] } },
+    });
+    log(`client_timeline: deleted ${deleted.count} prior imported rows`);
+  }
+
+  let buffer: ClientTimelineRowData[] = [];
+  const flush = async (): Promise<void> => {
+    if (buffer.length === 0) return;
+    await prisma.mgrClientTimelineEntry.createMany({ data: buffer });
+    buffer = [];
+  };
+
+  for await (const rows of streamTable(
+    src,
+    "_InfoRg7459",
+    CLIENT_TIMELINE_COLS,
+    {
+      batch: args.batch,
+      limit: args.limit,
+      orderBy: ["_Period", "_Fld7461RRef"],
+    },
+  )) {
+    for (const row of rows) {
+      try {
+        const clientHex = bufToHex(row["_Fld7461RRef"]);
+        const occurredAt = asDate(row["_Period"]);
+        const body = asString(row["_Fld7462"]);
+        const clientId = clientHex
+          ? (clientIdByHex.get(clientHex) ?? null)
+          : null;
+        // Без клієнта у нашій базі, без дати або без тексту — пропускаємо.
+        if (!clientId || !occurredAt || !body) {
+          recon.skipped++;
+          continue;
+        }
+        const agentHex = bufToHex(row["_Fld7460RRef"]);
+        const authorUserId = agentHex
+          ? (ctx.agentUserIdByHex.get(agentHex) ?? null)
+          : null;
+        const auto = asBool(row["_Fld7682"]);
+        buffer.push({
+          clientId,
+          kind: auto ? "note_1c_auto" : "note_1c",
+          body,
+          occurredAt,
+          authorUserId,
+          metadata: { uid1C: bufToHex(row["_Fld7463"]), auto },
+        });
+        recon.written++;
+        if (willWrite(ctx) && buffer.length >= 500) await flush();
+        if (!willWrite(ctx)) buffer = []; // dry-run: не накопичуємо
+      } catch (e) {
+        sink.record(bufToHex(row["_Fld7461RRef"]) ?? "?", e);
+      }
+    }
+    log(
+      `client_timeline: processed ${recon.written + recon.skipped + recon.errors}`,
+    );
+  }
+  if (willWrite(ctx)) await flush();
+  log(`client_timeline: written=${recon.written} skipped=${recon.skipped}`);
+  return recon;
+}
+
 interface ReliabilityRowData {
   supplierCode1C: string;
   reliability: string;
@@ -6616,6 +6739,7 @@ const ENTITY_RUNNERS: Record<
   "cost-reg": importCostReg,
   bankdocs: importBankDocs,
   cashtransfers: importCashTransfers,
+  "client-timeline": importClientTimeline,
 };
 
 // Порядок за FK-залежностями (план §13).

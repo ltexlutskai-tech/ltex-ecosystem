@@ -2,7 +2,6 @@ import { randomUUID } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@ltex/db";
 import { getCurrentUser } from "@/lib/auth/manager-auth";
-import { canEditClient } from "@/lib/permissions/mgr-client-edit";
 import { recomputeDebtForClients } from "@/lib/manager/debt-register";
 import { recordClientEventSafe } from "@/lib/manager/client-timeline";
 import { debtCorrectionSchema } from "@/lib/validations/mgr-debt-correction";
@@ -31,10 +30,10 @@ export async function POST(
 
   const { id } = await params;
 
-  const allowed = await canEditClient(user, id);
-  if (!allowed) {
+  // Корекцію боргу дозволено лише власнику та адміністратору (рішення user).
+  if (user.role !== "owner" && user.role !== "admin") {
     return NextResponse.json(
-      { error: "Недостатньо прав для редагування цього клієнта" },
+      { error: "Корекція боргу доступна лише власнику та адміністратору" },
       { status: 403 },
     );
   }

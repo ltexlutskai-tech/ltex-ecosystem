@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { ArrowLeft, Printer, Truck } from "lucide-react";
+import { Printer, Truck } from "lucide-react";
 import { prisma } from "@ltex/db";
 import { getCurrentUser } from "@/lib/auth/manager-auth";
 import {
@@ -15,6 +15,7 @@ import {
 } from "@/lib/manager/route-sheet-documents";
 import { getUnclosedMileageWarning } from "@/lib/manager/route-sheet-mileage";
 import { formatDocNumber } from "@/lib/manager/order-number";
+import { BackButton } from "../../_components/back-button";
 import { DiscussButton } from "../../messenger/_components/discuss-button";
 import {
   RouteSheetForm,
@@ -253,13 +254,7 @@ export default async function ManagerRouteSheetDetailPage({
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">
-      <Link
-        href="/manager/routes"
-        className="inline-flex items-center gap-1 text-sm text-gray-600 hover:text-gray-900"
-      >
-        <ArrowLeft className="h-4 w-4" />
-        Назад до списку
-      </Link>
+      <BackButton fallbackHref="/manager/routes" />
 
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div>

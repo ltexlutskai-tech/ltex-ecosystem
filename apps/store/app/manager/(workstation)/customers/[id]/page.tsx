@@ -1,9 +1,8 @@
-import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { ArrowLeft } from "lucide-react";
 import { prisma } from "@ltex/db";
 import { getCurrentUser } from "@/lib/auth/manager-auth";
 import { canEditClient } from "@/lib/permissions/mgr-client-edit";
+import { BackButton } from "../../_components/back-button";
 import { DiscussButton } from "../../messenger/_components/discuss-button";
 import { ClientAssortmentTab } from "./_components/client-assortment-tab";
 import { ClientDebtMovementsTab } from "./_components/client-debt-movements-tab";
@@ -18,7 +17,6 @@ import { ClientRequisitesTab } from "./_components/client-requisites-tab";
 import { ClientSalesHistoryTab } from "./_components/client-sales-history-tab";
 import { ClientSocialTab } from "./_components/client-social-tab";
 import { ClientTabs } from "./_components/client-tabs";
-import { ClientViberTab } from "./_components/client-viber-tab";
 import { countOverdue } from "./_components/client-reminders-grouping";
 import { loadClientDetail } from "./_lib/load-client";
 import { loadEditDictionaries } from "./_lib/load-edit-dictionaries";
@@ -54,6 +52,7 @@ export default async function ClientDetailPage({
 
   const isForeign = client.viewerOwnership === "foreign";
   const canAssign = user.role === "admin";
+  const canCorrectDebt = user.role === "admin" || user.role === "owner";
   const canEdit = await canEditClient(user, client.id);
   const editDisabledReason = canEdit
     ? undefined
@@ -73,18 +72,9 @@ export default async function ClientDetailPage({
     : null;
 
   return (
-    <div className="mx-auto max-w-5xl space-y-4">
-      <Link
-        href="/manager/customers"
-        className="inline-flex items-center gap-1 text-sm text-gray-600 hover:text-gray-900"
-      >
-        <ArrowLeft className="h-4 w-4" />
-        Назад до списку
-      </Link>
-
-      <ClientHeader client={client} canAssign={canAssign} />
-
-      <div className="flex justify-end">
+    <div className="mx-auto max-w-6xl space-y-4">
+      <div className="flex items-center justify-between">
+        <BackButton fallbackHref="/manager/customers" />
         <DiscussButton
           docRef={{
             type: "client",
@@ -94,6 +84,8 @@ export default async function ClientDetailPage({
           }}
         />
       </div>
+
+      <ClientHeader client={client} canAssign={canAssign} />
 
       <ClientTabs
         overdueRemindersCount={overdueCount}
@@ -109,7 +101,7 @@ export default async function ClientDetailPage({
             customerId={customerMirror?.id ?? null}
           />
         }
-        assortment={<ClientAssortmentTab items={client.assortmentItems} />}
+        assortment={<ClientAssortmentTab clientId={client.id} />}
         presentations={<ClientPresentationsTab items={client.presentations} />}
         history={
           <ClientHistoryTab
@@ -130,7 +122,6 @@ export default async function ClientDetailPage({
             currentUserRole={user.role}
           />
         }
-        viber={<ClientViberTab client={client} />}
         presentationHistory={<ClientPresentationHistoryTab />}
         social={
           <ClientSocialTab
@@ -148,7 +139,10 @@ export default async function ClientDetailPage({
           />
         }
         debtMovements={
-          <ClientDebtMovementsTab clientId={client.id} canEdit={canEdit} />
+          <ClientDebtMovementsTab
+            clientId={client.id}
+            canCorrectDebt={canCorrectDebt}
+          />
         }
       />
     </div>

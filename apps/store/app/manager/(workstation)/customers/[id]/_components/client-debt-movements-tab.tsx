@@ -35,10 +35,11 @@ function AmountCell({ value }: { value: number }) {
 
 export async function ClientDebtMovementsTab({
   clientId,
-  canEdit,
+  canCorrectDebt,
 }: {
   clientId: string;
-  canEdit: boolean;
+  /** Корекцію боргу може робити лише власник/адмін. */
+  canCorrectDebt: boolean;
 }) {
   const [client, movements] = await Promise.all([
     prisma.mgrClient.findUnique({
@@ -74,7 +75,7 @@ export async function ClientDebtMovementsTab({
             </span>
           </p>
         </div>
-        {canEdit && <ClientDebtCorrectionButton clientId={clientId} />}
+        {canCorrectDebt && <ClientDebtCorrectionButton clientId={clientId} />}
       </div>
 
       {movements.length === 0 ? (

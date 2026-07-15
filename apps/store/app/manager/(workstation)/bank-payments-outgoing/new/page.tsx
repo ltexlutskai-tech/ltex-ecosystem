@@ -1,9 +1,8 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
-import { ArrowLeft } from "lucide-react";
 import { prisma } from "@ltex/db";
 import { requireRole } from "@/lib/auth/manager-auth";
 import { getCurrentRate } from "@/lib/exchange-rate";
+import { BackButton } from "../../_components/back-button";
 import { BankPaymentForm } from "../../_components/treasury/bank-payment-form";
 
 export const dynamic = "force-dynamic";
@@ -29,13 +28,7 @@ export default async function NewBankPaymentOutgoingPage() {
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
-      <Link
-        href="/manager/bank-payments-outgoing"
-        className="inline-flex items-center gap-1 text-sm text-gray-600 hover:text-gray-900"
-      >
-        <ArrowLeft className="h-4 w-4" />
-        Назад до списку
-      </Link>
+      <BackButton fallbackHref="/manager/bank-payments-outgoing" />
 
       <header>
         <h1 className="text-2xl font-bold text-gray-800">

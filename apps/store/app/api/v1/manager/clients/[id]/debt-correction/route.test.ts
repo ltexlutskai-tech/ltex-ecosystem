@@ -7,7 +7,6 @@ process.env.MANAGER_JWT_SECRET = VALID_SECRET;
 const {
   mockPrisma,
   getCurrentUserMock,
-  canEditClientMock,
   recomputeDebtMock,
   recordClientEventSafeMock,
 } = vi.hoisted(() => ({
@@ -16,7 +15,6 @@ const {
     mgrDebtMovement: { create: vi.fn() },
   },
   getCurrentUserMock: vi.fn(),
-  canEditClientMock: vi.fn(),
   recomputeDebtMock: vi.fn(),
   recordClientEventSafeMock: vi.fn(),
 }));
@@ -27,10 +25,6 @@ vi.mock("@/lib/auth/manager-auth", () => ({
   getCurrentUser: (...args: unknown[]) => getCurrentUserMock(...args),
   MANAGER_ACCESS_COOKIE: "ltex_mgr_access",
   MANAGER_REFRESH_COOKIE: "ltex_mgr_refresh",
-}));
-
-vi.mock("@/lib/permissions/mgr-client-edit", () => ({
-  canEditClient: (...args: unknown[]) => canEditClientMock(...args),
 }));
 
 vi.mock("@/lib/manager/debt-register", () => ({
@@ -44,17 +38,19 @@ vi.mock("@/lib/manager/client-timeline", () => ({
 
 import { POST } from "./route";
 
-const MANAGER_USER = {
+const OWNER_USER = {
   id: "u1",
   email: "alice@example.com",
   fullName: "Alice",
-  role: "manager" as const,
+  role: "owner" as const,
   isActive: true,
   code1C: null,
   telegramLinked: false,
   notifyChannels: [],
   lastSeenAt: null,
 };
+
+const MANAGER_USER = { ...OWNER_USER, id: "u2", role: "manager" as const };
 
 function postReq(body: unknown): NextRequest {
   return new NextRequest(
@@ -71,8 +67,7 @@ const idParams = (): Promise<{ id: string }> => Promise.resolve({ id: "c1" });
 
 beforeEach(() => {
   vi.clearAllMocks();
-  getCurrentUserMock.mockResolvedValue(MANAGER_USER);
-  canEditClientMock.mockResolvedValue(true);
+  getCurrentUserMock.mockResolvedValue(OWNER_USER);
   mockPrisma.mgrClient.findUnique
     .mockResolvedValueOnce({ id: "c1" }) // existence check
     .mockResolvedValue({ debt: 100 }); // updated debt read
@@ -90,8 +85,8 @@ describe("POST /clients/[id]/debt-correction", () => {
     expect(mockPrisma.mgrDebtMovement.create).not.toHaveBeenCalled();
   });
 
-  it("403 when manager has no permission", async () => {
-    canEditClientMock.mockResolvedValueOnce(false);
+  it("403 when role is not owner/admin (manager)", async () => {
+    getCurrentUserMock.mockResolvedValueOnce(MANAGER_USER);
     const res = await POST(postReq({ amountEur: 50, direction: "increase" }), {
       params: idParams(),
     });

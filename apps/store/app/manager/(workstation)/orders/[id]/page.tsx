@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { ArrowLeft } from "lucide-react";
 import { prisma } from "@ltex/db";
 import { getCurrentUser } from "@/lib/auth/manager-auth";
 import { getCurrentRate } from "@/lib/exchange-rate";
@@ -8,6 +7,7 @@ import { canViewOrder } from "@/lib/manager/order-ownership";
 import { getOwnedClientIds } from "@/lib/manager/client-visibility";
 import { canEditOrder, isOrderLocked } from "@/lib/manager/order-status";
 import { formatOrderNumber, formatDocNumber } from "@/lib/manager/order-number";
+import { BackButton } from "../../_components/back-button";
 import { LinkedDocBanner } from "../../_components/linked-doc-banner";
 import { DiscussButton } from "../../messenger/_components/discuss-button";
 import { OrderForm } from "../new/_components/order-form";
@@ -226,13 +226,7 @@ export default async function ManagerOrderDetailPage({
     <div className="mx-auto max-w-6xl space-y-6">
       {/* Read-only режим автооновлюємо; у режимі редагування — ні (не заважати). */}
       {!editable && <AutoRefresh intervalMs={30_000} />}
-      <Link
-        href="/manager/orders"
-        className="inline-flex items-center gap-1 text-sm text-gray-600 hover:text-gray-900"
-      >
-        <ArrowLeft className="h-4 w-4" />
-        Назад до списку
-      </Link>
+      <BackButton fallbackHref="/manager/orders" />
 
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div>
