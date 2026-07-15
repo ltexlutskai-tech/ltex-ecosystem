@@ -4,6 +4,7 @@ import { getCurrentUser } from "@/lib/auth/manager-auth";
 import { canEditClient } from "@/lib/permissions/mgr-client-edit";
 import { BackButton } from "../../_components/back-button";
 import { DiscussButton } from "../../messenger/_components/discuss-button";
+import { ClientActionButtons } from "./_components/client-action-buttons";
 import { ClientAssortmentTab } from "./_components/client-assortment-tab";
 import { ClientDebtMovementsTab } from "./_components/client-debt-movements-tab";
 import { ClientHeader } from "./_components/client-header";
@@ -51,7 +52,7 @@ export default async function ClientDetailPage({
   if (!client) notFound();
 
   const isForeign = client.viewerOwnership === "foreign";
-  const canAssign = user.role === "admin";
+  const canAssign = user.role === "admin" || user.role === "owner";
   const canCorrectDebt = user.role === "admin" || user.role === "owner";
   const canEdit = await canEditClient(user, client.id);
   const editDisabledReason = canEdit
@@ -85,7 +86,17 @@ export default async function ClientDetailPage({
         />
       </div>
 
-      <ClientHeader client={client} canAssign={canAssign} />
+      {/* Закріплена шапка — завжди видно, з ким працюємо (C6). */}
+      <div className="sticky top-0 z-20 -mx-1 bg-gray-50 px-1 pt-1 pb-2">
+        <ClientHeader client={client} canAssign={canAssign} />
+      </div>
+
+      {/* Дії по клієнту — на верху картки, поза «Реквізитами» (C1). */}
+      <ClientActionButtons
+        clientId={client.id}
+        customerId={customerMirror?.id ?? null}
+        canEdit={canEdit}
+      />
 
       <ClientTabs
         overdueRemindersCount={overdueCount}

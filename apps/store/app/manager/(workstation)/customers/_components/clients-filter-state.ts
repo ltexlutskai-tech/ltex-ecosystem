@@ -1,4 +1,4 @@
-// Pure URL ↔ filter state mapping (M1.3e).
+// Pure URL ↔ filter state mapping (M1.3e; спрощено — прибрано частину фільтрів).
 // Тримаємо все у одному місці щоб однакову логіку могли використати:
 // (а) toolbar/filter-sheet — UI читання+запис URL,
 // (б) page.tsx server — конверт у params для loadClients,
@@ -19,29 +19,19 @@ export interface FilterState {
   primaryRouteIds?: string[];
   agentUserIds?: string[];
 
-  // text LIKE
-  region?: string;
-  city?: string;
-  dialogStatus?: string;
+  // Область/Місто — вибір значень з довідника (не вільний текст).
+  regionValues?: string[];
+  cityValues?: string[];
 
   // numeric range
-  debtMin?: number;
-  debtMax?: number;
-  overdueDebtMin?: number;
-  overdueDebtMax?: number;
-  monthlyVolumeMin?: number;
-  monthlyVolumeMax?: number;
   daysSinceMin?: number;
   daysSinceMax?: number;
 
   // date
-  licenseExpiresBefore?: string; // ISO date string (YYYY-MM-DD)
   createdFrom?: string;
   createdTo?: string;
 
   // bool
-  hasNewMessage?: boolean;
-  isViberLinked?: boolean;
   hasDebt?: boolean;
   hasOverpayment?: boolean;
   onlyMine?: boolean;
@@ -63,25 +53,15 @@ export function urlToState(sp: URLSearchParams): FilterState {
     primaryRouteIds: parseCsv(sp.get("primaryRouteId")),
     agentUserIds: parseCsv(sp.get("agentUserId")),
 
-    region: pickStr(sp.get("region")),
-    city: pickStr(sp.get("city")),
-    dialogStatus: pickStr(sp.get("dialogStatus")),
+    regionValues: parseCsv(sp.get("region")),
+    cityValues: parseCsv(sp.get("city")),
 
-    debtMin: parseNum(sp.get("debtMin")),
-    debtMax: parseNum(sp.get("debtMax")),
-    overdueDebtMin: parseNum(sp.get("overdueDebtMin")),
-    overdueDebtMax: parseNum(sp.get("overdueDebtMax")),
-    monthlyVolumeMin: parseNum(sp.get("monthlyVolumeMin")),
-    monthlyVolumeMax: parseNum(sp.get("monthlyVolumeMax")),
     daysSinceMin: parseInt2(sp.get("daysSinceMin")),
     daysSinceMax: parseInt2(sp.get("daysSinceMax")),
 
-    licenseExpiresBefore: pickStr(sp.get("licenseExpiresBefore")),
     createdFrom: pickStr(sp.get("createdFrom")),
     createdTo: pickStr(sp.get("createdTo")),
 
-    hasNewMessage: parseBool(sp.get("hasNewMessage")),
-    isViberLinked: parseBool(sp.get("isViberLinked")),
     hasDebt: parseBool(sp.get("hasDebt")),
     hasOverpayment: parseBool(sp.get("hasOverpayment")),
     onlyMine: parseBool(sp.get("onlyMine")),
@@ -110,25 +90,15 @@ export function stateToUrl(
   setCsv(sp, "primaryRouteId", state.primaryRouteIds);
   setCsv(sp, "agentUserId", state.agentUserIds);
 
-  setStr(sp, "region", state.region);
-  setStr(sp, "city", state.city);
-  setStr(sp, "dialogStatus", state.dialogStatus);
+  setCsv(sp, "region", state.regionValues);
+  setCsv(sp, "city", state.cityValues);
 
-  setNum(sp, "debtMin", state.debtMin);
-  setNum(sp, "debtMax", state.debtMax);
-  setNum(sp, "overdueDebtMin", state.overdueDebtMin);
-  setNum(sp, "overdueDebtMax", state.overdueDebtMax);
-  setNum(sp, "monthlyVolumeMin", state.monthlyVolumeMin);
-  setNum(sp, "monthlyVolumeMax", state.monthlyVolumeMax);
   setNum(sp, "daysSinceMin", state.daysSinceMin);
   setNum(sp, "daysSinceMax", state.daysSinceMax);
 
-  setStr(sp, "licenseExpiresBefore", state.licenseExpiresBefore);
   setStr(sp, "createdFrom", state.createdFrom);
   setStr(sp, "createdTo", state.createdTo);
 
-  setBool(sp, "hasNewMessage", state.hasNewMessage);
-  setBool(sp, "isViberLinked", state.isViberLinked);
   setBool(sp, "hasDebt", state.hasDebt);
   setBool(sp, "hasOverpayment", state.hasOverpayment);
   setBool(sp, "onlyMine", state.onlyMine);
@@ -153,29 +123,19 @@ export function countActiveFilters(state: FilterState): number {
     state.primaryAssortmentIds,
     state.primaryRouteIds,
     state.agentUserIds,
+    state.regionValues,
+    state.cityValues,
   ]) {
     if (arr && arr.length > 0) count += 1;
   }
 
-  for (const s of [state.region, state.city, state.dialogStatus]) {
-    if (s && s.length > 0) count += 1;
-  }
-
   // Range pairs — кожна група рахується як 1 якщо хоч одна з пари виставлена.
-  for (const [a, b] of [
-    [state.debtMin, state.debtMax],
-    [state.overdueDebtMin, state.overdueDebtMax],
-    [state.monthlyVolumeMin, state.monthlyVolumeMax],
-    [state.daysSinceMin, state.daysSinceMax],
-  ]) {
+  for (const [a, b] of [[state.daysSinceMin, state.daysSinceMax]]) {
     if (a !== undefined || b !== undefined) count += 1;
   }
 
-  if (state.licenseExpiresBefore) count += 1;
   if (state.createdFrom || state.createdTo) count += 1;
 
-  if (state.hasNewMessage !== undefined) count += 1;
-  if (state.isViberLinked !== undefined) count += 1;
   if (state.hasDebt) count += 1;
   if (state.hasOverpayment) count += 1;
   // onlyMine + hideTrash — НЕ враховуємо в "Фільтри (N)" бо вони
@@ -199,12 +159,6 @@ function parseCsv(v: string | null): string[] | undefined {
     .map((s) => s.trim())
     .filter((s) => s.length > 0);
   return arr.length > 0 ? arr : undefined;
-}
-
-function parseNum(v: string | null): number | undefined {
-  if (!v) return undefined;
-  const n = Number(v);
-  return Number.isFinite(n) ? n : undefined;
 }
 
 function parseInt2(v: string | null): number | undefined {

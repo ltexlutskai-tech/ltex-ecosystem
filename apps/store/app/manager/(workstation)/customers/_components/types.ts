@@ -70,4 +70,7 @@ export interface DictionariesSnapshot {
   assortmentCodes: DictionaryOptionWithId[];
   routes: Array<{ id: string; name: string }>;
   agents: Array<{ id: string; fullName: string }>;
+  /** Distinct значення для фільтрів «Область» / «Місто». */
+  regions: string[];
+  cities: string[];
 }

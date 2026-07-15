@@ -22,23 +22,27 @@ describe("clients-filter-state", () => {
 
   it("parses ranges + dates", () => {
     const sp = new URLSearchParams(
-      "debtMin=100&debtMax=5000&createdFrom=2026-01-01&createdTo=2026-12-31",
+      "daysSinceMin=5&daysSinceMax=90&createdFrom=2026-01-01&createdTo=2026-12-31",
     );
     const state = urlToState(sp);
-    expect(state.debtMin).toBe(100);
-    expect(state.debtMax).toBe(5000);
+    expect(state.daysSinceMin).toBe(5);
+    expect(state.daysSinceMax).toBe(90);
     expect(state.createdFrom).toBe("2026-01-01");
     expect(state.createdTo).toBe("2026-12-31");
   });
 
-  it("parses booleans", () => {
-    const sp = new URLSearchParams(
-      "hasNewMessage=true&isViberLinked=false&hasDebt=true",
-    );
+  it("parses region/city as value arrays", () => {
+    const sp = new URLSearchParams("region=Київська,Волинська&city=Луцьк");
     const state = urlToState(sp);
-    expect(state.hasNewMessage).toBe(true);
-    expect(state.isViberLinked).toBe(false);
+    expect(state.regionValues).toEqual(["Київська", "Волинська"]);
+    expect(state.cityValues).toEqual(["Луцьк"]);
+  });
+
+  it("parses booleans", () => {
+    const sp = new URLSearchParams("hasDebt=true&hasOverpayment=false");
+    const state = urlToState(sp);
     expect(state.hasDebt).toBe(true);
+    expect(state.hasOverpayment).toBe(false);
   });
 
   it("ignores unknown params (no leakage)", () => {
@@ -51,15 +55,15 @@ describe("clients-filter-state", () => {
   it("roundtrip non-trivial state", () => {
     const sp = new URLSearchParams();
     sp.set("statusId", "s1,s2");
-    sp.set("debtMin", "100");
+    sp.set("daysSinceMin", "10");
     sp.set("region", "Київська");
-    sp.set("hasNewMessage", "true");
+    sp.set("hasDebt", "true");
     const state = urlToState(sp);
     const out = stateToUrl(state);
     expect(out.get("statusId")).toBe("s1,s2");
-    expect(out.get("debtMin")).toBe("100");
+    expect(out.get("daysSinceMin")).toBe("10");
     expect(out.get("region")).toBe("Київська");
-    expect(out.get("hasNewMessage")).toBe("true");
+    expect(out.get("hasDebt")).toBe("true");
   });
 
   it("countActiveFilters counts unique groups", () => {
@@ -67,15 +71,14 @@ describe("clients-filter-state", () => {
       search: "abc", // not counted
       statusGeneralIds: ["a"],
       categoryTTIds: ["x", "y"],
-      debtMin: 100,
-      debtMax: 5000, // counted once with debtMin
-      region: "Київська",
-      hasNewMessage: true,
+      daysSinceMin: 10,
+      daysSinceMax: 90, // counted once with daysSinceMin
+      regionValues: ["Київська"],
       hasDebt: true,
       onlyMine: true, // not counted
       hideTrash: true, // not counted
     };
-    expect(countActiveFilters(state)).toBe(6);
+    expect(countActiveFilters(state)).toBe(5);
   });
 
   it("countActiveFilters returns 0 for empty state", () => {
@@ -86,7 +89,7 @@ describe("clients-filter-state", () => {
     const out = stateToUrl({
       search: undefined,
       statusGeneralIds: [],
-      debtMin: undefined,
+      daysSinceMin: undefined,
     });
     expect(out.toString()).toBe("");
   });

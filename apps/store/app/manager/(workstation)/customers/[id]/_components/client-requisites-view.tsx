@@ -1,7 +1,6 @@
 import { formatPhoneUkr, phoneToViberUrl } from "@ltex/shared";
 import { ClientStatusBadge } from "../../_components/client-status-badge";
 import { formatEur, parseDecimal } from "../../_components/format";
-import { ClientActionButtons } from "./client-action-buttons";
 import { ClientBankAccountRow } from "./client-bank-account-row";
 import { ClientContactsSection } from "./client-contacts-section";
 import { ClientHierarchySection } from "./client-hierarchy-section";
@@ -356,12 +355,6 @@ export function ClientRequisitesView({
       />
 
       <FlagsBlock client={client} />
-
-      <ClientActionButtons
-        clientId={client.id}
-        customerId={customerId}
-        canEdit={canEdit}
-      />
     </div>
   );
 }

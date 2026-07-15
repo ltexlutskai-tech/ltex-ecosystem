@@ -1,5 +1,7 @@
 "use client";
 
+import { useState } from "react";
+import { GripVertical } from "lucide-react";
 import type { ConfigItem } from "@/lib/manager/view-defaults";
 
 interface Props {
@@ -9,21 +11,27 @@ interface Props {
   disabled?: boolean;
 }
 
+/**
+ * Список колонок/фільтрів з перетягуванням (drag-and-drop) для зміни порядку +
+ * чекбокс видимості. Порядок переписується у полі `order` після кожного
+ * переміщення.
+ */
 export function ViewCustomizerList({
   items,
   labels,
   onChange,
   disabled,
 }: Props) {
-  function move(i: number, dir: -1 | 1) {
-    const j = i + dir;
-    if (j < 0 || j >= items.length) return;
-    const next = items.map((it, idx) => {
-      if (idx === i) return { ...items[j]!, order: i + 1 };
-      if (idx === j) return { ...items[i]!, order: j + 1 };
-      return { ...it, order: idx + 1 };
-    });
-    onChange(next);
+  const [dragIndex, setDragIndex] = useState<number | null>(null);
+  const [overIndex, setOverIndex] = useState<number | null>(null);
+
+  function reorder(from: number, to: number) {
+    if (from === to) return;
+    const arr = [...items];
+    const [moved] = arr.splice(from, 1);
+    if (!moved) return;
+    arr.splice(to, 0, moved);
+    onChange(arr.map((it, idx) => ({ ...it, order: idx + 1 })));
   }
 
   function toggleVisible(i: number, visible: boolean) {
@@ -38,28 +46,28 @@ export function ViewCustomizerList({
       {items.map((item, i) => (
         <li
           key={item.key}
-          className="flex items-center gap-2 px-3 py-2 text-sm"
+          draggable={!disabled}
+          onDragStart={() => setDragIndex(i)}
+          onDragOver={(e) => {
+            if (disabled || dragIndex === null) return;
+            e.preventDefault();
+            setOverIndex(i);
+          }}
+          onDrop={(e) => {
+            e.preventDefault();
+            if (dragIndex !== null) reorder(dragIndex, i);
+            setDragIndex(null);
+            setOverIndex(null);
+          }}
+          onDragEnd={() => {
+            setDragIndex(null);
+            setOverIndex(null);
+          }}
+          className={`flex items-center gap-2 px-3 py-2 text-sm ${
+            disabled ? "" : "cursor-grab active:cursor-grabbing"
+          } ${overIndex === i && dragIndex !== null && dragIndex !== i ? "bg-blue-50" : ""}`}
         >
-          <div className="flex flex-col">
-            <button
-              type="button"
-              aria-label={`Перемістити ${labels[item.key] ?? item.key} вгору`}
-              disabled={disabled || i === 0}
-              onClick={() => move(i, -1)}
-              className="rounded p-0.5 text-xs hover:bg-gray-100 disabled:opacity-30"
-            >
-              ▲
-            </button>
-            <button
-              type="button"
-              aria-label={`Перемістити ${labels[item.key] ?? item.key} вниз`}
-              disabled={disabled || i === items.length - 1}
-              onClick={() => move(i, 1)}
-              className="rounded p-0.5 text-xs hover:bg-gray-100 disabled:opacity-30"
-            >
-              ▼
-            </button>
-          </div>
+          <GripVertical className="h-4 w-4 shrink-0 text-gray-300" />
           <input
             type="checkbox"
             checked={item.visible}

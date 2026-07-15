@@ -33,6 +33,9 @@ export interface LoadClientsParams {
   page: number;
   pageSize: number;
   hideTrash?: boolean;
+  // Сортування по колонках
+  sort?: string;
+  dir?: "asc" | "desc";
   // M1.3e multi-select FK
   statusIds?: string[];
   statusOperationalIds?: string[];
@@ -43,23 +46,49 @@ export interface LoadClientsParams {
   primaryAssortmentIds?: string[];
   primaryRouteIds?: string[];
   agentUserIds?: string[];
-  // M1.3e text/number/date/bool
-  region?: string;
-  city?: string;
-  dialogStatus?: string;
-  debtMin?: number;
-  debtMax?: number;
-  overdueDebtMin?: number;
-  overdueDebtMax?: number;
-  monthlyVolumeMin?: number;
-  monthlyVolumeMax?: number;
+  // Область/Місто — вибір значень з довідника (не вільний текст)
+  regionValues?: string[];
+  cityValues?: string[];
   daysSinceMin?: number;
   daysSinceMax?: number;
-  licenseExpiresBefore?: Date;
   createdFrom?: Date;
   createdTo?: Date;
-  hasNewMessage?: boolean;
-  isViberLinked?: boolean;
+}
+
+/** Ключі сортування → Prisma orderBy. Дефолт — ім'я за зростанням. */
+export function buildClientsOrderBy(
+  sort: string | undefined,
+  dir: "asc" | "desc",
+): Prisma.MgrClientOrderByWithRelationInput {
+  switch (sort) {
+    case "phonePrimary":
+      return { phonePrimary: dir };
+    case "code1C":
+      return { code1C: dir };
+    case "tradePointName":
+      return { tradePointName: dir };
+    case "region":
+      return { region: dir };
+    case "city":
+      return { city: dir };
+    case "debt":
+      return { debt: dir };
+    case "overdueDebt":
+      return { overdueDebt: dir };
+    case "monthlyVolume":
+      return { monthlyVolume: dir };
+    case "daysSinceLast":
+      return { daysSinceLastPurchase: dir };
+    case "lastSyncedAt":
+      return { lastSyncedAt: dir };
+    case "createdAt":
+      return { createdAt: dir };
+    case "agent":
+      return { agent: { fullName: dir } };
+    case "name":
+    default:
+      return { name: dir };
+  }
 }
 
 export interface LoadClientsResult {
@@ -123,43 +152,19 @@ export async function loadClients(
     andClauses.push({ agentUserId: { in: p.agentUserIds } });
   }
 
-  if (p.region) {
-    andClauses.push({
-      region: { contains: p.region, mode: "insensitive" },
-    });
+  if (p.regionValues && p.regionValues.length > 0) {
+    andClauses.push({ region: { in: p.regionValues } });
   }
-  if (p.city) {
-    andClauses.push({ city: { contains: p.city, mode: "insensitive" } });
-  }
-  if (p.dialogStatus) {
-    andClauses.push({
-      dialogStatus: { equals: p.dialogStatus, mode: "insensitive" },
-    });
+  if (p.cityValues && p.cityValues.length > 0) {
+    andClauses.push({ city: { in: p.cityValues } });
   }
 
-  if (p.debtMin !== undefined || p.debtMax !== undefined) {
-    const f: Prisma.DecimalFilter = {};
-    if (p.debtMin !== undefined) f.gte = p.debtMin;
-    if (p.debtMax !== undefined) f.lte = p.debtMax;
-    andClauses.push({ debt: f });
-  } else if (p.hasDebt) {
+  if (p.hasDebt) {
     andClauses.push({ debt: { gt: 0 } });
   } else if (p.hasOverpayment) {
     andClauses.push({ debt: { lt: 0 } });
   }
 
-  if (p.overdueDebtMin !== undefined || p.overdueDebtMax !== undefined) {
-    const f: Prisma.DecimalFilter = {};
-    if (p.overdueDebtMin !== undefined) f.gte = p.overdueDebtMin;
-    if (p.overdueDebtMax !== undefined) f.lte = p.overdueDebtMax;
-    andClauses.push({ overdueDebt: f });
-  }
-  if (p.monthlyVolumeMin !== undefined || p.monthlyVolumeMax !== undefined) {
-    const f: Prisma.DecimalNullableFilter = {};
-    if (p.monthlyVolumeMin !== undefined) f.gte = p.monthlyVolumeMin;
-    if (p.monthlyVolumeMax !== undefined) f.lte = p.monthlyVolumeMax;
-    andClauses.push({ monthlyVolume: f });
-  }
   if (p.daysSinceMin !== undefined || p.daysSinceMax !== undefined) {
     const f: Prisma.IntNullableFilter = {};
     if (p.daysSinceMin !== undefined) f.gte = p.daysSinceMin;
@@ -167,21 +172,11 @@ export async function loadClients(
     andClauses.push({ daysSinceLastPurchase: f });
   }
 
-  if (p.licenseExpiresBefore) {
-    andClauses.push({ licenseExpiresAt: { lte: p.licenseExpiresBefore } });
-  }
   if (p.createdFrom || p.createdTo) {
     const f: Prisma.DateTimeFilter = {};
     if (p.createdFrom) f.gte = p.createdFrom;
     if (p.createdTo) f.lte = p.createdTo;
     andClauses.push({ createdAt: f });
-  }
-
-  if (p.hasNewMessage !== undefined) {
-    andClauses.push({ hasNewMessage: p.hasNewMessage });
-  }
-  if (p.isViberLinked !== undefined) {
-    andClauses.push({ isViberLinked: p.isViberLinked });
   }
 
   // `onlyMine` URL-toggle лише для admin-а. Менеджеру ownership scope
@@ -215,7 +210,7 @@ export async function loadClients(
     prisma.mgrClient.count({ where }),
     prisma.mgrClient.findMany({
       where,
-      orderBy: { name: "asc" },
+      orderBy: buildClientsOrderBy(p.sort, p.dir ?? "asc"),
       skip: (p.page - 1) * p.pageSize,
       take: p.pageSize,
       include: {
@@ -316,6 +311,8 @@ export async function loadDictionariesSnapshot() {
     assortmentCodes,
     routes,
     agents,
+    regionRows,
+    cityRows,
   ] = await Promise.all([
     // ТЗ 8.0 B7: у списках вибору не показуємо заархівовані / позначені
     // на вилучення значення довідників.
@@ -349,6 +346,19 @@ export async function loadDictionariesSnapshot() {
       where: { role: { in: ["manager", "admin"] }, isActive: true },
       orderBy: { fullName: "asc" },
       select: { id: true, fullName: true },
+    }),
+    // Довідники Область/Місто — distinct значення з клієнтів (для фільтрів).
+    prisma.mgrClient.findMany({
+      where: { region: { not: null }, archived: false },
+      distinct: ["region"],
+      select: { region: true },
+      orderBy: { region: "asc" },
+    }),
+    prisma.mgrClient.findMany({
+      where: { city: { not: null }, archived: false },
+      distinct: ["city"],
+      select: { city: true },
+      orderBy: { city: "asc" },
     }),
   ]);
 
@@ -388,5 +398,9 @@ export async function loadDictionariesSnapshot() {
     })),
     routes: routes.map((r) => ({ id: r.id, name: r.name })),
     agents: agents.map((u) => ({ id: u.id, fullName: u.fullName })),
+    regions: regionRows
+      .map((r) => r.region)
+      .filter((v): v is string => Boolean(v)),
+    cities: cityRows.map((c) => c.city).filter((v): v is string => Boolean(v)),
   };
 }

@@ -12,6 +12,7 @@ import { ClientListBulk } from "./_components/client-list-bulk";
 import { ClientListTable } from "./_components/client-list-table";
 import { ClientListToolbar } from "./_components/client-list-toolbar";
 import { ListPagination } from "./_components/list-pagination";
+import { PageSizeSelect } from "./_components/page-size-select";
 import { loadClients, loadDictionariesSnapshot } from "./_lib/load-clients";
 
 export const dynamic = "force-dynamic";
@@ -28,6 +29,8 @@ export default async function CustomersPage({
   const sp = await searchParams;
   const page = clampInt(sp.page, 1, 1, 9_999);
   const pageSize = clampInt(sp.pageSize, 50, 10, 100);
+  const sort = pickString(sp.sort);
+  const dir = pickString(sp.dir) === "asc" ? "asc" : "desc";
 
   const [dictionaries, list, columnsPrefs, filtersPrefs] = await Promise.all([
     loadDictionariesSnapshot(),
@@ -35,6 +38,8 @@ export default async function CustomersPage({
       userId: user.id,
       userRole: user.role,
       search: pickString(sp.search),
+      sort,
+      dir: sort ? dir : "asc",
       // legacy single — backward compat
       status: pickString(sp.status),
       channel: pickString(sp.channel),
@@ -49,26 +54,15 @@ export default async function CustomersPage({
       primaryAssortmentIds: pickCsv(sp.primaryAssortmentId),
       primaryRouteIds: pickCsv(sp.primaryRouteId),
       agentUserIds: pickCsv(sp.agentUserId),
-      // text
-      region: pickString(sp.region),
-      city: pickString(sp.city),
-      dialogStatus: pickString(sp.dialogStatus),
-      // numeric ranges
-      debtMin: pickNumber(sp.debtMin),
-      debtMax: pickNumber(sp.debtMax),
-      overdueDebtMin: pickNumber(sp.overdueDebtMin),
-      overdueDebtMax: pickNumber(sp.overdueDebtMax),
-      monthlyVolumeMin: pickNumber(sp.monthlyVolumeMin),
-      monthlyVolumeMax: pickNumber(sp.monthlyVolumeMax),
+      // Область/Місто — вибір значень з довідника
+      regionValues: pickCsv(sp.region),
+      cityValues: pickCsv(sp.city),
+      // numeric range + dates
       daysSinceMin: pickInt(sp.daysSinceMin),
       daysSinceMax: pickInt(sp.daysSinceMax),
-      // dates
-      licenseExpiresBefore: pickDate(sp.licenseExpiresBefore),
       createdFrom: pickDate(sp.createdFrom),
       createdTo: pickDate(sp.createdTo),
       // bool
-      hasNewMessage: pickBool(sp.hasNewMessage),
-      isViberLinked: pickBool(sp.isViberLinked),
       hasDebt: pickBool(sp.hasDebt),
       hasOverpayment: pickBool(sp.hasOverpayment),
       onlyMine: pickBool(sp.onlyMine),
@@ -84,8 +78,8 @@ export default async function CustomersPage({
     where: { status: { in: ["new", "contacted"] } },
   });
 
-  // Групова зміна менеджера доступна лише admin — вантажимо активних менеджерів.
-  const canBulkAssign = user.role === "admin";
+  // Групова зміна менеджера — власник/адмін. Вантажимо активних менеджерів.
+  const canBulkAssign = user.role === "admin" || user.role === "owner";
   const managers = canBulkAssign
     ? await prisma.user.findMany({
         where: { isActive: true },
@@ -139,7 +133,10 @@ export default async function CustomersPage({
       ) : (
         <ClientListTable items={list.items} columnsPrefs={columnsPrefs} />
       )}
-      <ListPagination page={list.page} totalPages={list.totalPages} />
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <PageSizeSelect pageSize={pageSize} />
+        <ListPagination page={list.page} totalPages={list.totalPages} />
+      </div>
     </div>
   );
 }
@@ -183,13 +180,6 @@ function pickBool(v: string | string[] | undefined): boolean | undefined {
   if (s === "true") return true;
   if (s === "false") return false;
   return undefined;
-}
-
-function pickNumber(v: string | string[] | undefined): number | undefined {
-  const s = pickString(v);
-  if (!s) return undefined;
-  const n = Number(s);
-  return Number.isFinite(n) ? n : undefined;
 }
 
 function pickInt(v: string | string[] | undefined): number | undefined {

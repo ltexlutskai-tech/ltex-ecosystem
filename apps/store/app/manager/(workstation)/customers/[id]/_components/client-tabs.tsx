@@ -39,6 +39,18 @@ interface GroupDef {
  */
 const GROUPS: GroupDef[] = [
   {
+    // Комунікація — перший розділ; головна вкладка картки = «Історія» (робота
+    // з клієнтом). Для чужого клієнта весь розділ приховано → дефолт впаде на
+    // перший видимий («Реквізити»).
+    id: "communication",
+    label: "Комунікація",
+    tabs: [
+      { id: "history", label: "Історія", foreignVisible: false },
+      { id: "reminders", label: "Нагадування", foreignVisible: false },
+      { id: "social", label: "Соцмережі та месенджери", foreignVisible: false },
+    ],
+  },
+  {
     id: "overview",
     label: "Огляд",
     tabs: [
@@ -59,15 +71,6 @@ const GROUPS: GroupDef[] = [
         label: "Іст. презентацій",
         foreignVisible: false,
       },
-    ],
-  },
-  {
-    id: "communication",
-    label: "Комунікація",
-    tabs: [
-      { id: "history", label: "Історія", foreignVisible: false },
-      { id: "reminders", label: "Нагадування", foreignVisible: false },
-      { id: "social", label: "Соцмережі та месенджери", foreignVisible: false },
     ],
   },
   {
@@ -163,7 +166,7 @@ export function ClientTabs({
     <div className="grid gap-4 md:grid-cols-[220px_1fr]">
       <nav
         aria-label="Розділи картки клієнта"
-        className="space-y-3 md:sticky md:top-2 md:self-start"
+        className="space-y-3 md:self-start"
       >
         {visibleGroups.map((g) => (
           <div key={g.id}>

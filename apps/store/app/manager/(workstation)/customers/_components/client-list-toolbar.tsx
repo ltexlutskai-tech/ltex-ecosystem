@@ -2,7 +2,7 @@
 
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
-import { Button, Input } from "@ltex/ui";
+import { Input } from "@ltex/ui";
 import { ClientListFilterSheet } from "./client-list-filter-sheet";
 import { ViewCustomizerSheet } from "../../_components/view-customizer-sheet";
 import { COLUMN_LABELS, FILTER_LABELS } from "../_lib/filter-labels";
@@ -46,10 +46,20 @@ export function ClientListToolbar({
     startTransition(() => router.push(`${pathname}?${sp.toString()}`));
   }
 
-  function submitSearch(e: React.FormEvent) {
-    e.preventDefault();
-    setParam("search", search.trim() || null);
-  }
+  // Динамічний пошук — оновлює URL за 350 мс після останнього символу.
+  useEffect(() => {
+    const current = searchParams.get("search") ?? "";
+    const next = search.trim();
+    if (next === current) return;
+    const t = setTimeout(() => {
+      const sp = new URLSearchParams(searchParams.toString());
+      if (next) sp.set("search", next);
+      else sp.delete("search");
+      sp.delete("page");
+      startTransition(() => router.push(`${pathname}?${sp.toString()}`));
+    }, 350);
+    return () => clearTimeout(t);
+  }, [search, searchParams, pathname, router, startTransition]);
 
   const onlyMine = searchParams.get("onlyMine") === "true";
   const hideTrashOff = searchParams.get("hideTrash") === "false";
@@ -57,10 +67,7 @@ export function ClientListToolbar({
   return (
     <div className="space-y-2">
       <div className="flex flex-wrap items-center gap-2">
-        <form
-          onSubmit={submitSearch}
-          className="flex flex-1 min-w-[240px] gap-2"
-        >
+        <div className="flex min-w-[240px] flex-1 gap-2">
           <Input
             type="search"
             value={search}
@@ -68,10 +75,7 @@ export function ClientListToolbar({
             placeholder="Пошук за іменем, телефоном або містом…"
             className="flex-1"
           />
-          <Button type="submit" variant="outline" size="sm">
-            Шукати
-          </Button>
-        </form>
+        </div>
 
         <div className="flex flex-wrap items-center gap-2">
           <ClientListFilterSheet

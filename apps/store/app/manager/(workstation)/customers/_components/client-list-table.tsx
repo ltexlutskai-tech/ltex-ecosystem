@@ -1,5 +1,7 @@
+import { SortableHeader } from "../../_components/sortable-header";
 import { renderCell } from "../_lib/column-render";
 import { COLUMN_LABELS } from "../_lib/filter-labels";
+import { SORTABLE_COLUMN_KEYS } from "../_lib/sortable-columns";
 import type { ClientListItem, ConfigItem } from "./types";
 
 interface Props {
@@ -36,7 +38,14 @@ export function ClientListTable({ items, columnsPrefs }: Props) {
           <tr>
             {visibleCols.map((col) => (
               <th key={col.key} className="px-2.5 py-1.5 whitespace-nowrap">
-                {COLUMN_LABELS[col.key] ?? col.key}
+                {SORTABLE_COLUMN_KEYS.has(col.key) ? (
+                  <SortableHeader
+                    sortKey={col.key}
+                    label={COLUMN_LABELS[col.key] ?? col.key}
+                  />
+                ) : (
+                  (COLUMN_LABELS[col.key] ?? col.key)
+                )}
               </th>
             ))}
           </tr>

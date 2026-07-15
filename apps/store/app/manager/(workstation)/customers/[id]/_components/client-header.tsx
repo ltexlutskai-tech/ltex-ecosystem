@@ -39,12 +39,14 @@ export function ClientHeader({
               )}
             </div>
             {(client.region || client.city) && (
-              <p className="text-sm text-gray-600">
+              <p className="hidden text-sm text-gray-600 sm:block">
                 {[client.region, client.city].filter(Boolean).join(" · ")}
               </p>
             )}
-            <ClientContactsStrip client={client} isForeign={isForeign} />
-            <div className="flex flex-wrap items-center gap-4 pt-2 text-sm">
+            <div className="hidden sm:block">
+              <ClientContactsStrip client={client} isForeign={isForeign} />
+            </div>
+            <div className="hidden flex-wrap items-center gap-4 pt-2 text-sm sm:flex">
               <span className="text-gray-700">
                 Борг:{" "}
                 <span

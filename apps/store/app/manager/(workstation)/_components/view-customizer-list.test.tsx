@@ -35,33 +35,25 @@ describe("ViewCustomizerList", () => {
     expect(arg[0]?.visible).toBe(false);
   });
 
-  it("move down swaps adjacent items + renumbers order", () => {
+  it("drag-and-drop переставляє елементи + перенумеровує order", () => {
     const onChange = vi.fn();
     render(
       <ViewCustomizerList items={ITEMS} labels={LABELS} onChange={onChange} />,
     );
-    // Кнопка ▼ перша → item idx=0
-    const down = screen.getAllByLabelText(/Перемістити Найменування вниз/)[0]!;
-    fireEvent.click(down);
+    const rows = screen.getAllByRole("listitem");
+    // Перетягуємо «Найменування» (idx 0) на позицію «Борг» (idx 1).
+    fireEvent.dragStart(rows[0]!);
+    fireEvent.dragOver(rows[1]!);
+    fireEvent.drop(rows[1]!);
     expect(onChange).toHaveBeenCalled();
-    const arg = onChange.mock.calls[0]?.[0] as typeof ITEMS;
+    const arg = onChange.mock.calls.at(-1)?.[0] as typeof ITEMS;
     expect(arg[0]?.key).toBe("debt");
     expect(arg[1]?.key).toBe("name");
     expect(arg[0]?.order).toBe(1);
     expect(arg[1]?.order).toBe(2);
   });
 
-  it("up disabled на першому item, down disabled на останньому", () => {
-    render(
-      <ViewCustomizerList items={ITEMS} labels={LABELS} onChange={() => {}} />,
-    );
-    const ups = screen.getAllByLabelText(/Перемістити .* вгору/);
-    const downs = screen.getAllByLabelText(/Перемістити .* вниз/);
-    expect((ups[0] as HTMLButtonElement).disabled).toBe(true);
-    expect((downs[downs.length - 1] as HTMLButtonElement).disabled).toBe(true);
-  });
-
-  it("disabled=true — усі controls disabled", () => {
+  it("disabled=true — рядки не draggable + чекбокси disabled", () => {
     render(
       <ViewCustomizerList
         items={ITEMS}
@@ -69,6 +61,10 @@ describe("ViewCustomizerList", () => {
         onChange={() => {}}
         disabled
       />,
+    );
+    const rows = screen.getAllByRole("listitem");
+    expect(rows.every((r) => r.getAttribute("draggable") === "false")).toBe(
+      true,
     );
     const checkboxes = screen.getAllByRole("checkbox") as HTMLInputElement[];
     expect(checkboxes.every((c) => c.disabled)).toBe(true);

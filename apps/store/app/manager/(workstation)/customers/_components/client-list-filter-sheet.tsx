@@ -13,11 +13,9 @@ import {
 } from "@ltex/ui";
 import { SlidersHorizontal } from "lucide-react";
 import { SelectMulti } from "./filter-controls/select-multi";
-import { TextFilter } from "./filter-controls/text-filter";
 import { BoolFilter } from "./filter-controls/bool-filter";
 import { RangeNumeric } from "./filter-controls/range-numeric";
 import { RangeDate } from "./filter-controls/range-date";
-import { DateBefore } from "./filter-controls/date-before";
 import {
   countActiveFilters,
   stateToUrl,
@@ -229,66 +227,22 @@ function renderFilter(
       );
     case "region":
       return (
-        <TextFilter
+        <SelectMulti
           key={key}
           label={label}
-          value={draft.region ?? ""}
-          onChange={(v) => update({ region: v || undefined })}
+          options={d.regions.map((r) => ({ id: r, label: r }))}
+          value={draft.regionValues ?? []}
+          onChange={(v) => update({ regionValues: v })}
         />
       );
     case "city":
       return (
-        <TextFilter
+        <SelectMulti
           key={key}
           label={label}
-          value={draft.city ?? ""}
-          onChange={(v) => update({ city: v || undefined })}
-        />
-      );
-    case "dialogStatus":
-      return (
-        <TextFilter
-          key={key}
-          label={label}
-          value={draft.dialogStatus ?? ""}
-          onChange={(v) => update({ dialogStatus: v || undefined })}
-        />
-      );
-    case "debtRange":
-      return (
-        <RangeNumeric
-          key={key}
-          label={label}
-          unit="₴"
-          min={draft.debtMin}
-          max={draft.debtMax}
-          onChange={({ min, max }) => update({ debtMin: min, debtMax: max })}
-        />
-      );
-    case "overdueDebtRange":
-      return (
-        <RangeNumeric
-          key={key}
-          label={label}
-          unit="₴"
-          min={draft.overdueDebtMin}
-          max={draft.overdueDebtMax}
-          onChange={({ min, max }) =>
-            update({ overdueDebtMin: min, overdueDebtMax: max })
-          }
-        />
-      );
-    case "monthlyVolumeRange":
-      return (
-        <RangeNumeric
-          key={key}
-          label={label}
-          unit="кг"
-          min={draft.monthlyVolumeMin}
-          max={draft.monthlyVolumeMax}
-          onChange={({ min, max }) =>
-            update({ monthlyVolumeMin: min, monthlyVolumeMax: max })
-          }
+          options={d.cities.map((c) => ({ id: c, label: c }))}
+          value={draft.cityValues ?? []}
+          onChange={(v) => update({ cityValues: v })}
         />
       );
     case "daysSinceRange":
@@ -304,15 +258,6 @@ function renderFilter(
           }
         />
       );
-    case "licenseExpiresBefore":
-      return (
-        <DateBefore
-          key={key}
-          label={label}
-          value={draft.licenseExpiresBefore}
-          onChange={(v) => update({ licenseExpiresBefore: v })}
-        />
-      );
     case "createdRange":
       return (
         <RangeDate
@@ -323,24 +268,6 @@ function renderFilter(
           onChange={({ from, to }) =>
             update({ createdFrom: from, createdTo: to })
           }
-        />
-      );
-    case "hasNewMessage":
-      return (
-        <BoolFilter
-          key={key}
-          label={label}
-          value={draft.hasNewMessage}
-          onChange={(v) => update({ hasNewMessage: v })}
-        />
-      );
-    case "isViberLinked":
-      return (
-        <BoolFilter
-          key={key}
-          label={label}
-          value={draft.isViberLinked}
-          onChange={(v) => update({ isViberLinked: v })}
         />
       );
     case "hasDebt":

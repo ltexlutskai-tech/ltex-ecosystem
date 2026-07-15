@@ -77,8 +77,6 @@ export function renderCell(key: string, c: ClientListItem): ReactNode {
       return c.monthlyVolume ? `${c.monthlyVolume} кг` : "—";
     case "daysSinceLast":
       return <DaysSinceCell days={c.daysSinceLastPurchase} />;
-    case "licenseExpiresAt":
-      return formatDate(c.licenseExpiresAt);
     case "lastSyncedAt":
       return formatDate(c.lastSyncedAt);
     case "createdAt":

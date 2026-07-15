@@ -9,7 +9,7 @@ import { bulkAssignSchema } from "@/lib/validations/manager-clients";
  * одиничного `/clients/[id]/assign`, але у транзакції по всіх обраних клієнтах.
  */
 export async function POST(req: NextRequest) {
-  const admin = await requireRole(["admin"], req);
+  const admin = await requireRole(["admin", "owner"], req);
   if (!admin) {
     return NextResponse.json({ error: "Не авторизовано" }, { status: 403 });
   }

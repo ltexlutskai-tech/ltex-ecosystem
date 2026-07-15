@@ -6,6 +6,19 @@ import { Button, Textarea, useToast } from "@ltex/ui";
 import { formatRelativeShort } from "../../../_components/format-relative";
 import type { ClientTimelineEntry } from "./types";
 
+/** Повна дата запису ДД.ММ.РРРР, ГГ:ХХ. */
+function formatFullDate(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toLocaleString("uk-UA", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
 /**
  * Метадані типів записів історії. `auto: true` — авто-запис по нашій події
  * (read-only); `comment` — ручний запис менеджера (редагований власником/admin).
@@ -178,7 +191,8 @@ export function ClientTimelineItem({
             </span>
           )}
           <span className="text-xs text-gray-500">
-            {formatRelativeShort(entry.occurredAt)}
+            {formatFullDate(entry.occurredAt)} (
+            {formatRelativeShort(entry.occurredAt)})
           </span>
           {entry.author && (
             <span className="text-xs text-gray-500">

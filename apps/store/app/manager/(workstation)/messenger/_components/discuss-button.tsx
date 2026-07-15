@@ -1,10 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { MessagesSquare } from "lucide-react";
 import { Button, useToast } from "@ltex/ui";
 import type { MessengerDocRef } from "@/lib/messenger/types";
+import { openManagerTab } from "../../_components/open-manager-tab";
 import { PickConversationDialog } from "./pick-conversation-dialog";
 
 /**
@@ -23,7 +23,6 @@ export function DiscussButton({
   label?: string;
   variant?: "outline" | "default";
 }) {
-  const router = useRouter();
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const { toast } = useToast();
@@ -45,8 +44,13 @@ export function DiscussButton({
         throw new Error(d.error ?? "Не вдалось надіслати");
       }
       setOpen(false);
-      // Переносимо користувача у чат, куди щойно надіслали посилання.
-      router.push(`/manager/messenger?c=${encodeURIComponent(conversationId)}`);
+      // Відкриваємо чат окремою вкладкою менеджерки (усередині shell сторінки —
+      // в iframe, тому звичайний router.push затер би поточний документ). У чаті
+      // повідомлення вже містить клікабельне посилання на цей документ.
+      openManagerTab(
+        `/manager/messenger?c=${encodeURIComponent(conversationId)}`,
+        "Месенджер",
+      );
     } catch (e) {
       toast({
         description: e instanceof Error ? e.message : "Помилка",

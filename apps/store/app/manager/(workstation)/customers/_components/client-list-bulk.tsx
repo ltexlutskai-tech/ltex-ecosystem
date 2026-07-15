@@ -3,8 +3,10 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button, useToast } from "@ltex/ui";
+import { SortableHeader } from "../../_components/sortable-header";
 import { renderCell } from "../_lib/column-render";
 import { COLUMN_LABELS } from "../_lib/filter-labels";
+import { SORTABLE_COLUMN_KEYS } from "../_lib/sortable-columns";
 import type { ClientListItem, ConfigItem } from "./types";
 
 export interface BulkManagerOption {
@@ -132,7 +134,14 @@ export function ClientListBulk({
               </th>
               {visibleCols.map((col) => (
                 <th key={col.key} className="px-2.5 py-1.5 whitespace-nowrap">
-                  {COLUMN_LABELS[col.key] ?? col.key}
+                  {SORTABLE_COLUMN_KEYS.has(col.key) ? (
+                    <SortableHeader
+                      sortKey={col.key}
+                      label={COLUMN_LABELS[col.key] ?? col.key}
+                    />
+                  ) : (
+                    (COLUMN_LABELS[col.key] ?? col.key)
+                  )}
                 </th>
               ))}
             </tr>

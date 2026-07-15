@@ -17,10 +17,11 @@ export function ClientHistoryTab({
 }) {
   return (
     <div className="space-y-4 rounded-lg border bg-white p-5 shadow-sm">
+      <ClientHistoryCommentForm clientId={clientId} />
       {timeline.length === 0 ? (
         <p className="text-sm text-gray-500">
           Жодного запису в історії взаємодій ще немає. Додайте перший коментар
-          нижче.
+          вище.
         </p>
       ) : (
         <ul className="divide-y divide-gray-100">
@@ -36,7 +37,6 @@ export function ClientHistoryTab({
           ))}
         </ul>
       )}
-      <ClientHistoryCommentForm clientId={clientId} />
     </div>
   );
 }
