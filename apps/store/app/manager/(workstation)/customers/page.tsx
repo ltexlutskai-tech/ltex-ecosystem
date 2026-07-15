@@ -8,6 +8,7 @@ import {
   getDefaultsFor,
   mergePrefs,
 } from "@/lib/manager/view-defaults";
+import { ClientListBulk } from "./_components/client-list-bulk";
 import { ClientListTable } from "./_components/client-list-table";
 import { ClientListToolbar } from "./_components/client-list-toolbar";
 import { ListPagination } from "./_components/list-pagination";
@@ -83,6 +84,16 @@ export default async function CustomersPage({
     where: { status: { in: ["new", "contacted"] } },
   });
 
+  // Групова зміна менеджера доступна лише admin — вантажимо активних менеджерів.
+  const canBulkAssign = user.role === "admin";
+  const managers = canBulkAssign
+    ? await prisma.user.findMany({
+        where: { isActive: true },
+        select: { id: true, fullName: true, email: true },
+        orderBy: { fullName: "asc" },
+      })
+    : [];
+
   return (
     <div className="max-w-none space-y-3">
       <header className="flex items-center justify-between">
@@ -119,7 +130,15 @@ export default async function CustomersPage({
         totalCount={list.total}
         showOnlyMineToggle={user.role === "admin"}
       />
-      <ClientListTable items={list.items} columnsPrefs={columnsPrefs} />
+      {canBulkAssign ? (
+        <ClientListBulk
+          items={list.items}
+          columnsPrefs={columnsPrefs}
+          managers={managers}
+        />
+      ) : (
+        <ClientListTable items={list.items} columnsPrefs={columnsPrefs} />
+      )}
       <ListPagination page={list.page} totalPages={list.totalPages} />
     </div>
   );

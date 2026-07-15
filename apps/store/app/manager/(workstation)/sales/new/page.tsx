@@ -109,10 +109,7 @@ export default async function NewSalePage({
 
   return (
     <div className="mx-auto max-w-6xl space-y-6">
-      <BackButton
-        label={routeSheetId ? "Назад до маршруту" : "Назад до списку"}
-        fallbackHref={returnHref}
-      />
+      <BackButton label="Назад" fallbackHref={returnHref} />
 
       <header>
         <h1 className="text-2xl font-bold text-gray-800">Нова реалізація</h1>

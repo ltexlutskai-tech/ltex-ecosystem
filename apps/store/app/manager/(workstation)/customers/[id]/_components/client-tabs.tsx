@@ -2,54 +2,82 @@
 
 import { useEffect, useMemo, useState } from "react";
 
+type TabId =
+  | "requisites"
+  | "assortment"
+  | "presentations"
+  | "history"
+  | "sales-history"
+  | "orders"
+  | "reminders"
+  | "presentation-history"
+  | "social"
+  | "keywords"
+  | "debt-movements";
+
 interface TabDef {
-  id:
-    | "requisites"
-    | "assortment"
-    | "presentations"
-    | "history"
-    | "sales-history"
-    | "orders"
-    | "reminders"
-    | "viber"
-    | "presentation-history"
-    | "social"
-    | "keywords"
-    | "debt-movements";
+  id: TabId;
   label: string;
   foreignVisible: boolean;
 }
 
-/**
- * Усі tabs у точному 1С порядку. Поле `foreignVisible` — чи показати tab
- * коли поточний user дивиться на чужого клієнта (M1.3f).
- *
- * У foreign view приховуються tabs з sensitive contact data:
- * Презентації, Історія, Нагадування, Viber, Іст. презентацій, Соц мережі
- * (6 з 10). Лишається: Реквізити (з masked полями), Асортимент, Історія
- * продаж, Замовлення. Розрахунковий рахунок тепер показується read-only
- * усередині вкладки «Реквізити» (окремої вкладки «Банк. рахунки» немає).
- */
-const TABS: TabDef[] = [
-  { id: "requisites", label: "Реквізити", foreignVisible: true },
-  { id: "assortment", label: "Асортимент", foreignVisible: true },
-  { id: "presentations", label: "Презентації", foreignVisible: false },
-  { id: "history", label: "Історія", foreignVisible: false },
-  { id: "sales-history", label: "Історія продаж", foreignVisible: true },
-  { id: "orders", label: "Замовлення", foreignVisible: true },
-  { id: "reminders", label: "Нагадування", foreignVisible: false },
-  { id: "viber", label: "Viber", foreignVisible: false },
-  {
-    id: "presentation-history",
-    label: "Іст. презентацій",
-    foreignVisible: false,
-  },
-  { id: "social", label: "Соцмережі та месенджери", foreignVisible: false },
-  { id: "keywords", label: "Ключові слова", foreignVisible: false },
-  { id: "debt-movements", label: "Рухи боргу", foreignVisible: false },
-];
+interface GroupDef {
+  id: string;
+  label: string;
+  tabs: TabDef[];
+}
 
-type TabId = TabDef["id"];
+/**
+ * Картка клієнта у стилі CRM: 11 вкладок згруповано у 4 логічні розділи з
+ * бічним меню (Огляд · Продажі й замовлення · Комунікація · Фінанси). Поле
+ * `foreignVisible` — чи показати вкладку коли поточний user дивиться на чужого
+ * клієнта (M1.3f): у foreign-режимі ховаються розділи з чутливими контактами;
+ * розділ без жодної видимої вкладки не показується взагалі.
+ *
+ * Вкладку «Viber» прибрано — цей функціонал живе в окремому місці (Месенджер /
+ * чат-inbox).
+ */
+const GROUPS: GroupDef[] = [
+  {
+    id: "overview",
+    label: "Огляд",
+    tabs: [
+      { id: "requisites", label: "Реквізити", foreignVisible: true },
+      { id: "keywords", label: "Ключові слова", foreignVisible: false },
+    ],
+  },
+  {
+    id: "sales",
+    label: "Продажі й замовлення",
+    tabs: [
+      { id: "sales-history", label: "Історія продаж", foreignVisible: true },
+      { id: "assortment", label: "Асортимент", foreignVisible: true },
+      { id: "orders", label: "Замовлення", foreignVisible: true },
+      { id: "presentations", label: "Презентації", foreignVisible: false },
+      {
+        id: "presentation-history",
+        label: "Іст. презентацій",
+        foreignVisible: false,
+      },
+    ],
+  },
+  {
+    id: "communication",
+    label: "Комунікація",
+    tabs: [
+      { id: "history", label: "Історія", foreignVisible: false },
+      { id: "reminders", label: "Нагадування", foreignVisible: false },
+      { id: "social", label: "Соцмережі та месенджери", foreignVisible: false },
+    ],
+  },
+  {
+    id: "finance",
+    label: "Фінанси",
+    tabs: [
+      { id: "debt-movements", label: "Рухи боргу", foreignVisible: false },
+    ],
+  },
+];
 
 export function ClientTabs({
   requisites,
@@ -59,7 +87,6 @@ export function ClientTabs({
   salesHistory,
   orders,
   reminders,
-  viber,
   presentationHistory,
   social,
   keywords,
@@ -74,7 +101,6 @@ export function ClientTabs({
   salesHistory: React.ReactNode;
   orders: React.ReactNode;
   reminders: React.ReactNode;
-  viber: React.ReactNode;
   presentationHistory: React.ReactNode;
   social: React.ReactNode;
   keywords: React.ReactNode;
@@ -82,16 +108,24 @@ export function ClientTabs({
   overdueRemindersCount?: number;
   isForeign?: boolean;
 }) {
-  const visibleTabs = useMemo(
-    () => (isForeign ? TABS.filter((t) => t.foreignVisible) : TABS),
+  // Групи з відфільтрованими за foreign-режимом вкладками; порожні групи геть.
+  const visibleGroups = useMemo(
+    () =>
+      GROUPS.map((g) => ({
+        ...g,
+        tabs: isForeign ? g.tabs.filter((t) => t.foreignVisible) : g.tabs,
+      })).filter((g) => g.tabs.length > 0),
     [isForeign],
   );
+
   const visibleIds = useMemo(
-    () => new Set<string>(visibleTabs.map((t) => t.id)),
-    [visibleTabs],
+    () =>
+      new Set<string>(visibleGroups.flatMap((g) => g.tabs.map((t) => t.id))),
+    [visibleGroups],
   );
 
-  const [tab, setTab] = useState<TabId>("requisites");
+  const firstId = visibleGroups[0]?.tabs[0]?.id ?? "requisites";
+  const [tab, setTab] = useState<TabId>(firstId);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -99,12 +133,10 @@ export function ClientTabs({
     if (hash && visibleIds.has(hash)) {
       setTab(hash as TabId);
     } else if (hash && !visibleIds.has(hash)) {
-      // Deeplink на hidden tab (наприклад #viber для foreign view) →
-      // fallback на 'requisites' + очистити anchor щоб не reset-нути назад.
-      setTab("requisites");
-      window.history.replaceState(null, "", "#requisites");
+      setTab(firstId);
+      window.history.replaceState(null, "", `#${firstId}`);
     }
-  }, [visibleIds]);
+  }, [visibleIds, firstId]);
 
   function selectTab(id: TabId) {
     setTab(id);
@@ -121,7 +153,6 @@ export function ClientTabs({
     "sales-history": salesHistory,
     orders,
     reminders,
-    viber,
     "presentation-history": presentationHistory,
     social,
     keywords,
@@ -129,34 +160,43 @@ export function ClientTabs({
   };
 
   return (
-    <div>
-      <div
-        role="tablist"
-        className="flex flex-wrap gap-1 border-b border-gray-200"
+    <div className="grid gap-4 md:grid-cols-[220px_1fr]">
+      <nav
+        aria-label="Розділи картки клієнта"
+        className="space-y-3 md:sticky md:top-2 md:self-start"
       >
-        {visibleTabs.map((t) => (
-          <button
-            key={t.id}
-            type="button"
-            role="tab"
-            aria-selected={tab === t.id}
-            onClick={() => selectTab(t.id)}
-            className={
-              tab === t.id
-                ? "inline-flex items-center gap-1 border-b-2 border-blue-600 px-3 py-2 text-sm font-medium text-blue-700"
-                : "inline-flex items-center gap-1 border-b-2 border-transparent px-3 py-2 text-sm text-gray-600 hover:text-gray-900"
-            }
-          >
-            {t.label}
-            {t.id === "reminders" && overdueRemindersCount > 0 && (
-              <span className="ml-1 inline-flex h-4 min-w-[16px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-medium text-white">
-                {overdueRemindersCount > 9 ? "9+" : overdueRemindersCount}
-              </span>
-            )}
-          </button>
+        {visibleGroups.map((g) => (
+          <div key={g.id}>
+            <p className="px-2 pb-1 text-[11px] font-semibold tracking-wide text-gray-400 uppercase">
+              {g.label}
+            </p>
+            <div className="flex flex-col gap-0.5">
+              {g.tabs.map((t) => (
+                <button
+                  key={t.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={tab === t.id}
+                  onClick={() => selectTab(t.id)}
+                  className={
+                    tab === t.id
+                      ? "flex items-center justify-between gap-1 rounded-md bg-blue-50 px-3 py-1.5 text-left text-sm font-medium text-blue-700"
+                      : "flex items-center justify-between gap-1 rounded-md px-3 py-1.5 text-left text-sm text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+                  }
+                >
+                  <span>{t.label}</span>
+                  {t.id === "reminders" && overdueRemindersCount > 0 && (
+                    <span className="inline-flex h-4 min-w-[16px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-medium text-white">
+                      {overdueRemindersCount > 9 ? "9+" : overdueRemindersCount}
+                    </span>
+                  )}
+                </button>
+              ))}
+            </div>
+          </div>
         ))}
-      </div>
-      <div className="pt-4">{panels[tab]}</div>
+      </nav>
+      <div className="min-w-0">{panels[tab]}</div>
     </div>
   );
 }

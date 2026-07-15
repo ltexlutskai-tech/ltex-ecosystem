@@ -4,6 +4,7 @@ import { prisma } from "@ltex/db";
 import { requireRole } from "@/lib/auth/manager-auth";
 import { isStockDocKind } from "@/lib/manager/stock-documents-api";
 import { getStockDocMeta } from "@/lib/manager/stock-documents";
+import { BackButton } from "../../../_components/back-button";
 import {
   fetchStockDoc,
   type StockDocLineView,
@@ -65,12 +66,7 @@ export default async function StockDocDetailPage({
   return (
     <div className={`mx-auto space-y-4 ${wide ? "max-w-none" : "max-w-5xl"}`}>
       <div className="text-sm">
-        <Link
-          href={`/manager/stock-documents/${meta.slug}`}
-          className="text-gray-500 hover:text-gray-800 hover:underline"
-        >
-          ← Назад до списку
-        </Link>
+        <BackButton fallbackHref={`/manager/stock-documents/${meta.slug}`} />
       </div>
       <div className="rounded-md border bg-white p-4">
         <div className="flex flex-wrap items-start justify-between gap-2">

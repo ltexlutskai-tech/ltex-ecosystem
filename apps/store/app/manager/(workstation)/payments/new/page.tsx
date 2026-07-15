@@ -189,7 +189,7 @@ export default async function NewPaymentPage({
   return (
     <div className="mx-auto max-w-3xl space-y-6">
       <BackButton
-        label={routeSheetId ? "Назад до маршруту" : "Назад до списку"}
+        label="Назад"
         fallbackHref={returnHref ?? "/manager/payments"}
       />
 

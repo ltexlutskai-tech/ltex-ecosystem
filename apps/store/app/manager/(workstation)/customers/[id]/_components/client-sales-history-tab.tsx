@@ -37,7 +37,14 @@ export async function ClientSalesHistoryTab({
       where,
       orderBy: { createdAt: "desc" },
       take: TAKE,
-      include: { _count: { select: { items: true } } },
+      include: {
+        _count: { select: { items: true } },
+        items: {
+          include: {
+            product: { select: { name: true, articleCode: true } },
+          },
+        },
+      },
     }),
     prisma.sale.count({ where }),
   ]);
@@ -52,6 +59,16 @@ export async function ClientSalesHistoryTab({
     totalUah: s.totalUah,
     itemCount: s._count.items,
     createdAt: s.createdAt,
+    items: s.items.map((it) => ({
+      id: it.id,
+      articleCode: it.product?.articleCode ?? null,
+      productName: it.product?.name ?? null,
+      quantity: it.quantity,
+      weight: it.weight,
+      pricePerKg: it.pricePerKg,
+      priceEur: it.priceEur,
+      exchangeRateEur: s.exchangeRateEur,
+    })),
   }));
 
   return (

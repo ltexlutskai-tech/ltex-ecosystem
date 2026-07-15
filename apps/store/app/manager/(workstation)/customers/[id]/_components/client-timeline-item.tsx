@@ -60,6 +60,19 @@ const KIND_META: Record<
     color: "text-amber-700",
     auto: true,
   },
+  // Історія роботи з клієнтом, перенесена з 1С (read-only).
+  note_1c: {
+    icon: "📝",
+    label: "Запис (1С)",
+    color: "text-gray-700",
+    auto: false,
+  },
+  note_1c_auto: {
+    icon: "🤖",
+    label: "Авто-запис (1С)",
+    color: "text-gray-500",
+    auto: true,
+  },
 };
 
 export function ClientTimelineItem({

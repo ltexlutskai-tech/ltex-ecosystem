@@ -94,3 +94,15 @@ export const assignSchema = z.object({
     .describe("null = unassign, інакше — User.id"),
 });
 export type AssignInput = z.infer<typeof assignSchema>;
+
+/** Групова зміна менеджера (групова обробка). */
+export const bulkAssignSchema = z.object({
+  clientIds: z.array(z.string().min(1).max(50)).min(1).max(500),
+  userId: z
+    .string()
+    .min(1)
+    .max(50)
+    .nullable()
+    .describe("null = зняти прив'язку, інакше — User.id"),
+});
+export type BulkAssignInput = z.infer<typeof bulkAssignSchema>;
