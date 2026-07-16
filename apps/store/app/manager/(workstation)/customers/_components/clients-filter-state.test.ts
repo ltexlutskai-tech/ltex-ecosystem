@@ -85,6 +85,43 @@ describe("clients-filter-state", () => {
     expect(countActiveFilters({})).toBe(0);
   });
 
+  it("парсить нові зрізи: color / keywords / historySearch / assortment", () => {
+    const sp = new URLSearchParams(
+      "colors=stale,green&keywords=опт,дитяче&keywordsOr=true&historySearch=дзвінок&assortmentSearch=куртка",
+    );
+    const state = urlToState(sp);
+    expect(state.colors).toEqual(["stale", "green"]);
+    expect(state.keywords).toEqual(["опт", "дитяче"]);
+    expect(state.keywordsOr).toBe(true);
+    expect(state.historySearch).toBe("дзвінок");
+    expect(state.assortmentSearch).toBe("куртка");
+  });
+
+  it("roundtrip нових зрізів через stateToUrl", () => {
+    const state = {
+      colors: ["today"],
+      keywords: ["vip"],
+      historySearch: "оплата",
+      assortmentSearch: "взуття",
+    };
+    const out = stateToUrl(state);
+    expect(out.get("colors")).toBe("today");
+    expect(out.get("keywords")).toBe("vip");
+    expect(out.get("historySearch")).toBe("оплата");
+    expect(out.get("assortmentSearch")).toBe("взуття");
+  });
+
+  it("countActiveFilters враховує нові зрізи", () => {
+    expect(
+      countActiveFilters({
+        colors: ["stale"],
+        keywords: ["опт"],
+        historySearch: "дзвінок",
+        assortmentSearch: "куртка",
+      }),
+    ).toBe(4);
+  });
+
   it("stateToUrl drops undefined values", () => {
     const out = stateToUrl({
       search: undefined,

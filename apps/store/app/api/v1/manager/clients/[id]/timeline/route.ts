@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@ltex/db";
+import { Prisma, prisma } from "@ltex/db";
 import { getCurrentUser } from "@/lib/auth/manager-auth";
 import {
   timelinePostSchema,
@@ -36,10 +36,29 @@ export async function GET(
     return NextResponse.json({ error: "Клієнта не знайдено" }, { status: 404 });
   }
 
+  const where: Prisma.MgrClientTimelineEntryWhereInput = { clientId: id };
+  if (q.search) {
+    where.body = { contains: q.search, mode: "insensitive" };
+  }
+  if (q.kind) {
+    where.kind = q.kind;
+  }
+  if (q.from || q.to) {
+    const range: Prisma.DateTimeFilter = {};
+    if (q.from) range.gte = new Date(q.from);
+    if (q.to) {
+      // Включно по кінцевий день (до 23:59:59.999).
+      const end = new Date(q.to);
+      end.setHours(23, 59, 59, 999);
+      range.lte = end;
+    }
+    where.occurredAt = range;
+  }
+
   const [total, entries] = await Promise.all([
-    prisma.mgrClientTimelineEntry.count({ where: { clientId: id } }),
+    prisma.mgrClientTimelineEntry.count({ where }),
     prisma.mgrClientTimelineEntry.findMany({
-      where: { clientId: id },
+      where,
       orderBy: { occurredAt: "desc" },
       skip: (q.page - 1) * q.pageSize,
       take: q.pageSize,

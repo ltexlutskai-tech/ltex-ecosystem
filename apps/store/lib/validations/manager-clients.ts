@@ -78,6 +78,11 @@ export type ListQueryInput = z.infer<typeof listQuerySchema>;
 export const timelineQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(10).max(100).default(50),
+  // Пошук/фільтр усередині історії (Блок «Картка клієнта», 2026-07-16).
+  search: z.string().trim().max(200).optional(),
+  kind: z.string().trim().max(40).optional(),
+  from: optionalIsoDate,
+  to: optionalIsoDate,
 });
 
 export const timelineCommentSchema = z.object({

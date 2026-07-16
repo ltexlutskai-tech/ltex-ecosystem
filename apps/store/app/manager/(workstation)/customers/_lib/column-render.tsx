@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { CLIENT_COLOR_META } from "@/lib/manager/client-color";
 import { ClientStatusBadge } from "../_components/client-status-badge";
 import { DebtCell } from "../_components/debt-cell";
 import { DaysSinceCell } from "../_components/days-since-cell";
@@ -22,6 +23,44 @@ function formatDate(iso: string | null | undefined): string {
 
 export function renderCell(key: string, c: ClientListItem): ReactNode {
   switch (key) {
+    case "color": {
+      const meta = CLIENT_COLOR_META[c.color];
+      return (
+        <span
+          className="inline-flex items-center"
+          title={`${meta.label} — ${meta.description}`}
+        >
+          <span
+            className={`inline-block h-3 w-3 rounded-full ${meta.dotClass}`}
+            aria-label={meta.label}
+          />
+        </span>
+      );
+    }
+    case "keywords": {
+      const tags = (c.keywords ?? "")
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean);
+      if (tags.length === 0) return "—";
+      return (
+        <div className="flex flex-wrap gap-1">
+          {tags.slice(0, 6).map((t) => (
+            <span
+              key={t}
+              className="rounded-full bg-blue-50 px-2 py-0.5 text-xs text-blue-700"
+            >
+              {t}
+            </span>
+          ))}
+          {tags.length > 6 && (
+            <span className="text-xs text-gray-400">+{tags.length - 6}</span>
+          )}
+        </div>
+      );
+    }
+    case "lastContactAt":
+      return formatDate(c.lastContactAt);
     case "name":
       return (
         <Link

@@ -14,9 +14,10 @@ describe("view-defaults", () => {
   it("empty saved → returns defaults + auto-appended invisibles", () => {
     const out = mergePrefs(null, CLIENTS_TABLE_DEFAULT, CLIENTS_TABLE_KEYS);
     expect(out.length).toBe(CLIENTS_TABLE_KEYS.length);
-    // Перші 7 — visible (дефолтні), решта — invisible.
-    expect(out.slice(0, 7).every((i) => i.visible)).toBe(true);
-    expect(out.slice(7).every((i) => !i.visible)).toBe(true);
+    // Перші N — visible (дефолтні), решта — invisible.
+    const visibleCount = CLIENTS_TABLE_DEFAULT.length;
+    expect(out.slice(0, visibleCount).every((i) => i.visible)).toBe(true);
+    expect(out.slice(visibleCount).every((i) => !i.visible)).toBe(true);
     // Order безперервний 1..n
     expect(out[0]?.order).toBe(1);
     expect(out[out.length - 1]?.order).toBe(CLIENTS_TABLE_KEYS.length);

@@ -31,6 +31,18 @@ export interface FilterState {
   createdFrom?: string;
   createdTo?: string;
 
+  // Блок «Список клієнтів» (2026-07-16)
+  /** Пошук по історії роботи (timeline). */
+  historySearch?: string;
+  /** Ключові слова (теги) — список слів. */
+  keywords?: string[];
+  /** Режим збігу тегів: усі (AND) чи будь-яке (OR). */
+  keywordsOr?: boolean;
+  /** Пошук по асортименту (артикул/назва товару). */
+  assortmentSearch?: string;
+  /** Кольори-пріоритети (світлофор): green|today|week|fortnight|stale|never. */
+  colors?: string[];
+
   // bool
   hasDebt?: boolean;
   hasOverpayment?: boolean;
@@ -61,6 +73,12 @@ export function urlToState(sp: URLSearchParams): FilterState {
 
     createdFrom: pickStr(sp.get("createdFrom")),
     createdTo: pickStr(sp.get("createdTo")),
+
+    historySearch: pickStr(sp.get("historySearch")),
+    keywords: parseCsv(sp.get("keywords")),
+    keywordsOr: parseBool(sp.get("keywordsOr")),
+    assortmentSearch: pickStr(sp.get("assortmentSearch")),
+    colors: parseCsv(sp.get("colors")),
 
     hasDebt: parseBool(sp.get("hasDebt")),
     hasOverpayment: parseBool(sp.get("hasOverpayment")),
@@ -99,6 +117,12 @@ export function stateToUrl(
   setStr(sp, "createdFrom", state.createdFrom);
   setStr(sp, "createdTo", state.createdTo);
 
+  setStr(sp, "historySearch", state.historySearch);
+  setCsv(sp, "keywords", state.keywords);
+  setBool(sp, "keywordsOr", state.keywordsOr);
+  setStr(sp, "assortmentSearch", state.assortmentSearch);
+  setCsv(sp, "colors", state.colors);
+
   setBool(sp, "hasDebt", state.hasDebt);
   setBool(sp, "hasOverpayment", state.hasOverpayment);
   setBool(sp, "onlyMine", state.onlyMine);
@@ -125,9 +149,14 @@ export function countActiveFilters(state: FilterState): number {
     state.agentUserIds,
     state.regionValues,
     state.cityValues,
+    state.keywords,
+    state.colors,
   ]) {
     if (arr && arr.length > 0) count += 1;
   }
+
+  if (state.historySearch) count += 1;
+  if (state.assortmentSearch) count += 1;
 
   // Range pairs — кожна група рахується як 1 якщо хоч одна з пари виставлена.
   for (const [a, b] of [[state.daysSinceMin, state.daysSinceMax]]) {

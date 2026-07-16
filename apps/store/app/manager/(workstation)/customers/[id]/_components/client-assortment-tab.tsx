@@ -1,4 +1,8 @@
 import { prisma } from "@ltex/db";
+import {
+  ClientAssortmentTable,
+  type AssortmentRow,
+} from "./client-assortment-table";
 
 /**
  * Асортимент клієнта = реальний перелік товарів, які він купував, порахований
@@ -76,64 +80,17 @@ export async function ClientAssortmentTab({ clientId }: { clientId: string }) {
     if (it.sale.createdAt > a.lastAt) a.lastAt = it.sale.createdAt;
   }
 
-  const rows = Array.from(byProduct.values()).sort(
-    (x, y) => y.lastAt.getTime() - x.lastAt.getTime(),
-  );
+  const rows: AssortmentRow[] = Array.from(byProduct.values())
+    .sort((x, y) => y.lastAt.getTime() - x.lastAt.getTime())
+    .map((r) => ({
+      productId: r.productId,
+      articleCode: r.articleCode,
+      productName: r.productName,
+      times: r.saleIds.size,
+      bags: r.bags,
+      avgPerKg: r.totalWeight > 0 ? r.totalEur / r.totalWeight : 0,
+      lastAtIso: r.lastAt.toISOString(),
+    }));
 
-  return (
-    <div className="space-y-3">
-      <h3 className="text-lg font-semibold text-gray-800">
-        Асортимент ({rows.length})
-      </h3>
-      <p className="text-sm text-gray-500">
-        Товари, які купував клієнт (за історією реалізацій).
-      </p>
-      <div className="overflow-x-auto rounded-lg border bg-white shadow-sm">
-        <table className="min-w-full divide-y divide-gray-200 text-sm">
-          <thead className="bg-gray-50 text-left text-xs tracking-wide text-gray-500 uppercase">
-            <tr>
-              <th className="px-4 py-2">Артикул</th>
-              <th className="px-4 py-2">Назва товару</th>
-              <th className="px-4 py-2 text-center">Разів</th>
-              <th className="px-4 py-2 text-right">Мішків</th>
-              <th className="px-4 py-2 text-right">Сер. ціна, €/кг</th>
-              <th className="px-4 py-2">Остання покупка</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-100">
-            {rows.map((r) => {
-              const avgPerKg =
-                r.totalWeight > 0 ? r.totalEur / r.totalWeight : 0;
-              return (
-                <tr key={r.productId} className="hover:bg-gray-50">
-                  <td className="px-4 py-2 font-mono text-xs text-gray-500">
-                    {r.articleCode ?? "—"}
-                  </td>
-                  <td className="px-4 py-2 text-gray-800">
-                    {r.productName ?? "—"}
-                  </td>
-                  <td className="px-4 py-2 text-center text-gray-700">
-                    {r.saleIds.size}
-                  </td>
-                  <td className="px-4 py-2 text-right whitespace-nowrap text-gray-700">
-                    {r.bags}
-                  </td>
-                  <td className="px-4 py-2 text-right whitespace-nowrap text-gray-700">
-                    {avgPerKg.toLocaleString("uk-UA", {
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 2,
-                    })}{" "}
-                    €
-                  </td>
-                  <td className="px-4 py-2 text-xs whitespace-nowrap text-gray-500">
-                    {r.lastAt.toLocaleDateString("uk-UA")}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
+  return <ClientAssortmentTable rows={rows} />;
 }
