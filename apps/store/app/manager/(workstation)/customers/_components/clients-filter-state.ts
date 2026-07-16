@@ -149,14 +149,12 @@ export function countActiveFilters(state: FilterState): number {
     state.agentUserIds,
     state.regionValues,
     state.cityValues,
-    state.keywords,
-    state.colors,
   ]) {
     if (arr && arr.length > 0) count += 1;
   }
-
-  if (state.historySearch) count += 1;
-  if (state.assortmentSearch) count += 1;
+  // Примітка: color / keywords / historySearch / assortmentSearch — окремі
+  // завжди-видимі зрізи на головній (не у шторці), тому в лічильник «Фільтри
+  // (N)» не входять.
 
   // Range pairs — кожна група рахується як 1 якщо хоч одна з пари виставлена.
   for (const [a, b] of [[state.daysSinceMin, state.daysSinceMax]]) {

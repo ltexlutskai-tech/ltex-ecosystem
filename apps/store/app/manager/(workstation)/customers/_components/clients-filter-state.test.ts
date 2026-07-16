@@ -111,7 +111,7 @@ describe("clients-filter-state", () => {
     expect(out.get("assortmentSearch")).toBe("взуття");
   });
 
-  it("countActiveFilters враховує нові зрізи", () => {
+  it("countActiveFilters НЕ рахує окремі верхньорівневі зрізи (color/keywords/history/assortment)", () => {
     expect(
       countActiveFilters({
         colors: ["stale"],
@@ -119,7 +119,7 @@ describe("clients-filter-state", () => {
         historySearch: "дзвінок",
         assortmentSearch: "куртка",
       }),
-    ).toBe(4);
+    ).toBe(0);
   });
 
   it("stateToUrl drops undefined values", () => {

@@ -1,8 +1,12 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { prisma, Prisma } from "@ltex/db";
+import { prisma } from "@ltex/db";
 import { getCurrentUser } from "@/lib/auth/manager-auth";
 import { convertLeadToClient, rejectLead } from "./actions";
+import { buildLeadsWhere, normalizeLeadsFilter } from "./leads-filters";
+import { LeadsToolbar } from "./leads-toolbar";
+import { ListPagination } from "../_components/list-pagination";
+import { PageSizeSelect } from "../_components/page-size-select";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Ліди з сайту — L-TEX Manager" };
@@ -21,11 +25,11 @@ const FILTERS = [
   { key: "all", label: "Усі" },
 ] as const;
 
-function whereForFilter(filter: string): Prisma.MgrLeadWhereInput {
-  if (filter === "converted") return { status: "converted" };
-  if (filter === "rejected") return { status: "rejected" };
-  if (filter === "all") return {};
-  return { status: { in: ["new", "contacted"] } }; // active (default)
+const DEFAULT_PAGE_SIZE = 50;
+
+/** Перше значення параметра (searchParams може віддавати масив). */
+function first(v: string | string[] | undefined): string | undefined {
+  return Array.isArray(v) ? v[0] : v;
 }
 
 export default async function LeadsPage({
@@ -37,19 +41,66 @@ export default async function LeadsPage({
   if (!user) redirect("/manager/login");
 
   const sp = await searchParams;
-  const filterRaw = Array.isArray(sp.filter) ? sp.filter[0] : sp.filter;
-  const filter = FILTERS.some((f) => f.key === filterRaw)
-    ? (filterRaw as string)
-    : "active";
+  const filter = normalizeLeadsFilter(first(sp.filter));
+  const q = first(sp.q);
+  const city = first(sp.city);
+  const source = first(sp.source);
+  const from = first(sp.from);
+  const to = first(sp.to);
 
-  const [leads, activeCount] = await Promise.all([
+  const pageSizeRaw = Number.parseInt(first(sp.pageSize) ?? "", 10);
+  const pageSize = Number.isFinite(pageSizeRaw)
+    ? Math.max(10, Math.min(100, pageSizeRaw))
+    : DEFAULT_PAGE_SIZE;
+  const pageRaw = Number.parseInt(first(sp.page) ?? "", 10);
+  const page = Number.isFinite(pageRaw) && pageRaw > 1 ? pageRaw : 1;
+
+  const where = buildLeadsWhere({ filter, q, city, source, from, to });
+
+  const [leads, total, activeCount, cityRows, sourceRows] = await Promise.all([
     prisma.mgrLead.findMany({
-      where: whereForFilter(filter),
+      where,
       orderBy: { createdAt: "desc" },
-      take: 200,
+      skip: (page - 1) * pageSize,
+      take: pageSize,
     }),
+    prisma.mgrLead.count({ where }),
     prisma.mgrLead.count({ where: { status: { in: ["new", "contacted"] } } }),
+    prisma.mgrLead.findMany({
+      where: { city: { not: null } },
+      distinct: ["city"],
+      select: { city: true },
+      orderBy: { city: "asc" },
+    }),
+    prisma.mgrLead.findMany({
+      distinct: ["source"],
+      select: { source: true },
+      orderBy: { source: "asc" },
+    }),
   ]);
+
+  const cityOptions = cityRows
+    .map((r) => r.city)
+    .filter((c): c is string => Boolean(c));
+  const sourceOptions = sourceRows
+    .map((r) => r.source)
+    .filter((s): s is string => Boolean(s));
+
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+
+  // Чипи статусу зберігають решту фільтрів (лише скидають статус + сторінку).
+  function chipHref(key: string): string {
+    const params = new URLSearchParams();
+    params.set("filter", key);
+    if (q) params.set("q", q);
+    if (city) params.set("city", city);
+    if (source) params.set("source", source);
+    if (from) params.set("from", from);
+    if (to) params.set("to", to);
+    if (pageSize !== DEFAULT_PAGE_SIZE)
+      params.set("pageSize", String(pageSize));
+    return `/manager/customers/leads?${params.toString()}`;
+  }
 
   return (
     <div className="max-w-none space-y-3">
@@ -73,7 +124,7 @@ export default async function LeadsPage({
         {FILTERS.map((f) => (
           <Link
             key={f.key}
-            href={`/manager/customers/leads?filter=${f.key}`}
+            href={chipHref(f.key)}
             className={`rounded-md px-3 py-1.5 text-sm ${
               filter === f.key
                 ? "bg-green-600 text-white"
@@ -83,6 +134,13 @@ export default async function LeadsPage({
             {f.label}
           </Link>
         ))}
+      </div>
+
+      <LeadsToolbar cityOptions={cityOptions} sourceOptions={sourceOptions} />
+
+      <div className="flex items-center justify-between text-xs text-gray-500">
+        <span>Знайдено: {total}</span>
+        <PageSizeSelect pageSize={pageSize} />
       </div>
 
       {leads.length === 0 ? (
@@ -97,6 +155,8 @@ export default async function LeadsPage({
                 <th className="px-3 py-2 font-medium">Імʼя</th>
                 <th className="px-3 py-2 font-medium">Телефон</th>
                 <th className="px-3 py-2 font-medium">Місто</th>
+                <th className="px-3 py-2 font-medium">Область</th>
+                <th className="px-3 py-2 font-medium">Джерело</th>
                 <th className="px-3 py-2 font-medium">Статус</th>
                 <th className="px-3 py-2 font-medium">Дата</th>
                 <th className="px-3 py-2"></th>
@@ -116,6 +176,12 @@ export default async function LeadsPage({
                     </td>
                     <td className="px-3 py-2 text-gray-600">
                       {lead.city ?? "—"}
+                    </td>
+                    <td className="px-3 py-2 text-gray-600">
+                      {lead.region ?? "—"}
+                    </td>
+                    <td className="px-3 py-2 text-gray-600">
+                      {lead.source ?? "—"}
                     </td>
                     <td className="px-3 py-2">
                       <span className="rounded bg-gray-100 px-2 py-0.5 text-xs text-gray-700">
@@ -165,6 +231,8 @@ export default async function LeadsPage({
           </table>
         </div>
       )}
+
+      <ListPagination page={page} totalPages={totalPages} />
     </div>
   );
 }
