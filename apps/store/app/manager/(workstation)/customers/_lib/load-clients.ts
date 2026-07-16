@@ -127,9 +127,6 @@ export async function loadClients(
         { phonePrimary: { contains: p.search } },
         { city: { contains: p.search, mode: "insensitive" } },
         { phones: { some: { phone: { contains: p.search } } } },
-        // Пошук по тегах (ключових словах) — раніше працював лише через REST
-        // endpoint; тепер і у сторінковому лоадері.
-        { keywords: { contains: p.search, mode: "insensitive" } },
       ],
     });
   }

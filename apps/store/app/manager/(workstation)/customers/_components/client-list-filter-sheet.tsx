@@ -16,9 +16,6 @@ import { SelectMulti } from "./filter-controls/select-multi";
 import { BoolFilter } from "./filter-controls/bool-filter";
 import { RangeNumeric } from "./filter-controls/range-numeric";
 import { RangeDate } from "./filter-controls/range-date";
-import { TextFilter } from "./filter-controls/text-filter";
-import { ColorFilter } from "./filter-controls/color-filter";
-import { KeywordFilter } from "./filter-controls/keyword-filter";
 import {
   countActiveFilters,
   stateToUrl,
@@ -132,48 +129,6 @@ function renderFilter(
   const label = FILTER_LABELS[key] ?? key;
 
   switch (key) {
-    case "color":
-      return (
-        <ColorFilter
-          key={key}
-          label={label}
-          value={draft.colors ?? []}
-          onChange={(v) => update({ colors: v.length > 0 ? v : undefined })}
-        />
-      );
-    case "keywords":
-      return (
-        <KeywordFilter
-          key={key}
-          label={label}
-          value={draft.keywords ?? []}
-          orMode={draft.keywordsOr}
-          onChange={(v) => update({ keywords: v.length > 0 ? v : undefined })}
-          onModeChange={(orMode) =>
-            update({ keywordsOr: orMode ? true : undefined })
-          }
-        />
-      );
-    case "historySearch":
-      return (
-        <TextFilter
-          key={key}
-          label={label}
-          value={draft.historySearch ?? ""}
-          placeholder="Текст із запису історії…"
-          onChange={(v) => update({ historySearch: v || undefined })}
-        />
-      );
-    case "assortmentSearch":
-      return (
-        <TextFilter
-          key={key}
-          label={label}
-          value={draft.assortmentSearch ?? ""}
-          placeholder="Артикул або назва товару…"
-          onChange={(v) => update({ assortmentSearch: v || undefined })}
-        />
-      );
     case "statusGeneralId":
       return (
         <SelectMulti

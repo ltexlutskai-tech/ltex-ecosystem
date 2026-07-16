@@ -64,12 +64,11 @@ export const CLIENTS_TABLE_DEFAULT: ConfigItem[] = [
 
 // ─── clients_filters ───────────────────────────────────────────────────────
 
+// Примітка: color / keywords / historySearch / assortmentSearch винесені як
+// окремі завжди-видимі зрізи на головну (не у шторці «Фільтри») — тому їх
+// НЕМАЄ у ключах шторки й у кастомайзері.
 export const CLIENTS_FILTERS_KEYS = [
   "search",
-  "color",
-  "keywords",
-  "historySearch",
-  "assortmentSearch",
   "statusGeneralId",
   "statusOperationalId",
   "searchChannelId",
@@ -93,17 +92,13 @@ export type ClientsFiltersKey = (typeof CLIENTS_FILTERS_KEYS)[number];
 
 export const CLIENTS_FILTERS_DEFAULT: ConfigItem[] = [
   { key: "search", visible: true, order: 1 },
-  { key: "color", visible: true, order: 2 },
-  { key: "keywords", visible: true, order: 3 },
-  { key: "historySearch", visible: true, order: 4 },
-  { key: "assortmentSearch", visible: true, order: 5 },
-  { key: "statusGeneralId", visible: true, order: 6 },
-  { key: "searchChannelId", visible: true, order: 7 },
-  { key: "deliveryMethodId", visible: true, order: 8 },
-  { key: "hasDebt", visible: true, order: 9 },
-  { key: "hasOverpayment", visible: true, order: 10 },
-  { key: "onlyMine", visible: true, order: 11 },
-  { key: "hideTrash", visible: true, order: 12 },
+  { key: "statusGeneralId", visible: true, order: 2 },
+  { key: "searchChannelId", visible: true, order: 3 },
+  { key: "deliveryMethodId", visible: true, order: 4 },
+  { key: "hasDebt", visible: true, order: 5 },
+  { key: "hasOverpayment", visible: true, order: 6 },
+  { key: "onlyMine", visible: true, order: 7 },
+  { key: "hideTrash", visible: true, order: 8 },
 ];
 
 // ─── Lookup helpers ────────────────────────────────────────────────────────

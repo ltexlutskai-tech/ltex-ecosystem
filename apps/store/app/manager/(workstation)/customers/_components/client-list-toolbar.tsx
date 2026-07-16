@@ -4,6 +4,8 @@ import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 import { Input } from "@ltex/ui";
 import { ClientListFilterSheet } from "./client-list-filter-sheet";
+import { ClientAdvancedFilters } from "./client-advanced-filters";
+import { ClientFilterPresets } from "./client-filter-presets";
 import { ViewCustomizerSheet } from "../../_components/view-customizer-sheet";
 import { COLUMN_LABELS, FILTER_LABELS } from "../_lib/filter-labels";
 import {
@@ -88,7 +90,7 @@ export function ClientListToolbar({
             type="search"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Пошук за іменем, телефоном, містом або тегом…"
+            placeholder="Пошук за іменем, телефоном або містом…"
             className="flex-1"
           />
         </div>
@@ -114,6 +116,10 @@ export function ClientListToolbar({
           />
         </div>
       </div>
+
+      <ClientAdvancedFilters />
+
+      <ClientFilterPresets />
 
       <div className="flex flex-wrap items-center gap-1.5">
         <span className="mr-1 text-xs text-gray-400">Пріоритет:</span>

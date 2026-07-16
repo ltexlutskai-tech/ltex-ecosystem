@@ -83,12 +83,23 @@ export default async function ProductCardPage({
   return (
     <div className="mx-auto max-w-5xl space-y-4">
       <div className="flex items-center justify-between text-sm">
-        <Link
-          href="/manager/prices"
-          className="text-gray-500 hover:text-gray-800 hover:underline"
-        >
-          ← Назад до прайсу
-        </Link>
+        <div className="flex items-center gap-4">
+          <Link
+            href="/manager/prices"
+            className="text-gray-500 hover:text-gray-800 hover:underline"
+          >
+            ← Назад до прайсу
+          </Link>
+          <Link
+            href={`/manager/customers?assortmentSearch=${encodeURIComponent(
+              product.articleCode ?? product.name,
+            )}`}
+            className="text-blue-600 hover:underline"
+            title="Показати всіх клієнтів, що беруть цей товар"
+          >
+            👥 Клієнти цього товару
+          </Link>
+        </div>
         <DiscussButton
           docRef={{
             type: "product",
