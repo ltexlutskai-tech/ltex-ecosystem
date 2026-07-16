@@ -69,6 +69,17 @@ export interface LoadClientsParams {
   assortmentSearch?: string;
   /** Мультивибір кольору-пріоритету (світлофор). */
   colors?: ClientColor[];
+  /** Лише клієнти з активними (незавершеними) нагадуваннями. */
+  hasReminder?: boolean;
+}
+
+/** Найпізніша з двох (можливо відсутніх) дат. */
+function latestOf(
+  a: Date | null | undefined,
+  b: Date | null | undefined,
+): Date | null {
+  if (a && b) return a > b ? a : b;
+  return a ?? b ?? null;
 }
 
 /** Ключі сортування → Prisma orderBy. Дефолт — ім'я за зростанням. */
@@ -202,6 +213,11 @@ export async function loadClients(
     andClauses.push({ debt: { gt: 0 } });
   } else if (p.hasOverpayment) {
     andClauses.push({ debt: { lt: 0 } });
+  }
+
+  // Лише клієнти з активними (незавершеними) нагадуваннями.
+  if (p.hasReminder) {
+    andClauses.push({ reminders: { some: { completedAt: null } } });
   }
 
   if (p.daysSinceMin !== undefined || p.daysSinceMax !== undefined) {
@@ -382,10 +398,12 @@ export async function loadClients(
         : null,
       color: computeClientColor({
         hasActiveOrder: c.code1C ? activePageCodes.has(c.code1C) : false,
-        lastContactAt: lastContactMap.get(c.id) ?? null,
+        lastContactAt: latestOf(lastContactMap.get(c.id), c.lastPurchaseAt),
         now,
       }),
-      lastContactAt: (lastContactMap.get(c.id) ?? null)?.toISOString() ?? null,
+      lastContactAt:
+        latestOf(lastContactMap.get(c.id), c.lastPurchaseAt)?.toISOString() ??
+        null,
     })),
     total,
     page: p.page,
@@ -455,6 +473,42 @@ async function resolveActiveOrderCodes(
     if (code) set.add(code);
   }
   return Array.from(set);
+}
+
+/**
+ * Усі унікальні теги (ключові слова) в системі — для автокомпліту у полі
+ * «Ключові слова». keywords зберігаються як рядок через кому на MgrClient.
+ */
+export async function loadAllTags(): Promise<string[]> {
+  const rows = await prisma.mgrClient.findMany({
+    where: { keywords: { not: null }, archived: false },
+    select: { keywords: true },
+  });
+  const set = new Set<string>();
+  for (const r of rows) {
+    for (const t of (r.keywords ?? "").split(",")) {
+      const v = t.trim();
+      if (v) set.add(v);
+    }
+  }
+  return Array.from(set).sort((a, b) => a.localeCompare(b, "uk"));
+}
+
+/**
+ * Кількість активних (незавершених) нагадувань у зоні видимості користувача
+ * (для бейджа на кнопці «Є нагадування»). Manager → лише по своїх клієнтах.
+ */
+export async function countOpenReminders(
+  userId: string,
+  userRole: CurrentManager["role"],
+): Promise<number> {
+  const ownership = ownershipWhere({ id: userId, role: userRole });
+  return prisma.mgrReminder.count({
+    where: {
+      completedAt: null,
+      client: Object.keys(ownership).length > 0 ? ownership : { isNot: null },
+    },
+  });
 }
 
 export async function loadDictionariesSnapshot() {

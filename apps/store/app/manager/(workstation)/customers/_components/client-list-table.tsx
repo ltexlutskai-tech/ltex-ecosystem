@@ -1,3 +1,4 @@
+import { CLIENT_COLOR_META } from "@/lib/manager/client-color";
 import { SortableHeader } from "../../_components/sortable-header";
 import { renderCell } from "../_lib/column-render";
 import { COLUMN_LABELS } from "../_lib/filter-labels";
@@ -32,12 +33,15 @@ export function ClientListTable({ items, columnsPrefs }: Props) {
   }
 
   return (
-    <div className="overflow-x-auto rounded-lg border bg-white shadow-sm">
+    <div className="max-h-[calc(100vh-15rem)] overflow-auto rounded-lg border bg-white shadow-sm">
       <table className="min-w-full divide-y divide-gray-200 text-sm">
-        <thead className="bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
+        <thead className="sticky top-0 z-10 bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500 shadow-sm">
           <tr>
             {visibleCols.map((col) => (
-              <th key={col.key} className="px-2.5 py-1.5 whitespace-nowrap">
+              <th
+                key={col.key}
+                className="bg-gray-50 px-2.5 py-1.5 whitespace-nowrap"
+              >
                 {SORTABLE_COLUMN_KEYS.has(col.key) ? (
                   <SortableHeader
                     sortKey={col.key}
@@ -52,14 +56,12 @@ export function ClientListTable({ items, columnsPrefs }: Props) {
         </thead>
         <tbody className="divide-y divide-gray-100">
           {items.map((c) => {
-            const isInactive = c.statusGeneral?.code === "inactive";
+            const tint = CLIENT_COLOR_META[c.color].rowClass;
             return (
               <tr
                 key={c.id}
                 className={
-                  isInactive
-                    ? "bg-red-50/60 hover:bg-red-100/60"
-                    : "hover:bg-gray-50"
+                  tint ? `${tint} hover:brightness-95` : "hover:bg-gray-50"
                 }
               >
                 {visibleCols.map((col) => (

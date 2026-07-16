@@ -13,7 +13,12 @@ import { History, Package, Tag, X } from "lucide-react";
  *   • Асортимент (товар, який клієнт реально бере).
  * Кожен зріз пише свій URL-параметр напряму (текст — з debounce 350 мс).
  */
-export function ClientAdvancedFilters() {
+export function ClientAdvancedFilters({
+  allTags = [],
+}: {
+  /** Усі теги в системі — для випадаючого автокомпліту. */
+  allTags?: string[];
+}) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -162,6 +167,7 @@ export function ClientAdvancedFilters() {
         )}
         <input
           type="text"
+          list="ltex-all-tags"
           value={tagDraft}
           onChange={(e) => setTagDraft(e.target.value)}
           onKeyDown={(e) => {
@@ -171,9 +177,16 @@ export function ClientAdvancedFilters() {
             }
           }}
           onBlur={addTag}
-          placeholder="Тег + Enter"
+          placeholder="Оберіть або введіть тег…"
           className="h-8 w-full rounded-md border bg-white px-2 text-sm"
         />
+        <datalist id="ltex-all-tags">
+          {allTags
+            .filter((t) => !keywords.includes(t))
+            .map((t) => (
+              <option key={t} value={t} />
+            ))}
+        </datalist>
       </div>
 
       {/* Асортимент */}
