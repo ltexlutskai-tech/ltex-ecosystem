@@ -53,42 +53,46 @@ export interface ClientColorMeta {
   description: string;
 }
 
+// Кольори точно як у 1С («Условное оформление» форми списку контрагентів):
+//   green — PaleGreen, today — Yellow, week — білий (свіжий), fortnight —
+//   MistyRose, stale — Tomato, never — #FF8DAD («немає роботи з клієнтом»).
+// Крапки-індикатори — насичені, щоб було видно на будь-якому чипі/рядку.
 export const CLIENT_COLOR_META: Record<ClientColor, ClientColorMeta> = {
   green: {
     label: "В роботі",
     dotClass: "bg-green-500",
-    rowClass: "bg-green-50",
+    rowClass: "bg-green-100",
     description: "Є активне замовлення",
   },
   today: {
     label: "Сьогодні",
     dotClass: "bg-yellow-400",
-    rowClass: "bg-yellow-50",
-    description: "Контакт сьогодні",
+    rowClass: "bg-yellow-100",
+    description: "Взаємодія сьогодні",
   },
   week: {
     label: "Цього тижня",
-    dotClass: "bg-slate-300",
+    dotClass: "bg-white ring-1 ring-gray-400",
     rowClass: "",
-    description: "Контакт за останні 7 днів",
+    description: "Взаємодія за останні 7 днів",
   },
   fortnight: {
     label: "1–2 тижні тому",
     dotClass: "bg-pink-300",
     rowClass: "bg-pink-50",
-    description: "Контакт 7–14 днів тому",
+    description: "Взаємодія 7–14 днів тому",
   },
   stale: {
     label: "Давно не працювали",
     dotClass: "bg-red-500",
-    rowClass: "bg-red-50",
-    description: "Останній контакт понад 14 днів тому",
+    rowClass: "bg-red-100",
+    description: "Остання взаємодія понад 14 днів тому",
   },
   never: {
-    label: "Без історії",
-    dotClass: "bg-gray-300",
-    rowClass: "",
-    description: "Немає жодної взаємодії",
+    label: "Без взаємодій",
+    dotClass: "bg-pink-500",
+    rowClass: "bg-pink-100",
+    description: "Жодного запису в історії роботи з клієнтом",
   },
 };
 
@@ -122,13 +126,12 @@ export function computeClientColor(args: {
 
 /**
  * Будує Prisma-`where` для фільтра списку по кольорах (мультивибір → OR).
- * «Активність» = найсвіжіше з {остання покупка (`daysSinceLastPurchase`),
- * остання подія історії (`timeline.occurredAt`)}. Це дзеркалить дисплейний
- * `computeClientColor` (там max(lastPurchaseAt, timeline max)), тому фільтр і
- * підсвітка рядків узгоджені. Бакети рахуються на боці БД.
  *
- * green — через список `code1C` клієнтів з активними замовленнями
- * (`activeOrderCodes`, резолвиться окремим запитом лише коли обрано green).
+ * Логіка ТОЧНО як у 1С: колір рахується від давності останньої взаємодії в
+ * історії роботи з клієнтом (`РаботаСКлиентом` → наш `timeline`, max
+ * `occurredAt`). «Без взаємодій» = взагалі немає записів історії (1С #FF8DAD).
+ * green — окрема вісь: клієнти з активними замовленнями (`activeOrderCodes`,
+ * резолвиться лише коли обрано green).
  *
  * Повертає `null`, якщо кольори не задані.
  */
@@ -143,30 +146,6 @@ export function buildColorWhere(
   const d7 = new Date(now.getTime() - 7 * DAY_MS);
   const d14 = new Date(now.getTime() - 14 * DAY_MS);
 
-  // «Активність не давніше вікна» = покупка ≤N днів тому АБО подія історії
-  // пізніше відповідної дати.
-  const activityToday: Prisma.MgrClientWhereInput = {
-    OR: [
-      { daysSinceLastPurchase: { lte: 0 } },
-      { timeline: { some: { occurredAt: { gte: startToday } } } },
-    ],
-  };
-  const within7: Prisma.MgrClientWhereInput = {
-    OR: [
-      { daysSinceLastPurchase: { gte: 0, lte: 7 } },
-      { timeline: { some: { occurredAt: { gte: d7 } } } },
-    ],
-  };
-  const within14: Prisma.MgrClientWhereInput = {
-    OR: [
-      { daysSinceLastPurchase: { gte: 0, lte: 14 } },
-      { timeline: { some: { occurredAt: { gte: d14 } } } },
-    ],
-  };
-  const anyActivity: Prisma.MgrClientWhereInput = {
-    OR: [{ daysSinceLastPurchase: { not: null } }, { timeline: { some: {} } }],
-  };
-
   const clauses: Prisma.MgrClientWhereInput[] = [];
   for (const c of colors) {
     switch (c) {
@@ -174,21 +153,36 @@ export function buildColorWhere(
         clauses.push({ code1C: { in: activeOrderCodes } });
         break;
       case "today":
-        clauses.push(activityToday);
+        clauses.push({
+          timeline: { some: { occurredAt: { gte: startToday } } },
+        });
         break;
       case "week":
-        clauses.push({ AND: [within7, { NOT: activityToday }] });
+        clauses.push({
+          AND: [
+            { timeline: { some: { occurredAt: { gte: d7 } } } },
+            { timeline: { none: { occurredAt: { gte: startToday } } } },
+          ],
+        });
         break;
       case "fortnight":
-        clauses.push({ AND: [within14, { NOT: within7 }] });
+        clauses.push({
+          AND: [
+            { timeline: { some: { occurredAt: { gte: d14 } } } },
+            { timeline: { none: { occurredAt: { gte: d7 } } } },
+          ],
+        });
         break;
       case "stale":
-        clauses.push({ AND: [anyActivity, { NOT: within14 }] });
+        clauses.push({
+          AND: [
+            { timeline: { some: {} } },
+            { timeline: { none: { occurredAt: { gte: d14 } } } },
+          ],
+        });
         break;
       case "never":
-        clauses.push({
-          AND: [{ daysSinceLastPurchase: null }, { timeline: { none: {} } }],
-        });
+        clauses.push({ timeline: { none: {} } });
         break;
     }
   }

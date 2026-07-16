@@ -86,15 +86,9 @@ describe("buildColorWhere", () => {
     expect(buildColorWhere([], [], NOW)).toBeNull();
   });
 
-  it("never → немає ні покупок, ні історії", () => {
+  it("never → немає жодного запису історії (як 1С)", () => {
     const w = buildColorWhere(["never"], [], NOW);
-    expect(w).toEqual({
-      OR: [
-        {
-          AND: [{ daysSinceLastPurchase: null }, { timeline: { none: {} } }],
-        },
-      ],
-    });
+    expect(w).toEqual({ OR: [{ timeline: { none: {} } }] });
   });
 
   it("green → фільтр по code1C з активних замовлень", () => {

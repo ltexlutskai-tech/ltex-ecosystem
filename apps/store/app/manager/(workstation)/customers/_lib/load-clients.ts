@@ -73,15 +73,6 @@ export interface LoadClientsParams {
   hasReminder?: boolean;
 }
 
-/** Найпізніша з двох (можливо відсутніх) дат. */
-function latestOf(
-  a: Date | null | undefined,
-  b: Date | null | undefined,
-): Date | null {
-  if (a && b) return a > b ? a : b;
-  return a ?? b ?? null;
-}
-
 /** Ключі сортування → Prisma orderBy. Дефолт — ім'я за зростанням. */
 export function buildClientsOrderBy(
   sort: string | undefined,
@@ -398,12 +389,10 @@ export async function loadClients(
         : null,
       color: computeClientColor({
         hasActiveOrder: c.code1C ? activePageCodes.has(c.code1C) : false,
-        lastContactAt: latestOf(lastContactMap.get(c.id), c.lastPurchaseAt),
+        lastContactAt: lastContactMap.get(c.id) ?? null,
         now,
       }),
-      lastContactAt:
-        latestOf(lastContactMap.get(c.id), c.lastPurchaseAt)?.toISOString() ??
-        null,
+      lastContactAt: (lastContactMap.get(c.id) ?? null)?.toISOString() ?? null,
     })),
     total,
     page: p.page,
