@@ -86,14 +86,27 @@ describe("buildColorWhere", () => {
     expect(buildColorWhere([], [], NOW)).toBeNull();
   });
 
-  it("never → timeline none", () => {
+  it("never → немає ні покупок, ні історії", () => {
     const w = buildColorWhere(["never"], [], NOW);
-    expect(w).toEqual({ OR: [{ timeline: { none: {} } }] });
+    expect(w).toEqual({
+      OR: [
+        {
+          AND: [{ daysSinceLastPurchase: null }, { timeline: { none: {} } }],
+        },
+      ],
+    });
   });
 
   it("green → фільтр по code1C з активних замовлень", () => {
     const w = buildColorWhere(["green"], ["A1", "B2"], NOW);
     expect(w).toEqual({ OR: [{ code1C: { in: ["A1", "B2"] } }] });
+  });
+
+  it("stale → є активність, але не за 14 днів", () => {
+    const w = buildColorWhere(["stale"], [], NOW);
+    const clause = (w as { OR: Array<{ AND?: unknown[] }> }).OR[0];
+    expect(clause?.AND).toBeDefined();
+    expect(clause?.AND).toHaveLength(2);
   });
 
   it("кілька кольорів → OR з кількома клаузами", () => {

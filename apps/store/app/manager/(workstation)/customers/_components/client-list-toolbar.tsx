@@ -12,6 +12,7 @@ import {
   CLIENT_COLOR_META,
   CLIENT_COLOR_ORDER,
 } from "@/lib/manager/client-color";
+import { Bell } from "lucide-react";
 import type { ConfigItem, DictionariesSnapshot } from "./types";
 
 interface Props {
@@ -25,6 +26,10 @@ interface Props {
    * Адмін бачить toggle щоб опційно зафільтрувати на власних клієнтів.
    */
   showOnlyMineToggle?: boolean;
+  /** Усі теги в системі — для автокомпліту поля «Ключові слова». */
+  allTags?: string[];
+  /** Кількість активних (незавершених) нагадувань — бейдж на кнопці. */
+  openReminderCount?: number;
 }
 
 export function ClientListToolbar({
@@ -33,6 +38,8 @@ export function ClientListToolbar({
   columnsPrefs,
   totalCount,
   showOnlyMineToggle = true,
+  allTags = [],
+  openReminderCount = 0,
 }: Props) {
   const router = useRouter();
   const pathname = usePathname();
@@ -69,6 +76,7 @@ export function ClientListToolbar({
 
   const onlyMine = searchParams.get("onlyMine") === "true";
   const hideTrashOff = searchParams.get("hideTrash") === "false";
+  const hasReminder = searchParams.get("hasReminder") === "true";
 
   const activeColors = (searchParams.get("colors") ?? "")
     .split(",")
@@ -117,7 +125,7 @@ export function ClientListToolbar({
         </div>
       </div>
 
-      <ClientAdvancedFilters />
+      <ClientAdvancedFilters allTags={allTags} />
 
       <ClientFilterPresets />
 
@@ -145,6 +153,30 @@ export function ClientListToolbar({
             </button>
           );
         })}
+
+        <button
+          type="button"
+          onClick={() => setParam("hasReminder", hasReminder ? null : "true")}
+          title="Клієнти з активними нагадуваннями"
+          className={
+            hasReminder
+              ? "ml-1 inline-flex items-center gap-1.5 rounded-full border border-gray-900 bg-gray-900 px-2.5 py-1 text-xs text-white"
+              : "ml-1 inline-flex items-center gap-1.5 rounded-full border bg-white px-2.5 py-1 text-xs text-gray-700 hover:bg-gray-50"
+          }
+        >
+          <Bell className="h-3.5 w-3.5" />Є нагадування
+          {openReminderCount > 0 && (
+            <span
+              className={
+                hasReminder
+                  ? "rounded-full bg-white px-1.5 text-[11px] font-bold text-gray-900"
+                  : "rounded-full bg-amber-500 px-1.5 text-[11px] font-bold text-white"
+              }
+            >
+              {openReminderCount > 99 ? "99+" : openReminderCount}
+            </span>
+          )}
+        </button>
       </div>
 
       <div className="flex items-center justify-between text-xs text-gray-500">

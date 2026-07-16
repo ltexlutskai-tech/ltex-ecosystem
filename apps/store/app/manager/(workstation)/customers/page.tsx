@@ -14,7 +14,12 @@ import { ClientListToolbar } from "./_components/client-list-toolbar";
 import { ListPagination } from "./_components/list-pagination";
 import { PageSizeSelect } from "./_components/page-size-select";
 import { isClientColor, type ClientColor } from "@/lib/manager/client-color";
-import { loadClients, loadDictionariesSnapshot } from "./_lib/load-clients";
+import {
+  countOpenReminders,
+  loadAllTags,
+  loadClients,
+  loadDictionariesSnapshot,
+} from "./_lib/load-clients";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Клієнти — L-TEX Manager" };
@@ -69,6 +74,7 @@ export default async function CustomersPage({
       keywordsMode: pickBool(sp.keywordsOr) ? "or" : "and",
       assortmentSearch: pickString(sp.assortmentSearch),
       colors: pickColors(sp.colors),
+      hasReminder: pickBool(sp.hasReminder),
       // bool
       hasDebt: pickBool(sp.hasDebt),
       hasOverpayment: pickBool(sp.hasOverpayment),
@@ -81,9 +87,11 @@ export default async function CustomersPage({
     loadViewPrefs(user.id, "clients_filters"),
   ]);
 
-  const leadsCount = await prisma.mgrLead.count({
-    where: { status: { in: ["new", "contacted"] } },
-  });
+  const [leadsCount, allTags, openReminderCount] = await Promise.all([
+    prisma.mgrLead.count({ where: { status: { in: ["new", "contacted"] } } }),
+    loadAllTags(),
+    countOpenReminders(user.id, user.role),
+  ]);
 
   // Групова зміна менеджера — власник/адмін. Вантажимо активних менеджерів.
   const canBulkAssign = user.role === "admin" || user.role === "owner";
@@ -130,6 +138,8 @@ export default async function CustomersPage({
         columnsPrefs={columnsPrefs}
         totalCount={list.total}
         showOnlyMineToggle={user.role === "admin"}
+        allTags={allTags}
+        openReminderCount={openReminderCount}
       />
       {canBulkAssign ? (
         <ClientListBulk

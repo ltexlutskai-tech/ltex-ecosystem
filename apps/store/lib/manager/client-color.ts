@@ -122,11 +122,13 @@ export function computeClientColor(args: {
 
 /**
  * Будує Prisma-`where` для фільтра списку по кольорах (мультивибір → OR).
- * Осі незалежні:
- *   • recency-бакети (today/week/fortnight/stale/never) — через relation-фільтр
- *     `timeline` (max(occurredAt) у відповідному вікні), рахуються на боці БД;
- *   • green — через список `code1C` клієнтів з активними замовленнями
- *     (`activeOrderCodes`, резолвиться окремим запитом лише коли обрано green).
+ * «Активність» = найсвіжіше з {остання покупка (`daysSinceLastPurchase`),
+ * остання подія історії (`timeline.occurredAt`)}. Це дзеркалить дисплейний
+ * `computeClientColor` (там max(lastPurchaseAt, timeline max)), тому фільтр і
+ * підсвітка рядків узгоджені. Бакети рахуються на боці БД.
+ *
+ * green — через список `code1C` клієнтів з активними замовленнями
+ * (`activeOrderCodes`, резолвиться окремим запитом лише коли обрано green).
  *
  * Повертає `null`, якщо кольори не задані.
  */
@@ -141,6 +143,30 @@ export function buildColorWhere(
   const d7 = new Date(now.getTime() - 7 * DAY_MS);
   const d14 = new Date(now.getTime() - 14 * DAY_MS);
 
+  // «Активність не давніше вікна» = покупка ≤N днів тому АБО подія історії
+  // пізніше відповідної дати.
+  const activityToday: Prisma.MgrClientWhereInput = {
+    OR: [
+      { daysSinceLastPurchase: { lte: 0 } },
+      { timeline: { some: { occurredAt: { gte: startToday } } } },
+    ],
+  };
+  const within7: Prisma.MgrClientWhereInput = {
+    OR: [
+      { daysSinceLastPurchase: { gte: 0, lte: 7 } },
+      { timeline: { some: { occurredAt: { gte: d7 } } } },
+    ],
+  };
+  const within14: Prisma.MgrClientWhereInput = {
+    OR: [
+      { daysSinceLastPurchase: { gte: 0, lte: 14 } },
+      { timeline: { some: { occurredAt: { gte: d14 } } } },
+    ],
+  };
+  const anyActivity: Prisma.MgrClientWhereInput = {
+    OR: [{ daysSinceLastPurchase: { not: null } }, { timeline: { some: {} } }],
+  };
+
   const clauses: Prisma.MgrClientWhereInput[] = [];
   for (const c of colors) {
     switch (c) {
@@ -148,36 +174,21 @@ export function buildColorWhere(
         clauses.push({ code1C: { in: activeOrderCodes } });
         break;
       case "today":
-        clauses.push({
-          timeline: { some: { occurredAt: { gte: startToday } } },
-        });
+        clauses.push(activityToday);
         break;
       case "week":
-        clauses.push({
-          AND: [
-            { timeline: { some: { occurredAt: { gte: d7 } } } },
-            { timeline: { none: { occurredAt: { gte: startToday } } } },
-          ],
-        });
+        clauses.push({ AND: [within7, { NOT: activityToday }] });
         break;
       case "fortnight":
-        clauses.push({
-          AND: [
-            { timeline: { some: { occurredAt: { gte: d14 } } } },
-            { timeline: { none: { occurredAt: { gte: d7 } } } },
-          ],
-        });
+        clauses.push({ AND: [within14, { NOT: within7 }] });
         break;
       case "stale":
-        clauses.push({
-          AND: [
-            { timeline: { some: {} } },
-            { timeline: { none: { occurredAt: { gte: d14 } } } },
-          ],
-        });
+        clauses.push({ AND: [anyActivity, { NOT: within14 }] });
         break;
       case "never":
-        clauses.push({ timeline: { none: {} } });
+        clauses.push({
+          AND: [{ daysSinceLastPurchase: null }, { timeline: { none: {} } }],
+        });
         break;
     }
   }
