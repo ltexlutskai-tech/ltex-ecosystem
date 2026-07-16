@@ -164,7 +164,12 @@ export function ClientListToolbar({
               : "ml-1 inline-flex items-center gap-1.5 rounded-full border bg-white px-2.5 py-1 text-xs text-gray-700 hover:bg-gray-50"
           }
         >
-          <Bell className="h-3.5 w-3.5" />Є нагадування
+          <Bell
+            className={
+              hasReminder ? "h-3.5 w-3.5" : "h-3.5 w-3.5 text-amber-500"
+            }
+          />
+          Є нагадування
           {openReminderCount > 0 && (
             <span
               className={
