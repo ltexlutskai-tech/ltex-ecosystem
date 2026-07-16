@@ -85,6 +85,30 @@ export const timelineCommentSchema = z.object({
 });
 export type TimelineCommentInput = z.infer<typeof timelineCommentSchema>;
 
+/** Вкладення запису історії (файл/картинка). URL має вести на наш /media/. */
+export const timelineAttachmentSchema = z.object({
+  url: z
+    .string()
+    .max(500)
+    .refine((u) => /(^|\/)media\//.test(u), "Недозволене посилання вкладення"),
+  name: z.string().trim().min(1).max(200),
+  type: z.string().max(120).optional(),
+  size: z.number().int().nonnegative().optional(),
+});
+export type TimelineAttachmentInput = z.infer<typeof timelineAttachmentSchema>;
+
+/** POST історії: текст АБО вкладення (хоча б щось). */
+export const timelinePostSchema = z
+  .object({
+    body: z.string().trim().max(2000).optional().default(""),
+    attachments: z.array(timelineAttachmentSchema).max(10).optional(),
+  })
+  .refine(
+    (d) => (d.body && d.body.length > 0) || (d.attachments?.length ?? 0) > 0,
+    { message: "Додайте текст або вкладення" },
+  );
+export type TimelinePostInput = z.infer<typeof timelinePostSchema>;
+
 export const assignSchema = z.object({
   userId: z
     .string()

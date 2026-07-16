@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@ltex/db";
 import { getCurrentUser } from "@/lib/auth/manager-auth";
 import {
-  timelineCommentSchema,
+  timelinePostSchema,
   timelineQuerySchema,
 } from "@/lib/validations/manager-clients";
 
@@ -77,7 +77,7 @@ export async function POST(
 
   const { id } = await params;
   const body = await req.json().catch(() => null);
-  const parsed = timelineCommentSchema.safeParse(body);
+  const parsed = timelinePostSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json(
       {
@@ -96,13 +96,15 @@ export async function POST(
     return NextResponse.json({ error: "Клієнта не знайдено" }, { status: 404 });
   }
 
+  const attachments = parsed.data.attachments ?? [];
   const created = await prisma.mgrClientTimelineEntry.create({
     data: {
       clientId: id,
       kind: "comment",
-      body: parsed.data.body,
+      body: parsed.data.body ?? "",
       occurredAt: new Date(),
       authorUserId: user.id,
+      metadata: attachments.length > 0 ? { attachments } : undefined,
     },
     include: { author: { select: { id: true, fullName: true } } },
   });

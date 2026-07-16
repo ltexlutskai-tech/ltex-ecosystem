@@ -2,9 +2,36 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { Paperclip } from "lucide-react";
 import { Button, Textarea, useToast } from "@ltex/ui";
 import { formatRelativeShort } from "../../../_components/format-relative";
 import type { ClientTimelineEntry } from "./types";
+
+interface TimelineAttachment {
+  url: string;
+  name: string;
+  type?: string;
+  size?: number;
+}
+
+/** Дістає вкладення з metadata запису (масив {url,name,...}). */
+function extractAttachments(meta: unknown): TimelineAttachment[] {
+  if (!meta || typeof meta !== "object") return [];
+  const arr = (meta as { attachments?: unknown }).attachments;
+  if (!Array.isArray(arr)) return [];
+  return arr.filter(
+    (a): a is TimelineAttachment =>
+      !!a &&
+      typeof a === "object" &&
+      typeof (a as TimelineAttachment).url === "string" &&
+      typeof (a as TimelineAttachment).name === "string",
+  );
+}
+
+function isImageAttachment(a: TimelineAttachment): boolean {
+  if (a.type?.startsWith("image/")) return true;
+  return /\.(png|jpe?g|webp|gif)$/i.test(a.url);
+}
 
 /** Повна дата запису ДД.ММ.РРРР, ГГ:ХХ. */
 function formatFullDate(iso: string): string {
@@ -113,6 +140,7 @@ export function ClientTimelineItem({
     color: "text-gray-700",
     auto: true,
   };
+  const attachments = extractAttachments(entry.metadata);
 
   // Редагувати/видалити можна лише ручний коментар, власником (або admin).
   const isManual = entry.kind === "comment";
@@ -234,9 +262,45 @@ export function ClientTimelineItem({
           </div>
         ) : (
           <>
-            <p className="mt-1 whitespace-pre-wrap text-sm text-gray-800">
-              {entry.body}
-            </p>
+            {entry.body && (
+              <p className="mt-1 whitespace-pre-wrap text-sm text-gray-800">
+                {entry.body}
+              </p>
+            )}
+            {attachments.length > 0 && (
+              <div className="mt-2 flex flex-wrap gap-2">
+                {attachments.map((a, i) =>
+                  isImageAttachment(a) ? (
+                    <a
+                      key={i}
+                      href={a.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="block"
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={a.url}
+                        alt={a.name}
+                        className="h-20 w-20 rounded border object-cover"
+                      />
+                    </a>
+                  ) : (
+                    <a
+                      key={i}
+                      href={a.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      download
+                      className="inline-flex items-center gap-1.5 rounded border bg-gray-50 px-2 py-1 text-xs text-blue-700 hover:bg-gray-100"
+                    >
+                      <Paperclip className="h-3 w-3" />
+                      <span className="max-w-[180px] truncate">{a.name}</span>
+                    </a>
+                  ),
+                )}
+              </div>
+            )}
             {canMutate && (
               <div className="mt-1 flex gap-3">
                 <button

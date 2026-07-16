@@ -46,6 +46,7 @@ import {
 } from "@/lib/manager/sale-status";
 import { useDocumentAutosave } from "@/lib/autosave/use-document-autosave";
 import { AutosaveStatus } from "../../../_components/autosave-status";
+import { notifyPendingBadges } from "../../../_components/notify-pending-badges";
 import {
   collectPriceDeviations,
   draftToWire,
@@ -656,6 +657,7 @@ export function SaleForm({
   ): Promise<void> {
     const id = await saveSale(nextStatus, post);
     if (id === null) return;
+    notifyPendingBadges();
     // Статусний перехід у edit лишає менеджера на сторінці (бачить новий стан).
     if (isEdit && nextStatus) {
       router.refresh();

@@ -12,6 +12,7 @@ import {
   Wallet,
 } from "lucide-react";
 import type { MessengerDocRef, MessengerDocRefType } from "./types";
+import { openManagerTab } from "../../_components/open-manager-tab";
 
 const ICONS: Record<
   MessengerDocRefType,
@@ -52,6 +53,14 @@ export function DocRefCard({
       href={docRef.url}
       target="_blank"
       rel="noopener noreferrer"
+      onClick={(e) => {
+        // Усередині shell (месенджер в iframe) відкриваємо документ окремою
+        // вкладкою менеджерки; поза shell — звичайне відкриття у новій вкладці.
+        if (typeof window === "undefined") return;
+        if (window.self === window.top) return;
+        e.preventDefault();
+        openManagerTab(docRef.url, TYPE_LABELS[docRef.type] ?? "Документ");
+      }}
       className={
         isMine
           ? "mb-1 flex items-center gap-2 rounded-md bg-white/15 px-2 py-1.5 hover:bg-white/25"

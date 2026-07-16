@@ -65,9 +65,12 @@ export function ClientHeader({
               <span className="text-gray-700">
                 Менеджер:{" "}
                 <span className="font-medium">
-                  {client.assignedManager?.fullName ?? (
-                    <em className="font-normal text-gray-500">не призначено</em>
-                  )}
+                  {client.assignedManager?.fullName ??
+                    client.agent?.fullName ?? (
+                      <em className="font-normal text-gray-500">
+                        не призначено
+                      </em>
+                    )}
                 </span>
               </span>
             </div>

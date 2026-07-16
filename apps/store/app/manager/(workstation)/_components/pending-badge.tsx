@@ -36,10 +36,23 @@ export function PendingBadge({ kind }: { kind: "orders" | "sales" }) {
     function onVis() {
       if (document.visibilityState === "visible") void refetch();
     }
+    // Миттєве оновлення після проведення/видалення документа (postMessage із
+    // iframe-вкладки або self-вікна).
+    function onMsg(e: MessageEvent) {
+      if (
+        e.data &&
+        typeof e.data === "object" &&
+        (e.data as { type?: string }).type === "ltex:refresh-pending"
+      ) {
+        void refetch();
+      }
+    }
     document.addEventListener("visibilitychange", onVis);
+    window.addEventListener("message", onMsg);
     return () => {
       window.clearInterval(id);
       document.removeEventListener("visibilitychange", onVis);
+      window.removeEventListener("message", onMsg);
     };
   }, [refetch]);
 

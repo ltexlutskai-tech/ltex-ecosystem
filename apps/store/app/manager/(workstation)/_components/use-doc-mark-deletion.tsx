@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { useToast } from "@ltex/ui";
+import { notifyPendingBadges } from "./notify-pending-badges";
 
 /**
  * Спільний хук ПОЗНАЧЕННЯ менеджерського документа НА ВИЛУЧЕННЯ (ТЗ 8.0 B6).
@@ -116,6 +117,7 @@ export function useDocMarkDeletion(): {
           description:
             "Позначено на вилучення. Рухи оновлено; повернути можна з «Кошика».",
         });
+        notifyPendingBadges();
         router.refresh();
         return;
       }

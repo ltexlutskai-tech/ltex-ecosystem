@@ -2,6 +2,7 @@
 
 import { useCallback, useMemo, useState } from "react";
 import { openManagerTab } from "../../../_components/open-manager-tab";
+import { notifyPendingBadges } from "../../../_components/notify-pending-badges";
 import { useRouter } from "next/navigation";
 import { MessageSquare, ListPlus } from "lucide-react";
 import { isOrderLocked } from "@/lib/manager/order-status";
@@ -385,6 +386,7 @@ export function OrderForm({
         const created = (await res.json().catch(() => ({}))) as { id?: string };
         if (created.id) setSavedId(created.id);
       }
+      notifyPendingBadges();
       router.push("/manager/orders");
     } catch (e) {
       setError((e as Error).message ?? "Невідома помилка");
