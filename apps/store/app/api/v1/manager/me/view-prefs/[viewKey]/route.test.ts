@@ -70,8 +70,8 @@ describe("GET /api/v1/manager/me/view-prefs/[viewKey]", () => {
       items: { key: string; visible: boolean }[];
     };
     expect(json.items.length).toBeGreaterThan(0);
-    // Перший дефолтний — "name", visible
-    expect(json.items[0]?.key).toBe("name");
+    // Перший дефолтний — "color" (світлофор), visible
+    expect(json.items[0]?.key).toBe("color");
     expect(json.items[0]?.visible).toBe(true);
   });
 

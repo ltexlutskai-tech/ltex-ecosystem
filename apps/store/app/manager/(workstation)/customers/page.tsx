@@ -13,6 +13,7 @@ import { ClientListTable } from "./_components/client-list-table";
 import { ClientListToolbar } from "./_components/client-list-toolbar";
 import { ListPagination } from "./_components/list-pagination";
 import { PageSizeSelect } from "./_components/page-size-select";
+import { isClientColor, type ClientColor } from "@/lib/manager/client-color";
 import { loadClients, loadDictionariesSnapshot } from "./_lib/load-clients";
 
 export const dynamic = "force-dynamic";
@@ -62,6 +63,12 @@ export default async function CustomersPage({
       daysSinceMax: pickInt(sp.daysSinceMax),
       createdFrom: pickDate(sp.createdFrom),
       createdTo: pickDate(sp.createdTo),
+      // Блок «Список клієнтів» (2026-07-16): нові зрізи
+      historySearch: pickString(sp.historySearch),
+      keywords: pickCsv(sp.keywords),
+      keywordsMode: pickBool(sp.keywordsOr) ? "or" : "and",
+      assortmentSearch: pickString(sp.assortmentSearch),
+      colors: pickColors(sp.colors),
       // bool
       hasDebt: pickBool(sp.hasDebt),
       hasOverpayment: pickBool(sp.hasOverpayment),
@@ -173,6 +180,15 @@ function pickCsv(v: string | string[] | undefined): string[] | undefined {
     .map((x) => x.trim())
     .filter((x) => x.length > 0);
   return arr.length > 0 ? arr : undefined;
+}
+
+function pickColors(
+  v: string | string[] | undefined,
+): ClientColor[] | undefined {
+  const arr = pickCsv(v);
+  if (!arr) return undefined;
+  const colors = arr.filter(isClientColor);
+  return colors.length > 0 ? colors : undefined;
 }
 
 function pickBool(v: string | string[] | undefined): boolean | undefined {

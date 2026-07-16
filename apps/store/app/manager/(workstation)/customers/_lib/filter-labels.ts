@@ -2,6 +2,10 @@
 
 export const FILTER_LABELS: Record<string, string> = {
   search: "Пошук",
+  color: "Колір (пріоритет)",
+  keywords: "Ключові слова",
+  historySearch: "Пошук по історії",
+  assortmentSearch: "Асортимент (товар)",
   statusGeneralId: "Статус",
   statusOperationalId: "Оперативний статус",
   searchChannelId: "Канал пошуку",
@@ -22,6 +26,9 @@ export const FILTER_LABELS: Record<string, string> = {
 };
 
 export const COLUMN_LABELS: Record<string, string> = {
+  color: "Колір",
+  keywords: "Ключові слова",
+  lastContactAt: "Останній контакт",
   name: "Найменування",
   tradePointName: "Назва ТТ",
   code1C: "Код 1С",

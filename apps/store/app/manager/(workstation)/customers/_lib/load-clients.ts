@@ -1,5 +1,10 @@
 import { Prisma, prisma } from "@ltex/db";
 import { ownershipWhere } from "@/lib/manager/client-visibility";
+import {
+  buildColorWhere,
+  computeClientColor,
+  type ClientColor,
+} from "@/lib/manager/client-color";
 import type { CurrentManager } from "@/lib/auth/manager-auth";
 import type { ClientListItem } from "../_components/types";
 
@@ -53,6 +58,17 @@ export interface LoadClientsParams {
   daysSinceMax?: number;
   createdFrom?: Date;
   createdTo?: Date;
+  // ── Блок «Список клієнтів» (2026-07-16): нові зрізи ──
+  /** Пошук по історії роботи (timeline.body contains). Порт 1С `ФільтрИстория`. */
+  historySearch?: string;
+  /** Фільтр по ключових словах (тегах). Порт 1С `ФільтрКлючовіСлова`. */
+  keywords?: string[];
+  /** Режим збігу ключових слів: усі (AND) чи будь-яке (OR). Дефолт — AND. */
+  keywordsMode?: "and" | "or";
+  /** Пошук по асортименту клієнта (артикул/назва товару з реальних продажів). */
+  assortmentSearch?: string;
+  /** Мультивибір кольору-пріоритету (світлофор). */
+  colors?: ClientColor[];
 }
 
 /** Ключі сортування → Prisma orderBy. Дефолт — ім'я за зростанням. */
@@ -111,8 +127,34 @@ export async function loadClients(
         { phonePrimary: { contains: p.search } },
         { city: { contains: p.search, mode: "insensitive" } },
         { phones: { some: { phone: { contains: p.search } } } },
+        // Пошук по тегах (ключових словах) — раніше працював лише через REST
+        // endpoint; тепер і у сторінковому лоадері.
+        { keywords: { contains: p.search, mode: "insensitive" } },
       ],
     });
+  }
+
+  // Пошук по історії роботи з клієнтом (порт 1С `ФільтрИстория`): звужуємо до
+  // клієнтів, у чиїй історії взаємодій є запис із цим текстом.
+  if (p.historySearch) {
+    andClauses.push({
+      timeline: {
+        some: { body: { contains: p.historySearch, mode: "insensitive" } },
+      },
+    });
+  }
+
+  // Фільтр по ключових словах (тегах). AND — клієнт містить УСІ слова;
+  // OR — містить будь-яке. Порт 1С `ФільтрКлючовіСлова` + тумблер «або».
+  if (p.keywords && p.keywords.length > 0) {
+    const perWord = p.keywords.map(
+      (w): Prisma.MgrClientWhereInput => ({
+        keywords: { contains: w, mode: "insensitive" },
+      }),
+    );
+    andClauses.push(
+      p.keywordsMode === "or" ? { OR: perWord } : { AND: perWord },
+    );
   }
 
   if (p.statusIds && p.statusIds.length > 0) {
@@ -203,6 +245,27 @@ export async function loadClients(
     andClauses.push(ownership);
   }
 
+  const now = new Date();
+
+  // Пошук по асортименту: резолвимо code1C клієнтів, які купували товар з таким
+  // артикулом/назвою (з реальних продажів SaleItem), і фільтруємо по них.
+  if (p.assortmentSearch) {
+    const codes = await resolveAssortmentClientCodes(p.assortmentSearch);
+    // Порожній результат → жоден клієнт не підходить.
+    andClauses.push({ code1C: { in: codes } });
+  }
+
+  // Фільтр по кольору-пріоритету (світлофор). Якщо серед обраних є 🟢 «в роботі»
+  // — резолвимо усі code1C з активними замовленнями (осі незалежні; recency-
+  // бакети рахуються на боці БД через relation-фільтр timeline).
+  if (p.colors && p.colors.length > 0) {
+    const activeCodes = p.colors.includes("green")
+      ? await resolveActiveOrderCodes()
+      : [];
+    const colorWhere = buildColorWhere(p.colors, activeCodes, now);
+    if (colorWhere) andClauses.push(colorWhere);
+  }
+
   const where: Prisma.MgrClientWhereInput =
     andClauses.length > 0 ? { AND: andClauses } : {};
 
@@ -230,6 +293,33 @@ export async function loadClients(
     }),
   ]);
 
+  // ── Світлофор пріоритету для показаних рядків ──
+  // Остання взаємодія (max timeline.occurredAt) по клієнтах сторінки + набір
+  // code1C з активними замовленнями (лише серед code1C сторінки — дешево).
+  const pageClientIds = rows.map((r) => r.id);
+  const pageCodes = rows
+    .map((r) => r.code1C)
+    .filter((c): c is string => Boolean(c));
+
+  const [lastContactRows, activePageCodesArr] = await Promise.all([
+    pageClientIds.length > 0
+      ? prisma.mgrClientTimelineEntry.groupBy({
+          by: ["clientId"],
+          where: { clientId: { in: pageClientIds } },
+          _max: { occurredAt: true },
+        })
+      : Promise.resolve([]),
+    pageCodes.length > 0
+      ? resolveActiveOrderCodes(pageCodes)
+      : Promise.resolve([]),
+  ]);
+
+  const lastContactMap = new Map<string, Date>();
+  for (const g of lastContactRows) {
+    if (g._max.occurredAt) lastContactMap.set(g.clientId, g._max.occurredAt);
+  }
+  const activePageCodes = new Set(activePageCodesArr);
+
   return {
     items: rows.map((c) => ({
       id: c.id,
@@ -244,6 +334,7 @@ export async function loadClients(
       monthlyVolume: c.monthlyVolume?.toString() ?? null,
       daysSinceLastPurchase: c.daysSinceLastPurchase,
       lastPurchaseAt: c.lastPurchaseAt?.toISOString() ?? null,
+      keywords: c.keywords,
       licenseExpiresAt: c.licenseExpiresAt?.toISOString() ?? null,
       lastSyncedAt: c.lastSyncedAt?.toISOString() ?? null,
       createdAt: c.createdAt.toISOString(),
@@ -292,12 +383,81 @@ export async function loadClients(
             fullName: c.assignments[0].user.fullName,
           }
         : null,
+      color: computeClientColor({
+        hasActiveOrder: c.code1C ? activePageCodes.has(c.code1C) : false,
+        lastContactAt: lastContactMap.get(c.id) ?? null,
+        now,
+      }),
+      lastContactAt: (lastContactMap.get(c.id) ?? null)?.toISOString() ?? null,
     })),
     total,
     page: p.page,
     pageSize: p.pageSize,
     totalPages: Math.max(1, Math.ceil(total / p.pageSize)),
   };
+}
+
+/**
+ * Резолвить набір `code1C` клієнтів, які реально купували товар, що збігається
+ * (contains, insensitive) за артикулом або назвою. Джерело — продажі (SaleItem).
+ * `distinct` по customerId; take-cap як запобіжник.
+ */
+async function resolveAssortmentClientCodes(term: string): Promise<string[]> {
+  const sales = await prisma.sale.findMany({
+    where: {
+      customer: { code1C: { not: null } },
+      items: {
+        some: {
+          product: {
+            OR: [
+              { name: { contains: term, mode: "insensitive" } },
+              { articleCode: { contains: term, mode: "insensitive" } },
+            ],
+          },
+        },
+      },
+    },
+    select: { customer: { select: { code1C: true } } },
+    distinct: ["customerId"],
+    take: 20_000,
+  });
+  const set = new Set<string>();
+  for (const s of sales) {
+    const code = s.customer?.code1C;
+    if (code) set.add(code);
+  }
+  return Array.from(set);
+}
+
+/**
+ * Резолвить набір `code1C` клієнтів з активними замовленнями (1С «Контрагенти з
+ * актуальними замовленнями» → 🟢 у світлофорі). Активне = isActual && !archived
+ * && !closed && !markedForDeletion. `limitToCodes` звужує до потрібних (для
+ * розмальовки сторінки); без нього — усі (для фільтра по кольору green).
+ */
+async function resolveActiveOrderCodes(
+  limitToCodes?: string[],
+): Promise<string[]> {
+  const orders = await prisma.order.findMany({
+    where: {
+      isActual: true,
+      archived: false,
+      closedAt: null,
+      markedForDeletion: false,
+      customer: limitToCodes
+        ? { code1C: { in: limitToCodes } }
+        : { code1C: { not: null } },
+    },
+    select: { customer: { select: { code1C: true } } },
+    distinct: ["customerId"],
+    take: 20_000,
+  });
+  const set = new Set<string>();
+  for (const o of orders) {
+    const code = o.customer?.code1C;
+    if (code) set.add(code);
+  }
+  return Array.from(set);
 }
 
 export async function loadDictionariesSnapshot() {

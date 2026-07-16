@@ -1,4 +1,6 @@
 export type { ConfigItem } from "@/lib/manager/view-defaults";
+export type { ClientColor } from "@/lib/manager/client-color";
+import type { ClientColor } from "@/lib/manager/client-color";
 
 export interface DictionaryRef {
   code: string;
@@ -24,6 +26,7 @@ export interface ClientListItem {
   monthlyVolume?: string | null;
   daysSinceLastPurchase: number | null;
   lastPurchaseAt: string | null;
+  keywords?: string | null;
   licenseExpiresAt?: string | null;
   lastSyncedAt?: string | null;
   createdAt?: string;
@@ -37,6 +40,10 @@ export interface ClientListItem {
   primaryRoute?: DictionaryRef | null;
   agent?: { id: string; fullName: string } | null;
   assignedManager: { id: string; fullName: string } | null;
+  /** Світлофор пріоритету (авто, з давності контакту + активних замовлень). */
+  color: ClientColor;
+  /** Момент останньої взаємодії (max timeline.occurredAt) або null. */
+  lastContactAt: string | null;
 }
 
 export interface DictionaryOption {
