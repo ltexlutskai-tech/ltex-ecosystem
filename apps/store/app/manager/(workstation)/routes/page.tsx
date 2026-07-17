@@ -8,6 +8,7 @@ import {
   routeSheetRowInclude,
   serializeRouteSheetRow,
 } from "@/lib/manager/route-sheets-list";
+import { canView } from "@/lib/permissions/role-permissions";
 import { EmptyState } from "../_components/empty-state";
 import { ListPagination } from "../customers/_components/list-pagination";
 import { RouteSheetsTable } from "./_components/route-sheets-table";
@@ -31,12 +32,21 @@ export default async function ManagerRouteSheetsPage({
   const fromDate = filter.from ? new Date(filter.from) : undefined;
   const toDate = filter.to ? new Date(filter.to) : undefined;
 
+  // Скоуп власності: ролі з view:mine на маршрутних листах (менеджер) бачать
+  // лише свої; ролі з view:all (admin/owner/supervisor/…) — усі. Експедитора
+  // тут не скоупимо по managerUserId (у нього інша семантика «свій» — за
+  // призначенням експедитором; лишаємо як було).
+  const routeScope = canView({ role: user.role }, "route_sheets").scope;
+  const ownerUserId =
+    routeScope === "mine" && user.role !== "expeditor" ? user.id : null;
+
   const where = buildRouteSheetsWhere({
     search: filter.search,
     status: filter.status,
     from: fromDate && !Number.isNaN(fromDate.getTime()) ? fromDate : undefined,
     to: toDate && !Number.isNaN(toDate.getTime()) ? toDate : undefined,
     archived: filter.archived,
+    ownerUserId,
   });
 
   const [items, total] = await Promise.all([

@@ -71,7 +71,7 @@ describe("GET /api/v1/manager/chat/conversations", () => {
     expect(res.status).toBe(401);
   });
 
-  it("manager → scope: own OR unassigned (agentUserId null)", async () => {
+  it("manager → scope: assigned to me OR my client (no shared pool)", async () => {
     mockPrisma.chatConversation.findMany.mockResolvedValueOnce([
       fakeConv("c1"),
     ]);
@@ -81,12 +81,12 @@ describe("GET /api/v1/manager/chat/conversations", () => {
     expect(res.status).toBe(200);
 
     const args = mockPrisma.chatConversation.findMany.mock.calls[0]?.[0] as {
-      where: { OR?: Array<{ agentUserId: string | null }> };
+      where: { OR?: Array<Record<string, unknown>> };
     };
     expect(args.where.OR).toBeDefined();
     expect(args.where.OR).toEqual([
       { agentUserId: "u1" },
-      { agentUserId: null },
+      { client: { agentUserId: "u1" } },
     ]);
   });
 

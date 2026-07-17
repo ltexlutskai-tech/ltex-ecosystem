@@ -15,6 +15,7 @@ import {
 } from "@/lib/manager/route-sheet-documents";
 import { getUnclosedMileageWarning } from "@/lib/manager/route-sheet-mileage";
 import { formatDocNumber } from "@/lib/manager/order-number";
+import { canView } from "@/lib/permissions/role-permissions";
 import { BackButton } from "../../_components/back-button";
 import { DiscussButton } from "../../messenger/_components/discuss-button";
 import {
@@ -67,6 +68,19 @@ export default async function ManagerRouteSheetDetailPage({
     },
   });
   if (!sheet) notFound();
+
+  // Скоуп власності (ТЗ 2026-07-17): менеджер (view:mine) відкриває лише свій
+  // маршрутний лист — де він менеджер рейсу або автор. Інакше — notFound
+  // (щоб не розкривати навіть факт існування чужого документа за URL).
+  const routeScope = canView({ role: user.role }, "route_sheets").scope;
+  if (
+    routeScope === "mine" &&
+    user.role !== "expeditor" &&
+    sheet.managerUserId !== user.id &&
+    sheet.createdByUserId !== user.id
+  ) {
+    notFound();
+  }
 
   // ─── Batch-resolve cross-model names (плоскі скаляри, без relation) ───────
   const orderIds = new Set<string>();

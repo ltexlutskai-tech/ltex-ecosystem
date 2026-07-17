@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { Fragment, type ReactNode } from "react";
 import type { ManagerRole } from "@/lib/auth/jwt";
 import { ChatUnreadBadge } from "./chat-unread-badge";
 import { DeletionsBadge } from "./deletions-badge";
@@ -7,170 +7,58 @@ import { PendingBadge } from "./pending-badge";
 import { WarehouseTasksBadge } from "./warehouse-tasks-badge";
 import { SidebarNavLink } from "./sidebar-nav-link";
 import {
-  ADMIN_AUDIT_LINK,
-  ADMIN_DELETIONS_LINK,
-  ADMIN_PERMISSIONS_LINK,
-  ADMIN_REGION_AGENTS_LINK,
-  ADMIN_USERS_LINK,
-  BAG_STATE_LINK,
-  CHAT_LINK,
-  FINANCE_LINKS,
-  MESSENGER_LINK,
-  PRIMARY_LINKS,
-  REGISTRY_LINK,
-  REPORTS_LINK,
-  SECONDARY_LINKS,
-  SETTINGS_LINK,
-  TRASH_LINK,
-  WAREHOUSE_RECEIVINGS_LINK,
-  WAREHOUSE_TASKS_LINK,
+  getSidebarSections,
   renderLinkIcon,
-  type SidebarLink,
+  type SidebarBadge,
+  type SidebarItem,
 } from "./sidebar-links";
 
+/** Мапить ключ бейджа у ноду-лічильник (client-компоненти з полінгом). */
+function badgeNode(badge: SidebarBadge | undefined): ReactNode {
+  switch (badge) {
+    case "orders-pending":
+      return <PendingBadge kind="orders" />;
+    case "sales-pending":
+      return <PendingBadge kind="sales" />;
+    case "chat":
+      return <ChatUnreadBadge />;
+    case "messenger":
+      return <MessengerUnreadBadge />;
+    case "warehouse-tasks":
+      return <WarehouseTasksBadge />;
+    case "deletions":
+      return <DeletionsBadge />;
+    default:
+      return undefined;
+  }
+}
+
 export function ManagerSidebar({ role }: { role: ManagerRole }) {
+  const sections = getSidebarSections(role);
   return (
     <aside className="hidden w-60 shrink-0 flex-col gap-1 overflow-y-auto border-r bg-white p-3 lg:flex">
-      <NavSection
-        links={PRIMARY_LINKS}
-        badges={{
-          "/manager/orders": <PendingBadge kind="orders" />,
-          "/manager/sales": <PendingBadge kind="sales" />,
-        }}
-      />
-      <Separator />
-      <NavSection links={SECONDARY_LINKS} />
-      <Separator />
-      <SidebarNavLink
-        href={CHAT_LINK.href}
-        label={CHAT_LINK.label}
-        icon={renderLinkIcon(CHAT_LINK)}
-        badgeSlot={<ChatUnreadBadge />}
-      />
-      <SidebarNavLink
-        href={MESSENGER_LINK.href}
-        label={MESSENGER_LINK.label}
-        icon={renderLinkIcon(MESSENGER_LINK)}
-        badgeSlot={<MessengerUnreadBadge />}
-      />
-      {(role === "warehouse" || role === "admin" || role === "owner") && (
-        <>
-          <SidebarNavLink
-            href={WAREHOUSE_TASKS_LINK.href}
-            label={WAREHOUSE_TASKS_LINK.label}
-            icon={renderLinkIcon(WAREHOUSE_TASKS_LINK)}
-            badgeSlot={<WarehouseTasksBadge />}
-          />
-          <SidebarNavLink
-            href={WAREHOUSE_RECEIVINGS_LINK.href}
-            label={WAREHOUSE_RECEIVINGS_LINK.label}
-            icon={renderLinkIcon(WAREHOUSE_RECEIVINGS_LINK)}
-          />
-          <SidebarNavLink
-            href={BAG_STATE_LINK.href}
-            label={BAG_STATE_LINK.label}
-            icon={renderLinkIcon(BAG_STATE_LINK)}
-          />
-        </>
-      )}
-      {role !== "warehouse" && role !== "expeditor" && (
-        <SidebarNavLink
-          href={REGISTRY_LINK.href}
-          label={REGISTRY_LINK.label}
-          icon={renderLinkIcon(REGISTRY_LINK)}
-        />
-      )}
-      {(role === "analyst" ||
-        role === "admin" ||
-        role === "owner" ||
-        role === "supervisor" ||
-        role === "bookkeeper") && (
-        <SidebarNavLink
-          href={REPORTS_LINK.href}
-          label={REPORTS_LINK.label}
-          icon={renderLinkIcon(REPORTS_LINK)}
-        />
-      )}
-      {(role === "bookkeeper" || role === "admin" || role === "owner") && (
-        <>
-          <Separator />
-          <NavSection links={FINANCE_LINKS} />
-        </>
-      )}
-      <Separator />
-      {role === "admin" && (
-        <>
-          <SidebarNavLink
-            href={ADMIN_USERS_LINK.href}
-            label={ADMIN_USERS_LINK.label}
-            icon={renderLinkIcon(ADMIN_USERS_LINK)}
-          />
-          <SidebarNavLink
-            href={ADMIN_REGION_AGENTS_LINK.href}
-            label={ADMIN_REGION_AGENTS_LINK.label}
-            icon={renderLinkIcon(ADMIN_REGION_AGENTS_LINK)}
-          />
-        </>
-      )}
-      {(role === "admin" || role === "owner") && (
-        <>
-          <SidebarNavLink
-            href={ADMIN_PERMISSIONS_LINK.href}
-            label={ADMIN_PERMISSIONS_LINK.label}
-            icon={renderLinkIcon(ADMIN_PERMISSIONS_LINK)}
-          />
-          <SidebarNavLink
-            href={ADMIN_AUDIT_LINK.href}
-            label={ADMIN_AUDIT_LINK.label}
-            icon={renderLinkIcon(ADMIN_AUDIT_LINK)}
-          />
-          <SidebarNavLink
-            href={ADMIN_DELETIONS_LINK.href}
-            label={ADMIN_DELETIONS_LINK.label}
-            icon={renderLinkIcon(ADMIN_DELETIONS_LINK)}
-            badgeSlot={<DeletionsBadge />}
-          />
-        </>
-      )}
-      {(role === "manager" ||
-        role === "senior_manager" ||
-        role === "admin" ||
-        role === "owner") && (
-        <SidebarNavLink
-          href={TRASH_LINK.href}
-          label={TRASH_LINK.label}
-          icon={renderLinkIcon(TRASH_LINK)}
-        />
-      )}
-      <SidebarNavLink
-        href={SETTINGS_LINK.href}
-        label={SETTINGS_LINK.label}
-        icon={renderLinkIcon(SETTINGS_LINK)}
-      />
+      {sections.map((section, i) => (
+        <Fragment key={i}>
+          {i > 0 && <Separator />}
+          <nav className="space-y-1">
+            {section.map((link) => (
+              <NavLink key={link.href} link={link} />
+            ))}
+          </nav>
+        </Fragment>
+      ))}
     </aside>
   );
 }
 
-function NavSection({
-  links,
-  badges,
-}: {
-  links: readonly SidebarLink[];
-  /** Опційні бейджі за href (напр. лічильник pending для замовлень/реалізацій). */
-  badges?: Record<string, ReactNode>;
-}) {
+function NavLink({ link }: { link: SidebarItem }) {
   return (
-    <nav className="space-y-1">
-      {links.map((link) => (
-        <SidebarNavLink
-          key={link.href}
-          href={link.href}
-          label={link.label}
-          icon={renderLinkIcon(link)}
-          badgeSlot={badges?.[link.href]}
-        />
-      ))}
-    </nav>
+    <SidebarNavLink
+      href={link.href}
+      label={link.label}
+      icon={renderLinkIcon(link)}
+      badgeSlot={badgeNode(link.badge)}
+    />
   );
 }
 

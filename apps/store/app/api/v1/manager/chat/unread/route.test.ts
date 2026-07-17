@@ -52,7 +52,7 @@ describe("GET /api/v1/manager/chat/unread", () => {
     expect(res.status).toBe(401);
   });
 
-  it("manager → scope: own OR unassigned, returns aggregated total", async () => {
+  it("manager → scope: assigned to me OR my client, returns aggregated total", async () => {
     mockPrisma.chatConversation.aggregate.mockResolvedValueOnce({
       _sum: { unreadForManager: 7 },
     });
@@ -62,11 +62,11 @@ describe("GET /api/v1/manager/chat/unread", () => {
     expect(json.total).toBe(7);
 
     const args = mockPrisma.chatConversation.aggregate.mock.calls[0]?.[0] as {
-      where: { OR?: Array<{ agentUserId: string | null }> };
+      where: { OR?: Array<Record<string, unknown>> };
     };
     expect(args.where.OR).toEqual([
       { agentUserId: "u1" },
-      { agentUserId: null },
+      { client: { agentUserId: "u1" } },
     ]);
   });
 
