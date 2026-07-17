@@ -39,11 +39,26 @@ const DENIED_PREFIXES: Partial<Record<ManagerRole, readonly string[]>> = {
   ],
 };
 
+/**
+ * Винятки-дозволи, що мають ПЕРЕВАГУ над deny-списком. Напр. менеджеру
+ * закрито хаб `/manager/reports`, але дозволено власний звіт
+ * `/manager/reports/manager`.
+ */
+const ALLOWED_EXCEPTIONS: Partial<Record<ManagerRole, readonly string[]>> = {
+  manager: ["/manager/reports/manager"],
+};
+
+function matchesPrefix(path: string, p: string): boolean {
+  return path === p || path.startsWith(`${p}/`);
+}
+
 /** Чи заборонений цей шлях для ролі (точний збіг або піддорога `prefix/…`). */
 function isDeniedForRole(role: ManagerRole, path: string): boolean {
+  const allow = ALLOWED_EXCEPTIONS[role];
+  if (allow && allow.some((p) => matchesPrefix(path, p))) return false;
   const prefixes = DENIED_PREFIXES[role];
   if (!prefixes) return false;
-  return prefixes.some((p) => path === p || path.startsWith(`${p}/`));
+  return prefixes.some((p) => matchesPrefix(path, p));
 }
 
 export async function managerGuard(req: NextRequest): Promise<NextResponse> {

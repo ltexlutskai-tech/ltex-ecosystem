@@ -130,6 +130,7 @@ describe("managerGuard", () => {
       "/manager/messenger",
       "/manager/warehouse-tasks",
       "/manager/routes",
+      "/manager/reports/manager",
       "/manager/settings",
     ]) {
       const res = await managerGuard(makeReq(p, "ltex_mgr_access=good"));

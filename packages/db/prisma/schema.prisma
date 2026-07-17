@@ -3379,3 +3379,26 @@ model MessengerAttachment {
   @@index([messageId])
   @@map("mgr_messenger_attachments")
 }
+
+// План продажів по областях (ТЗ 2026-07-17) — для звіту менеджера.
+// Задають адмін + аналітик. Гранулярність: місяць × область.
+// `regionSlug`:
+//   • slug області (з lib/constants/regions UA_REGIONS) — план по області;
+//   • службовий `"__total__"` — загальний план (може не дорівнювати сумі
+//     областей, бо частина областей без плану).
+// План порівнюється з фактом: виручка (₴), к-сть ТТ що скупились, к-сть
+// нових ТТ. `@@unique([month, regionSlug])` — один запис на область/місяць.
+model SalesPlan {
+  id             String   @id @default(cuid())
+  month          String // "YYYY-MM"
+  regionSlug     String   @map("region_slug")
+  planRevenueUah Float    @default(0) @map("plan_revenue_uah")
+  planTtCount    Int      @default(0) @map("plan_tt_count")
+  planNewTtCount Int      @default(0) @map("plan_new_tt_count")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  @@unique([month, regionSlug])
+  @@index([month])
+  @@map("mgr_sales_plans")
+}

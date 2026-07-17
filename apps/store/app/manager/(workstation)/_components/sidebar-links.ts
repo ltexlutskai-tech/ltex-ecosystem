@@ -130,6 +130,15 @@ export const REPORTS_LINK: SidebarLink = {
   icon: PieChart,
 };
 
+// ── Звіт менеджера (ТЗ 2026-07-17) ──────────────────────────────────────
+// Окремий пункт для ролі `manager` (веде прямо на його звіт, а не на хаб
+// аналітичних звітів). Дозволений у middleware як виняток.
+export const MANAGER_REPORT_LINK: SidebarLink = {
+  href: "/manager/reports/manager",
+  label: "Звіти",
+  icon: PieChart,
+};
+
 // ── Тиждень 2 блоку Поступлення (2026-06-04) ─────────────────────────────
 export const WAREHOUSE_RECEIVINGS_LINK: SidebarLink = {
   href: "/manager/receivings",
@@ -280,7 +289,7 @@ export function getSidebarSections(role: ManagerRole): SidebarItem[][] {
   if (!isWarehouse && role !== "expeditor" && !isManager) {
     sectionC.push({ ...REGISTRY_LINK });
   }
-  // Звіти — analyst/admin/owner/supervisor/bookkeeper (менеджер — 2-й етап).
+  // Звіти — analyst/admin/owner/supervisor/bookkeeper → хаб звітів.
   if (
     role === "analyst" ||
     adminOrOwner ||
@@ -288,6 +297,10 @@ export function getSidebarSections(role: ManagerRole): SidebarItem[][] {
     role === "bookkeeper"
   ) {
     sectionC.push({ ...REPORTS_LINK });
+  }
+  // Менеджер — прямий пункт «Звіти» на власний звіт менеджера.
+  if (isManager) {
+    sectionC.push({ ...MANAGER_REPORT_LINK });
   }
   sections.push(sectionC);
 
