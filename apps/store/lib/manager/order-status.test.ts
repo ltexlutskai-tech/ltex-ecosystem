@@ -24,6 +24,12 @@ describe("order-status meta", () => {
     expect(getOrderStatusMeta("draft").label).toBe("Чернетка");
   });
 
+  it("closed status has label «Закрите» (red)", () => {
+    const m = getOrderStatusMeta("closed");
+    expect(m.label).toBe("Закрите");
+    expect(m.color).toBe("red");
+  });
+
   it("legacy status shows a readable label (historical display only)", () => {
     expect(getOrderStatusMeta("cancelled").label).toBe("Скасовано");
     expect(getOrderStatusMeta("shipped").label).toBe("Відвантажено");
@@ -35,24 +41,26 @@ describe("order-status meta", () => {
     expect(m.color).toBe("gray");
   });
 
-  it("contains exactly the 4 canonical statuses (no legacy)", () => {
+  it("filter list = 4 canonical + closed (no legacy)", () => {
     expect(ORDER_STATUS_LIST).toEqual([
       "draft",
       "not_posted",
       "posted",
       "pending",
+      "closed",
     ]);
     expect(ORDER_STATUS_LIST).not.toContain("cancelled");
     expect(ORDER_STATUS_LIST).not.toContain("sent");
   });
 
-  it("MANAGER_ORDER_STATUSES — the 4 canonical", () => {
+  it("MANAGER_ORDER_STATUSES — the 4 canonical (closed is NOT selectable)", () => {
     expect(MANAGER_ORDER_STATUSES).toEqual([
       "draft",
       "not_posted",
       "posted",
       "pending",
     ]);
+    expect(MANAGER_ORDER_STATUSES).not.toContain("closed");
   });
 });
 
@@ -63,10 +71,12 @@ describe("isManagerOrderStatus", () => {
     expect(isManagerOrderStatus("pending")).toBe(true);
     expect(isManagerOrderStatus("posted")).toBe(true);
   });
-  it("false for legacy / unknown", () => {
+  it("false for legacy / unknown / closed", () => {
     expect(isManagerOrderStatus("cancelled")).toBe(false);
     expect(isManagerOrderStatus("sent")).toBe(false);
     expect(isManagerOrderStatus("nope")).toBe(false);
+    // «closed» — не менеджерський (не ціль переходу, ставиться формою закриття).
+    expect(isManagerOrderStatus("closed")).toBe(false);
   });
 });
 

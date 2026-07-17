@@ -246,6 +246,24 @@ describe("buildOrdersWhere — status + date range", () => {
     ).toBe("posted");
   });
 
+  it("closed filter shows closed orders regardless of archive/actuality defaults", () => {
+    const w = buildOrdersWhere({ customerCodes: null, status: "closed" });
+    expect(w.status).toBe("closed");
+    // не нав'язуємо «не архів» і «лише актуальні» — інакше було б порожньо.
+    expect(w.archived).toBeUndefined();
+    expect(w.isActual).toBeUndefined();
+  });
+
+  it("closed filter still respects an explicit actuality selector", () => {
+    const w = buildOrdersWhere({
+      customerCodes: null,
+      status: "closed",
+      actuality: "inactive",
+    });
+    expect(w.status).toBe("closed");
+    expect(w.isActual).toBe(false);
+  });
+
   it("applies date range (gte/lte)", () => {
     const from = new Date("2026-05-01");
     const to = new Date("2026-05-31");

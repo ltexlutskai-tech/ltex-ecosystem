@@ -145,8 +145,14 @@ export function buildOrdersWhere(
     where.source = { not: "site" };
   }
 
+  // Явний фільтр «Закрите» — це перегляд архіву закритих: закриті замовлення
+  // завжди archived=true + isActual=false, тому для цього фільтра НЕ нав'язуємо
+  // дефолтних обмежень «не архів» / «лише актуальні» (інакше список був би
+  // порожній). Користувач і далі може звузити через селектор актуальності.
+  const closedFilter = p.status === "closed";
+
   // Архів: за замовчуванням приховуємо історію 1С (`archived = true`).
-  if (!p.showArchived) {
+  if (!p.showArchived && !closedFilter) {
     where.archived = false;
   }
 
@@ -154,8 +160,9 @@ export function buildOrdersWhere(
   // рішення адміністратора у черзі `/manager/admin/deletions`).
   where.markedForDeletion = false;
 
-  // Актуальність документа (дефолт «actual» → лише isActual = true).
-  const actuality = p.actuality ?? "actual";
+  // Актуальність документа (дефолт «actual» → лише isActual = true; для фільтра
+  // «Закрите» дефолт — «all», бо закриті неактуальні).
+  const actuality = p.actuality ?? (closedFilter ? "all" : "actual");
   if (actuality === "actual") {
     where.isActual = true;
   } else if (actuality === "inactive") {
