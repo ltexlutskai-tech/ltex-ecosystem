@@ -21,6 +21,7 @@ export type {
 } from "./import-catalog";
 export {
   normalizePhone,
+  phoneMatchKey,
   formatPhoneUkr,
   phoneToTelUrl,
   phoneToViberUrl,

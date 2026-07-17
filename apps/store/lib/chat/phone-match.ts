@@ -1,9 +1,9 @@
 import { prisma } from "@ltex/db";
-import { normalizePhone } from "@ltex/shared";
+import { normalizePhone, phoneMatchKey } from "@ltex/shared";
 
 /**
  * Результат пошуку клієнта за телефоном.
- * Phone — нормалізований E.164 номер, який збігся.
+ * Phone — нормалізований E.164 номер (або вхідний, якщо не нормалізувався).
  */
 export interface PhoneMatchResult {
   clientId: string;
@@ -12,26 +12,31 @@ export interface PhoneMatchResult {
 }
 
 /**
- * Шукає `MgrClient` за телефоном (3 рівні пошуку):
+ * Шукає `MgrClient` за телефоном НЕЗАЛЕЖНО від формату номера.
  *
- *   1. `MgrClientPhone.phone` — exact match (додаткові номери клієнта)
- *   2. `MgrClient.phonePrimary` — exact match (основний номер)
- *   3. `Customer.phone` — exact match → резолв `MgrClient` через `code1C`
+ * Звірка йде по `phoneKey` — це БД-обчислювані останні 9 цифр номера
+ * (`GENERATED ALWAYS`). Тому збігаються `0501234567`, `+380501234567`,
+ * `380501234567` тощо — усі варіанти написання того самого номера, і навіть
+ * «брудні» формати з 1С (пробіли/дужки). Три рівні пошуку:
  *
- * Повертає `null` коли:
- *   - вхід не нормалізується (`normalizePhone` повернув `null`)
- *   - жоден з трьох рівнів не знайшов клієнта
- *   - знайдений `Customer.code1C` не має пов'язаного `MgrClient`
+ *   1. `MgrClientPhone.phoneKey` — додаткові номери клієнта
+ *   2. `MgrClient.phoneKey`      — основний номер
+ *   3. `Customer.phoneKey`       → резолв `MgrClient` через `code1C`
+ *
+ * Повертає `null`, коли номер надто короткий (`phoneMatchKey` = null) або
+ * жоден рівень не знайшов клієнта.
  */
 export async function matchClientByPhone(
   rawPhone: string,
 ): Promise<PhoneMatchResult | null> {
-  const normalized = normalizePhone(rawPhone);
-  if (!normalized) return null;
+  const key = phoneMatchKey(rawPhone);
+  if (!key) return null;
+
+  const phone = normalizePhone(rawPhone) ?? rawPhone;
 
   // Рівень 1: додаткові номери клієнта
   const phoneRow = await prisma.mgrClientPhone.findFirst({
-    where: { phone: normalized },
+    where: { phoneKey: key },
     select: { clientId: true },
   });
   if (phoneRow) {
@@ -40,30 +45,22 @@ export async function matchClientByPhone(
       select: { id: true, agentUserId: true },
     });
     if (client) {
-      return {
-        clientId: client.id,
-        agentUserId: client.agentUserId,
-        phone: normalized,
-      };
+      return { clientId: client.id, agentUserId: client.agentUserId, phone };
     }
   }
 
   // Рівень 2: основний номер клієнта
   const primary = await prisma.mgrClient.findFirst({
-    where: { phonePrimary: normalized },
+    where: { phoneKey: key },
     select: { id: true, agentUserId: true },
   });
   if (primary) {
-    return {
-      clientId: primary.id,
-      agentUserId: primary.agentUserId,
-      phone: normalized,
-    };
+    return { clientId: primary.id, agentUserId: primary.agentUserId, phone };
   }
 
   // Рівень 3: Customer.phone → MgrClient через code1C
   const customer = await prisma.customer.findFirst({
-    where: { phone: normalized },
+    where: { phoneKey: key },
     select: { code1C: true },
   });
   if (customer?.code1C) {
@@ -75,7 +72,7 @@ export async function matchClientByPhone(
       return {
         clientId: mgrByCode.id,
         agentUserId: mgrByCode.agentUserId,
-        phone: normalized,
+        phone,
       };
     }
   }

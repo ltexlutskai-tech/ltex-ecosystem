@@ -1,26 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@ltex/db";
+import { normalizePhone, phoneMatchKey } from "@ltex/shared";
 import { rateLimit, getClientIp } from "@/lib/rate-limit";
 import { setCustomerCookie } from "@/lib/customer-auth";
 import { notifyNewLead } from "@/lib/notifications";
 import { createSiteLead } from "@/lib/manager/site-lead";
+import { getRegionLabel, isValidRegionSlug } from "@/lib/constants/regions";
 
 const schema = z.object({
   phone: z.string().min(8).max(32),
   name: z.string().min(1).max(100),
+  // Область (slug з UA_REGIONS) — ОБОВʼЯЗКОВА при реєстрації. За нею лід
+  // одразу маршрутизується на менеджера (мапа MgrRegionAgent).
+  region: z.string().refine(isValidRegionSlug, "Оберіть область"),
+  // legacy — не використовується формою, лишено для сумісності.
   city: z.string().max(100).optional().nullable(),
 });
-
-function normalizePhone(raw: string): string {
-  const stripped = raw.replace(/\s+/g, "").replace(/[^\d+]/g, "");
-  if (stripped.startsWith("+")) return stripped;
-  if (stripped.startsWith("380")) return `+${stripped}`;
-  if (stripped.startsWith("0") && stripped.length >= 9) {
-    return `+38${stripped}`;
-  }
-  return `+${stripped}`;
-}
 
 export async function POST(request: NextRequest) {
   const ip = getClientIp(request);
@@ -54,33 +50,39 @@ export async function POST(request: NextRequest) {
   }
 
   const phone = normalizePhone(parsed.data.phone);
+  const phoneKey = phoneMatchKey(parsed.data.phone);
+  if (!phone || !phoneKey) {
+    return NextResponse.json(
+      { error: "Невірний номер телефону" },
+      { status: 400 },
+    );
+  }
   const name = parsed.data.name.trim();
-  const city =
-    parsed.data.city === undefined || parsed.data.city === null
-      ? null
-      : parsed.data.city.trim() || null;
+  const regionSlug = parsed.data.region;
+  const region = getRegionLabel(regionSlug);
 
   try {
     let wasCreated = false;
+    // Звірка з наявним покупцем — по останніх 9 цифрах (незалежно від формату).
     let customer = await prisma.customer.findFirst({
-      where: { phone },
-      select: { id: true, name: true, city: true },
+      where: { phoneKey },
+      select: { id: true, name: true, region: true },
     });
     if (!customer) {
       customer = await prisma.customer.create({
-        data: { phone, name, city },
-        select: { id: true, name: true, city: true },
+        data: { phone, name, region },
+        select: { id: true, name: true, region: true },
       });
       wasCreated = true;
     } else {
-      // For existing customers: never overwrite name/city the user set in
+      // For existing customers: never overwrite name/region the user set in
       // /account. Only fill empty/null fields from the login payload.
-      const updates: { name?: string; city?: string | null } = {};
+      const updates: { name?: string; region?: string | null } = {};
       if (!customer.name?.trim() && name) {
         updates.name = name;
       }
-      if (customer.city == null && city) {
-        updates.city = city;
+      if (customer.region == null && region) {
+        updates.region = region;
       }
       if (Object.keys(updates).length > 0) {
         await prisma.customer.update({
@@ -97,11 +99,12 @@ export async function POST(request: NextRequest) {
         customerId: customer.id,
         phone,
         name,
-        city,
+        city: region,
         source: "web",
       }).catch(() => {});
       // CRM-лід (не повноцінний клієнт) — окрема вкладка в «Клієнтах».
-      createSiteLead({ name, phone, city }).catch(() => {});
+      // Область → назва в лід + підвʼязка менеджера за мапою «область→агент».
+      createSiteLead({ name, phone, regionSlug }).catch(() => {});
     }
 
     // NOTE: Guest cart merge intentionally NOT supported here. The cart

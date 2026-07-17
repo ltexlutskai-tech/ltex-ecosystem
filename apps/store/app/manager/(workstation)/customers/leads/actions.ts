@@ -36,6 +36,8 @@ export async function convertLeadToClient(leadId: string): Promise<void> {
         phonePrimary: normalized,
         city: lead.city,
         region: lead.region,
+        // Переносимо менеджера, підвʼязаного за областю ще при реєстрації.
+        agentUserId: lead.agentUserId,
       },
       select: { id: true },
     });

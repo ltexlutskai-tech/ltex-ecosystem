@@ -217,9 +217,13 @@ model Customer {
   code1C    String?  @unique @map("code_1c")
   name      String
   phone     String?
+  // phoneKey — DB-generated (останні 9 цифр `phone`), для звірки за номером
+  // незалежно від формату. НІКОЛИ не писати з коду (GENERATED ALWAYS у БД).
+  phoneKey  String?  @map("phone_key")
   email     String?
   telegram  String?
   city      String?
+  region    String?
   notes     String?
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -237,6 +241,7 @@ model Customer {
   notifications        Notification[]
   viewLog              ViewLog[]
 
+  @@index([phoneKey])
   @@map("customers")
 }
 
@@ -1263,6 +1268,7 @@ model User {
   assignedClients      ClientAssignment[]
   timelineComments     MgrClientTimelineEntry[]
   agentForClients      MgrClient[]              @relation("ClientAgent")
+  agentForLeads        MgrLead[]                @relation("LeadAgent")
   reminders            MgrReminder[]            @relation("UserReminders")
   viewPrefs            MgrUserViewPrefs[]
   routeSheetsExpedited RouteSheet[]             @relation("RouteSheetExpeditor")
@@ -1659,6 +1665,8 @@ model MgrClient {
   uid1C            String?   @unique @map("uid_1c")
   name             String
   phonePrimary     String?   @map("phone_primary")
+  // phoneKey — DB-generated (останні 9 цифр `phone_primary`). Read-only з коду.
+  phoneKey         String?   @map("phone_key")
   city             String?
   region           String?
   street           String?
@@ -1753,6 +1761,7 @@ model MgrClient {
   @@index([searchChannelId])
   @@index([region])
   @@index([phonePrimary])
+  @@index([phoneKey])
   @@index([name])
   @@map("mgr_clients")
 }
@@ -1773,6 +1782,8 @@ model MgrClientPhone {
   id        String  @id @default(cuid())
   clientId  String  @map("client_id")
   phone     String
+  // phoneKey — DB-generated (останні 9 цифр `phone`). Read-only з коду.
+  phoneKey  String? @map("phone_key")
   label     String?
   messenger String?
   sortOrder Int     @default(0) @map("sort_order")
@@ -1780,6 +1791,7 @@ model MgrClientPhone {
   client MgrClient @relation(fields: [clientId], references: [id], onDelete: Cascade)
 
   @@index([phone])
+  @@index([phoneKey])
   @@index([clientId])
   @@map("mgr_client_phones")
 }
@@ -1907,8 +1919,12 @@ model MgrLead {
   id                String   @id @default(cuid())
   name              String
   phone             String?
+  // phoneKey — DB-generated (останні 9 цифр `phone`). Read-only з коду.
+  phoneKey          String?  @map("phone_key")
   city              String?
   region            String?
+  // Менеджер, підвʼязаний за областю (мапа MgrRegionAgent) уже при реєстрації.
+  agentUserId       String?  @map("agent_user_id")
   source            String   @default("site")
   // new | contacted | converted | rejected
   status            String   @default("new")
@@ -1917,8 +1933,12 @@ model MgrLead {
   createdAt         DateTime @default(now()) @map("created_at")
   updatedAt         DateTime @updatedAt @map("updated_at")
 
+  agent User? @relation("LeadAgent", fields: [agentUserId], references: [id], onDelete: SetNull)
+
   @@index([status, createdAt])
   @@index([phone])
+  @@index([phoneKey])
+  @@index([agentUserId])
   @@map("mgr_leads")
 }
 

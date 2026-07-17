@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, screen, cleanup, fireEvent } from "@testing-library/react";
 import { LoginForm } from "./login-form";
-import { UA_REGIONS } from "@ltex/shared";
+import { UA_REGIONS } from "@/lib/constants/regions";
 
 const replaceMock = vi.fn();
 const refreshMock = vi.fn();
@@ -22,17 +22,37 @@ describe("LoginForm", () => {
     render(<LoginForm returnTo="/" />);
     const select = screen.getByLabelText("Область") as HTMLSelectElement;
     expect(select).toBeDefined();
-    // 27 regions + 1 placeholder
+    // усі області + плейсхолдер
     expect(select.options.length).toBe(UA_REGIONS.length + 1);
     expect(select.options[0]?.value).toBe("");
     for (const region of UA_REGIONS) {
-      expect(Array.from(select.options).some((o) => o.value === region)).toBe(
-        true,
-      );
+      expect(
+        Array.from(select.options).some((o) => o.value === region.slug),
+      ).toBe(true);
     }
   });
 
-  it("submits the chosen region as `city` in the JSON body", async () => {
+  it("blocks submit until a region is chosen", async () => {
+    const fetchSpy = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValue(
+        new Response(JSON.stringify({ ok: true }), { status: 200 }),
+      );
+
+    render(<LoginForm returnTo="/" />);
+    fireEvent.change(screen.getByLabelText("Номер телефону"), {
+      target: { value: "+380 67 123 45 67" },
+    });
+    fireEvent.change(screen.getByLabelText("Імʼя"), {
+      target: { value: "Іван" },
+    });
+    // Region left empty → submit disabled, no request.
+    fireEvent.click(screen.getByRole("button", { name: "Увійти" }));
+    await new Promise((r) => setTimeout(r, 0));
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("submits the chosen region slug in the JSON body", async () => {
     const fetchSpy = vi
       .spyOn(globalThis, "fetch")
       .mockResolvedValue(
@@ -46,7 +66,7 @@ describe("LoginForm", () => {
 
     fireEvent.change(phone, { target: { value: "+380 67 123 45 67" } });
     fireEvent.change(name, { target: { value: "Іван" } });
-    fireEvent.change(region, { target: { value: "Волинська" } });
+    fireEvent.change(region, { target: { value: "volynska" } });
 
     const submit = screen.getByRole("button", { name: "Увійти" });
     fireEvent.click(submit);
@@ -57,7 +77,8 @@ describe("LoginForm", () => {
     expect(fetchSpy).toHaveBeenCalledTimes(1);
     const [, init] = fetchSpy.mock.calls[0]!;
     const body = JSON.parse((init as RequestInit).body as string);
-    expect(body.city).toBe("Волинська");
+    expect(body.region).toBe("volynska");
     expect(body.name).toBe("Іван");
+    expect(body.city).toBeUndefined();
   });
 });

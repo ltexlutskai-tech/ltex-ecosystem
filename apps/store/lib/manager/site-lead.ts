@@ -1,6 +1,7 @@
 import { prisma } from "@ltex/db";
-import { normalizePhone } from "@ltex/shared";
+import { normalizePhone, phoneMatchKey } from "@ltex/shared";
 import { matchClientByPhone } from "@/lib/chat/phone-match";
+import { getRegionLabel, isValidRegionSlug } from "@/lib/constants/regions";
 
 /**
  * Ліди з сайту (7.2 Блок 2 доповнення).
@@ -13,32 +14,55 @@ import { matchClientByPhone } from "@/lib/chat/phone-match";
 /**
  * Створює лід із реєстрації на сайті. Пропускає, якщо телефон уже належить
  * повноцінному клієнту, або якщо активний (неконвертований) лід уже існує.
+ *
+ * `regionSlug` (обовʼязкова область при реєстрації) → зберігаємо назву області
+ * у `region` і одразу підвʼязуємо менеджера за мапою «область→агент»
+ * (`MgrRegionAgent`), щоб лід уже був закріплений за потрібним менеджером.
+ *
  * Best-effort — ніколи не кидає.
  */
 export async function createSiteLead(opts: {
   name: string;
   phone: string;
+  regionSlug?: string | null;
   city?: string | null;
 }): Promise<void> {
   try {
     const normalized = normalizePhone(opts.phone);
-    if (!normalized) return;
+    const key = phoneMatchKey(opts.phone);
+    if (!normalized || !key) return;
 
     // Уже повноцінний клієнт → не лід.
     const client = await matchClientByPhone(normalized);
     if (client) return;
 
-    // Дедуп: активний лід із цим телефоном уже є.
+    // Дедуп: активний лід із цим телефоном уже є (звірка по 9 цифрах).
     const existing = await prisma.mgrLead.findFirst({
-      where: { phone: normalized, status: { not: "converted" } },
+      where: { phoneKey: key, status: { not: "converted" } },
       select: { id: true },
     });
     if (existing) return;
+
+    const regionSlug =
+      opts.regionSlug && isValidRegionSlug(opts.regionSlug)
+        ? opts.regionSlug
+        : null;
+    const region = regionSlug ? getRegionLabel(regionSlug) : null;
+    const agentUserId = regionSlug
+      ? ((
+          await prisma.mgrRegionAgent.findUnique({
+            where: { region: regionSlug },
+            select: { userId: true },
+          })
+        )?.userId ?? null)
+      : null;
 
     await prisma.mgrLead.create({
       data: {
         name: opts.name.trim() || normalized,
         phone: normalized,
+        region,
+        agentUserId,
         city: opts.city ?? null,
         source: "site",
         status: "new",
@@ -59,10 +83,10 @@ export async function markLeadsConverted(
 ): Promise<void> {
   try {
     if (!phone) return;
-    const normalized = normalizePhone(phone);
-    if (!normalized) return;
+    const key = phoneMatchKey(phone);
+    if (!key) return;
     await prisma.mgrLead.updateMany({
-      where: { phone: normalized, status: { not: "converted" } },
+      where: { phoneKey: key, status: { not: "converted" } },
       data: { status: "converted", convertedClientId: clientId },
     });
   } catch {

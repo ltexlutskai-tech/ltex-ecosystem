@@ -3,6 +3,7 @@ import {
   formatPhoneUkr,
   maskPhone,
   normalizePhone,
+  phoneMatchKey,
   phoneToTelUrl,
   phoneToViberUrl,
   phoneToWhatsAppUrl,
@@ -35,6 +36,28 @@ describe("normalizePhone", () => {
   it("returns null for too-short/too-long inputs", () => {
     expect(normalizePhone("12345")).toBeNull();
     expect(normalizePhone("+38050123456789999")).toBeNull();
+  });
+});
+
+describe("phoneMatchKey", () => {
+  it("returns the last 9 digits for all common formats", () => {
+    expect(phoneMatchKey("0501234567")).toBe("501234567");
+    expect(phoneMatchKey("+380501234567")).toBe("501234567");
+    expect(phoneMatchKey("380501234567")).toBe("501234567");
+    expect(phoneMatchKey("501234567")).toBe("501234567");
+  });
+
+  it("is format-agnostic — same key for the same number written differently", () => {
+    expect(phoneMatchKey("+380 (50) 123-45-67")).toBe(
+      phoneMatchKey("0501234567"),
+    );
+  });
+
+  it("returns null for empty or too-short input", () => {
+    expect(phoneMatchKey(null)).toBeNull();
+    expect(phoneMatchKey(undefined)).toBeNull();
+    expect(phoneMatchKey("")).toBeNull();
+    expect(phoneMatchKey("12345")).toBeNull();
   });
 });
 
