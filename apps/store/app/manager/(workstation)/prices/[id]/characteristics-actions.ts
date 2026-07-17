@@ -3,7 +3,7 @@
 import { prisma } from "@ltex/db";
 import { revalidatePath } from "next/cache";
 import { getCurrentUser } from "@/lib/auth/manager-auth";
-import { canManageCatalog } from "@/lib/manager/catalog-permissions";
+import { canEditProductCard } from "@/lib/manager/catalog-permissions";
 import { parseNumericRange } from "@/lib/manager/parse-numeric-range";
 
 export interface CharacteristicsState {
@@ -26,8 +26,8 @@ export async function updateProductCharacteristics(
   formData: FormData,
 ): Promise<CharacteristicsState> {
   const user = await getCurrentUser();
-  if (!user || !canManageCatalog(user.role)) {
-    return { error: "Немає прав керувати каталогом" };
+  if (!user || !canEditProductCard(user.role)) {
+    return { error: "Немає прав редагувати картку товару" };
   }
 
   const productId = ((formData.get("productId") as string) ?? "").trim();
