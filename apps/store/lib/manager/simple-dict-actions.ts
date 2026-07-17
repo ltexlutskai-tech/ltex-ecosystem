@@ -90,6 +90,34 @@ export async function loadDictRows(type: SimpleDictType): Promise<DictRow[]> {
       });
       return rows.map((r) => ({ id: r.id, label: r.label }));
     }
+    case "quality": {
+      const rows = await prisma.mgrQuality.findMany({
+        where: ACTIVE_DICT,
+        orderBy: [{ sortOrder: "asc" }, { label: "asc" }],
+      });
+      return rows.map((r) => ({ id: r.id, label: r.label }));
+    }
+    case "countries": {
+      const rows = await prisma.mgrCountry.findMany({
+        where: ACTIVE_DICT,
+        orderBy: [{ sortOrder: "asc" }, { label: "asc" }],
+      });
+      return rows.map((r) => ({ id: r.id, label: r.label }));
+    }
+    case "genders": {
+      const rows = await prisma.mgrGender.findMany({
+        where: ACTIVE_DICT,
+        orderBy: [{ sortOrder: "asc" }, { label: "asc" }],
+      });
+      return rows.map((r) => ({ id: r.id, label: r.label }));
+    }
+    case "seasons": {
+      const rows = await prisma.mgrSeason.findMany({
+        where: ACTIVE_DICT,
+        orderBy: [{ sortOrder: "asc" }, { label: "asc" }],
+      });
+      return rows.map((r) => ({ id: r.id, label: r.label }));
+    }
   }
 }
 
@@ -131,6 +159,25 @@ export async function createDictEntry(
       break;
     case "producers":
       await prisma.mgrProducer.create({
+        data: { code: makeCode(label), label },
+      });
+      break;
+    case "quality":
+      await prisma.mgrQuality.create({
+        data: { code: makeCode(label), label },
+      });
+      break;
+    case "countries":
+      await prisma.mgrCountry.create({
+        data: { code: makeCode(label), label },
+      });
+      break;
+    case "genders":
+      // Стать зберігається у Product.gender як текст = сам напис, тож code = label.
+      await prisma.mgrGender.create({ data: { code: label, label } });
+      break;
+    case "seasons":
+      await prisma.mgrSeason.create({
         data: { code: makeCode(label), label },
       });
       break;
@@ -176,6 +223,18 @@ export async function updateDictEntry(
       break;
     case "producers":
       await prisma.mgrProducer.update({ where: { id }, data: { label } });
+      break;
+    case "quality":
+      await prisma.mgrQuality.update({ where: { id }, data: { label } });
+      break;
+    case "countries":
+      await prisma.mgrCountry.update({ where: { id }, data: { label } });
+      break;
+    case "genders":
+      await prisma.mgrGender.update({ where: { id }, data: { label } });
+      break;
+    case "seasons":
+      await prisma.mgrSeason.update({ where: { id }, data: { label } });
       break;
   }
   revalidate(type);
@@ -260,8 +319,12 @@ async function isDictEntryReferenced(
       };
     }
     case "producers":
-      // Виробник у товарі зберігається як текст (не FK) — фізичного звʼязку
-      // немає, тож вільний запис можна стерти.
+    case "quality":
+    case "countries":
+    case "genders":
+    case "seasons":
+      // Ці характеристики у товарі зберігаються як текст (не FK) — фізичного
+      // звʼязку немає, тож вільний запис можна стерти.
       return { referenced: false, hasCode1C: false };
   }
 }
@@ -308,6 +371,30 @@ async function archiveDictEntry(
         data: { archived: true },
       });
       break;
+    case "quality":
+      await prisma.mgrQuality.update({
+        where: { id },
+        data: { archived: true },
+      });
+      break;
+    case "countries":
+      await prisma.mgrCountry.update({
+        where: { id },
+        data: { archived: true },
+      });
+      break;
+    case "genders":
+      await prisma.mgrGender.update({
+        where: { id },
+        data: { archived: true },
+      });
+      break;
+    case "seasons":
+      await prisma.mgrSeason.update({
+        where: { id },
+        data: { archived: true },
+      });
+      break;
   }
 }
 
@@ -334,6 +421,18 @@ async function hardDeleteDictEntry(
       break;
     case "producers":
       await prisma.mgrProducer.delete({ where: { id } });
+      break;
+    case "quality":
+      await prisma.mgrQuality.delete({ where: { id } });
+      break;
+    case "countries":
+      await prisma.mgrCountry.delete({ where: { id } });
+      break;
+    case "genders":
+      await prisma.mgrGender.delete({ where: { id } });
+      break;
+    case "seasons":
+      await prisma.mgrSeason.delete({ where: { id } });
       break;
   }
 }

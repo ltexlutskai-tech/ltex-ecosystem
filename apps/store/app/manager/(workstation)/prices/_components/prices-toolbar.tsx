@@ -60,9 +60,27 @@ export function PricesToolbar({ categories, totalCount }: Props) {
     startTransition(() => router.push(`${pathname}?${sp.toString()}`));
   }
 
+  // Динамічний пошук: пушимо `?q=` через 350мс після останнього натискання
+  // клавіші. Пропускаємо, коли значення вже збігається з URL (уникаємо циклу
+  // з ефектом-синхронізацією вище).
+  useEffect(() => {
+    const current = searchParams.get("q") ?? "";
+    if (search.trim() === current) return;
+    const t = setTimeout(() => {
+      setParams({ q: search.trim() || null });
+    }, 350);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [search]);
+
   function submitSearch(e: React.FormEvent) {
     e.preventDefault();
     setParams({ q: search.trim() || null });
+  }
+
+  function resetAllFilters() {
+    setSearch("");
+    startTransition(() => router.push(pathname));
   }
 
   const activeBoolCount = BOOL_FILTERS.filter(
@@ -80,6 +98,14 @@ export function PricesToolbar({ categories, totalCount }: Props) {
   const sort = searchParams.get("sort") ?? "name";
   const dir = searchParams.get("dir") ?? "asc";
 
+  // Чи є що скидати (пошук / фільтри / нестандартне сортування).
+  const anyFilterActive =
+    filterCount > 0 ||
+    (searchParams.get("q") ?? "") !== "" ||
+    search.trim() !== "" ||
+    sort !== "name" ||
+    dir !== "asc";
+
   return (
     <div className="space-y-2">
       <div className="flex flex-wrap items-center gap-2">
@@ -94,13 +120,22 @@ export function PricesToolbar({ categories, totalCount }: Props) {
             placeholder="Пошук за назвою або артикулом…"
             className="flex-1"
           />
-          <Button type="submit" variant="outline" size="sm">
-            Шукати
-          </Button>
         </form>
 
         <div className="flex flex-wrap items-center gap-2">
           <PriceFiltersSheet categories={categories} setParams={setParams} />
+
+          {anyFilterActive && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={resetAllFilters}
+              title="Скинути пошук і всі фільтри"
+            >
+              Скинути фільтри
+            </Button>
+          )}
 
           <label className="inline-flex items-center gap-1 text-sm">
             <span className="hidden sm:inline text-gray-500">Сортувати:</span>
@@ -142,15 +177,6 @@ export function PricesToolbar({ categories, totalCount }: Props) {
 
       <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-gray-500">
         <div className="flex items-center gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            disabled={isPending}
-            onClick={() => startTransition(() => router.refresh())}
-          >
-            Оновити залишки та ціни
-          </Button>
           <Link href="/manager/prices/lots">
             <Button type="button" variant="outline" size="sm">
               Деталі по мішках
@@ -160,7 +186,7 @@ export function PricesToolbar({ categories, totalCount }: Props) {
             <span className="text-gray-500">Фільтрів: {filterCount}</span>
           )}
         </div>
-        <span>Знайдено: {totalCount}</span>
+        <span>{isPending ? "Оновлюємо…" : `Знайдено: ${totalCount}`}</span>
       </div>
     </div>
   );

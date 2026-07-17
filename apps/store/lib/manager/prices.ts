@@ -197,6 +197,7 @@ export interface RawPriceProduct {
   prices: { priceType: string; amount: number; currency: string }[];
   lots: {
     weight: number;
+    quantity: number;
     status: string;
     isTarget: boolean;
     videoUrl: string | null;
@@ -215,6 +216,8 @@ export interface PriceRow {
   categoryName: string | null;
   /** Сумарний залишок у кг (вільні лоти). */
   remainingKg: number;
+  /** Сумарна кількість одиниць у вільних лотах (шт/пар). */
+  remainingUnits: number;
   /** Кількість вільних лотів. */
   freeLotsCount: number;
   /** Одиниця виміру (kg | piece). */
@@ -246,6 +249,10 @@ export function deriveProductRow(
 ): PriceRow {
   const freeLots = p.lots.filter((l) => l.status === "free");
   const remainingKg = freeLots.reduce((sum, l) => sum + (l.weight || 0), 0);
+  const remainingUnits = freeLots.reduce(
+    (sum, l) => sum + (l.quantity || 0),
+    0,
+  );
 
   const base = p.prices.find((pr) => pr.priceType === BASE_PRICE_TYPE);
   const sale = p.prices.find((pr) => pr.priceType === SALE_PRICE_TYPE);
@@ -269,6 +276,7 @@ export function deriveProductRow(
     videoUrl: p.videoUrl,
     categoryName: p.category?.name ?? null,
     remainingKg: Math.round(remainingKg * 100) / 100,
+    remainingUnits,
     freeLotsCount: freeLots.length,
     priceUnit: p.priceUnit,
     basePrice,
@@ -291,6 +299,7 @@ export const priceRowInclude = {
   lots: {
     select: {
       weight: true,
+      quantity: true,
       status: true,
       isTarget: true,
       videoUrl: true,

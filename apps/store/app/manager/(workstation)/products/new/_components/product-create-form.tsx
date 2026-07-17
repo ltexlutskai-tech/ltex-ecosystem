@@ -2,13 +2,8 @@
 
 import { useActionState, useEffect, useRef, useState } from "react";
 import { Button, Input } from "@ltex/ui";
-import {
-  QUALITY_LEVELS,
-  QUALITY_LABELS,
-  COUNTRIES,
-  COUNTRY_LABELS,
-} from "@ltex/shared";
 import { createManagerProduct, type CreateProductState } from "../actions";
+import type { ProductAttributeOptions } from "@/lib/manager/product-attributes";
 import {
   CategoryCascader,
   type CascaderNode,
@@ -27,14 +22,16 @@ const PRODUCT_DRAFT_KEY = localDraftKey("create-product", null);
 const inputCls =
   "w-full rounded-md border border-input bg-background px-3 py-2 text-sm";
 
-const GENDERS = ["Чоловіча", "Жіноча", "Дитяча", "Унісекс", "Мікс"] as const;
-
 export function ProductCreateForm({
   categories,
   producers,
+  attributeOptions,
+  suggestedCode1C,
 }: {
   categories: CascaderNode[];
   producers: string[];
+  attributeOptions: ProductAttributeOptions;
+  suggestedCode1C: string;
 }) {
   const [state, formAction, pending] = useActionState<
     CreateProductState,
@@ -127,6 +124,15 @@ export function ProductCreateForm({
           <label className="mb-1 block text-sm font-medium">Артикул *</label>
           <Input name="articleCode" required placeholder="Напр. 1235" />
         </div>
+        <div>
+          <label className="mb-1 block text-sm font-medium">
+            Код товару (1С)
+          </label>
+          <Input name="code1C" defaultValue={suggestedCode1C} />
+          <p className="mt-1 text-xs text-gray-400">
+            Підставлено наступний вільний код. Можна змінити вручну.
+          </p>
+        </div>
         <div className="sm:col-span-2">
           <label className="mb-1 block text-sm font-medium">Категорія *</label>
           <CategoryCascader
@@ -160,9 +166,9 @@ export function ProductCreateForm({
             <option value="" disabled>
               Оберіть якість…
             </option>
-            {QUALITY_LEVELS.map((q) => (
-              <option key={q} value={q}>
-                {QUALITY_LABELS[q]}
+            {attributeOptions.quality.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
               </option>
             ))}
           </select>
@@ -173,9 +179,9 @@ export function ProductCreateForm({
             <option value="" disabled>
               Оберіть країну…
             </option>
-            {COUNTRIES.map((c) => (
-              <option key={c} value={c}>
-                {COUNTRY_LABELS[c]}
+            {attributeOptions.countries.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
               </option>
             ))}
           </select>
@@ -186,9 +192,20 @@ export function ProductCreateForm({
             <option value="" disabled>
               Оберіть стать…
             </option>
-            {GENDERS.map((g) => (
-              <option key={g} value={g}>
-                {g}
+            {attributeOptions.genders.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="mb-1 block text-sm font-medium">Сезон</label>
+          <select name="season" defaultValue="" className={inputCls}>
+            <option value="">— не вказано —</option>
+            {attributeOptions.seasons.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
               </option>
             ))}
           </select>
@@ -196,6 +213,39 @@ export function ProductCreateForm({
         <div>
           <label className="mb-1 block text-sm font-medium">Розміри *</label>
           <Input name="sizes" required placeholder="Напр. S–XXL" />
+        </div>
+        <div>
+          <label className="mb-1 block text-sm font-medium">
+            Кількість одиниць
+          </label>
+          <Input name="unitsPerKg" placeholder="Напр. 40 або 40–50" />
+          <p className="mt-1 text-xs text-gray-400">
+            Середня кількість одиниць у лоті/кг.
+          </p>
+        </div>
+        <div>
+          <label className="mb-1 block text-sm font-medium">
+            Вага одиниці, кг
+          </label>
+          <Input name="unitWeight" placeholder="Напр. 0.3 або 0.3–0.5" />
+          <p className="mt-1 text-xs text-gray-400">
+            Середня вага однієї одиниці.
+          </p>
+        </div>
+        <div>
+          <label className="mb-1 block text-sm font-medium">
+            Вага лота, кг
+          </label>
+          <Input
+            name="averageWeight"
+            type="number"
+            step="0.01"
+            min="0"
+            placeholder="Напр. 20"
+          />
+          <p className="mt-1 text-xs text-gray-400">
+            Середня вага лота (мішка).
+          </p>
         </div>
         <div>
           <label className="mb-1 block text-sm font-medium">Виробник</label>
@@ -222,6 +272,16 @@ export function ProductCreateForm({
       </div>
 
       <div>
+        <label className="mb-1 block text-sm font-medium">Наповнення</label>
+        <textarea
+          name="filling"
+          rows={2}
+          className={inputCls}
+          placeholder="Короткий перелік вмісту лота (напр. куртки, светри, джинси)"
+        />
+      </div>
+
+      <div>
         <label className="mb-1 block text-sm font-medium">Опис *</label>
         <textarea
           name="description"
@@ -242,9 +302,10 @@ export function ProductCreateForm({
         {pending ? "Створення…" : "Створити товар"}
       </Button>
       <p className="text-xs text-gray-400">
-        Код товару (формат 1С) і дата створення присвоюються автоматично. Після
-        створення відкриється картка товару — там можна додати фото. Посилання
-        на сторінку товару й лоти формуються автоматично.
+        Дата створення присвоюється автоматично; код товару підставлено
+        автоматично (можна змінити). Після створення відкриється картка товару —
+        там можна додати фото. Посилання на сторінку товару й лоти формуються
+        автоматично.
       </p>
     </form>
   );

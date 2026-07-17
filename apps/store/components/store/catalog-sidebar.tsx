@@ -9,15 +9,21 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@ltex/ui";
-import { CatalogFilters, type SubcategoryOption } from "./catalog-filters";
+import {
+  CatalogFilters,
+  type SubcategoryOption,
+  type CatalogAttributeOptions,
+} from "./catalog-filters";
 import { getDictionary } from "@/lib/i18n";
 
 const dict = getDictionary();
 
 export function CatalogSidebar({
   subcategories,
+  attributeOptions,
 }: {
   subcategories?: SubcategoryOption[];
+  attributeOptions?: CatalogAttributeOptions;
 }) {
   const [open, setOpen] = useState(false);
 
@@ -44,7 +50,10 @@ export function CatalogSidebar({
               <SheetTitle>{dict.catalog.filters}</SheetTitle>
             </SheetHeader>
             <div className="mt-4">
-              <CatalogFilters subcategories={subcategories} />
+              <CatalogFilters
+                subcategories={subcategories}
+                attributeOptions={attributeOptions}
+              />
             </div>
             <button
               type="button"
@@ -60,7 +69,10 @@ export function CatalogSidebar({
       {/* Desktop sidebar */}
       <aside className="hidden lg:block lg:w-72 lg:flex-shrink-0">
         <div className="sticky top-20 max-h-[calc(100vh-6rem)] overflow-y-auto rounded-lg border bg-white p-4">
-          <CatalogFilters subcategories={subcategories} />
+          <CatalogFilters
+            subcategories={subcategories}
+            attributeOptions={attributeOptions}
+          />
         </div>
       </aside>
     </>

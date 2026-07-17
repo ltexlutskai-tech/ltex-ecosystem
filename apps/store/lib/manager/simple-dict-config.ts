@@ -39,6 +39,30 @@ export const SIMPLE_DICTS = {
     hasColor: false,
     desc: "Виробники товарів (VIVE, SOEX, Канада…).",
   },
+  quality: {
+    title: "Якість (сорт)",
+    kind: "labeled",
+    hasColor: false,
+    desc: "Сорт товару: Екстра, Крем, 1й/2й сорт, Сток, Мікс…",
+  },
+  countries: {
+    title: "Країни",
+    kind: "labeled",
+    hasColor: false,
+    desc: "Країна походження товару (Англія, Німеччина…).",
+  },
+  genders: {
+    title: "Стать",
+    kind: "labeled",
+    hasColor: false,
+    desc: "Стать/вік: Чоловіча, Жіноча, Дитяча, Унісекс…",
+  },
+  seasons: {
+    title: "Сезон",
+    kind: "labeled",
+    hasColor: false,
+    desc: "Сезонність: Зима, Літо, Демісезон, Всесезонне.",
+  },
 } as const;
 
 export type SimpleDictType = keyof typeof SIMPLE_DICTS;

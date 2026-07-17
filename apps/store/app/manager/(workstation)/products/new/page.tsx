@@ -3,6 +3,8 @@ import { redirect } from "next/navigation";
 import { prisma } from "@ltex/db";
 import { getCurrentUser } from "@/lib/auth/manager-auth";
 import { canManageCatalog } from "@/lib/manager/catalog-permissions";
+import { loadProductAttributeOptions } from "@/lib/manager/product-attributes";
+import { suggestNextProductCode1C } from "./actions";
 import { ProductCreateForm } from "./_components/product-create-form";
 
 export const dynamic = "force-dynamic";
@@ -13,18 +15,21 @@ export default async function NewProductPage() {
   if (!user) redirect("/manager/login");
   if (!canManageCatalog(user.role)) redirect("/manager/prices");
 
-  const [categories, producerRows] = await Promise.all([
-    prisma.category.findMany({
-      orderBy: [{ position: "asc" }, { name: "asc" }],
-      select: { id: true, name: true, parentId: true },
-    }),
-    prisma.mgrProducer.findMany({
-      // ТЗ 8.0 B7: не пропонуємо заархівовані / позначені на вилучення виробники.
-      where: { archived: false, markedForDeletion: false },
-      orderBy: [{ sortOrder: "asc" }, { label: "asc" }],
-      select: { label: true },
-    }),
-  ]);
+  const [categories, producerRows, attributeOptions, suggestedCode1C] =
+    await Promise.all([
+      prisma.category.findMany({
+        orderBy: [{ position: "asc" }, { name: "asc" }],
+        select: { id: true, name: true, parentId: true },
+      }),
+      prisma.mgrProducer.findMany({
+        // ТЗ 8.0 B7: не пропонуємо заархівовані / позначені на вилучення виробники.
+        where: { archived: false, markedForDeletion: false },
+        orderBy: [{ sortOrder: "asc" }, { label: "asc" }],
+        select: { label: true },
+      }),
+      loadProductAttributeOptions(),
+      suggestNextProductCode1C(),
+    ]);
   const producers = producerRows.map((p) => p.label);
 
   return (
@@ -44,7 +49,12 @@ export default async function NewProductPage() {
         </p>
       </div>
       <div className="rounded-lg border bg-white p-5">
-        <ProductCreateForm categories={categories} producers={producers} />
+        <ProductCreateForm
+          categories={categories}
+          producers={producers}
+          attributeOptions={attributeOptions}
+          suggestedCode1C={suggestedCode1C}
+        />
       </div>
     </div>
   );

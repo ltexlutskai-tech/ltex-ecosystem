@@ -66,6 +66,9 @@ model Product {
   archived          Boolean  @default(false)
   gender            String?
   sizes             String?
+  // Наповнення (короткий перелік вмісту лота) — показуємо на сайті окремо від
+  // опису. Вільний текст; заповнюється у формі створення/картці товару.
+  filling           String?
   unitsPerKg        String?  @map("units_per_kg")
   unitsPerKgMin     Float?   @map("units_per_kg_min")
   unitsPerKgMax     Float?   @map("units_per_kg_max")
@@ -1953,6 +1956,60 @@ model MgrProducer {
   archived          Boolean @default(false)
 
   @@map("mgr_producers")
+}
+
+// ─── Довідники характеристик товару (редаговані власником/адміном) ───────────
+// Значення (`code`) зберігаються у Product.quality/country/gender/season як
+// текст (без FK). Сідяться зі спільних констант, щоб наявні товари лишались
+// відфільтровуваними; нові значення власник додає у Довідниках і вони одразу
+// зʼявляються у формі товару та у фільтрах сайту.
+
+model MgrQuality {
+  id        String @id @default(cuid())
+  code      String @unique
+  label     String
+  sortOrder Int    @default(0) @map("sort_order")
+
+  markedForDeletion Boolean @default(false) @map("marked_for_deletion")
+  archived          Boolean @default(false)
+
+  @@map("mgr_qualities")
+}
+
+model MgrCountry {
+  id        String @id @default(cuid())
+  code      String @unique
+  label     String
+  sortOrder Int    @default(0) @map("sort_order")
+
+  markedForDeletion Boolean @default(false) @map("marked_for_deletion")
+  archived          Boolean @default(false)
+
+  @@map("mgr_countries")
+}
+
+model MgrGender {
+  id        String @id @default(cuid())
+  code      String @unique
+  label     String
+  sortOrder Int    @default(0) @map("sort_order")
+
+  markedForDeletion Boolean @default(false) @map("marked_for_deletion")
+  archived          Boolean @default(false)
+
+  @@map("mgr_genders")
+}
+
+model MgrSeason {
+  id        String @id @default(cuid())
+  code      String @unique
+  label     String
+  sortOrder Int    @default(0) @map("sort_order")
+
+  markedForDeletion Boolean @default(false) @map("marked_for_deletion")
+  archived          Boolean @default(false)
+
+  @@map("mgr_seasons")
 }
 
 // ─── ТЗ 8.0 — черга «позначок на вилучення» (1С «Видалення позначених») ──────
