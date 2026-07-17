@@ -16,6 +16,7 @@ const { mockPrisma, getCurrentUserMock, FakeKnownRequestError } = vi.hoisted(
     return {
       mockPrisma: {
         mgrMessageTemplate: {
+          findUnique: vi.fn(),
           update: vi.fn(),
           delete: vi.fn(),
         },
@@ -35,6 +36,7 @@ vi.mock("@ltex/db", () => ({
 
 vi.mock("@/lib/auth/manager-auth", () => ({
   getCurrentUser: (...args: unknown[]) => getCurrentUserMock(...args),
+  isAdminRole: (role: string) => role === "admin" || role === "owner",
   MANAGER_ACCESS_COOKIE: "ltex_mgr_access",
   MANAGER_REFRESH_COOKIE: "ltex_mgr_refresh",
 }));
@@ -59,6 +61,7 @@ const fakeTemplate = {
   id: "t1",
   name: "Оновлено",
   text: "Новий текст",
+  isShared: false,
   createdByUserId: "u1",
   createdAt: NOW,
   updatedAt: NOW,
@@ -85,6 +88,10 @@ function makeDelete(): NextRequest {
 beforeEach(() => {
   vi.clearAllMocks();
   getCurrentUserMock.mockResolvedValue(MANAGER_USER);
+  // За замовчуванням шаблон належить поточному менеджеру (u1).
+  mockPrisma.mgrMessageTemplate.findUnique.mockResolvedValue({
+    createdByUserId: "u1",
+  });
   mockPrisma.mgrMessageTemplate.update.mockResolvedValue(fakeTemplate);
   mockPrisma.mgrMessageTemplate.delete.mockResolvedValue(fakeTemplate);
 });
@@ -103,27 +110,52 @@ describe("PATCH /api/v1/manager/message-templates/[id]", () => {
     expect(mockPrisma.mgrMessageTemplate.update).not.toHaveBeenCalled();
   });
 
-  it("updates name and text (trimmed)", async () => {
+  it("updates name, text (trimmed) and isShared for the author", async () => {
     const res = await PATCH(
-      makePatch({ name: "  Оновлено  ", text: "  Новий текст  " }),
+      makePatch({
+        name: "  Оновлено  ",
+        text: "  Новий текст  ",
+        isShared: true,
+      }),
       params("t1"),
     );
     expect(res.status).toBe(200);
     expect(mockPrisma.mgrMessageTemplate.update).toHaveBeenCalledWith({
       where: { id: "t1" },
-      data: { name: "Оновлено", text: "Новий текст" },
+      data: { name: "Оновлено", text: "Новий текст", isShared: true },
     });
   });
 
   it("returns 404 when template not found", async () => {
-    mockPrisma.mgrMessageTemplate.update.mockRejectedValueOnce(
-      new FakeKnownRequestError("P2025"),
-    );
+    mockPrisma.mgrMessageTemplate.findUnique.mockResolvedValueOnce(null);
     const res = await PATCH(
       makePatch({ name: "X", text: "Y" }),
       params("missing"),
     );
     expect(res.status).toBe(404);
+    expect(mockPrisma.mgrMessageTemplate.update).not.toHaveBeenCalled();
+  });
+
+  it("returns 403 when a non-author manager edits", async () => {
+    mockPrisma.mgrMessageTemplate.findUnique.mockResolvedValueOnce({
+      createdByUserId: "someone-else",
+    });
+    const res = await PATCH(makePatch({ name: "X", text: "Y" }), params("t1"));
+    expect(res.status).toBe(403);
+    expect(mockPrisma.mgrMessageTemplate.update).not.toHaveBeenCalled();
+  });
+
+  it("allows admin to edit another manager's template", async () => {
+    getCurrentUserMock.mockResolvedValueOnce({
+      ...MANAGER_USER,
+      role: "admin",
+    });
+    mockPrisma.mgrMessageTemplate.findUnique.mockResolvedValueOnce({
+      createdByUserId: "someone-else",
+    });
+    const res = await PATCH(makePatch({ name: "X", text: "Y" }), params("t1"));
+    expect(res.status).toBe(200);
+    expect(mockPrisma.mgrMessageTemplate.update).toHaveBeenCalled();
   });
 });
 
@@ -135,7 +167,7 @@ describe("DELETE /api/v1/manager/message-templates/[id]", () => {
     expect(mockPrisma.mgrMessageTemplate.delete).not.toHaveBeenCalled();
   });
 
-  it("deletes the template", async () => {
+  it("deletes the template for the author", async () => {
     const res = await DELETE(makeDelete(), params("t1"));
     expect(res.status).toBe(200);
     expect(mockPrisma.mgrMessageTemplate.delete).toHaveBeenCalledWith({
@@ -146,10 +178,26 @@ describe("DELETE /api/v1/manager/message-templates/[id]", () => {
   });
 
   it("returns 404 when template not found", async () => {
+    mockPrisma.mgrMessageTemplate.findUnique.mockResolvedValueOnce(null);
+    const res = await DELETE(makeDelete(), params("missing"));
+    expect(res.status).toBe(404);
+    expect(mockPrisma.mgrMessageTemplate.delete).not.toHaveBeenCalled();
+  });
+
+  it("returns 403 when a non-author manager deletes", async () => {
+    mockPrisma.mgrMessageTemplate.findUnique.mockResolvedValueOnce({
+      createdByUserId: "someone-else",
+    });
+    const res = await DELETE(makeDelete(), params("t1"));
+    expect(res.status).toBe(403);
+    expect(mockPrisma.mgrMessageTemplate.delete).not.toHaveBeenCalled();
+  });
+
+  it("still maps a race-condition P2025 on delete to 404", async () => {
     mockPrisma.mgrMessageTemplate.delete.mockRejectedValueOnce(
       new FakeKnownRequestError("P2025"),
     );
-    const res = await DELETE(makeDelete(), params("missing"));
+    const res = await DELETE(makeDelete(), params("t1"));
     expect(res.status).toBe(404);
   });
 });
