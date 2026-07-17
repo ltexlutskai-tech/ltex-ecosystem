@@ -1,14 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Prisma, prisma } from "@ltex/db";
 import { getCurrentUser } from "@/lib/auth/manager-auth";
+import { canView } from "@/lib/permissions/role-permissions";
 
 /**
  * GET /api/v1/manager/chat/conversations
  *
- * Список розмов inbox-у.
- * - admin → бачить усі.
- * - manager → бачить ті, де `agentUserId = user.id` АБО `agentUserId IS NULL`
- *   (нерозприділені = спільний пул, доступний усім менеджерам).
+ * Список розмов inbox-у (ТЗ 2026-07-17 — «чат тільки зі своїми клієнтами»).
+ * - повний доступ (admin/owner/supervisor, chat view:all) → усі розмови;
+ * - менеджер (chat view:mine) → лише розмови, ПРИЗНАЧЕНІ йому
+ *   (`agentUserId = user.id`) АБО де клієнт розмови — його
+ *   (`client.agentUserId = user.id`). Нічийний / чужий пул більше НЕ видно;
+ *   нові невідомі номери авто-призначаються менеджеру за областю (inbound).
  *
  * Сортування: `lastMessageAt desc`.
  * Параметри: `page` (1+), `pageSize` (1..100, default 20).
@@ -24,10 +27,13 @@ export async function GET(req: NextRequest) {
   const pageSizeRaw = Number(url.searchParams.get("pageSize") ?? 20);
   const pageSize = Math.min(100, Math.max(1, pageSizeRaw || 20));
 
+  const chatScope = canView({ role: user.role }, "chat").scope;
   const where: Prisma.ChatConversationWhereInput =
-    user.role === "admin"
+    chatScope === "all"
       ? {}
-      : { OR: [{ agentUserId: user.id }, { agentUserId: null }] };
+      : {
+          OR: [{ agentUserId: user.id }, { client: { agentUserId: user.id } }],
+        };
 
   const [items, total] = await Promise.all([
     prisma.chatConversation.findMany({

@@ -95,4 +95,58 @@ describe("managerGuard", () => {
     expect(fetchMock).not.toHaveBeenCalled();
     expect(res.headers.get("location")).toContain("/manager/login");
   });
+
+  // ─── RBAC: заборонені розділи для менеджера (ТЗ 2026-07-17) ──────────────
+  it("redirects a manager away from a denied section to /manager", async () => {
+    verifyMock.mockReturnValue(VALID_PAYLOAD);
+    for (const p of [
+      "/manager/categories",
+      "/manager/needs",
+      "/manager/registry",
+      "/manager/presentations",
+      "/manager/reports",
+      "/manager/reports/sales-summary",
+      "/manager/admin/users",
+      "/manager/receivings",
+    ]) {
+      const res = await managerGuard(makeReq(p, "ltex_mgr_access=good"));
+      const location = res.headers.get("location");
+      expect(location, p).toContain("/manager");
+      expect(location, p).not.toContain(p.slice("/manager/".length));
+    }
+  });
+
+  it("lets a manager into allowed sections", async () => {
+    verifyMock.mockReturnValue(VALID_PAYLOAD);
+    for (const p of [
+      "/manager",
+      "/manager/orders",
+      "/manager/customers",
+      "/manager/prices",
+      "/manager/message-templates",
+      "/manager/reminders",
+      "/manager/closures",
+      "/manager/chat",
+      "/manager/messenger",
+      "/manager/warehouse-tasks",
+      "/manager/routes",
+      "/manager/settings",
+    ]) {
+      const res = await managerGuard(makeReq(p, "ltex_mgr_access=good"));
+      expect(res.headers.get("location"), p).toBeNull();
+    }
+  });
+
+  it("does NOT restrict admin from any section", async () => {
+    verifyMock.mockReturnValue({ ...VALID_PAYLOAD, role: "admin" });
+    for (const p of [
+      "/manager/categories",
+      "/manager/reports",
+      "/manager/admin/users",
+      "/manager/registry",
+    ]) {
+      const res = await managerGuard(makeReq(p, "ltex_mgr_access=good"));
+      expect(res.headers.get("location"), p).toBeNull();
+    }
+  });
 });

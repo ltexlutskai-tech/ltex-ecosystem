@@ -17,9 +17,10 @@ import {
  *    (`comment` — у 1С документ = `Комментарий`);
  *  • період — по полю `date` (дата складання документа).
  *
- * **Ownership:** маршрутний лист — спільний диспетчерський документ, його
- * бачать усі менеджери + admin (НЕ скоупиться по клієнту). Тому where-builder
- * не приймає ownership-скоуп (на відміну від `sales-list`/`orders-list`).
+ * **Ownership (ТЗ 2026-07-17):** менеджер бачить ЛИШЕ свої маршрутні листи —
+ * ті, де він менеджер рейсу (`managerUserId`) або автор (`createdByUserId`).
+ * Admin/owner (і решта ролей із повним доступом) бачать усі: для них
+ * `ownerUserId` не передається (undefined) і скоуп не накладається.
  */
 
 const ROUTE_SHEET_STATUS_SET = new Set<string>(ROUTE_SHEET_STATUS_LIST);
@@ -45,6 +46,12 @@ export interface BuildRouteSheetsWhereParams {
    * архівні (`archived = true`) приховані.
    */
   archived?: boolean;
+  /**
+   * Скоуп власності: `userId` — показати лише маршрутні листи цього менеджера
+   * (він менеджер рейсу АБО автор). `undefined`/`null` — без обмеження
+   * (admin/owner бачать усі). За рішенням user 2026-07-17.
+   */
+  ownerUserId?: string | null;
 }
 
 /**
@@ -88,6 +95,19 @@ export function buildRouteSheetsWhere(
       ...(p.from ? { gte: p.from } : {}),
       ...(p.to ? { lte: p.to } : {}),
     };
+  }
+
+  // Скоуп власності: лише свої (менеджер рейсу АБО автор). Додаємо через AND,
+  // щоб не конфліктувати з `where.OR` пошуку (обидві умови мають виконатись).
+  if (p.ownerUserId) {
+    where.AND = [
+      {
+        OR: [
+          { managerUserId: p.ownerUserId },
+          { createdByUserId: p.ownerUserId },
+        ],
+      },
+    ];
   }
 
   return where;

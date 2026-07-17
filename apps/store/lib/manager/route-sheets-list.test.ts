@@ -49,6 +49,27 @@ describe("buildRouteSheetsWhere", () => {
     const where = buildRouteSheetsWhere({ from, to });
     expect(where.date).toEqual({ gte: from, lte: to });
   });
+
+  it("no ownership scope when ownerUserId is absent (admin sees all)", () => {
+    expect(buildRouteSheetsWhere({}).AND).toBeUndefined();
+    expect(buildRouteSheetsWhere({ ownerUserId: null }).AND).toBeUndefined();
+  });
+
+  it("scopes to own (manager rejsu OR author) when ownerUserId is set", () => {
+    const where = buildRouteSheetsWhere({ ownerUserId: "u1" });
+    expect(where.AND).toEqual([
+      { OR: [{ managerUserId: "u1" }, { createdByUserId: "u1" }] },
+    ]);
+  });
+
+  it("ownership scope (AND) composes with search (OR)", () => {
+    const where = buildRouteSheetsWhere({ search: "Луцьк", ownerUserId: "u1" });
+    // search лишається у where.OR, власність — окремо у where.AND (обидві діють).
+    expect(where.OR).toHaveLength(3);
+    expect(where.AND).toEqual([
+      { OR: [{ managerUserId: "u1" }, { createdByUserId: "u1" }] },
+    ]);
+  });
 });
 
 describe("serializeRouteSheetRow", () => {

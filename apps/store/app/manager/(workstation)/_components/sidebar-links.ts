@@ -1,4 +1,5 @@
 import { createElement, type ComponentType, type ReactElement } from "react";
+import type { ManagerRole } from "@/lib/auth/jwt";
 import {
   BarChart3,
   Bell,
@@ -189,4 +190,129 @@ export const SETTINGS_LINK: SidebarLink = {
 // через `children`-style prop — серіалізується RSC normally.
 export function renderLinkIcon(link: SidebarLink): ReactElement {
   return createElement(link.icon, { className: "h-4 w-4" });
+}
+
+// ─── Єдине джерело правди: видимість пунктів меню за роллю ────────────────
+// І десктопне (`sidebar.tsx`), і мобільне (`sidebar-mobile-trigger.tsx`) меню
+// беруть структуру звідси — щоб гейти не розходились. Раніше логіка ролей була
+// продубльована в обох файлах і мобільне меню помилково не показувало частину
+// пунктів (бейджі, Завдання, Фінанси, Кошик).
+//
+// ⚠️ Правило: змінюючи доступ ролі, редагуй ТІЛЬКИ цю функцію.
+
+/** Ключ бейджа-лічильника біля пункту (рендериться у самих компонентах меню). */
+export type SidebarBadge =
+  | "orders-pending"
+  | "sales-pending"
+  | "chat"
+  | "messenger"
+  | "warehouse-tasks"
+  | "deletions";
+
+export interface SidebarItem {
+  href: string;
+  label: string;
+  icon: ComponentType<{ className?: string }>;
+  /** Опційний бейдж-лічильник (ключ → нода у рендерері меню). */
+  badge?: SidebarBadge;
+}
+
+// Блоки вторинного розділу, які бачить роль `manager` (за ТЗ 2026-07-17).
+// Свідомо приховані від менеджера: Презентації, Категорії, Потреби.
+const MANAGER_SECONDARY_HREFS = new Set<string>([
+  "/manager/customers", // Клієнти
+  "/manager/prices", // Прайс
+  "/manager/message-templates", // Шаблони повідомлень
+  "/manager/reminders", // Нагадування
+  "/manager/closures", // Закриття старих замовлень
+]);
+
+/**
+ * Повертає впорядковані секції меню для ролі. Кожна секція — масив пунктів;
+ * між секціями рендериться роздільник. Порожні секції відкидаються.
+ *
+ * Поведінка ролей, крім `manager`, збережена без змін (буде уточнюватись
+ * пізніше окремо). Для `manager` набір звужено до дозволеного списку.
+ */
+export function getSidebarSections(role: ManagerRole): SidebarItem[][] {
+  const isAdmin = role === "admin";
+  const isOwner = role === "owner";
+  const adminOrOwner = isAdmin || isOwner;
+  const isWarehouse = role === "warehouse";
+  const isManager = role === "manager";
+
+  const sections: SidebarItem[][] = [];
+
+  // Секція A — основні документи (бейджі pending для сайтових).
+  sections.push(
+    PRIMARY_LINKS.map((l) => ({
+      ...l,
+      badge:
+        l.href === "/manager/orders"
+          ? ("orders-pending" as const)
+          : l.href === "/manager/sales"
+            ? ("sales-pending" as const)
+            : undefined,
+    })),
+  );
+
+  // Секція B — вторинні блоки (для менеджера — звужений набір).
+  const secondary = isManager
+    ? SECONDARY_LINKS.filter((l) => MANAGER_SECONDARY_HREFS.has(l.href))
+    : [...SECONDARY_LINKS];
+  sections.push(secondary.map((l) => ({ ...l })));
+
+  // Секція C — комунікації + рольові блоки.
+  const sectionC: SidebarItem[] = [
+    { ...CHAT_LINK, badge: "chat" },
+    { ...MESSENGER_LINK, badge: "messenger" },
+  ];
+  // Завдання: склад/admin/owner (як було) + менеджер (нове — «свої» завдання).
+  if (isWarehouse || adminOrOwner || isManager) {
+    sectionC.push({ ...WAREHOUSE_TASKS_LINK, badge: "warehouse-tasks" });
+  }
+  // Поступлення + Зміна стану мішка — лише склад/admin/owner.
+  if (isWarehouse || adminOrOwner) {
+    sectionC.push({ ...WAREHOUSE_RECEIVINGS_LINK });
+    sectionC.push({ ...BAG_STATE_LINK });
+  }
+  // Довідники та регістри — усі, крім складу, експедитора і менеджера.
+  if (!isWarehouse && role !== "expeditor" && !isManager) {
+    sectionC.push({ ...REGISTRY_LINK });
+  }
+  // Звіти — analyst/admin/owner/supervisor/bookkeeper (менеджер — 2-й етап).
+  if (
+    role === "analyst" ||
+    adminOrOwner ||
+    role === "supervisor" ||
+    role === "bookkeeper"
+  ) {
+    sectionC.push({ ...REPORTS_LINK });
+  }
+  sections.push(sectionC);
+
+  // Секція D — фінансові документи (bookkeeper/admin/owner).
+  if (role === "bookkeeper" || adminOrOwner) {
+    sections.push(FINANCE_LINKS.map((l) => ({ ...l })));
+  }
+
+  // Секція E — адмінка + Кошик + Налаштування.
+  const sectionE: SidebarItem[] = [];
+  if (isAdmin) {
+    sectionE.push({ ...ADMIN_USERS_LINK }, { ...ADMIN_REGION_AGENTS_LINK });
+  }
+  if (adminOrOwner) {
+    sectionE.push(
+      { ...ADMIN_PERMISSIONS_LINK },
+      { ...ADMIN_AUDIT_LINK },
+      { ...ADMIN_DELETIONS_LINK, badge: "deletions" },
+    );
+  }
+  if (isManager || role === "senior_manager" || adminOrOwner) {
+    sectionE.push({ ...TRASH_LINK });
+  }
+  sectionE.push({ ...SETTINGS_LINK });
+  sections.push(sectionE);
+
+  return sections.filter((s) => s.length > 0);
 }

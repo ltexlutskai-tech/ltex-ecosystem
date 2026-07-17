@@ -1,5 +1,6 @@
 import { prisma } from "@ltex/db";
 import type { CurrentManager } from "@/lib/auth/manager-auth";
+import { canView } from "@/lib/permissions/role-permissions";
 
 export interface ConversationAccess {
   conversationId: string;
@@ -10,11 +11,12 @@ export interface ConversationAccess {
 }
 
 /**
- * Перевіряє чи поточний користувач має доступ до розмови.
+ * Перевіряє чи поточний користувач має доступ до розмови (ТЗ 2026-07-17).
  *
- * - admin → завжди дозволено.
- * - manager → дозволено коли `agentUserId === user.id` АБО `agentUserId IS NULL`
- *   (нерозподілена розмова в спільному пулі).
+ * - повний доступ (chat view:all — admin/owner/supervisor) → завжди дозволено;
+ * - менеджер (chat view:mine) → дозволено коли розмова призначена йому
+ *   (`agentUserId === user.id`) АБО клієнт розмови — його
+ *   (`client.agentUserId === user.id`). Нічийний / чужий пул — заборонено.
  *
  * Повертає:
  * - `{ status: 404 }` коли розмови нема;
@@ -38,11 +40,14 @@ export async function getConversationForUser(
       externalUserId: true,
       agentUserId: true,
       clientId: true,
+      client: { select: { agentUserId: true } },
     },
   });
   if (!c) return { status: 404 };
-  if (user.role !== "admin") {
-    const allowed = c.agentUserId === user.id || c.agentUserId === null;
+  const chatScope = canView({ role: user.role }, "chat").scope;
+  if (chatScope !== "all") {
+    const allowed =
+      c.agentUserId === user.id || c.client?.agentUserId === user.id;
     if (!allowed) return { status: 403 };
   }
   return {
