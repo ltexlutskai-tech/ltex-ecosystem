@@ -47,6 +47,23 @@ export function normalizePhone(raw: string | null | undefined): string | null {
 }
 
 /**
+ * Ключ для звірки номера НЕЗАЛЕЖНО від формату — останні 9 цифр.
+ *
+ * У базі номери зберігаються по-різному (`0501234567`, `+380501234567`,
+ * `380501234567`, з пробілами/дужками з 1С). Останні 9 цифр — стабільна
+ * частина українського номера (без коду країни й ведучого 0), тому це надійний
+ * ключ дедуплікації. Дзеркалить БД-колонку `phone_key` (GENERATED ALWAYS).
+ *
+ * Повертає `null`, якщо цифр менше 9 (номер надто короткий, щоб порівнювати).
+ */
+export function phoneMatchKey(raw: string | null | undefined): string | null {
+  if (!raw) return null;
+  const digits = digitsOnly(raw);
+  if (digits.length < UA_NUMBER_LENGTH) return null;
+  return digits.slice(-UA_NUMBER_LENGTH);
+}
+
+/**
  * Форматує номер для display у вигляді `+380 50 123 45 67`.
  * Якщо нормалізація не вдалася — повертає оригінальний рядок.
  */

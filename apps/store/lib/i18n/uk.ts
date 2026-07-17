@@ -480,7 +480,7 @@ export const uk = {
     nameLabel: "Імʼя",
     namePlaceholder: "Як до вас звертатися",
     regionLabel: "Область",
-    regionPlaceholder: "— Не обрано —",
+    regionPlaceholder: "Оберіть область…",
     submit: "Увійти",
     submitting: "Входимо...",
     priceLoginPrompt: "Увійдіть щоб побачити ціну",

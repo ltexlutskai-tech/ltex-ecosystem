@@ -1,21 +1,27 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest } from "next/server";
 
-const { mockPrisma, rateLimitMock, setCookieMock, notifyNewLeadMock } =
-  vi.hoisted(() => ({
-    mockPrisma: {
-      customer: {
-        findFirst: vi.fn(),
-        create: vi.fn(),
-        update: vi.fn(),
-      },
+const {
+  mockPrisma,
+  rateLimitMock,
+  setCookieMock,
+  notifyNewLeadMock,
+  createSiteLeadMock,
+} = vi.hoisted(() => ({
+  mockPrisma: {
+    customer: {
+      findFirst: vi.fn(),
+      create: vi.fn(),
+      update: vi.fn(),
     },
-    rateLimitMock: vi
-      .fn()
-      .mockReturnValue({ allowed: true, remaining: 5, resetAt: Date.now() }),
-    setCookieMock: vi.fn().mockResolvedValue(undefined),
-    notifyNewLeadMock: vi.fn().mockResolvedValue(undefined),
-  }));
+  },
+  rateLimitMock: vi
+    .fn()
+    .mockReturnValue({ allowed: true, remaining: 5, resetAt: Date.now() }),
+  setCookieMock: vi.fn().mockResolvedValue(undefined),
+  notifyNewLeadMock: vi.fn().mockResolvedValue(undefined),
+  createSiteLeadMock: vi.fn().mockResolvedValue(undefined),
+}));
 
 vi.mock("@ltex/db", () => ({
   prisma: mockPrisma,
@@ -34,7 +40,14 @@ vi.mock("@/lib/notifications", () => ({
   notifyNewLead: (...args: unknown[]) => notifyNewLeadMock(...args),
 }));
 
+vi.mock("@/lib/manager/site-lead", () => ({
+  createSiteLead: (...args: unknown[]) => createSiteLeadMock(...args),
+}));
+
 import { POST } from "./route";
+
+// Валідна область (slug) — обовʼязкова у кожному запиті.
+const REGION = "volynska"; // → "Волинська"
 
 function makeRequest(body: unknown): NextRequest {
   return new NextRequest("http://localhost/api/auth/customer/login", {
@@ -56,12 +69,12 @@ describe("POST /api/auth/customer/login", () => {
     mockPrisma.customer.create.mockResolvedValue({
       id: "customer-1",
       name: "Іван",
-      city: null,
+      region: null,
     });
     mockPrisma.customer.update.mockResolvedValue({
       id: "customer-1",
       name: "Іван",
-      city: null,
+      region: null,
     });
   });
 
@@ -70,30 +83,39 @@ describe("POST /api/auth/customer/login", () => {
     expect(res.status).toBe(400);
   });
 
-  it("creates a new customer when none exists by phone", async () => {
+  it("rejects when region is missing", async () => {
     const res = await POST(
       makeRequest({ phone: "+380671234567", name: "Іван" }),
     );
+    expect(res.status).toBe(400);
+  });
+
+  it("rejects an unknown region slug", async () => {
+    const res = await POST(
+      makeRequest({ phone: "+380671234567", name: "Іван", region: "narnia" }),
+    );
+    expect(res.status).toBe(400);
+  });
+
+  it("creates a new customer (phone + region label) when none exists", async () => {
+    const res = await POST(
+      makeRequest({ phone: "+380671234567", name: "Іван", region: REGION }),
+    );
     expect(res.status).toBe(200);
     expect(mockPrisma.customer.create).toHaveBeenCalledWith({
-      data: { phone: "+380671234567", name: "Іван", city: null },
-      select: { id: true, name: true, city: true },
+      data: { phone: "+380671234567", name: "Іван", region: "Волинська" },
+      select: { id: true, name: true, region: true },
     });
     expect(setCookieMock).toHaveBeenCalledWith("customer-1");
   });
 
-  it("creates a customer with city when provided", async () => {
-    const res = await POST(
-      makeRequest({
-        phone: "+380671234567",
-        name: "Іван",
-        city: "Волинська",
-      }),
+  it("looks up an existing customer by phoneKey (last 9 digits)", async () => {
+    await POST(
+      makeRequest({ phone: "0671234567", name: "Іван", region: REGION }),
     );
-    expect(res.status).toBe(200);
-    expect(mockPrisma.customer.create).toHaveBeenCalledWith({
-      data: { phone: "+380671234567", name: "Іван", city: "Волинська" },
-      select: { id: true, name: true, city: true },
+    expect(mockPrisma.customer.findFirst).toHaveBeenCalledWith({
+      where: { phoneKey: "671234567" },
+      select: { id: true, name: true, region: true },
     });
   });
 
@@ -101,10 +123,10 @@ describe("POST /api/auth/customer/login", () => {
     mockPrisma.customer.findFirst.mockResolvedValue({
       id: "customer-existing",
       name: "Олена",
-      city: null,
+      region: "Волинська",
     });
     const res = await POST(
-      makeRequest({ phone: "+380671234567", name: "Олена" }),
+      makeRequest({ phone: "+380671234567", name: "Олена", region: REGION }),
     );
     expect(res.status).toBe(200);
     expect(mockPrisma.customer.create).not.toHaveBeenCalled();
@@ -116,10 +138,10 @@ describe("POST /api/auth/customer/login", () => {
     mockPrisma.customer.findFirst.mockResolvedValue({
       id: "customer-existing",
       name: "   ",
-      city: null,
+      region: "Волинська",
     });
     const res = await POST(
-      makeRequest({ phone: "+380671234567", name: "Іван" }),
+      makeRequest({ phone: "+380671234567", name: "Іван", region: REGION }),
     );
     expect(res.status).toBe(200);
     expect(mockPrisma.customer.update).toHaveBeenCalledWith({
@@ -128,66 +150,30 @@ describe("POST /api/auth/customer/login", () => {
     });
   });
 
-  it("does NOT overwrite an existing non-empty name on login", async () => {
-    // User edited their name to "Олена" via /account; on next login they still
-    // submit "Стара" from the form — the DB value must win.
+  it("also backfills region when the existing name is non-empty but region empty", async () => {
     mockPrisma.customer.findFirst.mockResolvedValue({
       id: "customer-existing",
       name: "Олена",
-      city: null,
+      region: null,
     });
     const res = await POST(
-      makeRequest({ phone: "+380671234567", name: "Стара" }),
-    );
-    expect(res.status).toBe(200);
-    expect(mockPrisma.customer.update).not.toHaveBeenCalled();
-  });
-
-  it("does NOT overwrite an existing non-null city on login", async () => {
-    mockPrisma.customer.findFirst.mockResolvedValue({
-      id: "customer-existing",
-      name: "Олена",
-      city: "Львівська",
-    });
-    const res = await POST(
-      makeRequest({
-        phone: "+380671234567",
-        name: "Олена",
-        city: "Київська",
-      }),
-    );
-    expect(res.status).toBe(200);
-    expect(mockPrisma.customer.update).not.toHaveBeenCalled();
-  });
-
-  it("updates city when an existing customer logs in with a region", async () => {
-    mockPrisma.customer.findFirst.mockResolvedValue({
-      id: "customer-existing",
-      name: "Олена",
-      city: null,
-    });
-    const res = await POST(
-      makeRequest({
-        phone: "+380671234567",
-        name: "Олена",
-        city: "Львівська",
-      }),
+      makeRequest({ phone: "+380671234567", name: "Стара", region: REGION }),
     );
     expect(res.status).toBe(200);
     expect(mockPrisma.customer.update).toHaveBeenCalledWith({
       where: { id: "customer-existing" },
-      data: { city: "Львівська" },
+      data: { region: "Волинська" },
     });
   });
 
-  it("does not update city when not provided in payload (preserves existing)", async () => {
+  it("does NOT overwrite an existing non-null region on login", async () => {
     mockPrisma.customer.findFirst.mockResolvedValue({
       id: "customer-existing",
       name: "Олена",
-      city: "Волинська",
+      region: "Львівська",
     });
     const res = await POST(
-      makeRequest({ phone: "+380671234567", name: "Олена" }),
+      makeRequest({ phone: "+380671234567", name: "Олена", region: REGION }),
     );
     expect(res.status).toBe(200);
     expect(mockPrisma.customer.update).not.toHaveBeenCalled();
@@ -199,42 +185,35 @@ describe("POST /api/auth/customer/login", () => {
       remaining: 0,
       resetAt: Date.now() + 60_000,
     });
-    const res = await POST(makeRequest({ phone: "+380", name: "x" }));
+    const res = await POST(
+      makeRequest({ phone: "+380", name: "x", region: REGION }),
+    );
     expect(res.status).toBe(429);
   });
 
-  it("normalises a 0XX local phone to +380", async () => {
-    await POST(makeRequest({ phone: "0671234567", name: "Іван" }));
-    expect(mockPrisma.customer.findFirst).toHaveBeenCalledWith({
-      where: { phone: "+380671234567" },
-      select: { id: true, name: true, city: true },
+  it("normalises a 0XX local phone to +380 on create", async () => {
+    await POST(
+      makeRequest({ phone: "0671234567", name: "Іван", region: REGION }),
+    );
+    expect(mockPrisma.customer.create).toHaveBeenCalledWith({
+      data: { phone: "+380671234567", name: "Іван", region: "Волинська" },
+      select: { id: true, name: true, region: true },
     });
   });
 
-  it("fires notifyNewLead exactly once when a new customer is created", async () => {
+  it("rejects a phone that is too short to normalise", async () => {
     const res = await POST(
-      makeRequest({ phone: "+380671234567", name: "Іван" }),
+      makeRequest({ phone: "12345", name: "Іван", region: REGION }),
+    );
+    expect(res.status).toBe(400);
+  });
+
+  it("fires notifyNewLead once (region as city) when a customer is created", async () => {
+    const res = await POST(
+      makeRequest({ phone: "+380671234567", name: "Іван", region: REGION }),
     );
     expect(res.status).toBe(200);
     expect(notifyNewLeadMock).toHaveBeenCalledTimes(1);
-    expect(notifyNewLeadMock).toHaveBeenCalledWith({
-      customerId: "customer-1",
-      phone: "+380671234567",
-      name: "Іван",
-      city: null,
-      source: "web",
-    });
-  });
-
-  it("forwards city to notifyNewLead when provided on creation", async () => {
-    const res = await POST(
-      makeRequest({
-        phone: "+380671234567",
-        name: "Іван",
-        city: "Волинська",
-      }),
-    );
-    expect(res.status).toBe(200);
     expect(notifyNewLeadMock).toHaveBeenCalledWith({
       customerId: "customer-1",
       phone: "+380671234567",
@@ -244,51 +223,45 @@ describe("POST /api/auth/customer/login", () => {
     });
   });
 
+  it("passes the region slug to createSiteLead on creation", async () => {
+    await POST(
+      makeRequest({ phone: "+380671234567", name: "Іван", region: REGION }),
+    );
+    expect(createSiteLeadMock).toHaveBeenCalledWith({
+      name: "Іван",
+      phone: "+380671234567",
+      regionSlug: REGION,
+    });
+  });
+
   it("does NOT fire notifyNewLead for an existing customer (login, no create)", async () => {
     mockPrisma.customer.findFirst.mockResolvedValue({
       id: "customer-existing",
       name: "Олена",
-      city: null,
+      region: "Волинська",
     });
     const res = await POST(
-      makeRequest({ phone: "+380671234567", name: "Олена" }),
+      makeRequest({ phone: "+380671234567", name: "Олена", region: REGION }),
     );
     expect(res.status).toBe(200);
     expect(notifyNewLeadMock).not.toHaveBeenCalled();
-  });
-
-  it("does NOT fire notifyNewLead when an existing customer just renames", async () => {
-    mockPrisma.customer.findFirst.mockResolvedValue({
-      id: "customer-existing",
-      name: "Стара",
-      city: null,
-    });
-    const res = await POST(
-      makeRequest({ phone: "+380671234567", name: "Нова" }),
-    );
-    expect(res.status).toBe(200);
-    expect(notifyNewLeadMock).not.toHaveBeenCalled();
+    expect(createSiteLeadMock).not.toHaveBeenCalled();
   });
 
   it("does not fail the response when notifyNewLead rejects", async () => {
     notifyNewLeadMock.mockRejectedValueOnce(new Error("TG down"));
     const res = await POST(
-      makeRequest({ phone: "+380671234567", name: "Іван" }),
+      makeRequest({ phone: "+380671234567", name: "Іван", region: REGION }),
     );
     expect(res.status).toBe(200);
   });
 
   it("ignores sessionId from the request body (no cart merge)", async () => {
-    // sessionId from body is unverifiable (lives in localStorage on the
-    // client) — accepting it would let an attacker absorb a victim's guest
-    // cart by submitting their sessionId. Login must succeed but not touch
-    // any Cart row.
-    // The schema no longer accepts sessionId, so passing it via JSON is a
-    // no-op — login still succeeds and no Cart row is touched.
     const res = await POST(
       makeRequest({
         phone: "+380671234567",
         name: "Іван",
+        region: REGION,
         sessionId: "victim-session-id",
       }),
     );
