@@ -3,7 +3,7 @@
 import { prisma } from "@ltex/db";
 import { revalidatePath } from "next/cache";
 import { getCurrentUser } from "@/lib/auth/manager-auth";
-import { canManageCatalog } from "@/lib/manager/catalog-permissions";
+import { canManageCatalogStructure } from "@/lib/manager/catalog-permissions";
 
 /**
  * Зміна «Середньої ваги» товару з картки — характеристика, яку система
@@ -17,7 +17,7 @@ export async function updateProductAverageWeight(
   averageWeight: number | null,
 ): Promise<void> {
   const user = await getCurrentUser();
-  if (!user || !canManageCatalog(user.role)) {
+  if (!user || !canManageCatalogStructure(user.role)) {
     throw new Error("Немає прав керувати каталогом");
   }
 

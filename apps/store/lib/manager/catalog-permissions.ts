@@ -11,3 +11,14 @@ export const CATALOG_MANAGER_ROLES: ReadonlySet<ManagerRole> =
 export function canManageCatalog(role: ManagerRole): boolean {
   return CATALOG_MANAGER_ROLES.has(role);
 }
+
+/**
+ * Структурні дії над товаром (середня вага, категорія, фото) — лише власник
+ * та адмін (рішення user 2026-07-17). Склад бачить, але не змінює.
+ */
+export const CATALOG_STRUCTURE_ROLES: ReadonlySet<ManagerRole> =
+  new Set<ManagerRole>(["admin", "owner"]);
+
+export function canManageCatalogStructure(role: ManagerRole): boolean {
+  return CATALOG_STRUCTURE_ROLES.has(role);
+}

@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import type { LotGroup, LotListItem } from "@/lib/manager/lots-list";
 import { CopyBarcode } from "./copy-barcode";
 import { LotCardModal } from "./lot-card-modal";
+import { LotRowMenu, type LotRowMenuTarget } from "./lot-row-menu";
 
 interface Props {
   groups: LotGroup[];
@@ -84,7 +85,20 @@ function BookingCell({ lot }: { lot: LotListItem }) {
 
 export function AllLotsList({ groups, rateUah, sellerName }: Props) {
   const [openLotId, setOpenLotId] = useState<string | null>(null);
+  const [lotMenu, setLotMenu] = useState<LotRowMenuTarget | null>(null);
+  const [lotMenuPos, setLotMenuPos] = useState<{ x: number; y: number } | null>(
+    null,
+  );
   const searchParams = useSearchParams();
+
+  function openMenu(target: LotRowMenuTarget, x: number, y: number) {
+    setLotMenu(target);
+    setLotMenuPos({ x, y });
+  }
+  function closeMenu() {
+    setLotMenu(null);
+    setLotMenuPos(null);
+  }
 
   // Авто-відкриття картки лоту з `?lotId=` (діплінк з нагадування «Перенести
   // бронь»). LotCardModal сам тягне лот за id — отже працює навіть коли лот не
@@ -110,6 +124,7 @@ export function AllLotsList({ groups, rateUah, sellerName }: Props) {
           key={group.productId}
           group={group}
           onOpen={setOpenLotId}
+          onOpenMenu={openMenu}
         />
       ))}
 
@@ -118,6 +133,14 @@ export function AllLotsList({ groups, rateUah, sellerName }: Props) {
         lotId={openLotId}
         onClose={() => setOpenLotId(null)}
         rateUah={rateUah}
+        sellerName={sellerName}
+      />
+
+      <LotRowMenu
+        target={lotMenu}
+        position={lotMenuPos}
+        onClose={closeMenu}
+        onOpenCard={setOpenLotId}
         sellerName={sellerName}
       />
     </div>
@@ -132,11 +155,39 @@ export function AllLotsList({ groups, rateUah, sellerName }: Props) {
 function LotGroupSection({
   group,
   onOpen,
+  onOpenMenu,
 }: {
   group: LotGroup;
   onOpen: (id: string) => void;
+  onOpenMenu: (target: LotRowMenuTarget, x: number, y: number) => void;
 }) {
   const [open, setOpen] = useState(true);
+  const longPress = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const longPressFired = useRef(false);
+
+  function menuTarget(lot: LotListItem): LotRowMenuTarget {
+    return {
+      lotId: lot.id,
+      barcode: lot.barcode,
+      productId: group.productId,
+      productName: group.productName,
+      articleCode: group.articleCode,
+    };
+  }
+  function startLongPress(lot: LotListItem, x: number, y: number) {
+    clearLongPress();
+    longPressFired.current = false;
+    longPress.current = setTimeout(() => {
+      longPressFired.current = true;
+      onOpenMenu(menuTarget(lot), x, y);
+    }, 500);
+  }
+  function clearLongPress() {
+    if (longPress.current) {
+      clearTimeout(longPress.current);
+      longPress.current = null;
+    }
+  }
 
   return (
     <section className="overflow-hidden rounded-lg border bg-white shadow-sm">
@@ -199,6 +250,10 @@ function LotGroupSection({
                   <tr
                     key={lot.id}
                     onClick={() => onOpen(lot.id)}
+                    onContextMenu={(e) => {
+                      e.preventDefault();
+                      onOpenMenu(menuTarget(lot), e.clientX, e.clientY);
+                    }}
                     className={`cursor-pointer ${rowClass(lot)}`}
                   >
                     <td className="px-2.5 py-1.5 font-mono text-xs text-gray-600">
@@ -247,7 +302,25 @@ function LotGroupSection({
                 key={lot.id}
                 role="button"
                 tabIndex={0}
-                onClick={() => onOpen(lot.id)}
+                onClick={(e) => {
+                  if (longPressFired.current) {
+                    e.preventDefault();
+                    longPressFired.current = false;
+                    return;
+                  }
+                  onOpen(lot.id);
+                }}
+                onContextMenu={(e) => {
+                  e.preventDefault();
+                  onOpenMenu(menuTarget(lot), e.clientX, e.clientY);
+                }}
+                onTouchStart={(e) => {
+                  const t = e.touches[0];
+                  if (t) startLongPress(lot, t.clientX, t.clientY);
+                }}
+                onTouchEnd={clearLongPress}
+                onTouchMove={clearLongPress}
+                onTouchCancel={clearLongPress}
                 onKeyDown={(e) => {
                   if (e.key === "Enter" || e.key === " ") onOpen(lot.id);
                 }}

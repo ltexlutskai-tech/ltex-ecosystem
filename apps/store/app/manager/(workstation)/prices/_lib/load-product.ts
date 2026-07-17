@@ -101,6 +101,32 @@ export interface ProductCardVM {
   /** Активні замовлення на товар (← Етап 1 блоку Замовлень). null коли viewer
    *  не передано (анонімний рендер). */
   claims: ProductClaims | null;
+  /** Ціни постачальників (історія закупівель з Поступлень, новіші зверху) —
+   *  показуються лише власнику/адміну. */
+  supplierPrices: SupplierPriceVM[];
+  /** Сирі поля для редактора «Характеристики» (значення as-is у Product). */
+  edit: ProductEditFields;
+}
+
+export interface SupplierPriceVM {
+  supplierName: string;
+  priceEur: number;
+  dateIso: string;
+  /** 'receiving' (з документа поступлення) | 'manual' (ручний запис). */
+  source: string;
+}
+
+export interface ProductEditFields {
+  season: string;
+  quality: string;
+  gender: string;
+  country: string;
+  sizes: string;
+  unitsPerKg: string;
+  unitWeight: string;
+  filling: string;
+  producer: string;
+  videoUrl: string;
 }
 
 export async function loadProductCard(
@@ -125,6 +151,8 @@ export async function loadProductCard(
       sizes: true,
       unitsPerKg: true,
       unitWeight: true,
+      filling: true,
+      producer: true,
       quality: true,
       season: true,
       country: true,
@@ -193,6 +221,26 @@ export async function loadProductCard(
   // картка товару одразу мала повний контекст (хто і на скільки претендує).
   // Анонімний рендер (viewerUserId не передано) → null (відключаємо панель).
   const claims = viewerUserId ? await getProductClaims(id, viewerUserId) : null;
+
+  // Ціни постачальників — історія закупівель (PurchasePrice) з Поступлень.
+  // Реєструються автоматично при проведенні поступлення; показуємо історію.
+  const purchaseRows = await prisma.purchasePrice.findMany({
+    where: { productId: id },
+    orderBy: { validFrom: "desc" },
+    take: 50,
+    select: {
+      priceEur: true,
+      validFrom: true,
+      source: true,
+      supplier: { select: { name: true } },
+    },
+  });
+  const supplierPrices: SupplierPriceVM[] = purchaseRows.map((r) => ({
+    supplierName: r.supplier?.name ?? "—",
+    priceEur: r.priceEur,
+    dateIso: r.validFrom.toISOString(),
+    source: r.source,
+  }));
 
   const rawPrices: RawPrice[] = product.prices.map((p) => ({
     priceType: p.priceType,
@@ -288,6 +336,19 @@ export async function loadProductCard(
     // Кількість наявних лотів (після фільтра) — для заголовка «Лоти в наявності (N)».
     totalLotsCount: lots.length,
     claims,
+    supplierPrices,
+    edit: {
+      season: product.season ?? "",
+      quality: product.quality ?? "",
+      gender: product.gender ?? "",
+      country: product.country ?? "",
+      sizes: product.sizes ?? "",
+      unitsPerKg: product.unitsPerKg ?? "",
+      unitWeight: product.unitWeight ?? "",
+      filling: product.filling ?? "",
+      producer: product.producer ?? "",
+      videoUrl: product.videoUrl ?? "",
+    },
   };
 }
 

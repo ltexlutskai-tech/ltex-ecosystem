@@ -137,12 +137,13 @@ export function AllLotsToolbar({ totalCount, productLabel }: Props) {
       <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-gray-500">
         <Button
           type="button"
-          variant="outline"
+          variant="ghost"
           size="sm"
           disabled={isPending}
           onClick={() => startTransition(() => router.refresh())}
+          title="Оновити дані (зазвичай оновлюється автоматично)"
         >
-          Оновити залишки та ціни
+          {isPending ? "Оновлення…" : "↻ Оновити"}
         </Button>
         <span>Знайдено: {totalCount}</span>
       </div>

@@ -22,19 +22,16 @@ function formatPrice(value: number | null, currency: string): string {
 }
 
 /**
- * Залишок на складі по тонажу і кількості (вільні лоти). Показуємо і кг, і шт —
- * порожні значення пропускаємо; якщо все по нулях → «немає».
+ * Залишок на складі: загальна вага (кг) + кількість вільних лотів (мішків).
+ * Кількість лотів — це саме к-сть наявних мішків, не одиниць у мішку.
  */
 function formatRemaining(row: PriceRow): string {
-  const parts: string[] = [];
-  if (row.remainingKg > 0) {
-    parts.push(`${row.remainingKg.toLocaleString("uk-UA")} кг`);
-  }
-  if (row.remainingUnits > 0) {
-    parts.push(`${row.remainingUnits.toLocaleString("uk-UA")} шт`);
-  }
-  if (parts.length === 0) return "немає";
-  return parts.join(" · ");
+  if (row.freeLotsCount === 0) return "немає";
+  const kg =
+    row.remainingKg > 0
+      ? `${row.remainingKg.toLocaleString("uk-UA")} кг · `
+      : "";
+  return `${kg}${row.freeLotsCount} лот.`;
 }
 
 /** Підсвічування рядка: цільові/з відео — зелено; нові — янтарно. */

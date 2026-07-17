@@ -3,7 +3,7 @@
 import { prisma } from "@ltex/db";
 import { revalidatePath } from "next/cache";
 import { getCurrentUser } from "@/lib/auth/manager-auth";
-import { canManageCatalog } from "@/lib/manager/catalog-permissions";
+import { canManageCatalogStructure } from "@/lib/manager/catalog-permissions";
 
 /**
  * Зміна категорії товару з CRM-картки (7.2). Гейт — роль каталогу
@@ -15,7 +15,7 @@ export async function changeProductCategory(
   categoryId: string,
 ): Promise<void> {
   const user = await getCurrentUser();
-  if (!user || !canManageCatalog(user.role)) {
+  if (!user || !canManageCatalogStructure(user.role)) {
     throw new Error("Немає прав керувати каталогом");
   }
   if (!categoryId) throw new Error("Оберіть категорію");
