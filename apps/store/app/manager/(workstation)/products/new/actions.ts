@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 import { generateSlug } from "@ltex/shared";
 import { getCurrentUser } from "@/lib/auth/manager-auth";
 import { canManageCatalog } from "@/lib/manager/catalog-permissions";
+import { parseNumericRange } from "@/lib/manager/parse-numeric-range";
 
 export interface CreateProductState {
   error?: string;
@@ -44,6 +45,14 @@ async function nextProductCode1C(): Promise<string> {
 }
 
 /**
+ * Підказка коду товару для форми (наступний вільний 1С-код). Форма підставляє
+ * його у поле «Код товару», але користувач може перезаписати вручну.
+ */
+export async function suggestNextProductCode1C(): Promise<string> {
+  return nextProductCode1C();
+}
+
+/**
  * Створення товару з CRM (7.2 Блок 3.3). Гейт — роль каталогу. Обовʼязкові
  * поля (рішення user): назва, артикул, категорія, одиниця, ціна, опис, стать,
  * розміри. Quality + country потрібні схемою Product (теж у формі). Створює
@@ -69,6 +78,16 @@ export async function createManagerProduct(
   const sizes = ((formData.get("sizes") as string) || "").trim() || null;
   const producer = ((formData.get("producer") as string) || "").trim() || null;
   const videoUrl = ((formData.get("videoUrl") as string) || "").trim() || null;
+  const season = ((formData.get("season") as string) || "").trim();
+  const filling = ((formData.get("filling") as string) || "").trim() || null;
+  const unitsPerKgRaw =
+    ((formData.get("unitsPerKg") as string) || "").trim() || null;
+  const unitWeightRaw =
+    ((formData.get("unitWeight") as string) || "").trim() || null;
+  const averageWeightRaw = (
+    (formData.get("averageWeight") as string) || ""
+  ).trim();
+  const code1CInput = ((formData.get("code1C") as string) || "").trim();
   const price = Number.parseFloat((formData.get("price") as string) ?? "");
 
   if (!name) return { error: "Назва обовʼязкова" };
@@ -83,8 +102,24 @@ export async function createManagerProduct(
     return { error: "Вкажіть коректну ціну (€)" };
   }
 
+  const averageWeight =
+    averageWeightRaw && Number.isFinite(Number.parseFloat(averageWeightRaw))
+      ? Number.parseFloat(averageWeightRaw)
+      : null;
+  const unitsRange = parseNumericRange(unitsPerKgRaw);
+  const weightRange = parseNumericRange(unitWeightRaw);
+
+  // Код 1С: користувач може вписати свій; інакше — наступний вільний.
+  const code1C = code1CInput || (await nextProductCode1C());
+  if (code1CInput) {
+    const clash = await prisma.product.findUnique({
+      where: { code1C: code1CInput },
+      select: { id: true },
+    });
+    if (clash) return { error: `Код товару «${code1CInput}» вже зайнятий` };
+  }
+
   const slug = await uniqueSlug(generateSlug(name));
-  const code1C = await nextProductCode1C();
 
   let productId: string;
   try {
@@ -97,12 +132,21 @@ export async function createManagerProduct(
         categoryId,
         quality,
         country,
+        season,
         priceUnit,
         description,
         gender,
         sizes,
+        filling,
         producer,
         videoUrl,
+        averageWeight,
+        unitsPerKg: unitsPerKgRaw,
+        unitsPerKgMin: unitsRange?.min ?? null,
+        unitsPerKgMax: unitsRange?.max ?? null,
+        unitWeight: unitWeightRaw,
+        unitWeightMin: weightRange?.min ?? null,
+        unitWeightMax: weightRange?.max ?? null,
         inStock: true,
       },
       select: { id: true },

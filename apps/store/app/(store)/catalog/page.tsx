@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { CATEGORIES } from "@ltex/shared";
 import { getCatalogProducts } from "@/lib/catalog";
+import { loadProductAttributeOptions } from "@/lib/manager/product-attributes";
 import { ProductCard } from "@/components/store/product-card";
 import { CatalogSidebar } from "@/components/store/catalog-sidebar";
 import { Pagination } from "@/components/store/pagination";
@@ -76,6 +77,8 @@ export default async function CatalogPage({
     page,
   });
 
+  const attributeOptions = await loadProductAttributeOptions();
+
   const filterParams = new URLSearchParams();
   const qParam = getStr(params.quality);
   if (qParam) filterParams.set("quality", qParam);
@@ -131,7 +134,7 @@ export default async function CatalogPage({
       </div>
 
       <div className="mt-6 flex flex-col gap-6 lg:flex-row">
-        <CatalogSidebar />
+        <CatalogSidebar attributeOptions={attributeOptions} />
 
         <div className="min-w-0 flex-1">
           {products.length === 0 ? (

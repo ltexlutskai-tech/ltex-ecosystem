@@ -142,18 +142,37 @@ function raw(over: Partial<RawPriceProduct> = {}): RawPriceProduct {
 }
 
 describe("deriveProductRow", () => {
-  it("сумує залишок тільки вільних лотів", () => {
+  it("сумує залишок (кг + шт) тільки вільних лотів", () => {
     const row = deriveProductRow(
       raw({
         lots: [
-          { weight: 10, status: "free", isTarget: false, videoUrl: null },
-          { weight: 5, status: "free", isTarget: false, videoUrl: null },
-          { weight: 100, status: "sold", isTarget: false, videoUrl: null },
+          {
+            weight: 10,
+            quantity: 3,
+            status: "free",
+            isTarget: false,
+            videoUrl: null,
+          },
+          {
+            weight: 5,
+            quantity: 2,
+            status: "free",
+            isTarget: false,
+            videoUrl: null,
+          },
+          {
+            weight: 100,
+            quantity: 50,
+            status: "sold",
+            isTarget: false,
+            videoUrl: null,
+          },
         ],
       }),
       NOW,
     );
     expect(row.remainingKg).toBe(15);
+    expect(row.remainingUnits).toBe(5);
     expect(row.freeLotsCount).toBe(2);
   });
 
@@ -187,7 +206,15 @@ describe("deriveProductRow", () => {
   it("isTarget якщо будь-який лот цільовий", () => {
     const row = deriveProductRow(
       raw({
-        lots: [{ weight: 1, status: "free", isTarget: true, videoUrl: null }],
+        lots: [
+          {
+            weight: 1,
+            quantity: 1,
+            status: "free",
+            isTarget: true,
+            videoUrl: null,
+          },
+        ],
       }),
       NOW,
     );
@@ -199,7 +226,15 @@ describe("deriveProductRow", () => {
     expect(
       deriveProductRow(
         raw({
-          lots: [{ weight: 1, status: "free", isTarget: false, videoUrl: "u" }],
+          lots: [
+            {
+              weight: 1,
+              quantity: 1,
+              status: "free",
+              isTarget: false,
+              videoUrl: "u",
+            },
+          ],
         }),
         NOW,
       ).hasVideo,

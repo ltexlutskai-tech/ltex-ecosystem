@@ -3,6 +3,7 @@ import Link from "next/link";
 import { prisma } from "@ltex/db";
 import { notFound } from "next/navigation";
 import { getCatalogProducts } from "@/lib/catalog";
+import { loadProductAttributeOptions } from "@/lib/manager/product-attributes";
 import { ProductCard } from "@/components/store/product-card";
 import { CatalogSidebar } from "@/components/store/catalog-sidebar";
 import { Pagination } from "@/components/store/pagination";
@@ -109,6 +110,8 @@ export default async function CategoryPage({ params, searchParams }: Props) {
     page,
   });
 
+  const attributeOptions = await loadProductAttributeOptions();
+
   const filterParams = new URLSearchParams();
   const qParam = getStr(sp.quality);
   if (qParam) filterParams.set("quality", qParam);
@@ -200,6 +203,7 @@ export default async function CategoryPage({ params, searchParams }: Props) {
             slug: c.slug,
             name: c.name,
           }))}
+          attributeOptions={attributeOptions}
         />
 
         <div className="min-w-0 flex-1">

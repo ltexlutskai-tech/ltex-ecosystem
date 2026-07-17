@@ -2,10 +2,15 @@
 
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { QUALITY_LEVELS, QUALITY_LABELS } from "@ltex/shared";
-import { SEASONS, SEASON_LABELS } from "@ltex/shared";
-import { COUNTRIES, COUNTRY_LABELS } from "@ltex/shared";
-import { GENDER_OPTIONS } from "@ltex/shared";
+import {
+  QUALITY_LEVELS,
+  QUALITY_LABELS,
+  SEASONS,
+  SEASON_LABELS,
+  COUNTRIES,
+  COUNTRY_LABELS,
+  GENDER_OPTIONS,
+} from "@ltex/shared";
 import { SearchAutocomplete } from "./search-autocomplete";
 import { RangeWithInputs } from "./range-with-inputs";
 import { getDictionary } from "@/lib/i18n";
@@ -23,6 +28,19 @@ export interface SubcategoryOption {
   name: string;
 }
 
+export interface CatalogAttrOption {
+  value: string;
+  label: string;
+}
+
+/** Опції характеристик товару з довідників (fallback — спільні константи). */
+export interface CatalogAttributeOptions {
+  quality: CatalogAttrOption[];
+  countries: CatalogAttrOption[];
+  genders: CatalogAttrOption[];
+  seasons: CatalogAttrOption[];
+}
+
 function parseList(raw: string | null): string[] {
   if (!raw) return [];
   return raw
@@ -31,11 +49,33 @@ function parseList(raw: string | null): string[] {
     .filter(Boolean);
 }
 
+const QUALITY_FALLBACK: CatalogAttrOption[] = QUALITY_LEVELS.map((q) => ({
+  value: q,
+  label: QUALITY_LABELS[q],
+}));
+const COUNTRY_FALLBACK: CatalogAttrOption[] = COUNTRIES.map((c) => ({
+  value: c,
+  label: COUNTRY_LABELS[c],
+}));
+const GENDER_FALLBACK: CatalogAttrOption[] = GENDER_OPTIONS.map((g) => ({
+  value: g,
+  label: g,
+}));
+const SEASON_FALLBACK: CatalogAttrOption[] = SEASONS.filter(
+  (s) => s !== "",
+).map((s) => ({ value: s, label: SEASON_LABELS[s] ?? s }));
+
 export function CatalogFilters({
   subcategories,
+  attributeOptions,
 }: {
   subcategories?: SubcategoryOption[];
+  attributeOptions?: CatalogAttributeOptions;
 } = {}) {
+  const qualityOptions = attributeOptions?.quality ?? QUALITY_FALLBACK;
+  const countryOptions = attributeOptions?.countries ?? COUNTRY_FALLBACK;
+  const genderOptions = attributeOptions?.genders ?? GENDER_FALLBACK;
+  const seasonOptions = attributeOptions?.seasons ?? SEASON_FALLBACK;
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -179,20 +219,20 @@ export function CatalogFilters({
       <div>
         <span className={labelClass}>{dict.catalog.qualityLabel}</span>
         <div className="space-y-1.5">
-          {QUALITY_LEVELS.map((q) => {
-            const checked = selectedQualities.includes(q);
+          {qualityOptions.map((q) => {
+            const checked = selectedQualities.includes(q.value);
             return (
               <label
-                key={q}
+                key={q.value}
                 className="flex cursor-pointer items-center gap-2 text-sm text-gray-700"
               >
                 <input
                   type="checkbox"
                   checked={checked}
-                  onChange={() => toggleListValue("quality", q)}
+                  onChange={() => toggleListValue("quality", q.value)}
                   className="h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-1 focus:ring-green-500"
                 />
-                <span>{QUALITY_LABELS[q]}</span>
+                <span>{q.label}</span>
               </label>
             );
           })}
@@ -210,9 +250,9 @@ export function CatalogFilters({
           className={selectClass}
         >
           <option value="">{dict.catalog.allSeasons}</option>
-          {SEASONS.filter((s) => s !== "").map((s) => (
-            <option key={s} value={s}>
-              {SEASON_LABELS[s]}
+          {seasonOptions.map((s) => (
+            <option key={s.value} value={s.value}>
+              {s.label}
             </option>
           ))}
         </select>
@@ -221,20 +261,20 @@ export function CatalogFilters({
       <div>
         <span className={labelClass}>{dict.catalog.countryLabel}</span>
         <div className="space-y-1.5">
-          {COUNTRIES.map((c) => {
-            const checked = selectedCountries.includes(c);
+          {countryOptions.map((c) => {
+            const checked = selectedCountries.includes(c.value);
             return (
               <label
-                key={c}
+                key={c.value}
                 className="flex cursor-pointer items-center gap-2 text-sm text-gray-700"
               >
                 <input
                   type="checkbox"
                   checked={checked}
-                  onChange={() => toggleListValue("country", c)}
+                  onChange={() => toggleListValue("country", c.value)}
                   className="h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-1 focus:ring-green-500"
                 />
-                <span>{COUNTRY_LABELS[c]}</span>
+                <span>{c.label}</span>
               </label>
             );
           })}
@@ -244,20 +284,20 @@ export function CatalogFilters({
       <div>
         <span className={labelClass}>{dict.catalog.genderLabel}</span>
         <div className="space-y-1.5">
-          {GENDER_OPTIONS.map((g) => {
-            const checked = selectedGenders.includes(g);
+          {genderOptions.map((g) => {
+            const checked = selectedGenders.includes(g.value);
             return (
               <label
-                key={g}
+                key={g.value}
                 className="flex cursor-pointer items-center gap-2 text-sm text-gray-700"
               >
                 <input
                   type="checkbox"
                   checked={checked}
-                  onChange={() => toggleListValue("gender", g)}
+                  onChange={() => toggleListValue("gender", g.value)}
                   className="h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-1 focus:ring-green-500"
                 />
-                <span>{g}</span>
+                <span>{g.label}</span>
               </label>
             );
           })}

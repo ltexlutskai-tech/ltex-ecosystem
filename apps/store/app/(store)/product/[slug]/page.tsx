@@ -123,6 +123,7 @@ function buildKeyFacts(
     { label: "К-сть одиниць", value: product.unitsPerKg ?? null },
     { label: "Вага одиниці", value: product.unitWeight ?? null },
     { label: "Вага лота", value: avgWeight },
+    { label: "Наповнення", value: product.filling ?? null },
   ];
 }
 
