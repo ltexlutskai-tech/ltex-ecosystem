@@ -63,6 +63,20 @@
  *   # 3) реальний запис (після pg_dump + звірки):
  *   pnpm --filter @ltex/store exec tsx scripts/merge-duplicate-products.ts --apply --confirm-prod
  *
+ * ─── BROAD (--broad) ──────────────────────────────────────────────────────────
+ *   Стандартне виявлення бере ЛИШЕ пари з однаковим точним артикулом і обома
+ *   code1C. `--broad` розширює виявлення:
+ *     • сканує ВСІ товари, включно з code1C=null (порожні Excel-двійники);
+ *     • групує union-find за (точний articleCode) АБО (провідний 4-значний код
+ *       у назві «(0758) …») — ловить пари, де артикул різниться нулями
+ *       (206/00206) або де двійник без коду 1С.
+ *   Loser без code1C НЕ пишеться у ProductMerge (реімпорт його не відтворить),
+ *   просто переноситься історія (як правило порожньо) і видаляється.
+ *     # сухий звіт broad:
+ *     pnpm --filter @ltex/store exec tsx scripts/merge-duplicate-products.ts --broad
+ *     # запис broad:
+ *     pnpm --filter @ltex/store exec tsx scripts/merge-duplicate-products.ts --broad --apply --confirm-prod
+ *
  * Скрипт у пісочниці НЕ запускався (немає БД) — лише компілюється/перевіряється.
  */
 
@@ -177,10 +191,16 @@ interface CliArgs {
   apply: boolean;
   confirmProd: boolean;
   only: string | null;
+  broad: boolean;
 }
 
 function parseArgs(argv: string[]): CliArgs {
-  const args: CliArgs = { apply: false, confirmProd: false, only: null };
+  const args: CliArgs = {
+    apply: false,
+    confirmProd: false,
+    only: null,
+    broad: false,
+  };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     switch (a) {
@@ -189,6 +209,9 @@ function parseArgs(argv: string[]): CliArgs {
         break;
       case "--confirm-prod":
         args.confirmProd = true;
+        break;
+      case "--broad":
+        args.broad = true;
         break;
       case "--only": {
         const v = argv[++i];
@@ -200,6 +223,16 @@ function parseArgs(argv: string[]): CliArgs {
     }
   }
   return args;
+}
+
+/**
+ * Провідний 4-значний код у назві «(0758) …» → «0758» (1С-код у дужках на
+ * початку). Немає — null. Дублює логіку audit-duplicate-products.ts свідомо
+ * (не імпортуємо, щоб не запустити його main() під час імпорту модуля).
+ */
+export function leadingNameCode(name: string): string | null {
+  const m = /^\s*\((\d{4})\)/.exec(name);
+  return m?.[1] ?? null;
 }
 
 function maskDbUrl(url: string): string {
@@ -237,14 +270,100 @@ interface Group {
 /** Множина статусів лота, що вважаються «вільними». */
 const FREE_STATUSES = ["free", "on_sale"];
 
+/**
+ * Групування рядків у «сирі» групи (масиви ≥2):
+ *   • звичайний режим — точний непорожній articleCode (як у 7.1);
+ *   • broad — union-find за спільним (точний articleCode) АБО (провідний
+ *     4-значний код у назві). Це ловить пари, де артикул різниться нулями
+ *     (206/00206) або де двійник без code1C (порожні Excel-дублі).
+ * `keyOf` для звіту — представницький ключ групи.
+ */
+function buildRawGroups(
+  products: ProductRow[],
+  broad: boolean,
+): { key: string; rows: ProductRow[] }[] {
+  if (!broad) {
+    const byArticle = new Map<string, ProductRow[]>();
+    for (const p of products) {
+      const art = p.articleCode?.trim();
+      if (!art) continue;
+      const bucket = byArticle.get(art);
+      if (bucket) bucket.push(p);
+      else byArticle.set(art, [p]);
+    }
+    return [...byArticle.entries()]
+      .filter(([, rows]) => rows.length >= 2)
+      .map(([key, rows]) => ({ key, rows }));
+  }
+
+  // ── broad: union-find по двох ключах ──
+  const parent = new Map<string, string>();
+  const find = (x: string): string => {
+    let r = x;
+    while (parent.get(r) !== r) r = parent.get(r) ?? r;
+    let c = x;
+    while (parent.get(c) !== r) {
+      const n = parent.get(c) ?? r;
+      parent.set(c, r);
+      c = n;
+    }
+    return r;
+  };
+  const union = (a: string, b: string): void => {
+    const ra = find(a);
+    const rb = find(b);
+    if (ra !== rb) parent.set(ra, rb);
+  };
+  for (const p of products) parent.set(p.id, p.id);
+
+  // Ребра: спільний articleCode; спільний провідний код у назві.
+  const firstByArticle = new Map<string, string>();
+  const firstByNameCode = new Map<string, string>();
+  for (const p of products) {
+    const art = p.articleCode?.trim();
+    if (art) {
+      const rep = firstByArticle.get(art);
+      if (rep) union(rep, p.id);
+      else firstByArticle.set(art, p.id);
+    }
+    const nc = leadingNameCode(p.name);
+    if (nc) {
+      const rep = firstByNameCode.get(nc);
+      if (rep) union(rep, p.id);
+      else firstByNameCode.set(nc, p.id);
+    }
+  }
+
+  const byRoot = new Map<string, ProductRow[]>();
+  for (const p of products) {
+    const root = find(p.id);
+    const bucket = byRoot.get(root);
+    if (bucket) bucket.push(p);
+    else byRoot.set(root, [p]);
+  }
+  return [...byRoot.values()]
+    .filter((rows) => rows.length >= 2)
+    .map((rows) => {
+      const rep = rows[0];
+      const key =
+        rep?.articleCode?.trim() ||
+        (rep ? leadingNameCode(rep.name) : null) ||
+        rep?.id ||
+        "—";
+      return { key, rows };
+    });
+}
+
 async function buildGroups(
   prisma: PrismaClient,
   only: string | null,
+  broad: boolean,
 ): Promise<Group[]> {
-  const where: Prisma.ProductWhereInput = {
-    code1C: { not: null },
-    articleCode: only ? only : { not: null },
-  };
+  // У broad-режимі скануємо ВСІ товари (включно з code1C=null — порожні
+  // Excel-двійники); у звичайному — лише 1С-товари з непорожнім артикулом.
+  const where: Prisma.ProductWhereInput = broad
+    ? {}
+    : { code1C: { not: null }, articleCode: only ? only : { not: null } };
   const products = (await prisma.product.findMany({
     where,
     select: {
@@ -258,21 +377,22 @@ async function buildGroups(
     },
   })) as ProductRow[];
 
-  // Групуємо по articleCode (не-порожній).
-  const byArticle = new Map<string, ProductRow[]>();
-  for (const p of products) {
-    const art = p.articleCode?.trim();
-    if (!art) continue;
-    const bucket = byArticle.get(art);
-    if (bucket) bucket.push(p);
-    else byArticle.set(art, [p]);
+  let rawGroups = buildRawGroups(products, broad);
+
+  // `--only` у broad-режимі: лишаємо групи, де хоч один член має цей артикул
+  // або цей код у назві (у звичайному режимі фільтр уже в `where`).
+  if (broad && only) {
+    rawGroups = rawGroups.filter((g) =>
+      g.rows.some(
+        (r) =>
+          r.articleCode?.trim() === only || leadingNameCode(r.name) === only,
+      ),
+    );
   }
 
   // Лічильники лотів (free + total) для всіх товарів у групах-дублікатах.
   const dupProductIds: string[] = [];
-  for (const [, rows] of byArticle) {
-    if (rows.length > 1) for (const r of rows) dupProductIds.push(r.id);
-  }
+  for (const g of rawGroups) for (const r of g.rows) dupProductIds.push(r.id);
   const freeByProduct = new Map<string, number>();
   const totalByProduct = new Map<string, number>();
   if (dupProductIds.length > 0) {
@@ -297,7 +417,7 @@ async function buildGroups(
   }
 
   const groups: Group[] = [];
-  for (const [articleCode, rows] of byArticle) {
+  for (const { key, rows } of rawGroups) {
     if (rows.length < 2) continue;
     const candidates: MergeCandidate[] = rows.map((r) => ({
       id: r.id,
@@ -311,7 +431,7 @@ async function buildGroups(
     }));
     const survivor = pickSurvivor(candidates);
     const losers = candidates.filter((c) => c.id !== survivor.id);
-    groups.push({ articleCode, survivor, losers });
+    groups.push({ articleCode: key, survivor, losers });
   }
   // Стабільний порядок для звіту.
   groups.sort((a, b) => (a.articleCode < b.articleCode ? -1 : 1));
@@ -614,20 +734,20 @@ async function mergeGroup(
             ).count;
           }
 
-          // ── Журнал злиття (потрібен oldCode1C — інакше реімпорт відтворить) ──
-          if (!oldHex) {
-            throw new Error(
-              `старий товар ${old.id} (${old.name}) без code1C — не можна ` +
-                `надійно змапити для реімпортера; групу пропускаємо`,
-            );
+          // ── Журнал злиття ──
+          // ProductMerge потрібен лише щоб реімпортер (upsert by code1C) не
+          // відтворив злитий 1С-товар. Порожній двійник без code1C реімпорт
+          // ніколи не відтворить (нема ключа) → журнал не пишемо, просто
+          // видаляємо. Для losers з code1C — пишемо як раніше.
+          if (oldHex) {
+            await tx.productMerge.create({
+              data: {
+                oldCode1C: oldHex,
+                targetProductId: survivor.id,
+                oldName: old.name,
+              },
+            });
           }
-          await tx.productMerge.create({
-            data: {
-              oldCode1C: oldHex,
-              targetProductId: survivor.id,
-              oldName: old.name,
-            },
-          });
 
           // ── Видалення старого Product (Restrict-посилань уже нема) ──
           await tx.product.delete({ where: { id: old.id } });
@@ -718,7 +838,10 @@ async function main(): Promise<void> {
   console.log(`${TAG} ціль БД: ${maskDbUrl(dbUrl)}`);
   console.log(
     `${TAG} режим: ${args.apply ? "APPLY (запис)" : "DRY-RUN (звіт)"}` +
-      (args.only ? ` | тільки артикул ${args.only}` : ""),
+      (args.broad
+        ? " | BROAD (артикул+код-у-назві, з порожніми двійниками)"
+        : "") +
+      (args.only ? ` | тільки ${args.only}` : ""),
   );
 
   if (args.apply && !args.confirmProd) {
@@ -732,7 +855,7 @@ async function main(): Promise<void> {
   const prisma = new PrismaClient({ datasources: { db: { url: dbUrl } } });
 
   try {
-    const groups = await buildGroups(prisma, args.only);
+    const groups = await buildGroups(prisma, args.only, args.broad);
     printGroups(groups);
 
     const tally = emptyTally();

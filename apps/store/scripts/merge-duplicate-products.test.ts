@@ -4,8 +4,26 @@ import {
   pickSurvivor,
   splitByCustomer,
   splitPricesByKey,
+  leadingNameCode,
   type MergeCandidate,
 } from "./merge-duplicate-products";
+
+describe("leadingNameCode — провідний 4-значний код у назві", () => {
+  it("витягує «(0758) …» → 0758", () => {
+    expect(leadingNameCode("(0758) Мікс спортивного одягу Екстра")).toBe(
+      "0758",
+    );
+    expect(leadingNameCode("  (1235) x")).toBe("1235");
+  });
+  it("код у кінці назви НЕ рахується", () => {
+    expect(leadingNameCode("AGD Товари (0193)")).toBeNull();
+  });
+  it("не 4 цифри / без коду → null", () => {
+    expect(leadingNameCode("(123) короткий")).toBeNull();
+    expect(leadingNameCode("Без коду")).toBeNull();
+    expect(leadingNameCode("")).toBeNull();
+  });
+});
 
 function cand(overrides: Partial<MergeCandidate> = {}): MergeCandidate {
   return {
