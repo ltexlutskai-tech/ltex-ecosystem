@@ -19,9 +19,9 @@ export interface FilterState {
   primaryRouteIds?: string[];
   agentUserIds?: string[];
 
-  // Область/Місто — вибір значень з довідника (не вільний текст).
-  regionValues?: string[];
-  cityValues?: string[];
+  // Область/Місто — вільний текст (contains), як головний пошук.
+  region?: string;
+  city?: string;
 
   // numeric range
   daysSinceMin?: number;
@@ -65,8 +65,8 @@ export function urlToState(sp: URLSearchParams): FilterState {
     primaryRouteIds: parseCsv(sp.get("primaryRouteId")),
     agentUserIds: parseCsv(sp.get("agentUserId")),
 
-    regionValues: parseCsv(sp.get("region")),
-    cityValues: parseCsv(sp.get("city")),
+    region: pickStr(sp.get("region")),
+    city: pickStr(sp.get("city")),
 
     daysSinceMin: parseInt2(sp.get("daysSinceMin")),
     daysSinceMax: parseInt2(sp.get("daysSinceMax")),
@@ -108,8 +108,8 @@ export function stateToUrl(
   setCsv(sp, "primaryRouteId", state.primaryRouteIds);
   setCsv(sp, "agentUserId", state.agentUserIds);
 
-  setCsv(sp, "region", state.regionValues);
-  setCsv(sp, "city", state.cityValues);
+  setStr(sp, "region", state.region);
+  setStr(sp, "city", state.city);
 
   setNum(sp, "daysSinceMin", state.daysSinceMin);
   setNum(sp, "daysSinceMax", state.daysSinceMax);
@@ -147,11 +147,12 @@ export function countActiveFilters(state: FilterState): number {
     state.primaryAssortmentIds,
     state.primaryRouteIds,
     state.agentUserIds,
-    state.regionValues,
-    state.cityValues,
   ]) {
     if (arr && arr.length > 0) count += 1;
   }
+
+  if (state.region) count += 1;
+  if (state.city) count += 1;
   // Примітка: color / keywords / historySearch / assortmentSearch — окремі
   // завжди-видимі зрізи на головній (не у шторці), тому в лічильник «Фільтри
   // (N)» не входять.

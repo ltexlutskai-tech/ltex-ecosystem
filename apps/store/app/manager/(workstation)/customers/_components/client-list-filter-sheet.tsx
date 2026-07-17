@@ -227,23 +227,45 @@ function renderFilter(
       );
     case "region":
       return (
-        <SelectMulti
-          key={key}
-          label={label}
-          options={d.regions.map((r) => ({ id: r, label: r }))}
-          value={draft.regionValues ?? []}
-          onChange={(v) => update({ regionValues: v })}
-        />
+        <label key={key} className="block">
+          <span className="mb-1 block text-xs font-medium tracking-wide text-gray-500 uppercase">
+            {label}
+          </span>
+          <input
+            type="text"
+            list="ltex-region-options"
+            value={draft.region ?? ""}
+            onChange={(e) => update({ region: e.target.value || undefined })}
+            placeholder="Почніть вводити область…"
+            className="w-full rounded-md border px-2 py-1.5 text-sm shadow-sm"
+          />
+          <datalist id="ltex-region-options">
+            {d.regions.map((r) => (
+              <option key={r} value={r} />
+            ))}
+          </datalist>
+        </label>
       );
     case "city":
       return (
-        <SelectMulti
-          key={key}
-          label={label}
-          options={d.cities.map((c) => ({ id: c, label: c }))}
-          value={draft.cityValues ?? []}
-          onChange={(v) => update({ cityValues: v })}
-        />
+        <label key={key} className="block">
+          <span className="mb-1 block text-xs font-medium tracking-wide text-gray-500 uppercase">
+            {label}
+          </span>
+          <input
+            type="text"
+            list="ltex-city-options"
+            value={draft.city ?? ""}
+            onChange={(e) => update({ city: e.target.value || undefined })}
+            placeholder="Почніть вводити місто…"
+            className="w-full rounded-md border px-2 py-1.5 text-sm shadow-sm"
+          />
+          <datalist id="ltex-city-options">
+            {d.cities.map((c) => (
+              <option key={c} value={c} />
+            ))}
+          </datalist>
+        </label>
       );
     case "daysSinceRange":
       return (

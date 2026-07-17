@@ -51,9 +51,9 @@ export interface LoadClientsParams {
   primaryAssortmentIds?: string[];
   primaryRouteIds?: string[];
   agentUserIds?: string[];
-  // Область/Місто — вибір значень з довідника (не вільний текст)
-  regionValues?: string[];
-  cityValues?: string[];
+  // Область/Місто — вільний текст (contains), як головний пошук.
+  region?: string;
+  city?: string;
   daysSinceMin?: number;
   daysSinceMax?: number;
   createdFrom?: Date;
@@ -193,11 +193,11 @@ export async function loadClients(
     andClauses.push({ agentUserId: { in: p.agentUserIds } });
   }
 
-  if (p.regionValues && p.regionValues.length > 0) {
-    andClauses.push({ region: { in: p.regionValues } });
+  if (p.region) {
+    andClauses.push({ region: { contains: p.region, mode: "insensitive" } });
   }
-  if (p.cityValues && p.cityValues.length > 0) {
-    andClauses.push({ city: { in: p.cityValues } });
+  if (p.city) {
+    andClauses.push({ city: { contains: p.city, mode: "insensitive" } });
   }
 
   if (p.hasDebt) {

@@ -31,11 +31,11 @@ describe("clients-filter-state", () => {
     expect(state.createdTo).toBe("2026-12-31");
   });
 
-  it("parses region/city as value arrays", () => {
-    const sp = new URLSearchParams("region=Київська,Волинська&city=Луцьк");
+  it("parses region/city as free text (contains)", () => {
+    const sp = new URLSearchParams("region=Волин&city=Луцьк");
     const state = urlToState(sp);
-    expect(state.regionValues).toEqual(["Київська", "Волинська"]);
-    expect(state.cityValues).toEqual(["Луцьк"]);
+    expect(state.region).toBe("Волин");
+    expect(state.city).toBe("Луцьк");
   });
 
   it("parses booleans", () => {
@@ -56,13 +56,13 @@ describe("clients-filter-state", () => {
     const sp = new URLSearchParams();
     sp.set("statusId", "s1,s2");
     sp.set("daysSinceMin", "10");
-    sp.set("region", "Київська");
+    sp.set("region", "Волин");
     sp.set("hasDebt", "true");
     const state = urlToState(sp);
     const out = stateToUrl(state);
     expect(out.get("statusId")).toBe("s1,s2");
     expect(out.get("daysSinceMin")).toBe("10");
-    expect(out.get("region")).toBe("Київська");
+    expect(out.get("region")).toBe("Волин");
     expect(out.get("hasDebt")).toBe("true");
   });
 
@@ -73,7 +73,7 @@ describe("clients-filter-state", () => {
       categoryTTIds: ["x", "y"],
       daysSinceMin: 10,
       daysSinceMax: 90, // counted once with daysSinceMin
-      regionValues: ["Київська"],
+      region: "Волин",
       hasDebt: true,
       onlyMine: true, // not counted
       hideTrash: true, // not counted
