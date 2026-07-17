@@ -206,31 +206,16 @@ export function ProductCardView({
         </CollapsibleBlock>
       )}
 
-      {/* ── Характеристики (редаговані для ролей каталогу) ─────── */}
-      <CollapsibleBlock
-        title="Характеристики"
-        defaultOpen={canEditCharacteristics}
-      >
-        {canEditCharacteristics ? (
-          <ProductCharacteristicsEditor
-            productId={product.id}
-            values={product.edit}
-            attributeOptions={attributeOptions}
-            producers={producers}
-          />
-        ) : product.keyFacts.length > 0 ? (
-          <ul className="grid gap-1 text-sm text-gray-700 sm:grid-cols-2">
-            {product.keyFacts.map((fact) => (
-              <li key={fact.label} className="flex gap-2">
-                <span className="text-emerald-600">✔</span>
-                <span className="text-gray-500">{fact.label}:</span>
-                <span className="font-medium text-gray-800">{fact.value}</span>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <EmptyHint>Характеристики не заповнено.</EmptyHint>
-        )}
+      {/* ── Характеристики (перегляд за замовчуванням + кнопка «Редагувати») ── */}
+      <CollapsibleBlock title="Характеристики" defaultOpen>
+        <ProductCharacteristicsEditor
+          productId={product.id}
+          canEdit={canEditCharacteristics}
+          keyFacts={product.keyFacts}
+          values={product.edit}
+          attributeOptions={attributeOptions}
+          producers={producers}
+        />
       </CollapsibleBlock>
 
       {/* ── Ціни постачальника (історія закупівель) — лише власник/адмін ── */}

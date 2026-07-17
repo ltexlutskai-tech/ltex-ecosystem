@@ -177,6 +177,16 @@ export function PricesToolbar({ categories, totalCount }: Props) {
 
       <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-gray-500">
         <div className="flex items-center gap-2">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            disabled={isPending}
+            onClick={() => startTransition(() => router.refresh())}
+            title="Оновити дані (зазвичай оновлюється автоматично)"
+          >
+            {isPending ? "Оновлення…" : "↻ Оновити"}
+          </Button>
           <Link href="/manager/prices/lots">
             <Button type="button" variant="outline" size="sm">
               Деталі по мішках

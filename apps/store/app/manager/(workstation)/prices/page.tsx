@@ -7,7 +7,8 @@ import { getCurrentRate } from "@/lib/exchange-rate";
 import type { PriceSort, SortDir } from "@/lib/manager/prices";
 import { PricesToolbar } from "./_components/prices-toolbar";
 import { PricesList } from "./_components/prices-list";
-import { PricesPagination } from "./_components/prices-pagination";
+import { ListPagination } from "../customers/_components/list-pagination";
+import { PageSizeSelect } from "../customers/_components/page-size-select";
 import {
   loadCategoriesForFilter,
   loadCategoryNodes,
@@ -100,7 +101,10 @@ export default async function PricesPage({
         rateUah={rateUah}
         sellerName={user.fullName}
       />
-      <PricesPagination page={list.page} totalPages={list.totalPages} />
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <PageSizeSelect pageSize={pageSize} />
+        <ListPagination page={list.page} totalPages={list.totalPages} />
+      </div>
     </div>
   );
 }

@@ -5,7 +5,7 @@ import { getCurrentUser } from "@/lib/auth/manager-auth";
 import { getCurrentRate } from "@/lib/exchange-rate";
 import { buildProductShareText } from "@/lib/manager/share-message";
 import {
-  canManageCatalog,
+  canEditProductCard,
   canManageCatalogStructure,
 } from "@/lib/manager/catalog-permissions";
 import { loadProductAttributeOptions } from "@/lib/manager/product-attributes";
@@ -49,9 +49,9 @@ export default async function ProductCardPage({
     notFound();
   }
 
-  // Характеристики редагують ролі каталогу (admin/owner/warehouse);
-  // середня вага / категорія / фото — лише власник/адмін (рішення user 2026-07-17).
-  const canManage = canManageCatalog(user.role);
+  // Характеристики редагують усі, крім торгових менеджерів (менеджери лише
+  // переглядають). Середня вага / категорія / фото — лише власник/адмін.
+  const canEditCard = canEditProductCard(user.role);
   const canManageStructure = canManageCatalogStructure(user.role);
   const [managerImages, categoryRows, attributeOptions, producerRows] =
     await Promise.all([
@@ -132,7 +132,7 @@ export default async function ProductCardPage({
         productShareText={productShareText}
         rateUah={rateUah}
         sellerName={user.fullName}
-        canEditCharacteristics={canManage}
+        canEditCharacteristics={canEditCard}
         isOwnerAdmin={canManageStructure}
         attributeOptions={attributeOptions}
         producers={producers}

@@ -1,6 +1,7 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Button, Input } from "@ltex/ui";
 import type { ProductAttributeOptions } from "@/lib/manager/product-attributes";
 import type { ProductEditFields } from "../../_lib/load-product";
@@ -12,26 +13,102 @@ import {
 const inputCls =
   "w-full rounded-md border border-input bg-background px-3 py-2 text-sm";
 
+interface KeyFact {
+  label: string;
+  value: string;
+}
+
 /**
- * Редагування характеристик товару з картки (2026-07-17). Ті самі поля, що у
- * формі створення (крім ціни/категорії/середньої ваги) — щоб доповнювати старі
- * позиції. Рендериться лише для ролей каталогу; решта бачать read-only список.
+ * Характеристики товару на картці (2026-07-17). За замовчуванням — лише
+ * ПЕРЕГЛЯД (менеджери просто бачать інформацію). Ролі, що мають право (усі,
+ * крім торгових менеджерів), бачать кнопку «Редагувати» → форма з тими самими
+ * полями, що у створенні товару (крім ціни/категорії/середньої ваги).
  */
 export function ProductCharacteristicsEditor({
   productId,
+  canEdit,
+  keyFacts,
   values,
   attributeOptions,
   producers,
 }: {
   productId: string;
+  canEdit: boolean;
+  keyFacts: KeyFact[];
   values: ProductEditFields;
   attributeOptions: ProductAttributeOptions;
   producers: string[];
 }) {
+  const [editing, setEditing] = useState(false);
+
+  if (!editing) {
+    return (
+      <div className="space-y-3">
+        {keyFacts.length > 0 ? (
+          <ul className="grid gap-1 text-sm text-gray-700 sm:grid-cols-2">
+            {keyFacts.map((fact) => (
+              <li key={fact.label} className="flex gap-2">
+                <span className="text-emerald-600">✔</span>
+                <span className="text-gray-500">{fact.label}:</span>
+                <span className="font-medium text-gray-800">{fact.value}</span>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="text-sm text-gray-400">Характеристики не заповнено.</p>
+        )}
+        {canEdit && (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => setEditing(true)}
+          >
+            ✎ Редагувати
+          </Button>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <CharacteristicsForm
+      productId={productId}
+      values={values}
+      attributeOptions={attributeOptions}
+      producers={producers}
+      onDone={() => setEditing(false)}
+    />
+  );
+}
+
+function CharacteristicsForm({
+  productId,
+  values,
+  attributeOptions,
+  producers,
+  onDone,
+}: {
+  productId: string;
+  values: ProductEditFields;
+  attributeOptions: ProductAttributeOptions;
+  producers: string[];
+  onDone: () => void;
+}) {
+  const router = useRouter();
   const [state, formAction, pending] = useActionState<
     CharacteristicsState,
     FormData
   >(updateProductCharacteristics, {});
+
+  // Успішне збереження → оновити картку (нові значення) і вийти з режиму правки.
+  useEffect(() => {
+    if (state?.ok) {
+      router.refresh();
+      onDone();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state?.ok]);
 
   return (
     <form action={formAction} className="space-y-3">
@@ -150,11 +227,11 @@ export function ProductCharacteristicsEditor({
 
       <div className="flex items-center gap-3">
         <Button type="submit" size="sm" disabled={pending}>
-          {pending ? "Збереження…" : "Зберегти характеристики"}
+          {pending ? "Збереження…" : "Зберегти"}
         </Button>
-        {state?.ok && (
-          <span className="text-sm text-emerald-600">Збережено ✓</span>
-        )}
+        <Button type="button" variant="outline" size="sm" onClick={onDone}>
+          Скасувати
+        </Button>
         {state?.error && (
           <span className="text-sm text-red-600">{state.error}</span>
         )}
