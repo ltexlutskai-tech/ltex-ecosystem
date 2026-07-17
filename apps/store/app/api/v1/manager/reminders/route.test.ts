@@ -337,6 +337,36 @@ describe("POST /api/v1/manager/reminders — тип «Для товарів»", 
     expect(json.skippedProductIds).toEqual([]);
   });
 
+  it("persists orderId when product reminder is created from an order", async () => {
+    mockPrisma.mgrClient.findUnique.mockResolvedValueOnce({
+      id: "c1",
+      name: "ТОВ Ромашка",
+    });
+    getViewerOwnershipMock.mockResolvedValueOnce("mine");
+    mockPrisma.mgrReminderItem.findMany.mockResolvedValueOnce([]);
+    mockPrisma.mgrReminder.create.mockResolvedValueOnce(
+      fakeProductReminder("r5", [
+        { id: "it5", productId: "p1", quantity: 1, done: false },
+      ]),
+    );
+    mockPrisma.product.findMany.mockResolvedValueOnce([
+      { id: "p1", name: "Куртки", articleCode: null },
+    ]);
+    const res = await POST(
+      postReq({
+        isProductReminder: true,
+        clientId: "c1",
+        orderId: "ord-1",
+        items: [{ productId: "p1", quantity: 1 }],
+      }),
+    );
+    expect(res.status).toBe(201);
+    const args = mockPrisma.mgrReminder.create.mock.calls[0]?.[0] as {
+      data: { orderId: string | null };
+    };
+    expect(args.data.orderId).toBe("ord-1");
+  });
+
   it("antidubl: drops products already in active reminders, keeps the rest", async () => {
     mockPrisma.mgrClient.findUnique.mockResolvedValueOnce({
       id: "c1",

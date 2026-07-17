@@ -29,8 +29,19 @@ export interface ReminderRow {
   lotId: string | null;
   productId: string | null;
   clientId: string | null;
+  orderId: string | null;
   createdAt: string;
-  client: { id: string; name: string } | null;
+  client: {
+    id: string;
+    name: string;
+    phone: string | null;
+    code1C: string | null;
+  } | null;
+  order: {
+    id: string;
+    number1C: string | null;
+    docNumber: number | null;
+  } | null;
   owner: { id: string; fullName: string } | null;
   items?: ReminderItem[];
 }

@@ -27,14 +27,28 @@ export interface ReminderRow {
   lotId: string | null;
   productId: string | null;
   clientId: string | null;
+  orderId: string | null;
   createdAt: Date;
-  client: { id: string; name: string } | null;
+  client: {
+    id: string;
+    name: string;
+    phonePrimary: string | null;
+    code1C: string | null;
+  } | null;
+  order: {
+    id: string;
+    number1C: string | null;
+    docNumber: number | null;
+  } | null;
   owner: { id: string; fullName: string } | null;
   items: ReminderItemRow[];
 }
 
 export const REMINDER_INCLUDE = {
-  client: { select: { id: true, name: true } },
+  client: {
+    select: { id: true, name: true, phonePrimary: true, code1C: true },
+  },
+  order: { select: { id: true, number1C: true, docNumber: true } },
   owner: { select: { id: true, fullName: true } },
   items: {
     select: { id: true, productId: true, quantity: true, done: true },
@@ -82,8 +96,23 @@ export function serializeReminder(
     lotId: r.lotId,
     productId: r.productId,
     clientId: r.clientId,
+    orderId: r.orderId,
     createdAt: r.createdAt.toISOString(),
-    client: r.client ? { id: r.client.id, name: r.client.name } : null,
+    client: r.client
+      ? {
+          id: r.client.id,
+          name: r.client.name,
+          phone: r.client.phonePrimary,
+          code1C: r.client.code1C,
+        }
+      : null,
+    order: r.order
+      ? {
+          id: r.order.id,
+          number1C: r.order.number1C,
+          docNumber: r.order.docNumber,
+        }
+      : null,
     owner: r.owner ? { id: r.owner.id, fullName: r.owner.fullName } : null,
     items: r.items.map((item) => {
       const info = productNames.get(item.productId);

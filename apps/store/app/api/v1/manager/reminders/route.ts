@@ -91,7 +91,7 @@ export async function POST(req: NextRequest) {
 
   // ─── Тип «Для товарів» ────────────────────────────────────────────────────
   if (parsed.data.isProductReminder) {
-    const { clientId, items, body } = parsed.data;
+    const { clientId, items, body, orderId } = parsed.data;
 
     const client = await prisma.mgrClient.findUnique({
       where: { id: clientId },
@@ -159,6 +159,8 @@ export async function POST(req: NextRequest) {
         periodicity: "event",
         isProductReminder: true,
         source: "manual",
+        // Прив'язка до замовлення (1С «ИзЗаказа») — коли створене із замовлення.
+        orderId: orderId ?? null,
         items: {
           create: [...dedupedMap.entries()].map(([productId, quantity]) => ({
             productId,

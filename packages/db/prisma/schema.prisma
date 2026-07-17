@@ -2074,6 +2074,7 @@ enum MgrReminderAction {
   none
   continue_bron
   viber_video
+  close_orders
 
   @@map("mgr_reminder_action")
 }

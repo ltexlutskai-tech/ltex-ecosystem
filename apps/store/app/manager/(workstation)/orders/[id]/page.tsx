@@ -14,6 +14,7 @@ import { OrderForm } from "../new/_components/order-form";
 import { AutoRefresh } from "../../_components/auto-refresh";
 import { OrderCloseButton } from "./_components/order-close-button";
 import { OrderActualToggle } from "./_components/order-actual-toggle";
+import { OrderProductReminderButton } from "./_components/order-product-reminder-button";
 import type {
   ClientPickerItem,
   OrderEditInitial,
@@ -258,6 +259,17 @@ export default async function ManagerOrderDetailPage({
           {locked && !order.closedAt && !order.archived && (
             <OrderActualToggle orderId={order.id} isActual={order.isActual} />
           )}
+          <OrderProductReminderButton
+            mgrClientId={mgrClientId}
+            clientName={order.customer.name}
+            orderId={order.id}
+            products={order.items.map((it) => ({
+              productId: it.product.id,
+              name: it.product.name,
+              articleCode: it.product.articleCode,
+              quantity: it.quantity,
+            }))}
+          />
           <OrderCloseButton
             orderId={order.id}
             isAlreadyClosed={!!order.closedAt}

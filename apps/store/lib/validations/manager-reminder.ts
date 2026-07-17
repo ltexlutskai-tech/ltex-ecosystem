@@ -49,12 +49,17 @@ const regularReminderSchema = z.object({
   productId: z.string().min(1).nullable().optional(),
 });
 
-/** Тип «Для товарів» — клієнт обов'язковий, ≥1 товар, body опційний. */
+/**
+ * Тип «Для товарів» — клієнт обов'язковий, ≥1 товар, body опційний.
+ * `orderId` опційний — заповнюється, коли нагадування створене із замовлення
+ * (1С «ИзЗаказа»); дає лінк «↗ Замовлення» на картці нагадування.
+ */
 const productReminderSchema = z.object({
   isProductReminder: z.literal(true),
   clientId: z.string().min(1, "Оберіть клієнта"),
   items: z.array(reminderItemSchema).min(1, "Додайте хоча б один товар"),
   body: z.string().trim().max(500).optional(),
+  orderId: z.string().min(1).nullable().optional(),
 });
 
 /**
