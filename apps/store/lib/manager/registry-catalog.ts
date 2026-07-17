@@ -332,6 +332,14 @@ export const REGISTERS: readonly RegisterEntry[] = [
 /** Звіти (1С Reports). */
 export const REPORTS: readonly ReportEntry[] = [
   {
+    key: "manager",
+    label: "Звіт менеджера",
+    description:
+      "Виручка / тонаж по областях і клієнтах · Сток/Секонд · нові й втрачені ТТ · факт vs план.",
+    href: "/manager/reports/manager",
+    theme: "sales",
+  },
+  {
     key: "sales-summary",
     label: "Підсумок продажів",
     description:
