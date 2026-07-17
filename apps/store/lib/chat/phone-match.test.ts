@@ -80,10 +80,33 @@ describe("matchClientByPhone", () => {
       agentUserId: "u3",
       phone: "+380993334455",
     });
-    // Verify customer lookup used the normalized form
+    // Verify customer lookup used the phoneKey (last 9 digits)
     expect(mockPrisma.customer.findFirst).toHaveBeenCalledWith({
-      where: { phone: "+380993334455" },
+      where: { phoneKey: "993334455" },
       select: { code1C: true },
+    });
+  });
+
+  it("matches by last-9 key regardless of stored format", async () => {
+    // Level 2 is queried by phoneKey; a 0XX input and a +380 input share the
+    // same key → both hit the same client.
+    mockPrisma.mgrClientPhone.findFirst.mockResolvedValue(null);
+    mockPrisma.mgrClient.findFirst.mockResolvedValue({
+      id: "c9",
+      agentUserId: "u9",
+    });
+
+    await matchClientByPhone("0501234567");
+    await matchClientByPhone("+380501234567");
+
+    // Both calls used the same phoneKey.
+    expect(mockPrisma.mgrClient.findFirst).toHaveBeenNthCalledWith(1, {
+      where: { phoneKey: "501234567" },
+      select: { id: true, agentUserId: true },
+    });
+    expect(mockPrisma.mgrClient.findFirst).toHaveBeenNthCalledWith(2, {
+      where: { phoneKey: "501234567" },
+      select: { id: true, agentUserId: true },
     });
   });
 
