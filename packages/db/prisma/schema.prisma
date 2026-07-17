@@ -504,27 +504,27 @@ model MgrCashOrder {
 // (не можна вибирати при приході). Поки порожній — наповнюється вручну / з 1С.
 
 model MgrBankAccount {
-  id          String   @id @default(cuid())
-  code1C      String?  @unique @map("code_1c")
-  name        String
-  description String?
+  id             String   @id @default(cuid())
+  code1C         String?  @unique @map("code_1c")
+  name           String
+  description    String?
   // Тип рахунку: "account" (банк-рахунок/IBAN — показується у безготівці),
   // "card" (картка) або "cash" (готівкова каса). У безнал-дропдауні лише account.
-  kind        String   @default("account")
+  kind           String   @default("account")
   // Ліміт на отримання: рахунок приховано для МЕНЕДЖЕРІВ при Приході (адмін/
   // власник бачать); для Розходу (списання) видно завжди.
-  hiddenInApp Boolean  @default(false) @map("hidden_in_app")
+  hiddenInApp    Boolean  @default(false) @map("hidden_in_app")
   // ── Реквізити для «Скинути реквізити» у реалізації (2026-07-14) ──
   // Набір реквізитів одержувача, який менеджер обирає перед відправкою. Замість
   // окремого довідника — тут, бо це той самий рахунок, на який приймають оплату.
-  recipientName  String? @map("recipient_name") // Одержувач (юр. назва; fallback — name)
+  recipientName  String?  @map("recipient_name") // Одержувач (юр. назва; fallback — name)
   edrpou         String? // ЄДРПОУ/ІПН одержувача
   iban           String? // рахунок / IBAN / номер картки
-  bankName       String? @map("bank_name") // назва банку
-  paymentPurpose String? @map("payment_purpose") // призначення платежу
-  archived    Boolean  @default(false)
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
+  bankName       String?  @map("bank_name") // назва банку
+  paymentPurpose String?  @map("payment_purpose") // призначення платежу
+  archived       Boolean  @default(false)
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
 
   cashOrders           MgrCashOrder[]
   bankPaymentsIncoming BankPaymentIncoming[]
@@ -2074,6 +2074,7 @@ enum MgrReminderAction {
   none
   continue_bron
   viber_video
+  close_orders
 
   @@map("mgr_reminder_action")
 }
@@ -2584,10 +2585,16 @@ model MgrMessageTemplate {
   name            String
   text            String
   createdByUserId String?  @map("created_by_user_id")
+  // Видимість: false = приватний (бачить лише автор у вкладці «Мої»),
+  // true = спільний (усі менеджери бачать у вкладці «Спільні»). Дозвіл бачити
+  // надає автор шаблону. Редагувати/видаляти може лише автор (або admin/owner).
+  isShared        Boolean  @default(false) @map("is_shared")
   createdAt       DateTime @default(now()) @map("created_at")
   updatedAt       DateTime @updatedAt @map("updated_at")
 
   @@index([createdAt])
+  @@index([createdByUserId])
+  @@index([isShared])
   @@map("mgr_message_templates")
 }
 
@@ -3108,35 +3115,35 @@ model Inventory {
 }
 
 model InventoryItem {
-  id            String   @id @default(cuid())
-  inventoryId   String   @map("inventory_id")
-  productId     String?  @map("product_id")
-  charHex       String?  @map("char_hex")
+  id            String    @id @default(cuid())
+  inventoryId   String    @map("inventory_id")
+  productId     String?   @map("product_id")
+  charHex       String?   @map("char_hex")
   barcode       String?
   // ── Інвентаризація по мішках (2026-07-12) — знімок мішка на момент звірки.
   //    Плоскі скаляри (як RepackingItem): БЕЗ FK на Lot, щоб не зав'язувати
   //    менеджерський документ на життєвий цикл лота (лот може стати sold/архів).
   //    lotId — м'яке посилання для follow-up документів (списання нестач /
   //    оприбуткування надлишків «на підставі інвентаризації»).
-  lotId         String?  @map("lot_id")
-  productName   String?  @map("product_name")
-  articleCode   String?  @map("article_code")
-  weight        Float    @default(0)
+  lotId         String?   @map("lot_id")
+  productName   String?   @map("product_name")
+  articleCode   String?   @map("article_code")
+  weight        Float     @default(0)
   sector        String?
-  sectorId      String?  @map("sector_id")
-  unitName      String?  @map("unit_name")
+  sectorId      String?   @map("sector_id")
+  unitName      String?   @map("unit_name")
   quality       String?
-  qtyAccounting Float    @default(0) @map("qty_accounting")
-  qtyActual     Float    @default(0) @map("qty_actual")
-  qtyDifference Float    @default(0) @map("qty_difference")
-  priceEur      Decimal  @default(0) @map("price_eur") @db.Decimal(12, 2)
+  qtyAccounting Float     @default(0) @map("qty_accounting")
+  qtyActual     Float     @default(0) @map("qty_actual")
+  qtyDifference Float     @default(0) @map("qty_difference")
+  priceEur      Decimal   @default(0) @map("price_eur") @db.Decimal(12, 2)
   notes         String?
   // ── Спільна робота (хто/коли підтвердив факт) ──
-  foundByUserId String?  @map("found_by_user_id")
-  foundByName   String?  @map("found_by_name")
+  foundByUserId String?   @map("found_by_user_id")
+  foundByName   String?   @map("found_by_name")
   foundAt       DateTime? @map("found_at")
-  createdAt     DateTime @default(now()) @map("created_at")
-  updatedAt     DateTime @default(now()) @updatedAt @map("updated_at")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @default(now()) @updatedAt @map("updated_at")
 
   document Inventory @relation(fields: [inventoryId], references: [id], onDelete: Cascade)
 

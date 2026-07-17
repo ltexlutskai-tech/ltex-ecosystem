@@ -2,9 +2,10 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Check, CheckCircle2, Clock, Pencil, Send, Trash2 } from "lucide-react";
+import { Check, CheckCircle2, Clock, Pencil, Trash2 } from "lucide-react";
 import { Badge, Button, useToast } from "@ltex/ui";
 import { ShareSheet } from "../../prices/_components/share-sheet";
+import { buildReminderActions } from "@/lib/manager/reminder-actions";
 import { PERIOD_BADGE, type ReminderRow } from "./types";
 
 function fmtDateTime(iso: string) {
@@ -47,6 +48,7 @@ export function ReminderListItem({
     !done && !isProduct && new Date(effectiveAt).getTime() < Date.now();
   const periodBadge = PERIOD_BADGE[reminder.periodicity];
   const items = reminder.items ?? [];
+  const actions = buildReminderActions(reminder);
 
   async function patch(payload: Record<string, unknown>) {
     setBusy(true);
@@ -101,13 +103,14 @@ export function ReminderListItem({
     void patch({ action: "snooze", snoozedUntil: d.toISOString() });
   }
 
-  /** Дія «Перенести бронь» — перехід на екран лотів для ре-броні. */
-  function goToBooking() {
-    if (!reminder.lotId) return;
-    router.push(`/manager/prices/lots?lotId=${reminder.lotId}`);
+  /** Виконати контекстну дію (крім video-share, що має власний fetch). */
+  function runAction(href: string | undefined, internal: boolean) {
+    if (!href) return;
+    if (internal) router.push(href);
+    else window.location.href = href;
   }
 
-  /** Дія «Скинути Viber» — будує текст на сервері й відкриває ShareSheet. */
+  /** Дія «Надіслати відео» — будує текст на сервері й відкриває ShareSheet. */
   async function sendViber() {
     setBusy(true);
     try {
@@ -230,29 +233,34 @@ export function ReminderListItem({
             </ul>
           )}
 
-          {/* Дії авто-нагадувань (Етап 4): перенести бронь / скинути Viber. */}
-          {!done && canMutate && reminder.actionType === "continue_bron" && (
-            <Button
-              size="sm"
-              type="button"
-              className="mt-2"
-              disabled={busy || !reminder.lotId}
-              onClick={goToBooking}
-            >
-              Перенести бронь
-            </Button>
-          )}
-          {!done && canMutate && reminder.actionType === "viber_video" && (
-            <Button
-              size="sm"
-              type="button"
-              className="mt-2"
-              disabled={busy}
-              onClick={sendViber}
-            >
-              <Send className="mr-1.5 h-3.5 w-3.5" />
-              Скинути Viber
-            </Button>
+          {/* Контекстні швидкі дії: бронь / відео / замовлення / клієнт. */}
+          {!done && actions.length > 0 && (
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {actions.map((a) =>
+                a.kind === "video-share" ? (
+                  <Button
+                    key={a.kind}
+                    size="sm"
+                    type="button"
+                    disabled={busy}
+                    onClick={sendViber}
+                  >
+                    {a.label}
+                  </Button>
+                ) : (
+                  <Button
+                    key={a.kind}
+                    size="sm"
+                    type="button"
+                    variant={a.kind === "open-order" ? "default" : "outline"}
+                    disabled={busy}
+                    onClick={() => runAction(a.href, a.internal)}
+                  >
+                    {a.label}
+                  </Button>
+                ),
+              )}
+            </div>
           )}
         </div>
 
@@ -361,8 +369,9 @@ export function ReminderListItem({
       <ShareSheet
         open={shareOpen}
         onOpenChange={setShareOpen}
-        title="Скинути Viber"
+        title="Надіслати відео клієнту"
         text={shareText}
+        clientPhone={reminder.client?.phone}
       />
     </>
   );

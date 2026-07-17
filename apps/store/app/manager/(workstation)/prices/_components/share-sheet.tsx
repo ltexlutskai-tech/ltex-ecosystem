@@ -11,6 +11,7 @@ import {
   Textarea,
   useToast,
 } from "@ltex/ui";
+import { phoneToViberUrl } from "@ltex/shared";
 
 /**
  * Manager — єдине вікно «Поділитися».
@@ -32,6 +33,13 @@ interface Props {
   title: string;
   /** Готовий текст (initial) — користувач може редагувати перед відправкою. */
   text: string;
+  /**
+   * Телефон конкретного клієнта. Коли заданий — зʼявляється кнопка «Відкрити
+   * Viber клієнта»: копіює текст у буфер і відкриває чат саме цього клієнта
+   * (текст не передаємо в deep-link — Viber обрізає довгу кирилицю; менеджер
+   * вставляє з буфера).
+   */
+  clientPhone?: string | null;
 }
 
 /** Чи доступний Web Share API (мобільні браузери / частина десктопних). */
@@ -41,10 +49,17 @@ function hasWebShare(): boolean {
   );
 }
 
-export function ShareSheet({ open, onOpenChange, title, text }: Props) {
+export function ShareSheet({
+  open,
+  onOpenChange,
+  title,
+  text,
+  clientPhone,
+}: Props) {
   const { toast } = useToast();
   const [draft, setDraft] = useState(text);
   const [canShare, setCanShare] = useState(false);
+  const viberUrl = phoneToViberUrl(clientPhone);
 
   // Скидаємо текст при кожному новому відкритті.
   useEffect(() => {
@@ -79,6 +94,21 @@ export function ShareSheet({ open, onOpenChange, title, text }: Props) {
     }
   }
 
+  /** Копіює текст у буфер і відкриває чат клієнта у Viber. */
+  async function handleOpenClientViber() {
+    if (!viberUrl) return;
+    try {
+      await navigator.clipboard.writeText(draft);
+      toast({
+        title: "Текст скопійовано",
+        description: "Відкриваємо Viber клієнта — вставте повідомлення у чат.",
+      });
+    } catch {
+      // Навіть якщо копіювання не вдалось — все одно відкриваємо чат.
+    }
+    window.location.href = viberUrl;
+  }
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90vh] max-w-lg overflow-y-auto">
@@ -104,6 +134,15 @@ export function ShareSheet({ open, onOpenChange, title, text }: Props) {
             <Button type="button" onClick={handleCopy}>
               📋 Скопіювати
             </Button>
+            {viberUrl && (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleOpenClientViber}
+              >
+                Відкрити Viber клієнта
+              </Button>
+            )}
             {canShare && (
               <Button type="button" variant="outline" onClick={handleWebShare}>
                 Поділитися…

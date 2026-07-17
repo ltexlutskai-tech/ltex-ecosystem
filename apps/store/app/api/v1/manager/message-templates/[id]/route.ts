@@ -1,14 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Prisma, prisma } from "@ltex/db";
-import { getCurrentUser } from "@/lib/auth/manager-auth";
-import { messageTemplateSchema } from "@/lib/manager/message-template";
+import { getCurrentUser, isAdminRole } from "@/lib/auth/manager-auth";
+import {
+  canManageTemplate,
+  messageTemplateSchema,
+} from "@/lib/manager/message-template";
 
 /**
  * Manager «Прайс» — Stage 5b message templates [id] endpoint.
  *
- * PATCH  — оновити шаблон (auth, Zod). Спільний довідник — будь-який менеджер
- *          може редагувати (як у 1С).
- * DELETE — видалити шаблон (auth).
+ * PATCH  — оновити шаблон (auth, Zod). Редагувати може ЛИШЕ автор шаблону
+ *          (або admin/owner) — дозвіл на шаблон дає той, хто його створив.
+ * DELETE — видалити шаблон (auth, лише автор або admin/owner).
  */
 
 export async function PATCH(
@@ -34,12 +37,32 @@ export async function PATCH(
     );
   }
 
+  const existing = await prisma.mgrMessageTemplate.findUnique({
+    where: { id },
+    select: { createdByUserId: true },
+  });
+  if (!existing) {
+    return NextResponse.json({ error: "Шаблон не знайдено" }, { status: 404 });
+  }
+  if (
+    !canManageTemplate(existing, {
+      id: user.id,
+      isAdmin: isAdminRole(user.role),
+    })
+  ) {
+    return NextResponse.json(
+      { error: "Редагувати може лише автор шаблону" },
+      { status: 403 },
+    );
+  }
+
   try {
     const updated = await prisma.mgrMessageTemplate.update({
       where: { id },
       data: {
         name: parsed.data.name,
         text: parsed.data.text,
+        isShared: parsed.data.isShared,
       },
     });
     return NextResponse.json({
@@ -47,6 +70,7 @@ export async function PATCH(
         id: updated.id,
         name: updated.name,
         text: updated.text,
+        isShared: updated.isShared,
         createdByUserId: updated.createdByUserId,
         createdAt: updated.createdAt.toISOString(),
         updatedAt: updated.updatedAt.toISOString(),
@@ -76,6 +100,25 @@ export async function DELETE(
   }
 
   const { id } = await params;
+
+  const existing = await prisma.mgrMessageTemplate.findUnique({
+    where: { id },
+    select: { createdByUserId: true },
+  });
+  if (!existing) {
+    return NextResponse.json({ error: "Шаблон не знайдено" }, { status: 404 });
+  }
+  if (
+    !canManageTemplate(existing, {
+      id: user.id,
+      isAdmin: isAdminRole(user.role),
+    })
+  ) {
+    return NextResponse.json(
+      { error: "Видалити може лише автор шаблону" },
+      { status: 403 },
+    );
+  }
 
   try {
     await prisma.mgrMessageTemplate.delete({ where: { id } });

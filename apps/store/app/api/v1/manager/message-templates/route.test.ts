@@ -19,6 +19,14 @@ vi.mock("@ltex/db", () => ({
   Prisma: {},
 }));
 
+function lastWhere(): Record<string, unknown> {
+  const calls = mockPrisma.mgrMessageTemplate.findMany.mock.calls;
+  const arg = calls[calls.length - 1]?.[0] as
+    | { where?: Record<string, unknown> }
+    | undefined;
+  return arg?.where ?? {};
+}
+
 vi.mock("@/lib/auth/manager-auth", () => ({
   getCurrentUser: (...args: unknown[]) => getCurrentUserMock(...args),
   MANAGER_ACCESS_COOKIE: "ltex_mgr_access",
@@ -45,15 +53,17 @@ const fakeTemplate = {
   id: "t1",
   name: "Привітання",
   text: "Доброго дня!",
+  isShared: false,
   createdByUserId: "u1",
   createdAt: NOW,
   updatedAt: NOW,
 };
 
-function makeGet(): NextRequest {
-  return new NextRequest("http://localhost/api/v1/manager/message-templates", {
-    method: "GET",
-  });
+function makeGet(qs = ""): NextRequest {
+  return new NextRequest(
+    `http://localhost/api/v1/manager/message-templates${qs}`,
+    { method: "GET" },
+  );
 }
 
 function makePost(body: unknown): NextRequest {
@@ -78,17 +88,55 @@ describe("GET /api/v1/manager/message-templates", () => {
     expect(mockPrisma.mgrMessageTemplate.findMany).not.toHaveBeenCalled();
   });
 
-  it("returns all templates ordered by name asc", async () => {
+  it("returns visible templates (mine OR shared) ordered by name asc", async () => {
     const res = await GET(makeGet());
     expect(res.status).toBe(200);
     const json = (await res.json()) as {
-      templates: { id: string; name: string; text: string }[];
+      templates: {
+        id: string;
+        name: string;
+        text: string;
+        isShared: boolean;
+      }[];
     };
     expect(json.templates).toHaveLength(1);
     expect(json.templates[0]?.id).toBe("t1");
+    expect(json.templates[0]?.isShared).toBe(false);
     expect(mockPrisma.mgrMessageTemplate.findMany).toHaveBeenCalledWith(
       expect.objectContaining({ orderBy: { name: "asc" } }),
     );
+    // Дефолтна видимість — власні АБО спільні.
+    const where = lastWhere();
+    expect(JSON.stringify(where)).toContain("createdByUserId");
+    expect(JSON.stringify(where)).toContain("isShared");
+  });
+
+  it("scope=mine restricts to own templates", async () => {
+    await GET(makeGet("?scope=mine"));
+    const where = lastWhere();
+    // AND[0] має бути { createdByUserId: 'u1' } без OR/isShared.
+    const and = (where.AND as unknown[])[0] as Record<string, unknown>;
+    expect(and).toEqual({ createdByUserId: "u1" });
+  });
+
+  it("scope=shared restricts to others' shared templates", async () => {
+    await GET(makeGet("?scope=shared"));
+    const where = lastWhere();
+    const and = (where.AND as unknown[])[0] as Record<string, unknown>;
+    expect(and).toMatchObject({
+      isShared: true,
+      NOT: { createdByUserId: "u1" },
+    });
+  });
+
+  it("q= adds a name-or-text contains search", async () => {
+    await GET(makeGet("?q=знижка"));
+    const where = lastWhere();
+    const search = (where.AND as unknown[])[1] as {
+      OR?: { name?: unknown; text?: unknown }[];
+    };
+    expect(search.OR).toHaveLength(2);
+    expect(JSON.stringify(search)).toContain("знижка");
   });
 
   it("serializes dates to ISO strings", async () => {
@@ -125,7 +173,7 @@ describe("POST /api/v1/manager/message-templates", () => {
     expect(res.status).toBe(400);
   });
 
-  it("creates the template with createdByUserId = current manager", async () => {
+  it("creates the template with createdByUserId = current manager (private by default)", async () => {
     const res = await POST(
       makePost({ name: "Привітання", text: "Доброго дня!" }),
     );
@@ -134,11 +182,19 @@ describe("POST /api/v1/manager/message-templates", () => {
       data: {
         name: "Привітання",
         text: "Доброго дня!",
+        isShared: false,
         createdByUserId: "u1",
       },
     });
     const json = (await res.json()) as { template: { id: string } };
     expect(json.template.id).toBe("t1");
+  });
+
+  it("persists isShared=true when the author shares it", async () => {
+    await POST(makePost({ name: "Акція", text: "Знижки!", isShared: true }));
+    expect(mockPrisma.mgrMessageTemplate.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ isShared: true }),
+    });
   });
 
   it("trims name and text before persisting", async () => {

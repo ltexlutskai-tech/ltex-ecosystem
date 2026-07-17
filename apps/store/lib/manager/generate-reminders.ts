@@ -280,6 +280,7 @@ export async function detectOverdueOrders(
         body: `Замовлення протерміноване — клієнт ${o.customer?.name ?? "—"}. Закрийте або переробіть на нове (через закриття старих).`,
         remindAt: now,
         source: "manual",
+        actionType: "close_orders",
       },
     });
     await prisma.order.update({

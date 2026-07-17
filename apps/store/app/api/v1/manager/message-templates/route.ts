@@ -1,14 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@ltex/db";
+import { Prisma, prisma } from "@ltex/db";
 import { getCurrentUser } from "@/lib/auth/manager-auth";
 import { messageTemplateSchema } from "@/lib/manager/message-template";
 
 /**
  * Manager «Прайс» — Stage 5b message templates endpoint.
  *
- * GET  — список усіх шаблонів (orderBy name asc). Спільний довідник — будь-який
- *        залогінений менеджер бачить усі.
- * POST — створити шаблон (auth, Zod, createdByUserId = поточний менеджер).
+ * GET  — список шаблонів у зоні видимості менеджера: власні («Мої») + спільні
+ *        («Спільні», isShared=true). Фільтри: `?scope=mine|shared` звужує вкладку,
+ *        `?q=` шукає по назві АБО тексту (contains, регістронезалежно).
+ * POST — створити шаблон (auth, Zod, createdByUserId = поточний менеджер,
+ *        isShared = дозвіл автора показувати іншим).
  */
 
 export async function GET(req: NextRequest) {
@@ -17,12 +19,35 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Не авторизовано" }, { status: 401 });
   }
 
+  const url = new URL(req.url);
+  const scope = url.searchParams.get("scope");
+  const q = url.searchParams.get("q")?.trim();
+
+  // Базова видимість: власні АБО спільні від інших.
+  const mine = { createdByUserId: user.id };
+  const shared = { isShared: true, NOT: { createdByUserId: user.id } };
+  let visibility: Prisma.MgrMessageTemplateWhereInput;
+  if (scope === "mine") visibility = mine;
+  else if (scope === "shared") visibility = shared;
+  else visibility = { OR: [mine, shared] };
+
+  const search: Prisma.MgrMessageTemplateWhereInput = q
+    ? {
+        OR: [
+          { name: { contains: q, mode: "insensitive" } },
+          { text: { contains: q, mode: "insensitive" } },
+        ],
+      }
+    : {};
+
   const templates = await prisma.mgrMessageTemplate.findMany({
+    where: { AND: [visibility, search] },
     orderBy: { name: "asc" },
     select: {
       id: true,
       name: true,
       text: true,
+      isShared: true,
       createdByUserId: true,
       createdAt: true,
       updatedAt: true,
@@ -34,6 +59,7 @@ export async function GET(req: NextRequest) {
       id: t.id,
       name: t.name,
       text: t.text,
+      isShared: t.isShared,
       createdByUserId: t.createdByUserId,
       createdAt: t.createdAt.toISOString(),
       updatedAt: t.updatedAt.toISOString(),
@@ -63,6 +89,7 @@ export async function POST(req: NextRequest) {
     data: {
       name: parsed.data.name,
       text: parsed.data.text,
+      isShared: parsed.data.isShared,
       createdByUserId: user.id,
     },
   });
@@ -73,6 +100,7 @@ export async function POST(req: NextRequest) {
         id: created.id,
         name: created.name,
         text: created.text,
+        isShared: created.isShared,
         createdByUserId: created.createdByUserId,
         createdAt: created.createdAt.toISOString(),
         updatedAt: created.updatedAt.toISOString(),
