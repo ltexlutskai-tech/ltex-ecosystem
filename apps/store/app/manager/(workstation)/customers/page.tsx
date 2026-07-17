@@ -60,9 +60,9 @@ export default async function CustomersPage({
       primaryAssortmentIds: pickCsv(sp.primaryAssortmentId),
       primaryRouteIds: pickCsv(sp.primaryRouteId),
       agentUserIds: pickCsv(sp.agentUserId),
-      // Область/Місто — вибір значень з довідника
-      regionValues: pickCsv(sp.region),
-      cityValues: pickCsv(sp.city),
+      // Область/Місто — вільний текст (contains)
+      region: pickString(sp.region),
+      city: pickString(sp.city),
       // numeric range + dates
       daysSinceMin: pickInt(sp.daysSinceMin),
       daysSinceMax: pickInt(sp.daysSinceMax),
