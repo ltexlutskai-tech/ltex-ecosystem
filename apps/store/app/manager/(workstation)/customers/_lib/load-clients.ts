@@ -500,6 +500,32 @@ export async function countOpenReminders(
   });
 }
 
+/**
+ * Прибирає дублікати статусів за назвою у випадаючих списках. Дублікати
+ * зʼявились через два seed-скрипти (тестові словесні коди vs справжні 9-значні
+ * 1С-коди). Залишаємо ОДИН запис на назву, віддаючи перевагу канонічному
+ * 9-значному коду (саме його ставить авто-статус). Порядок — за sortOrder
+ * (порядок вхідного масиву).
+ */
+export function dedupeByLabelPreferCanonical<
+  T extends { code: string; label: string },
+>(rows: T[]): T[] {
+  const byLabel = new Map<string, T>();
+  for (const r of rows) {
+    const key = r.label.trim().toLocaleLowerCase();
+    const existing = byLabel.get(key);
+    if (!existing) {
+      byLabel.set(key, r);
+      continue;
+    }
+    // Канонічний = 9-значний числовий 1С-код.
+    if (/^\d{9}$/.test(r.code) && !/^\d{9}$/.test(existing.code)) {
+      byLabel.set(key, r);
+    }
+  }
+  return Array.from(byLabel.values());
+}
+
 export async function loadDictionariesSnapshot() {
   const [
     statuses,
@@ -563,18 +589,22 @@ export async function loadDictionariesSnapshot() {
   ]);
 
   return {
-    statuses: statuses.map((s) => ({
-      id: s.id,
-      code: s.code,
-      label: s.label,
-      colorHex: s.colorHex,
-    })),
-    statusesOperational: statusesOperational.map((s) => ({
-      id: s.id,
-      code: s.code,
-      label: s.label,
-      colorHex: s.colorHex,
-    })),
+    statuses: dedupeByLabelPreferCanonical(
+      statuses.map((s) => ({
+        id: s.id,
+        code: s.code,
+        label: s.label,
+        colorHex: s.colorHex,
+      })),
+    ),
+    statusesOperational: dedupeByLabelPreferCanonical(
+      statusesOperational.map((s) => ({
+        id: s.id,
+        code: s.code,
+        label: s.label,
+        colorHex: s.colorHex,
+      })),
+    ),
     channels: channels.map((c) => ({ id: c.id, code: c.code, label: c.label })),
     deliveries: deliveries.map((d) => ({
       id: d.id,
