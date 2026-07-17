@@ -4,7 +4,11 @@ import { prisma } from "@ltex/db";
 import { getCurrentUser } from "@/lib/auth/manager-auth";
 import { getCurrentRate } from "@/lib/exchange-rate";
 import { buildProductShareText } from "@/lib/manager/share-message";
-import { canManageCatalog } from "@/lib/manager/catalog-permissions";
+import {
+  canManageCatalog,
+  canManageCatalogStructure,
+} from "@/lib/manager/catalog-permissions";
+import { loadProductAttributeOptions } from "@/lib/manager/product-attributes";
 import { DiscussButton } from "../../messenger/_components/discuss-button";
 import { loadProductCard } from "../_lib/load-product";
 import { loadCategoryNodes, resolveCategoryAccess } from "../_lib/load-prices";
@@ -45,21 +49,35 @@ export default async function ProductCardPage({
     notFound();
   }
 
-  // Керування фото + категорією (7.2) — лише ролям каталогу.
+  // Характеристики редагують ролі каталогу (admin/owner/warehouse);
+  // середня вага / категорія / фото — лише власник/адмін (рішення user 2026-07-17).
   const canManage = canManageCatalog(user.role);
-  const [managerImages, categoryRows] = canManage
-    ? await Promise.all([
-        prisma.productImage.findMany({
-          where: { productId: product.id },
-          orderBy: { position: "asc" },
-          select: { id: true, url: true },
-        }),
-        prisma.category.findMany({
-          orderBy: [{ position: "asc" }, { name: "asc" }],
-          select: { id: true, name: true, parentId: true },
-        }),
-      ])
-    : [[], []];
+  const canManageStructure = canManageCatalogStructure(user.role);
+  const [managerImages, categoryRows, attributeOptions, producerRows] =
+    await Promise.all([
+      canManageStructure
+        ? prisma.productImage.findMany({
+            where: { productId: product.id },
+            orderBy: { position: "asc" },
+            select: { id: true, url: true },
+          })
+        : Promise.resolve([] as { id: string; url: string }[]),
+      canManageStructure
+        ? prisma.category.findMany({
+            orderBy: [{ position: "asc" }, { name: "asc" }],
+            select: { id: true, name: true, parentId: true },
+          })
+        : Promise.resolve(
+            [] as { id: string; name: string; parentId: string | null }[],
+          ),
+      loadProductAttributeOptions(),
+      prisma.mgrProducer.findMany({
+        where: { archived: false, markedForDeletion: false },
+        orderBy: [{ sortOrder: "asc" }, { label: "asc" }],
+        select: { label: true },
+      }),
+    ]);
+  const producers = producerRows.map((p) => p.label);
 
   // Вузли для каскадного вибору категорії (рівень за рівнем).
   const categoryTreeNodes = categoryRows.map((c) => ({
@@ -114,22 +132,25 @@ export default async function ProductCardPage({
         productShareText={productShareText}
         rateUah={rateUah}
         sellerName={user.fullName}
-        isAdmin={user.role === "admin"}
+        canEditCharacteristics={canManage}
+        isOwnerAdmin={canManageStructure}
+        attributeOptions={attributeOptions}
+        producers={producers}
       />
-      {canManage && (
+      {canManageStructure && (
         <ProductAverageWeightEditor
           productId={product.id}
           currentValue={product.averageWeight ?? null}
         />
       )}
-      {canManage && (
+      {canManageStructure && (
         <ProductCategoryEditor
           productId={product.id}
           currentCategoryId={product.categoryId}
           categories={categoryTreeNodes}
         />
       )}
-      {canManage && (
+      {canManageStructure && (
         <ProductPhotoManager productId={product.id} images={managerImages} />
       )}
     </div>

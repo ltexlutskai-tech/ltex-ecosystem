@@ -6,7 +6,7 @@ import sharp from "sharp";
 import { saveMediaFile, deleteMediaByUrl } from "@/lib/media/storage";
 import { validateImageFile, InvalidImageError } from "@/lib/validate-image";
 import { getCurrentUser } from "@/lib/auth/manager-auth";
-import { canManageCatalog } from "@/lib/manager/catalog-permissions";
+import { canManageCatalogStructure } from "@/lib/manager/catalog-permissions";
 
 /**
  * Керування фото товару з CRM-картки (7.2 Блок 3). Дзеркало
@@ -16,7 +16,7 @@ import { canManageCatalog } from "@/lib/manager/catalog-permissions";
 
 async function assertCatalogManager(): Promise<void> {
   const user = await getCurrentUser();
-  if (!user || !canManageCatalog(user.role)) {
+  if (!user || !canManageCatalogStructure(user.role)) {
     throw new Error("Немає прав керувати каталогом");
   }
 }
