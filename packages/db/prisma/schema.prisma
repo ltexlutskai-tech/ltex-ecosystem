@@ -3392,7 +3392,7 @@ model SalesPlan {
   id             String   @id @default(cuid())
   month          String // "YYYY-MM"
   regionSlug     String   @map("region_slug")
-  planRevenueUah Float    @default(0) @map("plan_revenue_uah")
+  planRevenueEur Float    @default(0) @map("plan_revenue_eur")
   planTtCount    Int      @default(0) @map("plan_tt_count")
   planNewTtCount Int      @default(0) @map("plan_new_tt_count")
   createdAt      DateTime @default(now()) @map("created_at")

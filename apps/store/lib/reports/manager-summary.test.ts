@@ -1,12 +1,56 @@
 import { describe, it, expect } from "vitest";
 import {
   aggregatePeriod,
+  aggregateProducts,
   comparePeriods,
   normalizeMonth,
   monthToRange,
   shiftMonth,
   type ManagerSaleRow,
+  type ProductItemRow,
 } from "./manager-summary";
+
+describe("aggregateProducts", () => {
+  const items: ProductItemRow[] = [
+    {
+      productId: "p1",
+      productName: "Куртки зима",
+      articleCode: "A1",
+      group: "stock",
+      revenueEur: 100,
+      weightKg: 40,
+      qty: 2,
+    },
+    {
+      productId: "p1",
+      productName: "Куртки зима",
+      articleCode: "A1",
+      group: "stock",
+      revenueEur: 50,
+      weightKg: 20,
+      qty: 1,
+    },
+    {
+      productId: "p2",
+      productName: "Футболки",
+      articleCode: "A2",
+      group: "second",
+      revenueEur: 200,
+      weightKg: 30,
+      qty: 5,
+    },
+  ];
+
+  it("сумує по товару й сортує спаданням виручки", () => {
+    const agg = aggregateProducts(items);
+    expect(agg.map((p) => p.productId)).toEqual(["p2", "p1"]);
+    const p1 = agg.find((p) => p.productId === "p1")!;
+    expect(p1.revenueEur).toBe(150);
+    expect(p1.weightKg).toBe(60);
+    expect(p1.qty).toBe(3);
+    expect(p1.group).toBe("stock");
+  });
+});
 
 describe("month helpers", () => {
   it("normalizeMonth", () => {
@@ -48,6 +92,7 @@ function row(
   const weightKg = g.stock.weightKg + g.second.weightKg + g.other.weightKg || 0;
   return {
     customerId,
+    customerCode1C: `code-${customerId}`,
     customerName: `Клієнт ${customerId}`,
     regionSlug,
     totalUah,

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { MessagesSquare } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { subscribeMessengerRead } from "@/lib/messenger/read-broadcast";
 import { useTabsOptional } from "./tabs/tabs-context";
 
 const POLL_INTERVAL_MS = 30_000;
@@ -60,9 +61,12 @@ export function HeaderMessengerBell() {
       if (document.visibilityState === "visible") void refetchCount();
     }
     document.addEventListener("visibilitychange", onVis);
+    // Миттєвий refetch, коли розмову прочитано в iframe-вкладці месенджера.
+    const unsub = subscribeMessengerRead(() => void refetchCount());
     return () => {
       window.clearInterval(id);
       document.removeEventListener("visibilitychange", onVis);
+      unsub();
     };
   }, [refetchCount]);
 

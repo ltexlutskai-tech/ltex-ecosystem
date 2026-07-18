@@ -10,7 +10,7 @@ import { normalizeMonth, TOTAL_PLAN_SLUG } from "@/lib/reports/manager-summary";
  * analyst (задають план).
  *
  * GET  ?month=YYYY-MM  → { plans: [...] }
- * POST { month, plans:[{regionSlug, planRevenueUah, planTtCount, planNewTtCount}] }
+ * POST { month, plans:[{regionSlug, planRevenueEur, planTtCount, planNewTtCount}] }
  *      → upsert усіх переданих рядків (по (month, regionSlug)).
  */
 
@@ -32,7 +32,7 @@ export async function GET(req: NextRequest) {
 
 interface PlanInput {
   regionSlug?: unknown;
-  planRevenueUah?: unknown;
+  planRevenueEur?: unknown;
   planTtCount?: unknown;
   planNewTtCount?: unknown;
 }
@@ -73,7 +73,7 @@ export async function POST(req: NextRequest) {
     rows.map((p) => {
       const regionSlug = p.regionSlug as string;
       const data = {
-        planRevenueUah: num(p.planRevenueUah),
+        planRevenueEur: num(p.planRevenueEur),
         planTtCount: Math.round(num(p.planTtCount)),
         planNewTtCount: Math.round(num(p.planNewTtCount)),
       };
