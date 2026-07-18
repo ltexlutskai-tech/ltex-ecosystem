@@ -32,14 +32,14 @@ export default async function SalesPlansPage({
   const totalRow: PlanRowInput = {
     regionSlug: TOTAL_PLAN_SLUG,
     label: "Загальний план",
-    planRevenueUah: bySlug.get(TOTAL_PLAN_SLUG)?.planRevenueUah ?? 0,
+    planRevenueEur: bySlug.get(TOTAL_PLAN_SLUG)?.planRevenueEur ?? 0,
     planTtCount: bySlug.get(TOTAL_PLAN_SLUG)?.planTtCount ?? 0,
     planNewTtCount: bySlug.get(TOTAL_PLAN_SLUG)?.planNewTtCount ?? 0,
   };
   const regionRows: PlanRowInput[] = UA_REGIONS.map((r) => ({
     regionSlug: r.slug,
     label: r.label,
-    planRevenueUah: bySlug.get(r.slug)?.planRevenueUah ?? 0,
+    planRevenueEur: bySlug.get(r.slug)?.planRevenueEur ?? 0,
     planTtCount: bySlug.get(r.slug)?.planTtCount ?? 0,
     planNewTtCount: bySlug.get(r.slug)?.planNewTtCount ?? 0,
   }));
@@ -49,7 +49,7 @@ export default async function SalesPlansPage({
       <header>
         <h1 className="text-xl font-bold text-gray-800">План продажів</h1>
         <p className="mt-1 text-sm text-gray-600">
-          Задайте план по областях на місяць: виручку (₴), кількість ТТ, що
+          Задайте план по областях на місяць: виручку (€), кількість ТТ, що
           скупились, та кількість нових ТТ. Порівнюється з фактом у «Звіті
           менеджера».
         </p>

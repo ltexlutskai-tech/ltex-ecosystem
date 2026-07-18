@@ -1,4 +1,4 @@
-import { prisma } from "@ltex/db";
+import { Prisma, prisma } from "@ltex/db";
 
 /**
  * Серіалізація нагадувань + batch-lookup назв товарів для рядків
@@ -38,23 +38,25 @@ export interface ReminderRow {
   order: {
     id: string;
     number1C: string | null;
-    docNumber: number | null;
   } | null;
   owner: { id: string; fullName: string } | null;
   items: ReminderItemRow[];
 }
 
+// `satisfies Prisma.MgrReminderInclude` — щоб TypeScript ловив неіснуючі поля
+// у select (напр. `Order` НЕ має `docNumber` — раніше це давало runtime-500 на
+// всіх запитах нагадувань, бо `as const` сам не валідує проти Prisma-типів).
 export const REMINDER_INCLUDE = {
   client: {
     select: { id: true, name: true, phonePrimary: true, code1C: true },
   },
-  order: { select: { id: true, number1C: true, docNumber: true } },
+  order: { select: { id: true, number1C: true } },
   owner: { select: { id: true, fullName: true } },
   items: {
     select: { id: true, productId: true, quantity: true, done: true },
     orderBy: { createdAt: "asc" },
   },
-} as const;
+} as const satisfies Prisma.MgrReminderInclude;
 
 /**
  * Будує map productId → {name, articleCode} для усіх рядків переданих
@@ -110,7 +112,6 @@ export function serializeReminder(
       ? {
           id: r.order.id,
           number1C: r.order.number1C,
-          docNumber: r.order.docNumber,
         }
       : null,
     owner: r.owner ? { id: r.owner.id, fullName: r.owner.fullName } : null,

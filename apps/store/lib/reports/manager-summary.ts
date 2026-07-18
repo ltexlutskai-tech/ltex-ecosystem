@@ -15,9 +15,8 @@ import {
  * `comparePeriods`) + тонкий async-лоадер (`getManagerSummary`), який тягне
  * реалізації (`Sale` status=posted) з позиціями і кличе чисті функції.
  *
- * Валюти: виручка показується і в ₴ (шапка `Sale.totalUah`), і в €
- * (`Sale.totalEur`). Розбивка по групах — у € та кг (позиції мають лише €).
- * План порівнюється з фактом по ₴ (див. SalesPlan.planRevenueUah).
+ * Валюти: основна — ЄВРО (`Sale.totalEur`), ₴ (`Sale.totalUah`) показується
+ * додатково. Розбивка по групах і план — у € (див. SalesPlan.planRevenueEur).
  */
 
 /** Службовий slug загального (не по області) плану. */
@@ -69,12 +68,35 @@ export interface SaleRowGroups {
 
 export interface ManagerSaleRow {
   customerId: string;
+  customerCode1C: string | null;
   customerName: string;
   regionSlug: string | null;
   totalUah: number;
   totalEur: number;
   weightKg: number;
   groups: SaleRowGroups;
+}
+
+// ─── Товарна агрегація (для вкладки «Товари») ────────────────────────────────
+
+export interface ProductItemRow {
+  productId: string;
+  productName: string;
+  articleCode: string | null;
+  group: ProductGroup;
+  revenueEur: number;
+  weightKg: number;
+  qty: number;
+}
+
+export interface ProductAgg {
+  productId: string;
+  productName: string;
+  articleCode: string | null;
+  group: ProductGroup;
+  revenueEur: number;
+  weightKg: number;
+  qty: number;
 }
 
 // ─── Результати агрегації ────────────────────────────────────────────────────
@@ -96,6 +118,9 @@ export interface RegionAgg {
 
 export interface ClientAgg {
   customerId: string;
+  customerCode1C: string | null;
+  /** MgrClient.id для лінка на картку клієнта (резолвиться лоадером). */
+  mgrClientId: string | null;
   customerName: string;
   regionSlug: string | null;
   regionLabel: string;
@@ -185,6 +210,8 @@ export function aggregatePeriod(
     if (!ca) {
       ca = {
         customerId: r.customerId,
+        customerCode1C: r.customerCode1C,
+        mgrClientId: null,
         customerName: r.customerName,
         regionSlug: r.regionSlug,
         regionLabel: regionLabelFor(r.regionSlug),
@@ -233,11 +260,39 @@ export function aggregatePeriod(
 
 // ─── Порівняння двох періодів (спрацювання ТТ) ───────────────────────────────
 
+/** Згортає позиції реалізацій по товарах. Чиста функція. */
+export function aggregateProducts(
+  items: readonly ProductItemRow[],
+): ProductAgg[] {
+  const map = new Map<string, ProductAgg>();
+  for (const it of items) {
+    let p = map.get(it.productId);
+    if (!p) {
+      p = {
+        productId: it.productId,
+        productName: it.productName,
+        articleCode: it.articleCode,
+        group: it.group,
+        revenueEur: 0,
+        weightKg: 0,
+        qty: 0,
+      };
+      map.set(it.productId, p);
+    }
+    p.revenueEur += it.revenueEur;
+    p.weightKg += it.weightKg;
+    p.qty += it.qty;
+  }
+  return [...map.values()].sort((a, b) => b.revenueEur - a.revenueEur);
+}
+
 export interface ClientRef {
   customerId: string;
+  mgrClientId: string | null;
   customerName: string;
   regionLabel: string;
   revenueUah: number;
+  revenueEur: number;
 }
 
 export interface PeriodComparison {
@@ -254,9 +309,11 @@ export interface PeriodComparison {
 function toRef(c: ClientAgg): ClientRef {
   return {
     customerId: c.customerId,
+    mgrClientId: c.mgrClientId,
     customerName: c.customerName,
     regionLabel: c.regionLabel,
     revenueUah: c.revenueUah,
+    revenueEur: c.revenueEur,
   };
 }
 
@@ -290,7 +347,7 @@ export function comparePeriods(
 // ─── Планове зіставлення ─────────────────────────────────────────────────────
 
 export interface PlanValues {
-  planRevenueUah: number;
+  planRevenueEur: number;
   planTtCount: number;
   planNewTtCount: number;
 }
@@ -324,6 +381,9 @@ export interface ManagerSummaryResult {
   regions: RegionPlanFact[];
   /** Загальний план (по всіх областях) + факт-підсумок. */
   totalPlan: PlanValues | null;
+  /** По товарах — поточний і порівняльний період (вкладка «Товари»). */
+  currentProducts: ProductAgg[];
+  previousProducts: ProductAgg[];
   clientLimitApplied: number;
 }
 
@@ -332,12 +392,15 @@ const SALE_SELECT = {
   totalUah: true,
   totalEur: true,
   createdAt: true,
-  customer: { select: { name: true, region: true } },
+  customer: { select: { name: true, region: true, code1C: true } },
   items: {
     select: {
       weight: true,
       priceEur: true,
-      product: { select: { categoryId: true } },
+      quantity: true,
+      product: {
+        select: { id: true, name: true, articleCode: true, categoryId: true },
+      },
     },
   },
 } as const;
@@ -347,11 +410,21 @@ type RawSale = {
   totalUah: number;
   totalEur: number;
   createdAt: Date;
-  customer: { name: string; region: string | null } | null;
+  customer: {
+    name: string;
+    region: string | null;
+    code1C: string | null;
+  } | null;
   items: {
     weight: number;
     priceEur: number;
-    product: { categoryId: string };
+    quantity: number;
+    product: {
+      id: string;
+      name: string;
+      articleCode: string | null;
+      categoryId: string;
+    };
   }[];
 };
 
@@ -374,6 +447,7 @@ function toRows(
     }
     return {
       customerId: s.customerId,
+      customerCode1C: s.customer?.code1C ?? null,
       customerName: s.customer?.name ?? "—",
       regionSlug: s.customer?.region ?? null,
       totalUah: s.totalUah,
@@ -382,6 +456,29 @@ function toRows(
       groups,
     };
   });
+}
+
+/** Плаский список позицій (для товарної агрегації) з класифікацією групи. */
+function toProductItems(
+  sales: RawSale[],
+  groupOf: (categoryId: string | null | undefined) => ProductGroup,
+): ProductItemRow[] {
+  const out: ProductItemRow[] = [];
+  for (const s of sales) {
+    for (const it of s.items) {
+      if (!it.product) continue;
+      out.push({
+        productId: it.product.id,
+        productName: it.product.name,
+        articleCode: it.product.articleCode ?? null,
+        group: groupOf(it.product.categoryId),
+        revenueEur: it.priceEur,
+        weightKg: it.weight,
+        qty: it.quantity,
+      });
+    }
+  }
+  return out;
 }
 
 export async function getManagerSummary(
@@ -441,7 +538,37 @@ export async function getManagerSummary(
 
   const current = aggregatePeriod(currentRows, newInCurrent);
   const previous = aggregatePeriod(prevRows, newInPrev);
+
+  // Резолвимо MgrClient.id по code1C для лінка на картку клієнта.
+  const codes = [
+    ...new Set(
+      [...current.byClient, ...previous.byClient]
+        .map((c) => c.customerCode1C)
+        .filter((c): c is string => !!c),
+    ),
+  ];
+  if (codes.length > 0) {
+    const mgrClients = await prisma.mgrClient.findMany({
+      where: { code1C: { in: codes } },
+      select: { id: true, code1C: true },
+    });
+    const idByCode = new Map<string, string>();
+    for (const m of mgrClients) if (m.code1C) idByCode.set(m.code1C, m.id);
+    for (const c of [...current.byClient, ...previous.byClient]) {
+      if (c.customerCode1C)
+        c.mgrClientId = idByCode.get(c.customerCode1C) ?? null;
+    }
+  }
+
   const comparison = comparePeriods(current, previous);
+
+  // Товарна агрегація.
+  const currentProducts = aggregateProducts(
+    toProductItems(currentSales as RawSale[], groupOf),
+  ).slice(0, clientLimit);
+  const previousProducts = aggregateProducts(
+    toProductItems(prevSales as RawSale[], groupOf),
+  ).slice(0, clientLimit);
 
   // План на місяць.
   const plans = await prisma.salesPlan.findMany({
@@ -450,7 +577,7 @@ export async function getManagerSummary(
   const planBySlug = new Map<string, PlanValues>();
   for (const p of plans) {
     planBySlug.set(p.regionSlug, {
-      planRevenueUah: p.planRevenueUah,
+      planRevenueEur: p.planRevenueEur,
       planTtCount: p.planTtCount,
       planNewTtCount: p.planNewTtCount,
     });
@@ -474,6 +601,8 @@ export async function getManagerSummary(
     comparison,
     regions,
     totalPlan,
+    currentProducts,
+    previousProducts,
     clientLimitApplied: clientLimit,
   };
 }

@@ -40,7 +40,6 @@ export interface ReminderRow {
   order: {
     id: string;
     number1C: string | null;
-    docNumber: number | null;
   } | null;
   owner: { id: string; fullName: string } | null;
   items?: ReminderItem[];

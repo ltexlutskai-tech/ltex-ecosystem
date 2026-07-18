@@ -22,6 +22,7 @@ import { formatRelativeShort } from "../../_components/format-relative";
 import { Avatar } from "./avatar";
 import { DocRefCard } from "./doc-ref-card";
 import { GroupInfoDialog } from "./group-info-dialog";
+import { broadcastMessengerRead } from "@/lib/messenger/read-broadcast";
 import { linkify } from "./linkify";
 import { PickConversationDialog } from "./pick-conversation-dialog";
 import { roleLabel } from "./role-label";
@@ -106,6 +107,8 @@ export function ConversationThread({
           { method: "POST", cache: "no-store" },
         );
         onReadCleared();
+        // Миттєво оновити лічильники у верхньому вікні (сайдбар + дзвіночок).
+        broadcastMessengerRead();
       } catch {
         // silent
       }

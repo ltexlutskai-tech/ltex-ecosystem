@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { subscribeMessengerRead } from "@/lib/messenger/read-broadcast";
 
 const POLL_INTERVAL_MS = 30_000;
 
@@ -36,9 +37,12 @@ export function MessengerUnreadBadge() {
       if (document.visibilityState === "visible") void refetch();
     }
     document.addEventListener("visibilitychange", onVis);
+    // Миттєвий refetch, коли розмову прочитано в iframe-вкладці месенджера.
+    const unsub = subscribeMessengerRead(() => void refetch());
     return () => {
       window.clearInterval(id);
       document.removeEventListener("visibilitychange", onVis);
+      unsub();
     };
   }, [refetch]);
 

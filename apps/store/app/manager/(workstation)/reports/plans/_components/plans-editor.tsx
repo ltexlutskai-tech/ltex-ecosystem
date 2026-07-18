@@ -6,21 +6,21 @@ import { useRouter } from "next/navigation";
 export interface PlanRowInput {
   regionSlug: string;
   label: string;
-  planRevenueUah: number;
+  planRevenueEur: number;
   planTtCount: number;
   planNewTtCount: number;
 }
 
 type Values = Record<
   string,
-  { planRevenueUah: number; planTtCount: number; planNewTtCount: number }
+  { planRevenueEur: number; planTtCount: number; planNewTtCount: number }
 >;
 
 function initValues(rows: PlanRowInput[]): Values {
   const v: Values = {};
   for (const r of rows) {
     v[r.regionSlug] = {
-      planRevenueUah: r.planRevenueUah,
+      planRevenueEur: r.planRevenueEur,
       planTtCount: r.planTtCount,
       planNewTtCount: r.planNewTtCount,
     };
@@ -46,13 +46,13 @@ export function PlansEditor({
 
   function setField(
     slug: string,
-    field: "planRevenueUah" | "planTtCount" | "planNewTtCount",
+    field: "planRevenueEur" | "planTtCount" | "planNewTtCount",
     raw: string,
   ) {
     const n = Number(raw.replace(/\s/g, "").replace(",", "."));
     setValues((prev) => {
       const cur = prev[slug] ?? {
-        planRevenueUah: 0,
+        planRevenueEur: 0,
         planTtCount: 0,
         planNewTtCount: 0,
       };
@@ -64,7 +64,7 @@ export function PlansEditor({
   }
 
   const valueFor = (slug: string) =>
-    values[slug] ?? { planRevenueUah: 0, planTtCount: 0, planNewTtCount: 0 };
+    values[slug] ?? { planRevenueEur: 0, planTtCount: 0, planNewTtCount: 0 };
 
   async function save() {
     setSaving(true);
@@ -124,7 +124,7 @@ export function PlansEditor({
           <thead className="bg-gray-50 text-left text-gray-600">
             <tr>
               <th className="px-3 py-2 font-medium">Область</th>
-              <th className="px-3 py-2 text-right font-medium">Виручка, ₴</th>
+              <th className="px-3 py-2 text-right font-medium">Виручка, €</th>
               <th className="px-3 py-2 text-right font-medium">ТТ скупились</th>
               <th className="px-3 py-2 text-right font-medium">Нові ТТ</th>
             </tr>
@@ -145,9 +145,9 @@ export function PlansEditor({
                   <td className="px-3 py-1.5">{r.label}</td>
                   <td className="px-2 py-1 text-right">
                     <NumCell
-                      value={v.planRevenueUah}
+                      value={v.planRevenueEur}
                       onChange={(val) =>
-                        setField(r.regionSlug, "planRevenueUah", val)
+                        setField(r.regionSlug, "planRevenueEur", val)
                       }
                     />
                   </td>
