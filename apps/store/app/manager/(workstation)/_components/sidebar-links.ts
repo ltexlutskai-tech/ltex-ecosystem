@@ -154,8 +154,18 @@ export const BAG_STATE_LINK: SidebarLink = {
 };
 
 // ── Завдання складу (2026-07-14) — підготувати відправлення + ТТН ──────────
+// Детальна сторінка складського завдання (пакування/ТТН). У меню більше не
+// показується окремо — доступна через блок «Завдання» (deep-link на картці).
 export const WAREHOUSE_TASKS_LINK: SidebarLink = {
   href: "/manager/warehouse-tasks",
+  label: "Завдання складу",
+  icon: PackageCheck,
+};
+
+// ── Блок «Завдання» (2026-07-18) — доручення між користувачами + складські.
+// Доступний УСІМ ролям. Об'єднує ручні доручення й авто-завдання складу.
+export const TASKS_LINK: SidebarLink = {
+  href: "/manager/tasks",
   label: "Завдання",
   icon: PackageCheck,
 };
@@ -215,6 +225,7 @@ export type SidebarBadge =
   | "sales-pending"
   | "chat"
   | "messenger"
+  | "tasks"
   | "warehouse-tasks"
   | "deletions";
 
@@ -276,10 +287,8 @@ export function getSidebarSections(role: ManagerRole): SidebarItem[][] {
     { ...CHAT_LINK, badge: "chat" },
     { ...MESSENGER_LINK, badge: "messenger" },
   ];
-  // Завдання: склад/admin/owner (як було) + менеджер (нове — «свої» завдання).
-  if (isWarehouse || adminOrOwner || isManager) {
-    sectionC.push({ ...WAREHOUSE_TASKS_LINK, badge: "warehouse-tasks" });
-  }
+  // Завдання — доступні УСІМ ролям (доручення + складські в одному блоці).
+  sectionC.push({ ...TASKS_LINK, badge: "tasks" });
   // Поступлення + Зміна стану мішка — лише склад/admin/owner.
   if (isWarehouse || adminOrOwner) {
     sectionC.push({ ...WAREHOUSE_RECEIVINGS_LINK });

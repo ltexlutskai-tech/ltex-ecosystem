@@ -4,6 +4,7 @@ import { ChatUnreadBadge } from "./chat-unread-badge";
 import { DeletionsBadge } from "./deletions-badge";
 import { MessengerUnreadBadge } from "./messenger-unread-badge";
 import { PendingBadge } from "./pending-badge";
+import { TasksBadge } from "./tasks-badge";
 import { WarehouseTasksBadge } from "./warehouse-tasks-badge";
 import { SidebarNavLink } from "./sidebar-nav-link";
 import {
@@ -24,6 +25,8 @@ function badgeNode(badge: SidebarBadge | undefined): ReactNode {
       return <ChatUnreadBadge />;
     case "messenger":
       return <MessengerUnreadBadge />;
+    case "tasks":
+      return <TasksBadge />;
     case "warehouse-tasks":
       return <WarehouseTasksBadge />;
     case "deletions":

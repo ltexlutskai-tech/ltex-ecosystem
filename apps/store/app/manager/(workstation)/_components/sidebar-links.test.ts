@@ -26,7 +26,7 @@ describe("getSidebarSections — доступ меню за роллю", () => {
       "/manager/closures",
       "/manager/chat",
       "/manager/messenger",
-      "/manager/warehouse-tasks", // Завдання
+      "/manager/tasks", // Завдання (доручення + складські)
       "/manager/reports/manager", // Звіти (власний звіт менеджера)
       "/manager/trash", // Кошик
       "/manager/settings",

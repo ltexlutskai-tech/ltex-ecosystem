@@ -1281,6 +1281,8 @@ model User {
   chatInboxMessages    ChatInboxMessage[]       @relation("ChatInboxMessageAuthor")
   regionAgents         MgrRegionAgent[]         @relation("RegionAgentUser")
   auditLogs            AuditLog[]               @relation("AuditLogUser")
+  createdTasks         Task[]                   @relation("TaskCreator")
+  assignedTasks        Task[]                   @relation("TaskAssignee")
   receivingsCreated    Receiving[]              @relation("ReceivingCreatedBy")
   receivingsPosted     Receiving[]              @relation("ReceivingPostedBy")
   receivingsCancelled  Receiving[]              @relation("ReceivingCancelledBy")
@@ -3401,4 +3403,39 @@ model SalesPlan {
   @@unique([month, regionSlug])
   @@index([month])
   @@map("mgr_sales_plans")
+}
+
+// Блок «Завдання» (ТЗ 2026-07-18) — доручення між користувачами. Будь-хто може
+// поставити завдання будь-кому. Об'єднує ручні доручення й авто-завдання
+// (напр. складу від реалізації). Пізніше: пріоритети, дедлайни.
+//   • assigneeUserId — конкретний виконавець (ручне доручення);
+//   • assigneeRole   — завдання на РОЛЬ (напр. "warehouse" — бачать усі складські);
+//     задається одне з двох.
+//   • type — "manual" | "warehouse" (для кольору/іконки у списку);
+//   • status — "open" | "done"; resultComment — коментар виконавця при закритті.
+//   • clientId/saleId — опційний контекст (картка клієнта / реалізація).
+model Task {
+  id                String    @id @default(cuid())
+  title             String
+  description       String?   @db.Text
+  createdByUserId   String    @map("created_by_user_id")
+  assigneeUserId    String?   @map("assignee_user_id")
+  assigneeRole      String?   @map("assignee_role")
+  status            String    @default("open")
+  type              String    @default("manual")
+  resultComment     String?   @map("result_comment") @db.Text
+  completedAt       DateTime? @map("completed_at")
+  completedByUserId String?   @map("completed_by_user_id")
+  clientId          String?   @map("client_id")
+  saleId            String?   @map("sale_id")
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+
+  createdBy User  @relation("TaskCreator", fields: [createdByUserId], references: [id], onDelete: Cascade)
+  assignee  User? @relation("TaskAssignee", fields: [assigneeUserId], references: [id], onDelete: SetNull)
+
+  @@index([assigneeUserId, status])
+  @@index([createdByUserId, status])
+  @@index([assigneeRole, status])
+  @@map("mgr_tasks")
 }
