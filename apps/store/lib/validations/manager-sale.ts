@@ -45,8 +45,18 @@ export const createSaleSchema = z.object({
   priceTypeId: z.string().min(1).nullable().optional(),
   /** Спосіб доставки — код запису довідника «Способи доставки» (7.3). */
   deliveryMethod: z.string().max(50).nullable().optional(),
-  /** № відділення Нової Пошти. */
+  /** № відділення Нової Пошти (номер — для сумісності з наявними показами/завданням). */
   novaPoshtaBranch: z.string().max(20).nullable().optional(),
+  /** Реф міста НП (довідник) — для авто-створення ТТН (Фаза 1). */
+  npCityRef: z.string().max(120).nullable().optional(),
+  /** Назва міста НП (для показу без запиту до довідника). */
+  npCityName: z.string().max(120).nullable().optional(),
+  /** Реф відділення НП (довідник) — для авто-створення ТТН (Фаза 1). */
+  npWarehouseRef: z.string().max(120).nullable().optional(),
+  /** Назва/номер відділення НП (для показу без запиту). */
+  npWarehouseName: z.string().max(120).nullable().optional(),
+  /** Тип доставки НП (WarehouseWarehouse | WarehouseDoors). */
+  npDeliveryType: z.string().max(40).nullable().optional(),
   deliveryAddress: z.string().max(500).nullable().optional(),
   /** Наложка (післяплата). */
   cashOnDelivery: z.boolean().optional().default(false),
@@ -92,6 +102,11 @@ export const updateSaleSchema = z.object({
   priceTypeId: z.string().min(1).nullable().optional(),
   deliveryMethod: z.string().max(50).nullable().optional(),
   novaPoshtaBranch: z.string().max(20).nullable().optional(),
+  npCityRef: z.string().max(120).nullable().optional(),
+  npCityName: z.string().max(120).nullable().optional(),
+  npWarehouseRef: z.string().max(120).nullable().optional(),
+  npWarehouseName: z.string().max(120).nullable().optional(),
+  npDeliveryType: z.string().max(40).nullable().optional(),
   deliveryAddress: z.string().max(500).nullable().optional(),
   cashOnDelivery: z.boolean().optional().default(false),
   assignedAgentUserId: z.string().min(1).nullable().optional(),
@@ -134,6 +149,11 @@ export const saleDraftSchema = z.object({
   priceTypeId: z.string().min(1).nullable().optional(),
   deliveryMethod: z.string().max(50).nullable().optional(),
   novaPoshtaBranch: z.string().max(20).nullable().optional(),
+  npCityRef: z.string().max(120).nullable().optional(),
+  npCityName: z.string().max(120).nullable().optional(),
+  npWarehouseRef: z.string().max(120).nullable().optional(),
+  npWarehouseName: z.string().max(120).nullable().optional(),
+  npDeliveryType: z.string().max(40).nullable().optional(),
   deliveryAddress: z.string().max(500).nullable().optional(),
   cashOnDelivery: z.boolean().optional(),
   assignedAgentUserId: z.string().min(1).nullable().optional(),

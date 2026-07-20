@@ -163,6 +163,62 @@ describe("createSaleSchema", () => {
     });
     expect(result.success).toBe(false);
   });
+
+  it("приймає структуровані реф-и Нової Пошти", () => {
+    const result = createSaleSchema.safeParse({
+      customerId: "c1",
+      items: [minimalItem],
+      deliveryMethod: "post",
+      novaPoshtaBranch: "1",
+      npCityRef: "8d5a980d-391c-11dd-90d9-001a92567626",
+      npCityName: "Луцьк (Волинська обл.)",
+      npWarehouseRef: "1ec09d88-e1c2-11e3-8c4a-0050568002cf",
+      npWarehouseName: "Відділення №1: вул. Прикладна, 1",
+      npDeliveryType: "WarehouseWarehouse",
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("np-поля опційні (документ без Нової Пошти)", () => {
+    const parsed = createSaleSchema.parse({
+      customerId: "c1",
+      items: [minimalItem],
+    });
+    expect(parsed.npCityRef).toBeUndefined();
+    expect(parsed.npWarehouseRef).toBeUndefined();
+    expect(parsed.npDeliveryType).toBeUndefined();
+  });
+
+  it("приймає np-поля = null (скидання при зміні доставки)", () => {
+    const result = createSaleSchema.safeParse({
+      customerId: "c1",
+      items: [minimalItem],
+      npCityRef: null,
+      npCityName: null,
+      npWarehouseRef: null,
+      npWarehouseName: null,
+      npDeliveryType: null,
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("відхиляє задовгий npDeliveryType (>40)", () => {
+    const result = createSaleSchema.safeParse({
+      customerId: "c1",
+      items: [minimalItem],
+      npDeliveryType: "x".repeat(41),
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("відхиляє задовгий npCityRef (>120)", () => {
+    const result = createSaleSchema.safeParse({
+      customerId: "c1",
+      items: [minimalItem],
+      npCityRef: "x".repeat(121),
+    });
+    expect(result.success).toBe(false);
+  });
 });
 
 describe("updateSaleSchema", () => {
@@ -208,6 +264,18 @@ describe("updateSaleSchema", () => {
       status: "delivered",
     });
     expect(result.success).toBe(false);
+  });
+
+  it("приймає структуровані реф-и Нової Пошти", () => {
+    const result = updateSaleSchema.safeParse({
+      items: [minimalItem],
+      npCityRef: "city-ref",
+      npCityName: "Луцьк",
+      npWarehouseRef: "wh-ref",
+      npWarehouseName: "Відділення №1",
+      npDeliveryType: "WarehouseWarehouse",
+    });
+    expect(result.success).toBe(true);
   });
 });
 
@@ -260,5 +328,18 @@ describe("saleDraftSchema (relaxed draft mode для autosave)", () => {
       items: [{ ...minimalItem, pricePerKg: -1 }],
     });
     expect(result.success).toBe(false);
+  });
+
+  it("приймає draft із реф-ами Нової Пошти", () => {
+    const result = saleDraftSchema.safeParse({
+      draft: true,
+      deliveryMethod: "post",
+      npCityRef: "city-ref",
+      npCityName: "Луцьк",
+      npWarehouseRef: "wh-ref",
+      npWarehouseName: "Відділення №1",
+      npDeliveryType: "WarehouseWarehouse",
+    });
+    expect(result.success).toBe(true);
   });
 });

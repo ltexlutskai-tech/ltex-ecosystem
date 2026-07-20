@@ -235,6 +235,12 @@ export interface SaleEditInitial {
   priceTypeId: string | null;
   deliveryMethod: string | null;
   novaPoshtaBranch: string | null;
+  /** Реф-и/назви обраного відділення НП (для показу пікера при редагуванні). */
+  npCityRef: string | null;
+  npCityName: string | null;
+  npWarehouseRef: string | null;
+  npWarehouseName: string | null;
+  npDeliveryType: string | null;
   deliveryAddress: string | null;
   cashOnDelivery: boolean;
   assignedAgentUserId: string | null;

@@ -17,6 +17,7 @@ import { ShareSheet } from "../../../prices/_components/share-sheet";
 import { SaleItemsEditor } from "./sale-items-editor";
 import { SaleTotals } from "./sale-totals";
 import { BarcodeInput } from "./barcode-input";
+import { NpWarehousePicker, type NpSelection } from "./np-warehouse-picker";
 import {
   SaleLotPicker,
   type SaleGeneralPick,
@@ -71,6 +72,10 @@ interface SaleDraftData {
   notes: string;
   deliveryMethod: string;
   novaPoshtaBranch: string;
+  npCityRef: string;
+  npCityName: string;
+  npWarehouseRef: string;
+  npWarehouseName: string;
   deliveryAddress: string;
   cashOnDelivery: boolean;
   onTradeAgent: boolean;
@@ -127,6 +132,16 @@ function mapClientDelivery(
 
 function newUid(): string {
   return `i-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+/**
+ * Витягує № відділення з назви обраного відділення НП (формат
+ * «Відділення №{number}: {name}») — для запису у `novaPoshtaBranch`, який
+ * читають наявні покази/завдання складу. Якщо номера немає — повертає назву.
+ */
+function branchNumberFromWarehouseName(name: string): string {
+  const match = name.match(/№\s*([^\s:]+)/);
+  return match?.[1] ?? name;
 }
 
 interface BarcodeLookupResponse {
@@ -247,6 +262,16 @@ export function SaleForm({
   const [novaPoshtaBranch, setNovaPoshtaBranch] = useState(
     initialSale?.novaPoshtaBranch ?? "",
   );
+  // ─── Нова Пошта (структурований вибір міста + відділення з довідника НП) ────
+  // Реф-и використовує Фаза 1 для авто-створення ТТН; *Name — для показу.
+  const [npCityRef, setNpCityRef] = useState(initialSale?.npCityRef ?? "");
+  const [npCityName, setNpCityName] = useState(initialSale?.npCityName ?? "");
+  const [npWarehouseRef, setNpWarehouseRef] = useState(
+    initialSale?.npWarehouseRef ?? "",
+  );
+  const [npWarehouseName, setNpWarehouseName] = useState(
+    initialSale?.npWarehouseName ?? "",
+  );
   // Адреса доставки (спосіб «Доставка») — з картки клієнта або вручну.
   const [deliveryAddress, setDeliveryAddress] = useState(
     initialSale?.deliveryAddress ?? initialClient?.address ?? "",
@@ -289,6 +314,10 @@ export function SaleForm({
       notes,
       deliveryMethod,
       novaPoshtaBranch,
+      npCityRef,
+      npCityName,
+      npWarehouseRef,
+      npWarehouseName,
       deliveryAddress,
       cashOnDelivery,
       onTradeAgent,
@@ -301,6 +330,10 @@ export function SaleForm({
       notes,
       deliveryMethod,
       novaPoshtaBranch,
+      npCityRef,
+      npCityName,
+      npWarehouseRef,
+      npWarehouseName,
       deliveryAddress,
       cashOnDelivery,
       onTradeAgent,
@@ -314,6 +347,13 @@ export function SaleForm({
       const wire = d.items
         .map(draftToWire)
         .filter((x): x is NonNullable<typeof x> => x !== null);
+      // Реф-и НП зберігаємо лише для Нової Пошти (post); інакше — null, щоб не
+      // лишати застарілі значення при зміні способу доставки.
+      const kind = classifyDelivery(
+        d.deliveryMethod,
+        deliveryMethods.find((o) => o.code === d.deliveryMethod)?.label,
+      );
+      const isNovaPoshta = kind === "post";
       return {
         draft: true,
         items: wire,
@@ -323,6 +363,11 @@ export function SaleForm({
         priceTypeId: null,
         deliveryMethod: d.deliveryMethod || null,
         novaPoshtaBranch: d.novaPoshtaBranch.trim() || null,
+        npCityRef: isNovaPoshta ? d.npCityRef.trim() || null : null,
+        npCityName: isNovaPoshta ? d.npCityName.trim() || null : null,
+        npWarehouseRef: isNovaPoshta ? d.npWarehouseRef.trim() || null : null,
+        npWarehouseName: isNovaPoshta ? d.npWarehouseName.trim() || null : null,
+        npDeliveryType: isNovaPoshta ? "WarehouseWarehouse" : null,
         deliveryAddress: d.deliveryAddress.trim() || null,
         cashOnDelivery: d.cashOnDelivery,
         assignedAgentUserId: d.onTradeAgent ? null : currentUserId,
@@ -330,7 +375,7 @@ export function SaleForm({
         expressWaybill: d.expressWaybill.trim() || null,
       };
     },
-    [exchangeRateEur, exchangeRateUsd, currentUserId],
+    [exchangeRateEur, exchangeRateUsd, currentUserId, deliveryMethods],
   );
 
   const createDraftServer = useCallback(
@@ -398,6 +443,19 @@ export function SaleForm({
       );
       if (mapped) setDeliveryMethod(mapped);
     }
+  }
+
+  /** Оновлення вибору міста/відділення НП з пікера. */
+  function onNpChange(v: NpSelection): void {
+    setNpCityRef(v.cityRef);
+    setNpCityName(v.cityName);
+    setNpWarehouseRef(v.warehouseRef);
+    setNpWarehouseName(v.warehouseName);
+    // Дублюємо № відділення у novaPoshtaBranch — щоб наявні покази та завдання
+    // складу (читають novaPoshtaBranch) працювали без змін.
+    setNovaPoshtaBranch(
+      v.warehouseName ? branchNumberFromWarehouseName(v.warehouseName) : "",
+    );
   }
 
   /**
@@ -615,6 +673,16 @@ export function SaleForm({
           // № відділення/накладну зберігаємо для Пошти й Укрпошти, адресу — лише
           // для «Доставка».
           novaPoshtaBranch: isPostLike ? novaPoshtaBranch.trim() || null : null,
+          // Структуровані реф-и НП — лише для Нової Пошти (post). Для решти
+          // способів надсилаємо null, щоб не лишати застарілі реф-и.
+          npCityRef: deliveryKind === "post" ? npCityRef.trim() || null : null,
+          npCityName:
+            deliveryKind === "post" ? npCityName.trim() || null : null,
+          npWarehouseRef:
+            deliveryKind === "post" ? npWarehouseRef.trim() || null : null,
+          npWarehouseName:
+            deliveryKind === "post" ? npWarehouseName.trim() || null : null,
+          npDeliveryType: deliveryKind === "post" ? "WarehouseWarehouse" : null,
           deliveryAddress:
             deliveryKind === "delivery" ? deliveryAddress.trim() || null : null,
           cashOnDelivery,
@@ -921,8 +989,19 @@ export function SaleForm({
             </select>
           </div>
 
-          {/* № відділення — для Нової Пошти та Укрпошти (лейбл змінюється). */}
-          {isPostLike && (
+          {/* Нова Пошта — структурований вибір міста + відділення (довідник НП). */}
+          {deliveryKind === "post" && (
+            <NpWarehousePicker
+              cityRef={npCityRef}
+              cityName={npCityName}
+              warehouseRef={npWarehouseRef}
+              warehouseName={npWarehouseName}
+              onChange={onNpChange}
+            />
+          )}
+
+          {/* Укрпошта — вільний ввід індексу/№ відділення (лейбл змінюється). */}
+          {isUkrposhta && (
             <div>
               <label
                 htmlFor="sale-np-branch"
