@@ -17,6 +17,9 @@ import { RepackToleranceSection } from "./_components/repack-tolerance-section";
 import { LogoutButton } from "./_components/logout-button";
 
 const REPACK_EDIT_ROLES = ["warehouse", "admin", "owner"];
+// Блоки «Активні сесії» та «Перепаковка» — лише власнику/адміну (ТЗ 2026-07-18):
+// менеджеру вони не потрібні.
+const OWNER_SETTINGS_ROLES = ["admin", "owner"];
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Налаштування — L-TEX Manager" };
@@ -53,7 +56,10 @@ export default async function SettingsPage() {
     isCurrent: currentHash !== null && s.tokenHash === currentHash,
   }));
 
-  const repackTolerance = await getRepackWeightTolerance();
+  const showOwnerSettings = OWNER_SETTINGS_ROLES.includes(user.role);
+  const repackTolerance = showOwnerSettings
+    ? await getRepackWeightTolerance()
+    : 0;
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
@@ -64,11 +70,15 @@ export default async function SettingsPage() {
         initialChannels={user.notifyChannels}
         telegramLinked={user.telegramLinked}
       />
-      <SessionsSection sessions={sessions} />
-      <RepackToleranceSection
-        initial={repackTolerance}
-        canEdit={REPACK_EDIT_ROLES.includes(user.role)}
-      />
+      {showOwnerSettings && (
+        <>
+          <SessionsSection sessions={sessions} />
+          <RepackToleranceSection
+            initial={repackTolerance}
+            canEdit={REPACK_EDIT_ROLES.includes(user.role)}
+          />
+        </>
+      )}
       {(user.role === "admin" || user.role === "owner") && (
         <section className="rounded-lg border bg-white p-4">
           <h2 className="text-sm font-semibold text-gray-700">Довідники</h2>
