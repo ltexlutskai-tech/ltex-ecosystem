@@ -182,7 +182,18 @@ describe("buildTtnMethodProperties", () => {
     expect(props.RecipientAddress).toBe("wh-rec");
     expect(props.NewAddress).toBe("1");
     expect(props.BackwardDeliveryData).toBeUndefined();
+    expect(props.AfterpaymentOnGoodsCost).toBeUndefined();
     expect(props.OptionsSeat).toBeUndefined();
+  });
+
+  it("adds AfterpaymentOnGoodsCost (Контроль оплати) when set", () => {
+    const props = buildTtnMethodProperties({
+      ...baseTtnInput,
+      afterpaymentOnGoodsCost: 4200,
+    });
+    expect(props.AfterpaymentOnGoodsCost).toBe("4200");
+    // «Контроль оплати» — це НЕ класична післяплата.
+    expect(props.BackwardDeliveryData).toBeUndefined();
   });
 
   it("adds BackwardDeliveryData when cod set", () => {

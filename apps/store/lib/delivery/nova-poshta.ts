@@ -113,8 +113,20 @@ export interface CreateTtnInput {
   /** Дата відправлення у форматі ddMMyyyy. */
   dateTime?: string;
 
-  /** Накладений платіж (₴). Коли задано — додається BackwardDeliveryData. */
+  /**
+   * Класична післяплата (₴) — гроші повертають ГОТІВКОЮ на відділенні
+   * відправника (`BackwardDeliveryData` CargoType Money). Потребує послуги
+   * «Післяплата». L-TEX цим НЕ користується (див. afterpaymentOnGoodsCost).
+   */
   backwardDeliveryCod?: number;
+
+  /**
+   * «Контроль оплати» (₴) — сума, яку отримувач платить при отриманні, а гроші
+   * йдуть на РАХУНОК відправника через NovaPay (`AfterpaymentOnGoodsCost`).
+   * Це механізм накладки L-TEX. Потребує послуги «Контроль оплати» на ключі/
+   * договорі NovaPay (інакше NP поверне «AfterpaymentOnGoodsCost недоступний»).
+   */
+  afterpaymentOnGoodsCost?: number;
 
   /** Габарити місць (см) + вага (кг). Коли задано — додається OptionsSeat. */
   optionsSeat?: NpSeatOption[];
@@ -403,6 +415,11 @@ export function buildTtnMethodProperties(
         RedeliveryString: String(input.backwardDeliveryCod),
       },
     ];
+  }
+
+  // «Контроль оплати» (гроші на рахунок відправника через NovaPay).
+  if (typeof input.afterpaymentOnGoodsCost === "number") {
+    props.AfterpaymentOnGoodsCost = String(input.afterpaymentOnGoodsCost);
   }
 
   if (input.optionsSeat && input.optionsSeat.length > 0) {
