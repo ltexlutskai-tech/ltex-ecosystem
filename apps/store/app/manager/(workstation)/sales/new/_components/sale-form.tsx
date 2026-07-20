@@ -76,6 +76,10 @@ interface SaleDraftData {
   npCityName: string;
   npWarehouseRef: string;
   npWarehouseName: string;
+  npRecipientName: string;
+  npRecipientPhone: string;
+  npPayerType: string;
+  declaredValueEnabled: boolean;
   deliveryAddress: string;
   cashOnDelivery: boolean;
   onTradeAgent: boolean;
@@ -272,6 +276,27 @@ export function SaleForm({
   const [npWarehouseName, setNpWarehouseName] = useState(
     initialSale?.npWarehouseName ?? "",
   );
+  // ─── Отримувач ТТН (Нова Пошта) ──────────────────────────────────────────
+  // Дефолти для нового документа — з картки клієнта (ПІБ + телефон); у режимі
+  // редагування — збережені значення реалізації.
+  const [npRecipientName, setNpRecipientName] = useState(
+    initialSale?.npRecipientName ?? initialClient?.name ?? "",
+  );
+  const [npRecipientPhone, setNpRecipientPhone] = useState(
+    initialSale?.npRecipientPhone ?? initialClient?.phone ?? "",
+  );
+  const [npPayerType, setNpPayerType] = useState(
+    initialSale?.npPayerType ?? "Recipient",
+  );
+  const [declaredValueEnabled, setDeclaredValueEnabled] = useState(
+    initialSale?.declaredValueEnabled ?? true,
+  );
+  // Чи редагував менеджер поля отримувача вручну — щоб зміна клієнта не
+  // перезаписувала вже введене значення (best-effort).
+  const [recipientTouched, setRecipientTouched] = useState({
+    name: false,
+    phone: false,
+  });
   // Адреса доставки (спосіб «Доставка») — з картки клієнта або вручну.
   const [deliveryAddress, setDeliveryAddress] = useState(
     initialSale?.deliveryAddress ?? initialClient?.address ?? "",
@@ -318,6 +343,10 @@ export function SaleForm({
       npCityName,
       npWarehouseRef,
       npWarehouseName,
+      npRecipientName,
+      npRecipientPhone,
+      npPayerType,
+      declaredValueEnabled,
       deliveryAddress,
       cashOnDelivery,
       onTradeAgent,
@@ -334,6 +363,10 @@ export function SaleForm({
       npCityName,
       npWarehouseRef,
       npWarehouseName,
+      npRecipientName,
+      npRecipientPhone,
+      npPayerType,
+      declaredValueEnabled,
       deliveryAddress,
       cashOnDelivery,
       onTradeAgent,
@@ -368,6 +401,12 @@ export function SaleForm({
         npWarehouseRef: isNovaPoshta ? d.npWarehouseRef.trim() || null : null,
         npWarehouseName: isNovaPoshta ? d.npWarehouseName.trim() || null : null,
         npDeliveryType: isNovaPoshta ? "WarehouseWarehouse" : null,
+        npRecipientName: isNovaPoshta ? d.npRecipientName.trim() || null : null,
+        npRecipientPhone: isNovaPoshta
+          ? d.npRecipientPhone.trim() || null
+          : null,
+        npPayerType: isNovaPoshta ? d.npPayerType || null : null,
+        declaredValueEnabled: isNovaPoshta ? d.declaredValueEnabled : null,
         deliveryAddress: d.deliveryAddress.trim() || null,
         cashOnDelivery: d.cashOnDelivery,
         assignedAgentUserId: d.onTradeAgent ? null : currentUserId,
@@ -442,6 +481,10 @@ export function SaleForm({
         deliveryMethods,
       );
       if (mapped) setDeliveryMethod(mapped);
+      // Дефолти отримувача ТТН — з нового клієнта, якщо менеджер їх ще не
+      // редагував вручну (best-effort, не перезаписуємо введене значення).
+      if (!recipientTouched.name) setNpRecipientName(summary.name ?? "");
+      if (!recipientTouched.phone) setNpRecipientPhone(summary.phone ?? "");
     }
   }
 
@@ -683,6 +726,13 @@ export function SaleForm({
           npWarehouseName:
             deliveryKind === "post" ? npWarehouseName.trim() || null : null,
           npDeliveryType: deliveryKind === "post" ? "WarehouseWarehouse" : null,
+          npRecipientName:
+            deliveryKind === "post" ? npRecipientName.trim() || null : null,
+          npRecipientPhone:
+            deliveryKind === "post" ? npRecipientPhone.trim() || null : null,
+          npPayerType: deliveryKind === "post" ? npPayerType || null : null,
+          declaredValueEnabled:
+            deliveryKind === "post" ? declaredValueEnabled : null,
           deliveryAddress:
             deliveryKind === "delivery" ? deliveryAddress.trim() || null : null,
           cashOnDelivery,
@@ -998,6 +1048,76 @@ export function SaleForm({
               warehouseName={npWarehouseName}
               onChange={onNpChange}
             />
+          )}
+
+          {/* Нова Пошта — отримувач ТТН (для авто-створення накладної). */}
+          {deliveryKind === "post" && (
+            <>
+              <div>
+                <label
+                  htmlFor="sale-np-recipient"
+                  className="mb-1 block text-sm font-medium text-gray-700"
+                >
+                  Отримувач (ПІБ)
+                </label>
+                <input
+                  id="sale-np-recipient"
+                  value={npRecipientName}
+                  onChange={(e) => {
+                    setNpRecipientName(e.target.value);
+                    setRecipientTouched((t) => ({ ...t, name: true }));
+                  }}
+                  maxLength={160}
+                  placeholder="ПІБ отримувача"
+                  className="h-10 w-full rounded-md border border-gray-300 bg-white px-3 text-sm focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500"
+                />
+              </div>
+              <div>
+                <label
+                  htmlFor="sale-np-recipient-phone"
+                  className="mb-1 block text-sm font-medium text-gray-700"
+                >
+                  Телефон отримувача
+                </label>
+                <input
+                  id="sale-np-recipient-phone"
+                  value={npRecipientPhone}
+                  onChange={(e) => {
+                    setNpRecipientPhone(e.target.value);
+                    setRecipientTouched((t) => ({ ...t, phone: true }));
+                  }}
+                  maxLength={30}
+                  placeholder="напр. +380671234567"
+                  className="h-10 w-full rounded-md border border-gray-300 bg-white px-3 text-sm focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500"
+                />
+              </div>
+              <div>
+                <label
+                  htmlFor="sale-np-payer"
+                  className="mb-1 block text-sm font-medium text-gray-700"
+                >
+                  Платник доставки
+                </label>
+                <select
+                  id="sale-np-payer"
+                  value={npPayerType}
+                  onChange={(e) => setNpPayerType(e.target.value)}
+                  className="h-10 w-full rounded-md border border-gray-300 bg-white px-3 text-sm focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500"
+                >
+                  <option value="Recipient">Отримувач</option>
+                  <option value="Sender">Відправник</option>
+                </select>
+              </div>
+              <label className="inline-flex cursor-pointer items-center gap-2 text-sm text-gray-700 sm:col-span-2 lg:col-span-3">
+                <input
+                  type="checkbox"
+                  checked={declaredValueEnabled}
+                  onChange={(e) => setDeclaredValueEnabled(e.target.checked)}
+                  className="h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
+                />
+                <span>Оголошена цінність = сума реалізації</span>
+              </label>
+            </>
           )}
 
           {/* Укрпошта — вільний ввід індексу/№ відділення (лейбл змінюється). */}

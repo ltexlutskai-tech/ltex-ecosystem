@@ -25,8 +25,10 @@ import {
   type CashOrderView,
 } from "./_components/payments-panel";
 import { SaleDebtTerm } from "./_components/sale-debt-term";
+import { NpTtnStatus } from "./_components/np-ttn-status";
 import { LinkedDocBanner } from "../../_components/linked-doc-banner";
 import { BackButton } from "../../_components/back-button";
+import { classifyDelivery } from "@/lib/manager/order-delivery";
 
 export const dynamic = "force-dynamic";
 
@@ -210,6 +212,10 @@ export default async function ManagerSaleDetailPage({
     npWarehouseRef: sale.npWarehouseRef,
     npWarehouseName: sale.npWarehouseName,
     npDeliveryType: sale.npDeliveryType,
+    npRecipientName: sale.npRecipientName,
+    npRecipientPhone: sale.npRecipientPhone,
+    npPayerType: sale.npPayerType,
+    declaredValueEnabled: sale.declaredValueEnabled,
     deliveryAddress: sale.deliveryAddress,
     cashOnDelivery: sale.cashOnDelivery,
     assignedAgentUserId: sale.assignedAgentUserId,
@@ -298,6 +304,19 @@ export default async function ManagerSaleDetailPage({
         cashOnDelivery={sale.cashOnDelivery}
         initialDebtTermDays={sale.debtTermDays}
       />
+
+      {classifyDelivery(
+        sale.deliveryMethod,
+        deliveryLabelOf(sale.deliveryMethod),
+      ) === "post" && (
+        <NpTtnStatus
+          saleId={sale.id}
+          ttnRef={sale.ttnRef}
+          ttnNumber={sale.expressWaybill}
+          ttnError={sale.ttnError}
+          posted={sale.status === "posted"}
+        />
+      )}
 
       {editable ? (
         <SaleForm
