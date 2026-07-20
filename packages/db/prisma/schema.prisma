@@ -60,6 +60,11 @@ model Product {
   videoUrl          String?  @map("video_url")
   // Виробник (← 1С «Производитель»: VIVE, SOEX, Канада…). 7.2.
   producer          String?
+  // Назва для друку та інтеграції (← 1С `Номенклатура.Название`): узагальнена
+  // назва для чеків Checkbox і друкованих форм — «Одяг вживаний», «Взуття
+  // вживане», «Товари для дому вживані». Заповнюється в картці товару / скриптом
+  // переносу з 1С. Порожнє → резолвер бере назву за деревом категорій.
+  receiptName       String?  @map("receipt_name")
   inStock           Boolean  @default(true) @map("in_stock")
   // ТЗ 8.0 soft-delete (позначка на вилучення / архів). Вітрина ці поля не читає.
   markedForDeletion Boolean  @default(false) @map("marked_for_deletion")
@@ -401,7 +406,21 @@ model Sale {
   assignedAgentUserId String?  @map("assigned_agent_user_id")
   onTradeAgent        Boolean  @default(true) @map("on_trade_agent")
   exportTo1C          Boolean  @default(true) @map("export_to_1c")
-  expressWaybill      String?  @map("express_waybill")
+  expressWaybill      String?  @map("express_waybill") // № ТТН (IntDocNumber НП)
+  // Структуровані поля Нової Пошти (відділення-отримувач) — для авто-створення ТТН.
+  // npCityRef/npWarehouseRef — реф-и з довідника НП; *Name — для показу без запиту.
+  npCityRef           String?  @map("np_city_ref")
+  npCityName          String?  @map("np_city_name")
+  npWarehouseRef      String?  @map("np_warehouse_ref")
+  npWarehouseName     String?  @map("np_warehouse_name")
+  npDeliveryType      String?  @map("np_delivery_type") // WarehouseWarehouse | WarehouseDoors
+  // ТТН (InternetDocument) Нової Пошти.
+  ttnRef              String?  @map("ttn_ref") // Ref документа НП (для update/delete)
+  ttnCreatedAt        DateTime? @map("ttn_created_at")
+  ttnError            String?  @map("ttn_error") // остання помилка створення/оновлення ТТН
+  // Оголошена цінність ТТН (₴). enabled=false → не декларуємо (мінімальна).
+  declaredValueUah    Float?   @map("declared_value_uah")
+  declaredValueEnabled Boolean @default(true) @map("declared_value_enabled")
   notes               String?
   agentName           String?  @map("agent_name") // ТорговийАгент._Description (історичний імпорт 5.4.6a)
   orderId             String?  @map("order_id")

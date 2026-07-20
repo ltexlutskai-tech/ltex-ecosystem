@@ -24,8 +24,11 @@
  *   --entity <name>      одна сутність: customers|categories|products|lots|barcodes|prices|
  *                        dictionaries|dictionaries-full|rates|orders|sales|cashorders|
  *                        routesheets|debt|misc|sales-reg|cashflow-reg|stock-reg|
- *                        orders-reg|bankdocs|cashtransfers
- *                        (дефолт = всі, крім rates/*-reg/bankdocs/cashtransfers)
+ *                        orders-reg|bankdocs|cashtransfers|product-receipt-names
+ *                        (дефолт = всі, крім rates/*-reg/bankdocs/cashtransfers/
+ *                        product-receipt-names)
+ *                        product-receipt-names = Номенклатура.Название → Product.receiptName
+ *                        (назва товару для чеку, матч за code1C=hex(_IDRRef))
  *                        dictionaries-full = Фаза 1: одиниці/міста/області/агенти
  *                        rates = Фаза 4: історичні курси валют
  *                        misc = Фаза 8: історія статусів клієнтів + надійність постачальників
@@ -34,6 +37,8 @@
  *   --confirm-prod       дозволити запис коли ціль = бойова база
  *   --batch N            розмір батчу запису (дефолт 500)
  *   --since YYYY-MM-DD   (опц.) лише документи з цієї дати
+ *   --print-columns      надрукувати колонки _Reference76 (Номенклатура) і вийти
+ *                        (звірка фізичного _Fld для реквізиту «Название» на сервері)
  *
  * ─── ЗАПУСК (диктує orchestrator) ─────────────────────────────────────────────
  *   # 1. одноразово: pnpm --filter @ltex/store add mssql; pnpm ... add -D @types/mssql
@@ -101,6 +106,8 @@ const ENTITY_NAMES = [
   "cashtransfers",
   // ── Картка клієнта — «Історія роботи з клієнтом» (ИсторияРаботыСКлиентом) ──
   "client-timeline",
+  // ── Назва товару для чеку (Номенклатура.Название → Product.receiptName) ──
+  "product-receipt-names",
 ] as const;
 
 type EntityName = (typeof ENTITY_NAMES)[number];
@@ -115,6 +122,9 @@ interface CliArgs {
   // Сесія 5.7: переносити товари з запасної «Імпортовано з 1С» у відповідну
   // 1С-групу (за _ParentIDRRef). Без прапора update НЕ чіпає categoryId.
   recategorize: boolean;
+  // Діагностика: надрукувати перелік колонок _Reference76 (Номенклатура) з
+  // INFORMATION_SCHEMA.COLUMNS і вийти (для звірки _Fld####). Нічого не пише.
+  printColumns: boolean;
 }
 
 function parseArgs(argv: string[]): CliArgs {
@@ -126,6 +136,7 @@ function parseArgs(argv: string[]): CliArgs {
     batch: 500,
     since: null,
     recategorize: false,
+    printColumns: false,
   };
 
   for (let i = 0; i < argv.length; i++) {
@@ -139,6 +150,9 @@ function parseArgs(argv: string[]): CliArgs {
         break;
       case "--recategorize":
         args.recategorize = true;
+        break;
+      case "--print-columns":
+        args.printColumns = true;
         break;
       case "--limit": {
         const v = argv[++i];
@@ -484,6 +498,36 @@ async function countTable(
     `SELECT COUNT(*) AS n FROM [${table}]${whereClause}`,
   );
   return result.recordset?.[0]?.n ?? 0;
+}
+
+// ─── Діагностика: перелік колонок таблиці (--print-columns) ───────────────────
+// Дампить INFORMATION_SCHEMA.COLUMNS для звірки фізичних _Fld#### на живому MSSQL
+// (напр. підтвердити, що реквізит «Название» Номенклатури = _Fld7773).
+
+async function printReferenceColumns(
+  pool: mssql.ConnectionPool,
+  table: string,
+): Promise<void> {
+  const req = pool.request();
+  req.input("t", mssql.NVarChar, table);
+  const result = await req.query<{
+    COLUMN_NAME: string;
+    DATA_TYPE: string;
+    CHARACTER_MAXIMUM_LENGTH: number | null;
+  }>(
+    `SELECT COLUMN_NAME, DATA_TYPE, CHARACTER_MAXIMUM_LENGTH ` +
+      `FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = @t ` +
+      `ORDER BY ORDINAL_POSITION`,
+  );
+  const rows = result.recordset ?? [];
+  log(`columns of [${table}] (${rows.length}):`);
+  for (const r of rows) {
+    const len =
+      r.CHARACTER_MAXIMUM_LENGTH == null
+        ? ""
+        : `(${r.CHARACTER_MAXIMUM_LENGTH})`;
+    console.log(`${TAG}   ${r.COLUMN_NAME}  ${r.DATA_TYPE}${len}`);
+  }
 }
 
 // ─── Контекст імпорту (словники hex → наш id) ─────────────────────────────────
@@ -1137,6 +1181,115 @@ async function importProducts(ctx: ImportContext): Promise<Recon> {
     log(`products: пропущено ${mergedSkipped} злитих дублікатів (Сесія 7.1)`);
   }
 
+  return recon;
+}
+
+// ─── 2b. Номенклатура.Название → Product.receiptName ─ _Reference76 ───────────
+// Кастомний реквізит «Название» (uuid 86c89be2-30a1-43d1-8ffb-085fd5c28cf7) —
+// коротка узагальнена назва для чеку («Одяг вживаний»/«Взуття вживане»/…), НЕ
+// плутати зі стандартним `_Description` (name) і `НаименованиеПолное` (повна).
+// Фізична колонка визначена ОФЛАЙН:
+//   dbnames.txt: {86c89be2-30a1-43d1-8ffb-085fd5c28cf7,"Fld",7773} → _Fld7773
+//   columns.tsv: _Reference76 → _Fld7773 nvarchar(100) (= xs:string length 100 у XML)
+// ⚠️ ЗВІРИТИ НА СЕРВЕРІ через `--print-columns`, якщо на живій базі структура
+// відрізняється (напр. після оновлення конфігурації 1С), і за потреби змінити.
+const NAZVANIE_FLD = "_Fld7773";
+
+const RECEIPT_NAME_COLS = ["_IDRRef", "_Folder", NAZVANIE_FLD];
+const RECEIPT_NAME_WRITE_BATCH = 200;
+
+async function importProductReceiptNames(ctx: ImportContext): Promise<Recon> {
+  const recon = newRecon("product-receipt-names");
+  const sink = new ErrorSink(recon, "product-receipt-names");
+  const { args, src, prisma } = ctx;
+
+  recon.sourceRows = await countTable(src, "_Reference76");
+  log(`product-receipt-names: source rows = ${recon.sourceRows}`);
+
+  // Мапа code1C(=hex _IDRRef) → Product.id. Читання цільової бази дозволене й у
+  // dry-run (read-only), тож звірка matched/not-found коректна в обох режимах.
+  const productIdByCode = new Map<string, string>();
+  const all = await prisma.product.findMany({
+    where: { code1C: { not: null } },
+    select: { id: true, code1C: true },
+  });
+  for (const p of all) if (p.code1C) productIdByCode.set(p.code1C, p.id);
+  log(`product-receipt-names: loaded ${productIdByCode.size} products from DB`);
+
+  let emptySource = 0;
+  let notFound = 0;
+
+  // Накопичуємо оновлення й пишемо батчами у транзакціях (ідемпотентно —
+  // повторний прогін перезаписує тим самим значенням).
+  let batchUpdates: { id: string; receiptName: string }[] = [];
+  const flush = async (): Promise<void> => {
+    if (batchUpdates.length === 0 || !willWrite(ctx)) {
+      batchUpdates = [];
+      return;
+    }
+    const chunk = batchUpdates;
+    batchUpdates = [];
+    try {
+      await prisma.$transaction(
+        chunk.map((u) =>
+          prisma.product.update({
+            where: { id: u.id },
+            data: { receiptName: u.receiptName },
+          }),
+        ),
+      );
+    } catch (e) {
+      // Транзакція впала цілим блоком → рахуємо кожен рядок як помилку.
+      recon.written -= chunk.length;
+      for (const u of chunk) sink.record(u.id, e);
+    }
+  };
+
+  for await (const rows of streamTable(src, "_Reference76", RECEIPT_NAME_COLS, {
+    batch: args.batch,
+    limit: args.limit,
+    orderBy: ["_IDRRef"],
+  })) {
+    for (const row of rows) {
+      // 1С `_Folder`: 1 = елемент, 0 = група (ІНВЕРСНА логіка 1С!). Групи не мають
+      // товару в нашій БД — пропускаємо.
+      if (!asBool(row["_Folder"])) {
+        recon.skipped++;
+        continue;
+      }
+      const hex = bufToHex(row["_IDRRef"]);
+      if (!hex) {
+        recon.skipped++;
+        continue;
+      }
+      const receiptName = asString(row[NAZVANIE_FLD]);
+      if (!receiptName) {
+        emptySource++;
+        recon.skipped++;
+        continue;
+      }
+
+      // code1C = hex(_IDRRef). Враховуємо злиття дублікатів (Сесія 7.1):
+      // mergedCode1C дає survivor Product.id напряму.
+      const targetId = ctx.mergedCode1C.get(hex) ?? productIdByCode.get(hex);
+      if (!targetId) {
+        notFound++;
+        recon.unresolved++;
+        continue;
+      }
+
+      recon.written++;
+      batchUpdates.push({ id: targetId, receiptName });
+      if (batchUpdates.length >= RECEIPT_NAME_WRITE_BATCH) await flush();
+    }
+  }
+  await flush();
+
+  log(
+    `product-receipt-names: matched/updated=${recon.written} ` +
+      `not-found=${notFound} empty-source=${emptySource} ` +
+      `skipped(groups+empty)=${recon.skipped}`,
+  );
   return recon;
 }
 
@@ -6740,6 +6893,7 @@ const ENTITY_RUNNERS: Record<
   bankdocs: importBankDocs,
   cashtransfers: importCashTransfers,
   "client-timeline": importClientTimeline,
+  "product-receipt-names": importProductReceiptNames,
 };
 
 // Порядок за FK-залежностями (план §13).
@@ -6842,6 +6996,16 @@ async function main(): Promise<void> {
     `connecting to 1C MSSQL ${mssqlConfig.server}:${mssqlConfig.port}/${mssqlConfig.database} (read-only)`,
   );
   const src = await new mssql.ConnectionPool(mssqlConfig).connect();
+
+  // Діагностика: надрукувати колонки _Reference76 (Номенклатура) і вийти. Нічого
+  // не пише в цільову базу — допомагає звірити фізичний _Fld для «Название».
+  if (args.printColumns) {
+    await printReferenceColumns(src, "_Reference76");
+    await src.close().catch(() => undefined);
+    log("done (print-columns).");
+    return;
+  }
+
   YEAR_OFFSET = await loadYearOffset(src);
 
   const prisma = new PrismaClient({

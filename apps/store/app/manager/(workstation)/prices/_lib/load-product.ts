@@ -126,6 +126,7 @@ export interface ProductEditFields {
   unitWeight: string;
   filling: string;
   producer: string;
+  receiptName: string;
   videoUrl: string;
 }
 
@@ -153,6 +154,7 @@ export async function loadProductCard(
       unitWeight: true,
       filling: true,
       producer: true,
+      receiptName: true,
       quality: true,
       season: true,
       country: true,
@@ -347,6 +349,7 @@ export async function loadProductCard(
       unitWeight: product.unitWeight ?? "",
       filling: product.filling ?? "",
       producer: product.producer ?? "",
+      receiptName: product.receiptName ?? "",
       videoUrl: product.videoUrl ?? "",
     },
   };
