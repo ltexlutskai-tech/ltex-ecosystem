@@ -12,6 +12,8 @@
  *   pnpm --filter @ltex/store exec tsx scripts/np-resolve-sender.ts
  */
 
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import {
   searchCities,
   getWarehouses,
@@ -21,10 +23,46 @@ import {
 
 const SENDER_CITY_QUERY = "Піддубці";
 
+/**
+ * Мінімальний зчитувач `.env` (без залежності dotenv, якої нема у @ltex/store):
+ * якщо змінна ще не в оточенні — пробуємо взяти її з `.env` у поточній теці або
+ * в `apps/store/.env`. Заповнює лише відсутні ключі (inline-env має пріоритет).
+ */
+function loadEnvFile(): void {
+  const candidates = [
+    resolve(process.cwd(), ".env"),
+    resolve(process.cwd(), "apps/store/.env"),
+  ];
+  for (const path of candidates) {
+    let content: string;
+    try {
+      content = readFileSync(path, "utf8");
+    } catch {
+      continue;
+    }
+    for (const line of content.split(/\r?\n/)) {
+      const m = /^\s*([A-Z0-9_]+)\s*=\s*(.*)\s*$/.exec(line);
+      if (!m) continue;
+      const key = m[1];
+      if (!key || process.env[key] !== undefined) continue;
+      let value = (m[2] ?? "").trim();
+      if (
+        (value.startsWith('"') && value.endsWith('"')) ||
+        (value.startsWith("'") && value.endsWith("'"))
+      ) {
+        value = value.slice(1, -1);
+      }
+      process.env[key] = value;
+    }
+  }
+}
+
 async function main(): Promise<void> {
+  loadEnvFile();
   if (!process.env.NOVA_POSHTA_API_KEY) {
     console.error(
-      "NOVA_POSHTA_API_KEY не заданий у оточенні. Додайте його в apps/store/.env",
+      "NOVA_POSHTA_API_KEY не заданий. Додайте його в apps/store/.env " +
+        'або запустіть з ключем: $env:NOVA_POSHTA_API_KEY="..."; pnpm ...',
     );
     process.exit(1);
   }
