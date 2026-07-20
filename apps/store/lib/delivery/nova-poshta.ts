@@ -14,6 +14,8 @@
  */
 
 const NOVA_POSHTA_API = "https://api.novaposhta.ua/v2.0/json/";
+// Друк документів/етикеток — окремий хост кабінету (GET з apiKey у шляху).
+const NOVA_POSHTA_PRINT_BASE = "https://my.novaposhta.ua";
 const REQUEST_TIMEOUT_MS = 15_000;
 
 // ─── Типи відповіді NP ───────────────────────────────────────────────────────
@@ -522,6 +524,48 @@ export async function trackTtn(number: string): Promise<NpTracking | null> {
     recipientAddress: first.RecipientAddress,
     warehouseRecipient: first.WarehouseRecipient,
   };
+}
+
+// ─── Друк етикетки / маркування (100×100) ────────────────────────────────────
+
+/**
+ * URL друку етикетки-маркування 100×100 НП (PDF). Ключ у шляху — тому НІКОЛИ не
+ * віддаємо цей URL у браузер; лише сервер його викликає (див. fetchMarkingPdf).
+ * `ref` — Ref документа (InternetDocument) або №ТТН.
+ */
+export function buildMarkingUrl(ref: string): string | null {
+  const apiKey = process.env.NOVA_POSHTA_API_KEY;
+  if (!apiKey) return null;
+  return `${NOVA_POSHTA_PRINT_BASE}/orders/printMarking100x100/orders[]/${encodeURIComponent(
+    ref,
+  )}/type/pdf/apiKey/${apiKey}`;
+}
+
+/**
+ * Завантажує PDF етикетки НП на СЕРВЕРІ (ключ лишається прихованим). Роут
+ * стрімить цей PDF у браузер складу для друку.
+ */
+export async function fetchMarkingPdf(
+  ref: string,
+): Promise<{ pdf: ArrayBuffer } | { error: string }> {
+  const url = buildMarkingUrl(ref);
+  if (!url) return { error: "NOVA_POSHTA_API_KEY not set" };
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  try {
+    const res = await fetch(url, { signal: controller.signal });
+    if (!res.ok) return { error: `NP print HTTP ${res.status}` };
+    const contentType = res.headers.get("content-type") ?? "";
+    if (contentType.includes("application/json")) {
+      // НП повертає JSON-помилку замість PDF (напр. неправильний ref/ключ).
+      return { error: "НП не повернув PDF етикетки (перевірте ТТН/ключ)" };
+    }
+    return { pdf: await res.arrayBuffer() };
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : String(err) };
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 /** Тест-хук: скидає module-level кеші відправника (лише для юніт-тестів). */

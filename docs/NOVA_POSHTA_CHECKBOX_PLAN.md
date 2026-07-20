@@ -120,8 +120,11 @@ CHECKBOX_BASE_URL=https://api.checkbox.ua/api/v1
   на картці реалізації (`np-ttn-status.tsx`); № ТТН у завданні складу; ендпоінт `POST /sales/[id]/create-ttn`.
   Sender refs (Піддубці №1) — у `.env` (`NP_SENDER_CITY_REF`/`NP_SENDER_WAREHOUSE_REF`/`NP_SENDER_PHONE`).
   ⚠️ Cargo type = "Parcel", місць = к-сть рядків, вага = сума ваг — орієнтовно; склад фіналізує у Фазі 2.
-- **Фаза 2 — Місця/габарити на складі + фіналізація ТТН + «Готово»:** `WarehouseTaskSeat` + редактор місць;
-  `updateTtn`; `ttnConfirmed`; сповіщення менеджеру.
+- **Фаза 2 — Місця/габарити + фіналізація ТТН + друк етикетки + «Готово» ✅ (merged, міграція `20260809`):**
+  `WarehouseTaskSeat` + редактор місць (пресети мініпалета/палета/коробка); `updateTtnForSale` (SeatsAmount +
+  OptionsSeat); **друк етикетки НП 100×100 з нашої системи** (`fetchMarkingPdf` серверно, ключ прихований;
+  `GET .../label`); `WarehouseTask.labelPrintedAt`; «Готово» (send) гейтиться на друк етикетки для НП;
+  сповіщення менеджеру (наявне). Спільний `buildTtnInputForSale` для create/update.
 - **Фаза 3 — Чек Checkbox при «Готово» (лише NovaPay-накладка):** `CheckboxReceipt` + `lib/fiscal/checkbox.ts`;
   групування позицій за загальною назвою; статус чека на реалізації/завданні.
 - **Фаза 4 — Сповіщення + трекінг у кабінеті:** бот Viber/Telegram; `Notification`; `Shipment` на Order;
