@@ -35,8 +35,9 @@ export async function POST(
       status: true,
       managerUserId: true,
       customerName: true,
+      labelPrintedAt: true,
       sale: {
-        select: { number1C: true, code1C: true, docNumber: true },
+        select: { number1C: true, code1C: true, docNumber: true, ttnRef: true },
       },
     },
   });
@@ -50,6 +51,13 @@ export async function POST(
     return NextResponse.json(
       { error: "Завдання вже відправлено" },
       { status: 409 },
+    );
+  }
+  // Для відправлень Новою Поштою «Готово» доступне лише після друку етикетки.
+  if (task.sale?.ttnRef && !task.labelPrintedAt) {
+    return NextResponse.json(
+      { error: "Спершу надрукуйте етикетку Нової Пошти." },
+      { status: 400 },
     );
   }
 

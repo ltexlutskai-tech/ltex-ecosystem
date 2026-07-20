@@ -8,6 +8,7 @@ const h = vi.hoisted(() => ({
   category: { findMany: vi.fn() },
   warehouseTask: { updateMany: vi.fn() },
   createInternetDocument: vi.fn(),
+  updateInternetDocument: vi.fn(),
   ensureRecipientPrivatePerson: vi.fn(),
   getSenderCounterparty: vi.fn(),
   getSenderContact: vi.fn(),
@@ -23,6 +24,7 @@ vi.mock("@ltex/db", () => ({
 }));
 vi.mock("@/lib/delivery/nova-poshta", () => ({
   createInternetDocument: (...a: unknown[]) => h.createInternetDocument(...a),
+  updateInternetDocument: (...a: unknown[]) => h.updateInternetDocument(...a),
   ensureRecipientPrivatePerson: (...a: unknown[]) =>
     h.ensureRecipientPrivatePerson(...a),
   getSenderCounterparty: (...a: unknown[]) => h.getSenderCounterparty(...a),
@@ -33,7 +35,11 @@ vi.mock("@/lib/manager/delivery-methods", () => ({
     h.getDeliveryLabelResolver(...a),
 }));
 
-import { createTtnForSale, splitRecipientName } from "./create-ttn-for-sale";
+import {
+  createTtnForSale,
+  updateTtnForSale,
+  splitRecipientName,
+} from "./create-ttn-for-sale";
 
 function baseSale(overrides: Record<string, unknown> = {}) {
   return {
@@ -107,6 +113,12 @@ describe("createTtnForSale", () => {
       ref: "ttn-ref-1",
       number: "20450000000001",
       costUah: "70",
+      estimatedDeliveryDate: "",
+    });
+    h.updateInternetDocument.mockResolvedValue({
+      ref: "ttn-ref-1",
+      number: "20450000000001",
+      costUah: "90",
       estimatedDeliveryDate: "",
     });
   });
@@ -203,5 +215,84 @@ describe("createTtnForSale", () => {
       (c) => (c[0] as { data?: { ttnRef?: string } }).data?.ttnRef,
     );
     expect(wroteRef).toBe(false);
+  });
+});
+
+describe("updateTtnForSale (Фаза 2 — місця/габарити)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    process.env.NP_SENDER_CITY_REF = "sender-city";
+    process.env.NP_SENDER_WAREHOUSE_REF = "sender-wh";
+    process.env.NP_SENDER_PHONE = "380632396395";
+    h.getDeliveryLabelResolver.mockResolvedValue((code: string) =>
+      code === "post" ? "Нова Пошта" : code,
+    );
+    h.getSenderCounterparty.mockResolvedValue({ ref: "sender-cp" });
+    h.getSenderContact.mockResolvedValue({ ref: "sender-contact" });
+    h.ensureRecipientPrivatePerson.mockResolvedValue({
+      counterpartyRef: "r-cp",
+      contactRef: "r-contact",
+    });
+    h.updateInternetDocument.mockResolvedValue({
+      ref: "ttn-ref-1",
+      number: "20450000000001",
+      costUah: "90",
+      estimatedDeliveryDate: "",
+    });
+  });
+
+  const seats = [
+    { weight: 30, lengthCm: 120, widthCm: 80, heightCm: 60 },
+    { weight: 20, lengthCm: 60, widthCm: 40, heightCm: 40 },
+  ];
+
+  it("updates the existing TTN with real seats (OptionsSeat + summed weight)", async () => {
+    h.sale.findUnique.mockResolvedValue(baseSale({ ttnRef: "ttn-ref-1" }));
+    const res = await updateTtnForSale("s1", seats);
+
+    expect(res.ok).toBe(true);
+    expect(h.updateInternetDocument).toHaveBeenCalledTimes(1);
+    const [ref, input] = h.updateInternetDocument.mock.calls[0]!;
+    expect(ref).toBe("ttn-ref-1");
+    expect(input.seatsAmount).toBe(2);
+    expect(input.weight).toBe(50); // 30 + 20
+    expect(input.optionsSeat).toEqual([
+      {
+        volumetricWidth: 80,
+        volumetricLength: 120,
+        volumetricHeight: 60,
+        weight: 30,
+      },
+      {
+        volumetricWidth: 40,
+        volumetricLength: 60,
+        volumetricHeight: 40,
+        weight: 20,
+      },
+    ]);
+  });
+
+  it("creates the TTN with seats when none exists yet", async () => {
+    h.sale.findUnique.mockResolvedValue(baseSale({ ttnRef: null }));
+    h.createInternetDocument.mockResolvedValue({
+      ref: "new-ttn",
+      number: "20459999999999",
+      costUah: "90",
+      estimatedDeliveryDate: "",
+    });
+    const res = await updateTtnForSale("s1", seats);
+    expect(res.ok).toBe(true);
+    expect(res.number).toBe("20459999999999");
+    expect(h.createInternetDocument).toHaveBeenCalledTimes(1);
+    expect(h.updateInternetDocument).not.toHaveBeenCalled();
+  });
+
+  it("returns an error when the sale is not Nova Poshta", async () => {
+    h.sale.findUnique.mockResolvedValue(
+      baseSale({ ttnRef: "ttn-ref-1", deliveryMethod: "pickup" }),
+    );
+    const res = await updateTtnForSale("s1", seats);
+    expect(res.ok).toBe(false);
+    expect(h.updateInternetDocument).not.toHaveBeenCalled();
   });
 });

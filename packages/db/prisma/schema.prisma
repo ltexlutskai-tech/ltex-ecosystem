@@ -643,6 +643,8 @@ model WarehouseTask {
   sentByName   String?   @map("sent_by_name")
   sentAt       DateTime? @map("sent_at")
   ttnConfirmed Boolean   @default(false) @map("ttn_confirmed") // склад підтвердив ТТН
+  // Друк етикетки НП з нашої системи (Фаза 2). «Готово» доступне лише після друку.
+  labelPrintedAt DateTime? @map("label_printed_at")
 
   comment   String?
   createdAt DateTime @default(now()) @map("created_at")
@@ -650,6 +652,7 @@ model WarehouseTask {
 
   sale  Sale                @relation(fields: [saleId], references: [id], onDelete: Cascade)
   items WarehouseTaskItem[]
+  seats WarehouseTaskSeat[]
 
   @@index([status])
   @@map("warehouse_tasks")
@@ -671,6 +674,27 @@ model WarehouseTaskItem {
 
   @@index([taskId])
   @@map("warehouse_task_items")
+}
+
+// ─── Місця відправлення (габарити для ТТН НП) — Фаза 2 ──────────────────────
+// Склад визначає ФАКТИЧНІ місця посилки (мініпалета/палета/коробка) — кожне з
+// вагою й габаритами (Д×Ш×В, см). На «Готово» ці місця пушаться у ТТН НП
+// (`InternetDocument.update`: SeatsAmount + OptionsSeat). Кількість/габарити
+// вирішує склад (пакує кілька лотів в одне або розпаковує).
+model WarehouseTaskSeat {
+  id       String @id @default(cuid())
+  taskId   String @map("task_id")
+  position Int    @default(0)
+  weight   Float  @default(0) // кг
+  lengthCm Float  @default(0) @map("length_cm")
+  widthCm  Float  @default(0) @map("width_cm")
+  heightCm Float  @default(0) @map("height_cm")
+  note     String?
+
+  task WarehouseTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@index([taskId])
+  @@map("warehouse_task_seats")
 }
 
 // ─── Exchange Rates (← 1С КурсиВалют) ──────────────────────────────────────
