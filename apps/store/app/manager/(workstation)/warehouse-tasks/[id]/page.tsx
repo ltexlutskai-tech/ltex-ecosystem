@@ -24,8 +24,16 @@ export default async function WarehouseTaskDetailPage({
     where: { id },
     include: {
       items: { orderBy: { productName: "asc" } },
+      seats: { orderBy: { position: "asc" } },
       sale: {
-        select: { id: true, number1C: true, code1C: true, docNumber: true },
+        select: {
+          id: true,
+          number1C: true,
+          code1C: true,
+          docNumber: true,
+          ttnRef: true,
+          expressWaybill: true,
+        },
       },
     },
   });
@@ -64,8 +72,19 @@ export default async function WarehouseTaskDetailPage({
           receivedAt: task.receivedAt?.toISOString() ?? null,
           sentByName: task.sentByName,
           sentAt: task.sentAt?.toISOString() ?? null,
+          labelPrintedAt: task.labelPrintedAt?.toISOString() ?? null,
           saleId: task.sale?.id ?? null,
           saleNumber,
+          saleTtnRef: task.sale?.ttnRef ?? null,
+          saleExpressWaybill: task.sale?.expressWaybill ?? null,
+          seats: task.seats.map((s) => ({
+            id: s.id,
+            weight: s.weight,
+            lengthCm: s.lengthCm,
+            widthCm: s.widthCm,
+            heightCm: s.heightCm,
+            note: s.note,
+          })),
           items: task.items.map((it) => ({
             id: it.id,
             productName: it.productName,

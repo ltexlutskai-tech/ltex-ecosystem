@@ -4,7 +4,15 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button, Input, useToast } from "@ltex/ui";
-import { PackageCheck, Truck, ExternalLink } from "lucide-react";
+import {
+  PackageCheck,
+  Truck,
+  ExternalLink,
+  Printer,
+  Check,
+} from "lucide-react";
+import { classifyDelivery } from "@/lib/manager/order-delivery";
+import { SeatsEditor, type SeatInit } from "./seats-editor";
 
 /** Публічне посилання відстеження Нової Пошти за номером ТТН. */
 function trackingUrl(cargoNumber: string): string {
@@ -39,8 +47,12 @@ interface TaskData {
   receivedAt: string | null;
   sentByName: string | null;
   sentAt: string | null;
+  labelPrintedAt: string | null;
   saleId: string | null;
   saleNumber: string;
+  saleTtnRef: string | null;
+  saleExpressWaybill: string | null;
+  seats: SeatInit[];
   items: TaskItem[];
 }
 
@@ -75,7 +87,20 @@ export function WarehouseTaskClient({
   const st = STATUS_LABEL[task.status] ?? DEFAULT_STATUS;
   const isPost =
     task.deliveryMethod === "post" || task.deliveryMethod === "ukrposhta";
+  // Нова Пошта: є ТТН у реалізації АБО спосіб доставки класифікується як «post».
+  const isNovaPoshta =
+    Boolean(task.saleTtnRef) ||
+    classifyDelivery(task.deliveryMethod, task.deliveryLabel) === "post";
+  const hasTtn = Boolean(task.saleTtnRef);
+  // «Готово» для НП доступне лише після друку етикетки.
+  const needsLabel = hasTtn && !task.labelPrintedAt;
   const allPacked = task.items.every((i) => packed[i.id]);
+
+  function printLabel() {
+    window.open(`${BASE}/${task.id}/label`, "_blank");
+    // Даємо серверу час позначити labelPrintedAt, тоді оновлюємо стан сторінки.
+    setTimeout(() => startTransition(() => router.refresh()), 1500);
+  }
 
   async function call(url: string, body?: unknown): Promise<boolean> {
     setBusy(true);
@@ -272,6 +297,11 @@ export function WarehouseTaskClient({
         </div>
       </section>
 
+      {/* Місця відправлення (габарити) — лише для Нової Пошти */}
+      {canAct && isNovaPoshta && task.status !== "sent" && (
+        <SeatsEditor taskId={task.id} initialSeats={task.seats} />
+      )}
+
       {/* Дії складу */}
       {canAct && task.status !== "sent" && (
         <section className="rounded-lg border bg-white p-5 shadow-sm">
@@ -301,14 +331,49 @@ export function WarehouseTaskClient({
                   />
                 </div>
               )}
+              {/* Друк етикетки Нової Пошти */}
+              {isNovaPoshta && (
+                <div className="space-y-2">
+                  <div className="flex flex-wrap items-center gap-3">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      disabled={!hasTtn}
+                      onClick={printLabel}
+                    >
+                      <Printer className="mr-1 h-4 w-4" />
+                      Друк етикетки
+                    </Button>
+                    {task.labelPrintedAt && (
+                      <span className="inline-flex items-center gap-1 text-sm text-green-700">
+                        <Check className="h-4 w-4" />
+                        Етикетку надруковано
+                      </span>
+                    )}
+                  </div>
+                  {!hasTtn && (
+                    <p className="text-xs text-amber-600">
+                      Спершу створіть ТТН у реалізації.
+                    </p>
+                  )}
+                  <p className="text-xs text-gray-500">
+                    Якщо етикетка не відкрилась — перевірте, що ТТН створено.
+                  </p>
+                </div>
+              )}
               {!allPacked && (
                 <p className="text-xs text-amber-600">
                   Відмітьте всі позиції як запаковані перед відправленням.
                 </p>
               )}
+              {needsLabel && (
+                <p className="text-xs text-amber-600">
+                  Спершу надрукуйте етикетку.
+                </p>
+              )}
               <Button
                 type="button"
-                disabled={busy || !allPacked}
+                disabled={busy || !allPacked || needsLabel}
                 onClick={() => void send()}
                 className="bg-green-600 text-white hover:bg-green-700"
               >
