@@ -9,7 +9,9 @@ import {
 } from "@/lib/auth/manager-auth";
 import { sha256 } from "@/lib/auth/jwt";
 import { getRepackWeightTolerance } from "@/lib/manager/mgr-settings";
+import { parseUiMode, UI_MODE_COOKIE } from "@/lib/manager/ui-mode";
 import { ProfileSection } from "./_components/profile-section";
+import { UiModeSection } from "./_components/ui-mode-section";
 import { TelegramSection } from "./_components/telegram-section";
 import { NotifyChannelsSection } from "./_components/notify-channels-section";
 import { SessionsSection } from "./_components/sessions-section";
@@ -54,10 +56,12 @@ export default async function SettingsPage() {
   }));
 
   const repackTolerance = await getRepackWeightTolerance();
+  const uiMode = parseUiMode(cookieStore.get(UI_MODE_COOKIE)?.value);
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
       <h1 className="text-2xl font-bold text-gray-800">Налаштування</h1>
+      <UiModeSection initialMode={uiMode} />
       <ProfileSection email={user.email} fullName={user.fullName} />
       <TelegramSection telegramLinked={user.telegramLinked} />
       <NotifyChannelsSection

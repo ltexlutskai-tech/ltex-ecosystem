@@ -3,6 +3,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { usePathname } from "next/navigation";
 import { Toaster } from "@ltex/ui";
+import type { UiMode } from "@/lib/manager/ui-mode";
 import { IframeHost } from "./tabs/iframe-host";
 import { TabStrip } from "./tabs/tab-strip";
 import { TabUrlReporter } from "./tabs/tab-url-reporter";
@@ -13,14 +14,57 @@ import { DETACHED_WINDOW_PREFIX, TabsProvider } from "./tabs/tabs-context";
  * вкладками) навіть у новій вкладці браузера верхнього рівня. Сюди належать
  * сторінки друку (рахунок, накладна, касовий ордер, маршрутний лист): вони
  * відкриваються через `target="_blank"`, тож без цього top-window показував би
- * оболонку з вкладками (список замовлень), а не сам документ (7.3 фікс).
+ * оболонку (список замовлень), а не сам документ (7.3 фікс).
  */
 function isStandaloneRoute(pathname: string | null): boolean {
   if (!pathname) return false;
   return pathname.endsWith("/print") || pathname.includes("/print/");
 }
 
+/**
+ * Оболонка робочого простору. `mode` приходить з root-layout (cookie):
+ * - "classic" — 1С-подібні вкладки+iframe (`ClassicShell`);
+ * - "simple"  — одне вікно зі звичайною навігацією (`SimpleShell`).
+ */
 export function WorkstationShell({
+  header,
+  sidebar,
+  children,
+  mode,
+}: {
+  header: ReactNode;
+  sidebar: ReactNode;
+  children: ReactNode;
+  mode: UiMode;
+}) {
+  const pathname = usePathname();
+
+  // Друк — завжди чистий контент, у будь-якому режимі.
+  if (isStandaloneRoute(pathname)) {
+    return <>{children}</>;
+  }
+
+  if (mode === "simple") {
+    return (
+      <SimpleShell header={header} sidebar={sidebar}>
+        {children}
+      </SimpleShell>
+    );
+  }
+
+  return (
+    <ClassicShell header={header} sidebar={sidebar}>
+      {children}
+    </ClassicShell>
+  );
+}
+
+/**
+ * Простий режим: без вкладок і iframe. Зафіксовані шапка + ліва панель, одна
+ * прокручувана робоча область. Сайдбар (`SidebarNavLink`) поза `TabsProvider`
+ * автоматично працює як звичайні лінки (клієнтська навігація Next.js).
+ */
+function SimpleShell({
   header,
   sidebar,
   children,
@@ -29,7 +73,31 @@ export function WorkstationShell({
   sidebar: ReactNode;
   children: ReactNode;
 }) {
-  const pathname = usePathname();
+  return (
+    <div className="flex h-screen flex-col bg-gray-50">
+      {header}
+      <div className="flex flex-1 overflow-hidden">
+        {sidebar}
+        <main className="flex-1 overflow-y-auto p-3 sm:p-4">{children}</main>
+      </div>
+      <Toaster />
+    </div>
+  );
+}
+
+/**
+ * Класичний режим (1С-подібний): рядок вкладок + iframe-и. Кожна вкладка —
+ * постійно змонтований iframe зі справжньою сторінкою `/manager/...`.
+ */
+function ClassicShell({
+  header,
+  sidebar,
+  children,
+}: {
+  header: ReactNode;
+  sidebar: ReactNode;
+  children: ReactNode;
+}) {
   // mount-gate: до визначення framed рендеримо нейтральний сплеш —
   // це водночас уникає hydration mismatch і гарантує, що embedded-сторінка
   // НІКОЛИ не змонтує iframe-host (глибина iframe = 1, рекурсії немає).
@@ -44,12 +112,6 @@ export function WorkstationShell({
         window.name.startsWith(DETACHED_WINDOW_PREFIX),
     );
   }, []);
-
-  // Автономні маршрути (друк) — завжди контент, без сплеш-гейта й без shell:
-  // це те, що очікує «Рахунок»/«Друк», відкритий у новій вкладці.
-  if (isStandaloneRoute(pathname)) {
-    return <>{children}</>;
-  }
 
   if (framed === null) {
     // Нейтральний сплеш — нейтральне тло на повну висоту.
