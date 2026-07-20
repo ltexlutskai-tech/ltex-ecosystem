@@ -241,6 +241,14 @@ export interface SaleEditInitial {
   npWarehouseRef: string | null;
   npWarehouseName: string | null;
   npDeliveryType: string | null;
+  /** ПІБ отримувача ТТН (Нова Пошта). */
+  npRecipientName: string | null;
+  /** Телефон отримувача ТТН (Нова Пошта). */
+  npRecipientPhone: string | null;
+  /** Платник доставки НП: "Recipient" (дефолт) | "Sender". */
+  npPayerType: string | null;
+  /** Оголошена цінність = сума реалізації (за замовч. увімкнено). */
+  declaredValueEnabled: boolean;
   deliveryAddress: string | null;
   cashOnDelivery: boolean;
   assignedAgentUserId: string | null;

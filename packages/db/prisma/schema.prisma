@@ -414,6 +414,10 @@ model Sale {
   npWarehouseRef      String?  @map("np_warehouse_ref")
   npWarehouseName     String?  @map("np_warehouse_name")
   npDeliveryType      String?  @map("np_delivery_type") // WarehouseWarehouse | WarehouseDoors
+  // Отримувач ТТН (ПІБ + телефон) — префіл з картки клієнта, редаговано у формі.
+  npRecipientName     String?  @map("np_recipient_name")
+  npRecipientPhone    String?  @map("np_recipient_phone")
+  npPayerType         String?  @map("np_payer_type") // Recipient (дефолт) | Sender
   // ТТН (InternetDocument) Нової Пошти.
   ttnRef              String?  @map("ttn_ref") // Ref документа НП (для update/delete)
   ttnCreatedAt        DateTime? @map("ttn_created_at")

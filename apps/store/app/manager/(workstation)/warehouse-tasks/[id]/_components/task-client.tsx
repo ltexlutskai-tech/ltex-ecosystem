@@ -4,7 +4,14 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button, Input, useToast } from "@ltex/ui";
-import { PackageCheck, Truck } from "lucide-react";
+import { PackageCheck, Truck, ExternalLink } from "lucide-react";
+
+/** Публічне посилання відстеження Нової Пошти за номером ТТН. */
+function trackingUrl(cargoNumber: string): string {
+  return `https://novaposhta.ua/tracking/?cargo_number=${encodeURIComponent(
+    cargoNumber,
+  )}`;
+}
 
 interface TaskItem {
   id: string;
@@ -150,7 +157,23 @@ export function WarehouseTaskClient({
             <Field label="№ відділення">{task.novaPoshtaBranch}</Field>
           )}
           {task.expressWaybill && (
-            <Field label="ТТН / трек">{task.expressWaybill}</Field>
+            <Field label="ТТН / трек">
+              {task.deliveryMethod === "post" ? (
+                <a
+                  href={trackingUrl(task.expressWaybill)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 font-mono font-semibold text-blue-600 hover:text-blue-700"
+                >
+                  {task.expressWaybill}
+                  <ExternalLink className="h-3.5 w-3.5" />
+                </a>
+              ) : (
+                <span className="font-mono font-semibold text-gray-900">
+                  {task.expressWaybill}
+                </span>
+              )}
+            </Field>
           )}
           {task.deliveryAddress && (
             <Field label="Адреса">{task.deliveryAddress}</Field>

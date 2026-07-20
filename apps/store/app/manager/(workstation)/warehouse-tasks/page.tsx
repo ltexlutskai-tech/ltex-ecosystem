@@ -71,6 +71,7 @@ export default async function WarehouseTasksPage() {
                   ]
                     .filter(Boolean)
                     .join(", ") || "—";
+                const isNovaPoshta = t.deliveryMethod === "post";
                 return (
                   <tr
                     key={t.id}
@@ -84,7 +85,26 @@ export default async function WarehouseTasksPage() {
                         {t.customerName}
                       </Link>
                     </td>
-                    <td className="px-4 py-2 text-gray-600">{delivery}</td>
+                    <td className="px-4 py-2 text-gray-600">
+                      <div>{delivery}</div>
+                      {t.expressWaybill &&
+                        (isNovaPoshta ? (
+                          <a
+                            href={`https://novaposhta.ua/tracking/?cargo_number=${encodeURIComponent(
+                              t.expressWaybill,
+                            )}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="mt-0.5 inline-flex items-center gap-1 font-mono text-xs font-semibold text-blue-600 hover:text-blue-700"
+                          >
+                            ТТН {t.expressWaybill}
+                          </a>
+                        ) : (
+                          <div className="mt-0.5 font-mono text-xs font-semibold text-gray-700">
+                            ТТН {t.expressWaybill}
+                          </div>
+                        ))}
+                    </td>
                     <td className="px-4 py-2 text-center text-gray-700">
                       {t._count.items}
                     </td>
