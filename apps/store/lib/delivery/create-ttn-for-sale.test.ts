@@ -155,7 +155,7 @@ describe("createTtnForSale", () => {
       cityRecipientRef: "city-ref",
       recipientName: "Іваненко Іван Петрович",
     });
-    expect(input.backwardDeliveryCod).toBeUndefined();
+    expect(input.afterpaymentOnGoodsCost).toBeUndefined();
 
     expect(h.sale.update).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -173,13 +173,14 @@ describe("createTtnForSale", () => {
     });
   });
 
-  it("adds COD (backward delivery) when cash on delivery", async () => {
+  it("adds «Контроль оплати» (AfterpaymentOnGoodsCost) when cash on delivery", async () => {
     h.sale.findUnique.mockResolvedValue(
       baseSale({ cashOnDelivery: true, codAmountUah: 4200 }),
     );
     await createTtnForSale("s1");
     const input = h.createInternetDocument.mock.calls[0]![0];
-    expect(input.backwardDeliveryCod).toBe(4200);
+    expect(input.afterpaymentOnGoodsCost).toBe(4200);
+    expect(input.backwardDeliveryCod).toBeUndefined();
   });
 
   it("honours a Sender payer type", async () => {

@@ -212,7 +212,9 @@ export async function createTtnForSale(saleId: string): Promise<void> {
       recipientWarehouseRef: sale.npWarehouseRef,
       recipientPhone: npPhone,
       recipientName,
-      backwardDeliveryCod: cod,
+      // Накладка L-TEX = «Контроль оплати» (гроші на рахунок ФОП через NovaPay),
+      // НЕ класична післяплата. Потребує послуги «Контроль оплати» на ключі НП.
+      afterpaymentOnGoodsCost: cod,
     };
 
     const result = await createInternetDocument(input);
