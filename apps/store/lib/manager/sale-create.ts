@@ -11,6 +11,7 @@ import {
 import { applySaleMovements } from "@/lib/manager/sale-movement-hooks";
 import { notifyOrdersClosedBySale } from "@/lib/manager/sale-order-close";
 import { createWarehouseTaskForSale } from "@/lib/manager/warehouse-task";
+import { createTtnForSale } from "@/lib/delivery/create-ttn-for-sale";
 import type {
   CreateSaleInputRaw,
   SaleDraftInput,
@@ -157,6 +158,9 @@ export async function createSaleWithItems(
         npWarehouseRef: input.npWarehouseRef ?? null,
         npWarehouseName: input.npWarehouseName ?? null,
         npDeliveryType: input.npDeliveryType ?? null,
+        npRecipientName: input.npRecipientName ?? null,
+        npRecipientPhone: input.npRecipientPhone ?? null,
+        npPayerType: input.npPayerType ?? null,
         deliveryAddress: input.deliveryAddress ?? null,
         cashOnDelivery,
         codAmountUah: codAmountFor(cashOnDelivery, totalUah),
@@ -208,7 +212,11 @@ export async function createSaleWithItems(
     // ідемпотентно (delete-then-create за реєстратором sale.code1C ?? sale.id).
     applySaleMovements(sale.id);
     // Завдання складу (підготувати лоти + ТТН) — при проведенні, fire-and-forget.
-    void createWarehouseTaskForSale(sale.id);
+    // Після створення завдання — авто-створення ТТН НП (best-effort, пише №ТТН
+    // у Sale + завдання; помилку — у Sale.ttnError, UI показує «Повторити»).
+    void createWarehouseTaskForSale(sale.id).then(() =>
+      createTtnForSale(sale.id),
+    );
     void notifyOrdersClosedBySale({
       saleId: sale.id,
       saleNumber1C: sale.number1C,
@@ -268,6 +276,9 @@ export async function updateSaleWithItems(
         npWarehouseRef: input.npWarehouseRef ?? null,
         npWarehouseName: input.npWarehouseName ?? null,
         npDeliveryType: input.npDeliveryType ?? null,
+        npRecipientName: input.npRecipientName ?? null,
+        npRecipientPhone: input.npRecipientPhone ?? null,
+        npPayerType: input.npPayerType ?? null,
         deliveryAddress: input.deliveryAddress ?? null,
         cashOnDelivery,
         codAmountUah: codAmountFor(cashOnDelivery, totalUah),
@@ -309,7 +320,10 @@ export async function updateSaleWithItems(
     // Рухи регістрів (склад/продажі/собівартість) при проведенні з картки.
     applySaleMovements(sale.id);
     // Завдання складу (підготувати лоти + ТТН) — при проведенні з картки.
-    void createWarehouseTaskForSale(sale.id);
+    // Після завдання — авто-створення ТТН НП (best-effort).
+    void createWarehouseTaskForSale(sale.id).then(() =>
+      createTtnForSale(sale.id),
+    );
     void notifyOrdersClosedBySale({
       saleId: sale.id,
       saleNumber1C: sale.number1C,
@@ -366,6 +380,9 @@ export async function createSaleDraft(
       npWarehouseRef: input.npWarehouseRef ?? null,
       npWarehouseName: input.npWarehouseName ?? null,
       npDeliveryType: input.npDeliveryType ?? null,
+      npRecipientName: input.npRecipientName ?? null,
+      npRecipientPhone: input.npRecipientPhone ?? null,
+      npPayerType: input.npPayerType ?? null,
       deliveryAddress: input.deliveryAddress ?? null,
       cashOnDelivery,
       codAmountUah: codAmountFor(cashOnDelivery, totalUah),
@@ -412,6 +429,9 @@ export async function updateSaleDraft(saleId: string, input: SaleDraftInput) {
         npWarehouseRef: input.npWarehouseRef ?? null,
         npWarehouseName: input.npWarehouseName ?? null,
         npDeliveryType: input.npDeliveryType ?? null,
+        npRecipientName: input.npRecipientName ?? null,
+        npRecipientPhone: input.npRecipientPhone ?? null,
+        npPayerType: input.npPayerType ?? null,
         deliveryAddress: input.deliveryAddress ?? null,
         cashOnDelivery,
         codAmountUah: codAmountFor(cashOnDelivery, totalUah),
