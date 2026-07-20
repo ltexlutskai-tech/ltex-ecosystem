@@ -214,6 +214,23 @@ function CharacteristicsForm({
             placeholder="https://youtu.be/…"
           />
         </Field>
+        <Field label="Назва для друку та інтеграції" full>
+          <Input
+            name="receiptName"
+            defaultValue={values.receiptName}
+            list="receipt-name-options"
+            placeholder="Напр. Одяг вживаний"
+          />
+          <datalist id="receipt-name-options">
+            <option value="Одяг вживаний" />
+            <option value="Взуття вживане" />
+            <option value="Товари для дому вживані" />
+          </datalist>
+          <p className="mt-1 text-xs text-gray-400">
+            Узагальнена назва для чеків Checkbox і друкованих накладних. Порожнє
+            — система визначить за категорією.
+          </p>
+        </Field>
         <Field label="Наповнення" full>
           <textarea
             name="filling"

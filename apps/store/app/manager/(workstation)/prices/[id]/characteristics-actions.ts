@@ -43,6 +43,7 @@ export async function updateProductCharacteristics(
   const sizes = str("sizes") || null;
   const filling = str("filling") || null;
   const producer = str("producer") || null;
+  const receiptName = str("receiptName") || null;
   const videoUrl = str("videoUrl") || null;
   const unitsPerKg = str("unitsPerKg") || null;
   const unitWeight = str("unitWeight") || null;
@@ -63,6 +64,7 @@ export async function updateProductCharacteristics(
       sizes,
       filling,
       producer,
+      receiptName,
       videoUrl,
       unitsPerKg,
       unitsPerKgMin: unitsRange?.min ?? null,

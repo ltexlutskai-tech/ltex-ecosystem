@@ -77,6 +77,8 @@ export async function createManagerProduct(
   const gender = ((formData.get("gender") as string) || "").trim() || null;
   const sizes = ((formData.get("sizes") as string) || "").trim() || null;
   const producer = ((formData.get("producer") as string) || "").trim() || null;
+  const receiptName =
+    ((formData.get("receiptName") as string) || "").trim() || null;
   const videoUrl = ((formData.get("videoUrl") as string) || "").trim() || null;
   const season = ((formData.get("season") as string) || "").trim();
   const filling = ((formData.get("filling") as string) || "").trim() || null;
@@ -139,6 +141,7 @@ export async function createManagerProduct(
         sizes,
         filling,
         producer,
+        receiptName,
         videoUrl,
         averageWeight,
         unitsPerKg: unitsPerKgRaw,
