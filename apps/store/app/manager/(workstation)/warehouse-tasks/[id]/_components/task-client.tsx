@@ -10,6 +10,8 @@ import {
   ExternalLink,
   Printer,
   Check,
+  Receipt,
+  RefreshCw,
 } from "lucide-react";
 import { classifyDelivery } from "@/lib/manager/order-delivery";
 import { SeatsEditor, type SeatInit } from "./seats-editor";
@@ -52,6 +54,12 @@ interface TaskData {
   saleNumber: string;
   saleTtnRef: string | null;
   saleExpressWaybill: string | null;
+  /** Реалізація з накладкою (COD) — тоді очікуємо чек Checkbox. */
+  saleCashOnDelivery: boolean;
+  /** Статус чека Checkbox: "created" | "failed" | "pending" | null. */
+  receiptStatus: string | null;
+  /** Остання помилка створення чека Checkbox. */
+  receiptError: string | null;
   seats: SeatInit[];
   items: TaskItem[];
 }
@@ -84,6 +92,7 @@ export function WarehouseTaskClient({
   const { toast } = useToast();
   const [, startTransition] = useTransition();
   const [busy, setBusy] = useState(false);
+  const [receiptBusy, setReceiptBusy] = useState(false);
   const [ttn, setTtn] = useState(task.expressWaybill ?? "");
   // Локальний стан «запаковано» для миттєвого відгуку.
   const [packed, setPacked] = useState<Record<string, boolean>>(
@@ -106,6 +115,9 @@ export function WarehouseTaskClient({
   const canEditSeats = canAct && isNovaPoshta && (!isSent || ttnDraft);
   // Відправлене НП-завдання, чия ТТН уже в дорозі — місця лише для читання.
   const seatsLocked = canAct && isNovaPoshta && isSent && !ttnDraft;
+  // Чек Checkbox (ETTN) — індикатор після «Готово» для накладки (COD).
+  const showReceipt = task.saleCashOnDelivery && isSent;
+  const receiptCreated = task.receiptStatus === "created";
 
   function printLabel() {
     window.open(`${BASE}/${task.id}/label`, "_blank");
@@ -159,6 +171,32 @@ export function WarehouseTaskClient({
       expressWaybill: ttn.trim() || undefined,
     });
     if (ok) toast({ description: "Позначено як відправлено ✓" });
+  }
+
+  async function retryReceipt() {
+    if (!task.saleId) return;
+    setReceiptBusy(true);
+    try {
+      const res = await fetch(
+        `/api/v1/manager/sales/${task.saleId}/create-receipt`,
+        { method: "POST" },
+      );
+      const j = (await res.json().catch(() => ({}))) as {
+        ok?: boolean;
+        error?: string;
+      };
+      if (!res.ok || j.ok === false) {
+        toast({
+          description: j.error ?? "Не вдалося створити чек",
+          variant: "destructive",
+        });
+      } else {
+        toast({ description: "Чек Checkbox створено ✓" });
+      }
+      startTransition(() => router.refresh());
+    } finally {
+      setReceiptBusy(false);
+    }
   }
 
   return (
@@ -241,6 +279,41 @@ export function WarehouseTaskClient({
           </p>
         )}
       </section>
+
+      {/* Чек Checkbox (ETTN) — індикатор після відправлення для накладки */}
+      {showReceipt && (
+        <section className="rounded-lg border bg-white p-4 shadow-sm">
+          <h2 className="mb-2 flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-gray-500">
+            <Receipt className="h-4 w-4" />
+            Чек Checkbox
+          </h2>
+          {receiptCreated ? (
+            <span className="inline-flex items-center gap-1 text-sm font-medium text-green-700">
+              <Check className="h-4 w-4" />
+              Чек Checkbox створено
+            </span>
+          ) : (
+            <div className="flex flex-wrap items-center gap-3">
+              <span className="text-sm font-medium text-red-700">
+                ⚠ Чек не створено
+                {task.receiptError ? `: ${task.receiptError}` : ""}
+              </span>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={receiptBusy}
+                onClick={() => void retryReceipt()}
+              >
+                <RefreshCw
+                  className={`mr-1 h-4 w-4 ${receiptBusy ? "animate-spin" : ""}`}
+                />
+                {receiptBusy ? "Створення…" : "Повторити чек"}
+              </Button>
+            </div>
+          )}
+        </section>
+      )}
 
       {/* Позиції */}
       <section className="rounded-lg border bg-white p-5 shadow-sm">

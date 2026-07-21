@@ -34,6 +34,10 @@ export default async function WarehouseTaskDetailPage({
           docNumber: true,
           ttnRef: true,
           expressWaybill: true,
+          cashOnDelivery: true,
+          checkboxReceipt: {
+            select: { status: true, error: true },
+          },
         },
       },
     },
@@ -97,6 +101,9 @@ export default async function WarehouseTaskDetailPage({
           saleNumber,
           saleTtnRef: task.sale?.ttnRef ?? null,
           saleExpressWaybill: task.sale?.expressWaybill ?? null,
+          saleCashOnDelivery: task.sale?.cashOnDelivery ?? false,
+          receiptStatus: task.sale?.checkboxReceipt?.status ?? null,
+          receiptError: task.sale?.checkboxReceipt?.error ?? null,
           seats: task.seats.map((s) => ({
             id: s.id,
             weight: s.weight,

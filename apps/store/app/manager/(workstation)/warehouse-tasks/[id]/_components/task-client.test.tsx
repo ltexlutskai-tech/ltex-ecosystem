@@ -1,5 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import { WarehouseTaskClient } from "./task-client";
 import type { SeatInit } from "./seats-editor";
 
@@ -30,6 +36,9 @@ interface Overrides {
   deliveryMethod?: string | null;
   packed?: boolean;
   seats?: SeatInit[];
+  saleCashOnDelivery?: boolean;
+  receiptStatus?: string | null;
+  receiptError?: string | null;
 }
 
 function makeTask(o: Overrides = {}) {
@@ -53,6 +62,9 @@ function makeTask(o: Overrides = {}) {
     saleNumber: "L1",
     saleTtnRef: o.saleTtnRef === undefined ? "ref-1" : o.saleTtnRef,
     saleExpressWaybill: "59000000000001",
+    saleCashOnDelivery: o.saleCashOnDelivery ?? false,
+    receiptStatus: o.receiptStatus ?? null,
+    receiptError: o.receiptError ?? null,
     seats: o.seats ?? [],
     items: [
       {
@@ -180,5 +192,68 @@ describe("WarehouseTaskClient — НП етикетка та gating «Готов
       screen.queryByRole("button", { name: /Зберегти місця й оновити ТТН/ }),
     ).toBeNull();
     expect(screen.queryByRole("button", { name: /Друк етикетки/ })).toBeNull();
+  });
+});
+
+describe("WarehouseTaskClient — індикатор чека Checkbox (COD)", () => {
+  it("НЕ показує чек для не-COD завдання", () => {
+    render(
+      <WarehouseTaskClient
+        canAct
+        ttnDraft={false}
+        ttnStatusText={null}
+        task={makeTask({ status: "sent", saleCashOnDelivery: false })}
+      />,
+    );
+    expect(screen.queryByText(/Чек Checkbox/)).toBeNull();
+  });
+
+  it("COD + created → зелений «створено», без кнопки", () => {
+    render(
+      <WarehouseTaskClient
+        canAct
+        ttnDraft={false}
+        ttnStatusText={null}
+        task={makeTask({
+          status: "sent",
+          saleCashOnDelivery: true,
+          receiptStatus: "created",
+        })}
+      />,
+    );
+    expect(screen.getByText(/Чек Checkbox створено/)).toBeDefined();
+    expect(screen.queryByRole("button", { name: /Повторити чек/ })).toBeNull();
+  });
+
+  it("COD + failed → «не створено» + кнопка «Повторити чек» → POST + refresh", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ ok: true, status: "created" }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(
+      <WarehouseTaskClient
+        canAct
+        ttnDraft={false}
+        ttnStatusText={null}
+        task={makeTask({
+          status: "sent",
+          saleCashOnDelivery: true,
+          receiptStatus: "failed",
+          receiptError: "збій",
+        })}
+      />,
+    );
+    expect(screen.getByText(/Чек не створено/)).toBeDefined();
+    fireEvent.click(screen.getByRole("button", { name: /Повторити чек/ }));
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/v1/manager/sales/s1/create-receipt",
+        { method: "POST" },
+      );
+    });
+    await waitFor(() => expect(refresh).toHaveBeenCalled());
   });
 });
