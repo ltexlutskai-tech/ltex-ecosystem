@@ -35,6 +35,10 @@ export default async function WarehouseTaskDetailPage({
           ttnRef: true,
           expressWaybill: true,
           cashOnDelivery: true,
+          npCityRef: true,
+          npCityName: true,
+          npWarehouseRef: true,
+          npWarehouseName: true,
           checkboxReceipt: {
             select: { status: true, error: true },
           },
@@ -102,6 +106,10 @@ export default async function WarehouseTaskDetailPage({
           saleTtnRef: task.sale?.ttnRef ?? null,
           saleExpressWaybill: task.sale?.expressWaybill ?? null,
           saleCashOnDelivery: task.sale?.cashOnDelivery ?? false,
+          npCityRef: task.sale?.npCityRef ?? null,
+          npCityName: task.sale?.npCityName ?? null,
+          npWarehouseRef: task.sale?.npWarehouseRef ?? null,
+          npWarehouseName: task.sale?.npWarehouseName ?? null,
           receiptStatus: task.sale?.checkboxReceipt?.status ?? null,
           receiptError: task.sale?.checkboxReceipt?.error ?? null,
           seats: task.seats.map((s) => ({

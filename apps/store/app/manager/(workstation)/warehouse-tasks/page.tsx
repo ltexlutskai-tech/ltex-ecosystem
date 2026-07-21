@@ -1,8 +1,14 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { prisma, type Prisma } from "@ltex/db";
+import { prisma } from "@ltex/db";
 import { getCurrentUser } from "@/lib/auth/manager-auth";
+import {
+  buildWarehouseTasksWhere,
+  buildWarehouseTasksOrderBy,
+} from "@/lib/manager/warehouse-tasks-list";
 import { AutoRefresh } from "../_components/auto-refresh";
+import { WarehouseTasksToolbar } from "./_components/warehouse-tasks-toolbar";
+import { TaskSortHeader } from "./_components/task-sort-header";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Завдання складу — L-TEX Manager" };
@@ -17,19 +23,35 @@ const STATUS_LABEL: Record<string, { label: string; cls: string }> = {
   cancelled: { label: "Скасовано", cls: "bg-gray-100 text-gray-500" },
 };
 
-export default async function WarehouseTasksPage() {
+function firstParam(v: string | string[] | undefined): string | undefined {
+  return Array.isArray(v) ? v[0] : v;
+}
+
+export default async function WarehouseTasksPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const user = await getCurrentUser();
   if (!user) redirect("/manager/login");
 
+  const sp = await searchParams;
+
   // Склад/адмін/власник — усі завдання; менеджер — свої (за реалізацією).
   const isWarehouse = WAREHOUSE_ROLES.includes(user.role);
-  const where: Prisma.WarehouseTaskWhereInput = isWarehouse
-    ? {}
-    : { managerUserId: user.id };
+  const where = buildWarehouseTasksWhere({
+    managerUserId: isWarehouse ? null : user.id,
+    status: firstParam(sp.status),
+    customerName: firstParam(sp.customerName),
+    deliveryMethod: firstParam(sp.deliveryMethod),
+  });
 
   const tasks = await prisma.warehouseTask.findMany({
     where,
-    orderBy: [{ status: "asc" }, { createdAt: "desc" }],
+    orderBy: buildWarehouseTasksOrderBy(
+      firstParam(sp.sort),
+      firstParam(sp.dir),
+    ),
     include: { _count: { select: { items: true } } },
     take: 200,
   });
@@ -45,20 +67,28 @@ export default async function WarehouseTasksPage() {
         </p>
       </header>
 
+      <WarehouseTasksToolbar />
+
       {tasks.length === 0 ? (
         <div className="rounded-lg border border-dashed bg-gray-50 px-4 py-12 text-center text-sm text-gray-500">
-          Немає завдань.
+          Немає завдань за обраними фільтрами.
         </div>
       ) : (
         <div className="overflow-x-auto rounded-lg border bg-white">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-400">
-                <th className="px-4 py-2 font-medium">Клієнт</th>
+                <th className="px-4 py-2 font-medium">
+                  <TaskSortHeader sortKey="customerName" label="Клієнт" />
+                </th>
                 <th className="px-4 py-2 font-medium">Доставка</th>
                 <th className="px-4 py-2 text-center font-medium">Позицій</th>
-                <th className="px-4 py-2 font-medium">Статус</th>
-                <th className="px-4 py-2 font-medium">Створено</th>
+                <th className="px-4 py-2 font-medium">
+                  <TaskSortHeader sortKey="status" label="Статус" />
+                </th>
+                <th className="px-4 py-2 font-medium">
+                  <TaskSortHeader sortKey="createdAt" label="Створено" />
+                </th>
               </tr>
             </thead>
             <tbody>

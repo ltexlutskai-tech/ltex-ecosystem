@@ -39,6 +39,8 @@ interface Overrides {
   saleCashOnDelivery?: boolean;
   receiptStatus?: string | null;
   receiptError?: string | null;
+  npCityRef?: string | null;
+  npWarehouseRef?: string | null;
 }
 
 function makeTask(o: Overrides = {}) {
@@ -65,6 +67,11 @@ function makeTask(o: Overrides = {}) {
     saleCashOnDelivery: o.saleCashOnDelivery ?? false,
     receiptStatus: o.receiptStatus ?? null,
     receiptError: o.receiptError ?? null,
+    npCityRef: o.npCityRef === undefined ? "city-ref-1" : o.npCityRef,
+    npCityName: "Луцьк (Волинська)",
+    npWarehouseRef:
+      o.npWarehouseRef === undefined ? "wh-ref-1" : o.npWarehouseRef,
+    npWarehouseName: "Відділення №5",
     seats: o.seats ?? [],
     items: [
       {
@@ -187,7 +194,10 @@ describe("WarehouseTaskClient — НП етикетка та gating «Готов
         task={makeTask({ status: "sent", saleTtnRef: "ref-1" })}
       />,
     );
-    expect(screen.getByText(/ТТН уже в дорозі/)).toBeDefined();
+    // Нотатка саме редактора місць (щоб не збігтися з блоком відділення НП).
+    expect(
+      screen.getByText(/ТТН уже в дорозі.*зміни недоступні/),
+    ).toBeDefined();
     expect(
       screen.queryByRole("button", { name: /Зберегти місця й оновити ТТН/ }),
     ).toBeNull();
@@ -255,5 +265,80 @@ describe("WarehouseTaskClient — індикатор чека Checkbox (COD)", (
       );
     });
     await waitFor(() => expect(refresh).toHaveBeenCalled());
+  });
+});
+
+describe("WarehouseTaskClient — зміна відділення отримувача НП", () => {
+  it("зберігає відділення → POST recipient-warehouse + показує ТТН + refresh", async () => {
+    const fetchMock = vi.fn((url: string, init?: RequestInit) => {
+      if (url.includes("/recipient-warehouse")) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            ok: true,
+            ttn: { ok: true, number: "59000000000009" },
+          }),
+        });
+      }
+      // Довідник НП на монтуванні пікера — порожній список.
+      return Promise.resolve({
+        ok: true,
+        json: async () => ({ warehouses: [], cities: [] }),
+      });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(
+      <WarehouseTaskClient
+        canAct
+        ttnDraft={false}
+        ttnStatusText={null}
+        task={makeTask()}
+      />,
+    );
+
+    fireEvent.click(
+      screen.getByRole("button", { name: /Зберегти відділення/ }),
+    );
+
+    await waitFor(() => {
+      const call = fetchMock.mock.calls.find((c) =>
+        c[0].includes("/recipient-warehouse"),
+      );
+      expect(call).toBeDefined();
+    });
+
+    const call = fetchMock.mock.calls.find((c) =>
+      c[0].includes("/recipient-warehouse"),
+    );
+    expect(call?.[0]).toBe(
+      "/api/v1/manager/warehouse-tasks/t1/recipient-warehouse",
+    );
+    expect(call?.[1]?.method).toBe("POST");
+    const body = JSON.parse((call?.[1]?.body as string) ?? "{}") as {
+      npCityRef: string;
+      npWarehouseRef: string;
+    };
+    expect(body.npCityRef).toBe("city-ref-1");
+    expect(body.npWarehouseRef).toBe("wh-ref-1");
+
+    await waitFor(() =>
+      expect(screen.getByText(/ТТН оновлено: 59000000000009/)).toBeDefined(),
+    );
+    await waitFor(() => expect(refresh).toHaveBeenCalled());
+  });
+
+  it("менеджер (canAct=false) не бачить блок зміни відділення", () => {
+    render(
+      <WarehouseTaskClient
+        canAct={false}
+        ttnDraft={false}
+        ttnStatusText={null}
+        task={makeTask()}
+      />,
+    );
+    expect(
+      screen.queryByRole("button", { name: /Зберегти відділення/ }),
+    ).toBeNull();
   });
 });
