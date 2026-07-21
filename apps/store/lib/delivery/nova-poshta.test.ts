@@ -105,7 +105,7 @@ describe("searchCities", () => {
 });
 
 describe("getWarehouses", () => {
-  it("maps raw NP warehouse fields incl numeric maxWeight", async () => {
+  it("maps raw NP warehouse fields incl numeric maxWeight + freight flag", async () => {
     mockFetchOnce({
       success: true,
       data: [
@@ -115,6 +115,15 @@ describe("getWarehouses", () => {
           Description: "Відділення №5",
           TypeOfWarehouseRef: "type-ref",
           TotalMaxWeightAllowed: "30",
+          PlaceMaxWeightAllowed: "30",
+        },
+        {
+          Ref: "wh-2",
+          Number: "9",
+          Description: "Вантажне відділення №9: вул. Промислова, 1",
+          TypeOfWarehouseRef: "type-ref-2",
+          TotalMaxWeightAllowed: "1000",
+          PlaceMaxWeightAllowed: "1000",
         },
       ],
     });
@@ -128,6 +137,17 @@ describe("getWarehouses", () => {
         name: "Відділення №5",
         typeRef: "type-ref",
         maxWeight: 30,
+        placeMaxWeight: 30,
+        isFreight: false,
+      },
+      {
+        ref: "wh-2",
+        number: "9",
+        name: "Вантажне відділення №9: вул. Промислова, 1",
+        typeRef: "type-ref-2",
+        maxWeight: 1000,
+        placeMaxWeight: 1000,
+        isFreight: true,
       },
     ]);
   });

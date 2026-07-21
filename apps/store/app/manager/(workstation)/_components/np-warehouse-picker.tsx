@@ -29,6 +29,8 @@ interface NpWarehouse {
   name: string;
   typeRef: string;
   maxWeight: number;
+  placeMaxWeight: number;
+  isFreight: boolean;
 }
 
 export interface NpSelection {
@@ -68,6 +70,8 @@ export function NpWarehousePicker({
   const [whResults, setWhResults] = useState<NpWarehouse[]>([]);
   const [whOpen, setWhOpen] = useState(false);
   const [whError, setWhError] = useState(false);
+  // Фільтр «лише вантажні» — для РО/спецвантажу (важкі місця).
+  const [freightOnly, setFreightOnly] = useState(false);
   const debouncedWh = useDebouncedValue(whQuery, 300);
 
   const hasCity = cityRef.trim().length > 0;
@@ -291,26 +295,54 @@ export function NpWarehousePicker({
             }
             className={INPUT_CLASS}
           />
-          {whOpen && hasCity && whResults.length > 0 && (
-            <ul className="absolute z-20 mt-1 max-h-60 w-full overflow-y-auto rounded-md border border-gray-200 bg-white py-1 text-sm shadow-lg">
-              {whResults.map((w) => (
-                <li key={w.ref}>
-                  <button
-                    type="button"
-                    onClick={() => pickWarehouse(w)}
-                    className="block w-full px-3 py-1.5 text-left text-gray-800 hover:bg-green-50"
-                  >
-                    {w.number ? (
-                      <span className="font-medium">
-                        Відділення №{w.number}:{" "}
-                      </span>
-                    ) : null}
-                    {w.name}
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
+          <label className="mt-1 flex items-center gap-1.5 text-xs text-gray-500">
+            <input
+              type="checkbox"
+              checked={freightOnly}
+              onChange={(e) => setFreightOnly(e.target.checked)}
+              disabled={!hasCity}
+            />
+            🚚 лише вантажні (для мішків/РО)
+          </label>
+          {whOpen &&
+            hasCity &&
+            (() => {
+              const list = freightOnly
+                ? whResults.filter((w) => w.isFreight)
+                : whResults;
+              if (list.length === 0) return null;
+              return (
+                <ul className="absolute z-20 mt-1 max-h-60 w-full overflow-y-auto rounded-md border border-gray-200 bg-white py-1 text-sm shadow-lg">
+                  {list.map((w) => (
+                    <li key={w.ref}>
+                      <button
+                        type="button"
+                        onClick={() => pickWarehouse(w)}
+                        className="block w-full px-3 py-1.5 text-left text-gray-800 hover:bg-green-50"
+                      >
+                        {w.number ? (
+                          <span className="font-medium">
+                            Відділення №{w.number}:{" "}
+                          </span>
+                        ) : null}
+                        {w.name}
+                        {w.isFreight ? (
+                          <span className="ml-1 rounded bg-amber-100 px-1 text-xs font-medium text-amber-700">
+                            🚚 вантажне
+                          </span>
+                        ) : null}
+                        {w.placeMaxWeight > 0 ? (
+                          <span className="text-gray-400">
+                            {" "}
+                            · до {w.placeMaxWeight} кг/місце
+                          </span>
+                        ) : null}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              );
+            })()}
           {whError && (
             <p className="mt-1 text-xs text-amber-600">
               Не вдалося завантажити відділення
