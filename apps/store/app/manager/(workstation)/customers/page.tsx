@@ -8,6 +8,7 @@ import {
   getDefaultsFor,
   mergePrefs,
 } from "@/lib/manager/view-defaults";
+import { serializeFields } from "@/lib/manager/bulk-edit/registry";
 import { ClientListBulk } from "./_components/client-list-bulk";
 import { ClientListTable } from "./_components/client-list-table";
 import { ClientListToolbar } from "./_components/client-list-toolbar";
@@ -103,6 +104,36 @@ export default async function CustomersPage({
       })
     : [];
 
+  // Поля «Групової обробки» (масова зміна довідникових полів) — лише admin/owner.
+  // Опції select-полів беремо зі знімка довідників; менеджера — з активних User.
+  const bulkFields = serializeFields("client", user.role, {
+    statusGeneralId: dictionaries.statuses.map((s) => ({
+      value: s.id,
+      label: s.label,
+    })),
+    statusOperationalId: dictionaries.statusesOperational.map((s) => ({
+      value: s.id,
+      label: s.label,
+    })),
+    agentUserId: managers.map((m) => ({ value: m.id, label: m.fullName })),
+    categoryTTId: dictionaries.categoriesTT.map((c) => ({
+      value: c.id,
+      label: c.label,
+    })),
+    deliveryMethodId: dictionaries.deliveries.map((d) => ({
+      value: d.id,
+      label: d.label,
+    })),
+    searchChannelId: dictionaries.channels.map((c) => ({
+      value: c.id,
+      label: c.label,
+    })),
+    primaryRouteId: dictionaries.routes.map((r) => ({
+      value: r.id,
+      label: r.name,
+    })),
+  });
+
   return (
     <div className="max-w-none space-y-3">
       <header className="flex items-center justify-between">
@@ -146,6 +177,7 @@ export default async function CustomersPage({
           items={list.items}
           columnsPrefs={columnsPrefs}
           managers={managers}
+          bulkFields={bulkFields}
         />
       ) : (
         <ClientListTable items={list.items} columnsPrefs={columnsPrefs} />

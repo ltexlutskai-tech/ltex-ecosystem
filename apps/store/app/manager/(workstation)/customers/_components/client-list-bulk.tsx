@@ -4,7 +4,9 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button, useToast } from "@ltex/ui";
 import { CLIENT_COLOR_META } from "@/lib/manager/client-color";
+import type { SerializedBulkField } from "@/lib/manager/bulk-edit/registry";
 import { SortableHeader } from "../../_components/sortable-header";
+import { BulkFieldDialog } from "../../_components/bulk/bulk-field-dialog";
 import { renderCell } from "../_lib/column-render";
 import { COLUMN_LABELS } from "../_lib/filter-labels";
 import { SORTABLE_COLUMN_KEYS } from "../_lib/sortable-columns";
@@ -25,16 +27,21 @@ export function ClientListBulk({
   items,
   columnsPrefs,
   managers,
+  bulkFields,
 }: {
   items: ClientListItem[];
   columnsPrefs: ConfigItem[];
   managers: BulkManagerOption[];
+  /** Поля «Групової обробки» (масова зміна довідникових полів). */
+  bulkFields?: SerializedBulkField[];
 }) {
   const router = useRouter();
   const { toast } = useToast();
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [managerId, setManagerId] = useState<string>("");
   const [submitting, setSubmitting] = useState(false);
+  const [bulkOpen, setBulkOpen] = useState(false);
+  const bulkEnabled = (bulkFields?.length ?? 0) > 0;
 
   const visibleCols = useMemo(
     () =>
@@ -208,6 +215,17 @@ export function ClientListBulk({
           <Button type="button" size="sm" onClick={apply} disabled={submitting}>
             {submitting ? "Збереження…" : "Змінити менеджера"}
           </Button>
+          {bulkEnabled && (
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={() => setBulkOpen(true)}
+              disabled={submitting}
+            >
+              Групова обробка
+            </Button>
+          )}
           <Button
             type="button"
             size="sm"
@@ -218,6 +236,20 @@ export function ClientListBulk({
             Скасувати
           </Button>
         </div>
+      )}
+
+      {bulkEnabled && (
+        <BulkFieldDialog
+          entity="client"
+          fields={bulkFields ?? []}
+          ids={Array.from(selected)}
+          open={bulkOpen}
+          onClose={() => setBulkOpen(false)}
+          onDone={() => {
+            setBulkOpen(false);
+            clear();
+          }}
+        />
       )}
     </>
   );

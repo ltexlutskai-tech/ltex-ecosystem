@@ -7,6 +7,7 @@ import {
   BulkFieldError,
   getBulkEntity,
   getBulkField,
+  type BulkRefModel,
   type BulkValue,
 } from "@/lib/manager/bulk-edit/registry";
 
@@ -90,36 +91,37 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // Для категорії — переконатись, що вона існує (FK-цілісність).
-  if (field.type === "category" && typeof value === "string") {
-    const cat = await prisma.category.findUnique({
-      where: { id: value },
-      select: { id: true },
-    });
-    if (!cat) {
+  // FK-цілісність: для полів із refModel (category/select) — переконатись, що
+  // обране значення існує. `null` (очищення) перевірки не потребує.
+  const refModel: BulkRefModel | undefined =
+    field.refModel ?? (field.type === "category" ? "category" : undefined);
+  if (refModel && typeof value === "string") {
+    const exists = await referenceExists(refModel, value);
+    if (!exists) {
       return NextResponse.json(
-        { error: "Категорію не знайдено" },
+        { error: "Значення не знайдено" },
         { status: 400 },
       );
     }
   }
 
-  // Наразі MVP — лише `product`.
-  if (entityDef.entity !== "product") {
-    return NextResponse.json(
-      { error: "Сутність не підтримується" },
-      { status: 400 },
-    );
-  }
-
   let updated = 0;
   try {
     const result = await prisma.$transaction(async (tx) => {
-      const res = await tx.product.updateMany({
-        where: { id: { in: ids } },
-        data: { [field.column]: value },
-      });
-      return res.count;
+      const where = { id: { in: ids } };
+      const data = { [field.column]: value };
+      switch (entityDef.entity) {
+        case "product":
+          return (await tx.product.updateMany({ where, data })).count;
+        case "client":
+          return (await tx.mgrClient.updateMany({ where, data })).count;
+        case "order":
+          return (await tx.order.updateMany({ where, data })).count;
+        case "sale":
+          return (await tx.sale.updateMany({ where, data })).count;
+        default:
+          return 0;
+      }
     });
     updated = result;
   } catch (err) {
@@ -150,4 +152,30 @@ function describeValue(value: BulkValue): string {
   if (value === null) return "(очищено)";
   if (typeof value === "boolean") return value ? "так" : "ні";
   return value;
+}
+
+/** Перевіряє існування рядка у відповідному довіднику (FK-цілісність). */
+async function referenceExists(
+  refModel: BulkRefModel,
+  id: string,
+): Promise<boolean> {
+  const where = { where: { id }, select: { id: true } } as const;
+  switch (refModel) {
+    case "category":
+      return Boolean(await prisma.category.findUnique(where));
+    case "mgrClientStatus":
+      return Boolean(await prisma.mgrClientStatus.findUnique(where));
+    case "user":
+      return Boolean(await prisma.user.findUnique(where));
+    case "mgrCategoryTT":
+      return Boolean(await prisma.mgrCategoryTT.findUnique(where));
+    case "mgrDeliveryMethod":
+      return Boolean(await prisma.mgrDeliveryMethod.findUnique(where));
+    case "mgrSearchChannel":
+      return Boolean(await prisma.mgrSearchChannel.findUnique(where));
+    case "mgrRoute":
+      return Boolean(await prisma.mgrRoute.findUnique(where));
+    default:
+      return false;
+  }
 }

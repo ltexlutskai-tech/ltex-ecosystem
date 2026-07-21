@@ -33,9 +33,16 @@ export interface SalesRowData {
 export function SalesRow({
   sale,
   rowHandlers,
+  selectable = false,
+  selected = false,
+  onToggle,
 }: {
   sale: SalesRowData;
   rowHandlers?: RowHandlers;
+  /** Показувати колонку-чекбокс «Групової обробки» (лише admin/owner). */
+  selectable?: boolean;
+  selected?: boolean;
+  onToggle?: () => void;
 }) {
   const date = new Date(sale.createdAt).toLocaleDateString("uk-UA");
   // Архівні (проведені в 1С) — приглушені, як у 1С ФормаСписка.
@@ -45,9 +52,19 @@ export function SalesRow({
     <tr
       {...rowHandlers}
       className={`border-b last:border-b-0 hover:bg-gray-50 ${
-        dimmed ? "bg-gray-50 text-gray-400" : ""
+        selected ? "bg-blue-100" : dimmed ? "bg-gray-50 text-gray-400" : ""
       }`}
     >
+      {selectable && (
+        <td className="px-2.5 py-1.5 align-top">
+          <input
+            type="checkbox"
+            checked={selected}
+            onChange={() => onToggle?.()}
+            aria-label={`Обрати реалізацію ${formatDocNumber(sale)}`}
+          />
+        </td>
+      )}
       <td
         data-col="date"
         data-value={date}

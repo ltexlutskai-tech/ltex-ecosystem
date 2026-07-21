@@ -11,6 +11,7 @@ import {
 } from "@/lib/manager/sales-list";
 import { getDeliveryLabelResolver } from "@/lib/manager/delivery-methods";
 import { getSaleFilterOptions } from "@/lib/manager/sale-filter-options";
+import { serializeFields } from "@/lib/manager/bulk-edit/registry";
 import { EmptyState } from "../_components/empty-state";
 import { AutoRefresh } from "../_components/auto-refresh";
 import { ListPagination } from "../customers/_components/list-pagination";
@@ -169,7 +170,10 @@ export default async function ManagerSalesPage({
         />
       ) : (
         <>
-          <SalesTable items={rows} />
+          <SalesTable
+            items={rows}
+            bulkFields={serializeFields("sale", user.role)}
+          />
           <ListPagination page={filter.page} totalPages={totalPages} />
         </>
       )}
