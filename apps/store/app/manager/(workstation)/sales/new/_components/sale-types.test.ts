@@ -6,6 +6,7 @@ import {
   lineTotalEur,
   parseNumericInput,
   repeatPriceForProduct,
+  resolveInitialNpAddress,
   sanitizeNumericText,
   type SaleItemDraft,
 } from "./sale-types";
@@ -285,5 +286,59 @@ describe("sanitizeNumericText (Fix 5 — no stuck leading zero)", () => {
 
   it("відкидає нецифрові символи", () => {
     expect(sanitizeNumericText("12abc")).toBe("12");
+  });
+});
+
+describe("resolveInitialNpAddress", () => {
+  const clientRefs = {
+    npCityRef: "city-client",
+    npCityName: "Луцьк",
+    npWarehouseRef: "wh-client",
+    npWarehouseName: "Відділення №1: центр",
+  };
+  const saleRefs = {
+    npCityRef: "city-sale",
+    npCityName: "Київ",
+    npWarehouseRef: "wh-sale",
+    npWarehouseName: "Відділення №5: пошта",
+  };
+
+  it("новий документ підставляє звірену адресу клієнта", () => {
+    expect(resolveInitialNpAddress(null, clientRefs)).toEqual({
+      cityRef: "city-client",
+      cityName: "Луцьк",
+      warehouseRef: "wh-client",
+      warehouseName: "Відділення №1: центр",
+    });
+  });
+
+  it("на редагуванні збережені реф-и реалізації перемагають клієнта", () => {
+    expect(resolveInitialNpAddress(saleRefs, clientRefs)).toEqual({
+      cityRef: "city-sale",
+      cityName: "Київ",
+      warehouseRef: "wh-sale",
+      warehouseName: "Відділення №5: пошта",
+    });
+  });
+
+  it("реалізація без адреси падає на адресу клієнта", () => {
+    const emptySale = {
+      npCityRef: null,
+      npCityName: null,
+      npWarehouseRef: null,
+      npWarehouseName: null,
+    };
+    expect(resolveInitialNpAddress(emptySale, clientRefs).cityRef).toBe(
+      "city-client",
+    );
+  });
+
+  it("клієнт «не звірено» → порожня адреса (пікер чистий)", () => {
+    expect(resolveInitialNpAddress(null, null)).toEqual({
+      cityRef: "",
+      cityName: "",
+      warehouseRef: "",
+      warehouseName: "",
+    });
   });
 });

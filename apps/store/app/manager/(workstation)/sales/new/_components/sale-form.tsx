@@ -17,7 +17,10 @@ import { ShareSheet } from "../../../prices/_components/share-sheet";
 import { SaleItemsEditor } from "./sale-items-editor";
 import { SaleTotals } from "./sale-totals";
 import { BarcodeInput } from "./barcode-input";
-import { NpWarehousePicker, type NpSelection } from "./np-warehouse-picker";
+import {
+  NpWarehousePicker,
+  type NpSelection,
+} from "../../../_components/np-warehouse-picker";
 import {
   SaleLotPicker,
   type SaleGeneralPick,
@@ -53,6 +56,7 @@ import {
   draftToWire,
   isForeignActiveReservation,
   lineTotalEur,
+  resolveInitialNpAddress,
   type ClientPickerItem,
   type OrderDeliveryOption,
   type PriceDeviation,
@@ -263,19 +267,26 @@ export function SaleForm({
             deliveryMethods,
           )),
   );
-  const [novaPoshtaBranch, setNovaPoshtaBranch] = useState(
-    initialSale?.novaPoshtaBranch ?? "",
-  );
   // ─── Нова Пошта (структурований вибір міста + відділення з довідника НП) ────
+  // Початкова адреса: збережені реф-и реалізації (edit) перемагають; інакше —
+  // «звірена» адреса картки клієнта (авто-підстановка для нового документа).
+  const npInitial = resolveInitialNpAddress(initialSale, initialClient);
+  const [novaPoshtaBranch, setNovaPoshtaBranch] = useState(
+    initialSale?.novaPoshtaBranch ??
+      (npInitial.warehouseName
+        ? branchNumberFromWarehouseName(npInitial.warehouseName)
+        : ""),
+  );
   // Реф-и використовує Фаза 1 для авто-створення ТТН; *Name — для показу.
-  const [npCityRef, setNpCityRef] = useState(initialSale?.npCityRef ?? "");
-  const [npCityName, setNpCityName] = useState(initialSale?.npCityName ?? "");
-  const [npWarehouseRef, setNpWarehouseRef] = useState(
-    initialSale?.npWarehouseRef ?? "",
-  );
+  const [npCityRef, setNpCityRef] = useState(npInitial.cityRef);
+  const [npCityName, setNpCityName] = useState(npInitial.cityName);
+  const [npWarehouseRef, setNpWarehouseRef] = useState(npInitial.warehouseRef);
   const [npWarehouseName, setNpWarehouseName] = useState(
-    initialSale?.npWarehouseName ?? "",
+    npInitial.warehouseName,
   );
+  // Чи редагував менеджер адресу НП вручну — щоб зміна клієнта не перезаписувала
+  // вже введене/обране значення (best-effort, дзеркалить recipientTouched).
+  const [npTouched, setNpTouched] = useState(false);
   // ─── Отримувач ТТН (Нова Пошта) ──────────────────────────────────────────
   // Дефолти для нового документа — з картки клієнта (ПІБ + телефон); у режимі
   // редагування — збережені значення реалізації.
@@ -485,11 +496,26 @@ export function SaleForm({
       // редагував вручну (best-effort, не перезаписуємо введене значення).
       if (!recipientTouched.name) setNpRecipientName(summary.name ?? "");
       if (!recipientTouched.phone) setNpRecipientPhone(summary.phone ?? "");
+      // Авто-підстановка «звіреної» адреси НП клієнта (якщо менеджер ще не
+      // чіпав пікер і клієнт має звірену адресу). Ручний вибір не перетираємо.
+      if (!npTouched && summary.npCityRef) {
+        setNpCityRef(summary.npCityRef);
+        setNpCityName(summary.npCityName ?? "");
+        setNpWarehouseRef(summary.npWarehouseRef ?? "");
+        setNpWarehouseName(summary.npWarehouseName ?? "");
+        setNovaPoshtaBranch(
+          summary.npWarehouseName
+            ? branchNumberFromWarehouseName(summary.npWarehouseName)
+            : "",
+        );
+      }
     }
   }
 
   /** Оновлення вибору міста/відділення НП з пікера. */
   function onNpChange(v: NpSelection): void {
+    // Ручний вибір → фіксуємо, щоб зміна клієнта не перезаписала.
+    setNpTouched(true);
     setNpCityRef(v.cityRef);
     setNpCityName(v.cityName);
     setNpWarehouseRef(v.warehouseRef);
@@ -1049,6 +1075,15 @@ export function SaleForm({
               onChange={onNpChange}
             />
           )}
+          {/* Підказка коли адресу НП клієнта ще не звірено (нема реф-ів). */}
+          {deliveryKind === "post" &&
+            clientSummary &&
+            !clientSummary.npCityRef && (
+              <p className="text-xs text-amber-600 sm:col-span-2 lg:col-span-3">
+                Адресу НП для цього клієнта не звірено — оберіть відділення
+                вручну (і звірте адресу в картці клієнта).
+              </p>
+            )}
 
           {/* Нова Пошта — отримувач ТТН (для авто-створення накладної). */}
           {deliveryKind === "post" && (

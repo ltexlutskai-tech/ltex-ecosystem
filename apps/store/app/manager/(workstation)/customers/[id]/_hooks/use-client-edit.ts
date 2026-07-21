@@ -11,6 +11,12 @@ export interface EditableClientFields {
   street: string | null;
   house: string | null;
   novaPoshtaBranch: string | null;
+  // Структуровані реф-и адреси НП (звірка). Зберігаємо як рядки (порожній =
+  // «не обрано»), щоб напряму передати у пікер міста/відділення.
+  npCityRef: string;
+  npCityName: string;
+  npWarehouseRef: string;
+  npWarehouseName: string;
   websiteUrl: string | null;
   geolocation: string | null;
   viberContact: string | null;
@@ -52,6 +58,10 @@ export function extractEditableFields(
     street: client.street,
     house: client.house,
     novaPoshtaBranch: client.novaPoshtaBranch,
+    npCityRef: client.npCityRef ?? "",
+    npCityName: client.npCityName ?? "",
+    npWarehouseRef: client.npWarehouseRef ?? "",
+    npWarehouseName: client.npWarehouseName ?? "",
     websiteUrl: client.websiteUrl,
     geolocation: client.geolocation,
     viberContact: client.viberContact,

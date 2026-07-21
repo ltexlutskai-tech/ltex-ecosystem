@@ -4,6 +4,7 @@ import { ArrowLeft } from "lucide-react";
 import { prisma } from "@ltex/db";
 import { getCurrentUser } from "@/lib/auth/manager-auth";
 import { formatDocNumber } from "@/lib/manager/order-number";
+import { getTtnStatus } from "@/lib/delivery/nova-poshta";
 import { WarehouseTaskClient } from "./_components/task-client";
 
 export const dynamic = "force-dynamic";
@@ -45,6 +46,23 @@ export default async function WarehouseTaskDetailPage({
 
   const saleNumber = task.sale ? formatDocNumber(task.sale) : "—";
 
+  // Якщо реалізація має ТТН НП — дізнаємось, чи це ще «Чернетка» (draft).
+  // Поки чернетка — склад може правити габарити й друкувати етикетку навіть
+  // на вже відправленому завданні; коли ТТН у дорозі — місця read-only.
+  let ttnDraft = false;
+  let ttnStatusText: string | null = null;
+  if (task.sale?.ttnRef && task.sale?.expressWaybill) {
+    try {
+      const status = await getTtnStatus(task.sale.expressWaybill);
+      if (status) {
+        ttnDraft = status.isDraft;
+        ttnStatusText = status.status;
+      }
+    } catch {
+      // Мережевий збій НП — трактуємо як «невідомо»: місця лишаються read-only.
+    }
+  }
+
   return (
     <div className="mx-auto max-w-3xl space-y-5">
       <Link
@@ -57,6 +75,8 @@ export default async function WarehouseTaskDetailPage({
 
       <WarehouseTaskClient
         canAct={isWarehouse}
+        ttnDraft={ttnDraft}
+        ttnStatusText={ttnStatusText}
         task={{
           id: task.id,
           status: task.status,
@@ -83,6 +103,7 @@ export default async function WarehouseTaskDetailPage({
             lengthCm: s.lengthCm,
             widthCm: s.widthCm,
             heightCm: s.heightCm,
+            manualHandling: s.manualHandling,
             note: s.note,
           })),
           items: task.items.map((it) => ({

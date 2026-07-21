@@ -45,7 +45,12 @@ export interface SeatDims {
   lengthCm: number;
   widthCm: number;
   heightCm: number;
+  // «Ручна обробка» — зберігаємо для складу; у публічне API НП НЕ передаємо.
+  manualHandling?: boolean;
 }
+
+// НП вимагає габарити ≥ 5 см на кожну сторону, коли передається OptionsSeat.
+const MIN_DIM_CM = 5;
 
 /** Розбиває «Прізвище Ім'я По-батькові» на частини для NP PrivatePerson. */
 export function splitRecipientName(raw: string): {
@@ -187,9 +192,10 @@ async function buildTtnInputForSale(
     seatsAmount = seats.length;
     const perSeatFallback = Math.round((weight / seats.length) * 100) / 100;
     optionsSeat = seats.map((s) => ({
-      volumetricWidth: s.widthCm,
-      volumetricLength: s.lengthCm,
-      volumetricHeight: s.heightCm,
+      // НП вимагає ≥ 5 см на сторону; піднімаємо мінімум, щоб уникнути відмови.
+      volumetricWidth: Math.max(MIN_DIM_CM, s.widthCm),
+      volumetricLength: Math.max(MIN_DIM_CM, s.lengthCm),
+      volumetricHeight: Math.max(MIN_DIM_CM, s.heightCm),
       weight: Math.max(MIN_WEIGHT_KG, s.weight || perSeatFallback),
     }));
   } else {

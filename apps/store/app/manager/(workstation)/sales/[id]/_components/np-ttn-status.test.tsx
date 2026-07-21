@@ -35,7 +35,7 @@ beforeEach(() => {
 });
 
 describe("NpTtnStatus", () => {
-  it("показує номер ТТН + посилання відстеження коли ТТН створена", () => {
+  it("показує номер ТТН + кнопку «Відстежити» + зовнішнє посилання НП", () => {
     render(
       <NpTtnStatus
         saleId="s1"
@@ -46,8 +46,64 @@ describe("NpTtnStatus", () => {
       />,
     );
     expect(screen.getByText("59000000000001")).toBeDefined();
-    const link = screen.getByText("Відстежити").closest("a");
+    expect(screen.getByRole("button", { name: /Відстежити/ })).toBeDefined();
+    const link = screen.getByText(/Відкрити на сайті НП/).closest("a");
     expect(link?.getAttribute("href")).toContain("cargo_number=59000000000001");
+  });
+
+  it("«Відстежити» тягне статус ТТН і показує його інлайн", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        number: "59000000000001",
+        status: "Прямує до відділення",
+        statusCode: "5",
+        scheduledDeliveryDate: "2026-07-23",
+        warehouseRecipient: "Відділення №5",
+      }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(
+      <NpTtnStatus
+        saleId="s1"
+        ttnRef="ref-1"
+        ttnNumber="59000000000001"
+        ttnError={null}
+        posted
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /Відстежити/ }));
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith("/api/v1/manager/sales/s1/track");
+      expect(screen.getByText("Прямує до відділення")).toBeDefined();
+      expect(screen.getByText("Відділення №5")).toBeDefined();
+    });
+  });
+
+  it("показує помилку коли відстеження не вдалось", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 502,
+      json: async () => ({ error: "Не вдалося отримати статус ТТН" }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(
+      <NpTtnStatus
+        saleId="s1"
+        ttnRef="ref-1"
+        ttnNumber="59000000000001"
+        ttnError={null}
+        posted
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /Відстежити/ }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/Не вдалося отримати статус ТТН/)).toBeDefined();
+    });
   });
 
   it("показує помилку + кнопку повтору коли ttnError", () => {

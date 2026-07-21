@@ -689,6 +689,9 @@ model WarehouseTaskSeat {
   lengthCm Float  @default(0) @map("length_cm")
   widthCm  Float  @default(0) @map("width_cm")
   heightCm Float  @default(0) @map("height_cm")
+  // «Ручна обробка» (нестандартне пакування) — зберігаємо для складу/довідки.
+  // НП визначає її сама за пакуванням; у публічному API поля немає.
+  manualHandling Boolean @default(false) @map("manual_handling")
   note     String?
 
   task WarehouseTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
@@ -1724,6 +1727,15 @@ model MgrClient {
   street           String?
   house            String?
   novaPoshtaBranch String?   @map("nova_poshta_branch")
+  // Структуровані реф-и Нової Пошти (звірені з довідником НП) — для авто-
+  // підстановки міста/відділення у реалізацію. npAddressMatchedAt != null →
+  // «звірено» (реф-и валідні); null → ще не звірено (менеджер/скрипт мають
+  // звірити). Ручне редагування у реалізації лишається.
+  npCityRef        String?   @map("np_city_ref")
+  npCityName       String?   @map("np_city_name")
+  npWarehouseRef   String?   @map("np_warehouse_ref")
+  npWarehouseName  String?   @map("np_warehouse_name")
+  npAddressMatchedAt DateTime? @map("np_address_matched_at")
   geolocation      String?
   websiteUrl       String?   @map("website_url")
   monthlyVolume    Decimal?  @map("monthly_volume") @db.Decimal(10, 2)

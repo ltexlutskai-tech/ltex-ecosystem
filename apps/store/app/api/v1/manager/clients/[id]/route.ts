@@ -126,6 +126,22 @@ export async function PATCH(
   if (data.house !== undefined) updateData.house = data.house;
   if (data.novaPoshtaBranch !== undefined)
     updateData.novaPoshtaBranch = data.novaPoshtaBranch;
+  // Структуровані реф-и адреси НП. Порожній рядок → null. Коли змінюється
+  // відділення (`npWarehouseRef`) — штампуємо/скидаємо мітку «звірено»:
+  // непорожнє відділення = звірено (now), порожнє = не звірено (null).
+  const emptyToNull = (v: string | null | undefined): string | null =>
+    v == null || v.trim() === "" ? null : v;
+  if (data.npCityRef !== undefined)
+    updateData.npCityRef = emptyToNull(data.npCityRef);
+  if (data.npCityName !== undefined)
+    updateData.npCityName = emptyToNull(data.npCityName);
+  if (data.npWarehouseRef !== undefined) {
+    const ref = emptyToNull(data.npWarehouseRef);
+    updateData.npWarehouseRef = ref;
+    updateData.npAddressMatchedAt = ref ? new Date() : null;
+  }
+  if (data.npWarehouseName !== undefined)
+    updateData.npWarehouseName = emptyToNull(data.npWarehouseName);
   if (data.geolocation !== undefined) updateData.geolocation = data.geolocation;
   if (data.viberContact !== undefined)
     updateData.viberContact = data.viberContact;
@@ -253,6 +269,11 @@ function serializeMgrClient(client: LoadedMgrClient) {
     street: client.street,
     house: client.house,
     novaPoshtaBranch: client.novaPoshtaBranch,
+    npCityRef: client.npCityRef,
+    npCityName: client.npCityName,
+    npWarehouseRef: client.npWarehouseRef,
+    npWarehouseName: client.npWarehouseName,
+    npAddressMatchedAt: client.npAddressMatchedAt,
     geolocation: client.geolocation,
     websiteUrl: client.websiteUrl,
     monthlyVolume: client.monthlyVolume

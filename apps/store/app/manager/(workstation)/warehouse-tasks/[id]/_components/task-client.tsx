@@ -69,10 +69,16 @@ const BASE = "/api/v1/manager/warehouse-tasks";
 export function WarehouseTaskClient({
   task,
   canAct,
+  ttnDraft,
+  ttnStatusText,
 }: {
   task: TaskData;
   /** Чи може користувач діяти (склад/адмін/власник). Менеджер — лише перегляд. */
   canAct: boolean;
+  /** ТТН НП ще «Чернетка» — тоді габарити/друк доступні навіть на відправленому. */
+  ttnDraft: boolean;
+  /** Людський статус ТТН НП (для нотатки, коли вже в дорозі). */
+  ttnStatusText: string | null;
 }) {
   const router = useRouter();
   const { toast } = useToast();
@@ -95,6 +101,11 @@ export function WarehouseTaskClient({
   // «Готово» для НП доступне лише після друку етикетки.
   const needsLabel = hasTtn && !task.labelPrintedAt;
   const allPacked = task.items.every((i) => packed[i.id]);
+  const isSent = task.status === "sent";
+  // Габарити можна правити поки завдання не відправлене АБО ТТН ще чернетка в НП.
+  const canEditSeats = canAct && isNovaPoshta && (!isSent || ttnDraft);
+  // Відправлене НП-завдання, чия ТТН уже в дорозі — місця лише для читання.
+  const seatsLocked = canAct && isNovaPoshta && isSent && !ttnDraft;
 
   function printLabel() {
     window.open(`${BASE}/${task.id}/label`, "_blank");
@@ -298,8 +309,81 @@ export function WarehouseTaskClient({
       </section>
 
       {/* Місця відправлення (габарити) — лише для Нової Пошти */}
-      {canAct && isNovaPoshta && task.status !== "sent" && (
+      {canEditSeats && (
         <SeatsEditor taskId={task.id} initialSeats={task.seats} />
+      )}
+
+      {/* Відправлено, ТТН у дорозі — місця лише для читання */}
+      {seatsLocked && (
+        <section className="rounded-lg border bg-white p-5 shadow-sm">
+          <h2 className="mb-1 text-base font-semibold text-gray-800">
+            Місця відправлення (габарити)
+          </h2>
+          <p className="mb-3 rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-xs text-gray-600">
+            ТТН уже в дорозі{ttnStatusText ? ` (${ttnStatusText})` : ""} — зміни
+            недоступні.
+          </p>
+          {task.seats.length > 0 ? (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b text-left text-xs uppercase tracking-wide text-gray-400">
+                    <th className="w-8 px-2 py-2 font-medium">№</th>
+                    <th className="px-2 py-2 font-medium">Вага, кг</th>
+                    <th className="px-2 py-2 font-medium">Д×Ш×В, см</th>
+                    <th className="px-2 py-2 font-medium">Ручна обробка</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {task.seats.map((s, i) => (
+                    <tr key={s.id} className="border-b last:border-b-0">
+                      <td className="px-2 py-2 text-gray-500">{i + 1}</td>
+                      <td className="px-2 py-2 text-gray-700">{s.weight}</td>
+                      <td className="px-2 py-2 text-gray-700">
+                        {s.lengthCm}×{s.widthCm}×{s.heightCm}
+                      </td>
+                      <td className="px-2 py-2 text-gray-700">
+                        {s.manualHandling ? "Так" : "—"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <p className="text-sm text-gray-500">Місця не вказано.</p>
+          )}
+        </section>
+      )}
+
+      {/* Відправлено, ТТН ще чернетка — можна передрукувати етикетку */}
+      {canAct && isNovaPoshta && isSent && ttnDraft && (
+        <section className="rounded-lg border bg-white p-5 shadow-sm">
+          <h2 className="mb-3 text-base font-semibold text-gray-800">
+            Етикетка
+          </h2>
+          <p className="mb-3 text-xs text-gray-500">
+            ТТН ще чернетка в Новій Пошті — за потреби виправте габарити вище та
+            передрукуйте етикетку.
+          </p>
+          <div className="flex flex-wrap items-center gap-3">
+            <Button
+              type="button"
+              variant="outline"
+              disabled={!hasTtn}
+              onClick={printLabel}
+            >
+              <Printer className="mr-1 h-4 w-4" />
+              Друк етикетки
+            </Button>
+            {task.labelPrintedAt && (
+              <span className="inline-flex items-center gap-1 text-sm text-green-700">
+                <Check className="h-4 w-4" />
+                Етикетку надруковано
+              </span>
+            )}
+          </div>
+        </section>
       )}
 
       {/* Дії складу */}

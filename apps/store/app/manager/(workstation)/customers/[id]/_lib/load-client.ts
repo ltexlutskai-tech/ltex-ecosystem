@@ -90,6 +90,11 @@ export async function loadClientDetail(
     street: client.street,
     house: client.house,
     novaPoshtaBranch: client.novaPoshtaBranch,
+    npCityRef: client.npCityRef,
+    npCityName: client.npCityName,
+    npWarehouseRef: client.npWarehouseRef,
+    npWarehouseName: client.npWarehouseName,
+    npAddressMatchedAt: client.npAddressMatchedAt?.toISOString() ?? null,
     geolocation: client.geolocation,
     websiteUrl: client.websiteUrl,
     monthlyVolume: client.monthlyVolume

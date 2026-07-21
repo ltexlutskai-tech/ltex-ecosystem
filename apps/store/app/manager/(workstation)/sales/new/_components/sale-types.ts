@@ -140,6 +140,53 @@ export function repeatPriceForProduct(
   });
 }
 
+/** Структуровані реф-и/назви адреси Нової Пошти (місто + відділення). */
+export interface NpAddressRefs {
+  cityRef: string;
+  cityName: string;
+  warehouseRef: string;
+  warehouseName: string;
+}
+
+/** Мінімальне джерело реф-ів НП (реалізація або картка клієнта). */
+export interface NpRefSource {
+  npCityRef?: string | null;
+  npCityName?: string | null;
+  npWarehouseRef?: string | null;
+  npWarehouseName?: string | null;
+}
+
+/**
+ * Обирає початкову адресу НП для форми реалізації. На редагуванні збережені
+ * реф-и самого документа перемагають; якщо їх немає (новий документ або документ
+ * без адреси) — падаємо на «звірену» адресу картки клієнта. Коли обидва порожні
+ * — повертає порожні рядки (пікер відкриється чистим).
+ *
+ * Чиста функція (без I/O) — покрита тестами.
+ */
+export function resolveInitialNpAddress(
+  initialSale: NpRefSource | null | undefined,
+  initialClient: NpRefSource | null | undefined,
+): NpAddressRefs {
+  if (initialSale?.npCityRef) {
+    return {
+      cityRef: initialSale.npCityRef,
+      cityName: initialSale.npCityName ?? "",
+      warehouseRef: initialSale.npWarehouseRef ?? "",
+      warehouseName: initialSale.npWarehouseName ?? "",
+    };
+  }
+  if (initialClient?.npCityRef) {
+    return {
+      cityRef: initialClient.npCityRef,
+      cityName: initialClient.npCityName ?? "",
+      warehouseRef: initialClient.npWarehouseRef ?? "",
+      warehouseName: initialClient.npWarehouseName ?? "",
+    };
+  }
+  return { cityRef: "", cityName: "", warehouseRef: "", warehouseName: "" };
+}
+
 /** Одне відхилення ціни рядка від еталонної (для попередження перед проведенням). */
 export interface PriceDeviation {
   name: string;

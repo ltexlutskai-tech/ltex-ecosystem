@@ -393,6 +393,9 @@ export async function loadClients(
         now,
       }),
       lastContactAt: (lastContactMap.get(c.id) ?? null)?.toISOString() ?? null,
+      // Є легасі «№ відділення НП», але структуровану адресу ще не звірено.
+      npNotMatched:
+        Boolean(c.novaPoshtaBranch?.trim()) && c.npAddressMatchedAt == null,
     })),
     total,
     page: p.page,

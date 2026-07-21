@@ -68,6 +68,12 @@ export async function GET(req: NextRequest) {
         phonePrimary: true,
         street: true,
         house: true,
+        novaPoshtaBranch: true,
+        npCityRef: true,
+        npCityName: true,
+        npWarehouseRef: true,
+        npWarehouseName: true,
+        npAddressMatchedAt: true,
         deliveryMethod: { select: { code: true } },
         agent: { select: { id: true, fullName: true } },
       },
@@ -92,6 +98,14 @@ export async function GET(req: NextRequest) {
         debt: c.debt.toString(),
         priceTypeId: c.priceTypeId,
         deliveryMethodCode: c.deliveryMethod?.code ?? null,
+        // Адресу НП віддаємо лише «своїм» (як телефон/адресу) — форма Реалізації
+        // підставить її авто. Чужим — null (не прифілиться).
+        novaPoshtaBranch: isOwned ? (c.novaPoshtaBranch ?? null) : null,
+        npCityRef: isOwned ? (c.npCityRef ?? null) : null,
+        npCityName: isOwned ? (c.npCityName ?? null) : null,
+        npWarehouseRef: isOwned ? (c.npWarehouseRef ?? null) : null,
+        npWarehouseName: isOwned ? (c.npWarehouseName ?? null) : null,
+        npAddressMatched: isOwned ? c.npAddressMatchedAt != null : false,
         agent: c.agent ? { id: c.agent.id, fullName: c.agent.fullName } : null,
         isOwned,
       };

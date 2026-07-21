@@ -131,6 +131,13 @@ export interface ClientDetail {
   street: string | null;
   house: string | null;
   novaPoshtaBranch: string | null;
+  /** Структуровані реф-и/назви «звіреної» адреси Нової Пошти (довідник НП). */
+  npCityRef: string | null;
+  npCityName: string | null;
+  npWarehouseRef: string | null;
+  npWarehouseName: string | null;
+  /** Мітка «адресу НП звірено» (не null → звірено). */
+  npAddressMatchedAt: string | null;
   geolocation: string | null;
   websiteUrl: string | null;
   monthlyVolume: string | null;

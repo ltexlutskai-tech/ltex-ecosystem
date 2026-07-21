@@ -11,6 +11,7 @@ export interface SeatInit {
   lengthCm: number;
   widthCm: number;
   heightCm: number;
+  manualHandling: boolean;
   note: string | null;
 }
 
@@ -20,6 +21,7 @@ interface SeatRow {
   lengthCm: string;
   widthCm: string;
   heightCm: string;
+  manualHandling: boolean;
   note: string;
 }
 
@@ -34,7 +36,14 @@ const PRESETS: { label: string; l: number; w: number; h: number }[] = [
 const BASE = "/api/v1/manager/warehouse-tasks";
 
 function emptyRow(): SeatRow {
-  return { weight: "", lengthCm: "", widthCm: "", heightCm: "", note: "" };
+  return {
+    weight: "",
+    lengthCm: "",
+    widthCm: "",
+    heightCm: "",
+    manualHandling: false,
+    note: "",
+  };
 }
 
 function toRow(s: SeatInit): SeatRow {
@@ -43,6 +52,7 @@ function toRow(s: SeatInit): SeatRow {
     lengthCm: String(s.lengthCm),
     widthCm: String(s.widthCm),
     heightCm: String(s.heightCm),
+    manualHandling: s.manualHandling,
     note: s.note ?? "",
   };
 }
@@ -96,6 +106,7 @@ export function SeatsEditor({
         lengthCm: p.l ? String(p.l) : "",
         widthCm: p.w ? String(p.w) : "",
         heightCm: p.h ? String(p.h) : "",
+        manualHandling: false,
         note: "",
       },
     ]);
@@ -111,6 +122,7 @@ export function SeatsEditor({
         lengthCm: num(r.lengthCm),
         widthCm: num(r.widthCm),
         heightCm: num(r.heightCm),
+        manualHandling: r.manualHandling,
         note: r.note.trim() || null,
       }));
       const res = await fetch(`${BASE}/${taskId}/seats`, {
@@ -138,9 +150,12 @@ export function SeatsEditor({
       <h2 className="mb-1 text-base font-semibold text-gray-800">
         Місця відправлення (габарити)
       </h2>
-      <p className="mb-3 text-xs text-gray-500">
+      <p className="mb-1 text-xs text-gray-500">
         Впишіть фактичні місця (вагу й розміри) — вони оновлять ТТН у Новій
         Пошті.
+      </p>
+      <p className="mb-3 text-xs text-gray-400">
+        Габарити — мін. 5 см на сторону.
       </p>
 
       <div className="overflow-x-auto">
@@ -152,6 +167,7 @@ export function SeatsEditor({
               <th className="px-2 py-2 font-medium">Довжина, см</th>
               <th className="px-2 py-2 font-medium">Ширина, см</th>
               <th className="px-2 py-2 font-medium">Висота, см</th>
+              <th className="px-2 py-2 font-medium">Ручна обробка</th>
               <th className="w-10 px-2 py-2"></th>
             </tr>
           </thead>
@@ -201,6 +217,17 @@ export function SeatsEditor({
                     onChange={(e) => update(i, { heightCm: e.target.value })}
                     aria-label={`Висота місця ${i + 1}`}
                     className="w-24"
+                  />
+                </td>
+                <td className="px-2 py-2 text-center">
+                  <input
+                    type="checkbox"
+                    checked={r.manualHandling}
+                    onChange={(e) =>
+                      update(i, { manualHandling: e.target.checked })
+                    }
+                    className="h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
+                    aria-label={`Ручна обробка місця ${i + 1}`}
                   />
                 </td>
                 <td className="px-2 py-2 text-center">

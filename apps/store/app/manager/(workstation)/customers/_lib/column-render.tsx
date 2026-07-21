@@ -67,7 +67,17 @@ export function renderCell(key: string, c: ClientListItem): ReactNode {
           href={`/manager/customers/${c.id}`}
           className="block text-gray-900 hover:text-blue-600"
         >
-          <div className="font-medium">{c.name}</div>
+          <div className="flex flex-wrap items-center gap-1.5 font-medium">
+            <span>{c.name}</span>
+            {c.npNotMatched && (
+              <span
+                className="inline-flex items-center rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-800"
+                title="Є № відділення НП, але адресу не звірено з довідником Нової Пошти"
+              >
+                ⚠ НП не звірено
+              </span>
+            )}
+          </div>
           {(c.region || c.city) && (
             <div className="text-xs text-gray-500">
               {[c.region, c.city].filter(Boolean).join(" · ")}

@@ -15,6 +15,7 @@ const seatSchema = z.object({
   lengthCm: z.number().nonnegative().max(1000),
   widthCm: z.number().nonnegative().max(1000),
   heightCm: z.number().nonnegative().max(1000),
+  manualHandling: z.boolean().optional(),
   note: z.string().max(200).nullable().optional(),
 });
 
@@ -67,6 +68,7 @@ export async function POST(
     lengthCm: s.lengthCm,
     widthCm: s.widthCm,
     heightCm: s.heightCm,
+    manualHandling: s.manualHandling ?? false,
   }));
 
   // Заміна місць (replace-all) у транзакції.
@@ -80,6 +82,7 @@ export async function POST(
         lengthCm: s.lengthCm,
         widthCm: s.widthCm,
         heightCm: s.heightCm,
+        manualHandling: s.manualHandling ?? false,
         note: s.note ?? null,
       })),
     }),

@@ -44,6 +44,11 @@ export interface ClientListItem {
   color: ClientColor;
   /** Момент останньої взаємодії (max timeline.occurredAt) або null. */
   lastContactAt: string | null;
+  /**
+   * Є вільний текст «Відділення НП», але адресу ще не звірено зі структурованим
+   * довідником НП (`npAddressMatchedAt == null`) — менеджеру варто виправити.
+   */
+  npNotMatched: boolean;
 }
 
 export interface DictionaryOption {

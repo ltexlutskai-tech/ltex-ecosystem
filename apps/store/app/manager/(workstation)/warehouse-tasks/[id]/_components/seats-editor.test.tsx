@@ -92,6 +92,7 @@ describe("SeatsEditor", () => {
         lengthCm: 60,
         widthCm: 40,
         heightCm: 40,
+        manualHandling: false,
         note: null,
       },
     ];
@@ -113,6 +114,7 @@ describe("SeatsEditor", () => {
           lengthCm: 60,
           widthCm: 40,
           heightCm: 40,
+          manualHandling: false,
           note: null,
         },
       ],
@@ -122,6 +124,69 @@ describe("SeatsEditor", () => {
       expect(screen.getByText(/59000000000009/)).toBeDefined();
       expect(refresh).toHaveBeenCalled();
     });
+  });
+
+  it("ініціалізує чекбокс «Ручна обробка» з даних місця", () => {
+    const seats: SeatInit[] = [
+      {
+        id: "s1",
+        weight: 10,
+        lengthCm: 60,
+        widthCm: 40,
+        heightCm: 40,
+        manualHandling: true,
+        note: null,
+      },
+    ];
+    render(<SeatsEditor taskId="t1" initialSeats={seats} />);
+    const cb = screen.getByLabelText(
+      /Ручна обробка місця 1/,
+    ) as HTMLInputElement;
+    expect(cb.checked).toBe(true);
+  });
+
+  it("перемикає «Ручна обробка» та включає його у body запиту", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        ok: true,
+        ttn: { ok: true, number: "59000000000010" },
+      }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const seats: SeatInit[] = [
+      {
+        id: "s1",
+        weight: 10,
+        lengthCm: 60,
+        widthCm: 40,
+        heightCm: 40,
+        manualHandling: false,
+        note: null,
+      },
+    ];
+    render(<SeatsEditor taskId="t1" initialSeats={seats} />);
+
+    const cb = screen.getByLabelText(
+      /Ручна обробка місця 1/,
+    ) as HTMLInputElement;
+    expect(cb.checked).toBe(false);
+    fireEvent.click(cb);
+    expect(cb.checked).toBe(true);
+
+    fireEvent.click(
+      screen.getByRole("button", { name: /Зберегти місця й оновити ТТН/ }),
+    );
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+    const call = fetchMock.mock.calls[0] as [string, { body: string }];
+    const body = JSON.parse(call[1].body) as {
+      seats: { manualHandling: boolean }[];
+    };
+    expect(body.seats[0]?.manualHandling).toBe(true);
   });
 
   it("показує помилку оновлення ТТН", async () => {

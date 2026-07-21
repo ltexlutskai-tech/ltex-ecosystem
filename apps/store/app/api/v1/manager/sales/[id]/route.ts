@@ -21,6 +21,10 @@ import {
   resolveClientIdByCustomer,
 } from "@/lib/manager/debt-register";
 import { removeSaleMovements } from "@/lib/manager/sale-movement-hooks";
+import {
+  getTtnStatus,
+  deleteInternetDocument,
+} from "@/lib/delivery/nova-poshta";
 
 export async function GET(
   req: NextRequest,
@@ -310,13 +314,45 @@ export async function DELETE(
 
   const existing = await prisma.sale.findUnique({
     where: { id },
-    select: { id: true, customerId: true, code1C: true },
+    select: {
+      id: true,
+      customerId: true,
+      code1C: true,
+      ttnRef: true,
+      expressWaybill: true,
+    },
   });
   if (!existing) {
     return NextResponse.json(
       { error: "Реалізацію не знайдено" },
       { status: 404 },
     );
+  }
+
+  // ТТН НП: чернетку — видаляємо разом з реалізацією; ТТН у дорозі — блокуємо
+  // видалення (є реальне привʼязане відправлення).
+  if (existing.ttnRef && existing.expressWaybill) {
+    const status = await getTtnStatus(existing.expressWaybill);
+    if (status && !status.isDraft) {
+      return NextResponse.json(
+        {
+          error: `Не можна видалити: є привʼязана ТТН ${existing.expressWaybill} (статус: ${status.status}). Спершу поверніть/скасуйте відправлення в Новій Пошті.`,
+        },
+        { status: 409 },
+      );
+    }
+    // Чернетка (або НП недоступний → best-effort): пробуємо видалити ТТН у НП.
+    if (!status || status.isDraft) {
+      const del = await deleteInternetDocument(existing.ttnRef);
+      if (!del.success && status?.isDraft) {
+        return NextResponse.json(
+          {
+            error: `Не вдалося видалити ТТН ${existing.expressWaybill} у Новій Пошті: ${del.error ?? "невідома помилка"}.`,
+          },
+          { status: 502 },
+        );
+      }
+    }
   }
 
   // Ключ реєстратора рухів регістрів (як пише `applySaleMovements`).

@@ -50,6 +50,24 @@ describe("mgrClientPatchSchema", () => {
     expect(parsed.success).toBe(true);
   });
 
+  it("accepts structured Nova Poshta refs (звірка адреси)", () => {
+    const parsed = mgrClientPatchSchema.safeParse({
+      npCityRef: "db5c88f0-city",
+      npCityName: "Луцьк",
+      npWarehouseRef: "1ec09d2e-wh",
+      npWarehouseName: "Відділення №1: вул. Центральна",
+    });
+    expect(parsed.success).toBe(true);
+  });
+
+  it("allows empty NP refs (means clear / not matched)", () => {
+    const parsed = mgrClientPatchSchema.safeParse({
+      npCityRef: "",
+      npWarehouseRef: "",
+    });
+    expect(parsed.success).toBe(true);
+  });
+
   it("rejects invalid date string for licenseExpiresAt", () => {
     const parsed = mgrClientPatchSchema.safeParse({
       licenseExpiresAt: "not-a-date",
