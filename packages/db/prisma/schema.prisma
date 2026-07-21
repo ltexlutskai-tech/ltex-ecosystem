@@ -45,47 +45,54 @@ model Category {
 // ─── Products (← 1С Номенклатура) ───────────────────────────────────────────
 
 model Product {
-  id                String   @id @default(cuid())
-  code1C            String?  @unique @map("code_1c")
-  articleCode       String?  @map("article_code")
-  name              String
-  slug              String   @unique
-  categoryId        String   @map("category_id")
-  description       String   @default("")
-  quality           String
-  season            String   @default("")
-  country           String
-  priceUnit         String   @default("kg") @map("price_unit")
-  averageWeight     Float?   @map("average_weight")
-  videoUrl          String?  @map("video_url")
+  id                  String   @id @default(cuid())
+  code1C              String?  @unique @map("code_1c")
+  articleCode         String?  @map("article_code")
+  name                String
+  slug                String   @unique
+  categoryId          String   @map("category_id")
+  description         String   @default("")
+  quality             String
+  season              String   @default("")
+  country             String
+  priceUnit           String   @default("kg") @map("price_unit")
+  averageWeight       Float?   @map("average_weight")
+  videoUrl            String?  @map("video_url")
   // Виробник (← 1С «Производитель»: VIVE, SOEX, Канада…). 7.2.
-  producer          String?
+  producer            String?
   // Назва для друку та інтеграції (← 1С `Номенклатура.Название`): узагальнена
   // назва для чеків Checkbox і друкованих форм — «Одяг вживаний», «Взуття
   // вживане», «Товари для дому вживані». Заповнюється в картці товару / скриптом
   // переносу з 1С. Порожнє → резолвер бере назву за деревом категорій.
-  receiptName       String?  @map("receipt_name")
+  receiptName         String?  @map("receipt_name")
   // Пакування: «box» (коробка) | «bag» (мішок) | null (не вказано). Мішки на НП
   // потребують «ручної обробки» (specialCargo) → підказка складу при пакуванні.
-  packaging         String?
-  inStock           Boolean  @default(true) @map("in_stock")
+  packaging           String?
+  // Габарити за замовчуванням (см) + типова вага місця (кг). Заповнюються в
+  // картці товару; авто-підтягуються у «Місця відправлення» завдання складу —
+  // склад лише перевіряє й за потреби коригує. Порожні → місця вводяться вручну.
+  defaultLengthCm     Float?   @map("default_length_cm")
+  defaultWidthCm      Float?   @map("default_width_cm")
+  defaultHeightCm     Float?   @map("default_height_cm")
+  defaultSeatWeightKg Float?   @map("default_seat_weight_kg")
+  inStock             Boolean  @default(true) @map("in_stock")
   // ТЗ 8.0 soft-delete (позначка на вилучення / архів). Вітрина ці поля не читає.
-  markedForDeletion Boolean  @default(false) @map("marked_for_deletion")
-  archived          Boolean  @default(false)
-  gender            String?
-  sizes             String?
+  markedForDeletion   Boolean  @default(false) @map("marked_for_deletion")
+  archived            Boolean  @default(false)
+  gender              String?
+  sizes               String?
   // Наповнення (короткий перелік вмісту лота) — показуємо на сайті окремо від
   // опису. Вільний текст; заповнюється у формі створення/картці товару.
-  filling           String?
-  unitsPerKg        String?  @map("units_per_kg")
-  unitsPerKgMin     Float?   @map("units_per_kg_min")
-  unitsPerKgMax     Float?   @map("units_per_kg_max")
-  unitWeight        String?  @map("unit_weight")
-  unitWeightMin     Float?   @map("unit_weight_min")
-  unitWeightMax     Float?   @map("unit_weight_max")
-  isOversize        Boolean  @default(false) @map("is_oversize")
-  createdAt         DateTime @default(now()) @map("created_at")
-  updatedAt         DateTime @updatedAt @map("updated_at")
+  filling             String?
+  unitsPerKg          String?  @map("units_per_kg")
+  unitsPerKgMin       Float?   @map("units_per_kg_min")
+  unitsPerKgMax       Float?   @map("units_per_kg_max")
+  unitWeight          String?  @map("unit_weight")
+  unitWeightMin       Float?   @map("unit_weight_min")
+  unitWeightMax       Float?   @map("unit_weight_max")
+  isOversize          Boolean  @default(false) @map("is_oversize")
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
 
   category           Category            @relation(fields: [categoryId], references: [id])
   images             ProductImage[]
@@ -386,58 +393,58 @@ model OrderItem {
 // не заважають. Зразок — Order/OrderItem + Payment.
 
 model Sale {
-  id                  String   @id @default(cuid())
-  code1C              String?  @unique @map("code_1c")
-  number1C            String?  @map("number_1c") // 1С _Number (напр. "L0000001335"), display-only
-  docNumber           Int      @default(autoincrement()) @map("doc_number")
-  customerId          String   @map("customer_id")
-  status              String   @default("draft") // draft|sent|posted|cancelled
-  totalEur            Float    @default(0) @map("total_eur")
-  totalUah            Float    @default(0) @map("total_uah")
-  exchangeRateEur     Float    @default(0) @map("exchange_rate_eur")
-  exchangeRateUsd     Float    @default(0) @map("exchange_rate_usd")
-  priceTypeId         String?  @map("price_type_id")
-  deliveryMethod      String?  @map("delivery_method") // delivery|post|pickup
-  novaPoshtaBranch    String?  @map("nova_poshta_branch")
+  id                   String    @id @default(cuid())
+  code1C               String?   @unique @map("code_1c")
+  number1C             String?   @map("number_1c") // 1С _Number (напр. "L0000001335"), display-only
+  docNumber            Int       @default(autoincrement()) @map("doc_number")
+  customerId           String    @map("customer_id")
+  status               String    @default("draft") // draft|sent|posted|cancelled
+  totalEur             Float     @default(0) @map("total_eur")
+  totalUah             Float     @default(0) @map("total_uah")
+  exchangeRateEur      Float     @default(0) @map("exchange_rate_eur")
+  exchangeRateUsd      Float     @default(0) @map("exchange_rate_usd")
+  priceTypeId          String?   @map("price_type_id")
+  deliveryMethod       String?   @map("delivery_method") // delivery|post|pickup
+  novaPoshtaBranch     String?   @map("nova_poshta_branch")
   // Адреса доставки (для способу «Доставка»): з картки клієнта або вручну.
-  deliveryAddress     String?  @map("delivery_address")
-  cashOnDelivery      Boolean  @default(false) @map("cash_on_delivery")
+  deliveryAddress      String?   @map("delivery_address")
+  cashOnDelivery       Boolean   @default(false) @map("cash_on_delivery")
   // Per-document debt deferral («днів до закриття»). null = глобальний дефолт зі
   // звіту. Наложка (cashOnDelivery=true) ігнорує це поле (без відстрочки).
-  debtTermDays        Int?     @map("debt_term_days")
-  codAmountUah        Float?   @map("cod_amount_uah")
-  assignedAgentUserId String?  @map("assigned_agent_user_id")
-  onTradeAgent        Boolean  @default(true) @map("on_trade_agent")
-  exportTo1C          Boolean  @default(true) @map("export_to_1c")
-  expressWaybill      String?  @map("express_waybill") // № ТТН (IntDocNumber НП)
+  debtTermDays         Int?      @map("debt_term_days")
+  codAmountUah         Float?    @map("cod_amount_uah")
+  assignedAgentUserId  String?   @map("assigned_agent_user_id")
+  onTradeAgent         Boolean   @default(true) @map("on_trade_agent")
+  exportTo1C           Boolean   @default(true) @map("export_to_1c")
+  expressWaybill       String?   @map("express_waybill") // № ТТН (IntDocNumber НП)
   // Структуровані поля Нової Пошти (відділення-отримувач) — для авто-створення ТТН.
   // npCityRef/npWarehouseRef — реф-и з довідника НП; *Name — для показу без запиту.
-  npCityRef           String?  @map("np_city_ref")
-  npCityName          String?  @map("np_city_name")
-  npWarehouseRef      String?  @map("np_warehouse_ref")
-  npWarehouseName     String?  @map("np_warehouse_name")
-  npDeliveryType      String?  @map("np_delivery_type") // WarehouseWarehouse | WarehouseDoors
+  npCityRef            String?   @map("np_city_ref")
+  npCityName           String?   @map("np_city_name")
+  npWarehouseRef       String?   @map("np_warehouse_ref")
+  npWarehouseName      String?   @map("np_warehouse_name")
+  npDeliveryType       String?   @map("np_delivery_type") // WarehouseWarehouse | WarehouseDoors
   // Отримувач ТТН (ПІБ + телефон) — префіл з картки клієнта, редаговано у формі.
-  npRecipientName     String?  @map("np_recipient_name")
-  npRecipientPhone    String?  @map("np_recipient_phone")
-  npPayerType         String?  @map("np_payer_type") // Recipient (дефолт) | Sender
+  npRecipientName      String?   @map("np_recipient_name")
+  npRecipientPhone     String?   @map("np_recipient_phone")
+  npPayerType          String?   @map("np_payer_type") // Recipient (дефолт) | Sender
   // ТТН (InternetDocument) Нової Пошти.
-  ttnRef              String?  @map("ttn_ref") // Ref документа НП (для update/delete)
-  ttnCreatedAt        DateTime? @map("ttn_created_at")
-  ttnError            String?  @map("ttn_error") // остання помилка створення/оновлення ТТН
+  ttnRef               String?   @map("ttn_ref") // Ref документа НП (для update/delete)
+  ttnCreatedAt         DateTime? @map("ttn_created_at")
+  ttnError             String?   @map("ttn_error") // остання помилка створення/оновлення ТТН
   // Оголошена цінність ТТН (₴). enabled=false → не декларуємо (мінімальна).
-  declaredValueUah    Float?   @map("declared_value_uah")
-  declaredValueEnabled Boolean @default(true) @map("declared_value_enabled")
-  notes               String?
-  agentName           String?  @map("agent_name") // ТорговийАгент._Description (історичний імпорт 5.4.6a)
-  orderId             String?  @map("order_id")
-  routeId             String?  @map("route_id")
-  archived            Boolean  @default(false)
-  isActual            Boolean  @default(true) @map("is_actual")
-  markedForDeletion   Boolean  @default(false) @map("marked_for_deletion") // ТЗ 8.0 soft-delete
-  routeSheetId        String?  @map("route_sheet_id") // зворотне посилання на МЛ
-  createdAt           DateTime @default(now()) @map("created_at")
-  updatedAt           DateTime @updatedAt @map("updated_at")
+  declaredValueUah     Float?    @map("declared_value_uah")
+  declaredValueEnabled Boolean   @default(true) @map("declared_value_enabled")
+  notes                String?
+  agentName            String?   @map("agent_name") // ТорговийАгент._Description (історичний імпорт 5.4.6a)
+  orderId              String?   @map("order_id")
+  routeId              String?   @map("route_id")
+  archived             Boolean   @default(false)
+  isActual             Boolean   @default(true) @map("is_actual")
+  markedForDeletion    Boolean   @default(false) @map("marked_for_deletion") // ТЗ 8.0 soft-delete
+  routeSheetId         String?   @map("route_sheet_id") // зворотне посилання на МЛ
+  createdAt            DateTime  @default(now()) @map("created_at")
+  updatedAt            DateTime  @updatedAt @map("updated_at")
 
   customer        Customer         @relation(fields: [customerId], references: [id])
   order           Order?           @relation("SaleOrder", fields: [orderId], references: [id], onDelete: SetNull)
@@ -643,10 +650,10 @@ model WarehouseTask {
   receivedAt       DateTime? @map("received_at")
 
   // Відправлення (запаковано + ТТН).
-  sentByUserId String?   @map("sent_by_user_id")
-  sentByName   String?   @map("sent_by_name")
-  sentAt       DateTime? @map("sent_at")
-  ttnConfirmed Boolean   @default(false) @map("ttn_confirmed") // склад підтвердив ТТН
+  sentByUserId   String?   @map("sent_by_user_id")
+  sentByName     String?   @map("sent_by_name")
+  sentAt         DateTime? @map("sent_at")
+  ttnConfirmed   Boolean   @default(false) @map("ttn_confirmed") // склад підтвердив ТТН
   // Друк етикетки НП з нашої системи (Фаза 2). «Готово» доступне лише після друку.
   labelPrintedAt DateTime? @map("label_printed_at")
 
@@ -663,16 +670,23 @@ model WarehouseTask {
 }
 
 model WarehouseTaskItem {
-  id          String  @id @default(cuid())
-  taskId      String  @map("task_id")
-  productName String  @map("product_name")
-  articleCode String? @map("article_code")
-  barcode     String?
-  lotId       String? @map("lot_id")
-  quantity    Int     @default(1)
-  weight      Float   @default(0)
-  sector      String? // сектор складу (якщо відомий) — куди йти по лот
-  packed      Boolean @default(false) // склад позначає, що позицію запаковано
+  id              String  @id @default(cuid())
+  taskId          String  @map("task_id")
+  productId       String? @map("product_id") // знімок id товару (для довідки/габаритів)
+  productName     String  @map("product_name")
+  articleCode     String? @map("article_code")
+  barcode         String?
+  lotId           String? @map("lot_id")
+  quantity        Int     @default(1)
+  weight          Float   @default(0)
+  sector          String? // сектор складу (якщо відомий) — куди йти по лот
+  // Знімок пакування/габаритів товару на момент створення завдання — щоб
+  // авто-заповнити місця відправлення й підказати складу, що це мішок (bag).
+  packaging       String? // box | bag | null
+  defaultLengthCm Float?  @map("default_length_cm")
+  defaultWidthCm  Float?  @map("default_width_cm")
+  defaultHeightCm Float?  @map("default_height_cm")
+  packed          Boolean @default(false) // склад позначає, що позицію запаковано
 
   task WarehouseTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
 
@@ -707,17 +721,17 @@ model CheckboxReceipt {
 }
 
 model WarehouseTaskSeat {
-  id       String @id @default(cuid())
-  taskId   String @map("task_id")
-  position Int    @default(0)
-  weight   Float  @default(0) // кг
-  lengthCm Float  @default(0) @map("length_cm")
-  widthCm  Float  @default(0) @map("width_cm")
-  heightCm Float  @default(0) @map("height_cm")
+  id             String  @id @default(cuid())
+  taskId         String  @map("task_id")
+  position       Int     @default(0)
+  weight         Float   @default(0) // кг
+  lengthCm       Float   @default(0) @map("length_cm")
+  widthCm        Float   @default(0) @map("width_cm")
+  heightCm       Float   @default(0) @map("height_cm")
   // «Ручна обробка» (нестандартне пакування) — зберігаємо для складу/довідки.
   // НП визначає її сама за пакуванням; у публічному API поля немає.
   manualHandling Boolean @default(false) @map("manual_handling")
-  note     String?
+  note           String?
 
   task WarehouseTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
 
@@ -1740,33 +1754,33 @@ model RouteSheetExpense {
 }
 
 model MgrClient {
-  id               String    @id @default(cuid())
-  code1C           String?   @unique @map("code_1c")
-  uid1C            String?   @unique @map("uid_1c")
-  name             String
-  phonePrimary     String?   @map("phone_primary")
+  id                 String    @id @default(cuid())
+  code1C             String?   @unique @map("code_1c")
+  uid1C              String?   @unique @map("uid_1c")
+  name               String
+  phonePrimary       String?   @map("phone_primary")
   // phoneKey — DB-generated (останні 9 цифр `phone_primary`). Read-only з коду.
-  phoneKey         String?   @map("phone_key")
-  city             String?
-  region           String?
-  street           String?
-  house            String?
-  novaPoshtaBranch String?   @map("nova_poshta_branch")
+  phoneKey           String?   @map("phone_key")
+  city               String?
+  region             String?
+  street             String?
+  house              String?
+  novaPoshtaBranch   String?   @map("nova_poshta_branch")
   // Структуровані реф-и Нової Пошти (звірені з довідником НП) — для авто-
   // підстановки міста/відділення у реалізацію. npAddressMatchedAt != null →
   // «звірено» (реф-и валідні); null → ще не звірено (менеджер/скрипт мають
   // звірити). Ручне редагування у реалізації лишається.
-  npCityRef        String?   @map("np_city_ref")
-  npCityName       String?   @map("np_city_name")
-  npWarehouseRef   String?   @map("np_warehouse_ref")
-  npWarehouseName  String?   @map("np_warehouse_name")
+  npCityRef          String?   @map("np_city_ref")
+  npCityName         String?   @map("np_city_name")
+  npWarehouseRef     String?   @map("np_warehouse_ref")
+  npWarehouseName    String?   @map("np_warehouse_name")
   npAddressMatchedAt DateTime? @map("np_address_matched_at")
-  geolocation      String?
-  websiteUrl       String?   @map("website_url")
-  monthlyVolume    Decimal?  @map("monthly_volume") @db.Decimal(10, 2)
-  licenseExpiresAt DateTime? @map("license_expires_at")
-  isOwn            Boolean   @default(false) @map("is_own")
-  notDirectInput   Boolean   @default(false) @map("not_direct_input")
+  geolocation        String?
+  websiteUrl         String?   @map("website_url")
+  monthlyVolume      Decimal?  @map("monthly_volume") @db.Decimal(10, 2)
+  licenseExpiresAt   DateTime? @map("license_expires_at")
+  isOwn              Boolean   @default(false) @map("is_own")
+  notDirectInput     Boolean   @default(false) @map("not_direct_input")
 
   // ─── ТЗ 8.0 — «позначка на вилучення» (soft-delete у стилі 1С) ─────────────
   // markedForDeletion — кандидат на видалення, чекає рішення адміна (зникає з

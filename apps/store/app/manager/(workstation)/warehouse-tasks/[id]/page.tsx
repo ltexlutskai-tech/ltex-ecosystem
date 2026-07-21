@@ -5,6 +5,8 @@ import { prisma } from "@ltex/db";
 import { getCurrentUser } from "@/lib/auth/manager-auth";
 import { formatDocNumber } from "@/lib/manager/order-number";
 import { getTtnStatus } from "@/lib/delivery/nova-poshta";
+import { buildSuggestedSeats } from "@/lib/manager/warehouse-seat-suggest";
+import { AutoRefresh } from "../../_components/auto-refresh";
 import { WarehouseTaskClient } from "./_components/task-client";
 
 export const dynamic = "force-dynamic";
@@ -29,6 +31,7 @@ export default async function WarehouseTaskDetailPage({
       sale: {
         select: {
           id: true,
+          markedForDeletion: true,
           number1C: true,
           code1C: true,
           docNumber: true,
@@ -47,12 +50,25 @@ export default async function WarehouseTaskDetailPage({
     },
   });
   if (!task) notFound();
+  // Реалізацію видалено «у себе» менеджером — завдання зникає для всіх.
+  if (task.sale?.markedForDeletion) notFound();
 
   // Склад/адмін/власник — усі; менеджер — лише свої завдання.
   const isWarehouse = WAREHOUSE_ROLES.includes(user.role);
   if (!isWarehouse && task.managerUserId !== user.id) notFound();
 
   const saleNumber = task.sale ? formatDocNumber(task.sale) : "—";
+
+  // Пропоновані місця з габаритів карток товарів (склад перевіряє/коригує).
+  const suggestedSeats = buildSuggestedSeats(
+    task.items.map((it) => ({
+      weight: it.weight,
+      packaging: it.packaging,
+      defaultLengthCm: it.defaultLengthCm,
+      defaultWidthCm: it.defaultWidthCm,
+      defaultHeightCm: it.defaultHeightCm,
+    })),
+  );
 
   // Якщо реалізація має ТТН НП — дізнаємось, чи це ще «Чернетка» (draft).
   // Поки чернетка — склад може правити габарити й друкувати етикетку навіть
@@ -73,6 +89,7 @@ export default async function WarehouseTaskDetailPage({
 
   return (
     <div className="mx-auto max-w-3xl space-y-5">
+      <AutoRefresh intervalMs={15_000} />
       <Link
         href="/manager/warehouse-tasks"
         className="inline-flex items-center gap-1 text-sm text-gray-600 hover:text-gray-900"
@@ -85,6 +102,7 @@ export default async function WarehouseTaskDetailPage({
         canAct={isWarehouse}
         ttnDraft={ttnDraft}
         ttnStatusText={ttnStatusText}
+        suggestedSeats={suggestedSeats}
         task={{
           id: task.id,
           status: task.status,
@@ -130,6 +148,7 @@ export default async function WarehouseTaskDetailPage({
             quantity: it.quantity,
             weight: it.weight,
             packed: it.packed,
+            packaging: it.packaging,
           })),
         }}
       />

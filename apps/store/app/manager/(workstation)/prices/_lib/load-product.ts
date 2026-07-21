@@ -128,7 +128,16 @@ export interface ProductEditFields {
   producer: string;
   receiptName: string;
   packaging: string;
+  defaultLengthCm: string;
+  defaultWidthCm: string;
+  defaultHeightCm: string;
+  defaultSeatWeightKg: string;
   videoUrl: string;
+}
+
+/** Число → рядок для форми (null/0 → порожньо, щоб поле лишалось незаданим). */
+function numOrEmpty(n: number | null | undefined): string {
+  return typeof n === "number" && Number.isFinite(n) && n > 0 ? String(n) : "";
 }
 
 export async function loadProductCard(
@@ -157,6 +166,10 @@ export async function loadProductCard(
       producer: true,
       receiptName: true,
       packaging: true,
+      defaultLengthCm: true,
+      defaultWidthCm: true,
+      defaultHeightCm: true,
+      defaultSeatWeightKg: true,
       quality: true,
       season: true,
       country: true,
@@ -353,6 +366,10 @@ export async function loadProductCard(
       producer: product.producer ?? "",
       receiptName: product.receiptName ?? "",
       packaging: product.packaging ?? "",
+      defaultLengthCm: numOrEmpty(product.defaultLengthCm),
+      defaultWidthCm: numOrEmpty(product.defaultWidthCm),
+      defaultHeightCm: numOrEmpty(product.defaultHeightCm),
+      defaultSeatWeightKg: numOrEmpty(product.defaultSeatWeightKg),
       videoUrl: product.videoUrl ?? "",
     },
   };

@@ -83,6 +83,7 @@ function makeTask(o: Overrides = {}) {
         quantity: 1,
         weight: 10,
         packed: o.packed ?? true,
+        packaging: null,
       },
     ],
   };

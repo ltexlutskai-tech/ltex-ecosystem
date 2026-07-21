@@ -58,6 +58,16 @@ export async function updateProductCharacteristics(
   const unitsPerKg = str("unitsPerKg") || null;
   const unitWeight = str("unitWeight") || null;
 
+  // Габарити за замовчуванням (см) + типова вага місця (кг). Порожнє/0 → null.
+  const posNum = (key: string): number | null => {
+    const n = Number(str(key).replace(",", "."));
+    return Number.isFinite(n) && n > 0 ? n : null;
+  };
+  const defaultLengthCm = posNum("defaultLengthCm");
+  const defaultWidthCm = posNum("defaultWidthCm");
+  const defaultHeightCm = posNum("defaultHeightCm");
+  const defaultSeatWeightKg = posNum("defaultSeatWeightKg");
+
   if (!quality) return { error: "Оберіть якість (сорт)" };
   if (!country) return { error: "Оберіть країну" };
 
@@ -76,6 +86,10 @@ export async function updateProductCharacteristics(
       producer,
       receiptName,
       packaging,
+      defaultLengthCm,
+      defaultWidthCm,
+      defaultHeightCm,
+      defaultSeatWeightKg,
       videoUrl,
       unitsPerKg,
       unitsPerKgMin: unitsRange?.min ?? null,

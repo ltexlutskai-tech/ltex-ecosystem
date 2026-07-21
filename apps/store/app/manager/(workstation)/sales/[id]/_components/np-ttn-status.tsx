@@ -3,7 +3,13 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@ltex/ui";
-import { PackageCheck, RefreshCw, ExternalLink, MapPin } from "lucide-react";
+import {
+  PackageCheck,
+  RefreshCw,
+  ExternalLink,
+  MapPin,
+  Calculator,
+} from "lucide-react";
 
 /** Публічне посилання відстеження Нової Пошти за номером ТТН. */
 function trackingUrl(cargoNumber: string): string {
@@ -27,6 +33,13 @@ interface TrackResult {
   warehouseRecipient: string;
 }
 
+interface EstimateResult {
+  ok: boolean;
+  costUah: number;
+  redeliveryCostUah: number;
+  deliveryDate: string | null;
+}
+
 export interface NpTtnStatusProps {
   saleId: string;
   /** Ref документа НП (є → ТТН створена). */
@@ -37,6 +50,8 @@ export interface NpTtnStatusProps {
   ttnError: string | null;
   /** Чи проведено реалізацію (тоді очікуємо авто-створення ТТН). */
   posted: boolean;
+  /** Чи вибрано місто/відділення НП — тоді доступний попередній розрахунок. */
+  hasNpAddress?: boolean;
 }
 
 /**
@@ -53,6 +68,7 @@ export function NpTtnStatus({
   ttnNumber,
   ttnError,
   posted,
+  hasNpAddress = false,
 }: NpTtnStatusProps) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
@@ -60,8 +76,32 @@ export function NpTtnStatus({
   const [tracking, setTracking] = useState<TrackResult | null>(null);
   const [trackBusy, setTrackBusy] = useState(false);
   const [trackError, setTrackError] = useState<string | null>(null);
+  const [estimateBusy, setEstimateBusy] = useState(false);
+  const [estimate, setEstimate] = useState<EstimateResult | null>(null);
+  const [estimateError, setEstimateError] = useState<string | null>(null);
 
   const hasTtn = Boolean(ttnRef) && Boolean(ttnNumber);
+
+  async function runEstimate(): Promise<void> {
+    setEstimateBusy(true);
+    setEstimateError(null);
+    try {
+      const res = await fetch(`/api/v1/manager/sales/${saleId}/np-estimate`);
+      const data = (await res.json().catch(() => ({}))) as Partial<
+        EstimateResult & { error: string }
+      >;
+      if (!res.ok || data.ok === false) {
+        setEstimateError(data.error ?? `Помилка ${res.status}`);
+        setEstimate(null);
+        return;
+      }
+      setEstimate(data as EstimateResult);
+    } catch (e) {
+      setEstimateError((e as Error).message ?? "Не вдалося розрахувати");
+    } finally {
+      setEstimateBusy(false);
+    }
+  }
 
   async function track(): Promise<void> {
     setTrackBusy(true);
@@ -107,10 +147,56 @@ export function NpTtnStatus({
 
   return (
     <section className="rounded-lg border bg-white p-4 shadow-sm">
-      <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-gray-500">
-        <PackageCheck className="h-4 w-4" />
-        Нова Пошта
-      </h2>
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-gray-500">
+          <PackageCheck className="h-4 w-4" />
+          Нова Пошта
+        </h2>
+        {hasNpAddress && (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={estimateBusy}
+            onClick={() => void runEstimate()}
+          >
+            <Calculator
+              className={`mr-1 h-4 w-4 ${estimateBusy ? "animate-pulse" : ""}`}
+            />
+            {estimateBusy ? "Розрахунок…" : "Розрахувати вартість і дату"}
+          </Button>
+        )}
+      </div>
+
+      {estimateError && (
+        <div className="mb-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+          {estimateError}
+        </div>
+      )}
+      {estimate && (
+        <dl className="mb-3 rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm">
+          <div className="flex gap-2">
+            <dt className="text-gray-500">Орієнтовна вартість:</dt>
+            <dd className="font-medium text-gray-900">
+              {estimate.costUah} грн
+            </dd>
+          </div>
+          {estimate.redeliveryCostUah > 0 && (
+            <div className="flex gap-2">
+              <dt className="text-gray-500">Комісія за контроль оплати:</dt>
+              <dd className="text-gray-800">
+                {estimate.redeliveryCostUah} грн
+              </dd>
+            </div>
+          )}
+          {estimate.deliveryDate && (
+            <div className="flex gap-2">
+              <dt className="text-gray-500">Орієнтовна доставка:</dt>
+              <dd className="text-gray-800">{estimate.deliveryDate}</dd>
+            </div>
+          )}
+        </dl>
+      )}
 
       {hasTtn ? (
         <div className="space-y-3">

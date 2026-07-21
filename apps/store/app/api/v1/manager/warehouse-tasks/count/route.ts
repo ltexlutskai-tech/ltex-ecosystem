@@ -19,7 +19,11 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ open: 0 });
   }
   const open = await prisma.warehouseTask.count({
-    where: { status: { in: ["new", "received"] } },
+    where: {
+      status: { in: ["new", "received"] },
+      // Реалізації, які менеджер видалив «у себе», не рахуємо.
+      sale: { markedForDeletion: false },
+    },
   });
   return NextResponse.json({ open });
 }

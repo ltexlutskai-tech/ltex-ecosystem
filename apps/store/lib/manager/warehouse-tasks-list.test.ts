@@ -18,13 +18,18 @@ describe("normalizeTaskStatus / normalizeTaskDelivery", () => {
 });
 
 describe("buildWarehouseTasksWhere", () => {
+  // Завжди присутній фільтр «реалізацію не видалено у себе».
+  const NOT_DELETED = { sale: { markedForDeletion: false } };
+
   it("менеджер — обмежено своїм managerUserId", () => {
     const where = buildWarehouseTasksWhere({ managerUserId: "u1" });
-    expect(where).toEqual({ AND: [{ managerUserId: "u1" }] });
+    expect(where).toEqual({ AND: [NOT_DELETED, { managerUserId: "u1" }] });
   });
 
-  it("склад/адмін (null) без фільтрів — порожній where", () => {
-    expect(buildWarehouseTasksWhere({ managerUserId: null })).toEqual({});
+  it("склад/адмін (null) без фільтрів — лише виключення видалених", () => {
+    expect(buildWarehouseTasksWhere({ managerUserId: null })).toEqual({
+      AND: [NOT_DELETED],
+    });
   });
 
   it("накопичує статус + доставку + пошук по клієнту", () => {
@@ -36,6 +41,7 @@ describe("buildWarehouseTasksWhere", () => {
     });
     expect(where).toEqual({
       AND: [
+        NOT_DELETED,
         { status: "sent" },
         { deliveryMethod: "post" },
         { customerName: { contains: "тов", mode: "insensitive" } },
@@ -50,7 +56,7 @@ describe("buildWarehouseTasksWhere", () => {
       deliveryMethod: "yyy",
       customerName: "   ",
     });
-    expect(where).toEqual({});
+    expect(where).toEqual({ AND: [NOT_DELETED] });
   });
 });
 

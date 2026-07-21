@@ -82,6 +82,11 @@ export function buildWarehouseTasksWhere(
 ): Prisma.WarehouseTaskWhereInput {
   const and: Prisma.WarehouseTaskWhereInput[] = [];
 
+  // Завдання зникає одразу, щойно менеджер видаляє реалізацію «в себе»
+  // (`markedForDeletion=true`) — не чекаючи фінального видалення адміном.
+  // Якщо адмін відхилить/відновить видалення — завдання повертається.
+  and.push({ sale: { markedForDeletion: false } });
+
   if (params.managerUserId !== null) {
     and.push({ managerUserId: params.managerUserId });
   }
