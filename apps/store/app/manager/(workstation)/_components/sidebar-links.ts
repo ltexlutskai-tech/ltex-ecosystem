@@ -1,6 +1,7 @@
 import { createElement, type ComponentType, type ReactElement } from "react";
 import type { ManagerRole } from "@/lib/auth/jwt";
 import {
+  BadgeCheck,
   BarChart3,
   Bell,
   Boxes,
@@ -123,6 +124,14 @@ export const FINANCE_LINKS: readonly SidebarLink[] = [
     icon: ArrowLeftRight,
   },
 ];
+
+// ── Звірка NovaPay (2026-07-21) — офіс: bookkeeper | admin | owner ────────
+// Щоденна звірка авто-оплат післяплати NovaPay з тим, що надійшло на рахунок.
+export const NP_CHECK_LINK: SidebarLink = {
+  href: "/manager/novapay-check",
+  label: "Звірка NovaPay",
+  icon: BadgeCheck,
+};
 
 // ── Тиждень 5 блоку Ролі (Analyst) ──────────────────────────────────────
 export const REPORTS_LINK: SidebarLink = {
@@ -323,9 +332,12 @@ export function getSidebarSections(role: ManagerRole): SidebarItem[][] {
   }
   sections.push(sectionC);
 
-  // Секція D — фінансові документи (bookkeeper/admin/owner).
+  // Секція D — фінансові документи + звірка NovaPay (bookkeeper/admin/owner).
   if (role === "bookkeeper" || adminOrOwner) {
-    sections.push(FINANCE_LINKS.map((l) => ({ ...l })));
+    sections.push([
+      ...FINANCE_LINKS.map((l) => ({ ...l })),
+      { ...NP_CHECK_LINK },
+    ]);
   }
 
   // Секція E — адмінка + Кошик + Налаштування.
