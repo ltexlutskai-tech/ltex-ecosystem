@@ -331,6 +331,7 @@ export default async function ManagerSaleDetailPage({
           ttnNumber={sale.expressWaybill}
           ttnError={sale.ttnError}
           posted={sale.status === "posted"}
+          hasNpAddress={Boolean(sale.npCityRef)}
         />
       )}
 
