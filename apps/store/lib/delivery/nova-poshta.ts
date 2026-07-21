@@ -41,6 +41,10 @@ export interface NpWarehouse {
   name: string;
   typeRef: string;
   maxWeight: number;
+  /** Макс. вага на ОДНЕ місце (кг). Для РО/спецвантажу звичайне відділення ~30. */
+  placeMaxWeight: number;
+  /** Вантажне відділення — приймає спецвантаж/РО (важкі місця, > лімітів звичайного). */
+  isFreight: boolean;
 }
 
 export interface NpCounterparty {
@@ -248,6 +252,8 @@ interface RawWarehouse {
   Description: string;
   TypeOfWarehouseRef: string;
   TotalMaxWeightAllowed: string;
+  PlaceMaxWeightAllowed?: string;
+  CategoryOfWarehouse?: string;
 }
 
 export async function getWarehouses(
@@ -266,6 +272,9 @@ export async function getWarehouses(
     name: w.Description,
     typeRef: w.TypeOfWarehouseRef,
     maxWeight: Number(w.TotalMaxWeightAllowed) || 0,
+    placeMaxWeight: Number(w.PlaceMaxWeightAllowed) || 0,
+    // Вантажні відділення НП підписані «Вантажне відділення №N…» — надійна ознака.
+    isFreight: /вантажн/i.test(w.Description),
   }));
 }
 
