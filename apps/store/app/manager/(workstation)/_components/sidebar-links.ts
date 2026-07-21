@@ -6,6 +6,7 @@ import {
   Boxes,
   ClipboardList,
   Database,
+  FileStack,
   FileText,
   FolderClock,
   FolderTree,
@@ -153,6 +154,14 @@ export const BAG_STATE_LINK: SidebarLink = {
   icon: Boxes,
 };
 
+// ── Реєстри Нової Пошти (2026-07-21) — склад + адмін/власник ──────────────
+// Групування ТТН у реєстр відправлень (передавальна відомість для кур'єра).
+export const NP_REGISTERS_LINK: SidebarLink = {
+  href: "/manager/np-registers",
+  label: "Реєстри НП",
+  icon: FileStack,
+};
+
 // ── Завдання складу (2026-07-14) — підготувати відправлення + ТТН ──────────
 // Детальна сторінка складського завдання (пакування/ТТН). У меню більше не
 // показується окремо — доступна через блок «Завдання» (deep-link на картці).
@@ -293,6 +302,7 @@ export function getSidebarSections(role: ManagerRole): SidebarItem[][] {
   if (isWarehouse || adminOrOwner) {
     sectionC.push({ ...WAREHOUSE_RECEIVINGS_LINK });
     sectionC.push({ ...BAG_STATE_LINK });
+    sectionC.push({ ...NP_REGISTERS_LINK });
   }
   // Довідники та регістри — усі, крім складу, експедитора і менеджера.
   if (!isWarehouse && role !== "expeditor" && !isManager) {
