@@ -288,6 +288,11 @@ export interface SaleEditInitial {
   npWarehouseRef: string | null;
   npWarehouseName: string | null;
   npDeliveryType: string | null;
+  /** Адресна доставка «до дверей»: реф/назва вулиці + будинок + квартира. */
+  npStreetRef: string | null;
+  npStreetName: string | null;
+  npBuildingNumber: string | null;
+  npFlat: string | null;
   /** ПІБ отримувача ТТН (Нова Пошта). */
   npRecipientName: string | null;
   /** Телефон отримувача ТТН (Нова Пошта). */

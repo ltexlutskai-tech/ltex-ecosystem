@@ -375,6 +375,69 @@ export async function ensureRecipientPrivatePerson(input: {
   return { counterpartyRef: first.Ref, contactRef };
 }
 
+// ─── Адресна доставка «до дверей» (вулиці + адреса отримувача) ────────────────
+
+export interface NpStreet {
+  ref: string;
+  name: string;
+}
+
+interface RawStreet {
+  Ref: string;
+  Description: string;
+  StreetsType?: string;
+}
+
+/**
+ * Пошук вулиць у місті (Address.getStreet). Для адресної доставки «до дверей»:
+ * повертає `ref` (StreetRef) + назву. НЕ кидає — при помилці порожній масив.
+ */
+export async function searchStreets(
+  cityRef: string,
+  query: string,
+  limit?: number,
+): Promise<NpStreet[]> {
+  const res = await callNovaPoshta<RawStreet>("Address", "getStreet", {
+    CityRef: cityRef,
+    FindByString: query,
+    Limit: String(limit ?? 20),
+  });
+  return res.data.map((s) => ({ ref: s.Ref, name: s.Description }));
+}
+
+interface RawSaveAddress {
+  Ref: string;
+}
+
+/**
+ * Створює адресу отримувача (Address.save) для доставки «до дверей». Повертає
+ * `ref` створеної адреси (передається у ТТН як RecipientAddress разом із
+ * `ServiceType="WarehouseDoors"`). Помилки перекладаються `translateNpError`.
+ */
+export async function saveRecipientAddress(input: {
+  counterpartyRef: string;
+  streetRef: string;
+  building: string;
+  flat?: string;
+}): Promise<{ ref: string } | { error: string }> {
+  const res = await callNovaPoshta<RawSaveAddress>("Address", "save", {
+    CounterpartyRef: input.counterpartyRef,
+    StreetRef: input.streetRef,
+    BuildingNumber: input.building,
+    Flat: input.flat ?? "",
+    Note: "",
+  });
+  const first = res.data[0];
+  if (!res.success || !first?.Ref) {
+    return {
+      error: translateNpError(
+        res.errors[0] ?? "Не вдалося створити адресу отримувача",
+      ),
+    };
+  }
+  return { ref: first.Ref };
+}
+
 // ─── ТТН (експрес-накладна) ──────────────────────────────────────────────────
 
 interface RawInternetDocument {

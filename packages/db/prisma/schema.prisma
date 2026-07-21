@@ -424,6 +424,11 @@ model Sale {
   npWarehouseRef       String?   @map("np_warehouse_ref")
   npWarehouseName      String?   @map("np_warehouse_name")
   npDeliveryType       String?   @map("np_delivery_type") // WarehouseWarehouse | WarehouseDoors
+  // Адресна доставка «до дверей» (WarehouseDoors) — вулиця/будинок/квартира НП.
+  npStreetRef          String?   @map("np_street_ref")
+  npStreetName         String?   @map("np_street_name")
+  npBuildingNumber     String?   @map("np_building_number")
+  npFlat               String?   @map("np_flat")
   // Отримувач ТТН (ПІБ + телефон) — префіл з картки клієнта, редаговано у формі.
   npRecipientName      String?   @map("np_recipient_name")
   npRecipientPhone     String?   @map("np_recipient_phone")

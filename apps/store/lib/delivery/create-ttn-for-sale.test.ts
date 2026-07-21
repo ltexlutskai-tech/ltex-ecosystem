@@ -10,6 +10,7 @@ const h = vi.hoisted(() => ({
   createInternetDocument: vi.fn(),
   updateInternetDocument: vi.fn(),
   ensureRecipientPrivatePerson: vi.fn(),
+  saveRecipientAddress: vi.fn(),
   getSenderCounterparty: vi.fn(),
   getSenderContact: vi.fn(),
   getDeliveryLabelResolver: vi.fn(),
@@ -27,6 +28,7 @@ vi.mock("@/lib/delivery/nova-poshta", () => ({
   updateInternetDocument: (...a: unknown[]) => h.updateInternetDocument(...a),
   ensureRecipientPrivatePerson: (...a: unknown[]) =>
     h.ensureRecipientPrivatePerson(...a),
+  saveRecipientAddress: (...a: unknown[]) => h.saveRecipientAddress(...a),
   getSenderCounterparty: (...a: unknown[]) => h.getSenderCounterparty(...a),
   getSenderContact: (...a: unknown[]) => h.getSenderContact(...a),
 }));
@@ -215,6 +217,89 @@ describe("createTtnForSale", () => {
       (c) => (c[0] as { data?: { ttnRef?: string } }).data?.ttnRef,
     );
     expect(wroteRef).toBe(false);
+  });
+});
+
+describe("createTtnForSale — адресна доставка «до дверей» (WarehouseDoors)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    process.env.NP_SENDER_CITY_REF = "sender-city";
+    process.env.NP_SENDER_WAREHOUSE_REF = "sender-wh";
+    process.env.NP_SENDER_PHONE = "380632396395";
+    h.getDeliveryLabelResolver.mockResolvedValue((code: string) =>
+      code === "post" ? "Нова Пошта" : code,
+    );
+    h.getSenderCounterparty.mockResolvedValue({ ref: "sender-cp" });
+    h.getSenderContact.mockResolvedValue({ ref: "sender-contact" });
+    h.ensureRecipientPrivatePerson.mockResolvedValue({
+      counterpartyRef: "r-cp",
+      contactRef: "r-contact",
+    });
+    h.saveRecipientAddress.mockResolvedValue({ ref: "addr-ref-1" });
+    h.createInternetDocument.mockResolvedValue({
+      ref: "ttn-ref-doors",
+      number: "20450000000009",
+      costUah: "80",
+      estimatedDeliveryDate: "",
+    });
+  });
+
+  const doorsSale = (overrides: Record<string, unknown> = {}) =>
+    baseSale({
+      npDeliveryType: "WarehouseDoors",
+      npWarehouseRef: null,
+      npStreetRef: "street-ref",
+      npStreetName: "вул. Ковельська",
+      npBuildingNumber: "12А",
+      npFlat: "5",
+      ...overrides,
+    });
+
+  it("creates the recipient address and issues a WarehouseDoors TTN", async () => {
+    h.sale.findUnique.mockResolvedValue(doorsSale());
+    await createTtnForSale("s1");
+
+    expect(h.saveRecipientAddress).toHaveBeenCalledWith({
+      counterpartyRef: "r-cp",
+      streetRef: "street-ref",
+      building: "12А",
+      flat: "5",
+    });
+    expect(h.createInternetDocument).toHaveBeenCalledTimes(1);
+    const input = h.createInternetDocument.mock.calls[0]![0];
+    expect(input).toMatchObject({
+      serviceType: "WarehouseDoors",
+      recipientWarehouseRef: "addr-ref-1",
+      cityRecipientRef: "city-ref",
+    });
+  });
+
+  it("records an error when the street or building is missing", async () => {
+    h.sale.findUnique.mockResolvedValue(doorsSale({ npStreetRef: null }));
+    await createTtnForSale("s1");
+    expect(h.saveRecipientAddress).not.toHaveBeenCalled();
+    expect(h.createInternetDocument).not.toHaveBeenCalled();
+    expect(h.sale.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          ttnError: expect.stringContaining("кур'єр"),
+        }),
+      }),
+    );
+  });
+
+  it("records an error when NP rejects the address save", async () => {
+    h.sale.findUnique.mockResolvedValue(doorsSale());
+    h.saveRecipientAddress.mockResolvedValue({ error: "Адресу не знайдено" });
+    await createTtnForSale("s1");
+    expect(h.createInternetDocument).not.toHaveBeenCalled();
+    expect(h.sale.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          ttnError: expect.stringContaining("Адреса"),
+        }),
+      }),
+    );
   });
 });
 

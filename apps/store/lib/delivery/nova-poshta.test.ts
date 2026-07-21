@@ -3,6 +3,8 @@ import {
   callNovaPoshta,
   searchCities,
   getWarehouses,
+  searchStreets,
+  saveRecipientAddress,
   createInternetDocument,
   buildTtnMethodProperties,
   trackTtn,
@@ -150,6 +152,80 @@ describe("getWarehouses", () => {
         isFreight: true,
       },
     ]);
+  });
+});
+
+describe("searchStreets", () => {
+  it("maps raw NP street fields to domain shape", async () => {
+    const fetchFn = mockFetchOnce({
+      success: true,
+      data: [
+        { Ref: "street-ref-1", Description: "Ковельська", StreetsType: "вул." },
+      ],
+      errors: [],
+      warnings: [],
+    });
+
+    const streets = await searchStreets("city-ref-1", "Ковель", 5);
+
+    expect(streets).toEqual([{ ref: "street-ref-1", name: "Ковельська" }]);
+    const firstCall = fetchFn.mock.calls[0];
+    expect(firstCall).toBeDefined();
+    const sentBody = JSON.parse((firstCall![1] as { body: string }).body);
+    expect(sentBody.modelName).toBe("Address");
+    expect(sentBody.calledMethod).toBe("getStreet");
+    expect(sentBody.methodProperties).toEqual({
+      CityRef: "city-ref-1",
+      FindByString: "Ковель",
+      Limit: "5",
+    });
+  });
+
+  it("returns [] on NP failure without throwing", async () => {
+    mockFetchOnce({ success: false, data: [], errors: ["boom"] });
+    const streets = await searchStreets("city-ref-1", "Ковель");
+    expect(streets).toEqual([]);
+  });
+});
+
+describe("saveRecipientAddress", () => {
+  it("returns the created address ref on success", async () => {
+    const fetchFn = mockFetchOnce({
+      success: true,
+      data: [{ Ref: "addr-ref-1" }],
+      errors: [],
+      warnings: [],
+    });
+
+    const result = await saveRecipientAddress({
+      counterpartyRef: "rec-cp",
+      streetRef: "street-ref-1",
+      building: "12А",
+      flat: "5",
+    });
+
+    expect(result).toEqual({ ref: "addr-ref-1" });
+    const sentBody = JSON.parse(
+      (fetchFn.mock.calls[0]![1] as { body: string }).body,
+    );
+    expect(sentBody.calledMethod).toBe("save");
+    expect(sentBody.methodProperties).toEqual({
+      CounterpartyRef: "rec-cp",
+      StreetRef: "street-ref-1",
+      BuildingNumber: "12А",
+      Flat: "5",
+      Note: "",
+    });
+  });
+
+  it("returns a translated error when NP responds success:false", async () => {
+    mockFetchOnce({ success: false, data: [], errors: ["Some NP error"] });
+    const result = await saveRecipientAddress({
+      counterpartyRef: "rec-cp",
+      streetRef: "street-ref-1",
+      building: "12",
+    });
+    expect(result).toEqual({ error: "Нова Пошта: Some NP error" });
   });
 });
 

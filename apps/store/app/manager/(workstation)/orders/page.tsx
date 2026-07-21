@@ -10,6 +10,7 @@ import {
   serializeOrderRow,
 } from "@/lib/manager/orders-list";
 import { getOrderFilterOptions } from "@/lib/manager/order-filter-options";
+import { serializeFields } from "@/lib/manager/bulk-edit/registry";
 import { EmptyState } from "../_components/empty-state";
 import { AutoRefresh } from "../_components/auto-refresh";
 import { ListPagination } from "../customers/_components/list-pagination";
@@ -203,7 +204,10 @@ export default async function ManagerOrdersPage({
         />
       ) : (
         <>
-          <OrdersTable items={rows} />
+          <OrdersTable
+            items={rows}
+            bulkFields={serializeFields("order", user.role)}
+          />
           <ListPagination page={filter.page} totalPages={totalPages} />
         </>
       )}

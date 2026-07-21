@@ -1,8 +1,13 @@
 "use client";
 
+import { useState } from "react";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
+import type { SerializedBulkField } from "@/lib/manager/bulk-edit/registry";
 import { SalesRow, type SalesRowData } from "./sales-row";
 import { SortableHeader } from "../../_components/sortable-header";
+import { useBulkSelection } from "../../_components/bulk/use-bulk-selection";
+import { BulkProcessingBar } from "../../_components/bulk/bulk-processing-bar";
+import { BulkFieldDialog } from "../../_components/bulk/bulk-field-dialog";
 import { useListContextMenu } from "../../_components/use-list-context-menu";
 import { useDocMarkDeletion } from "../../_components/use-doc-mark-deletion";
 import type { ContextMenuItem } from "../../_components/list-context-menu";
@@ -27,11 +32,22 @@ const COLS: Record<string, { sortKey?: string; filterParam?: string }> = {
   sum: { sortKey: "sum" },
 };
 
-export function SalesTable({ items }: { items: SalesRowData[] }) {
+export function SalesTable({
+  items,
+  bulkFields,
+}: {
+  items: SalesRowData[];
+  /** Поля «Групової обробки» (масова зміна прапорців) — лише admin/owner. */
+  bulkFields?: SerializedBulkField[];
+}) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const { requestMark, dialog: deleteDialog } = useDocMarkDeletion();
+  const bulkEnabled = (bulkFields?.length ?? 0) > 0;
+  const bulk = useBulkSelection();
+  const [bulkOpen, setBulkOpen] = useState(false);
+  const pageIds = items.map((s) => s.id);
 
   function setSort(key: string, dir: "asc" | "desc") {
     const p = new URLSearchParams(searchParams);
@@ -123,6 +139,16 @@ export function SalesTable({ items }: { items: SalesRowData[] }) {
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b bg-gray-50 text-left text-xs tracking-wide text-gray-500 uppercase">
+            {bulkEnabled && (
+              <th className="w-8 px-2.5 py-1.5">
+                <input
+                  type="checkbox"
+                  checked={bulk.allOnPageSelected(pageIds)}
+                  onChange={() => bulk.toggleAllOnPage(pageIds)}
+                  aria-label="Вибрати всі на сторінці"
+                />
+              </th>
+            )}
             <th className="px-2.5 py-1.5 font-medium">
               <SortableHeader sortKey="date" label="Дата" />
             </th>
@@ -174,12 +200,35 @@ export function SalesTable({ items }: { items: SalesRowData[] }) {
               key={s.id}
               sale={s}
               rowHandlers={rowHandlers(`/manager/sales/${s.id}`)}
+              selectable={bulkEnabled}
+              selected={bulk.isSelected(s.id)}
+              onToggle={() => bulk.toggle(s.id)}
             />
           ))}
         </tbody>
       </table>
       {menu}
       {deleteDialog}
+      {bulkEnabled && (
+        <>
+          <BulkProcessingBar
+            count={bulk.count}
+            onOpen={() => setBulkOpen(true)}
+            onClear={bulk.clear}
+          />
+          <BulkFieldDialog
+            entity="sale"
+            fields={bulkFields ?? []}
+            ids={Array.from(bulk.selected)}
+            open={bulkOpen}
+            onClose={() => setBulkOpen(false)}
+            onDone={() => {
+              setBulkOpen(false);
+              bulk.clear();
+            }}
+          />
+        </>
+      )}
     </div>
   );
 }

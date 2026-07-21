@@ -46,6 +46,11 @@ export interface NpWarehousePickerProps {
   warehouseRef: string;
   warehouseName: string;
   onChange: (value: NpSelection) => void;
+  /**
+   * Приховати вибір відділення (лишити тільки місто) — для адресної доставки
+   * «до дверей», де відділення не потрібне (адресу задає окремий street-пікер).
+   */
+  hideWarehouse?: boolean;
 }
 
 const INPUT_CLASS =
@@ -57,6 +62,7 @@ export function NpWarehousePicker({
   warehouseRef,
   warehouseName,
   onChange,
+  hideWarehouse = false,
 }: NpWarehousePickerProps) {
   // ─── Місто ────────────────────────────────────────────────────────────────
   const [cityQuery, setCityQuery] = useState("");
@@ -193,7 +199,8 @@ export function NpWarehousePicker({
   }
 
   // Обрано і місто, і відділення → компактний підсумок із «змінити».
-  if (hasCity && hasWarehouse) {
+  // У режимі «до дверей» (hideWarehouse) відділення не показуємо — місто нижче.
+  if (!hideWarehouse && hasCity && hasWarehouse) {
     return (
       <div className="sm:col-span-2">
         <label className="mb-1 block text-sm font-medium text-gray-700">
@@ -221,9 +228,13 @@ export function NpWarehousePicker({
         htmlFor="np-city"
         className="mb-1 block text-sm font-medium text-gray-700"
       >
-        Нова Пошта — місто та відділення
+        {hideWarehouse
+          ? "Нова Пошта — місто"
+          : "Нова Пошта — місто та відділення"}
       </label>
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div
+        className={hideWarehouse ? "grid gap-3" : "grid gap-3 sm:grid-cols-2"}
+      >
         {/* ─── Місто ─────────────────────────────────────────────────────── */}
         <div className="relative">
           {hasCity ? (
@@ -279,76 +290,80 @@ export function NpWarehousePicker({
         </div>
 
         {/* ─── Відділення ────────────────────────────────────────────────── */}
-        <div className="relative">
-          <input
-            id="np-warehouse"
-            value={whQuery}
-            onChange={(e) => {
-              setWhQuery(e.target.value);
-              setWhOpen(true);
-            }}
-            onFocus={() => setWhOpen(true)}
-            disabled={!hasCity}
-            autoComplete="off"
-            placeholder={
-              hasCity ? "Відділення (номер або назва)" : "Спершу оберіть місто"
-            }
-            className={INPUT_CLASS}
-          />
-          <label className="mt-1 flex items-center gap-1.5 text-xs text-gray-500">
+        {!hideWarehouse && (
+          <div className="relative">
             <input
-              type="checkbox"
-              checked={freightOnly}
-              onChange={(e) => setFreightOnly(e.target.checked)}
+              id="np-warehouse"
+              value={whQuery}
+              onChange={(e) => {
+                setWhQuery(e.target.value);
+                setWhOpen(true);
+              }}
+              onFocus={() => setWhOpen(true)}
               disabled={!hasCity}
+              autoComplete="off"
+              placeholder={
+                hasCity
+                  ? "Відділення (номер або назва)"
+                  : "Спершу оберіть місто"
+              }
+              className={INPUT_CLASS}
             />
-            🚚 лише вантажні (для мішків/РО)
-          </label>
-          {whOpen &&
-            hasCity &&
-            (() => {
-              const list = freightOnly
-                ? whResults.filter((w) => w.isFreight)
-                : whResults;
-              if (list.length === 0) return null;
-              return (
-                <ul className="absolute z-20 mt-1 max-h-60 w-full overflow-y-auto rounded-md border border-gray-200 bg-white py-1 text-sm shadow-lg">
-                  {list.map((w) => (
-                    <li key={w.ref}>
-                      <button
-                        type="button"
-                        onClick={() => pickWarehouse(w)}
-                        className="block w-full px-3 py-1.5 text-left text-gray-800 hover:bg-green-50"
-                      >
-                        {w.number ? (
-                          <span className="font-medium">
-                            Відділення №{w.number}:{" "}
-                          </span>
-                        ) : null}
-                        {w.name}
-                        {w.isFreight ? (
-                          <span className="ml-1 rounded bg-amber-100 px-1 text-xs font-medium text-amber-700">
-                            🚚 вантажне
-                          </span>
-                        ) : null}
-                        {w.placeMaxWeight > 0 ? (
-                          <span className="text-gray-400">
-                            {" "}
-                            · до {w.placeMaxWeight} кг/місце
-                          </span>
-                        ) : null}
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              );
-            })()}
-          {whError && (
-            <p className="mt-1 text-xs text-amber-600">
-              Не вдалося завантажити відділення
-            </p>
-          )}
-        </div>
+            <label className="mt-1 flex items-center gap-1.5 text-xs text-gray-500">
+              <input
+                type="checkbox"
+                checked={freightOnly}
+                onChange={(e) => setFreightOnly(e.target.checked)}
+                disabled={!hasCity}
+              />
+              🚚 лише вантажні (для мішків/РО)
+            </label>
+            {whOpen &&
+              hasCity &&
+              (() => {
+                const list = freightOnly
+                  ? whResults.filter((w) => w.isFreight)
+                  : whResults;
+                if (list.length === 0) return null;
+                return (
+                  <ul className="absolute z-20 mt-1 max-h-60 w-full overflow-y-auto rounded-md border border-gray-200 bg-white py-1 text-sm shadow-lg">
+                    {list.map((w) => (
+                      <li key={w.ref}>
+                        <button
+                          type="button"
+                          onClick={() => pickWarehouse(w)}
+                          className="block w-full px-3 py-1.5 text-left text-gray-800 hover:bg-green-50"
+                        >
+                          {w.number ? (
+                            <span className="font-medium">
+                              Відділення №{w.number}:{" "}
+                            </span>
+                          ) : null}
+                          {w.name}
+                          {w.isFreight ? (
+                            <span className="ml-1 rounded bg-amber-100 px-1 text-xs font-medium text-amber-700">
+                              🚚 вантажне
+                            </span>
+                          ) : null}
+                          {w.placeMaxWeight > 0 ? (
+                            <span className="text-gray-400">
+                              {" "}
+                              · до {w.placeMaxWeight} кг/місце
+                            </span>
+                          ) : null}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                );
+              })()}
+            {whError && (
+              <p className="mt-1 text-xs text-amber-600">
+                Не вдалося завантажити відділення
+              </p>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

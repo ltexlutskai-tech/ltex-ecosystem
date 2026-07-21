@@ -10,12 +10,26 @@ import { canManageCatalog } from "@/lib/manager/catalog-permissions";
  * Реєстр сам резолвить `fieldKey → column`. Це закриває ін'єкцію довільних полів:
  * записати можна ЛИШЕ те, що явно занесено сюди.
  *
- * MVP: сутність `product` (номенклатура). Права — per-field (не per-entity).
+ * Сутності: `product` (номенклатура), `client` (контрагенти), `order`
+ * (замовлення), `sale` (реалізації). Права — per-field (не per-entity).
  */
 
-export type BulkEntity = "product";
+export type BulkEntity = "product" | "client" | "order" | "sale";
 
-export type BulkFieldType = "text" | "enum" | "boolean" | "category";
+export type BulkFieldType = "text" | "enum" | "boolean" | "category" | "select";
+
+/**
+ * Модель-довідник для перевірки існування обраного id (FK-цілісність) на сервері.
+ * `category` тримаємо окремим типом поля (легасі), решта FK — через `select`.
+ */
+export type BulkRefModel =
+  | "category"
+  | "mgrClientStatus"
+  | "user"
+  | "mgrCategoryTT"
+  | "mgrDeliveryMethod"
+  | "mgrSearchChannel"
+  | "mgrRoute";
 
 /** Значення, яке дозволено записувати масово (після валідації). */
 export type BulkValue = string | boolean | null;
@@ -36,9 +50,14 @@ export interface BulkFieldDef {
   /**
    * Для `enum` — строгий перелік дозволених значень (валідація по ньому).
    * Для `text` — необовʼязкові підказки (datalist), значення не обмежують.
-   * Для `category` опції підтягуються з БД у `serializeFields` (динамічні).
+   * Для `category`/`select` опції підтягуються з БД у `serializeFields`.
    */
   options?: BulkFieldOption[];
+  /**
+   * FK-модель для перевірки існування значення на сервері (для `category` та
+   * `select`). Для `category` можна не вказувати — трактується як `"category"`.
+   */
+  refModel?: BulkRefModel;
   /** Чи можна встановити `null` (скинути значення). */
   nullable: boolean;
   /** Макс. довжина для `text`. */
@@ -125,8 +144,117 @@ const PRODUCT_ENTITY: BulkEntityDef = {
   ],
 };
 
+/** Гейт для клієнтів/документів: масову зміну робить лише admin/owner. */
+const adminOrOwner = (role: ManagerRole): boolean =>
+  role === "admin" || role === "owner";
+
+const CLIENT_ENTITY: BulkEntityDef = {
+  entity: "client",
+  label: "Клієнти",
+  fields: [
+    {
+      key: "statusGeneralId",
+      label: "Статус (загальний)",
+      column: "statusGeneralId",
+      type: "select",
+      refModel: "mgrClientStatus",
+      nullable: true,
+      roles: adminOrOwner,
+    },
+    {
+      key: "statusOperationalId",
+      label: "Статус (оперативний)",
+      column: "statusOperationalId",
+      type: "select",
+      refModel: "mgrClientStatus",
+      nullable: true,
+      roles: adminOrOwner,
+    },
+    {
+      key: "agentUserId",
+      label: "Менеджер",
+      column: "agentUserId",
+      type: "select",
+      refModel: "user",
+      nullable: true,
+      roles: adminOrOwner,
+    },
+    {
+      key: "categoryTTId",
+      label: "Категорія ТТ",
+      column: "categoryTTId",
+      type: "select",
+      refModel: "mgrCategoryTT",
+      nullable: true,
+      roles: adminOrOwner,
+    },
+    {
+      key: "deliveryMethodId",
+      label: "Спосіб доставки",
+      column: "deliveryMethodId",
+      type: "select",
+      refModel: "mgrDeliveryMethod",
+      nullable: true,
+      roles: adminOrOwner,
+    },
+    {
+      key: "searchChannelId",
+      label: "Канал пошуку",
+      column: "searchChannelId",
+      type: "select",
+      refModel: "mgrSearchChannel",
+      nullable: true,
+      roles: adminOrOwner,
+    },
+    {
+      key: "primaryRouteId",
+      label: "Маршрут",
+      column: "primaryRouteId",
+      type: "select",
+      refModel: "mgrRoute",
+      nullable: true,
+      roles: adminOrOwner,
+    },
+  ],
+};
+
+/** Спільні поля документів (Замовлення/Реалізація) — булеві прапорці. */
+const DOC_BOOLEAN_FIELDS: BulkFieldDef[] = [
+  {
+    key: "isActual",
+    label: "Актуальне",
+    column: "isActual",
+    type: "boolean",
+    nullable: false,
+    roles: adminOrOwner,
+  },
+  {
+    key: "archived",
+    label: "Архів",
+    column: "archived",
+    type: "boolean",
+    nullable: false,
+    roles: adminOrOwner,
+  },
+];
+
+const ORDER_ENTITY: BulkEntityDef = {
+  entity: "order",
+  label: "Замовлення",
+  fields: DOC_BOOLEAN_FIELDS,
+};
+
+const SALE_ENTITY: BulkEntityDef = {
+  entity: "sale",
+  label: "Реалізація",
+  fields: DOC_BOOLEAN_FIELDS,
+};
+
 const REGISTRY: Record<BulkEntity, BulkEntityDef> = {
   product: PRODUCT_ENTITY,
+  client: CLIENT_ENTITY,
+  order: ORDER_ENTITY,
+  sale: SALE_ENTITY,
 };
 
 /** Повертає опис сутності або null, якщо невідома. */
@@ -171,9 +299,10 @@ export function assertValueForField(
       }
       return value;
     }
-    case "category": {
+    case "category":
+    case "select": {
       if (typeof value !== "string" || value.trim().length === 0) {
-        throw new BulkFieldError(`Оберіть категорію для поля «${field.label}»`);
+        throw new BulkFieldError(`Оберіть значення для поля «${field.label}»`);
       }
       return value.trim();
     }
@@ -221,7 +350,7 @@ export interface SerializedBulkField {
 /**
  * Повертає лише ті поля сутності, які роль поточного користувача МОЖЕ масово
  * редагувати, у серіалізованому вигляді (без реального `column`). Для полів типу
- * `category` опції підтягуються з переданого `dynamicOptions` (з БД).
+ * `category`/`select` опції підтягуються з переданого `dynamicOptions` (з БД).
  */
 export function serializeFields(
   entity: string,
@@ -234,7 +363,9 @@ export function serializeFields(
     .filter((f) => f.roles(role))
     .map((f) => {
       const options =
-        f.type === "category" ? (dynamicOptions?.[f.key] ?? []) : f.options;
+        f.type === "category" || f.type === "select"
+          ? (dynamicOptions?.[f.key] ?? [])
+          : f.options;
       const out: SerializedBulkField = {
         key: f.key,
         label: f.label,
