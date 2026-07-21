@@ -169,6 +169,12 @@ describe("GET /api/v1/manager/clients/search-all", () => {
         "deliveryMethodCode",
         "agent",
         "isOwned",
+        "novaPoshtaBranch",
+        "npCityRef",
+        "npCityName",
+        "npWarehouseRef",
+        "npWarehouseName",
+        "npAddressMatched",
       ].sort(),
     );
     // No phone / messenger / bankAccount keys leaked.
