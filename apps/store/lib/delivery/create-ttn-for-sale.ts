@@ -187,21 +187,28 @@ async function buildTtnInputForSale(
   // відділення-отримувач, габарити ≤ 120 см — контролює склад при виборі місць).
   const anyManual = seats.some((s) => s.manualHandling);
   if (seats.length > 0) {
-    const seatWeight = seats.reduce((s, x) => s + (x.weight || 0), 0);
-    weight = Math.max(
-      MIN_WEIGHT_KG,
-      Math.round((seatWeight || itemsWeight) * 100) / 100,
-    );
     seatsAmount = seats.length;
-    const perSeatFallback = Math.round((weight / seats.length) * 100) / 100;
+    const round2 = (n: number): number => Math.round(n * 100) / 100;
+    const rawSum = seats.reduce((s, x) => s + (x.weight || 0), 0);
+    const perSeatFallback = round2((rawSum || itemsWeight) / seats.length);
     optionsSeat = seats.map((s) => ({
       // НП вимагає ≥ 5 см на сторону; піднімаємо мінімум, щоб уникнути відмови.
       volumetricWidth: Math.max(MIN_DIM_CM, s.widthCm),
       volumetricLength: Math.max(MIN_DIM_CM, s.lengthCm),
       volumetricHeight: Math.max(MIN_DIM_CM, s.heightCm),
-      weight: Math.max(MIN_WEIGHT_KG, s.weight || perSeatFallback),
+      // Спецвантаж (РО) — НП вимагає ЦІЛІ кг на місце (інакше «Special Cargo
+      // seat not match in weight»); звичайні місця — до сотих.
+      weight: s.manualHandling
+        ? Math.max(1, Math.round(s.weight || perSeatFallback))
+        : Math.max(MIN_WEIGHT_KG, round2(s.weight) || perSeatFallback),
       specialCargo: s.manualHandling ?? false,
     }));
+    // Вага документа = ТОЧНА сума ваг місць (щоб НП не бачив розбіжності —
+    // «Special Cargo seat not match in weight»); ті самі round2-значення.
+    weight = Math.max(
+      MIN_WEIGHT_KG,
+      round2(optionsSeat.reduce((a, s) => a + s.weight, 0)),
+    );
   } else {
     weight = Math.max(MIN_WEIGHT_KG, Math.round(itemsWeight * 100) / 100);
     seatsAmount = Math.max(1, sale.items.length);
