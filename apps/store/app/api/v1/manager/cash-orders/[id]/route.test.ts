@@ -10,6 +10,8 @@ const {
   getMyClientCodesMock,
   recomputeDebtMock,
   resolveClientIdMock,
+  updateCashOrderDraftMock,
+  createPaymentOrdersMock,
 } = vi.hoisted(() => ({
   mockPrisma: {
     mgrCashOrder: {
@@ -21,12 +23,15 @@ const {
     mgrDebtMovement: { findMany: vi.fn(), deleteMany: vi.fn() },
     cashFlowMovement: { deleteMany: vi.fn() },
     customer: { findUnique: vi.fn() },
+    mgrBankAccount: { findUnique: vi.fn() },
     $transaction: vi.fn(),
   },
   getCurrentUserMock: vi.fn(),
   getMyClientCodesMock: vi.fn(),
   recomputeDebtMock: vi.fn(),
   resolveClientIdMock: vi.fn(),
+  updateCashOrderDraftMock: vi.fn(),
+  createPaymentOrdersMock: vi.fn(),
 }));
 
 vi.mock("@ltex/db", () => ({ prisma: mockPrisma }));
@@ -44,8 +49,13 @@ vi.mock("@/lib/manager/debt-register", () => ({
     resolveClientIdMock(...args),
 }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
+vi.mock("@/lib/manager/cash-order", () => ({
+  updateCashOrderDraft: (...args: unknown[]) =>
+    updateCashOrderDraftMock(...args),
+  createPaymentOrders: (...args: unknown[]) => createPaymentOrdersMock(...args),
+}));
 
-import { DELETE } from "./route";
+import { DELETE, PATCH } from "./route";
 
 const MANAGER = {
   id: "u1",
@@ -82,6 +92,47 @@ beforeEach(() => {
   mockPrisma.mgrCashOrder.delete.mockResolvedValue({ id: "co1" });
   mockPrisma.cashFlowMovement.deleteMany.mockResolvedValue({ count: 0 });
   recomputeDebtMock.mockResolvedValue(1);
+  updateCashOrderDraftMock.mockResolvedValue({ id: "co1", status: "draft" });
+  createPaymentOrdersMock.mockResolvedValue({
+    income: { id: "co1" },
+    change: null,
+  });
+});
+
+function patchReq(body: unknown): NextRequest {
+  return new NextRequest("http://localhost/api/v1/manager/cash-orders/co1", {
+    method: "PATCH",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+  });
+}
+
+describe("PATCH draft autosave — preserves sale link (regression)", () => {
+  it("passes existing saleId/customerId into updateCashOrderDraft", async () => {
+    getCurrentUserMock.mockResolvedValueOnce(ADMIN);
+    // Наявна чернетка з прив'язкою до реалізації.
+    mockPrisma.mgrCashOrder.findUnique.mockResolvedValueOnce({
+      id: "co1",
+      status: "draft",
+      saleId: "sale1",
+      customerId: "cust1",
+      customer: { code1C: "000001" },
+      sale: { customerId: "cust1" },
+    });
+    // Autosave-оновлення (draftBody БЕЗ saleId/customerId).
+    const res = await PATCH(
+      patchReq({ draft: true, type: "income", amountUah: 500, rateEur: 45 }),
+      { params: Promise.resolve({ id: "co1" }) },
+    );
+    expect(res.status).toBe(200);
+    expect(updateCashOrderDraftMock).toHaveBeenCalledTimes(1);
+    const arg = updateCashOrderDraftMock.mock.calls[0]![1] as {
+      saleId: string | null;
+      customerId: string | null;
+    };
+    expect(arg.saleId).toBe("sale1");
+    expect(arg.customerId).toBe("cust1");
+  });
 });
 
 describe("DELETE /api/v1/manager/cash-orders/[id]", () => {

@@ -69,6 +69,10 @@ export async function PATCH(
     select: {
       id: true,
       status: true,
+      // Підстава (реалізація/клієнт) — щоб autosave-оновлення чернетки її НЕ
+      // губило (draftBody з форми не несе saleId/customerId).
+      saleId: true,
+      customerId: true,
       customer: { select: { code1C: true } },
       sale: { select: { customerId: true } },
     },
@@ -105,6 +109,11 @@ export async function PATCH(
     const input = parsedDraft.data;
     try {
       const draft = await updateCashOrderDraft(id, {
+        // Зберігаємо підставу з наявного рядка (draftBody її не передає) — інакше
+        // повний replace обнулив би saleId/customerId, і проведення втратило б
+        // зв'язок з реалізацією.
+        saleId: existing.saleId,
+        customerId: existing.customerId,
         type: input.type ?? "income",
         paid: {
           uah: input.amountUah ?? 0,
