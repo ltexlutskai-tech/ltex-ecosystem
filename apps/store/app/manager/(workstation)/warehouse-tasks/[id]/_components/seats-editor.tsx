@@ -15,6 +15,15 @@ export interface SeatInit {
   note: string | null;
 }
 
+/** Пропоноване місце з габаритів картки товару (без id/нотатки). */
+export interface SeatSuggestion {
+  weight: number;
+  lengthCm: number;
+  widthCm: number;
+  heightCm: number;
+  manualHandling: boolean;
+}
+
 /** Рядок редактора — значення тримаємо рядками, щоб поля можна було чистити. */
 interface SeatRow {
   weight: string;
@@ -57,6 +66,18 @@ function toRow(s: SeatInit): SeatRow {
   };
 }
 
+/** Пропозицію переводимо в рядок; нульові розміри лишаємо порожніми. */
+function suggestionToRow(s: SeatSuggestion): SeatRow {
+  return {
+    weight: s.weight ? String(s.weight) : "",
+    lengthCm: s.lengthCm ? String(s.lengthCm) : "",
+    widthCm: s.widthCm ? String(s.widthCm) : "",
+    heightCm: s.heightCm ? String(s.heightCm) : "",
+    manualHandling: s.manualHandling,
+    note: "",
+  };
+}
+
 function num(v: string): number {
   const n = Number(v.replace(",", "."));
   return Number.isFinite(n) && n > 0 ? n : 0;
@@ -76,14 +97,22 @@ interface TtnResult {
 export function SeatsEditor({
   taskId,
   initialSeats,
+  suggestedSeats = [],
 }: {
   taskId: string;
   initialSeats: SeatInit[];
+  suggestedSeats?: SeatSuggestion[];
 }) {
   const router = useRouter();
   const [, startTransition] = useTransition();
+  // Пріоритет: вже збережені місця → пропозиція з карток товарів → порожній рядок.
+  const usedSuggestion = !initialSeats.length && suggestedSeats.length > 0;
   const [rows, setRows] = useState<SeatRow[]>(
-    initialSeats.length ? initialSeats.map(toRow) : [emptyRow()],
+    initialSeats.length
+      ? initialSeats.map(toRow)
+      : suggestedSeats.length
+        ? suggestedSeats.map(suggestionToRow)
+        : [emptyRow()],
   );
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<TtnResult | null>(null);
@@ -157,6 +186,13 @@ export function SeatsEditor({
       <p className="mb-3 text-xs text-gray-400">
         Габарити — мін. 5 см на сторону.
       </p>
+
+      {usedSuggestion && (
+        <p className="mb-3 rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-800">
+          Заповнено з габаритів карток товарів — перевірте вагу й розміри та за
+          потреби відкоригуйте перед збереженням.
+        </p>
+      )}
 
       <div className="overflow-x-auto">
         <table className="w-full text-sm">

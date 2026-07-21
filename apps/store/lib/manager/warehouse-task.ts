@@ -36,7 +36,17 @@ export async function createWarehouseTaskForSale(
         customer: { select: { name: true } },
         items: {
           include: {
-            product: { select: { name: true, articleCode: true } },
+            product: {
+              select: {
+                id: true,
+                name: true,
+                articleCode: true,
+                packaging: true,
+                defaultLengthCm: true,
+                defaultWidthCm: true,
+                defaultHeightCm: true,
+              },
+            },
             lot: { select: { barcode: true, sector: true } },
           },
         },
@@ -73,6 +83,7 @@ export async function createWarehouseTaskForSale(
         managerName,
         items: {
           create: sale.items.map((it) => ({
+            productId: it.product.id,
             productName: it.product.name,
             articleCode: it.product.articleCode,
             barcode: it.barcode ?? it.lot?.barcode ?? null,
@@ -80,6 +91,10 @@ export async function createWarehouseTaskForSale(
             quantity: it.quantity,
             weight: it.weight,
             sector: it.lot?.sector ?? null,
+            packaging: it.product.packaging,
+            defaultLengthCm: it.product.defaultLengthCm,
+            defaultWidthCm: it.product.defaultWidthCm,
+            defaultHeightCm: it.product.defaultHeightCm,
           })),
         },
       },

@@ -245,6 +245,51 @@ function CharacteristicsForm({
             Мішки потребують ручної обробки на Новій Пошті.
           </p>
         </Field>
+        <Field label="Габарити за замовчуванням (Д×Ш×В, см) + вага місця" full>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            <Input
+              name="defaultLengthCm"
+              type="number"
+              inputMode="numeric"
+              min={0}
+              defaultValue={values.defaultLengthCm}
+              placeholder="Довжина"
+              aria-label="Довжина за замовчуванням, см"
+            />
+            <Input
+              name="defaultWidthCm"
+              type="number"
+              inputMode="numeric"
+              min={0}
+              defaultValue={values.defaultWidthCm}
+              placeholder="Ширина"
+              aria-label="Ширина за замовчуванням, см"
+            />
+            <Input
+              name="defaultHeightCm"
+              type="number"
+              inputMode="numeric"
+              min={0}
+              defaultValue={values.defaultHeightCm}
+              placeholder="Висота"
+              aria-label="Висота за замовчуванням, см"
+            />
+            <Input
+              name="defaultSeatWeightKg"
+              type="number"
+              inputMode="decimal"
+              min={0}
+              step="0.1"
+              defaultValue={values.defaultSeatWeightKg}
+              placeholder="Вага, кг"
+              aria-label="Типова вага місця, кг"
+            />
+          </div>
+          <p className="mt-1 text-xs text-gray-400">
+            Підтягуються у «Місця відправлення» завдання складу — склад лише
+            перевіряє й за потреби коригує.
+          </p>
+        </Field>
         <Field label="Наповнення" full>
           <textarea
             name="filling"

@@ -21,6 +21,7 @@ import {
   type NpSelection,
 } from "../../../_components/np-warehouse-picker";
 import { SeatsEditor, type SeatInit } from "./seats-editor";
+import type { SuggestedSeat } from "@/lib/manager/warehouse-seat-suggest";
 
 /** Публічне посилання відстеження Нової Пошти за номером ТТН. */
 function trackingUrl(cargoNumber: string): string {
@@ -38,6 +39,7 @@ interface TaskItem {
   quantity: number;
   weight: number;
   packed: boolean;
+  packaging: string | null;
 }
 
 interface TaskData {
@@ -90,6 +92,7 @@ export function WarehouseTaskClient({
   canAct,
   ttnDraft,
   ttnStatusText,
+  suggestedSeats = [],
 }: {
   task: TaskData;
   /** Чи може користувач діяти (склад/адмін/власник). Менеджер — лише перегляд. */
@@ -98,6 +101,8 @@ export function WarehouseTaskClient({
   ttnDraft: boolean;
   /** Людський статус ТТН НП (для нотатки, коли вже в дорозі). */
   ttnStatusText: string | null;
+  /** Пропоновані місця з габаритів карток товарів (склад перевіряє/коригує). */
+  suggestedSeats?: SuggestedSeat[];
 }) {
   const router = useRouter();
   const { toast } = useToast();
@@ -420,8 +425,18 @@ export function WarehouseTaskClient({
                     </td>
                   )}
                   <td className="px-2 py-2">
-                    <div className="font-medium text-gray-800">
+                    <div className="flex items-center gap-2 font-medium text-gray-800">
                       {it.productName}
+                      {it.packaging === "bag" && (
+                        <span className="inline-flex rounded-full bg-orange-100 px-1.5 py-0.5 text-[10px] font-semibold text-orange-700">
+                          мішок · ручна обробка
+                        </span>
+                      )}
+                      {it.packaging === "box" && (
+                        <span className="inline-flex rounded-full bg-gray-100 px-1.5 py-0.5 text-[10px] font-medium text-gray-600">
+                          коробка
+                        </span>
+                      )}
                     </div>
                     <div className="text-xs text-gray-500">
                       {it.articleCode ? `Арт. ${it.articleCode}` : "Арт. —"}
@@ -522,7 +537,11 @@ export function WarehouseTaskClient({
 
       {/* Місця відправлення (габарити) — лише для Нової Пошти */}
       {canEditSeats && (
-        <SeatsEditor taskId={task.id} initialSeats={task.seats} />
+        <SeatsEditor
+          taskId={task.id}
+          initialSeats={task.seats}
+          suggestedSeats={suggestedSeats}
+        />
       )}
 
       {/* Відправлено, ТТН у дорозі — місця лише для читання */}
