@@ -106,7 +106,7 @@ describe("WarehouseTaskClient — НП етикетка та gating «Готов
       />,
     );
     const done = screen.getByRole("button", {
-      name: /Запаковано \+ ТТН — відправлено/,
+      name: /Готово/,
     });
     expect((done as HTMLButtonElement).disabled).toBe(true);
     expect(screen.getByText(/Спершу надрукуйте етикетку/)).toBeDefined();
@@ -125,7 +125,7 @@ describe("WarehouseTaskClient — НП етикетка та gating «Готов
       />,
     );
     const done = screen.getByRole("button", {
-      name: /Запаковано \+ ТТН — відправлено/,
+      name: /Готово/,
     });
     expect((done as HTMLButtonElement).disabled).toBe(false);
     expect(screen.getByText(/Етикетку надруковано/)).toBeDefined();
@@ -164,7 +164,7 @@ describe("WarehouseTaskClient — НП етикетка та gating «Готов
     expect(screen.queryByRole("button", { name: /Друк етикетки/ })).toBeNull();
     // Без НП «Готово» залежить лише від запакування (усе запаковано) → enabled.
     const done = screen.getByRole("button", {
-      name: /Запаковано \+ ТТН — відправлено/,
+      name: /Готово/,
     });
     expect((done as HTMLButtonElement).disabled).toBe(false);
   });

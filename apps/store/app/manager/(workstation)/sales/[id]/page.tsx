@@ -424,7 +424,7 @@ function ReadOnlySale({
       <section className="rounded-lg border bg-white p-5">
         <p className="text-sm text-gray-500">
           {locked
-            ? "Реалізацію проведено в 1С — редагування заборонено."
+            ? "Реалізацію проведено — редагування заборонено."
             : "Реалізацію скасовано — лише перегляд."}
         </p>
       </section>

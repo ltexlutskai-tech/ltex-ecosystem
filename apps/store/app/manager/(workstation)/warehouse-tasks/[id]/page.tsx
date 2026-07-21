@@ -88,7 +88,7 @@ export default async function WarehouseTaskDetailPage({
   }
 
   return (
-    <div className="mx-auto max-w-3xl space-y-5">
+    <div className="mx-auto max-w-6xl space-y-5">
       <AutoRefresh intervalMs={15_000} />
       <Link
         href="/manager/warehouse-tasks"

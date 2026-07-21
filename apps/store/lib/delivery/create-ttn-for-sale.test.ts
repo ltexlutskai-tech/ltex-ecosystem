@@ -14,6 +14,7 @@ const h = vi.hoisted(() => ({
   getSenderCounterparty: vi.fn(),
   getSenderContact: vi.fn(),
   getDeliveryLabelResolver: vi.fn(),
+  getPaymentSummary: vi.fn(),
 }));
 
 vi.mock("@ltex/db", () => ({
@@ -35,6 +36,9 @@ vi.mock("@/lib/delivery/nova-poshta", () => ({
 vi.mock("@/lib/manager/delivery-methods", () => ({
   getDeliveryLabelResolver: (...a: unknown[]) =>
     h.getDeliveryLabelResolver(...a),
+}));
+vi.mock("@/lib/manager/payment-summary", () => ({
+  getPaymentSummary: (...a: unknown[]) => h.getPaymentSummary(...a),
 }));
 
 import {
@@ -107,6 +111,8 @@ describe("createTtnForSale", () => {
     );
     h.getSenderCounterparty.mockResolvedValue({ ref: "sender-cp" });
     h.getSenderContact.mockResolvedValue({ ref: "sender-contact" });
+    // За замовчуванням — без свіжого зведення (cod береться з sale.codAmountUah).
+    h.getPaymentSummary.mockResolvedValue(null);
     h.ensureRecipientPrivatePerson.mockResolvedValue({
       counterpartyRef: "r-cp",
       contactRef: "r-contact",
@@ -197,6 +203,22 @@ describe("createTtnForSale", () => {
     expect(input.backwardDeliveryCod).toBeUndefined();
   });
 
+  it("COD = залишок після передоплати (свіже зведення по касі)", async () => {
+    // Сума накладки збережена 9150, але внесено передоплату → залишок 8650.
+    h.sale.findUnique.mockResolvedValue(
+      baseSale({ cashOnDelivery: true, codAmountUah: 9150 }),
+    );
+    h.getPaymentSummary.mockResolvedValue({
+      receivedUah: 500,
+      balanceUah: 8650,
+      codAmountUah: 8650,
+      status: "debt",
+    });
+    await createTtnForSale("s1");
+    const input = h.createInternetDocument.mock.calls[0]![0];
+    expect(input.afterpaymentOnGoodsCost).toBe(8650);
+  });
+
   it("honours a Sender payer type", async () => {
     h.sale.findUnique.mockResolvedValue(baseSale({ npPayerType: "Sender" }));
     await createTtnForSale("s1");
@@ -231,6 +253,8 @@ describe("createTtnForSale — адресна доставка «до двере
     );
     h.getSenderCounterparty.mockResolvedValue({ ref: "sender-cp" });
     h.getSenderContact.mockResolvedValue({ ref: "sender-contact" });
+    // За замовчуванням — без свіжого зведення (cod береться з sale.codAmountUah).
+    h.getPaymentSummary.mockResolvedValue(null);
     h.ensureRecipientPrivatePerson.mockResolvedValue({
       counterpartyRef: "r-cp",
       contactRef: "r-contact",
@@ -314,6 +338,8 @@ describe("updateTtnForSale (Фаза 2 — місця/габарити)", () => 
     );
     h.getSenderCounterparty.mockResolvedValue({ ref: "sender-cp" });
     h.getSenderContact.mockResolvedValue({ ref: "sender-contact" });
+    // За замовчуванням — без свіжого зведення (cod береться з sale.codAmountUah).
+    h.getPaymentSummary.mockResolvedValue(null);
     h.ensureRecipientPrivatePerson.mockResolvedValue({
       counterpartyRef: "r-cp",
       contactRef: "r-contact",

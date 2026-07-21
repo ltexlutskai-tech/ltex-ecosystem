@@ -7,7 +7,8 @@ import type { EttnRequest } from "./ettn-payload";
  * (`/np/ettn`). Усі доступи — з env (НЕ в коді):
  *   CHECKBOX_BASE_URL (default https://api.checkbox.ua/api/v1)
  *   CHECKBOX_PIN_CODE, CHECKBOX_LICENSE_KEY
- *   CHECKBOX_CLIENT_NAME (default «Експрес-накладна (API)»), CHECKBOX_CLIENT_VERSION (default 1.0)
+ *   CHECKBOX_CLIENT_NAME (default «LTEX Express API» — ЛИШЕ ASCII, бо це HTTP-
+ *   заголовок; кирилиця валить fetch), CHECKBOX_CLIENT_VERSION (default 1.0)
  *
  * Best-effort: функції НЕ кидають на мережевих/HTTP-помилках — повертають
  * `{ error }` (щоб «Готово» не падало через фіскалізацію).
@@ -23,13 +24,28 @@ function baseUrl(): string {
   );
 }
 
+/**
+ * HTTP-заголовки мають бути Latin-1 (ByteString). Кирилиця у значенні (напр.
+ * X-Client-Name) валить `fetch` («character has a value > 255»). Лишаємо лише
+ * ASCII-друковані символи; якщо після чистки порожньо — беремо fallback.
+ */
+export function asciiHeader(
+  value: string | undefined,
+  fallback: string,
+): string {
+  const cleaned = (value ?? "").replace(/[^\x20-\x7E]/g, "").trim();
+  return cleaned.length > 0 ? cleaned : fallback;
+}
+
 function clientHeaders(): Record<string, string> {
   return {
     accept: "application/json",
-    "X-Client-Name":
-      process.env.CHECKBOX_CLIENT_NAME ?? "Експрес-накладна (API)",
-    "X-Client-Version": process.env.CHECKBOX_CLIENT_VERSION ?? "1.0",
-    "X-License-Key": process.env.CHECKBOX_LICENSE_KEY ?? "",
+    "X-Client-Name": asciiHeader(
+      process.env.CHECKBOX_CLIENT_NAME,
+      "LTEX Express API",
+    ),
+    "X-Client-Version": asciiHeader(process.env.CHECKBOX_CLIENT_VERSION, "1.0"),
+    "X-License-Key": asciiHeader(process.env.CHECKBOX_LICENSE_KEY, ""),
     "Content-Type": "application/json",
   };
 }

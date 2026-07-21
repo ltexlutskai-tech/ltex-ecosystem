@@ -5,8 +5,6 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button, Input, useToast } from "@ltex/ui";
 import {
-  PackageCheck,
-  Truck,
   ExternalLink,
   Printer,
   Check,
@@ -138,7 +136,6 @@ export function WarehouseTaskClient({
   const hasTtn = Boolean(task.saleTtnRef);
   // «Готово» для НП доступне лише після друку етикетки.
   const needsLabel = hasTtn && !task.labelPrintedAt;
-  const allPacked = task.items.every((i) => packed[i.id]);
   const isSent = task.status === "sent";
   // Габарити можна правити поки завдання не відправлене АБО ТТН ще чернетка в НП.
   const canEditSeats = canAct && isNovaPoshta && (!isSent || ttnDraft);
@@ -192,11 +189,6 @@ export function WarehouseTaskClient({
     } catch {
       // локальний стан лишається; best-effort
     }
-  }
-
-  async function receive() {
-    const ok = await call(`${BASE}/${task.id}/receive`);
-    if (ok) toast({ description: "Завдання прийнято ✓" });
   }
 
   async function send() {
@@ -562,6 +554,7 @@ export function WarehouseTaskClient({
                     <th className="w-8 px-2 py-2 font-medium">№</th>
                     <th className="px-2 py-2 font-medium">Вага, кг</th>
                     <th className="px-2 py-2 font-medium">Д×Ш×В, см</th>
+                    <th className="px-2 py-2 font-medium">Об'ємна вага, кг</th>
                     <th className="px-2 py-2 font-medium">Ручна обробка</th>
                   </tr>
                 </thead>
@@ -572,6 +565,11 @@ export function WarehouseTaskClient({
                       <td className="px-2 py-2 text-gray-700">{s.weight}</td>
                       <td className="px-2 py-2 text-gray-700">
                         {s.lengthCm}×{s.widthCm}×{s.heightCm}
+                      </td>
+                      <td className="px-2 py-2 text-gray-700">
+                        {Math.round(
+                          ((s.lengthCm * s.widthCm * s.heightCm) / 4000) * 100,
+                        ) / 100 || "—"}
                       </td>
                       <td className="px-2 py-2 text-gray-700">
                         {s.manualHandling ? "Так" : "—"}
@@ -617,86 +615,66 @@ export function WarehouseTaskClient({
         </section>
       )}
 
-      {/* Дії складу */}
+      {/* Дії складу: друк етикетки → «Готово» (закриває завдання + сповіщає менеджера) */}
       {canAct && task.status !== "sent" && (
         <section className="rounded-lg border bg-white p-5 shadow-sm">
           <h2 className="mb-3 text-base font-semibold text-gray-800">Дії</h2>
-          {task.status === "new" && (
+          <div className="space-y-3">
+            {isPost && !isNovaPoshta && (
+              <div className="max-w-sm">
+                <label className="mb-1 block text-xs font-medium text-gray-600">
+                  ТТН / трек-номер (за потреби уточніть)
+                </label>
+                <Input
+                  value={ttn}
+                  onChange={(e) => setTtn(e.target.value)}
+                  placeholder="номер накладної"
+                />
+              </div>
+            )}
+            {/* Крок 1 — друк етикетки Нової Пошти */}
+            {isNovaPoshta && (
+              <div className="space-y-2">
+                <div className="flex flex-wrap items-center gap-3">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={!hasTtn}
+                    onClick={printLabel}
+                  >
+                    <Printer className="mr-1 h-4 w-4" />
+                    Друк етикетки
+                  </Button>
+                  {task.labelPrintedAt && (
+                    <span className="inline-flex items-center gap-1 text-sm text-green-700">
+                      <Check className="h-4 w-4" />
+                      Етикетку надруковано
+                    </span>
+                  )}
+                </div>
+                {!hasTtn && (
+                  <p className="text-xs text-amber-600">
+                    Спершу створіть ТТН у реалізації.
+                  </p>
+                )}
+              </div>
+            )}
+            {/* Крок 2 — «Готово»: доступне після друку етикетки (для НП) */}
+            {needsLabel && (
+              <p className="text-xs text-amber-600">
+                Спершу надрукуйте етикетку — тоді зʼявиться кнопка «Готово».
+              </p>
+            )}
             <Button
               type="button"
-              disabled={busy}
-              onClick={() => void receive()}
-              className="bg-blue-600 text-white hover:bg-blue-700"
+              disabled={busy || needsLabel}
+              onClick={() => void send()}
+              className="bg-green-600 text-white hover:bg-green-700"
             >
-              <PackageCheck className="mr-1 h-4 w-4" />
-              Прийняти в роботу
+              <Check className="mr-1 h-4 w-4" />
+              Готово
             </Button>
-          )}
-          {task.status === "received" && (
-            <div className="space-y-3">
-              {isPost && (
-                <div className="max-w-sm">
-                  <label className="mb-1 block text-xs font-medium text-gray-600">
-                    ТТН / трек-номер (за потреби уточніть)
-                  </label>
-                  <Input
-                    value={ttn}
-                    onChange={(e) => setTtn(e.target.value)}
-                    placeholder="номер накладної"
-                  />
-                </div>
-              )}
-              {/* Друк етикетки Нової Пошти */}
-              {isNovaPoshta && (
-                <div className="space-y-2">
-                  <div className="flex flex-wrap items-center gap-3">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      disabled={!hasTtn}
-                      onClick={printLabel}
-                    >
-                      <Printer className="mr-1 h-4 w-4" />
-                      Друк етикетки
-                    </Button>
-                    {task.labelPrintedAt && (
-                      <span className="inline-flex items-center gap-1 text-sm text-green-700">
-                        <Check className="h-4 w-4" />
-                        Етикетку надруковано
-                      </span>
-                    )}
-                  </div>
-                  {!hasTtn && (
-                    <p className="text-xs text-amber-600">
-                      Спершу створіть ТТН у реалізації.
-                    </p>
-                  )}
-                  <p className="text-xs text-gray-500">
-                    Якщо етикетка не відкрилась — перевірте, що ТТН створено.
-                  </p>
-                </div>
-              )}
-              {!allPacked && (
-                <p className="text-xs text-amber-600">
-                  Відмітьте всі позиції як запаковані перед відправленням.
-                </p>
-              )}
-              {needsLabel && (
-                <p className="text-xs text-amber-600">
-                  Спершу надрукуйте етикетку.
-                </p>
-              )}
-              <Button
-                type="button"
-                disabled={busy || !allPacked || needsLabel}
-                onClick={() => void send()}
-                className="bg-green-600 text-white hover:bg-green-700"
-              >
-                <Truck className="mr-1 h-4 w-4" />
-                Запаковано + ТТН — відправлено
-              </Button>
-            </div>
-          )}
+          </div>
         </section>
       )}
     </div>

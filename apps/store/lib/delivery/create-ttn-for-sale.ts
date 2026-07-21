@@ -2,6 +2,7 @@ import { prisma } from "@ltex/db";
 import { normalizePhone } from "@ltex/shared";
 import { classifyDelivery } from "@/lib/manager/order-delivery";
 import { getDeliveryLabelResolver } from "@/lib/manager/delivery-methods";
+import { getPaymentSummary } from "@/lib/manager/payment-summary";
 import {
   buildReceiptNameResolver,
   resolveReceiptName,
@@ -282,11 +283,15 @@ async function buildTtnInputForSale(
     : MIN_DECLARED_UAH;
   const cost = Math.max(1, baseCost);
 
-  // Накладка → «Контроль оплати».
-  const cod =
-    sale.cashOnDelivery && sale.codAmountUah && sale.codAmountUah > 0
-      ? Math.round(sale.codAmountUah)
-      : undefined;
+  // Накладка → «Контроль оплати». Береться ЗАЛИШОК до сплати з урахуванням
+  // передоплат (свіже зведення по касі), а не збережене `codAmountUah`, яке
+  // могло бути пораховане до внесення передоплати. Так наложка = сума − оплачено.
+  let cod: number | undefined;
+  if (sale.cashOnDelivery) {
+    const summary = await getPaymentSummary(sale.id);
+    const remainUah = summary ? summary.codAmountUah : (sale.codAmountUah ?? 0);
+    cod = remainUah > 0 ? Math.round(remainUah) : undefined;
+  }
 
   const input: CreateTtnInput = {
     payerType: sale.npPayerType === "Sender" ? "Sender" : "Recipient",

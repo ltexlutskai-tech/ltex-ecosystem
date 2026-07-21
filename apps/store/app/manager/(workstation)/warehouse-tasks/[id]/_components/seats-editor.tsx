@@ -83,6 +83,15 @@ function num(v: string): number {
   return Number.isFinite(n) && n > 0 ? n : 0;
 }
 
+/**
+ * Об'ємна вага (кг) — як у Нової Пошти: Д×Ш×В (см) / 4000. НП тарифікує за
+ * більшою з фактичної та об'ємної ваги, тому склад бачить її одразу.
+ */
+function volumetricWeight(l: string, w: string, h: string): number {
+  const v = (num(l) * num(w) * num(h)) / 4000;
+  return Math.round(v * 100) / 100;
+}
+
 interface TtnResult {
   ok: boolean;
   number?: string;
@@ -203,6 +212,7 @@ export function SeatsEditor({
               <th className="px-2 py-2 font-medium">Довжина, см</th>
               <th className="px-2 py-2 font-medium">Ширина, см</th>
               <th className="px-2 py-2 font-medium">Висота, см</th>
+              <th className="px-2 py-2 font-medium">Об'ємна вага, кг</th>
               <th className="px-2 py-2 font-medium">Ручна обробка</th>
               <th className="w-10 px-2 py-2"></th>
             </tr>
@@ -254,6 +264,9 @@ export function SeatsEditor({
                     aria-label={`Висота місця ${i + 1}`}
                     className="w-24"
                   />
+                </td>
+                <td className="px-2 py-2 text-center text-gray-600">
+                  {volumetricWeight(r.lengthCm, r.widthCm, r.heightCm) || "—"}
                 </td>
                 <td className="px-2 py-2 text-center">
                   <input
