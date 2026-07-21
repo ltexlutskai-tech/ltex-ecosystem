@@ -22,6 +22,10 @@ import {
   type NpSelection,
 } from "../../../_components/np-warehouse-picker";
 import {
+  NpStreetPicker,
+  type NpAddressSelection,
+} from "../../../_components/np-street-picker";
+import {
   SaleLotPicker,
   type SaleGeneralPick,
   type SaleLotPick,
@@ -80,6 +84,11 @@ interface SaleDraftData {
   npCityName: string;
   npWarehouseRef: string;
   npWarehouseName: string;
+  npDeliveryType: string;
+  npStreetRef: string;
+  npStreetName: string;
+  npBuildingNumber: string;
+  npFlat: string;
   npRecipientName: string;
   npRecipientPhone: string;
   npPayerType: string;
@@ -284,6 +293,24 @@ export function SaleForm({
   const [npWarehouseName, setNpWarehouseName] = useState(
     npInitial.warehouseName,
   );
+  // Тип доставки НП: «на відділення» (дефолт) чи «до дверей» (кур'єр на адресу).
+  const [npDeliveryType, setNpDeliveryType] = useState(
+    initialSale?.npDeliveryType === "WarehouseDoors"
+      ? "WarehouseDoors"
+      : "WarehouseWarehouse",
+  );
+  // Адресна доставка «до дверей»: вулиця (реф+назва) + будинок + квартира.
+  const [npStreetRef, setNpStreetRef] = useState(
+    initialSale?.npStreetRef ?? "",
+  );
+  const [npStreetName, setNpStreetName] = useState(
+    initialSale?.npStreetName ?? "",
+  );
+  const [npBuildingNumber, setNpBuildingNumber] = useState(
+    initialSale?.npBuildingNumber ?? "",
+  );
+  const [npFlat, setNpFlat] = useState(initialSale?.npFlat ?? "");
+  const isNpDoors = npDeliveryType === "WarehouseDoors";
   // Чи редагував менеджер адресу НП вручну — щоб зміна клієнта не перезаписувала
   // вже введене/обране значення (best-effort, дзеркалить recipientTouched).
   const [npTouched, setNpTouched] = useState(false);
@@ -354,6 +381,11 @@ export function SaleForm({
       npCityName,
       npWarehouseRef,
       npWarehouseName,
+      npDeliveryType,
+      npStreetRef,
+      npStreetName,
+      npBuildingNumber,
+      npFlat,
       npRecipientName,
       npRecipientPhone,
       npPayerType,
@@ -374,6 +406,11 @@ export function SaleForm({
       npCityName,
       npWarehouseRef,
       npWarehouseName,
+      npDeliveryType,
+      npStreetRef,
+      npStreetName,
+      npBuildingNumber,
+      npFlat,
       npRecipientName,
       npRecipientPhone,
       npPayerType,
@@ -411,7 +448,23 @@ export function SaleForm({
         npCityName: isNovaPoshta ? d.npCityName.trim() || null : null,
         npWarehouseRef: isNovaPoshta ? d.npWarehouseRef.trim() || null : null,
         npWarehouseName: isNovaPoshta ? d.npWarehouseName.trim() || null : null,
-        npDeliveryType: isNovaPoshta ? "WarehouseWarehouse" : null,
+        npDeliveryType: isNovaPoshta ? d.npDeliveryType : null,
+        npStreetRef:
+          isNovaPoshta && d.npDeliveryType === "WarehouseDoors"
+            ? d.npStreetRef.trim() || null
+            : null,
+        npStreetName:
+          isNovaPoshta && d.npDeliveryType === "WarehouseDoors"
+            ? d.npStreetName.trim() || null
+            : null,
+        npBuildingNumber:
+          isNovaPoshta && d.npDeliveryType === "WarehouseDoors"
+            ? d.npBuildingNumber.trim() || null
+            : null,
+        npFlat:
+          isNovaPoshta && d.npDeliveryType === "WarehouseDoors"
+            ? d.npFlat.trim() || null
+            : null,
         npRecipientName: isNovaPoshta ? d.npRecipientName.trim() || null : null,
         npRecipientPhone: isNovaPoshta
           ? d.npRecipientPhone.trim() || null
@@ -525,6 +578,15 @@ export function SaleForm({
     setNovaPoshtaBranch(
       v.warehouseName ? branchNumberFromWarehouseName(v.warehouseName) : "",
     );
+  }
+
+  /** Оновлення адреси «до дверей» НП (вулиця/будинок/квартира) з пікера. */
+  function onNpStreetChange(v: NpAddressSelection): void {
+    setNpTouched(true);
+    setNpStreetRef(v.streetRef);
+    setNpStreetName(v.streetName);
+    setNpBuildingNumber(v.building);
+    setNpFlat(v.flat);
   }
 
   /**
@@ -751,7 +813,21 @@ export function SaleForm({
             deliveryKind === "post" ? npWarehouseRef.trim() || null : null,
           npWarehouseName:
             deliveryKind === "post" ? npWarehouseName.trim() || null : null,
-          npDeliveryType: deliveryKind === "post" ? "WarehouseWarehouse" : null,
+          npDeliveryType: deliveryKind === "post" ? npDeliveryType : null,
+          npStreetRef:
+            deliveryKind === "post" && isNpDoors
+              ? npStreetRef.trim() || null
+              : null,
+          npStreetName:
+            deliveryKind === "post" && isNpDoors
+              ? npStreetName.trim() || null
+              : null,
+          npBuildingNumber:
+            deliveryKind === "post" && isNpDoors
+              ? npBuildingNumber.trim() || null
+              : null,
+          npFlat:
+            deliveryKind === "post" && isNpDoors ? npFlat.trim() || null : null,
           npRecipientName:
             deliveryKind === "post" ? npRecipientName.trim() || null : null,
           npRecipientPhone:
@@ -1065,7 +1141,41 @@ export function SaleForm({
             </select>
           </div>
 
-          {/* Нова Пошта — структурований вибір міста + відділення (довідник НП). */}
+          {/* Нова Пошта — тип доставки (на відділення / кур'єром на адресу). */}
+          {deliveryKind === "post" && (
+            <div className="sm:col-span-2 lg:col-span-3">
+              <span className="mb-1 block text-sm font-medium text-gray-700">
+                Тип доставки Нової Пошти
+              </span>
+              <div className="inline-flex overflow-hidden rounded-md border border-gray-300">
+                <button
+                  type="button"
+                  onClick={() => setNpDeliveryType("WarehouseWarehouse")}
+                  className={
+                    !isNpDoors
+                      ? "bg-green-600 px-4 py-2 text-sm font-medium text-white"
+                      : "bg-white px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                  }
+                >
+                  На відділення
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setNpDeliveryType("WarehouseDoors")}
+                  className={
+                    isNpDoors
+                      ? "bg-green-600 px-4 py-2 text-sm font-medium text-white"
+                      : "bg-white px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                  }
+                >
+                  Кур'єром на адресу
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Нова Пошта — структурований вибір міста (+ відділення у режимі
+              «на відділення»; для «до дверей» відділення приховано). */}
           {deliveryKind === "post" && (
             <NpWarehousePicker
               cityRef={npCityRef}
@@ -1073,6 +1183,19 @@ export function SaleForm({
               warehouseRef={npWarehouseRef}
               warehouseName={npWarehouseName}
               onChange={onNpChange}
+              hideWarehouse={isNpDoors}
+            />
+          )}
+
+          {/* Нова Пошта — адреса «до дверей» (вулиця/будинок/квартира). */}
+          {deliveryKind === "post" && isNpDoors && (
+            <NpStreetPicker
+              cityRef={npCityRef}
+              streetRef={npStreetRef}
+              streetName={npStreetName}
+              building={npBuildingNumber}
+              flat={npFlat}
+              onChange={onNpStreetChange}
             />
           )}
           {/* Підказка коли адресу НП клієнта ще не звірено (нема реф-ів). */}

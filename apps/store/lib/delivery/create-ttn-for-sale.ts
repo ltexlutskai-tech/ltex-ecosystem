@@ -11,6 +11,7 @@ import {
   createInternetDocument,
   updateInternetDocument,
   ensureRecipientPrivatePerson,
+  saveRecipientAddress,
   getSenderCounterparty,
   getSenderContact,
   type CreateTtnInput,
@@ -127,7 +128,17 @@ async function buildTtnInputForSale(
   );
   if (kind !== "post") return { kind: "skip" };
 
-  if (!sale.npCityRef || !sale.npWarehouseRef) {
+  // Тип доставки НП: «до дверей» (кур'єр на адресу) чи «на відділення» (дефолт).
+  const isDoors = sale.npDeliveryType === "WarehouseDoors";
+  if (isDoors) {
+    if (!sale.npCityRef || !sale.npStreetRef || !sale.npBuildingNumber) {
+      return {
+        kind: "error",
+        message:
+          "Для доставки кур'єром вкажіть місто, вулицю та будинок Нової Пошти.",
+      };
+    }
+  } else if (!sale.npCityRef || !sale.npWarehouseRef) {
     return {
       kind: "error",
       message:
@@ -182,6 +193,24 @@ async function buildTtnInputForSale(
   });
   if ("error" in recipient) {
     return { kind: "error", message: `Отримувач: ${recipient.error}` };
+  }
+
+  // Адресна доставка «до дверей»: створюємо адресу отримувача (вулиця/будинок/
+  // квартира) → її ref піде у ТТН як RecipientAddress (ServiceType=WarehouseDoors).
+  let recipientAddressRef: string;
+  if (isDoors) {
+    const saved = await saveRecipientAddress({
+      counterpartyRef: recipient.counterpartyRef,
+      streetRef: sale.npStreetRef!,
+      building: sale.npBuildingNumber!,
+      flat: sale.npFlat ?? undefined,
+    });
+    if ("error" in saved) {
+      return { kind: "error", message: `Адреса: ${saved.error}` };
+    }
+    recipientAddressRef = saved.ref;
+  } else {
+    recipientAddressRef = sale.npWarehouseRef!;
   }
 
   // Вага/місця: фактичні складські місця (Фаза 2), інакше орієнтовні.
@@ -264,7 +293,7 @@ async function buildTtnInputForSale(
     paymentMethod: "Cash",
     cargoType: anyManual ? "Cargo" : "Parcel",
     weight,
-    serviceType: "WarehouseWarehouse",
+    serviceType: isDoors ? "WarehouseDoors" : "WarehouseWarehouse",
     seatsAmount,
     description,
     cost,
@@ -276,7 +305,8 @@ async function buildTtnInputForSale(
     recipientCounterpartyRef: recipient.counterpartyRef,
     recipientContactRef: recipient.contactRef,
     cityRecipientRef: sale.npCityRef,
-    recipientWarehouseRef: sale.npWarehouseRef,
+    // Для «до дверей» — ref створеної адреси; для «на відділення» — ref відділення.
+    recipientWarehouseRef: recipientAddressRef,
     recipientPhone: npPhone,
     recipientName,
     // Накладка L-TEX = «Контроль оплати» (гроші на рахунок ФОП через NovaPay).
