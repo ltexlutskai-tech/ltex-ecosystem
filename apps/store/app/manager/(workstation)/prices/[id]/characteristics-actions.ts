@@ -12,6 +12,15 @@ export interface CharacteristicsState {
 }
 
 /**
+ * Нормалізує значення «Пакування»: приймаємо лише "box"/"bag", решту
+ * (порожнє, невідоме) → null. Мішки (bag) потребують ручної обробки на
+ * Новій Пошті — це поле є джерелом правди для позначки specialCargo.
+ */
+function normalizePackaging(raw: string): "box" | "bag" | null {
+  return raw === "box" || raw === "bag" ? raw : null;
+}
+
+/**
  * Редагування «Характеристик» товару з картки (2026-07-17). Дозволяє
  * доповнити старі позиції полями з форми створення: Сорт/Стать/Сезон/Країна
  * (значення довідників), Розміри/Кількість одиниць/Вага одиниці (текст),
@@ -44,6 +53,7 @@ export async function updateProductCharacteristics(
   const filling = str("filling") || null;
   const producer = str("producer") || null;
   const receiptName = str("receiptName") || null;
+  const packaging = normalizePackaging(str("packaging"));
   const videoUrl = str("videoUrl") || null;
   const unitsPerKg = str("unitsPerKg") || null;
   const unitWeight = str("unitWeight") || null;
@@ -65,6 +75,7 @@ export async function updateProductCharacteristics(
       filling,
       producer,
       receiptName,
+      packaging,
       videoUrl,
       unitsPerKg,
       unitsPerKgMin: unitsRange?.min ?? null,

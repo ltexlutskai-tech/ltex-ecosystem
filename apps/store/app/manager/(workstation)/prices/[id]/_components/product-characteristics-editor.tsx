@@ -231,6 +231,20 @@ function CharacteristicsForm({
             — система визначить за категорією.
           </p>
         </Field>
+        <Field label="Пакування">
+          <select
+            name="packaging"
+            defaultValue={values.packaging}
+            className={inputCls}
+          >
+            <option value="">— не вказано —</option>
+            <option value="box">Коробка</option>
+            <option value="bag">Мішок</option>
+          </select>
+          <p className="mt-1 text-xs text-gray-400">
+            Мішки потребують ручної обробки на Новій Пошті.
+          </p>
+        </Field>
         <Field label="Наповнення" full>
           <textarea
             name="filling"

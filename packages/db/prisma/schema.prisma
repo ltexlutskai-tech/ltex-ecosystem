@@ -65,6 +65,9 @@ model Product {
   // вживане», «Товари для дому вживані». Заповнюється в картці товару / скриптом
   // переносу з 1С. Порожнє → резолвер бере назву за деревом категорій.
   receiptName       String?  @map("receipt_name")
+  // Пакування: «box» (коробка) | «bag» (мішок) | null (не вказано). Мішки на НП
+  // потребують «ручної обробки» (specialCargo) → підказка складу при пакуванні.
+  packaging         String?
   inStock           Boolean  @default(true) @map("in_stock")
   // ТЗ 8.0 soft-delete (позначка на вилучення / архів). Вітрина ці поля не читає.
   markedForDeletion Boolean  @default(false) @map("marked_for_deletion")
@@ -3502,11 +3505,15 @@ model Task {
   createdByUserId   String    @map("created_by_user_id")
   assigneeUserId    String?   @map("assignee_user_id")
   assigneeRole      String?   @map("assignee_role")
-  status            String    @default("open")
+  status            String    @default("open") // open | done | archived
   type              String    @default("manual")
   resultComment     String?   @map("result_comment") @db.Text
   completedAt       DateTime? @map("completed_at")
   completedByUserId String?   @map("completed_by_user_id")
+  // Архів: виконавець АБО постановник може відправити в архів (видно всім).
+  archivedAt        DateTime? @map("archived_at")
+  archivedByUserId  String?   @map("archived_by_user_id")
+  archivedByName    String?   @map("archived_by_name")
   clientId          String?   @map("client_id")
   saleId            String?   @map("sale_id")
   createdAt         DateTime  @default(now()) @map("created_at")

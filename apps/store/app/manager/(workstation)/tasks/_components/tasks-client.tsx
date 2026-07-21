@@ -92,21 +92,44 @@ function Section({
   empty: string;
   tasks: TaskCard[];
 }) {
+  const [showArchived, setShowArchived] = useState(false);
+  const active = tasks.filter((t) => t.status !== "archived");
+  const archived = tasks.filter((t) => t.status === "archived");
+
   return (
     <section>
       <h2 className="mb-2 text-sm font-semibold text-gray-700">
         {title}{" "}
-        <span className="font-normal text-gray-400">({tasks.length})</span>
+        <span className="font-normal text-gray-400">({active.length})</span>
       </h2>
-      {tasks.length === 0 ? (
+      {active.length === 0 ? (
         <p className="rounded-md border border-dashed border-gray-200 p-4 text-center text-sm text-gray-400">
           {empty}
         </p>
       ) : (
         <div className="space-y-2">
-          {tasks.map((t) => (
+          {active.map((t) => (
             <TaskRow key={`${t.kind}-${t.id}`} task={t} />
           ))}
+        </div>
+      )}
+
+      {archived.length > 0 && (
+        <div className="mt-2">
+          <button
+            type="button"
+            onClick={() => setShowArchived((v) => !v)}
+            className="text-xs font-medium text-gray-500 hover:underline"
+          >
+            {showArchived ? "▾" : "▸"} Архів ({archived.length})
+          </button>
+          {showArchived && (
+            <div className="mt-2 space-y-2">
+              {archived.map((t) => (
+                <TaskRow key={`${t.kind}-${t.id}`} task={t} />
+              ))}
+            </div>
+          )}
         </div>
       )}
     </section>
@@ -117,23 +140,39 @@ function TaskRow({ task }: { task: TaskCard }) {
   const router = useRouter();
   const { toast } = useToast();
   const [completeOpen, setCompleteOpen] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const [busy, setBusy] = useState(false);
   const meta = taskTypeMeta(task.type);
   const done = task.status === "done";
+  const archived = task.status === "archived";
 
-  async function reopen() {
+  async function patch(action: "reopen" | "archive" | "unarchive") {
     setBusy(true);
     try {
       const res = await fetch(`/api/v1/manager/tasks/${task.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "reopen" }),
+        body: JSON.stringify({ action }),
       });
       if (!res.ok) throw new Error();
       router.refresh();
     } catch {
-      toast({ title: "Не вдалося перевідкрити", variant: "destructive" });
+      toast({ title: "Не вдалося виконати дію", variant: "destructive" });
     } finally {
+      setBusy(false);
+    }
+  }
+
+  async function remove() {
+    setBusy(true);
+    try {
+      const res = await fetch(`/api/v1/manager/tasks/${task.id}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) throw new Error();
+      router.refresh();
+    } catch {
+      toast({ title: "Не вдалося вилучити", variant: "destructive" });
       setBusy(false);
     }
   }
@@ -142,7 +181,7 @@ function TaskRow({ task }: { task: TaskCard }) {
     <div
       className={`rounded-md border border-l-4 bg-white p-3 ${
         BORDER[meta.color] ?? BORDER.gray
-      } ${done ? "opacity-60" : ""}`}
+      } ${done || archived ? "opacity-60" : ""}`}
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
@@ -160,6 +199,11 @@ function TaskRow({ task }: { task: TaskCard }) {
                 Виконано
               </span>
             )}
+            {archived && (
+              <span className="rounded bg-gray-200 px-1.5 py-0.5 text-xs text-gray-600">
+                Архів
+              </span>
+            )}
           </div>
           {task.description && (
             <p className="mt-1 text-sm text-gray-600">{task.description}</p>
@@ -167,6 +211,11 @@ function TaskRow({ task }: { task: TaskCard }) {
           <p className="mt-1 text-xs text-gray-400">
             Від: {task.createdByName} · Кому: {task.assigneeName}
           </p>
+          {archived && task.archivedByName && (
+            <p className="mt-1 text-xs text-gray-400">
+              в архів: {task.archivedByName}
+            </p>
+          )}
           {task.resultComment && (
             <p className="mt-1 rounded bg-green-50 p-1.5 text-xs text-green-800">
               Результат: {task.resultComment}
@@ -197,12 +246,68 @@ function TaskRow({ task }: { task: TaskCard }) {
               type="button"
               size="sm"
               variant="outline"
-              onClick={reopen}
+              onClick={() => patch("reopen")}
               disabled={busy}
             >
               Перевідкрити
             </Button>
           )}
+          {task.canArchive && (
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={() => patch("archive")}
+              disabled={busy}
+            >
+              Відправити в архів
+            </Button>
+          )}
+          {task.canUnarchive && (
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={() => patch("unarchive")}
+              disabled={busy}
+            >
+              Відновити
+            </Button>
+          )}
+          {task.canDelete &&
+            (confirmDelete ? (
+              <div className="flex items-center gap-1">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="destructive"
+                  onClick={remove}
+                  disabled={busy}
+                >
+                  Так, вилучити
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setConfirmDelete(false)}
+                  disabled={busy}
+                >
+                  Скасувати
+                </Button>
+              </div>
+            ) : (
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => setConfirmDelete(true)}
+                disabled={busy}
+                className="text-red-600"
+              >
+                Вилучити
+              </Button>
+            ))}
         </div>
       </div>
 

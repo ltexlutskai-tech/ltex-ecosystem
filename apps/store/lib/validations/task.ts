@@ -35,6 +35,8 @@ export const patchTaskSchema = z.discriminatedUnion("action", [
     resultComment: z.string().trim().max(2000).optional(),
   }),
   z.object({ action: z.literal("reopen") }),
+  z.object({ action: z.literal("archive") }),
+  z.object({ action: z.literal("unarchive") }),
 ]);
 
 export type PatchTaskInput = z.infer<typeof patchTaskSchema>;

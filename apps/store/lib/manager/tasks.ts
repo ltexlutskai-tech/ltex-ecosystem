@@ -39,6 +39,7 @@ function toRaw(t: DbTask): RawTask {
     assigneeUserId: t.assigneeUserId,
     assigneeRole: t.assigneeRole,
     assigneeName: t.assignee?.fullName ?? null,
+    archivedByName: t.archivedByName,
     clientId: t.clientId,
     saleId: t.saleId,
   };
@@ -66,10 +67,11 @@ export async function getTasksForUser(
 
   const [assignedTasks, createdTasks, whAssigned, whCreated] =
     await Promise.all([
-      // Мені (ручні, відкриті): особисто або за роллю.
+      // Мені (ручні): відкриті + архівні (щоб виконавець бачив «Архів»),
+      // особисто або за роллю.
       prisma.task.findMany({
         where: {
-          status: "open",
+          status: { in: ["open", "archived"] },
           OR: [{ assigneeUserId: user.id }, { assigneeRole: user.role }],
         },
         include: TASK_INCLUDE,

@@ -12,6 +12,15 @@ export interface CreateProductState {
   error?: string;
 }
 
+/**
+ * Нормалізує значення «Пакування»: приймаємо лише "box"/"bag", решту
+ * (порожнє, невідоме) → null. Мішки (bag) потребують ручної обробки на
+ * Новій Пошті — це поле є джерелом правди для позначки specialCargo.
+ */
+function normalizePackaging(raw: string): "box" | "bag" | null {
+  return raw === "box" || raw === "bag" ? raw : null;
+}
+
 async function uniqueSlug(base: string): Promise<string> {
   const root = base || "tovar";
   let slug = root;
@@ -79,6 +88,9 @@ export async function createManagerProduct(
   const producer = ((formData.get("producer") as string) || "").trim() || null;
   const receiptName =
     ((formData.get("receiptName") as string) || "").trim() || null;
+  const packaging = normalizePackaging(
+    ((formData.get("packaging") as string) || "").trim(),
+  );
   const videoUrl = ((formData.get("videoUrl") as string) || "").trim() || null;
   const season = ((formData.get("season") as string) || "").trim();
   const filling = ((formData.get("filling") as string) || "").trim() || null;
@@ -142,6 +154,7 @@ export async function createManagerProduct(
         filling,
         producer,
         receiptName,
+        packaging,
         videoUrl,
         averageWeight,
         unitsPerKg: unitsPerKgRaw,
