@@ -436,11 +436,12 @@ model Sale {
   createdAt           DateTime @default(now()) @map("created_at")
   updatedAt           DateTime @updatedAt @map("updated_at")
 
-  customer      Customer       @relation(fields: [customerId], references: [id])
-  order         Order?         @relation("SaleOrder", fields: [orderId], references: [id], onDelete: SetNull)
-  items         SaleItem[]
-  cashOrders    MgrCashOrder[]
-  warehouseTask WarehouseTask?
+  customer        Customer         @relation(fields: [customerId], references: [id])
+  order           Order?           @relation("SaleOrder", fields: [orderId], references: [id], onDelete: SetNull)
+  items           SaleItem[]
+  cashOrders      MgrCashOrder[]
+  warehouseTask   WarehouseTask?
+  checkboxReceipt CheckboxReceipt?
 
   @@index([customerId])
   @@index([status])
@@ -681,6 +682,27 @@ model WarehouseTaskItem {
 // вагою й габаритами (Д×Ш×В, см). На «Готово» ці місця пушаться у ТТН НП
 // (`InternetDocument.update`: SeatsAmount + OptionsSeat). Кількість/габарити
 // вирішує склад (пакує кілька лотів в одне або розпаковує).
+// ─── Чек Checkbox (ПРРО, ETTN) — Фаза 3 ────────────────────────────────────
+// Проєкт фіскального чека Checkbox для NovaPay-накладки. Створюється на «Готово»
+// (склад підтвердив підготовку до відправки). Порт 1С РеалізаціяТоварівПослуг →
+// POST /api/v1/np/ettn. Ідемпотентно за saleId (@unique).
+model CheckboxReceipt {
+  id              String   @id @default(cuid())
+  saleId          String   @unique @map("sale_id")
+  status          String   @default("pending") // pending | created | failed
+  receiptId       String?  @map("receipt_id") // id чека у Checkbox
+  ettn            String? // № ТТН (експрес-накладна), до якої привʼязано чек
+  fiscalCode      String?  @map("fiscal_code")
+  error           String?
+  payloadSnapshot Json?    @map("payload_snapshot")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  sale Sale @relation(fields: [saleId], references: [id], onDelete: Cascade)
+
+  @@map("checkbox_receipts")
+}
+
 model WarehouseTaskSeat {
   id       String @id @default(cuid())
   taskId   String @map("task_id")

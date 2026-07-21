@@ -3,6 +3,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@ltex/db";
 import { getCurrentUser } from "@/lib/auth/manager-auth";
 import { notifyManagerAboutTask } from "@/lib/manager/warehouse-task";
+import { createCheckboxReceiptForSale } from "@/lib/fiscal/create-receipt-for-sale";
 
 const WAREHOUSE_ROLES = ["warehouse", "admin", "owner"];
 
@@ -33,6 +34,7 @@ export async function POST(
     select: {
       id: true,
       status: true,
+      saleId: true,
       managerUserId: true,
       customerName: true,
       labelPrintedAt: true,
@@ -81,6 +83,10 @@ export async function POST(
     saleRef: task.sale,
     kind: "sent",
   });
+
+  // Фаза 3: чек Checkbox (ETTN) для NovaPay-накладки — best-effort, не блокує
+  // «Готово» (гард на накладку/№ТТН — усередині). UI показує статус + «Повторити».
+  void createCheckboxReceiptForSale(task.saleId);
 
   revalidatePath("/manager/warehouse-tasks");
   revalidatePath(`/manager/warehouse-tasks/${id}`);
