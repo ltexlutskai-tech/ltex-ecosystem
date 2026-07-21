@@ -186,6 +186,14 @@ describe("buildTtnMethodProperties", () => {
     expect(props.OptionsSeat).toBeUndefined();
   });
 
+  it("isDraftTtn: only StatusCode 1 is a draft", async () => {
+    const { isDraftTtn } = await import("./nova-poshta");
+    expect(isDraftTtn("1")).toBe(true);
+    expect(isDraftTtn("2")).toBe(false);
+    expect(isDraftTtn(null)).toBe(false);
+    expect(isDraftTtn(undefined)).toBe(false);
+  });
+
   it("adds AfterpaymentOnGoodsCost (Контроль оплати) when set", () => {
     const props = buildTtnMethodProperties({
       ...baseTtnInput,

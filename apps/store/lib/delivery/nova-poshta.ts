@@ -509,6 +509,27 @@ interface RawTracking {
   WarehouseRecipient: string;
 }
 
+/**
+ * Чи ТТН ще «Чернетка» (StatusCode "1" — відправник створив накладну, але ще не
+ * надав до відправки). Лише у цьому стані НП дозволяє редагувати/видаляти ТТН.
+ */
+export function isDraftTtn(statusCode: string | null | undefined): boolean {
+  return statusCode === "1";
+}
+
+/** Статус ТТН для рішень «редагувати/видалити» (draft) чи «в дорозі». */
+export async function getTtnStatus(
+  number: string,
+): Promise<{ statusCode: string; status: string; isDraft: boolean } | null> {
+  const t = await trackTtn(number);
+  if (!t) return null;
+  return {
+    statusCode: t.statusCode,
+    status: t.status,
+    isDraft: isDraftTtn(t.statusCode),
+  };
+}
+
 export async function trackTtn(number: string): Promise<NpTracking | null> {
   const res = await callNovaPoshta<RawTracking>(
     "TrackingDocument",
