@@ -2,11 +2,13 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const findMany = vi.fn();
 const reminderCreate = vi.fn();
+const cashOrderUpdate = vi.fn();
 
 vi.mock("@ltex/db", () => ({
   prisma: {
     sale: { findMany: (...a: unknown[]) => findMany(...a) },
     mgrReminder: { create: (...a: unknown[]) => reminderCreate(...a) },
+    mgrCashOrder: { update: (...a: unknown[]) => cashOrderUpdate(...a) },
   },
 }));
 
@@ -15,9 +17,9 @@ vi.mock("@/lib/delivery/nova-poshta", () => ({
   trackTtnMany: (...a: unknown[]) => trackTtnMany(...a),
 }));
 
-const createCashOrderDraft = vi.fn();
+const createPaymentOrders = vi.fn();
 vi.mock("@/lib/manager/cash-order", () => ({
-  createCashOrderDraft: (...a: unknown[]) => createCashOrderDraft(...a),
+  createPaymentOrders: (...a: unknown[]) => createPaymentOrders(...a),
 }));
 
 import { reconcileNovaPayPayments } from "./novapay-reconcile";
@@ -41,19 +43,20 @@ function sale(over: Record<string, unknown> = {}) {
 beforeEach(() => {
   findMany.mockReset();
   reminderCreate.mockReset().mockResolvedValue({});
+  cashOrderUpdate.mockReset().mockResolvedValue({});
   trackTtnMany.mockReset();
-  createCashOrderDraft.mockReset().mockResolvedValue({ id: "co1" });
+  createPaymentOrders.mockReset().mockResolvedValue({ income: { id: "co1" } });
 });
 
 describe("reconcileNovaPayPayments", () => {
   it("returns zero when no candidates", async () => {
     findMany.mockResolvedValue([]);
     const res = await reconcileNovaPayPayments();
-    expect(res).toEqual({ checked: 0, drafted: 0 });
+    expect(res).toEqual({ checked: 0, posted: 0 });
     expect(trackTtnMany).not.toHaveBeenCalled();
   });
 
-  it("drafts a cash order + reminder when TTN delivered", async () => {
+  it("posts a cash order + reminder + tags source when TTN delivered", async () => {
     findMany.mockResolvedValue([sale()]);
     trackTtnMany.mockResolvedValue(
       new Map([
@@ -64,13 +67,20 @@ describe("reconcileNovaPayPayments", () => {
       ]),
     );
     const res = await reconcileNovaPayPayments();
-    expect(res).toEqual({ checked: 1, drafted: 1 });
-    expect(createCashOrderDraft).toHaveBeenCalledWith(
+    expect(res).toEqual({ checked: 1, posted: 1 });
+    expect(createPaymentOrders).toHaveBeenCalledWith(
       expect.objectContaining({
         saleId: "s1",
         type: "income",
+        post: true,
         paid: { uah: 0, eur: 0, usd: 0, uahCashless: 1500 },
         rates: { eur: 45, usd: 40 },
+      }),
+    );
+    expect(cashOrderUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: "co1" },
+        data: { source: "novapay_auto" },
       }),
     );
     expect(reminderCreate).toHaveBeenCalledTimes(1);
@@ -87,8 +97,8 @@ describe("reconcileNovaPayPayments", () => {
       ]),
     );
     const res = await reconcileNovaPayPayments();
-    expect(res).toEqual({ checked: 1, drafted: 0 });
-    expect(createCashOrderDraft).not.toHaveBeenCalled();
+    expect(res).toEqual({ checked: 1, posted: 0 });
+    expect(createPaymentOrders).not.toHaveBeenCalled();
   });
 
   it("does not send reminder when no assigned agent", async () => {
@@ -102,7 +112,7 @@ describe("reconcileNovaPayPayments", () => {
       ]),
     );
     const res = await reconcileNovaPayPayments();
-    expect(res.drafted).toBe(1);
+    expect(res.posted).toBe(1);
     expect(reminderCreate).not.toHaveBeenCalled();
   });
 });

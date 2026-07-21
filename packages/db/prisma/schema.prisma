@@ -473,55 +473,62 @@ model Sale {
 // «сирими» по валюті; порівняння йдуть через грн за курсами Sale-знімка.
 
 model MgrCashOrder {
-  id                String   @id @default(cuid())
-  code1C            String?  @unique @map("code_1c")
-  number1C          String?  @map("number_1c") // 1С _Number, display-only
-  docNumber         Int      @default(autoincrement()) @map("doc_number")
-  saleId            String?  @map("sale_id")
-  customerId        String?  @map("customer_id") // Контрагент (standalone-оплата без реалізації)
+  id                String    @id @default(cuid())
+  code1C            String?   @unique @map("code_1c")
+  number1C          String?   @map("number_1c") // 1С _Number, display-only
+  docNumber         Int       @default(autoincrement()) @map("doc_number")
+  saleId            String?   @map("sale_id")
+  customerId        String?   @map("customer_id") // Контрагент (standalone-оплата без реалізації)
   type              String // income | expense (Приход/Расход)
-  amountUah         Float    @default(0) @map("amount_uah")
-  amountEur         Float    @default(0) @map("amount_eur")
-  amountUsd         Float    @default(0) @map("amount_usd")
-  amountUahCashless Float    @default(0) @map("amount_uah_cashless")
-  changeCurrency    String?  @map("change_currency") // deprecated (3-валютна здача — у amount* expense-ордера)
-  changeForId       String?  @map("change_for_id") // expense → його прихідний ордер
+  amountUah         Float     @default(0) @map("amount_uah")
+  amountEur         Float     @default(0) @map("amount_eur")
+  amountUsd         Float     @default(0) @map("amount_usd")
+  amountUahCashless Float     @default(0) @map("amount_uah_cashless")
+  changeCurrency    String?   @map("change_currency") // deprecated (3-валютна здача — у amount* expense-ордера)
+  changeForId       String?   @map("change_for_id") // expense → його прихідний ордер
   // Довідники (← 1С БанковскиеСчета / СтатьиДвиженияДенежныхСредств).
-  bankAccountId     String?  @map("bank_account_id")
-  cashFlowArticleId String?  @map("cash_flow_article_id")
-  bankAccount       String?  @map("bank_account") // deprecated free-text (заміщено bankAccountId)
-  cashFlowArticle   String?  @map("cash_flow_article") // deprecated free-text
+  bankAccountId     String?   @map("bank_account_id")
+  cashFlowArticleId String?   @map("cash_flow_article_id")
+  bankAccount       String?   @map("bank_account") // deprecated free-text (заміщено bankAccountId)
+  cashFlowArticle   String?   @map("cash_flow_article") // deprecated free-text
   // Курси-знімок (КурсEUR/КурсUSD = грн за €/$) + зведена сума у EUR (СуммаДокумента).
-  rateEur           Float    @default(0) @map("rate_eur")
-  rateUsd           Float    @default(0) @map("rate_usd")
-  documentSumEur    Float    @default(0) @map("document_sum_eur")
+  rateEur           Float     @default(0) @map("rate_eur")
+  rateUsd           Float     @default(0) @map("rate_usd")
+  documentSumEur    Float     @default(0) @map("document_sum_eur")
   // Коректировка боргу (знижка на залишок без реалізації).
-  debtCorrection    Float    @default(0) @map("debt_correction")
+  debtCorrection    Float     @default(0) @map("debt_correction")
   // @deprecated ключ корекції для обміну з 1С — не заповнюється (1С відключено).
-  correctionUid     String?  @map("correction_uid")
+  correctionUid     String?   @map("correction_uid")
   // @deprecated мультивалютні бізнес-ключі обміну з 1С (УИДГРН/ПКО_УИД/УИДUSD).
   // Були потрібні лише для зворотної синхронізації (одна оплата → 3 ПКО у 1С).
   // 1С відключено → не заповнюються; колонки лишено заради історичного імпорту.
-  uidUah            String?  @map("uid_uah")
-  uidEur            String?  @map("uid_eur")
-  uidUsd            String?  @map("uid_usd")
-  archived          Boolean  @default(false)
-  markedForDeletion Boolean  @default(false) @map("marked_for_deletion") // ТЗ 8.0 soft-delete
+  uidUah            String?   @map("uid_uah")
+  uidEur            String?   @map("uid_eur")
+  uidUsd            String?   @map("uid_usd")
+  archived          Boolean   @default(false)
+  markedForDeletion Boolean   @default(false) @map("marked_for_deletion") // ТЗ 8.0 soft-delete
   // Життєвий цикл: "draft" (створено, БЕЗ впливу — не в ДДС, борг не чіпає) або
   // "posted" (проведено — рухи ДДС + борг + архів). Історичні = "posted".
-  status            String   @default("posted")
-  routeSheetId      String?  @map("route_sheet_id") // зворотне посилання на МЛ
+  status            String    @default("posted")
+  routeSheetId      String?   @map("route_sheet_id") // зворотне посилання на МЛ
   comment           String?
-  agentUserId       String?  @map("agent_user_id")
+  agentUserId       String?   @map("agent_user_id")
   // ── Фаза 6: спосіб оплати + банк-реквізити безготівки ──
   // paymentMethod ∈ cash | card | bank (готівка/картка/банк). Для безготівкових
   // (card/bank) — рахунок/призначення, щоб безнал не «тонув» у касі.
-  paymentMethod     String?  @map("payment_method")
-  bankAccountIban   String?  @map("bank_account_iban") // IBAN рахунку безготівкового платежу
-  paymentPurpose    String?  @map("payment_purpose") // призначення платежу (безнал)
-  paidAt            DateTime @default(now()) @map("paid_at")
-  createdAt         DateTime @default(now()) @map("created_at")
-  updatedAt         DateTime @updatedAt @map("updated_at")
+  paymentMethod     String?   @map("payment_method")
+  bankAccountIban   String?   @map("bank_account_iban") // IBAN рахунку безготівкового платежу
+  paymentPurpose    String?   @map("payment_purpose") // призначення платежу (безнал)
+  // Джерело створення: null (вручну) | "novapay_auto" (авто-звірка NovaPay).
+  source            String?
+  // Звірка працівником офісу (раз на день): хто/коли підтвердив, що оплата
+  // справді надійшла на рахунок і зафіксована коректно.
+  verifiedAt        DateTime? @map("verified_at")
+  verifiedByUserId  String?   @map("verified_by_user_id")
+  verifiedByName    String?   @map("verified_by_name")
+  paidAt            DateTime  @default(now()) @map("paid_at")
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
 
   sale               Sale?               @relation(fields: [saleId], references: [id], onDelete: SetNull)
   customer           Customer?           @relation(fields: [customerId], references: [id], onDelete: SetNull)
