@@ -26,6 +26,7 @@ import {
 } from "./_components/payments-panel";
 import { SaleDebtTerm } from "./_components/sale-debt-term";
 import { NpTtnStatus } from "./_components/np-ttn-status";
+import { CheckboxReceiptStatus } from "./_components/checkbox-receipt-status";
 import { LinkedDocBanner } from "../../_components/linked-doc-banner";
 import { BackButton } from "../../_components/back-button";
 import { classifyDelivery } from "@/lib/manager/order-delivery";
@@ -108,6 +109,9 @@ export default async function ManagerSaleDetailPage({
             select: { id: true, barcode: true },
           },
         },
+      },
+      checkboxReceipt: {
+        select: { status: true, receiptId: true, error: true },
       },
     },
   });
@@ -327,6 +331,16 @@ export default async function ManagerSaleDetailPage({
           ttnNumber={sale.expressWaybill}
           ttnError={sale.ttnError}
           posted={sale.status === "posted"}
+        />
+      )}
+
+      {sale.cashOnDelivery && (
+        <CheckboxReceiptStatus
+          saleId={sale.id}
+          status={sale.checkboxReceipt?.status ?? null}
+          receiptId={sale.checkboxReceipt?.receiptId ?? null}
+          error={sale.checkboxReceipt?.error ?? null}
+          hasTtn={Boolean(sale.ttnRef) && Boolean(sale.expressWaybill)}
         />
       )}
 

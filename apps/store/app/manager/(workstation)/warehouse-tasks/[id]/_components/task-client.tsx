@@ -10,8 +10,16 @@ import {
   ExternalLink,
   Printer,
   Check,
+  Receipt,
+  RefreshCw,
+  MapPin,
+  Loader2,
 } from "lucide-react";
 import { classifyDelivery } from "@/lib/manager/order-delivery";
+import {
+  NpWarehousePicker,
+  type NpSelection,
+} from "../../../_components/np-warehouse-picker";
 import { SeatsEditor, type SeatInit } from "./seats-editor";
 
 /** Публічне посилання відстеження Нової Пошти за номером ТТН. */
@@ -52,6 +60,17 @@ interface TaskData {
   saleNumber: string;
   saleTtnRef: string | null;
   saleExpressWaybill: string | null;
+  /** Реалізація з накладкою (COD) — тоді очікуємо чек Checkbox. */
+  saleCashOnDelivery: boolean;
+  /** Реф-и відділення-отримувача НП (для зміни при підготовці). */
+  npCityRef: string | null;
+  npCityName: string | null;
+  npWarehouseRef: string | null;
+  npWarehouseName: string | null;
+  /** Статус чека Checkbox: "created" | "failed" | "pending" | null. */
+  receiptStatus: string | null;
+  /** Остання помилка створення чека Checkbox. */
+  receiptError: string | null;
   seats: SeatInit[];
   items: TaskItem[];
 }
@@ -84,11 +103,25 @@ export function WarehouseTaskClient({
   const { toast } = useToast();
   const [, startTransition] = useTransition();
   const [busy, setBusy] = useState(false);
+  const [receiptBusy, setReceiptBusy] = useState(false);
   const [ttn, setTtn] = useState(task.expressWaybill ?? "");
   // Локальний стан «запаковано» для миттєвого відгуку.
   const [packed, setPacked] = useState<Record<string, boolean>>(
     Object.fromEntries(task.items.map((i) => [i.id, i.packed])),
   );
+  // Відділення-отримувач НП (склад може змінити при підготовці).
+  const [recipient, setRecipient] = useState<NpSelection>({
+    cityRef: task.npCityRef ?? "",
+    cityName: task.npCityName ?? "",
+    warehouseRef: task.npWarehouseRef ?? "",
+    warehouseName: task.npWarehouseName ?? "",
+  });
+  const [recipientBusy, setRecipientBusy] = useState(false);
+  const [recipientResult, setRecipientResult] = useState<{
+    ok: boolean;
+    number?: string;
+    error?: string;
+  } | null>(null);
 
   const st = STATUS_LABEL[task.status] ?? DEFAULT_STATUS;
   const isPost =
@@ -106,6 +139,13 @@ export function WarehouseTaskClient({
   const canEditSeats = canAct && isNovaPoshta && (!isSent || ttnDraft);
   // Відправлене НП-завдання, чия ТТН уже в дорозі — місця лише для читання.
   const seatsLocked = canAct && isNovaPoshta && isSent && !ttnDraft;
+  // Чек Checkbox (ETTN) — індикатор після «Готово» для накладки (COD).
+  const showReceipt = task.saleCashOnDelivery && isSent;
+  const receiptCreated = task.receiptStatus === "created";
+  // Відділення-отримувача НП можна правити, поки завдання не відправлене АБО
+  // ТТН ще «Чернетка» в НП (та сама умова, що й для габаритів).
+  const canEditRecipient = canAct && isNovaPoshta && (!isSent || ttnDraft);
+  const recipientLocked = canAct && isNovaPoshta && isSent && !ttnDraft;
 
   function printLabel() {
     window.open(`${BASE}/${task.id}/label`, "_blank");
@@ -159,6 +199,69 @@ export function WarehouseTaskClient({
       expressWaybill: ttn.trim() || undefined,
     });
     if (ok) toast({ description: "Позначено як відправлено ✓" });
+  }
+
+  async function saveRecipient() {
+    setRecipientBusy(true);
+    setRecipientResult(null);
+    try {
+      const res = await fetch(`${BASE}/${task.id}/recipient-warehouse`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          npCityRef: recipient.cityRef,
+          npCityName: recipient.cityName || null,
+          npWarehouseRef: recipient.warehouseRef,
+          npWarehouseName: recipient.warehouseName || null,
+        }),
+      });
+      const j = (await res.json().catch(() => ({}))) as {
+        ok?: boolean;
+        error?: string;
+        ttn?: { ok: boolean; number?: string; error?: string };
+      };
+      if (!res.ok || j.ok === false) {
+        setRecipientResult({
+          ok: false,
+          error: j.error ?? j.ttn?.error ?? "Помилка",
+        });
+        return;
+      }
+      setRecipientResult({
+        ok: Boolean(j.ttn?.ok),
+        number: j.ttn?.number,
+        error: j.ttn?.error,
+      });
+      startTransition(() => router.refresh());
+    } finally {
+      setRecipientBusy(false);
+    }
+  }
+
+  async function retryReceipt() {
+    if (!task.saleId) return;
+    setReceiptBusy(true);
+    try {
+      const res = await fetch(
+        `/api/v1/manager/sales/${task.saleId}/create-receipt`,
+        { method: "POST" },
+      );
+      const j = (await res.json().catch(() => ({}))) as {
+        ok?: boolean;
+        error?: string;
+      };
+      if (!res.ok || j.ok === false) {
+        toast({
+          description: j.error ?? "Не вдалося створити чек",
+          variant: "destructive",
+        });
+      } else {
+        toast({ description: "Чек Checkbox створено ✓" });
+      }
+      startTransition(() => router.refresh());
+    } finally {
+      setReceiptBusy(false);
+    }
   }
 
   return (
@@ -242,6 +345,41 @@ export function WarehouseTaskClient({
         )}
       </section>
 
+      {/* Чек Checkbox (ETTN) — індикатор після відправлення для накладки */}
+      {showReceipt && (
+        <section className="rounded-lg border bg-white p-4 shadow-sm">
+          <h2 className="mb-2 flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-gray-500">
+            <Receipt className="h-4 w-4" />
+            Чек Checkbox
+          </h2>
+          {receiptCreated ? (
+            <span className="inline-flex items-center gap-1 text-sm font-medium text-green-700">
+              <Check className="h-4 w-4" />
+              Чек Checkbox створено
+            </span>
+          ) : (
+            <div className="flex flex-wrap items-center gap-3">
+              <span className="text-sm font-medium text-red-700">
+                ⚠ Чек не створено
+                {task.receiptError ? `: ${task.receiptError}` : ""}
+              </span>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={receiptBusy}
+                onClick={() => void retryReceipt()}
+              >
+                <RefreshCw
+                  className={`mr-1 h-4 w-4 ${receiptBusy ? "animate-spin" : ""}`}
+                />
+                {receiptBusy ? "Створення…" : "Повторити чек"}
+              </Button>
+            </div>
+          )}
+        </section>
+      )}
+
       {/* Позиції */}
       <section className="rounded-lg border bg-white p-5 shadow-sm">
         <h2 className="mb-3 text-base font-semibold text-gray-800">
@@ -307,6 +445,80 @@ export function WarehouseTaskClient({
           </table>
         </div>
       </section>
+
+      {/* Відділення отримувача (Нова Пошта) — склад може змінити при підготовці */}
+      {canEditRecipient && (
+        <section className="rounded-lg border bg-white p-5 shadow-sm">
+          <h2 className="mb-1 flex items-center gap-2 text-base font-semibold text-gray-800">
+            <MapPin className="h-4 w-4" />
+            Відділення отримувача (Нова Пошта)
+          </h2>
+          <p className="mb-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+            Для мішків (ручна обробка) відділення-отримувач має бути ВАНТАЖНИМ,
+            інакше Нова Пошта відхилить.
+          </p>
+          <div className="grid gap-3">
+            <NpWarehousePicker
+              cityRef={recipient.cityRef}
+              cityName={recipient.cityName}
+              warehouseRef={recipient.warehouseRef}
+              warehouseName={recipient.warehouseName}
+              onChange={setRecipient}
+            />
+          </div>
+          <div className="mt-3 flex flex-wrap items-center gap-3">
+            <Button
+              type="button"
+              disabled={
+                recipientBusy || !recipient.cityRef || !recipient.warehouseRef
+              }
+              onClick={() => void saveRecipient()}
+            >
+              {recipientBusy ? (
+                <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+              ) : (
+                <MapPin className="mr-1 h-4 w-4" />
+              )}
+              {recipientBusy ? "Збереження…" : "Зберегти відділення"}
+            </Button>
+            {recipientResult &&
+              (recipientResult.number ? (
+                <span className="text-sm font-medium text-green-700">
+                  ТТН оновлено: {recipientResult.number}
+                </span>
+              ) : recipientResult.error ? (
+                <span className="text-sm font-medium text-red-700">
+                  {recipientResult.error}
+                </span>
+              ) : recipientResult.ok ? (
+                <span className="text-sm font-medium text-green-700">
+                  Відділення збережено ✓
+                </span>
+              ) : null)}
+          </div>
+        </section>
+      )}
+
+      {/* Відправлене НП, ТТН у дорозі — відділення лише для читання */}
+      {recipientLocked && (
+        <section className="rounded-lg border bg-white p-5 shadow-sm">
+          <h2 className="mb-1 flex items-center gap-2 text-base font-semibold text-gray-800">
+            <MapPin className="h-4 w-4" />
+            Відділення отримувача (Нова Пошта)
+          </h2>
+          <p className="mb-2 rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-xs text-gray-600">
+            ТТН уже в дорозі{ttnStatusText ? ` (${ttnStatusText})` : ""} — зміна
+            відділення недоступна.
+          </p>
+          <p className="text-sm text-gray-800">
+            {task.npCityName || task.npWarehouseName
+              ? [task.npCityName, task.npWarehouseName]
+                  .filter(Boolean)
+                  .join(" — ")
+              : "Відділення не вказано."}
+          </p>
+        </section>
+      )}
 
       {/* Місця відправлення (габарити) — лише для Нової Пошти */}
       {canEditSeats && (

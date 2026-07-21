@@ -81,12 +81,16 @@ export interface NpSeatOption {
   volumetricLength: number;
   volumetricHeight: number;
   weight: number;
+  // «Ручна обробка» місця (застрейчований мішок, не коробка). Потребує
+  // CargoType=Cargo + вантажного відділення-отримувача; габарити ≤ 120 см.
+  specialCargo?: boolean;
 }
 
 export interface CreateTtnInput {
   payerType?: "Recipient" | "Sender";
   paymentMethod?: "Cash" | "NonCash";
-  cargoType: "Parcel" | "Pallet";
+  // Cargo — для «ручної обробки» (мішки); Parcel — звичайні коробки.
+  cargoType: "Parcel" | "Pallet" | "Cargo";
   /** Вага, кг. */
   weight: number;
   serviceType: "WarehouseWarehouse" | "WarehouseDoors";
@@ -434,6 +438,10 @@ export function buildTtnMethodProperties(
       };
       if (typeof seat.volumetricVolume === "number") {
         mapped.volumetricVolume = String(seat.volumetricVolume);
+      }
+      // «Ручна обробка» місця (specialCargo — прапор у OptionsSeat, 1/0).
+      if (seat.specialCargo) {
+        mapped.specialCargo = "1";
       }
       return mapped;
     });

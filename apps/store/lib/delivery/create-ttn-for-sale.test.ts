@@ -262,14 +262,34 @@ describe("updateTtnForSale (Фаза 2 — місця/габарити)", () => 
         volumetricLength: 120,
         volumetricHeight: 60,
         weight: 30,
+        specialCargo: false,
       },
       {
         volumetricWidth: 40,
         volumetricLength: 60,
         volumetricHeight: 40,
         weight: 20,
+        specialCargo: false,
       },
     ]);
+    expect(input.cargoType).toBe("Parcel");
+  });
+
+  it("«ручна обробка» → CargoType=Cargo + specialCargo on the seat", async () => {
+    h.sale.findUnique.mockResolvedValue(baseSale({ ttnRef: "ttn-ref-1" }));
+    const res = await updateTtnForSale("s1", [
+      {
+        weight: 25,
+        lengthCm: 100,
+        widthCm: 60,
+        heightCm: 50,
+        manualHandling: true,
+      },
+    ]);
+    expect(res.ok).toBe(true);
+    const input = h.updateInternetDocument.mock.calls[0]![1];
+    expect(input.cargoType).toBe("Cargo");
+    expect(input.optionsSeat[0].specialCargo).toBe(true);
   });
 
   it("creates the TTN with seats when none exists yet", async () => {
