@@ -556,6 +556,34 @@ export async function getTtnStatus(
   };
 }
 
+/**
+ * Пакетний трекінг (до 100 номерів за виклик) — для фонового оновлення статусів.
+ * Повертає мапу №ТТН → статус (лише знайдені). НЕ кидає.
+ */
+export async function trackTtnMany(
+  numbers: string[],
+): Promise<Map<string, NpTracking>> {
+  const out = new Map<string, NpTracking>();
+  if (numbers.length === 0) return out;
+  const res = await callNovaPoshta<RawTracking & { Number?: string }>(
+    "TrackingDocument",
+    "getStatusDocuments",
+    { Documents: numbers.slice(0, 100).map((n) => ({ DocumentNumber: n })) },
+  );
+  for (const row of res.data) {
+    const num = row.Number;
+    if (!num) continue;
+    out.set(num, {
+      status: row.Status,
+      statusCode: row.StatusCode,
+      scheduledDeliveryDate: row.ScheduledDeliveryDate,
+      recipientAddress: row.RecipientAddress,
+      warehouseRecipient: row.WarehouseRecipient,
+    });
+  }
+  return out;
+}
+
 export async function trackTtn(number: string): Promise<NpTracking | null> {
   const res = await callNovaPoshta<RawTracking>(
     "TrackingDocument",
@@ -613,6 +641,221 @@ export async function fetchMarkingPdf(
   } finally {
     clearTimeout(timeout);
   }
+}
+
+// ─── Попередній розрахунок: вартість + дата доставки ─────────────────────────
+
+export interface NpPriceInput {
+  citySenderRef: string;
+  cityRecipientRef: string;
+  weight: number;
+  serviceType: "WarehouseWarehouse" | "WarehouseDoors";
+  cost: number;
+  cargoType: "Parcel" | "Pallet" | "Cargo";
+  seatsAmount: number;
+  /** «Контроль оплати»/післяплата (₴) — для оцінки комісії за переказ. */
+  redeliveryCalculate?: number;
+}
+
+export interface NpPriceResult {
+  /** Вартість доставки, ₴. */
+  costUah: number;
+  /** Комісія за переказ грошей (контроль оплати/післяплата), ₴. */
+  redeliveryCostUah: number;
+}
+
+interface RawPrice {
+  Cost: number | string;
+  CostRedelivery?: number | string;
+}
+
+/** Оцінка вартості доставки (InternetDocument.getDocumentPrice). */
+export async function getDocumentPrice(
+  input: NpPriceInput,
+): Promise<NpPriceResult | { error: string }> {
+  const props: Record<string, unknown> = {
+    CitySender: input.citySenderRef,
+    CityRecipient: input.cityRecipientRef,
+    Weight: String(input.weight),
+    ServiceType: input.serviceType,
+    Cost: String(input.cost),
+    CargoType: input.cargoType,
+    SeatsAmount: String(input.seatsAmount),
+  };
+  if (typeof input.redeliveryCalculate === "number") {
+    props.RedeliveryCalculate = {
+      CargoType: "Money",
+      Amount: String(input.redeliveryCalculate),
+    };
+  }
+  const res = await callNovaPoshta<RawPrice>(
+    "InternetDocument",
+    "getDocumentPrice",
+    props,
+  );
+  const first = res.data[0];
+  if (!res.success || !first) {
+    return {
+      error: translateNpError(res.errors[0] ?? "Не вдалося оцінити вартість"),
+    };
+  }
+  return {
+    costUah: Number(first.Cost) || 0,
+    redeliveryCostUah: Number(first.CostRedelivery) || 0,
+  };
+}
+
+export interface NpDeliveryDateInput {
+  citySenderRef: string;
+  cityRecipientRef: string;
+  serviceType: "WarehouseWarehouse" | "WarehouseDoors";
+  /** Дата відправлення ddMMyyyy (за замовч. — сьогодні на боці НП). */
+  dateTime?: string;
+}
+
+interface RawDeliveryDate {
+  DeliveryDate?: { date?: string } | string;
+}
+
+/** Оцінка дати доставки (InternetDocument.getDocumentDeliveryDate). ISO або null. */
+export async function getDocumentDeliveryDate(
+  input: NpDeliveryDateInput,
+): Promise<{ deliveryDate: string | null } | { error: string }> {
+  const props: Record<string, unknown> = {
+    CitySender: input.citySenderRef,
+    CityRecipient: input.cityRecipientRef,
+    ServiceType: input.serviceType,
+  };
+  if (input.dateTime) props.DateTime = input.dateTime;
+  const res = await callNovaPoshta<RawDeliveryDate>(
+    "InternetDocument",
+    "getDocumentDeliveryDate",
+    props,
+  );
+  const first = res.data[0];
+  if (!res.success || !first) {
+    return {
+      error: translateNpError(res.errors[0] ?? "Не вдалося оцінити дату"),
+    };
+  }
+  const raw = first.DeliveryDate;
+  const dateStr = typeof raw === "string" ? raw : (raw?.date ?? null);
+  return { deliveryDate: dateStr ? dateStr.slice(0, 10) : null };
+}
+
+// ─── Реєстри відправлень (ScanSheet) ─────────────────────────────────────────
+
+export interface NpScanSheetRef {
+  ref: string;
+  number: string;
+}
+
+interface RawScanSheetInsert {
+  Ref?: string;
+  Number?: string;
+}
+
+/**
+ * Додає ТТН у реєстр відправлень (ScanSheet.insertDocuments). Без `scanSheetRef`
+ * створює НОВИЙ реєстр; з `scanSheetRef` — додає у наявний. Повертає реф/номер
+ * реєстру. Реєстр — це «пакет» накладних для передачі кур'єру/у відділенні.
+ */
+export async function insertDocumentsToScanSheet(
+  documentRefs: string[],
+  scanSheetRef?: string,
+): Promise<NpScanSheetRef | { error: string }> {
+  const props: Record<string, unknown> = { DocumentRefs: documentRefs };
+  if (scanSheetRef) props.Ref = scanSheetRef;
+  const res = await callNovaPoshta<RawScanSheetInsert>(
+    "ScanSheet",
+    "insertDocuments",
+    props,
+  );
+  const first = res.data[0];
+  if (!res.success || !first?.Ref) {
+    return {
+      error: translateNpError(
+        res.errors[0] ?? "Не вдалося додати ТТН у реєстр",
+      ),
+    };
+  }
+  return { ref: first.Ref, number: first.Number ?? "" };
+}
+
+interface RawScanSheetListItem {
+  Ref: string;
+  Number: string;
+  DateTime?: string;
+  Count?: number | string;
+}
+
+export interface NpScanSheetListItem {
+  ref: string;
+  number: string;
+  date: string;
+  count: number;
+}
+
+/** Список реєстрів відправлень (ScanSheet.getScanSheetList). */
+export async function getScanSheetList(): Promise<NpScanSheetListItem[]> {
+  const res = await callNovaPoshta<RawScanSheetListItem>(
+    "ScanSheet",
+    "getScanSheetList",
+    {},
+  );
+  return res.data.map((s) => ({
+    ref: s.Ref,
+    number: s.Number,
+    date: s.DateTime ?? "",
+    count: Number(s.Count) || 0,
+  }));
+}
+
+/** Видаляє реєстр(и) відправлень (ScanSheet.deleteScanSheet). */
+export async function deleteScanSheet(
+  scanSheetRefs: string[],
+): Promise<{ success: boolean; error?: string }> {
+  const res = await callNovaPoshta<{ Ref: string }>(
+    "ScanSheet",
+    "deleteScanSheet",
+    { ScanSheetRefs: scanSheetRefs },
+  );
+  if (!res.success) {
+    return {
+      success: false,
+      error: translateNpError(res.errors[0] ?? "Не вдалося видалити реєстр"),
+    };
+  }
+  return { success: true };
+}
+
+/** Прибирає ТТН з реєстру (ScanSheet.removeDocuments). */
+export async function removeDocumentsFromScanSheet(
+  documentRefs: string[],
+): Promise<{ success: boolean; error?: string }> {
+  const res = await callNovaPoshta<{ Ref: string }>(
+    "ScanSheet",
+    "removeDocuments",
+    { DocumentRefs: documentRefs },
+  );
+  if (!res.success) {
+    return {
+      success: false,
+      error: translateNpError(res.errors[0] ?? "Не вдалося прибрати ТТН"),
+    };
+  }
+  return { success: true };
+}
+
+/**
+ * URL друку реєстру відправлень (PDF). Ключ у шляху — лише сервер його викликає.
+ */
+export function buildScanSheetPrintUrl(scanSheetRef: string): string | null {
+  const apiKey = process.env.NOVA_POSHTA_API_KEY;
+  if (!apiKey) return null;
+  return `${NOVA_POSHTA_PRINT_BASE}/scanSheet/printScanSheet/scanSheetRefs[]/${encodeURIComponent(
+    scanSheetRef,
+  )}/type/pdf/apiKey/${apiKey}`;
 }
 
 /** Тест-хук: скидає module-level кеші відправника (лише для юніт-тестів). */
