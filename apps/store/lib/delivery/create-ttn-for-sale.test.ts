@@ -292,6 +292,39 @@ describe("updateTtnForSale (Фаза 2 — місця/габарити)", () => 
     expect(input.optionsSeat[0].specialCargo).toBe(true);
   });
 
+  it("drops РО and retries without special cargo when NP rejects it", async () => {
+    h.sale.findUnique.mockResolvedValue(baseSale({ ttnRef: "ttn-ref-1" }));
+    h.updateInternetDocument
+      .mockResolvedValueOnce({
+        error: "Special Cargo seat not match in weight",
+      })
+      .mockResolvedValueOnce({
+        ref: "ttn-ref-1",
+        number: "20450000000001",
+        costUah: "70",
+        estimatedDeliveryDate: "",
+      });
+    const res = await updateTtnForSale("s1", [
+      {
+        weight: 38,
+        lengthCm: 45,
+        widthCm: 40,
+        heightCm: 35,
+        manualHandling: true,
+      },
+    ]);
+    expect(res.ok).toBe(true);
+    expect(res.note).toMatch(/без РО/);
+    expect(h.updateInternetDocument).toHaveBeenCalledTimes(2);
+    const second = h.updateInternetDocument.mock.calls[1]![1];
+    expect(second.cargoType).toBe("Parcel");
+    expect(
+      second.optionsSeat.every(
+        (s: { specialCargo: boolean }) => !s.specialCargo,
+      ),
+    ).toBe(true);
+  });
+
   it("creates the TTN with seats when none exists yet", async () => {
     h.sale.findUnique.mockResolvedValue(baseSale({ ttnRef: null }));
     h.createInternetDocument.mockResolvedValue({

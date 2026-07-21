@@ -14,8 +14,17 @@ import {
   getSenderCounterparty,
   getSenderContact,
   type CreateTtnInput,
+  type CreateTtnResult,
   type NpSeatOption,
 } from "@/lib/delivery/nova-poshta";
+
+/** Чи містить запит спецвантаж/РО (для авто-відкату при відмові НП). */
+function hasSpecialCargo(input: CreateTtnInput): boolean {
+  return (
+    input.cargoType === "Cargo" ||
+    (input.optionsSeat?.some((s) => s.specialCargo) ?? false)
+  );
+}
 
 /**
  * Створення / оновлення ТТН Нової Пошти для реалізації.
@@ -93,7 +102,7 @@ type BuildResult =
  */
 async function buildTtnInputForSale(
   saleId: string,
-  opts?: { seats?: SeatDims[] },
+  opts?: { seats?: SeatDims[]; disableSpecialCargo?: boolean },
 ): Promise<BuildResult> {
   const sale = await prisma.sale.findUnique({
     where: { id: saleId },
@@ -183,26 +192,30 @@ async function buildTtnInputForSale(
   let weight: number;
   let seatsAmount: number;
   let optionsSeat: NpSeatOption[] | undefined;
-  // «Ручна обробка» хоч на одному місці → CargoType=Cargo (мішки; вантажне
-  // відділення-отримувач, габарити ≤ 120 см — контролює склад при виборі місць).
-  const anyManual = seats.some((s) => s.manualHandling);
+  // «Ручна обробка» хоч на одному місці → CargoType=Cargo. Але НП часто відхиляє
+  // спецвантаж через API (маршрутизація й так на явно вказане відділення), тому
+  // є відкат: disableSpecialCargo вимикає РО й повертає звичайну посилку.
+  const useManual = !opts?.disableSpecialCargo;
+  const anyManual = useManual && seats.some((s) => s.manualHandling);
   if (seats.length > 0) {
     seatsAmount = seats.length;
     const round2 = (n: number): number => Math.round(n * 100) / 100;
     const rawSum = seats.reduce((s, x) => s + (x.weight || 0), 0);
     const perSeatFallback = round2((rawSum || itemsWeight) / seats.length);
-    optionsSeat = seats.map((s) => ({
-      // НП вимагає ≥ 5 см на сторону; піднімаємо мінімум, щоб уникнути відмови.
-      volumetricWidth: Math.max(MIN_DIM_CM, s.widthCm),
-      volumetricLength: Math.max(MIN_DIM_CM, s.lengthCm),
-      volumetricHeight: Math.max(MIN_DIM_CM, s.heightCm),
-      // Спецвантаж (РО) — НП вимагає ЦІЛІ кг на місце (інакше «Special Cargo
-      // seat not match in weight»); звичайні місця — до сотих.
-      weight: s.manualHandling
-        ? Math.max(1, Math.round(s.weight || perSeatFallback))
-        : Math.max(MIN_WEIGHT_KG, round2(s.weight) || perSeatFallback),
-      specialCargo: s.manualHandling ?? false,
-    }));
+    optionsSeat = seats.map((s) => {
+      const manual = useManual && (s.manualHandling ?? false);
+      return {
+        // НП вимагає ≥ 5 см на сторону; піднімаємо мінімум.
+        volumetricWidth: Math.max(MIN_DIM_CM, s.widthCm),
+        volumetricLength: Math.max(MIN_DIM_CM, s.lengthCm),
+        volumetricHeight: Math.max(MIN_DIM_CM, s.heightCm),
+        // Спецвантаж (РО) — НП вимагає ЦІЛІ кг на місце; звичайні — до сотих.
+        weight: manual
+          ? Math.max(1, Math.round(s.weight || perSeatFallback))
+          : Math.max(MIN_WEIGHT_KG, round2(s.weight) || perSeatFallback),
+        specialCargo: manual,
+      };
+    });
     // Вага документа = ТОЧНА сума ваг місць (щоб НП не бачив розбіжності —
     // «Special Cargo seat not match in weight»); ті самі round2-значення.
     weight = Math.max(
@@ -329,7 +342,7 @@ export async function createTtnForSale(saleId: string): Promise<void> {
 export async function updateTtnForSale(
   saleId: string,
   seats: SeatDims[],
-): Promise<{ ok: boolean; number?: string; error?: string }> {
+): Promise<{ ok: boolean; number?: string; error?: string; note?: string }> {
   try {
     const built = await buildTtnInputForSale(saleId, { seats });
     if (built.kind === "skip") {
@@ -339,32 +352,68 @@ export async function updateTtnForSale(
       await setTtnError(saleId, built.message);
       return { ok: false, error: built.message };
     }
+    const hadSpecial = hasSpecialCargo(built.input);
 
-    // ТТН ще нема — створюємо одразу з місцями.
-    if (!built.ttnRef) {
-      const created = await createInternetDocument(built.input);
-      if ("error" in created) {
-        await setTtnError(saleId, created.error);
-        return { ok: false, error: created.error };
+    // Виконує create/update; якщо НП відхилив РО-запит — повторює без РО
+    // (посилка все одно їде на явно обране відділення).
+    const send = async (
+      input: CreateTtnInput,
+    ): Promise<
+      | { ok: true; number: string; ref: string; roDropped: boolean }
+      | { error: string }
+    > => {
+      const call = async (
+        i: CreateTtnInput,
+      ): Promise<CreateTtnResult | { error: string }> =>
+        built.ttnRef
+          ? updateInternetDocument(built.ttnRef, i)
+          : createInternetDocument(i);
+
+      let res = await call(input);
+      let roDropped = false;
+      if ("error" in res && hadSpecial) {
+        const noRo = await buildTtnInputForSale(saleId, {
+          seats,
+          disableSpecialCargo: true,
+        });
+        if (noRo.kind === "ok") {
+          const res2 = await call(noRo.input);
+          if (!("error" in res2)) {
+            res = res2;
+            roDropped = true;
+          } else {
+            res = res2;
+          }
+        }
       }
-      await storeCreatedTtn(saleId, created.ref, created.number);
-      return { ok: true, number: created.number };
-    }
+      if ("error" in res) return { error: res.error };
+      return { ok: true, number: res.number, ref: res.ref, roDropped };
+    };
 
-    const result = await updateInternetDocument(built.ttnRef, built.input);
-    if ("error" in result) {
-      await setTtnError(saleId, result.error);
-      return { ok: false, error: result.error };
+    const sent = await send(built.input);
+    if ("error" in sent) {
+      await setTtnError(saleId, sent.error);
+      return { ok: false, error: sent.error };
     }
-    await prisma.sale.update({
-      where: { id: saleId },
-      data: { expressWaybill: result.number, ttnError: null },
-    });
-    await prisma.warehouseTask.updateMany({
-      where: { saleId },
-      data: { expressWaybill: result.number },
-    });
-    return { ok: true, number: result.number };
+    if (built.ttnRef) {
+      await prisma.sale.update({
+        where: { id: saleId },
+        data: { expressWaybill: sent.number, ttnError: null },
+      });
+      await prisma.warehouseTask.updateMany({
+        where: { saleId },
+        data: { expressWaybill: sent.number },
+      });
+    } else {
+      await storeCreatedTtn(saleId, sent.ref, sent.number);
+    }
+    return {
+      ok: true,
+      number: sent.number,
+      note: sent.roDropped
+        ? "Нова Пошта не прийняла ручну обробку — ТТН створено без РО (посилка все одно їде на обране відділення)."
+        : undefined,
+    };
   } catch (err) {
     const message =
       err instanceof Error ? err.message : "Помилка оновлення ТТН";
