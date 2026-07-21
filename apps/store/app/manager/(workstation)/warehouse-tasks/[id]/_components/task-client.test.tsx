@@ -80,6 +80,8 @@ describe("WarehouseTaskClient — НП етикетка та gating «Готов
     render(
       <WarehouseTaskClient
         canAct
+        ttnDraft={false}
+        ttnStatusText={null}
         task={makeTask({ saleTtnRef: "ref-1", labelPrintedAt: null })}
       />,
     );
@@ -94,6 +96,8 @@ describe("WarehouseTaskClient — НП етикетка та gating «Готов
     render(
       <WarehouseTaskClient
         canAct
+        ttnDraft={false}
+        ttnStatusText={null}
         task={makeTask({
           saleTtnRef: "ref-1",
           labelPrintedAt: new Date().toISOString(),
@@ -111,7 +115,12 @@ describe("WarehouseTaskClient — НП етикетка та gating «Готов
     const openMock = vi.fn();
     vi.stubGlobal("open", openMock);
     render(
-      <WarehouseTaskClient canAct task={makeTask({ saleTtnRef: "ref-1" })} />,
+      <WarehouseTaskClient
+        canAct
+        ttnDraft={false}
+        ttnStatusText={null}
+        task={makeTask({ saleTtnRef: "ref-1" })}
+      />,
     );
     fireEvent.click(screen.getByRole("button", { name: /Друк етикетки/ }));
     expect(openMock).toHaveBeenCalledWith(
@@ -124,6 +133,8 @@ describe("WarehouseTaskClient — НП етикетка та gating «Готов
     render(
       <WarehouseTaskClient
         canAct
+        ttnDraft={false}
+        ttnStatusText={null}
         task={makeTask({
           deliveryMethod: "pickup",
           saleTtnRef: null,
@@ -136,5 +147,38 @@ describe("WarehouseTaskClient — НП етикетка та gating «Готов
       name: /Запаковано \+ ТТН — відправлено/,
     });
     expect((done as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it("відправлене + чернетка ТТН — редактор місць і друк лишаються доступні", () => {
+    render(
+      <WarehouseTaskClient
+        canAct
+        ttnDraft
+        ttnStatusText="Чернетка"
+        task={makeTask({ status: "sent", saleTtnRef: "ref-1" })}
+      />,
+    );
+    // Редактор місць (SeatsEditor) присутній.
+    expect(
+      screen.getByRole("button", { name: /Зберегти місця й оновити ТТН/ }),
+    ).toBeDefined();
+    // Друк етикетки лишається доступним.
+    expect(screen.getByRole("button", { name: /Друк етикетки/ })).toBeDefined();
+  });
+
+  it("відправлене + ТТН у дорозі — місця read-only з підказкою", () => {
+    render(
+      <WarehouseTaskClient
+        canAct
+        ttnDraft={false}
+        ttnStatusText="Прямує до відділення"
+        task={makeTask({ status: "sent", saleTtnRef: "ref-1" })}
+      />,
+    );
+    expect(screen.getByText(/ТТН уже в дорозі/)).toBeDefined();
+    expect(
+      screen.queryByRole("button", { name: /Зберегти місця й оновити ТТН/ }),
+    ).toBeNull();
+    expect(screen.queryByRole("button", { name: /Друк етикетки/ })).toBeNull();
   });
 });
