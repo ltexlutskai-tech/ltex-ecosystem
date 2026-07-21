@@ -292,6 +292,18 @@ export function ProductCreateForm({
       </div>
 
       <div>
+        <label className="mb-1 block text-sm font-medium">Пакування</label>
+        <select name="packaging" defaultValue="" className={inputCls}>
+          <option value="">— не вказано —</option>
+          <option value="box">Коробка</option>
+          <option value="bag">Мішок</option>
+        </select>
+        <p className="mt-1 text-xs text-gray-400">
+          Мішки потребують ручної обробки на Новій Пошті.
+        </p>
+      </div>
+
+      <div>
         <label className="mb-1 block text-sm font-medium">Наповнення</label>
         <textarea
           name="filling"

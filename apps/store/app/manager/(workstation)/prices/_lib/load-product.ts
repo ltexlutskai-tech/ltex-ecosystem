@@ -127,6 +127,7 @@ export interface ProductEditFields {
   filling: string;
   producer: string;
   receiptName: string;
+  packaging: string;
   videoUrl: string;
 }
 
@@ -155,6 +156,7 @@ export async function loadProductCard(
       filling: true,
       producer: true,
       receiptName: true,
+      packaging: true,
       quality: true,
       season: true,
       country: true,
@@ -350,6 +352,7 @@ export async function loadProductCard(
       filling: product.filling ?? "",
       producer: product.producer ?? "",
       receiptName: product.receiptName ?? "",
+      packaging: product.packaging ?? "",
       videoUrl: product.videoUrl ?? "",
     },
   };
