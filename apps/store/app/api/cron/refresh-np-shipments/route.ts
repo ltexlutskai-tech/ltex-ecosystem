@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { refreshNpShipments } from "@/lib/delivery/refresh-shipments";
+import { reconcileNovaPayPayments } from "@/lib/manager/novapay-reconcile";
 
 export const dynamic = "force-dynamic";
 
@@ -37,8 +38,11 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   try {
-    const result = await refreshNpShipments();
-    return NextResponse.json(result);
+    // 1) Оновлення статусів ТТН + сповіщення про отримання.
+    const shipments = await refreshNpShipments();
+    // 2) Авто-звірка оплат накладки NovaPay → чернетки касових ордерів.
+    const novapay = await reconcileNovaPayPayments();
+    return NextResponse.json({ ...shipments, novapay });
   } catch (e: unknown) {
     const message = e instanceof Error ? e.message : "Unknown error";
     console.error("[L-TEX] refresh-np-shipments failed", { error: message });
