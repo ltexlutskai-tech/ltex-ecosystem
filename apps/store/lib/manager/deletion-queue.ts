@@ -5,6 +5,7 @@ import { logAuditEvent } from "@/lib/audit/audit-log";
 import { recordClientEventSafe } from "@/lib/manager/client-timeline";
 import { recomputeDebtForClients } from "@/lib/manager/debt-register";
 import { removeSaleMovements } from "@/lib/manager/sale-movement-hooks";
+import { deleteNpTtnForSale } from "@/lib/delivery/create-ttn-for-sale";
 import {
   reapplyDocMovements,
   reverseDocMovements,
@@ -553,11 +554,27 @@ async function hardDeleteEntity(
       const order = await prisma.order.findUnique({
         where: { id: entityId },
         select: {
-          sales: { select: { id: true, code1C: true } },
+          sales: {
+            select: {
+              id: true,
+              code1C: true,
+              ttnRef: true,
+              expressWaybill: true,
+            },
+          },
           items: { select: { lotId: true } },
         },
       });
       const saleIds = order?.sales.map((s) => s.id) ?? [];
+
+      // Прибираємо чернетки ТТН НП пов'язаних реалізацій (best-effort).
+      for (const s of order?.sales ?? []) {
+        if (s.ttnRef) {
+          await deleteNpTtnForSale(s.ttnRef, s.expressWaybill).catch(
+            () => undefined,
+          );
+        }
+      }
       const lotIds = (order?.items ?? [])
         .map((i) => i.lotId)
         .filter((l): l is string => l != null);
@@ -597,6 +614,16 @@ async function hardDeleteEntity(
     }
 
     case "sale": {
+      // Прибираємо чернетку ТТН НП (best-effort; у дорозі — лишаємо як є).
+      const saleTtn = await prisma.sale.findUnique({
+        where: { id: entityId },
+        select: { ttnRef: true, expressWaybill: true },
+      });
+      if (saleTtn?.ttnRef) {
+        await deleteNpTtnForSale(saleTtn.ttnRef, saleTtn.expressWaybill).catch(
+          () => undefined,
+        );
+      }
       const moves = await prisma.mgrDebtMovement.findMany({
         where: { sourceType: "sale", sourceId: entityId },
         select: { clientId: true },

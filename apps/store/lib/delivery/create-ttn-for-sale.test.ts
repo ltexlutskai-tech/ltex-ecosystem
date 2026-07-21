@@ -13,6 +13,8 @@ const h = vi.hoisted(() => ({
   saveRecipientAddress: vi.fn(),
   getSenderCounterparty: vi.fn(),
   getSenderContact: vi.fn(),
+  getTtnStatus: vi.fn(),
+  deleteInternetDocument: vi.fn(),
   getDeliveryLabelResolver: vi.fn(),
   getPaymentSummary: vi.fn(),
 }));
@@ -32,6 +34,8 @@ vi.mock("@/lib/delivery/nova-poshta", () => ({
   saveRecipientAddress: (...a: unknown[]) => h.saveRecipientAddress(...a),
   getSenderCounterparty: (...a: unknown[]) => h.getSenderCounterparty(...a),
   getSenderContact: (...a: unknown[]) => h.getSenderContact(...a),
+  getTtnStatus: (...a: unknown[]) => h.getTtnStatus(...a),
+  deleteInternetDocument: (...a: unknown[]) => h.deleteInternetDocument(...a),
 }));
 vi.mock("@/lib/manager/delivery-methods", () => ({
   getDeliveryLabelResolver: (...a: unknown[]) =>
@@ -45,6 +49,7 @@ import {
   createTtnForSale,
   updateTtnForSale,
   splitRecipientName,
+  deleteNpTtnForSale,
 } from "./create-ttn-for-sale";
 
 function baseSale(overrides: Record<string, unknown> = {}) {
@@ -458,5 +463,43 @@ describe("updateTtnForSale (Фаза 2 — місця/габарити)", () => 
     const res = await updateTtnForSale("s1", seats);
     expect(res.ok).toBe(false);
     expect(h.updateInternetDocument).not.toHaveBeenCalled();
+  });
+});
+
+describe("deleteNpTtnForSale", () => {
+  it("no-ttn коли немає ttnRef/номера", async () => {
+    const r = await deleteNpTtnForSale(null, null);
+    expect(r.state).toBe("no-ttn");
+    expect(h.deleteInternetDocument).not.toHaveBeenCalled();
+  });
+
+  it("in-transit → НЕ видаляє (ТТН у дорозі)", async () => {
+    h.getTtnStatus.mockResolvedValue({
+      statusCode: "7",
+      status: "Прибув",
+      isDraft: false,
+    });
+    const r = await deleteNpTtnForSale("ref-1", "204500");
+    expect(r.state).toBe("in-transit");
+    expect(h.deleteInternetDocument).not.toHaveBeenCalled();
+  });
+
+  it("чернетка → видаляє ТТН у НП", async () => {
+    h.getTtnStatus.mockResolvedValue({
+      statusCode: "1",
+      status: "Чернетка",
+      isDraft: true,
+    });
+    h.deleteInternetDocument.mockResolvedValue({ success: true });
+    const r = await deleteNpTtnForSale("ref-1", "204500");
+    expect(r.state).toBe("deleted");
+    expect(h.deleteInternetDocument).toHaveBeenCalledWith("ref-1");
+  });
+
+  it("НП недоступний → все одно пробує видалити чернетку", async () => {
+    h.getTtnStatus.mockRejectedValue(new Error("network"));
+    h.deleteInternetDocument.mockResolvedValue({ success: true });
+    const r = await deleteNpTtnForSale("ref-1", "204500");
+    expect(r.state).toBe("deleted");
   });
 });

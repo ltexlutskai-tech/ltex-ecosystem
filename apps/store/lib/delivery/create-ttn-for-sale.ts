@@ -15,6 +15,8 @@ import {
   saveRecipientAddress,
   getSenderCounterparty,
   getSenderContact,
+  getTtnStatus,
+  deleteInternetDocument,
   type CreateTtnInput,
   type CreateTtnResult,
   type NpSeatOption,
@@ -455,4 +457,38 @@ export async function updateTtnForSale(
     await setTtnError(saleId, message);
     return { ok: false, error: message };
   }
+}
+
+/**
+ * Стан очищення ТТН НП при видаленні реалізації.
+ *  • "no-ttn"     — ТТН не створювалась;
+ *  • "deleted"    — чернетку ТТН видалено в НП;
+ *  • "in-transit" — ТТН уже в дорозі (не чернетка) → НЕ чіпаємо;
+ *  • "error"      — НП відхилив видалення (передаємо текст).
+ */
+export interface DeleteNpTtnResult {
+  state: "no-ttn" | "deleted" | "in-transit" | "error";
+  error?: string;
+}
+
+/**
+ * Видаляє ЧЕРНЕТКУ ТТН НП, привʼязану до реалізації (при видаленні документа).
+ * Best-effort: НЕ кидає. Якщо ТТН уже в дорозі — повертає "in-transit" (рішення
+ * блокувати/пропускати лишає викликач). Якщо НП недоступний — пробує видалити
+ * (чернетку все одно безпечно прибрати).
+ */
+export async function deleteNpTtnForSale(
+  ttnRef: string | null | undefined,
+  expressWaybill: string | null | undefined,
+): Promise<DeleteNpTtnResult> {
+  if (!ttnRef || !expressWaybill) return { state: "no-ttn" };
+  try {
+    const status = await getTtnStatus(expressWaybill);
+    if (status && !status.isDraft) return { state: "in-transit" };
+  } catch {
+    // НП недоступний — пробуємо видалити чернетку далі (best-effort).
+  }
+  const del = await deleteInternetDocument(ttnRef);
+  if (!del.success) return { state: "error", error: del.error };
+  return { state: "deleted" };
 }
