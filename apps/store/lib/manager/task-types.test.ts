@@ -23,6 +23,7 @@ const base: RawTask = {
   assigneeUserId: "mgr",
   assigneeRole: null,
   assigneeName: "Менеджер",
+  archivedByName: null,
   clientId: null,
   saleId: null,
 };
@@ -69,6 +70,46 @@ describe("normalizeTask", () => {
   });
 });
 
+describe("normalizeTask — вилучення / архів (права)", () => {
+  it("постановник може вилучити й архівувати; виконавець — лише архівувати", () => {
+    const creator = normalizeTask(base, { id: "boss", role: "owner" });
+    expect(creator.canDelete).toBe(true);
+    expect(creator.canArchive).toBe(true);
+
+    const executor = normalizeTask(base, { id: "mgr", role: "manager" });
+    expect(executor.canDelete).toBe(false);
+    expect(executor.canArchive).toBe(true);
+  });
+
+  it("сторонній без ролі admin/owner не може ні вилучити, ні архівувати", () => {
+    const c = normalizeTask(base, { id: "stranger", role: "manager" });
+    expect(c.canDelete).toBe(false);
+    expect(c.canArchive).toBe(false);
+    expect(c.canUnarchive).toBe(false);
+  });
+
+  it("admin/owner має повний доступ навіть до чужого завдання", () => {
+    const c = normalizeTask(base, { id: "admin1", role: "admin" });
+    expect(c.canDelete).toBe(true);
+    expect(c.canArchive).toBe(true);
+  });
+
+  it("архівне завдання: статус archived, показ архіватора, можна відновити", () => {
+    const arch: RawTask = {
+      ...base,
+      status: "archived",
+      archivedByName: "Власник",
+    };
+    const c = normalizeTask(arch, { id: "mgr", role: "manager" });
+    expect(c.status).toBe("archived");
+    expect(c.archivedByName).toBe("Власник");
+    expect(c.canUnarchive).toBe(true);
+    // Архівне не можна архівувати повторно / закрити.
+    expect(c.canArchive).toBe(false);
+    expect(c.canComplete).toBe(false);
+  });
+});
+
 describe("normalizeWarehouseTask", () => {
   const w: RawWarehouseTask = {
     id: "w1",
@@ -87,6 +128,12 @@ describe("normalizeWarehouseTask", () => {
     expect(open.title).toContain("ТОВ Ромашка");
     const sent = normalizeWarehouseTask({ ...w, status: "sent" });
     expect(sent.status).toBe("done");
+  });
+  it("складські картки не мають дій вилучення/архіву", () => {
+    const c = normalizeWarehouseTask(w);
+    expect(c.canDelete).toBe(false);
+    expect(c.canArchive).toBe(false);
+    expect(c.canUnarchive).toBe(false);
   });
 });
 

@@ -6,7 +6,7 @@
  * `lib/manager/tasks.ts`.
  */
 
-export type TaskStatus = "open" | "done";
+export type TaskStatus = "open" | "done" | "archived";
 export type TaskKind = "task" | "warehouse";
 
 /** Тип завдання → підпис + колірна тема (підсвітка у списку). */
@@ -47,12 +47,20 @@ export interface TaskCard {
   resultComment: string | null;
   completedAt: string | null;
   createdAt: string;
+  /** Хто відправив у архів (для показу на архівній картці). */
+  archivedByName: string | null;
   /** Deep-link (складські → детальна сторінка); null → дії inline. */
   href: string | null;
   /** Поточний користувач може закрити (він виконавець, завдання відкрите). */
   canComplete: boolean;
   /** Поточний користувач може перевідкрити (він постановник, завдання закрите). */
   canReopen: boolean;
+  /** Поточний користувач може вилучити (постановник або admin/owner). */
+  canDelete: boolean;
+  /** Поточний користувач може відправити в архів (виконавець/постановник/admin/owner). */
+  canArchive: boolean;
+  /** Поточний користувач може відновити з архіву. */
+  canUnarchive: boolean;
   clientId: string | null;
   saleId: string | null;
 }
@@ -78,8 +86,14 @@ export interface RawTask {
   assigneeUserId: string | null;
   assigneeRole: string | null;
   assigneeName: string | null;
+  archivedByName: string | null;
   clientId: string | null;
   saleId: string | null;
+}
+
+/** Ролі з повним доступом (можуть вилучати/архівувати будь-яке завдання). */
+function isAdminOwner(role: string): boolean {
+  return role === "admin" || role === "owner";
 }
 
 /** Чи цей користувач — виконавець завдання (особисто або за роллю). */
@@ -93,12 +107,21 @@ export function isAssignee(
 }
 
 export function normalizeTask(raw: RawTask, viewer: Viewer): TaskCard {
-  const status: TaskStatus = raw.status === "done" ? "done" : "open";
+  const status: TaskStatus =
+    raw.status === "archived"
+      ? "archived"
+      : raw.status === "done"
+        ? "done"
+        : "open";
   const assigneeName =
     raw.assigneeName ??
     (raw.assigneeRole ? roleLabelUk(raw.assigneeRole) : "—");
   const mine = isAssignee(raw, viewer);
   const iCreated = raw.createdByUserId === viewer.id;
+  const admin = isAdminOwner(viewer.role);
+  const isArchived = status === "archived";
+  // Виконавець, постановник або admin/owner — можуть архівувати/відновлювати.
+  const canManage = mine || iCreated || admin;
   return {
     id: raw.id,
     kind: "task",
@@ -111,9 +134,14 @@ export function normalizeTask(raw: RawTask, viewer: Viewer): TaskCard {
     resultComment: raw.resultComment,
     completedAt: raw.completedAt ? raw.completedAt.toISOString() : null,
     createdAt: raw.createdAt.toISOString(),
+    archivedByName: raw.archivedByName,
     href: null,
     canComplete: mine && status === "open",
     canReopen: iCreated && status === "done",
+    // Вилучити (hard-delete) — лише постановник або admin/owner.
+    canDelete: iCreated || admin,
+    canArchive: canManage && !isArchived,
+    canUnarchive: canManage && isArchived,
     clientId: raw.clientId,
     saleId: raw.saleId,
   };
@@ -146,9 +174,13 @@ export function normalizeWarehouseTask(raw: RawWarehouseTask): TaskCard {
     resultComment: null,
     completedAt: null,
     createdAt: raw.createdAt.toISOString(),
+    archivedByName: null,
     href: `/manager/warehouse-tasks/${raw.id}`,
     canComplete: false, // керується на детальній сторінці складу
     canReopen: false,
+    canDelete: false,
+    canArchive: false,
+    canUnarchive: false,
     clientId: null,
     saleId: null,
   };
