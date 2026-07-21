@@ -4,6 +4,7 @@ import { prisma } from "@ltex/db";
 import { getCurrentUser } from "@/lib/auth/manager-auth";
 import { notifyManagerAboutTask } from "@/lib/manager/warehouse-task";
 import { createCheckboxReceiptForSale } from "@/lib/fiscal/create-receipt-for-sale";
+import { notifyCustomerShipmentSent } from "@/lib/manager/notify-customer";
 
 const WAREHOUSE_ROLES = ["warehouse", "admin", "owner"];
 
@@ -87,6 +88,10 @@ export async function POST(
   // Фаза 3: чек Checkbox (ETTN) для NovaPay-накладки — best-effort, не блокує
   // «Готово» (гард на накладку/№ТТН — усередині). UI показує статус + «Повторити».
   void createCheckboxReceiptForSale(task.saleId);
+
+  // Фаза 4: сповіщення покупцю про відправлення — лише через бот-розмову, яку
+  // він сам розпочав. Best-effort, не блокує відповідь.
+  void notifyCustomerShipmentSent(task.saleId);
 
   revalidatePath("/manager/warehouse-tasks");
   revalidatePath(`/manager/warehouse-tasks/${id}`);
