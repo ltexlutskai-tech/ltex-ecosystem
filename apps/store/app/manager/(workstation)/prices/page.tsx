@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/manager-auth";
 import { canManageCatalog } from "@/lib/manager/catalog-permissions";
+import { serializeFields } from "@/lib/manager/bulk-edit/registry";
 import { getHiddenCategoryIds } from "@/lib/catalog-visibility";
 import { getCurrentRate } from "@/lib/exchange-rate";
 import type { PriceSort, SortDir } from "@/lib/manager/prices";
@@ -77,6 +78,14 @@ export default async function PricesPage({
     pageSize,
   });
 
+  // Поля для «Групової обробки» — лише дозволені ролі; опції категорії з дерева.
+  const bulkFields = serializeFields("product", user.role, {
+    categoryId: categories.map((c) => ({
+      value: c.id,
+      label: `${"— ".repeat(c.depth)}${c.name}`,
+    })),
+  });
+
   return (
     <div className="max-w-none space-y-3">
       <header className="flex items-start justify-between gap-3">
@@ -100,6 +109,7 @@ export default async function PricesPage({
         items={list.items}
         rateUah={rateUah}
         sellerName={user.fullName}
+        bulkFields={bulkFields}
       />
       <div className="flex flex-wrap items-center justify-between gap-2">
         <PageSizeSelect pageSize={pageSize} />

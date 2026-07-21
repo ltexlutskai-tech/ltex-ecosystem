@@ -4,6 +4,10 @@ import Link from "next/link";
 import { useRef, useState } from "react";
 import type { PriceRow } from "@/lib/manager/prices";
 import { buildProductShareText } from "@/lib/manager/share-message";
+import type { SerializedBulkField } from "@/lib/manager/bulk-edit/registry";
+import { useBulkSelection } from "../../_components/bulk/use-bulk-selection";
+import { BulkProcessingBar } from "../../_components/bulk/bulk-processing-bar";
+import { BulkFieldDialog } from "../../_components/bulk/bulk-field-dialog";
 import { ProductClaimsBadge } from "./product-claims-panel";
 import { ProductRowMenu, type ProductRowMenuTarget } from "./product-row-menu";
 
@@ -13,6 +17,11 @@ interface Props {
   rateUah: number;
   /** ПІБ поточного менеджера (продавець у запиті «Замовити відео»). */
   sellerName: string;
+  /**
+   * Поля, дозволені для «Групової обробки» поточній ролі (серіалізовані, без
+   * реального стовпця). Порожній масив / відсутній → групова обробка вимкнена.
+   */
+  bulkFields?: SerializedBulkField[];
 }
 
 function formatPrice(value: number | null, currency: string): string {
@@ -63,11 +72,15 @@ function toMenuTarget(row: PriceRow, rateUah: number): ProductRowMenuTarget {
   };
 }
 
-export function PricesList({ items, rateUah, sellerName }: Props) {
+export function PricesList({ items, rateUah, sellerName, bulkFields }: Props) {
   const [menuTarget, setMenuTarget] = useState<ProductRowMenuTarget | null>(
     null,
   );
   const [menuPos, setMenuPos] = useState<{ x: number; y: number } | null>(null);
+  const bulkEnabled = (bulkFields?.length ?? 0) > 0;
+  const bulk = useBulkSelection();
+  const [bulkOpen, setBulkOpen] = useState(false);
+  const pageIds = items.map((r) => r.id);
   const longPressRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // true коли long-press встиг відкрити меню — тоді гасимо наступний клік по
   // мобільному рядку-`<Link>`, щоб не переходити на картку товара.
@@ -114,6 +127,16 @@ export function PricesList({ items, rateUah, sellerName }: Props) {
         <table className="min-w-full divide-y divide-gray-200 text-sm">
           <thead className="bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
             <tr>
+              {bulkEnabled && (
+                <th className="w-8 px-2.5 py-1.5">
+                  <input
+                    type="checkbox"
+                    checked={bulk.allOnPageSelected(pageIds)}
+                    onChange={() => bulk.toggleAllOnPage(pageIds)}
+                    aria-label="Вибрати всі на сторінці"
+                  />
+                </th>
+              )}
               <th className="px-2.5 py-1.5">Товар</th>
               <th className="px-2.5 py-1.5 whitespace-nowrap">Залишок</th>
               <th className="px-2.5 py-1.5 whitespace-nowrap">Ціна</th>
@@ -130,6 +153,16 @@ export function PricesList({ items, rateUah, sellerName }: Props) {
                   openMenu(row, e.clientX, e.clientY);
                 }}
               >
+                {bulkEnabled && (
+                  <td className="px-2.5 py-1.5 align-top">
+                    <input
+                      type="checkbox"
+                      checked={bulk.isSelected(row.id)}
+                      onChange={() => bulk.toggle(row.id)}
+                      aria-label={`Обрати ${row.name}`}
+                    />
+                  </td>
+                )}
                 <td className="px-2.5 py-1.5 align-top">
                   <Link
                     href={`/manager/prices/${row.id}`}
@@ -200,7 +233,23 @@ export function PricesList({ items, rateUah, sellerName }: Props) {
             }}
           >
             <div className="flex items-start justify-between gap-2">
-              <span className="font-medium text-gray-900">{row.name}</span>
+              <span className="flex items-start gap-2">
+                {bulkEnabled && (
+                  <input
+                    type="checkbox"
+                    checked={bulk.isSelected(row.id)}
+                    className="mt-1"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      bulk.toggle(row.id);
+                    }}
+                    onChange={() => {}}
+                    aria-label={`Обрати ${row.name}`}
+                  />
+                )}
+                <span className="font-medium text-gray-900">{row.name}</span>
+              </span>
               <div className="flex shrink-0 gap-1">
                 {row.isTarget && <Badge className="bg-emerald-600">Ціль</Badge>}
                 {row.isNew && <Badge className="bg-amber-500">Нове</Badge>}
@@ -235,12 +284,35 @@ export function PricesList({ items, rateUah, sellerName }: Props) {
         ))}
       </div>
 
+      {bulkEnabled && (
+        <>
+          <BulkProcessingBar
+            count={bulk.count}
+            onOpen={() => setBulkOpen(true)}
+            onClear={bulk.clear}
+          />
+          <BulkFieldDialog
+            entity="product"
+            fields={bulkFields ?? []}
+            ids={Array.from(bulk.selected)}
+            open={bulkOpen}
+            onClose={() => setBulkOpen(false)}
+            onDone={() => {
+              setBulkOpen(false);
+              bulk.clear();
+            }}
+          />
+        </>
+      )}
+
       <ProductRowMenu
         target={menuTarget}
         position={menuPos}
         onClose={closeMenu}
         sellerName={sellerName}
       />
+      {/* Примітка: вибірка «усі за фільтром» (select-all-matching) — пізніший
+          етап; наразі MVP — лише явні чекбокси на сторінці. */}
     </>
   );
 }
