@@ -68,6 +68,16 @@ export interface ClientPickerItem {
   deliveryMethodCode?: string | null;
   /** № відділення Нової Пошти клієнта (використовується у Реалізації). */
   novaPoshtaBranch?: string | null;
+  /**
+   * Структуровані реф-и «звіреної» адреси НП (довідник НП) — форма Реалізації
+   * підставляє їх авто у пікер міста/відділення. Порожні коли не звірено.
+   */
+  npCityRef?: string | null;
+  npCityName?: string | null;
+  npWarehouseRef?: string | null;
+  npWarehouseName?: string | null;
+  /** Чи звірено адресу НП клієнта (для підказки «не звірено» у формі). */
+  npAddressMatched?: boolean;
   agent: { id: string; fullName: string } | null;
   isOwned: boolean;
 }

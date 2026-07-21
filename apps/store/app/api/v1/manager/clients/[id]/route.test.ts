@@ -342,6 +342,49 @@ describe("PATCH /api/v1/manager/clients/[id]", () => {
     expect(updateCall.data.websiteUrl).toBeNull();
   });
 
+  it("stamps npAddressMatchedAt when a NP warehouse is picked", async () => {
+    mockPrisma.mgrClient.update.mockResolvedValueOnce(fakeClient);
+    await PATCH(
+      makePatchReq("c1", {
+        npCityRef: "city-ref",
+        npCityName: "Луцьк",
+        npWarehouseRef: "wh-ref",
+        npWarehouseName: "Відділення №1",
+      }),
+      { params: Promise.resolve({ id: "c1" }) },
+    );
+    const updateCall = (mockPrisma.mgrClient.update.mock.calls[0] ?? [])[0] as {
+      data: Record<string, unknown>;
+    };
+    expect(updateCall.data.npCityRef).toBe("city-ref");
+    expect(updateCall.data.npWarehouseRef).toBe("wh-ref");
+    expect(updateCall.data.npAddressMatchedAt).toBeInstanceOf(Date);
+  });
+
+  it("clears npAddressMatchedAt when NP warehouse is cleared", async () => {
+    mockPrisma.mgrClient.update.mockResolvedValueOnce(fakeClient);
+    await PATCH(makePatchReq("c1", { npWarehouseRef: "" }), {
+      params: Promise.resolve({ id: "c1" }),
+    });
+    const updateCall = (mockPrisma.mgrClient.update.mock.calls[0] ?? [])[0] as {
+      data: Record<string, unknown>;
+    };
+    expect(updateCall.data.npWarehouseRef).toBeNull();
+    expect(updateCall.data.npAddressMatchedAt).toBeNull();
+  });
+
+  it("does not touch npAddressMatchedAt when only city changes", async () => {
+    mockPrisma.mgrClient.update.mockResolvedValueOnce(fakeClient);
+    await PATCH(makePatchReq("c1", { npCityRef: "city-only" }), {
+      params: Promise.resolve({ id: "c1" }),
+    });
+    const updateCall = (mockPrisma.mgrClient.update.mock.calls[0] ?? [])[0] as {
+      data: Record<string, unknown>;
+    };
+    expect(updateCall.data.npCityRef).toBe("city-only");
+    expect("npAddressMatchedAt" in updateCall.data).toBe(false);
+  });
+
   it("FK null disconnects relation", async () => {
     mockPrisma.mgrClient.update.mockResolvedValueOnce(fakeClient);
     await PATCH(makePatchReq("c1", { statusGeneralId: null }), {

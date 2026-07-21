@@ -24,6 +24,14 @@ export const mgrClientPatchSchema = z
     street: z.string().max(255).nullable().optional(),
     house: z.string().max(50).nullable().optional(),
     novaPoshtaBranch: z.string().max(50).nullable().optional(),
+    // Структуровані реф-и «звіреної» адреси Нової Пошти (з довідника НП). Коли
+    // задано відділення — сервер штампує `npAddressMatchedAt` (мітка «звірено»),
+    // а форма реалізації підставляє їх авто. `novaPoshtaBranch` (вільний текст)
+    // лишається як legacy.
+    npCityRef: z.string().max(100).nullable().optional(),
+    npCityName: z.string().max(255).nullable().optional(),
+    npWarehouseRef: z.string().max(100).nullable().optional(),
+    npWarehouseName: z.string().max(255).nullable().optional(),
     websiteUrl: websiteUrlField,
     geolocation: z.string().max(100).nullable().optional(),
     viberContact: z.string().max(50).nullable().optional(),

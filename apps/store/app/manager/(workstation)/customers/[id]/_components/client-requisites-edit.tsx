@@ -24,6 +24,10 @@ import { EditDateRow } from "./edit-controls/edit-date-row";
 import { EditBoolRow } from "./edit-controls/edit-bool-row";
 import { EditSelectRow } from "./edit-controls/edit-select-row";
 import { ReadonlyRow } from "./edit-controls/readonly-row";
+import {
+  NpWarehousePicker,
+  type NpSelection,
+} from "../../../_components/np-warehouse-picker";
 
 function fmtDate(iso: string | null | undefined): string {
   if (!iso) return "—";
@@ -158,6 +162,18 @@ export function ClientRequisitesEdit({
       setSaving(false);
     }
   }
+
+  /** Оновлення вибору міста/відділення НП з пікера (звірка адреси). */
+  function onNpChange(v: NpSelection): void {
+    setField("npCityRef", v.cityRef);
+    setField("npCityName", v.cityName);
+    setField("npWarehouseRef", v.warehouseRef);
+    setField("npWarehouseName", v.warehouseName);
+  }
+
+  // «Звірено» коли обрано конкретне відділення НП (після збереження сервер
+  // штампує `npAddressMatchedAt`). Показуємо живий стан під час редагування.
+  const npMatched = values.npWarehouseRef.trim().length > 0;
 
   function handleCancel() {
     if (isDirty) {
@@ -457,6 +473,34 @@ export function ClientRequisitesEdit({
             value={values.isViberLinked}
             onChange={(v) => setField("isViberLinked", v)}
           />
+
+          <div className="sm:col-span-2 rounded-lg border border-gray-200 bg-gray-50 p-4">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <span className="text-sm font-medium text-gray-700">
+                Адреса Нової Пошти
+              </span>
+              {npMatched ? (
+                <span className="inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800">
+                  ✓ Адресу НП звірено
+                </span>
+              ) : (
+                <span className="inline-flex items-center rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-medium text-amber-800">
+                  ⚠ Адресу НП не звірено
+                </span>
+              )}
+            </div>
+            <NpWarehousePicker
+              cityRef={values.npCityRef}
+              cityName={values.npCityName}
+              warehouseRef={values.npWarehouseRef}
+              warehouseName={values.npWarehouseName}
+              onChange={onNpChange}
+            />
+            <p className="mt-2 text-xs text-gray-500">
+              Оберіть місто та відділення з довідника НП — його автоматично
+              підставить форма реалізації для цього клієнта.
+            </p>
+          </div>
 
           <div className="sm:col-span-2">
             <EditTextareaRow
