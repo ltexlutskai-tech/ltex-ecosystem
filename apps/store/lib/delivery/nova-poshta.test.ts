@@ -186,7 +186,7 @@ describe("createInternetDocument", () => {
 
     const result = await createInternetDocument(baseTtnInput);
 
-    expect(result).toEqual({ error: "Some NP error" });
+    expect(result).toEqual({ error: "Нова Пошта: Some NP error" });
   });
 });
 

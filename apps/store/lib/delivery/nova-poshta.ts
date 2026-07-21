@@ -1,3 +1,4 @@
+import { translateNpError } from "./np-error";
 /**
  * Nova Poshta API v2.0 client.
  *
@@ -365,7 +366,11 @@ export async function ensureRecipientPrivatePerson(input: {
   const first = res.data[0];
   const contactRef = first?.ContactPerson?.data?.[0]?.Ref;
   if (!res.success || !first || !contactRef) {
-    return { error: res.errors[0] ?? "Не вдалося створити отримувача" };
+    return {
+      error: translateNpError(
+        res.errors[0] ?? "Не вдалося створити отримувача",
+      ),
+    };
   }
   return { counterpartyRef: first.Ref, contactRef };
 }
@@ -478,7 +483,9 @@ export async function createInternetDocument(
   );
   const first = res.data[0];
   if (!res.success || !first) {
-    return { error: res.errors[0] ?? "Не вдалося створити ТТН" };
+    return {
+      error: translateNpError(res.errors[0] ?? "Не вдалося створити ТТН"),
+    };
   }
   return mapCreatedTtn(first);
 }
@@ -494,7 +501,9 @@ export async function updateInternetDocument(
   );
   const first = res.data[0];
   if (!res.success || !first) {
-    return { error: res.errors[0] ?? "Не вдалося оновити ТТН" };
+    return {
+      error: translateNpError(res.errors[0] ?? "Не вдалося оновити ТТН"),
+    };
   }
   return mapCreatedTtn(first);
 }
@@ -510,7 +519,7 @@ export async function deleteInternetDocument(
   if (!res.success) {
     return {
       success: false,
-      error: res.errors[0] ?? "Не вдалося видалити ТТН",
+      error: translateNpError(res.errors[0] ?? "Не вдалося видалити ТТН"),
     };
   }
   return { success: true };
