@@ -183,6 +183,9 @@ async function buildTtnInputForSale(
   let weight: number;
   let seatsAmount: number;
   let optionsSeat: NpSeatOption[] | undefined;
+  // «Ручна обробка» хоч на одному місці → CargoType=Cargo (мішки; вантажне
+  // відділення-отримувач, габарити ≤ 120 см — контролює склад при виборі місць).
+  const anyManual = seats.some((s) => s.manualHandling);
   if (seats.length > 0) {
     const seatWeight = seats.reduce((s, x) => s + (x.weight || 0), 0);
     weight = Math.max(
@@ -197,6 +200,7 @@ async function buildTtnInputForSale(
       volumetricLength: Math.max(MIN_DIM_CM, s.lengthCm),
       volumetricHeight: Math.max(MIN_DIM_CM, s.heightCm),
       weight: Math.max(MIN_WEIGHT_KG, s.weight || perSeatFallback),
+      specialCargo: s.manualHandling ?? false,
     }));
   } else {
     weight = Math.max(MIN_WEIGHT_KG, Math.round(itemsWeight * 100) / 100);
@@ -238,7 +242,7 @@ async function buildTtnInputForSale(
   const input: CreateTtnInput = {
     payerType: sale.npPayerType === "Sender" ? "Sender" : "Recipient",
     paymentMethod: "Cash",
-    cargoType: "Parcel",
+    cargoType: anyManual ? "Cargo" : "Parcel",
     weight,
     serviceType: "WarehouseWarehouse",
     seatsAmount,

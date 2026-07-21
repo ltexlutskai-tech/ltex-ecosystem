@@ -242,6 +242,25 @@ describe("buildTtnMethodProperties", () => {
     ]);
   });
 
+  it("maps specialCargo (ручна обробка) to '1' in OptionsSeat", () => {
+    const props = buildTtnMethodProperties({
+      ...baseTtnInput,
+      cargoType: "Cargo",
+      optionsSeat: [
+        {
+          volumetricWidth: 60,
+          volumetricLength: 100,
+          volumetricHeight: 50,
+          weight: 25,
+          specialCargo: true,
+        },
+      ],
+    });
+    const seat = (props.OptionsSeat as Array<Record<string, string>>)[0]!;
+    expect(seat.specialCargo).toBe("1");
+    expect(props.CargoType).toBe("Cargo");
+  });
+
   it("omits RecipientAddress for WarehouseDoors without warehouse ref", () => {
     const props = buildTtnMethodProperties({
       ...baseTtnInput,
