@@ -40,6 +40,9 @@ export function NpRegistersClient({
   const { toast } = useToast();
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [confirmingRef, setConfirmingRef] = useState<string | null>(null);
+  const [confirmingTtnSaleId, setConfirmingTtnSaleId] = useState<string | null>(
+    null,
+  );
   const [isPending, startTransition] = useTransition();
 
   const allSelected = useMemo(
@@ -85,6 +88,36 @@ export function NpRegistersClient({
         }
         toast({ title: `Реєстр створено №${body.number ?? ""}` });
         setSelected(new Set());
+        router.refresh();
+      } catch (err) {
+        toast({
+          title: "Помилка",
+          description: err instanceof Error ? err.message : String(err),
+          variant: "destructive",
+        });
+      }
+    });
+  }
+
+  async function deleteTtn(saleId: string) {
+    startTransition(async () => {
+      try {
+        const res = await fetch("/api/v1/manager/np-registers/ttn", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ saleId }),
+        });
+        const body = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          toast({
+            title: "Помилка",
+            description: body.error ?? "Не вдалося видалити ТТН",
+            variant: "destructive",
+          });
+          return;
+        }
+        toast({ title: "ТТН видалено" });
+        setConfirmingTtnSaleId(null);
         router.refresh();
       } catch (err) {
         toast({
@@ -167,6 +200,7 @@ export function NpRegistersClient({
                   <th className="px-4 py-2">Клієнт</th>
                   <th className="px-4 py-2">Місто / відділення</th>
                   <th className="px-4 py-2">Дата</th>
+                  <th className="px-4 py-2 text-right">Дії</th>
                 </tr>
               </thead>
               <tbody>
@@ -191,6 +225,29 @@ export function NpRegistersClient({
                     </td>
                     <td className="px-4 py-2 text-gray-600">
                       {formatDate(t.ttnCreatedAt)}
+                    </td>
+                    <td className="px-4 py-2">
+                      <div className="flex items-center justify-end">
+                        {confirmingTtnSaleId === t.saleId ? (
+                          <Button
+                            size="sm"
+                            variant="destructive"
+                            onClick={() => deleteTtn(t.saleId)}
+                            disabled={isPending}
+                          >
+                            Точно видалити ТТН?
+                          </Button>
+                        ) : (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => setConfirmingTtnSaleId(t.saleId)}
+                          >
+                            <Trash2 className="mr-1.5 h-4 w-4" />
+                            Видалити ТТН
+                          </Button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}
