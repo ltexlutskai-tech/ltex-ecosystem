@@ -4,6 +4,7 @@ import {
   resolveReceiptName,
   type CategoryNode,
 } from "@/lib/manager/receipt-name";
+import { getPaymentSummary } from "@/lib/manager/payment-summary";
 import { createEttnReceipt } from "./checkbox";
 import { buildEttnRequest, type EttnGoodInput } from "./ettn-payload";
 
@@ -44,7 +45,11 @@ export async function createCheckboxReceiptForSale(
     if (!sale.cashOnDelivery || !sale.expressWaybill) {
       return { ok: false, skipped: true };
     }
-    const codUah = sale.codAmountUah ?? 0;
+    // Сума чека = сума контролю оплати (накладки). Беремо ЗАЛИШОК до сплати з
+    // того ж свіжого зведення по касі, що й ТТН — інакше Checkbox відхилить
+    // («сума чека ≠ сума накладної»).
+    const summary = await getPaymentSummary(saleId);
+    const codUah = summary ? summary.codAmountUah : (sale.codAmountUah ?? 0);
     if (codUah <= 0) return { ok: false, skipped: true };
 
     // Ідемпотентність: чек уже створено.
@@ -65,15 +70,16 @@ export async function createCheckboxReceiptForSale(
     } else {
       resolver = buildReceiptNameResolver([]);
     }
+    // Групуємо у 3 категорії, ВАГИ лотів однієї групи додаємо разом.
     const byName = new Map<string, EttnGoodInput>();
     for (const it of sale.items) {
       const { name, code } = resolveReceiptName(it.product, resolver);
       const existing = byName.get(name);
-      const share = it.priceEur || 0;
+      const w = it.weight || 0;
       if (existing) {
-        existing.share += share;
+        existing.weightKg += w;
       } else {
-        byName.set(name, { name, code, share });
+        byName.set(name, { name, code, weightKg: w });
       }
     }
     const goods = [...byName.values()];

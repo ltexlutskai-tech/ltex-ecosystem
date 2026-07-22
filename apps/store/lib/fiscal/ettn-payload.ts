@@ -1,14 +1,15 @@
 /**
  * Чистий білдер тіла чека Checkbox для NovaPay-накладки (ETTN).
  *
- * Порт 1С `РеализацияТоваровУслуг.СформироватьСтруктуруЗапроса`:
- *  - позиції групуються за загальною назвою (Одяг/Взуття/Товари для дому) у 1–3
- *    рядки; сума накладки (COD) розподіляється між рядками ПРОПОРЦІЙНО їхній
- *    частці у сумі реалізації, останній рядок вбирає залишок округлення;
- *  - гроші — у копійках (×100), кількість — у мілі-одиницях (×1000);
- *  - оплата: type ETTN, label «Платіж через інтегратора NovaPay», value = COD,
- *    ettn = № експрес-накладної;
- *  - discounts балансують goods vs payment (зазвичай не потрібні — суми рівні).
+ * Правила L-TEX (рішення user):
+ *  - сума чека = сума КОНТРОЛЮ ОПЛАТИ (накладки), а НЕ повна вартість реалізації;
+ *  - позиції — лише 3 узагальнені групи: «Одяг вживаний» / «Взуття вживане» /
+ *    «Товари для дому вживані»; ваги лотів однієї групи ДОДАЮТЬСЯ разом;
+ *  - ціну рахуємо «від зворотного»: ціна за кг = сума накладки / загальна вага,
+ *    рядок = вага × ціна_за_кг (кількість у чеку = вага в кг);
+ *  - розбіжність округлення вирівнюємо знижкою/націнкою (Checkbox discounts);
+ *  - гроші — у копійках (×100), кількість — у мілі-одиницях (×1000, тобто 1 кг =
+ *    1000); оплата: type ETTN, value = сума накладки, ettn = № експрес-накладної.
  */
 
 export interface EttnGoodInput {
@@ -16,8 +17,8 @@ export interface EttnGoodInput {
   name: string;
   /** Код товару Checkbox (1/2/3). */
   code: string;
-  /** Частка позиції для розподілу COD (сума рядка; валюта не важлива — лише ratio). */
-  share: number;
+  /** Сумарна вага групи, кг (ваги лотів однієї групи вже додані). */
+  weightKg: number;
 }
 
 export interface EttnRequest {
@@ -50,11 +51,14 @@ const DEFAULT_FOOTER = "Дякуємо за покупку!";
 
 /**
  * Будує запит чека ETTN.
- *  - `goods` — вже згруповані за загальною назвою (name+code), `share` = сума
- *    рядка (для пропорції);
- *  - `codUah` — сума накладки (₴);
+ *  - `goods` — вже згруповані за загальною назвою (name+code) з сумарною вагою;
+ *  - `codUah` — сума накладки/контролю оплати (₴) = підсумок чека;
  *  - `ettn` — № ТТН;
- *  - `taxCode` — код ПДВ (Без ПДВ = 8; null → без tax);
+ *  - `taxCode` — код ПДВ (Без ПДВ = 8; null → без tax).
+ *
+ * Ціна за кг = codKop / загальна вага; рядок (Checkbox) = round(qty×price/1000),
+ * де qty = вага×1000. Залишок округлення вирівнюємо знижкою/націнкою, щоб
+ * підсумок дорівнював сумі накладки (інакше Checkbox: «сума чека ≠ сума накладної»).
  */
 export function buildEttnRequest(input: {
   goods: EttnGoodInput[];
@@ -69,36 +73,49 @@ export function buildEttnRequest(input: {
       ? []
       : [input.taxCode];
 
-  // Лише позиції з додатною часткою.
-  const positive = input.goods.filter((g) => g.share > 0);
-  const totalShare = positive.reduce((s, g) => s + g.share, 0);
+  const positive = input.goods.filter((g) => g.weightKg > 0);
+  const totalWeight = positive.reduce((s, g) => s + g.weightKg, 0);
 
   const goods: EttnRequest["receipt_body"]["goods"] = [];
-  if (positive.length > 0 && totalShare > 0 && codKop > 0) {
-    let allocated = 0;
-    positive.forEach((g, i) => {
-      const isLast = i === positive.length - 1;
-      const priceKop = isLast
-        ? codKop - allocated // останній вбирає залишок
-        : Math.round((codKop * g.share) / totalShare);
-      allocated += priceKop;
+  if (positive.length > 0 && totalWeight > 0 && codKop > 0) {
+    // Ціна за кг (копійки) = сума накладки / загальна вага.
+    const pricePerKgKop = Math.round(codKop / totalWeight);
+    for (const g of positive) {
+      const qtyMilli = Math.round(g.weightKg * 1000);
       goods.push({
-        good: { code: g.code, name: g.name, price: priceKop, tax },
-        quantity: 1000,
+        good: { code: g.code, name: g.name, price: pricePerKgKop, tax },
+        quantity: qtyMilli,
         is_return: false,
       });
+    }
+  } else if (codKop > 0) {
+    // Фолбек (немає ваги) — один рядок на всю суму, кількість = 1.
+    const g = input.goods[0];
+    goods.push({
+      good: {
+        code: g?.code ?? "1",
+        name: g?.name ?? "Товари вживані",
+        price: codKop,
+        tax,
+      },
+      quantity: 1000,
+      is_return: false,
     });
   }
 
-  const goodsSum = goods.reduce((s, g) => s + g.good.price, 0);
+  // Підсумок так, як його порахує Checkbox (округлення на кожному рядку).
+  const goodsSum = goods.reduce(
+    (s, g) => s + Math.round((g.quantity * g.good.price) / 1000),
+    0,
+  );
 
-  // Балансування (страховка від розбіжностей округлення).
+  // Вирівнюємо підсумок до суми накладки знижкою/націнкою.
   const discounts: EttnRequest["receipt_body"]["discounts"] = [];
   const diff = goodsSum - codKop;
   if (diff !== 0) {
     discounts.push({
       type: diff > 0 ? "DISCOUNT" : "EXTRA_CHARGE",
-      name: diff > 0 ? "Знижка" : "Націнка",
+      name: diff > 0 ? "Знижка (вирівнювання)" : "Націнка (вирівнювання)",
       mode: "VALUE",
       value: Math.abs(diff),
     });
