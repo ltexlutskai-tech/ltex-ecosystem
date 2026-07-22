@@ -92,7 +92,7 @@ interface SaleDraftData {
   npRecipientName: string;
   npRecipientPhone: string;
   npPayerType: string;
-  declaredValueEnabled: boolean;
+  declaredValueMode: "full" | "cod" | "none";
   deliveryAddress: string;
   cashOnDelivery: boolean;
   onTradeAgent: boolean;
@@ -326,8 +326,11 @@ export function SaleForm({
   const [npPayerType, setNpPayerType] = useState(
     initialSale?.npPayerType ?? "Recipient",
   );
-  const [declaredValueEnabled, setDeclaredValueEnabled] = useState(
-    initialSale?.declaredValueEnabled ?? true,
+  const [declaredValueMode, setDeclaredValueMode] = useState<
+    "full" | "cod" | "none"
+  >(
+    initialSale?.declaredValueMode ??
+      (initialSale?.declaredValueEnabled === false ? "none" : "full"),
   );
   // Чи редагував менеджер поля отримувача вручну — щоб зміна клієнта не
   // перезаписувала вже введене значення (best-effort).
@@ -389,7 +392,7 @@ export function SaleForm({
       npRecipientName,
       npRecipientPhone,
       npPayerType,
-      declaredValueEnabled,
+      declaredValueMode,
       deliveryAddress,
       cashOnDelivery,
       onTradeAgent,
@@ -414,7 +417,7 @@ export function SaleForm({
       npRecipientName,
       npRecipientPhone,
       npPayerType,
-      declaredValueEnabled,
+      declaredValueMode,
       deliveryAddress,
       cashOnDelivery,
       onTradeAgent,
@@ -470,7 +473,10 @@ export function SaleForm({
           ? d.npRecipientPhone.trim() || null
           : null,
         npPayerType: isNovaPoshta ? d.npPayerType || null : null,
-        declaredValueEnabled: isNovaPoshta ? d.declaredValueEnabled : null,
+        declaredValueMode: isNovaPoshta ? d.declaredValueMode : null,
+        declaredValueEnabled: isNovaPoshta
+          ? d.declaredValueMode !== "none"
+          : null,
         deliveryAddress: d.deliveryAddress.trim() || null,
         cashOnDelivery: d.cashOnDelivery,
         assignedAgentUserId: d.onTradeAgent ? null : currentUserId,
@@ -833,8 +839,9 @@ export function SaleForm({
           npRecipientPhone:
             deliveryKind === "post" ? npRecipientPhone.trim() || null : null,
           npPayerType: deliveryKind === "post" ? npPayerType || null : null,
+          declaredValueMode: deliveryKind === "post" ? declaredValueMode : null,
           declaredValueEnabled:
-            deliveryKind === "post" ? declaredValueEnabled : null,
+            deliveryKind === "post" ? declaredValueMode !== "none" : null,
           deliveryAddress:
             deliveryKind === "delivery" ? deliveryAddress.trim() || null : null,
           cashOnDelivery,
@@ -1266,15 +1273,34 @@ export function SaleForm({
                   <option value="Sender">Відправник</option>
                 </select>
               </div>
-              <label className="inline-flex cursor-pointer items-center gap-2 text-sm text-gray-700 sm:col-span-2 lg:col-span-3">
-                <input
-                  type="checkbox"
-                  checked={declaredValueEnabled}
-                  onChange={(e) => setDeclaredValueEnabled(e.target.checked)}
-                  className="h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
-                />
-                <span>Оголошена цінність = сума реалізації</span>
-              </label>
+              <div className="sm:col-span-2 lg:col-span-3">
+                <label
+                  htmlFor="sale-np-declared-value"
+                  className="mb-1 block text-sm font-medium text-gray-700"
+                >
+                  Оголошена цінність посилки
+                </label>
+                <select
+                  id="sale-np-declared-value"
+                  value={declaredValueMode}
+                  onChange={(e) =>
+                    setDeclaredValueMode(
+                      e.target.value as "full" | "cod" | "none",
+                    )
+                  }
+                  className="h-10 w-full rounded-md border border-gray-300 bg-white px-3 text-sm focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500"
+                >
+                  <option value="full">Повна вартість</option>
+                  <option value="cod">
+                    Дорівнює контролю оплати (накладці)
+                  </option>
+                  <option value="none">Не вказувати</option>
+                </select>
+                <p className="mt-1 text-xs text-gray-500">
+                  Уточніть у клієнта: страхувати на повну вартість, на суму
+                  накладки, чи не страхувати.
+                </p>
+              </div>
             </>
           )}
 

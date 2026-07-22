@@ -236,6 +236,7 @@ export default async function ManagerSaleDetailPage({
     npRecipientPhone: sale.npRecipientPhone,
     npPayerType: sale.npPayerType,
     declaredValueEnabled: sale.declaredValueEnabled,
+    declaredValueMode: sale.declaredValueMode as "full" | "cod" | "none" | null,
     deliveryAddress: sale.deliveryAddress,
     cashOnDelivery: sale.cashOnDelivery,
     assignedAgentUserId: sale.assignedAgentUserId,

@@ -66,6 +66,7 @@ export const createSaleSchema = z.object({
   npRecipientPhone: z.string().max(30).nullable().optional(),
   npPayerType: z.string().max(20).nullable().optional(),
   declaredValueEnabled: z.boolean().optional(),
+  declaredValueMode: z.enum(["full", "cod", "none"]).nullable().optional(),
   deliveryAddress: z.string().max(500).nullable().optional(),
   /** Наложка (післяплата). */
   cashOnDelivery: z.boolean().optional().default(false),
@@ -124,6 +125,7 @@ export const updateSaleSchema = z.object({
   npRecipientPhone: z.string().max(30).nullable().optional(),
   npPayerType: z.string().max(20).nullable().optional(),
   declaredValueEnabled: z.boolean().optional(),
+  declaredValueMode: z.enum(["full", "cod", "none"]).nullable().optional(),
   deliveryAddress: z.string().max(500).nullable().optional(),
   cashOnDelivery: z.boolean().optional().default(false),
   assignedAgentUserId: z.string().min(1).nullable().optional(),
@@ -179,6 +181,7 @@ export const saleDraftSchema = z.object({
   npRecipientPhone: z.string().max(30).nullable().optional(),
   npPayerType: z.string().max(20).nullable().optional(),
   declaredValueEnabled: z.boolean().optional(),
+  declaredValueMode: z.enum(["full", "cod", "none"]).nullable().optional(),
   deliveryAddress: z.string().max(500).nullable().optional(),
   cashOnDelivery: z.boolean().optional(),
   assignedAgentUserId: z.string().min(1).nullable().optional(),

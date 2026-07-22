@@ -301,6 +301,11 @@ export interface SaleEditInitial {
   npPayerType: string | null;
   /** Оголошена цінність = сума реалізації (за замовч. увімкнено). */
   declaredValueEnabled: boolean;
+  /**
+   * Режим оголошеної цінності НП: full = повна вартість, cod = сума накладки
+   * (контролю оплати), none = не вказувати. Null → похідне з declaredValueEnabled.
+   */
+  declaredValueMode?: "full" | "cod" | "none" | null;
   deliveryAddress: string | null;
   cashOnDelivery: boolean;
   assignedAgentUserId: string | null;
