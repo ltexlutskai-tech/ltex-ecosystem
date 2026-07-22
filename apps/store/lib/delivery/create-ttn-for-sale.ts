@@ -279,12 +279,6 @@ async function buildTtnInputForSale(
   }
   const description = [...names].join(", ") || "Товари вживані";
 
-  // Оголошена цінність.
-  const baseCost = sale.declaredValueEnabled
-    ? Math.round(sale.declaredValueUah ?? sale.totalUah)
-    : MIN_DECLARED_UAH;
-  const cost = Math.max(1, baseCost);
-
   // Накладка → «Контроль оплати». Береться ЗАЛИШОК до сплати з урахуванням
   // передоплат (свіже зведення по касі), а не збережене `codAmountUah`, яке
   // могло бути пораховане до внесення передоплати. Так наложка = сума − оплачено.
@@ -294,6 +288,23 @@ async function buildTtnInputForSale(
     const remainUah = summary ? summary.codAmountUah : (sale.codAmountUah ?? 0);
     cod = remainUah > 0 ? Math.round(remainUah) : undefined;
   }
+
+  // Оголошена цінність — режим на вибір менеджера (уточнює у клієнта):
+  //  • "full" — повна вартість (сума реалізації / declaredValueUah);
+  //  • "cod"  — дорівнює сумі контролю оплати (накладки);
+  //  • "none" — не вказуємо (мінімальна).
+  // null → сумісність зі старим прапорцем (declaredValueEnabled: true→full).
+  const declaredMode =
+    sale.declaredValueMode ?? (sale.declaredValueEnabled ? "full" : "none");
+  let baseCost: number;
+  if (declaredMode === "none") {
+    baseCost = MIN_DECLARED_UAH;
+  } else if (declaredMode === "cod") {
+    baseCost = cod ?? Math.round(sale.declaredValueUah ?? sale.totalUah);
+  } else {
+    baseCost = Math.round(sale.declaredValueUah ?? sale.totalUah);
+  }
+  const cost = Math.max(1, baseCost);
 
   const input: CreateTtnInput = {
     payerType: sale.npPayerType === "Sender" ? "Sender" : "Recipient",

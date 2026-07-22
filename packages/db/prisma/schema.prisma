@@ -440,6 +440,10 @@ model Sale {
   // Оголошена цінність ТТН (₴). enabled=false → не декларуємо (мінімальна).
   declaredValueUah     Float?    @map("declared_value_uah")
   declaredValueEnabled Boolean   @default(true) @map("declared_value_enabled")
+  // Режим оголошеної цінності ТТН: "full" (повна вартість) | "cod" (дорівнює
+  // сумі контролю оплати/накладки) | "none" (не вказувати, мінімальна). null →
+  // визначається зі старого declaredValueEnabled (true→full, false→none).
+  declaredValueMode    String?   @map("declared_value_mode")
   notes                String?
   agentName            String?   @map("agent_name") // ТорговийАгент._Description (історичний імпорт 5.4.6a)
   orderId              String?   @map("order_id")

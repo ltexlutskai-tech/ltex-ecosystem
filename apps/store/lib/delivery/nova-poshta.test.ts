@@ -127,6 +127,16 @@ describe("getWarehouses", () => {
           TotalMaxWeightAllowed: "1000",
           PlaceMaxWeightAllowed: "1000",
         },
+        {
+          // Вантажне за вагою місця, але БЕЗ слова «Вантажне» у назві (баг: такі
+          // не показувались при фільтрі «лише вантажні»).
+          Ref: "wh-3",
+          Number: "1",
+          Description: "Відділення №1: вул. Гранітна, 16",
+          TypeOfWarehouseRef: "type-ref-3",
+          TotalMaxWeightAllowed: "1100",
+          PlaceMaxWeightAllowed: "1100",
+        },
       ],
     });
 
@@ -149,6 +159,15 @@ describe("getWarehouses", () => {
         typeRef: "type-ref-2",
         maxWeight: 1000,
         placeMaxWeight: 1000,
+        isFreight: true,
+      },
+      {
+        ref: "wh-3",
+        number: "1",
+        name: "Відділення №1: вул. Гранітна, 16",
+        typeRef: "type-ref-3",
+        maxWeight: 1100,
+        placeMaxWeight: 1100,
         isFreight: true,
       },
     ]);

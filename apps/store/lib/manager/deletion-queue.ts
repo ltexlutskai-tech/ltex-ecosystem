@@ -192,6 +192,29 @@ export async function markForDeletion(
     return { ok: false, error: "Обʼєкт не знайдено" };
   }
 
+  // Реалізацію позначили на вилучення → ОДРАЗУ прибираємо чернетку ТТН НП (щоб
+  // не висіла в кабінеті), не чекаючи фінального видалення адміном. ТТН у
+  // дорозі не чіпаємо. Якщо видалили — очищаємо посилання на ТТН у реалізації.
+  if (entityType === "sale") {
+    const s = await prisma.sale.findUnique({
+      where: { id: entityId },
+      select: { ttnRef: true, expressWaybill: true },
+    });
+    if (s?.ttnRef) {
+      const res = await deleteNpTtnForSale(s.ttnRef, s.expressWaybill).catch(
+        () => null,
+      );
+      if (res?.state === "deleted") {
+        await prisma.sale
+          .update({
+            where: { id: entityId },
+            data: { ttnRef: null, expressWaybill: null, ttnCreatedAt: null },
+          })
+          .catch(() => undefined);
+      }
+    }
+  }
+
   // Антидубль: активний pending-запит на цей самий обʼєкт.
   const existing = await prisma.deletionRequest.findFirst({
     where: { entityType, entityId, status: "pending" },
