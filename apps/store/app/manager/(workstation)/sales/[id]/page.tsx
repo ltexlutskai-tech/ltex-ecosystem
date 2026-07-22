@@ -347,6 +347,7 @@ export default async function ManagerSaleDetailPage({
           receiptId={sale.checkboxReceipt?.receiptId ?? null}
           error={sale.checkboxReceipt?.error ?? null}
           hasTtn={Boolean(sale.ttnRef) && Boolean(sale.expressWaybill)}
+          clientPhone={clientSummary.phone}
         />
       )}
 

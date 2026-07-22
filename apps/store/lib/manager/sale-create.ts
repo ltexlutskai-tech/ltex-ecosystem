@@ -220,7 +220,7 @@ export async function createSaleWithItems(
     // Завдання складу (підготувати лоти + ТТН) — при проведенні, fire-and-forget.
     // Після створення завдання — авто-створення ТТН НП (best-effort, пише №ТТН
     // у Sale + завдання; помилку — у Sale.ttnError, UI показує «Повторити»).
-    void createWarehouseTaskForSale(sale.id).then(() =>
+    void createWarehouseTaskForSale(sale.id, actor.userId).then(() =>
       createTtnForSale(sale.id),
     );
     void notifyOrdersClosedBySale({
@@ -333,7 +333,7 @@ export async function updateSaleWithItems(
     applySaleMovements(sale.id);
     // Завдання складу (підготувати лоти + ТТН) — при проведенні з картки.
     // Після завдання — авто-створення ТТН НП (best-effort).
-    void createWarehouseTaskForSale(sale.id).then(() =>
+    void createWarehouseTaskForSale(sale.id, _actor.userId).then(() =>
       createTtnForSale(sale.id),
     );
     void notifyOrdersClosedBySale({

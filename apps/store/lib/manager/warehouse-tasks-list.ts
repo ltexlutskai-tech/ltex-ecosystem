@@ -75,6 +75,12 @@ export interface BuildWarehouseTasksWhereParams {
   customerName?: string;
   /** Спосіб доставки (нормалізується). */
   deliveryMethod?: string;
+  /**
+   * true → показувати лише активні (ховати завершені `sent`/скасовані
+   * `cancelled`). Діє тільки коли явний `status` не заданий. Так «Готово»
+   * (перехід у `sent`) прибирає завдання зі списку за замовчуванням.
+   */
+  openOnly?: boolean;
 }
 
 export function buildWarehouseTasksWhere(
@@ -92,7 +98,11 @@ export function buildWarehouseTasksWhere(
   }
 
   const status = normalizeTaskStatus(params.status);
-  if (status) and.push({ status });
+  if (status) {
+    and.push({ status });
+  } else if (params.openOnly) {
+    and.push({ status: { notIn: ["sent", "cancelled"] } });
+  }
 
   const delivery = normalizeTaskDelivery(params.deliveryMethod);
   if (delivery) and.push({ deliveryMethod: delivery });

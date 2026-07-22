@@ -31,6 +31,8 @@ interface Props {
   isForeign?: boolean;
   /** true → owner/admin, можна додавати/редагувати/видаляти. */
   canEdit?: boolean;
+  /** true → без зовнішньої картки (вбудовується у шапку картки клієнта). */
+  bare?: boolean;
 }
 
 /** Кнопки месенджерів + дзвінок для одного номера (brand-glyph icons). */
@@ -361,6 +363,7 @@ export function ClientPhonesSection({
   phonePrimary,
   isForeign,
   canEdit,
+  bare = false,
 }: Props) {
   const router = useRouter();
   const [adding, setAdding] = useState(false);
@@ -373,7 +376,7 @@ export function ClientPhonesSection({
   }
 
   return (
-    <div className="rounded-lg border bg-white p-5 shadow-sm">
+    <div className={bare ? "" : "rounded-lg border bg-white p-5 shadow-sm"}>
       <div className="mb-2 flex items-center justify-between">
         <h3 className="text-sm font-semibold text-gray-700">
           Номери телефонів

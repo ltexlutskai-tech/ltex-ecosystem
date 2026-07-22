@@ -49,6 +49,25 @@ describe("buildWarehouseTasksWhere", () => {
     });
   });
 
+  it("openOnly без явного статусу — ховає завершені/скасовані", () => {
+    const where = buildWarehouseTasksWhere({
+      managerUserId: null,
+      openOnly: true,
+    });
+    expect(where).toEqual({
+      AND: [NOT_DELETED, { status: { notIn: ["sent", "cancelled"] } }],
+    });
+  });
+
+  it("явний статус перемагає openOnly", () => {
+    const where = buildWarehouseTasksWhere({
+      managerUserId: null,
+      status: "sent",
+      openOnly: true,
+    });
+    expect(where).toEqual({ AND: [NOT_DELETED, { status: "sent" }] });
+  });
+
   it("ігнорує невалідні статус/доставку та порожній пошук", () => {
     const where = buildWarehouseTasksWhere({
       managerUserId: null,

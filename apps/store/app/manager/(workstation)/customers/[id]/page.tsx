@@ -14,7 +14,6 @@ import { ClientOrdersTab } from "./_components/client-orders-tab";
 import { ClientPresentationHistoryTab } from "./_components/client-presentation-history-tab";
 import { ClientPresentationsTab } from "./_components/client-presentations-tab";
 import { ClientRemindersTab } from "./_components/client-reminders-tab";
-import { ClientPhonesSection } from "./_components/client-phones-section";
 import { ClientRequisitesTab } from "./_components/client-requisites-tab";
 import { ClientSalesHistoryTab } from "./_components/client-sales-history-tab";
 import { ClientSocialTab } from "./_components/client-social-tab";
@@ -87,31 +86,18 @@ export default async function ClientDetailPage({
         />
       </div>
 
-      {/* Закріплена шапка — завжди видно, з ким працюємо (C6). */}
-      <div className="sticky top-0 z-20 -mx-1 bg-gray-50 px-1 pt-1 pb-2">
-        <ClientHeader client={client} canAssign={canAssign} />
-      </div>
+      {/* Шапка картки з телефонами/месенджерами всередині. */}
+      <ClientHeader client={client} canAssign={canAssign} canEdit={canEdit} />
 
-      {/* Контакти клієнта — телефони + соцмережі/месенджери винесено у шапку
-          картки (щоб не шукати їх у вкладках; швидший доступ). Для чужого
-          клієнта соцмережі приховані (masking), тож блок телефонів на всю
-          ширину. */}
-      <div className={isForeign ? "" : "grid gap-4 lg:grid-cols-2"}>
-        <ClientPhonesSection
-          clientId={client.id}
-          phones={client.phones}
-          phonePrimary={client.phonePrimary}
-          isForeign={isForeign}
+      {/* Соцмережі та месенджери — окремим блоком на всю ширину під шапкою.
+          Для чужого клієнта приховано (masking). */}
+      {!isForeign && (
+        <ClientSocialTab
+          client={client}
           canEdit={canEdit}
+          isForeign={isForeign}
         />
-        {!isForeign && (
-          <ClientSocialTab
-            client={client}
-            canEdit={canEdit}
-            isForeign={isForeign}
-          />
-        )}
-      </div>
+      )}
 
       {/* Дії по клієнту — на верху картки, поза «Реквізитами» (C1). */}
       <ClientActionButtons

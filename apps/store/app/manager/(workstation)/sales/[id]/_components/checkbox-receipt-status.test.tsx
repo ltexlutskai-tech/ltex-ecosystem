@@ -25,6 +25,11 @@ vi.mock("@ltex/ui", async () => {
   };
 });
 
+// ShareSheet тягне useToast/Dialog з @ltex/ui — у цьому тесті він нам не потрібен.
+vi.mock("../../../prices/_components/share-sheet", () => ({
+  ShareSheet: () => null,
+}));
+
 afterEach(() => cleanup());
 beforeEach(() => {
   refresh.mockClear();
@@ -32,7 +37,7 @@ beforeEach(() => {
 });
 
 describe("CheckboxReceiptStatus — статус чека Checkbox", () => {
-  it("status=created → зелений «створено» + receiptId, без кнопки", () => {
+  it("status=created → зелений «створено» + receiptId + кнопка «Поділитися чеком»", () => {
     render(
       <CheckboxReceiptStatus
         saleId="s1"
@@ -44,7 +49,12 @@ describe("CheckboxReceiptStatus — статус чека Checkbox", () => {
     );
     expect(screen.getByText(/Чек Checkbox створено/)).toBeDefined();
     expect(screen.getByText("rcpt-42")).toBeDefined();
+    // Немає «Повторити чек», але є «Поділитися чеком» + «Відкрити чек».
     expect(screen.queryByRole("button", { name: /Повторити чек/ })).toBeNull();
+    expect(
+      screen.getByRole("button", { name: /Поділитися чеком/ }),
+    ).toBeDefined();
+    expect(screen.getByText(/Відкрити чек/)).toBeDefined();
   });
 
   it("status=failed → червоний + помилка + кнопка «Повторити чек»", () => {

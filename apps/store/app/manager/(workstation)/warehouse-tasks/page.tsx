@@ -39,9 +39,13 @@ export default async function WarehouseTasksPage({
 
   // Склад/адмін/власник — усі завдання; менеджер — свої (за реалізацією).
   const isWarehouse = WAREHOUSE_ROLES.includes(user.role);
+  // За замовчуванням показуємо лише активні (без завершених/скасованих), щоб
+  // «Готово» прибирало завдання зі списку. `status=all` — показати всі.
+  const statusParam = firstParam(sp.status);
   const where = buildWarehouseTasksWhere({
     managerUserId: isWarehouse ? null : user.id,
-    status: firstParam(sp.status),
+    status: statusParam === "all" ? undefined : statusParam,
+    openOnly: !statusParam,
     customerName: firstParam(sp.customerName),
     deliveryMethod: firstParam(sp.deliveryMethod),
   });

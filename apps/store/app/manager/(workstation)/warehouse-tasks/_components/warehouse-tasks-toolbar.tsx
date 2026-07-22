@@ -76,7 +76,8 @@ export function WarehouseTasksToolbar() {
         className="h-9 rounded-md border border-gray-300 bg-white px-2 text-sm text-gray-700"
         aria-label="Фільтр за статусом"
       >
-        <option value="">Усі статуси</option>
+        <option value="">Активні (нові + в роботі)</option>
+        <option value="all">Усі статуси</option>
         {WAREHOUSE_TASK_STATUS_LIST.map((s) => (
           <option key={s} value={s}>
             {WAREHOUSE_TASK_STATUS_LABEL[s]}

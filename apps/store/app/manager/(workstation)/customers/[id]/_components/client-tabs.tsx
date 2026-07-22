@@ -162,7 +162,7 @@ export function ClientTabs({
     <div className="grid gap-4 md:grid-cols-[220px_1fr]">
       <nav
         aria-label="Розділи картки клієнта"
-        className="space-y-3 md:self-start"
+        className="space-y-3 md:sticky md:top-2 md:max-h-[calc(100vh-1rem)] md:self-start md:overflow-y-auto"
       >
         {visibleGroups.map((g) => (
           <div key={g.id}>

@@ -14,6 +14,8 @@ export interface SidebarNavLinkProps {
   /** Опціональний живий бейдж (client-side polling) — має пріоритет над `badge`. */
   badgeSlot?: ReactNode;
   onNavigate?: () => void;
+  /** Згорнутий сайдбар: лише іконка + тултип, бейдж — у куті. */
+  collapsed?: boolean;
 }
 
 export function SidebarNavLink({
@@ -23,6 +25,7 @@ export function SidebarNavLink({
   badge,
   badgeSlot,
   onNavigate,
+  collapsed = false,
 }: SidebarNavLinkProps) {
   const pathname = usePathname();
   const tabs = useTabsOptional();
@@ -41,24 +44,34 @@ export function SidebarNavLink({
     : isActiveHref(pathname);
 
   const className = cn(
-    "flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors",
+    "relative flex items-center rounded-md py-2 text-sm transition-colors",
+    collapsed ? "justify-center px-2" : "gap-3 px-3",
     active
       ? "bg-green-50 font-medium text-green-700"
       : "text-gray-700 hover:bg-gray-100",
   );
 
+  const defaultBadge =
+    badgeSlot !== undefined
+      ? badgeSlot
+      : badge !== undefined &&
+        badge > 0 && (
+          <span className="rounded-full bg-red-500 px-2 py-0.5 text-xs font-medium text-white">
+            {badge > 9 ? "9+" : badge}
+          </span>
+        );
+
   const inner = (
     <>
       {icon}
-      <span className="flex-1">{label}</span>
-      {badgeSlot !== undefined
-        ? badgeSlot
-        : badge !== undefined &&
-          badge > 0 && (
-            <span className="rounded-full bg-red-500 px-2 py-0.5 text-xs font-medium text-white">
-              {badge > 9 ? "9+" : badge}
+      {!collapsed && <span className="flex-1">{label}</span>}
+      {collapsed
+        ? badgeSlot !== undefined && (
+            <span className="absolute -top-0.5 right-0 scale-90">
+              {badgeSlot}
             </span>
-          )}
+          )
+        : defaultBadge}
     </>
   );
 
@@ -73,6 +86,7 @@ export function SidebarNavLink({
           onNavigate?.();
           tabs.openTab(href, label);
         }}
+        title={collapsed ? label : undefined}
         className={cn(className, "w-full text-left")}
       >
         {inner}
@@ -81,7 +95,12 @@ export function SidebarNavLink({
   }
 
   return (
-    <Link href={href} onClick={onNavigate} className={className}>
+    <Link
+      href={href}
+      onClick={onNavigate}
+      title={collapsed ? label : undefined}
+      className={className}
+    >
       {inner}
     </Link>
   );
