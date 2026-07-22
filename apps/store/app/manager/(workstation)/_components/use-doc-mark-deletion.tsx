@@ -42,6 +42,24 @@ export interface MarkDeletionRequest {
   message: string;
 }
 
+/** Нагадування про пов'язані документи, які теж зачепить видалення. */
+function relatedDeletionNote(
+  entityType: MarkDeletionEntityType,
+): string | null {
+  switch (entityType) {
+    case "sale":
+      return "Разом буде прибрано: чернетку ТТН Нової Пошти, завдання складу та проєкт чека Checkbox. Пов'язане замовлення й оплати перевірте окремо.";
+    case "order":
+      return "Разом видаляться пов'язані реалізації, їхні чернетки ТТН Нової Пошти та завдання складу. Резервування лотів звільниться.";
+    case "cash_order":
+      return "Видалення оплати змінить борг клієнта (рух коштів скасується). Перевірте пов'язану реалізацію.";
+    case "route_sheet":
+      return "Пов'язані реалізації, оплати та завантаження цього маршруту перевірте окремо.";
+    default:
+      return null;
+  }
+}
+
 /**
  * Стандартні причини вилучення (щоб не набирати щоразу вручну). Вибір із
  * списку одразу заповнює редаговане поле — за потреби причину можна дописати.
@@ -150,6 +168,11 @@ export function useDocMarkDeletion(): {
                 Позначити документ на вилучення?
               </h2>
               <p className="mt-2 text-sm text-gray-600">{pending.message}</p>
+              {relatedDeletionNote(pending.entityType) && (
+                <p className="mt-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                  ⚠️ {relatedDeletionNote(pending.entityType)}
+                </p>
+              )}
               <p className="mt-2 text-sm text-gray-600">
                 Рухи по регістрах (борг/каса/склад) оновляться одразу, документ
                 зникне зі списків. Повернути можна з «Кошика», поки

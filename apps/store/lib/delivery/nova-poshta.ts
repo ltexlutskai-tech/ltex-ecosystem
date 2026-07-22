@@ -267,16 +267,22 @@ export async function getWarehouses(
     FindByString: query ?? "",
     Limit: String(limit ?? 50),
   });
-  return res.data.map((w) => ({
-    ref: w.Ref,
-    number: w.Number,
-    name: w.Description,
-    typeRef: w.TypeOfWarehouseRef,
-    maxWeight: Number(w.TotalMaxWeightAllowed) || 0,
-    placeMaxWeight: Number(w.PlaceMaxWeightAllowed) || 0,
-    // Вантажні відділення НП підписані «Вантажне відділення №N…» — надійна ознака.
-    isFreight: /вантажн/i.test(w.Description),
-  }));
+  return res.data.map((w) => {
+    const placeMaxWeight = Number(w.PlaceMaxWeightAllowed) || 0;
+    return {
+      ref: w.Ref,
+      number: w.Number,
+      name: w.Description,
+      typeRef: w.TypeOfWarehouseRef,
+      maxWeight: Number(w.TotalMaxWeightAllowed) || 0,
+      placeMaxWeight,
+      // Вантажне відділення = приймає важкі місця (> 30 кг на місце — ліміт
+      // звичайного відділення). Назва «Вантажне…» не завжди присутня (напр.
+      // «Відділення №1 … до 1100 кг/місце» — теж вантажне), тому головна ознака
+      // — ліміт ваги на місце; назву лишаємо як додатковий сигнал.
+      isFreight: placeMaxWeight > 30 || /вантажн/i.test(w.Description),
+    };
+  });
 }
 
 // ─── Відправник (кешується, бо змінюється рідко) ─────────────────────────────
