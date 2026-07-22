@@ -241,7 +241,7 @@ function MessengerRow({
     <div className="flex flex-wrap items-center gap-2 py-2">
       <BrandIcon
         kind={resolveBrandIconKind(messenger.network)}
-        className="h-4 w-4"
+        className="h-6 w-6"
         aria-label={label}
       />
       <span className="text-sm font-medium text-gray-800">{label}</span>
@@ -257,9 +257,9 @@ function MessengerRow({
             rel="noopener"
             aria-label="Відкрити"
             title="Відкрити"
-            className="flex h-7 w-7 items-center justify-center rounded-md bg-gray-100 text-gray-700 hover:bg-gray-200"
+            className="flex h-9 w-9 items-center justify-center rounded-md bg-gray-100 text-gray-700 hover:bg-gray-200"
           >
-            <ExternalLink className="h-3.5 w-3.5" />
+            <ExternalLink className="h-4 w-4" />
           </a>
         )}
         {canEdit && (

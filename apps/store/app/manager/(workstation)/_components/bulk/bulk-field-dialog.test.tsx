@@ -83,6 +83,50 @@ describe("BulkFieldDialog — групова обробка", () => {
     await waitFor(() => expect(onDone).toHaveBeenCalled());
   });
 
+  it("renders a value select for `select`-type fields (client entity) and applies it", async () => {
+    // Регрес: поля клієнта мають type «select» — раніше значення не рендерилось
+    // взагалі, тож масово змінити нічого не можна було.
+    const selectFields: SerializedBulkField[] = [
+      {
+        key: "agentUserId",
+        label: "Менеджер",
+        type: "select",
+        nullable: true,
+        options: [
+          { value: "u1", label: "Іван" },
+          { value: "u2", label: "Петро" },
+        ],
+      },
+    ];
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(
+        new Response(JSON.stringify({ ok: true, updated: 3 }), { status: 200 }),
+      );
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(
+      <BulkFieldDialog
+        entity="client"
+        fields={selectFields}
+        ids={["a", "b", "c"]}
+        open={true}
+        onClose={vi.fn()}
+        onDone={vi.fn()}
+      />,
+    );
+
+    // Опції довідника відрендерились (раніше — жодного інпута).
+    expect(screen.getByText("Іван")).toBeTruthy();
+    expect(screen.getByText("Петро")).toBeTruthy();
+
+    fireEvent.click(screen.getByText("Застосувати до 3"));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const body = JSON.parse(init.body as string) as { value: unknown };
+    expect(body.value).toBe("u1");
+  });
+
   it("renders nothing when closed", () => {
     render(
       <BulkFieldDialog

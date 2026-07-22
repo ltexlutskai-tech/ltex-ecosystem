@@ -1,8 +1,11 @@
+"use client";
+
 import { CLIENT_COLOR_META } from "@/lib/manager/client-color";
 import { SortableHeader } from "../../_components/sortable-header";
 import { renderCell } from "../_lib/column-render";
 import { COLUMN_LABELS } from "../_lib/filter-labels";
 import { SORTABLE_COLUMN_KEYS } from "../_lib/sortable-columns";
+import { useClientContextMenu } from "./use-client-context-menu";
 import type { ClientListItem, ConfigItem } from "./types";
 
 interface Props {
@@ -11,6 +14,7 @@ interface Props {
 }
 
 export function ClientListTable({ items, columnsPrefs }: Props) {
+  const { rowHandlers, menu } = useClientContextMenu();
   const visibleCols = columnsPrefs
     .filter((c) => c.visible)
     .sort((a, b) => a.order - b.order);
@@ -60,6 +64,7 @@ export function ClientListTable({ items, columnsPrefs }: Props) {
             return (
               <tr
                 key={c.id}
+                {...rowHandlers(c)}
                 className={
                   tint ? `${tint} hover:brightness-95` : "hover:bg-gray-50"
                 }
@@ -77,6 +82,7 @@ export function ClientListTable({ items, columnsPrefs }: Props) {
           })}
         </tbody>
       </table>
+      {menu}
     </div>
   );
 }

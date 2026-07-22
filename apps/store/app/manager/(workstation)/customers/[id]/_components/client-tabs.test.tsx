@@ -19,22 +19,28 @@ const PANELS = {
   orders: <div>orders-panel</div>,
   reminders: <div>reminders-panel</div>,
   presentationHistory: <div>presentation-history-panel</div>,
-  social: <div>social-panel</div>,
   keywords: <div>keywords-panel</div>,
   debtMovements: <div>debt-movements-panel</div>,
 };
 
 describe("ClientTabs — CRM групи + M1.3f foreign visibility filtering", () => {
-  it("mine view: рендерить усі 11 tabs (без Viber)", () => {
+  it("mine view: рендерить усі 10 tabs (без Viber і без Соцмереж — вони у шапці)", () => {
     render(<ClientTabs {...PANELS} isForeign={false} />);
     const tabs = screen.getAllByRole("tab");
-    expect(tabs).toHaveLength(11);
+    expect(tabs).toHaveLength(10);
   });
 
-  it("admin view (default isForeign=false): рендерить усі 11 tabs", () => {
+  it("admin view (default isForeign=false): рендерить усі 10 tabs", () => {
     render(<ClientTabs {...PANELS} />);
     const tabs = screen.getAllByRole("tab");
-    expect(tabs).toHaveLength(11);
+    expect(tabs).toHaveLength(10);
+  });
+
+  it("вкладки «Соцмережі та месенджери» більше немає (перенесено в шапку)", () => {
+    render(<ClientTabs {...PANELS} />);
+    const tabs = screen.getAllByRole("tab");
+    const labels = new Set(tabs.map((b) => b.textContent?.trim() ?? ""));
+    expect(labels.has("Соцмережі та месенджери")).toBe(false);
   });
 
   it("Viber вкладки більше немає", () => {

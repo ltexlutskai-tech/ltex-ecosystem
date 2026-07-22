@@ -45,9 +45,9 @@ function PhoneActions({ phone }: { phone: string }) {
           href={telUrl}
           aria-label="Подзвонити"
           title="Подзвонити"
-          className="flex h-7 w-7 items-center justify-center rounded-md bg-gray-100 text-gray-700 hover:bg-gray-200"
+          className="flex h-9 w-9 items-center justify-center rounded-md bg-gray-100 text-gray-700 hover:bg-gray-200"
         >
-          <Phone className="h-3.5 w-3.5" />
+          <Phone className="h-4 w-4" />
         </a>
       )}
       {viberUrl && (
@@ -55,9 +55,9 @@ function PhoneActions({ phone }: { phone: string }) {
           href={viberUrl}
           aria-label="Viber"
           title="Viber"
-          className="flex h-7 w-7 items-center justify-center rounded-md bg-purple-50 hover:bg-purple-100"
+          className="flex h-9 w-9 items-center justify-center rounded-md bg-purple-50 hover:bg-purple-100"
         >
-          <BrandIcon kind="viber" className="h-4 w-4" />
+          <BrandIcon kind="viber" className="h-5 w-5" />
         </a>
       )}
       {whatsAppUrl && (
@@ -67,9 +67,9 @@ function PhoneActions({ phone }: { phone: string }) {
           rel="noopener"
           aria-label="WhatsApp"
           title="WhatsApp"
-          className="flex h-7 w-7 items-center justify-center rounded-md bg-green-50 hover:bg-green-100"
+          className="flex h-9 w-9 items-center justify-center rounded-md bg-green-50 hover:bg-green-100"
         >
-          <BrandIcon kind="whatsapp" className="h-4 w-4" />
+          <BrandIcon kind="whatsapp" className="h-5 w-5" />
         </a>
       )}
     </div>

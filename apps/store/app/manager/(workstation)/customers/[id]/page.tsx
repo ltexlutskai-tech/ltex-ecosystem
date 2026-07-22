@@ -14,6 +14,7 @@ import { ClientOrdersTab } from "./_components/client-orders-tab";
 import { ClientPresentationHistoryTab } from "./_components/client-presentation-history-tab";
 import { ClientPresentationsTab } from "./_components/client-presentations-tab";
 import { ClientRemindersTab } from "./_components/client-reminders-tab";
+import { ClientPhonesSection } from "./_components/client-phones-section";
 import { ClientRequisitesTab } from "./_components/client-requisites-tab";
 import { ClientSalesHistoryTab } from "./_components/client-sales-history-tab";
 import { ClientSocialTab } from "./_components/client-social-tab";
@@ -91,6 +92,27 @@ export default async function ClientDetailPage({
         <ClientHeader client={client} canAssign={canAssign} />
       </div>
 
+      {/* Контакти клієнта — телефони + соцмережі/месенджери винесено у шапку
+          картки (щоб не шукати їх у вкладках; швидший доступ). Для чужого
+          клієнта соцмережі приховані (masking), тож блок телефонів на всю
+          ширину. */}
+      <div className={isForeign ? "" : "grid gap-4 lg:grid-cols-2"}>
+        <ClientPhonesSection
+          clientId={client.id}
+          phones={client.phones}
+          phonePrimary={client.phonePrimary}
+          isForeign={isForeign}
+          canEdit={canEdit}
+        />
+        {!isForeign && (
+          <ClientSocialTab
+            client={client}
+            canEdit={canEdit}
+            isForeign={isForeign}
+          />
+        )}
+      </div>
+
       {/* Дії по клієнту — на верху картки, поза «Реквізитами» (C1). */}
       <ClientActionButtons
         clientId={client.id}
@@ -134,13 +156,6 @@ export default async function ClientDetailPage({
           />
         }
         presentationHistory={<ClientPresentationHistoryTab />}
-        social={
-          <ClientSocialTab
-            client={client}
-            canEdit={canEdit}
-            isForeign={isForeign}
-          />
-        }
         keywords={
           <ClientKeywordsTab
             clientId={client.id}

@@ -43,6 +43,16 @@ export function BulkFieldDialog({
     [fields, fieldKey],
   );
 
+  // Поле-довідник без завантажених опцій: обрати значення неможливо, лишається
+  // тільки «Очистити значення» (для nullable). Блокуємо «Застосувати».
+  const missingOptions =
+    !!field &&
+    !clearMode &&
+    (field.type === "enum" ||
+      field.type === "category" ||
+      field.type === "select") &&
+    (field.options?.length ?? 0) === 0;
+
   // Скидаємо значення при зміні поля (і при кожному відкритті).
   useEffect(() => {
     if (!open) return;
@@ -53,7 +63,11 @@ export function BulkFieldDialog({
       return;
     }
     if (field.type === "boolean") setValue(true);
-    else if (field.type === "enum" || field.type === "category")
+    else if (
+      field.type === "enum" ||
+      field.type === "category" ||
+      field.type === "select"
+    )
       setValue(field.options?.[0]?.value ?? "");
     else setValue("");
   }, [field, open]);
@@ -173,7 +187,10 @@ export function BulkFieldDialog({
                 )}
 
                 {!clearMode &&
-                  (field.type === "enum" || field.type === "category") && (
+                  (field.type === "enum" ||
+                    field.type === "category" ||
+                    field.type === "select") &&
+                  ((field.options?.length ?? 0) > 0 ? (
                     <select
                       value={typeof value === "string" ? value : ""}
                       onChange={(e) => setValue(e.target.value)}
@@ -185,7 +202,12 @@ export function BulkFieldDialog({
                         </option>
                       ))}
                     </select>
-                  )}
+                  ) : (
+                    <p className="mt-1 rounded border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                      Немає значень у довіднику для цього поля. Оберіть
+                      «Очистити значення» або інше поле.
+                    </p>
+                  ))}
 
                 {!clearMode && field.type === "text" && (
                   <>
@@ -233,7 +255,7 @@ export function BulkFieldDialog({
           <button
             type="button"
             onClick={() => void apply()}
-            disabled={busy || !field || ids.length === 0}
+            disabled={busy || !field || ids.length === 0 || missingOptions}
             className="rounded-md bg-green-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50"
           >
             {busy ? "Застосування…" : `Застосувати до ${ids.length}`}

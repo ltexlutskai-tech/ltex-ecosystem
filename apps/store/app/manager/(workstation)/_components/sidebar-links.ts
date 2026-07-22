@@ -71,9 +71,10 @@ export const SECONDARY_LINKS: readonly SidebarLink[] = [
   },
 ];
 
+// Вхідні звернення клієнтів із зовнішніх месенджерів (Viber/Telegram тощо).
 export const CHAT_LINK: SidebarLink = {
   href: "/manager/chat",
-  label: "Чат",
+  label: "Месенджери",
   icon: MessageCircle,
 };
 
@@ -81,7 +82,7 @@ export const CHAT_LINK: SidebarLink = {
 // Спілкування співробітників між собою. Доступний усім ролям.
 export const MESSENGER_LINK: SidebarLink = {
   href: "/manager/messenger",
-  label: "Месенджер",
+  label: "Чат LTEX",
   icon: MessagesSquare,
 };
 

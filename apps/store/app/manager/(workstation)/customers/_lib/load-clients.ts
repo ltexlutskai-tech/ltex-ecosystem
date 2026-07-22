@@ -305,29 +305,43 @@ export async function loadClients(
     .map((r) => r.code1C)
     .filter((c): c is string => Boolean(c));
 
-  const [lastContactRows, activePageCodesArr] = await Promise.all([
-    pageClientIds.length > 0
-      ? prisma.mgrClientTimelineEntry.groupBy({
-          by: ["clientId"],
-          where: { clientId: { in: pageClientIds } },
-          _max: { occurredAt: true },
-        })
-      : Promise.resolve([]),
-    pageCodes.length > 0
-      ? resolveActiveOrderCodes(pageCodes)
-      : Promise.resolve([]),
-  ]);
+  const [lastContactRows, activePageCodesArr, customerMirrorRows] =
+    await Promise.all([
+      pageClientIds.length > 0
+        ? prisma.mgrClientTimelineEntry.groupBy({
+            by: ["clientId"],
+            where: { clientId: { in: pageClientIds } },
+            _max: { occurredAt: true },
+          })
+        : Promise.resolve([]),
+      pageCodes.length > 0
+        ? resolveActiveOrderCodes(pageCodes)
+        : Promise.resolve([]),
+      // Дзеркало Customer.id по code1C — для дій контекстного меню
+      // (Створити замовлення/реалізацію). Один батч на сторінку.
+      pageCodes.length > 0
+        ? prisma.customer.findMany({
+            where: { code1C: { in: pageCodes } },
+            select: { id: true, code1C: true },
+          })
+        : Promise.resolve([]),
+    ]);
 
   const lastContactMap = new Map<string, Date>();
   for (const g of lastContactRows) {
     if (g._max.occurredAt) lastContactMap.set(g.clientId, g._max.occurredAt);
   }
   const activePageCodes = new Set(activePageCodesArr);
+  const customerIdByCode = new Map<string, string>();
+  for (const cu of customerMirrorRows) {
+    if (cu.code1C) customerIdByCode.set(cu.code1C, cu.id);
+  }
 
   return {
     items: rows.map((c) => ({
       id: c.id,
       code1C: c.code1C,
+      customerId: c.code1C ? (customerIdByCode.get(c.code1C) ?? null) : null,
       name: c.name,
       tradePointName: c.tradePointName,
       phonePrimary: c.phonePrimary,

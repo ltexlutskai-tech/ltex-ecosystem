@@ -14,7 +14,7 @@ import {
 import type { ClientDetail } from "./types";
 
 const ICON_BTN =
-  "flex h-8 w-8 items-center justify-center rounded-md border bg-white text-gray-700 shadow-sm hover:bg-gray-50";
+  "flex h-9 w-9 items-center justify-center rounded-md border bg-white text-gray-700 shadow-sm hover:bg-gray-50";
 
 /** Малий clickable бренд-icon для телефону (Viber/WhatsApp/дзвінок). */
 function PhoneIcon({
@@ -40,7 +40,7 @@ function PhoneIcon({
           title={title}
           className={ICON_BTN}
         >
-          <BrandIcon kind="viber" className="h-4 w-4" />
+          <BrandIcon kind="viber" className="h-5 w-5" />
         </a>
       );
   }
@@ -56,7 +56,7 @@ function PhoneIcon({
           title={title}
           className={ICON_BTN}
         >
-          <BrandIcon kind="whatsapp" className="h-4 w-4" />
+          <BrandIcon kind="whatsapp" className="h-5 w-5" />
         </a>
       );
   }
@@ -67,7 +67,7 @@ function PhoneIcon({
         aria-label={`Telegram ${pretty}`}
         title={title}
       >
-        <BrandIcon kind="telegram" className="h-4 w-4" />
+        <BrandIcon kind="telegram" className="h-5 w-5" />
       </span>
     );
   }
@@ -80,7 +80,7 @@ function PhoneIcon({
         title={title}
         className={ICON_BTN}
       >
-        <Phone className="h-3.5 w-3.5" />
+        <Phone className="h-4 w-4" />
       </a>
     );
   return null;
@@ -162,7 +162,7 @@ export function ClientContactsStrip({
         >
           <BrandIcon
             kind={resolveBrandIconKind(m.network)}
-            className="h-4 w-4"
+            className="h-5 w-5"
           />
         </a>
       );
@@ -180,7 +180,7 @@ export function ClientContactsStrip({
         title={client.websiteUrl}
         className={ICON_BTN}
       >
-        <BrandIcon kind="link" className="h-4 w-4" />
+        <BrandIcon kind="link" className="h-5 w-5" />
       </a>
     ) : null;
 
