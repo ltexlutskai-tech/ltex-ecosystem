@@ -1,8 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
-import { Button, useToast } from "@ltex/ui";
+import { Button } from "@ltex/ui";
 import { CLIENT_COLOR_META } from "@/lib/manager/client-color";
 import type { SerializedBulkField } from "@/lib/manager/bulk-edit/registry";
 import { SortableHeader } from "../../_components/sortable-header";
@@ -10,36 +9,29 @@ import { BulkFieldDialog } from "../../_components/bulk/bulk-field-dialog";
 import { renderCell } from "../_lib/column-render";
 import { COLUMN_LABELS } from "../_lib/filter-labels";
 import { SORTABLE_COLUMN_KEYS } from "../_lib/sortable-columns";
+import { useClientContextMenu } from "./use-client-context-menu";
 import type { ClientListItem, ConfigItem } from "./types";
 
-export interface BulkManagerOption {
-  id: string;
-  fullName: string;
-  email: string;
-}
-
 /**
- * Список клієнтів із можливістю групової зміни менеджера (лише admin).
- * Додає колонку-чекбокс + «вибрати всі на сторінці» та липку панель дій унизу.
- * Одинична зміна менеджера лишається у картці клієнта.
+ * Список клієнтів із «Груповою обробкою» (масова зміна довідникових полів —
+ * аналог 1С «Групповая обработка справочников и документов»). Додає
+ * колонку-чекбокс + «вибрати всіх на сторінці» та липку панель дій унизу.
+ *
+ * Зміну менеджера окремою кнопкою прибрано: менеджер тепер входить у поля
+ * «Групової обробки» (поле «Менеджер»; «Очистити значення» = зняти прив'язку).
  */
 export function ClientListBulk({
   items,
   columnsPrefs,
-  managers,
   bulkFields,
 }: {
   items: ClientListItem[];
   columnsPrefs: ConfigItem[];
-  managers: BulkManagerOption[];
   /** Поля «Групової обробки» (масова зміна довідникових полів). */
   bulkFields?: SerializedBulkField[];
 }) {
-  const router = useRouter();
-  const { toast } = useToast();
+  const { rowHandlers, menu } = useClientContextMenu();
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [managerId, setManagerId] = useState<string>("");
-  const [submitting, setSubmitting] = useState(false);
   const [bulkOpen, setBulkOpen] = useState(false);
   const bulkEnabled = (bulkFields?.length ?? 0) > 0;
 
@@ -76,37 +68,6 @@ export function ClientListBulk({
 
   function clear() {
     setSelected(new Set());
-    setManagerId("");
-  }
-
-  async function apply() {
-    if (selected.size === 0) return;
-    setSubmitting(true);
-    try {
-      const res = await fetch("/api/v1/manager/clients/bulk-assign", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({
-          clientIds: Array.from(selected),
-          userId: managerId === "" ? null : managerId,
-        }),
-      });
-      if (!res.ok) {
-        const err = (await res.json().catch(() => ({}))) as { error?: string };
-        toast({
-          description: err.error ?? "Помилка групової зміни",
-          variant: "destructive",
-        });
-        return;
-      }
-      const data = (await res.json()) as { updated: number };
-      toast({ description: `Менеджера змінено для ${data.updated} клієнтів` });
-      clear();
-      router.refresh();
-    } finally {
-      setSubmitting(false);
-    }
   }
 
   if (items.length === 0) {
@@ -164,6 +125,7 @@ export function ClientListBulk({
               return (
                 <tr
                   key={c.id}
+                  {...rowHandlers(c)}
                   className={
                     isSelected
                       ? "bg-blue-100"
@@ -195,44 +157,23 @@ export function ClientListBulk({
         </table>
       </div>
 
+      {menu}
+
       {selected.size > 0 && (
         <div className="sticky bottom-3 z-10 mx-auto flex w-fit max-w-full flex-wrap items-center gap-3 rounded-lg border bg-white px-4 py-2.5 shadow-lg">
           <span className="text-sm font-medium text-gray-700">
             Обрано: {selected.size}
           </span>
-          <select
-            value={managerId}
-            onChange={(e) => setManagerId(e.target.value)}
-            className="rounded-md border bg-white px-3 py-1.5 text-sm"
-          >
-            <option value="">— Зняти прив&apos;язку —</option>
-            {managers.map((m) => (
-              <option key={m.id} value={m.id}>
-                {m.fullName} ({m.email})
-              </option>
-            ))}
-          </select>
-          <Button type="button" size="sm" onClick={apply} disabled={submitting}>
-            {submitting ? "Збереження…" : "Змінити менеджера"}
-          </Button>
-          {bulkEnabled && (
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              onClick={() => setBulkOpen(true)}
-              disabled={submitting}
-            >
+          {bulkEnabled ? (
+            <Button type="button" size="sm" onClick={() => setBulkOpen(true)}>
               Групова обробка
             </Button>
+          ) : (
+            <span className="text-sm text-gray-500">
+              Немає полів для масової зміни
+            </span>
           )}
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            onClick={clear}
-            disabled={submitting}
-          >
+          <Button type="button" size="sm" variant="outline" onClick={clear}>
             Скасувати
           </Button>
         </div>

@@ -16,6 +16,12 @@ export interface DictionaryRefWithColor {
 export interface ClientListItem {
   id: string;
   code1C: string | null;
+  /**
+   * `Customer.id` (дзеркало по code1C) для швидких дій із контекстного меню
+   * (Створити замовлення/реалізацію чекають Customer.id у `?clientId`). null,
+   * якщо дзеркала ще немає — дії відкриють форму з порожнім пікером.
+   */
+  customerId: string | null;
   name: string;
   tradePointName?: string | null;
   phonePrimary: string | null;

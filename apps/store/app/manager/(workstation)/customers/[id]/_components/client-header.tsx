@@ -1,16 +1,18 @@
 import { ClientStatusBadge } from "../../_components/client-status-badge";
 import { formatEur, parseDecimal } from "../../_components/format";
 import { ClientAssignDialog } from "./client-assign-dialog";
-import { ClientContactsStrip } from "./client-contacts-strip";
 import { ClientForeignBanner } from "./client-foreign-banner";
+import { ClientPhonesSection } from "./client-phones-section";
 import type { ClientDetail } from "./types";
 
 export function ClientHeader({
   client,
   canAssign,
+  canEdit,
 }: {
   client: ClientDetail;
   canAssign: boolean;
+  canEdit: boolean;
 }) {
   const debtN = parseDecimal(client.debt);
   const isForeign = client.viewerOwnership === "foreign";
@@ -43,10 +45,7 @@ export function ClientHeader({
                 {[client.region, client.city].filter(Boolean).join(" · ")}
               </p>
             )}
-            <div className="hidden sm:block">
-              <ClientContactsStrip client={client} isForeign={isForeign} />
-            </div>
-            <div className="hidden flex-wrap items-center gap-4 pt-2 text-sm sm:flex">
+            <div className="flex flex-wrap items-center gap-4 pt-2 text-sm">
               <span className="text-gray-700">
                 Борг:{" "}
                 <span
@@ -81,6 +80,18 @@ export function ClientHeader({
               currentManager={client.assignedManager}
             />
           )}
+        </div>
+
+        {/* Телефони + месенджери + «Додати» — прямо у шапці картки. */}
+        <div className="mt-4 border-t pt-4">
+          <ClientPhonesSection
+            clientId={client.id}
+            phones={client.phones}
+            phonePrimary={client.phonePrimary}
+            isForeign={isForeign}
+            canEdit={canEdit}
+            bare
+          />
         </div>
       </header>
     </div>

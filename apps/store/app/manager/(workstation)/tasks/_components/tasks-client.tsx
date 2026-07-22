@@ -39,15 +39,18 @@ const CHIP: Record<string, string> = {
 export function TasksClient({
   assignedToMe,
   createdByMe,
+  completed,
   users,
   currentUserId,
 }: {
   assignedToMe: TaskCard[];
   createdByMe: TaskCard[];
+  completed: TaskCard[];
   users: UserOption[];
   currentUserId: string;
 }) {
   const [createOpen, setCreateOpen] = useState(false);
+  const [showCompleted, setShowCompleted] = useState(false);
 
   return (
     <div className="max-w-none space-y-5">
@@ -73,6 +76,32 @@ export function TasksClient({
         empty="Ви ще не ставили завдань."
         tasks={createdByMe}
       />
+
+      {/* Реєстр виконаних завдань — згорнуто за замовчуванням. */}
+      <section>
+        <button
+          type="button"
+          onClick={() => setShowCompleted((v) => !v)}
+          className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-gray-700 hover:underline"
+        >
+          {showCompleted ? "▾" : "▸"} Виконані{" "}
+          <span className="font-normal text-gray-400">
+            ({completed.length})
+          </span>
+        </button>
+        {showCompleted &&
+          (completed.length === 0 ? (
+            <p className="rounded-md border border-dashed border-gray-200 p-4 text-center text-sm text-gray-400">
+              Виконаних завдань поки немає.
+            </p>
+          ) : (
+            <div className="space-y-2">
+              {completed.map((t) => (
+                <TaskRow key={`${t.kind}-${t.id}`} task={t} />
+              ))}
+            </div>
+          ))}
+      </section>
 
       <CreateTaskDialog
         open={createOpen}

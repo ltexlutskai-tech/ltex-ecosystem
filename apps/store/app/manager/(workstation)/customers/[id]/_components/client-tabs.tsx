@@ -11,7 +11,6 @@ type TabId =
   | "orders"
   | "reminders"
   | "presentation-history"
-  | "social"
   | "keywords"
   | "debt-movements";
 
@@ -28,14 +27,15 @@ interface GroupDef {
 }
 
 /**
- * Картка клієнта у стилі CRM: 11 вкладок згруповано у 4 логічні розділи з
+ * Картка клієнта у стилі CRM: 10 вкладок згруповано у 4 логічні розділи з
  * бічним меню (Огляд · Продажі й замовлення · Комунікація · Фінанси). Поле
  * `foreignVisible` — чи показати вкладку коли поточний user дивиться на чужого
  * клієнта (M1.3f): у foreign-режимі ховаються розділи з чутливими контактами;
  * розділ без жодної видимої вкладки не показується взагалі.
  *
  * Вкладку «Viber» прибрано — цей функціонал живе в окремому місці (Месенджер /
- * чат-inbox).
+ * чат-inbox). Блок «Соцмережі та месенджери» винесено у шапку картки (разом із
+ * телефонами), тож окремої вкладки більше немає.
  */
 const GROUPS: GroupDef[] = [
   {
@@ -47,7 +47,6 @@ const GROUPS: GroupDef[] = [
     tabs: [
       { id: "history", label: "Історія", foreignVisible: false },
       { id: "reminders", label: "Нагадування", foreignVisible: false },
-      { id: "social", label: "Соцмережі та месенджери", foreignVisible: false },
     ],
   },
   {
@@ -91,7 +90,6 @@ export function ClientTabs({
   orders,
   reminders,
   presentationHistory,
-  social,
   keywords,
   debtMovements,
   overdueRemindersCount = 0,
@@ -105,7 +103,6 @@ export function ClientTabs({
   orders: React.ReactNode;
   reminders: React.ReactNode;
   presentationHistory: React.ReactNode;
-  social: React.ReactNode;
   keywords: React.ReactNode;
   debtMovements: React.ReactNode;
   overdueRemindersCount?: number;
@@ -157,7 +154,6 @@ export function ClientTabs({
     orders,
     reminders,
     "presentation-history": presentationHistory,
-    social,
     keywords,
     "debt-movements": debtMovements,
   };
@@ -166,7 +162,7 @@ export function ClientTabs({
     <div className="grid gap-4 md:grid-cols-[220px_1fr]">
       <nav
         aria-label="Розділи картки клієнта"
-        className="space-y-3 md:self-start"
+        className="space-y-3 md:sticky md:top-2 md:max-h-[calc(100vh-1rem)] md:self-start md:overflow-y-auto"
       >
         {visibleGroups.map((g) => (
           <div key={g.id}>

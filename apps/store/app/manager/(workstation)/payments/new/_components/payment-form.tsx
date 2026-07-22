@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button, Input, useToast } from "@ltex/ui";
 import {
@@ -22,6 +22,7 @@ import {
 import { ClientPicker } from "../../../orders/new/_components/client-picker";
 import type { ClientPickerItem } from "../../../orders/new/_components/types";
 import { ShareSheet } from "../../../prices/_components/share-sheet";
+import { useCancelDraft } from "../../../_components/use-cancel-draft";
 import { ArticleCombobox } from "./article-combobox";
 
 /**
@@ -235,6 +236,8 @@ export function PaymentForm({
    * `submit`: якщо є id → PATCH (перевикористати чернетку), інакше POST.
    */
   const [savedId, setSavedId] = useState<string | null>(null);
+  // Оплата — завжди новий документ; чернетка створюється autosave у цій сесії.
+  const createdThisSessionRef = useRef(false);
 
   // ─── Повідомлення (Viber/share квитанція) ─────────────────────────────────
   const [shareOpen, setShareOpen] = useState(false);
@@ -460,8 +463,19 @@ export function PaymentForm({
     updateDraft: updateDraftServer,
     onIdAssigned: (id) => {
       setSavedId(id);
+      createdThisSessionRef.current = true;
       window.history.replaceState(null, "", `/manager/payments/${id}`);
     },
+  });
+
+  // «Скасувати» — видаляє свіжостворену чернетку оплати (з підтвердженням).
+  const cancelDraft = useCancelDraft({
+    docKind: "cash-orders",
+    savedId,
+    createdThisSession: createdThisSessionRef.current,
+    isPosted: false, // форма /new — лише чернетки; проведені відкриваються read-only
+    clearAll: () => autosave.clearAll(),
+    cancelHref: returnHref ?? "/manager/payments",
   });
 
   /** Застосувати відновлені з localStorage дані у стан форми. */
@@ -1020,6 +1034,14 @@ export function PaymentForm({
             {discounting ? "Нарахування…" : "Дати знижку на залишок"}
           </Button>
         )}
+        <Button
+          type="button"
+          variant="outline"
+          onClick={cancelDraft.cancel}
+          disabled={submitting}
+        >
+          Скасувати
+        </Button>
         <Button type="button" variant="outline" onClick={openReceipt}>
           Квитанція
         </Button>
@@ -1046,6 +1068,8 @@ export function PaymentForm({
         title="Квитанція оплати"
         text={shareText}
       />
+
+      {cancelDraft.dialog}
     </div>
   );
 }

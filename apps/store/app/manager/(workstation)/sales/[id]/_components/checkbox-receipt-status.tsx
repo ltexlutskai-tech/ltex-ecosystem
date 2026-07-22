@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@ltex/ui";
-import { Receipt, RefreshCw, Check } from "lucide-react";
+import { Receipt, RefreshCw, Check, Share2 } from "lucide-react";
+import { ShareSheet } from "../../../prices/_components/share-sheet";
 
 interface CreateReceiptResponse {
   ok: boolean;
@@ -23,6 +24,17 @@ export interface CheckboxReceiptStatusProps {
   error: string | null;
   /** Чи вже є № ТТН (без неї чек не створюється — створиться після відправлення). */
   hasTtn: boolean;
+  /** Телефон клієнта — для кнопки «Відкрити Viber клієнта» у ShareSheet. */
+  clientPhone?: string | null;
+}
+
+// Публічний перегляд чека Checkbox для клієнта (споживацький хост, не API).
+const RECEIPT_BASE =
+  process.env.NEXT_PUBLIC_CHECKBOX_RECEIPT_URL || "https://check.checkbox.ua";
+
+function buildReceiptUrl(receiptId: string | null): string | null {
+  if (!receiptId) return null;
+  return `${RECEIPT_BASE.replace(/\/$/, "")}/${receiptId}`;
 }
 
 /**
@@ -39,10 +51,17 @@ export function CheckboxReceiptStatus({
   receiptId,
   error,
   hasTtn,
+  clientPhone,
 }: CheckboxReceiptStatusProps) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
+  const [shareOpen, setShareOpen] = useState(false);
+
+  const receiptUrl = buildReceiptUrl(receiptId);
+  const shareText = receiptUrl
+    ? `Дякуємо за покупку в L-TEX! Ваш фіскальний чек: ${receiptUrl}`
+    : "";
 
   // Чек має бути (спроба відбулась) коли є ТТН; без ТТН чек ще не створюється.
   const needsRetry = status === "failed" || (hasTtn && status !== "created");
@@ -77,13 +96,38 @@ export function CheckboxReceiptStatus({
       </h2>
 
       {status === "created" ? (
-        <div className="flex flex-wrap items-center gap-3 text-sm">
-          <span className="inline-flex items-center gap-1 font-medium text-green-700">
-            <Check className="h-4 w-4" />
-            Чек Checkbox створено
-          </span>
-          {receiptId && (
-            <span className="font-mono text-xs text-gray-500">{receiptId}</span>
+        <div className="space-y-3">
+          <div className="flex flex-wrap items-center gap-3 text-sm">
+            <span className="inline-flex items-center gap-1 font-medium text-green-700">
+              <Check className="h-4 w-4" />
+              Чек Checkbox створено
+            </span>
+            {receiptId && (
+              <span className="font-mono text-xs text-gray-500">
+                {receiptId}
+              </span>
+            )}
+          </div>
+          {receiptUrl && (
+            <div className="flex flex-wrap items-center gap-3">
+              <a
+                href={receiptUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-sm font-medium text-blue-600 hover:underline"
+              >
+                Відкрити чек
+              </a>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setShareOpen(true)}
+              >
+                <Share2 className="mr-1 h-4 w-4" />
+                Поділитися чеком
+              </Button>
+            </div>
           )}
         </div>
       ) : needsRetry ? (
@@ -113,6 +157,16 @@ export function CheckboxReceiptStatus({
         <p className="text-sm text-gray-500">
           Чек створиться після відправлення складом.
         </p>
+      )}
+
+      {receiptUrl && (
+        <ShareSheet
+          open={shareOpen}
+          onOpenChange={setShareOpen}
+          title="Поділитися чеком з клієнтом"
+          text={shareText}
+          clientPhone={clientPhone}
+        />
       )}
     </section>
   );

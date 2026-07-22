@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   MessageSquare,
@@ -55,6 +55,7 @@ import {
 import { useDocumentAutosave } from "@/lib/autosave/use-document-autosave";
 import { AutosaveStatus } from "../../../_components/autosave-status";
 import { notifyPendingBadges } from "../../../_components/notify-pending-badges";
+import { useCancelDraft } from "../../../_components/use-cancel-draft";
 import {
   collectPriceDeviations,
   draftToWire,
@@ -212,6 +213,9 @@ export function SaleForm({
    * збереження не дублювало вже створену autosave-чернетку.
    */
   const [savedId, setSavedId] = useState<string | null>(saleId ?? null);
+  // Чи чернетку створено САМЕ у цій сесії — щоб «Скасувати» видаляла лише
+  // свіжостворений документ (а не наявний, який редагуємо).
+  const createdThisSessionRef = useRef(false);
 
   const [clientId, setClientId] = useState<string | null>(
     initialClientId ?? null,
@@ -532,9 +536,26 @@ export function SaleForm({
     updateDraft: updateDraftServer,
     onIdAssigned: (id) => {
       setSavedId(id);
+      createdThisSessionRef.current = true;
       // Міняємо URL без remount форми (рефреш відкриє чернетку з БД).
       window.history.replaceState(null, "", `/manager/sales/${id}`);
     },
+  });
+
+  // «Скасувати» — видаляє свіжостворену чернетку (з підтвердженням). При
+  // видаленні повертаємось на `successHref` (список або сторінку МЛ).
+  const cancelDraft = useCancelDraft({
+    docKind: "sales",
+    savedId,
+    createdThisSession: createdThisSessionRef.current,
+    isPosted: !autosaveEnabled,
+    clearAll: () => autosave.clearAll(),
+    cancelHref:
+      savedId != null && createdThisSessionRef.current && autosaveEnabled
+        ? successHref
+        : savedId
+          ? `/manager/sales/${savedId}`
+          : successHref,
   });
 
   function onClientChange(
@@ -1695,11 +1716,7 @@ export function SaleForm({
           <Button
             type="button"
             variant="outline"
-            onClick={() =>
-              router.push(
-                savedId ? `/manager/sales/${savedId}` : "/manager/sales",
-              )
-            }
+            onClick={cancelDraft.cancel}
             disabled={submitting}
           >
             Скасувати
@@ -1744,6 +1761,8 @@ export function SaleForm({
         saleId={historySaleId}
         onChanged={() => router.refresh()}
       />
+
+      {cancelDraft.dialog}
 
       {/* Діалог контролю відхилення ціни (без window.confirm — блокується в
           iframe-менеджерці). Показується лише при проведенні з відхиленням. */}

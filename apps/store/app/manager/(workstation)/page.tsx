@@ -4,14 +4,16 @@ import { getCurrentUser } from "@/lib/auth/manager-auth";
 import { getFinanceStats, type PeriodPreset } from "@/lib/finance/owner-stats";
 import { getBookkeeperStats } from "@/lib/finance/bookkeeper-stats";
 import { getSupervisorStats } from "@/lib/finance/supervisor-stats";
+import { sanitizeDashboardConfig } from "@/lib/manager/dashboard-widgets";
+import type { ManagerRole } from "@/lib/auth/jwt";
 import { BookkeeperDashboard } from "./_components/bookkeeper-dashboard";
 import { AnalystDashboard } from "./_components/analyst-dashboard";
-import { DashboardCurrencyRow } from "./_components/dashboard-currency-row";
-import { DashboardGreeting } from "./_components/dashboard-greeting";
-import { DashboardStatsRow } from "./_components/dashboard-stats-row";
-import { DashboardTiles } from "./_components/dashboard-tiles";
-import { OwnerDashboard } from "./_components/owner-dashboard";
+import {
+  CustomizableDashboard,
+  type DashboardData,
+} from "./_components/dashboard/customizable-dashboard";
 import { SupervisorDashboard } from "./_components/supervisor-dashboard";
+import { countOpenReminders } from "./customers/_lib/load-clients";
 
 export const dynamic = "force-dynamic";
 
@@ -56,6 +58,16 @@ async function getDashboardData(userId: string) {
 
 const VALID_PERIODS: PeriodPreset[] = ["today", "week", "month", "year", "all"];
 
+/** Розклад робочого столу користувача (санітизований по allow-list віджетів). */
+async function loadDashboardConfig(userId: string, role: ManagerRole) {
+  const row = await prisma.mgrUserViewPrefs
+    .findUnique({
+      where: { userId_viewKey: { userId, viewKey: "dashboard" } },
+    })
+    .catch(() => null);
+  return sanitizeDashboardConfig(row?.config ?? null, role);
+}
+
 export default async function WorkstationDashboard({
   searchParams,
 }: {
@@ -69,20 +81,6 @@ export default async function WorkstationDashboard({
   const preset: PeriodPreset = VALID_PERIODS.includes(sp.period as PeriodPreset)
     ? (sp.period as PeriodPreset)
     : "month";
-
-  // ─── Owner / admin: фінансовий дашборд (← Тиждень 3 блоку Ролі) ───────────
-  if (user.role === "owner" || user.role === "admin") {
-    const stats = await getFinanceStats(preset);
-    return (
-      <div className="mx-auto max-w-6xl">
-        <OwnerDashboard
-          fullName={user.fullName}
-          stats={stats}
-          currentPreset={preset}
-        />
-      </div>
-    );
-  }
 
   // ─── Bookkeeper: каса / борги / курси (← Тиждень 4) ──────────────────────
   if (user.role === "bookkeeper") {
@@ -126,17 +124,37 @@ export default async function WorkstationDashboard({
     );
   }
 
-  // ─── Інші ролі: стандартний дашборд менеджера ─────────────────────────────
-  const data = await getDashboardData(user.id);
+  // ─── Owner / admin + решта ролей: КАСТОМІЗОВАНИЙ робочий стіл ─────────────
+  // Користувач сам складає панель віджетів (додати/змінити розмір/переставити).
+  // Owner/admin додатково мають фінансові віджети (виручка/маржа/графік/топ).
+  const financeAvailable = user.role === "owner" || user.role === "admin";
+  const [base, finance, config, openReminderCount] = await Promise.all([
+    getDashboardData(user.id),
+    financeAvailable ? getFinanceStats(preset) : Promise.resolve(null),
+    loadDashboardConfig(user.id, user.role),
+    countOpenReminders(user.id, user.role),
+  ]);
+
+  const dashboardData: DashboardData = {
+    fullName: user.fullName,
+    role: user.role,
+    clientCount: base.clientCount,
+    totalDebt: base.totalDebt,
+    eur: base.eur,
+    usd: base.usd,
+    tileCounts: base.tileCounts,
+    canEditCurrency: financeAvailable,
+    openReminderCount,
+    finance,
+  };
+
   return (
-    <div className="mx-auto max-w-5xl space-y-6">
-      <DashboardGreeting fullName={user.fullName} />
-      <DashboardStatsRow
-        clientCount={data.clientCount}
-        totalDebt={data.totalDebt}
+    <div className="mx-auto max-w-6xl">
+      <CustomizableDashboard
+        data={dashboardData}
+        initialWidgets={config.widgets}
+        currentPeriod={preset}
       />
-      <DashboardCurrencyRow eur={data.eur} usd={data.usd} canEdit={false} />
-      <DashboardTiles counts={data.tileCounts} />
     </div>
   );
 }

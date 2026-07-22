@@ -25,7 +25,12 @@ interface PreviewData {
     unitWeight: string | null;
   };
   images: { url: string; alt: string }[];
-  prices: { priceType: string; amount: number; currency: string }[];
+  /** Одна актуальна ціна продажу (без історії/зайвих типів цін). */
+  effectivePrice: {
+    amount: number;
+    currency: string;
+    isAkciya: boolean;
+  } | null;
   stock: { lots: number; weightKg: number; quantityPcs: number };
 }
 
@@ -38,11 +43,6 @@ const CHAR_LABELS: Record<string, string> = {
   producer: "Виробник",
   unitsPerKg: "Одиниць/кг",
   unitWeight: "Вага одиниці",
-};
-
-const PRICE_LABELS: Record<string, string> = {
-  wholesale: "Ціна продажу",
-  akciya: "Акційна",
 };
 
 /**
@@ -182,22 +182,23 @@ export function ProductQuickView({
               </div>
             </div>
 
-            {/* Ціни */}
-            {data.prices.length > 0 && (
-              <div className="flex flex-wrap gap-2">
-                {data.prices.map((pr, i) => (
-                  <span
-                    key={i}
-                    className="inline-flex items-center gap-1 rounded-md border border-gray-200 bg-white px-2 py-1 text-sm"
-                  >
-                    <span className="text-gray-500">
-                      {PRICE_LABELS[pr.priceType] ?? pr.priceType}:
-                    </span>
-                    <span className="font-semibold text-gray-800">
-                      {pr.amount} {pr.currency === "EUR" ? "€" : pr.currency}
-                    </span>
+            {/* Актуальна ціна — лише одна (без історії цін). */}
+            {data.effectivePrice && (
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="inline-flex items-center gap-1 rounded-md border border-gray-200 bg-white px-2 py-1 text-sm">
+                  <span className="text-gray-500">Актуальна ціна:</span>
+                  <span className="font-semibold text-gray-800">
+                    {data.effectivePrice.amount}{" "}
+                    {data.effectivePrice.currency === "EUR"
+                      ? "€"
+                      : data.effectivePrice.currency}
                   </span>
-                ))}
+                </span>
+                {data.effectivePrice.isAkciya && (
+                  <span className="rounded-md bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700">
+                    Акція
+                  </span>
+                )}
               </div>
             )}
 

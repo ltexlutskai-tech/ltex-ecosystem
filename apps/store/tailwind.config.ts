@@ -30,6 +30,11 @@ const config: Config = {
     "bg-pink-100",
     "text-amber-500",
     "bg-amber-500",
+    // Ширина віджетів кастомізованого робочого столу (динамічна за розкладом).
+    "lg:col-span-1",
+    "lg:col-span-2",
+    "lg:col-span-3",
+    "lg:col-span-4",
   ],
 };
 

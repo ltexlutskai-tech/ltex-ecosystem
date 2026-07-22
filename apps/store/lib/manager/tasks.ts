@@ -56,6 +56,8 @@ function sortCards(cards: TaskCard[]): TaskCard[] {
 export interface TasksForUser {
   assignedToMe: TaskCard[];
   createdByMe: TaskCard[];
+  /** Реєстр виконаних завдань користувача (виконав / був виконавцем). */
+  completed: TaskCard[];
 }
 
 export async function getTasksForUser(
@@ -65,41 +67,74 @@ export async function getTasksForUser(
   const viewer: Viewer = { id: user.id, role: user.role };
   const isWarehouseView = WAREHOUSE_VIEW_ROLES.has(user.role);
 
-  const [assignedTasks, createdTasks, whAssigned, whCreated] =
-    await Promise.all([
-      // Мені (ручні): відкриті + архівні (щоб виконавець бачив «Архів»),
-      // особисто або за роллю.
-      prisma.task.findMany({
-        where: {
-          status: { in: ["open", "archived"] },
-          OR: [{ assigneeUserId: user.id }, { assigneeRole: user.role }],
-        },
-        include: TASK_INCLUDE,
-        orderBy: { createdAt: "desc" },
-        take: limit,
-      }),
-      // Від мене (ручні, будь-який статус — щоб бачити результат).
-      prisma.task.findMany({
-        where: { createdByUserId: user.id },
-        include: TASK_INCLUDE,
-        orderBy: { createdAt: "desc" },
-        take: limit,
-      }),
-      // Мені (складські): лише для складських ролей — відкриті.
-      isWarehouseView
-        ? prisma.warehouseTask.findMany({
-            where: { status: { in: ["new", "received"] } },
-            orderBy: { createdAt: "desc" },
-            take: limit,
-          })
-        : Promise.resolve([]),
-      // Від мене (складські): де я — менеджер реалізації.
-      prisma.warehouseTask.findMany({
-        where: { managerUserId: user.id },
-        orderBy: { createdAt: "desc" },
-        take: limit,
-      }),
-    ]);
+  // Реєстр виконаних: складські «sent» — для складських ролей усі, інакше лише
+  // де я менеджер реалізації.
+  const whCompletedWhere: Prisma.WarehouseTaskWhereInput = isWarehouseView
+    ? { status: "sent" }
+    : { status: "sent", managerUserId: user.id };
+
+  const [
+    assignedTasks,
+    createdTasks,
+    completedTasks,
+    whAssigned,
+    whCreated,
+    whCompleted,
+  ] = await Promise.all([
+    // Мені (ручні): відкриті + архівні (щоб виконавець бачив «Архів»),
+    // особисто або за роллю.
+    prisma.task.findMany({
+      where: {
+        status: { in: ["open", "archived"] },
+        OR: [{ assigneeUserId: user.id }, { assigneeRole: user.role }],
+      },
+      include: TASK_INCLUDE,
+      orderBy: { createdAt: "desc" },
+      take: limit,
+    }),
+    // Від мене (ручні, будь-який статус — щоб бачити результат).
+    prisma.task.findMany({
+      where: { createdByUserId: user.id },
+      include: TASK_INCLUDE,
+      orderBy: { createdAt: "desc" },
+      take: limit,
+    }),
+    // Виконані (ручні): статус done, де я — виконавець/за роллю/фактичний
+    // виконавець. Це закриває «виконав завдання, а в списку пусто».
+    prisma.task.findMany({
+      where: {
+        status: "done",
+        OR: [
+          { completedByUserId: user.id },
+          { assigneeUserId: user.id },
+          { assigneeRole: user.role },
+        ],
+      },
+      include: TASK_INCLUDE,
+      orderBy: { completedAt: "desc" },
+      take: limit,
+    }),
+    // Мені (складські): лише для складських ролей — відкриті.
+    isWarehouseView
+      ? prisma.warehouseTask.findMany({
+          where: { status: { in: ["new", "received"] } },
+          orderBy: { createdAt: "desc" },
+          take: limit,
+        })
+      : Promise.resolve([]),
+    // Від мене (складські): де я — менеджер реалізації.
+    prisma.warehouseTask.findMany({
+      where: { managerUserId: user.id },
+      orderBy: { createdAt: "desc" },
+      take: limit,
+    }),
+    // Виконані (складські): відправлені.
+    prisma.warehouseTask.findMany({
+      where: whCompletedWhere,
+      orderBy: { sentAt: "desc" },
+      take: limit,
+    }),
+  ]);
 
   const assignedToMe = sortCards([
     ...assignedTasks.map((t) => normalizeTask(toRaw(t), viewer)),
@@ -109,8 +144,17 @@ export async function getTasksForUser(
     ...createdTasks.map((t) => normalizeTask(toRaw(t), viewer)),
     ...whCreated.map((w) => normalizeWarehouseTask(w)),
   ]);
+  // Виконані — новіші зверху (за фактом виконання/створення).
+  const completed = [
+    ...completedTasks.map((t) => normalizeTask(toRaw(t), viewer)),
+    ...whCompleted.map((w) => normalizeWarehouseTask(w)),
+  ].sort((a, b) => {
+    const at = a.completedAt ?? a.createdAt;
+    const bt = b.completedAt ?? b.createdAt;
+    return at < bt ? 1 : -1;
+  });
 
-  return { assignedToMe, createdByMe };
+  return { assignedToMe, createdByMe, completed };
 }
 
 /** Лічильник відкритих завдань «на мене» — для бейджа у меню. */

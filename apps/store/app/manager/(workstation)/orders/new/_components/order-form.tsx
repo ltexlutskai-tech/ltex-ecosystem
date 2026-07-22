@@ -1,8 +1,9 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { openManagerTab } from "../../../_components/open-manager-tab";
 import { notifyPendingBadges } from "../../../_components/notify-pending-badges";
+import { useCancelDraft } from "../../../_components/use-cancel-draft";
 import { useRouter } from "next/navigation";
 import { MessageSquare, ListPlus } from "lucide-react";
 import { isOrderLocked } from "@/lib/manager/order-status";
@@ -89,6 +90,9 @@ export function OrderForm({
    * збереження не дублювало вже створену autosave-чернетку.
    */
   const [savedId, setSavedId] = useState<string | null>(orderId ?? null);
+  // Чи чернетку створено САМЕ у цій сесії (нова, не відкриття наявного) — щоб
+  // «Скасувати» видаляла лише свіжостворений документ, а не наявний.
+  const createdThisSessionRef = useRef(false);
 
   const [clientId, setClientId] = useState<string | null>(
     initialClientId ?? null,
@@ -202,9 +206,26 @@ export function OrderForm({
     updateDraft: updateDraftServer,
     onIdAssigned: (id) => {
       setSavedId(id);
+      createdThisSessionRef.current = true;
       // Міняємо URL без remount форми (рефреш відкриє чернетку з БД).
       window.history.replaceState(null, "", `/manager/orders/${id}`);
     },
+  });
+
+  // «Скасувати» — видаляє свіжостворену чернетку (з підтвердженням).
+  const willDeleteOnCancel =
+    savedId != null && createdThisSessionRef.current && autosaveEnabled;
+  const cancelDraft = useCancelDraft({
+    docKind: "orders",
+    savedId,
+    createdThisSession: createdThisSessionRef.current,
+    isPosted: !autosaveEnabled,
+    clearAll: () => autosave.clearAll(),
+    cancelHref: willDeleteOnCancel
+      ? "/manager/orders"
+      : savedId
+        ? `/manager/orders/${savedId}`
+        : "/manager/orders",
   });
 
   function onClientChange(
@@ -668,11 +689,7 @@ export function OrderForm({
         <Button
           type="button"
           variant="outline"
-          onClick={() =>
-            router.push(
-              savedId ? `/manager/orders/${savedId}` : "/manager/orders",
-            )
-          }
+          onClick={cancelDraft.cancel}
           disabled={submitting}
         >
           Скасувати
@@ -700,6 +717,8 @@ export function OrderForm({
         onOpenChange={setPickerOpen}
         onAdd={onAddFromPicker}
       />
+
+      {cancelDraft.dialog}
 
       {/* ─── Діалог: у клієнта вже є актуальне замовлення (N2) ──────────────── */}
       <Dialog

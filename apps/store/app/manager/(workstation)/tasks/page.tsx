@@ -11,7 +11,7 @@ export default async function TasksPage() {
   const user = await getCurrentUser();
   if (!user) redirect("/manager/login");
 
-  const [{ assignedToMe, createdByMe }, users] = await Promise.all([
+  const [{ assignedToMe, createdByMe, completed }, users] = await Promise.all([
     getTasksForUser(user),
     prisma.user.findMany({
       where: { isActive: true },
@@ -24,6 +24,7 @@ export default async function TasksPage() {
     <TasksClient
       assignedToMe={assignedToMe}
       createdByMe={createdByMe}
+      completed={completed}
       users={users}
       currentUserId={user.id}
     />

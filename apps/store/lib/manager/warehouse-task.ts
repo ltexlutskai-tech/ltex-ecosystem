@@ -22,6 +22,9 @@ import { formatDocNumber } from "@/lib/manager/order-number";
  */
 export async function createWarehouseTaskForSale(
   saleId: string,
+  /** Запасний власник сповіщень, якщо у реалізації немає призначеного агента
+   *  (напр. той, хто провів документ). Без нього менеджеру нічого не приходить. */
+  fallbackManagerUserId?: string | null,
 ): Promise<void> {
   try {
     const existing = await prisma.warehouseTask.findUnique({
@@ -54,8 +57,10 @@ export async function createWarehouseTaskForSale(
     });
     if (!sale) return;
 
-    // Менеджер для сповіщень — призначений агент або автор (assignedAgentUserId).
-    const managerUserId = sale.assignedAgentUserId;
+    // Менеджер для сповіщень — призначений агент; якщо його немає — автор
+    // проведення (fallback), інакше сповіщення нікому не приходить.
+    const managerUserId =
+      sale.assignedAgentUserId ?? fallbackManagerUserId ?? null;
     let managerName: string | null = null;
     if (managerUserId) {
       const u = await prisma.user.findUnique({

@@ -176,7 +176,6 @@ export default async function CustomersPage({
         <ClientListBulk
           items={list.items}
           columnsPrefs={columnsPrefs}
-          managers={managers}
           bulkFields={bulkFields}
         />
       ) : (

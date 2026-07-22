@@ -86,10 +86,18 @@ export default async function ClientDetailPage({
         />
       </div>
 
-      {/* Закріплена шапка — завжди видно, з ким працюємо (C6). */}
-      <div className="sticky top-0 z-20 -mx-1 bg-gray-50 px-1 pt-1 pb-2">
-        <ClientHeader client={client} canAssign={canAssign} />
-      </div>
+      {/* Шапка картки з телефонами/месенджерами всередині. */}
+      <ClientHeader client={client} canAssign={canAssign} canEdit={canEdit} />
+
+      {/* Соцмережі та месенджери — окремим блоком на всю ширину під шапкою.
+          Для чужого клієнта приховано (masking). */}
+      {!isForeign && (
+        <ClientSocialTab
+          client={client}
+          canEdit={canEdit}
+          isForeign={isForeign}
+        />
+      )}
 
       {/* Дії по клієнту — на верху картки, поза «Реквізитами» (C1). */}
       <ClientActionButtons
@@ -134,13 +142,6 @@ export default async function ClientDetailPage({
           />
         }
         presentationHistory={<ClientPresentationHistoryTab />}
-        social={
-          <ClientSocialTab
-            client={client}
-            canEdit={canEdit}
-            isForeign={isForeign}
-          />
-        }
         keywords={
           <ClientKeywordsTab
             clientId={client.id}

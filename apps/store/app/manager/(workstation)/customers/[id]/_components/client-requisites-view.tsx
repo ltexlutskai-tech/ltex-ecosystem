@@ -4,7 +4,6 @@ import { formatEur, parseDecimal } from "../../_components/format";
 import { ClientBankAccountRow } from "./client-bank-account-row";
 import { ClientContactsSection } from "./client-contacts-section";
 import { ClientHierarchySection } from "./client-hierarchy-section";
-import { ClientPhonesSection } from "./client-phones-section";
 import { ClientRoutesSection } from "./client-routes-section";
 import {
   ClientAddressLink,
@@ -139,14 +138,6 @@ export function ClientRequisitesView({
       <ClientHierarchySection
         parentClient={client.parentClient}
         childClients={client.childClients}
-      />
-
-      <ClientPhonesSection
-        clientId={client.id}
-        phones={client.phones}
-        phonePrimary={client.phonePrimary}
-        isForeign={isForeign}
-        canEdit={canEdit}
       />
 
       <ClientContactsSection
