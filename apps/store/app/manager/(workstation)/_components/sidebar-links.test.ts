@@ -75,6 +75,46 @@ describe("getSidebarSections — доступ меню за роллю", () => {
     expect(h.has("/manager/admin/users")).toBe(false);
   });
 
+  it("склад бачить рівно дозволений набір блоків (2026-07-22)", () => {
+    const h = hrefs("warehouse");
+    const allowed = [
+      "/manager", // Робочий стіл
+      "/manager/routes", // Маршрут
+      "/manager/tasks", // Завдання
+      "/manager/reminders", // Нагадування
+      "/manager/receivings", // Поступлення
+      "/manager/stock-documents/repackings", // Перепаковка
+      "/manager/stock-documents/inventories", // Інвентаризація
+      "/manager/bag-state-changes", // Зміна стану мішка
+      "/manager/np-registers", // Реєстри НП
+      "/manager/reports/stock-balance", // Залишки складу
+      "/manager/prices", // Прайс
+      "/manager/messenger", // Чат L-TEX
+      "/manager/trash", // Кошик
+      "/manager/settings", // Налаштування
+    ];
+    for (const href of allowed) expect(h.has(href), href).toBe(true);
+    // Рівно 14 пунктів — жодного зайвого блоку.
+    expect(h.size).toBe(allowed.length);
+  });
+
+  it("склад НЕ бачить менеджерські/адмін/фінансові блоки", () => {
+    const h = hrefs("warehouse");
+    const denied = [
+      "/manager/orders",
+      "/manager/sales",
+      "/manager/payments",
+      "/manager/customers",
+      "/manager/chat", // Месенджери (зовнішні) — не Чат L-TEX
+      "/manager/reports", // хаб звітів (лише stock-balance)
+      "/manager/registry",
+      "/manager/bank-payments-incoming",
+      "/manager/admin/users",
+      "/manager/stock-documents", // хаб документів — недоступний
+    ];
+    for (const href of denied) expect(h.has(href), href).toBe(false);
+  });
+
   it("порожні секції відкидаються (немає undefined-розділювачів)", () => {
     for (const role of ["manager", "admin", "owner", "warehouse"] as const) {
       const sections = getSidebarSections(role);

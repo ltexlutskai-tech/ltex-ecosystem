@@ -138,6 +138,56 @@ describe("managerGuard", () => {
     }
   });
 
+  // ─── RBAC: кабінет «Склад» — allow-list (2026-07-22) ────────────────────
+  it("lets warehouse into its allowed sections", async () => {
+    verifyMock.mockReturnValue({ ...VALID_PAYLOAD, role: "warehouse" });
+    for (const p of [
+      "/manager",
+      "/manager/routes",
+      "/manager/tasks",
+      "/manager/warehouse-tasks/abc123", // deep-link з блоку «Завдання»
+      "/manager/reminders",
+      "/manager/receivings",
+      "/manager/stock-documents/repackings",
+      "/manager/stock-documents/inventories",
+      "/manager/bag-state-changes",
+      "/manager/np-registers",
+      "/manager/reports/stock-balance",
+      "/manager/prices",
+      "/manager/prices/xyz", // картка товару
+      "/manager/products/new", // створення товару з «Прайс»
+      "/manager/messenger",
+      "/manager/trash",
+      "/manager/settings",
+    ]) {
+      const res = await managerGuard(makeReq(p, "ltex_mgr_access=good"));
+      expect(res.headers.get("location"), p).toBeNull();
+    }
+  });
+
+  it("redirects warehouse away from everything outside its allow-list", async () => {
+    verifyMock.mockReturnValue({ ...VALID_PAYLOAD, role: "warehouse" });
+    for (const p of [
+      "/manager/orders",
+      "/manager/sales",
+      "/manager/payments",
+      "/manager/customers",
+      "/manager/chat", // зовнішні месенджери — не Чат L-TEX
+      "/manager/reports", // хаб звітів
+      "/manager/reports/sales-summary",
+      "/manager/registry",
+      "/manager/stock-documents", // хаб документів
+      "/manager/stock-documents/write-offs", // інший вид документа
+      "/manager/bank-payments-incoming",
+      "/manager/admin/users",
+    ]) {
+      const res = await managerGuard(makeReq(p, "ltex_mgr_access=good"));
+      const location = res.headers.get("location");
+      expect(location, p).toContain("/manager");
+      expect(location, p).not.toContain(p.slice("/manager/".length));
+    }
+  });
+
   it("does NOT restrict admin from any section", async () => {
     verifyMock.mockReturnValue({ ...VALID_PAYLOAD, role: "admin" });
     for (const p of [

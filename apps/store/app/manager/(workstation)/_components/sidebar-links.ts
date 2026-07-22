@@ -20,7 +20,9 @@ import {
   ArrowDownToLine,
   ArrowUpFromLine,
   ArrowLeftRight,
+  ClipboardCheck,
   PackageCheck,
+  PackageOpen,
   PackagePlus,
   PackageSearch,
   PieChart,
@@ -32,6 +34,7 @@ import {
   UserCog,
   Users,
   Wallet,
+  Warehouse,
 } from "lucide-react";
 
 export interface SidebarLink {
@@ -172,6 +175,29 @@ export const NP_REGISTERS_LINK: SidebarLink = {
   icon: FileStack,
 };
 
+// ── Складські документи окремими пунктами (2026-07-22) ────────────────────
+// Кабінет «Склад» показує ці два документи прямими пунктами меню (замість
+// хабу «Документи руху товару», який складу недоступний). Ведуть на ті самі
+// сторінки stock-documents з фільтром по виду.
+export const REPACKINGS_LINK: SidebarLink = {
+  href: "/manager/stock-documents/repackings",
+  label: "Перепаковка",
+  icon: PackageOpen,
+};
+
+export const INVENTORIES_LINK: SidebarLink = {
+  href: "/manager/stock-documents/inventories",
+  label: "Інвентаризація",
+  icon: ClipboardCheck,
+};
+
+// Звіт «Залишки складу» окремим пунктом для складу (прямо на звіт, а не хаб).
+export const STOCK_BALANCE_LINK: SidebarLink = {
+  href: "/manager/reports/stock-balance",
+  label: "Залишки складу",
+  icon: Warehouse,
+};
+
 // ── Завдання складу (2026-07-14) — підготувати відправлення + ТТН ──────────
 // Детальна сторінка складського завдання (пакування/ТТН). У меню більше не
 // показується окремо — доступна через блок «Завдання» (deep-link на картці).
@@ -280,6 +306,11 @@ export function getSidebarSections(role: ManagerRole): SidebarItem[][] {
   const isWarehouse = role === "warehouse";
   const isManager = role === "manager";
 
+  // ── Кабінет «Склад» (2026-07-22) — вузько-обмежений набір блоків, згрупований
+  // за контекстом. Доступи узгоджено з allow-list у `middleware-manager.ts`
+  // (справжній RBAC: приховане в меню недоступне й за прямим URL).
+  if (isWarehouse) return getWarehouseSections();
+
   const sections: SidebarItem[][] = [];
 
   // Секція A — основні документи (бейджі pending для сайтових).
@@ -360,4 +391,43 @@ export function getSidebarSections(role: ManagerRole): SidebarItem[][] {
   sections.push(sectionE);
 
   return sections.filter((s) => s.length > 0);
+}
+
+/**
+ * Меню кабінету «Склад» — окремі блоки, згруповані за контекстом:
+ *  1. Основне       — Робочий стіл, Маршрут, Завдання, Нагадування
+ *  2. Склад         — Поступлення, Перепаковка, Інвентаризація, Зміна стану
+ *                     мішка, Реєстри НП, Залишки складу
+ *  3. Прайс і чат   — Прайс, Чат L-TEX
+ *  4. Система       — Кошик, Налаштування
+ *
+ * ⚠️ Набір href має збігатися з allow-list у `middleware-manager.ts` — інакше
+ * пункт видно в меню, але прямий перехід редіректить на робочий стіл.
+ */
+function getWarehouseSections(): SidebarItem[][] {
+  return [
+    // 1. Основне
+    [
+      { href: "/manager", label: "Робочий стіл", icon: Home },
+      { href: "/manager/routes", label: "Маршрут", icon: Map },
+      { ...TASKS_LINK, badge: "tasks" },
+      { href: "/manager/reminders", label: "Нагадування", icon: Bell },
+    ],
+    // 2. Склад
+    [
+      { ...WAREHOUSE_RECEIVINGS_LINK },
+      { ...REPACKINGS_LINK },
+      { ...INVENTORIES_LINK },
+      { ...BAG_STATE_LINK },
+      { ...NP_REGISTERS_LINK },
+      { ...STOCK_BALANCE_LINK },
+    ],
+    // 3. Прайс і чат
+    [
+      { href: "/manager/prices", label: "Прайс", icon: BarChart3 },
+      { ...MESSENGER_LINK, badge: "messenger" },
+    ],
+    // 4. Система
+    [{ ...TRASH_LINK }, { ...SETTINGS_LINK }],
+  ];
 }

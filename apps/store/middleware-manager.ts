@@ -40,6 +40,37 @@ const DENIED_PREFIXES: Partial<Record<ManagerRole, readonly string[]>> = {
 };
 
 /**
+ * Allow-list ролей (2026-07-22). Якщо роль присутня тут — дозволено ЛИШЕ
+ * перелічені префікси (+ корінь `/manager`), усе інше редіректить на робочий
+ * стіл. Надійніше за deny-list для вузько-обмежених кабінетів: нові розділи
+ * системи за замовчуванням недоступні, доки їх свідомо не додадуть сюди.
+ *
+ * Кабінет «Склад» — набір збігається з `getWarehouseSections` у
+ * `sidebar-links.ts`. Крім явних пунктів меню, дозволено службові піддороги:
+ * `warehouse-tasks` (deep-link з блоку «Завдання») і `products` (картки/створення
+ * товару з блоку «Прайс»).
+ */
+const ALLOWED_PREFIXES: Partial<Record<ManagerRole, readonly string[]>> = {
+  warehouse: [
+    "/manager/routes",
+    "/manager/tasks",
+    "/manager/warehouse-tasks",
+    "/manager/reminders",
+    "/manager/receivings",
+    "/manager/stock-documents/repackings",
+    "/manager/stock-documents/inventories",
+    "/manager/bag-state-changes",
+    "/manager/np-registers",
+    "/manager/reports/stock-balance",
+    "/manager/prices",
+    "/manager/products",
+    "/manager/messenger",
+    "/manager/trash",
+    "/manager/settings",
+  ],
+};
+
+/**
  * Винятки-дозволи, що мають ПЕРЕВАГУ над deny-списком. Напр. менеджеру
  * закрито хаб `/manager/reports`, але дозволено власний звіт
  * `/manager/reports/manager`.
@@ -54,6 +85,13 @@ function matchesPrefix(path: string, p: string): boolean {
 
 /** Чи заборонений цей шлях для ролі (точний збіг або піддорога `prefix/…`). */
 function isDeniedForRole(role: ManagerRole, path: string): boolean {
+  // Allow-list має найвищий пріоритет: обмежені ролі бачать лише свій набір.
+  const allowOnly = ALLOWED_PREFIXES[role];
+  if (allowOnly) {
+    // Корінь /manager (робочий стіл) дозволено завжди.
+    if (path === "/manager") return false;
+    return !allowOnly.some((p) => matchesPrefix(path, p));
+  }
   const allow = ALLOWED_EXCEPTIONS[role];
   if (allow && allow.some((p) => matchesPrefix(path, p))) return false;
   const prefixes = DENIED_PREFIXES[role];
