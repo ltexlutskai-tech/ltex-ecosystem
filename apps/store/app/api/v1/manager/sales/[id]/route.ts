@@ -21,6 +21,7 @@ import {
   resolveClientIdByCustomer,
 } from "@/lib/manager/debt-register";
 import { removeSaleMovements } from "@/lib/manager/sale-movement-hooks";
+import { cancelCheckboxReceiptForSale } from "@/lib/fiscal/create-receipt-for-sale";
 import {
   getTtnStatus,
   deleteInternetDocument,
@@ -354,6 +355,9 @@ export async function DELETE(
       }
     }
   }
+
+  // Скасовуємо чек Checkbox (ETTN) до видалення реалізації (поки запис існує).
+  await cancelCheckboxReceiptForSale(id).catch(() => undefined);
 
   // Ключ реєстратора рухів регістрів (як пише `applySaleMovements`).
   const recorder = existing.code1C ?? existing.id;

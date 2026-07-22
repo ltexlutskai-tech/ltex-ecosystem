@@ -90,6 +90,33 @@ async function post<T>(
   }
 }
 
+/** Довільний метод (для скасування чека) — best-effort, повертає ok/error. */
+async function request(
+  method: string,
+  path: string,
+  extraHeaders?: Record<string, string>,
+): Promise<{ ok: true; data: unknown } | { ok: false; error: string }> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  try {
+    const res = await fetch(`${baseUrl()}${path}`, {
+      method,
+      headers: { ...clientHeaders(), ...extraHeaders },
+      signal: controller.signal,
+    });
+    const json = (await res.json().catch(() => null)) as unknown;
+    if (!res.ok) return { ok: false, error: extractError(json, res.status) };
+    return { ok: true, data: json };
+  } catch (err) {
+    return {
+      ok: false,
+      error: err instanceof Error ? err.message : String(err),
+    };
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 // ─── Авторизація (кеш токена) ────────────────────────────────────────────────
 
 let tokenCache: { token: string; expiresAt: number } | null = null;
@@ -149,6 +176,31 @@ export async function createEttnReceipt(
       status: res.data.status,
     },
   };
+}
+
+/**
+ * Скасовує (видаляє) чек ETTN «очікування оплати» у Checkbox — коли реалізацію
+ * видаляють, поки гроші ще не надійшли (чек не фіскалізований). Best-effort.
+ *
+ * Ендпоінт скасування можна перевизначити env `CHECKBOX_ETTN_CANCEL_PATH`
+ * (напр. `/receipts/{id}` для DELETE або `/np/ettn/{id}` тощо) — `{id}`
+ * підставляється; метод із `CHECKBOX_ETTN_CANCEL_METHOD` (дефолт DELETE).
+ */
+export async function cancelEttnReceipt(
+  receiptId: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const auth = await signinPinCode();
+  if ("error" in auth) return { ok: false, error: auth.error };
+  const method = (
+    process.env.CHECKBOX_ETTN_CANCEL_METHOD ?? "DELETE"
+  ).toUpperCase();
+  const template = process.env.CHECKBOX_ETTN_CANCEL_PATH ?? "/np/ettn/{id}";
+  const path = template.replace("{id}", encodeURIComponent(receiptId));
+  const res = await request(method, path, {
+    Authorization: `Bearer ${auth.token}`,
+  });
+  if (!res.ok) return { ok: false, error: res.error };
+  return { ok: true };
 }
 
 /** Тест-хук: скидає кеш токена. */

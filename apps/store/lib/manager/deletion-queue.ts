@@ -6,6 +6,7 @@ import { recordClientEventSafe } from "@/lib/manager/client-timeline";
 import { recomputeDebtForClients } from "@/lib/manager/debt-register";
 import { removeSaleMovements } from "@/lib/manager/sale-movement-hooks";
 import { deleteNpTtnForSale } from "@/lib/delivery/create-ttn-for-sale";
+import { cancelCheckboxReceiptForSale } from "@/lib/fiscal/create-receipt-for-sale";
 import {
   reapplyDocMovements,
   reverseDocMovements,
@@ -213,6 +214,8 @@ export async function markForDeletion(
           .catch(() => undefined);
       }
     }
+    // Скасовуємо чек Checkbox (ETTN «очікування оплати»), поки не оплачено.
+    await cancelCheckboxReceiptForSale(entityId).catch(() => undefined);
   }
 
   // Антидубль: активний pending-запит на цей самий обʼєкт.
@@ -590,13 +593,14 @@ async function hardDeleteEntity(
       });
       const saleIds = order?.sales.map((s) => s.id) ?? [];
 
-      // Прибираємо чернетки ТТН НП пов'язаних реалізацій (best-effort).
+      // Прибираємо чернетки ТТН НП + чеки Checkbox пов'язаних реалізацій.
       for (const s of order?.sales ?? []) {
         if (s.ttnRef) {
           await deleteNpTtnForSale(s.ttnRef, s.expressWaybill).catch(
             () => undefined,
           );
         }
+        await cancelCheckboxReceiptForSale(s.id).catch(() => undefined);
       }
       const lotIds = (order?.items ?? [])
         .map((i) => i.lotId)
@@ -647,6 +651,7 @@ async function hardDeleteEntity(
           () => undefined,
         );
       }
+      await cancelCheckboxReceiptForSale(entityId).catch(() => undefined);
       const moves = await prisma.mgrDebtMovement.findMany({
         where: { sourceType: "sale", sourceId: entityId },
         select: { clientId: true },

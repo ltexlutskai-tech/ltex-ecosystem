@@ -5,7 +5,7 @@ import {
   type CategoryNode,
 } from "@/lib/manager/receipt-name";
 import { getPaymentSummary } from "@/lib/manager/payment-summary";
-import { createEttnReceipt } from "./checkbox";
+import { createEttnReceipt, cancelEttnReceipt } from "./checkbox";
 import { buildEttnRequest, type EttnGoodInput } from "./ettn-payload";
 
 /**
@@ -156,4 +156,28 @@ async function upsertReceipt(
       ...(snapshot !== undefined ? { payloadSnapshot: snapshot } : {}),
     },
   });
+}
+
+/**
+ * Скасовує чек Checkbox (ETTN) при видаленні реалізації. Best-effort: НЕ кидає.
+ * Викликати ПЕРЕД видаленням реалізації (поки `CheckboxReceipt` ще існує). Діє
+ * лише для створеного чека з `receiptId`; після спроби позначає запис
+ * `cancelled` (ідемпотентно — повторний виклик пропускає).
+ */
+export async function cancelCheckboxReceiptForSale(
+  saleId: string,
+): Promise<void> {
+  try {
+    const rec = await prisma.checkboxReceipt.findUnique({
+      where: { saleId },
+      select: { receiptId: true, status: true },
+    });
+    if (!rec?.receiptId || rec.status !== "created") return;
+    await cancelEttnReceipt(rec.receiptId).catch(() => undefined);
+    await prisma.checkboxReceipt
+      .update({ where: { saleId }, data: { status: "cancelled" } })
+      .catch(() => undefined);
+  } catch {
+    // best-effort
+  }
 }
