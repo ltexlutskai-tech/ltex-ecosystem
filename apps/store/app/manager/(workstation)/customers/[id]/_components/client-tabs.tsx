@@ -162,7 +162,11 @@ export function ClientTabs({
     <div className="grid gap-4 md:grid-cols-[220px_1fr]">
       <nav
         aria-label="Розділи картки клієнта"
-        className="space-y-3 md:sticky md:top-2 md:max-h-[calc(100vh-1rem)] md:self-start md:overflow-y-auto"
+        // Закріплюємо ПІД шапкою (її висота — у CSS-змінній `--ccard-header-h`,
+        // яку виставляє StickyHeader; змінна має дефолт 0px у globals). Sticky
+        // лише md+; inline-top коректний і на моб. (де position:static → ігнорується).
+        style={{ top: "calc(var(--ccard-header-h) + 0.75rem)" }}
+        className="space-y-3 md:sticky md:max-h-[calc(100vh_-_var(--ccard-header-h)_-_1.5rem)] md:self-start md:overflow-y-auto"
       >
         {visibleGroups.map((g) => (
           <div key={g.id}>

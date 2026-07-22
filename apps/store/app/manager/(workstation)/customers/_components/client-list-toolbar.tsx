@@ -12,7 +12,7 @@ import {
   CLIENT_COLOR_META,
   CLIENT_COLOR_ORDER,
 } from "@/lib/manager/client-color";
-import { Bell, SlidersHorizontal } from "lucide-react";
+import { Bell, ChevronDown } from "lucide-react";
 import type { ConfigItem, DictionariesSnapshot } from "./types";
 
 interface Props {
@@ -133,8 +133,12 @@ export function ClientListToolbar({
                 : "inline-flex items-center gap-1.5 rounded-full border bg-white px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-50"
             }
           >
-            <SlidersHorizontal className="h-3.5 w-3.5" />
-            Фільтри
+            <ChevronDown
+              className={`h-3.5 w-3.5 transition-transform ${
+                filtersOpen ? "rotate-180" : ""
+              }`}
+            />
+            Більше
             {activeDrawerCount > 0 && (
               <span
                 className={

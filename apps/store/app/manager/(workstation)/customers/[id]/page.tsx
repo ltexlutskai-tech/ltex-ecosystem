@@ -18,6 +18,7 @@ import { ClientRequisitesTab } from "./_components/client-requisites-tab";
 import { ClientSalesHistoryTab } from "./_components/client-sales-history-tab";
 import { ClientSocialTab } from "./_components/client-social-tab";
 import { ClientTabs } from "./_components/client-tabs";
+import { StickyHeader } from "./_components/sticky-header";
 import { countOverdue } from "./_components/client-reminders-grouping";
 import { loadClientDetail } from "./_lib/load-client";
 import { loadEditDictionaries } from "./_lib/load-edit-dictionaries";
@@ -86,8 +87,11 @@ export default async function ClientDetailPage({
         />
       </div>
 
-      {/* Шапка картки з телефонами/месенджерами всередині. */}
-      <ClientHeader client={client} canAssign={canAssign} canEdit={canEdit} />
+      {/* Закріплена шапка картки (з телефонами/месенджерами) — завжди видно,
+          з ким працюємо. */}
+      <StickyHeader>
+        <ClientHeader client={client} canAssign={canAssign} canEdit={canEdit} />
+      </StickyHeader>
 
       {/* Соцмережі та месенджери — окремим блоком на всю ширину під шапкою.
           Для чужого клієнта приховано (masking). */}
