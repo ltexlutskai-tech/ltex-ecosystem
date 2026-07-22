@@ -25,12 +25,15 @@ export default async function StockBalanceReportPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
+  // Склад бачить лише цей звіт (див. allow-list у middleware) — тому warehouse
+  // тут дозволений, хоча хаб «Звіти» йому недоступний.
   const user = await requireRole([
     "analyst",
     "admin",
     "owner",
     "supervisor",
     "bookkeeper",
+    "warehouse",
   ]);
   if (!user) notFound();
 
@@ -101,7 +104,9 @@ export default async function StockBalanceReportPage({
 
   return (
     <div className="mx-auto max-w-6xl space-y-4">
-      <ReportsNav />
+      {/* Склад має доступ лише до цього звіту — навігацію по інших звітах
+          (хаб «Звіти») йому не показуємо, інакше кліки редіректять на /manager. */}
+      {user.role !== "warehouse" && <ReportsNav />}
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
           <h1 className="text-xl font-semibold text-gray-900">
