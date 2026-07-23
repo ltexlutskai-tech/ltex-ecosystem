@@ -172,7 +172,7 @@ export const BAG_STATE_LINK: SidebarLink = {
 // Завдання на відеоогляд товару: склад несе мішок → відеозона знімає й описує.
 export const VIDEO_TASKS_LINK: SidebarLink = {
   href: "/manager/video-tasks",
-  label: "Відеозавдання",
+  label: "Відеозона",
   icon: Clapperboard,
 };
 
@@ -282,6 +282,7 @@ export type SidebarBadge =
   | "tasks"
   | "warehouse-tasks"
   | "video-tasks"
+  | "reminders"
   | "deletions";
 
 export interface SidebarItem {
@@ -343,7 +344,13 @@ export function getSidebarSections(role: ManagerRole): SidebarItem[][] {
   const secondary = isManager
     ? SECONDARY_LINKS.filter((l) => MANAGER_SECONDARY_HREFS.has(l.href))
     : [...SECONDARY_LINKS];
-  sections.push(secondary.map((l) => ({ ...l })));
+  sections.push(
+    secondary.map((l) =>
+      l.href === "/manager/reminders"
+        ? { ...l, badge: "reminders" as const }
+        : { ...l },
+    ),
+  );
 
   // Секція C — комунікації + рольові блоки.
   const sectionC: SidebarItem[] = [
@@ -358,8 +365,9 @@ export function getSidebarSections(role: ManagerRole): SidebarItem[][] {
     sectionC.push({ ...BAG_STATE_LINK });
     sectionC.push({ ...NP_REGISTERS_LINK });
   }
-  // Відеозавдання — нагляд для admin/owner (відеозона має власний кабінет).
-  if (adminOrOwner) {
+  // Відеозона — admin/owner (нагляд) + менеджери (відстежують свої замовлення
+  // відео). Відеозона й склад мають блок у власних секціях.
+  if (adminOrOwner || isManager || role === "senior_manager") {
     sectionC.push({ ...VIDEO_TASKS_LINK, badge: "video-tasks" });
   }
   // Довідники та регістри — усі, крім складу, експедитора і менеджера.
@@ -428,7 +436,12 @@ function getWarehouseSections(): SidebarItem[][] {
       { href: "/manager", label: "Робочий стіл", icon: Home },
       { href: "/manager/routes", label: "Маршрут", icon: Map },
       { ...TASKS_LINK, badge: "tasks" },
-      { href: "/manager/reminders", label: "Нагадування", icon: Bell },
+      {
+        href: "/manager/reminders",
+        label: "Нагадування",
+        icon: Bell,
+        badge: "reminders",
+      },
     ],
     // 2. Склад
     [
@@ -464,7 +477,12 @@ function getVideozoneSections(): SidebarItem[][] {
       { href: "/manager", label: "Робочий стіл", icon: Home },
       { ...VIDEO_TASKS_LINK, badge: "video-tasks" },
       { ...BAG_STATE_LINK },
-      { href: "/manager/reminders", label: "Нагадування", icon: Bell },
+      {
+        href: "/manager/reminders",
+        label: "Нагадування",
+        icon: Bell,
+        badge: "reminders",
+      },
     ],
     [
       { href: "/manager/prices", label: "Прайс", icon: BarChart3 },

@@ -5,7 +5,7 @@ import { getCurrentUser } from "@/lib/auth/manager-auth";
 import { AutoRefresh } from "../_components/auto-refresh";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "Відеозавдання — L-TEX Manager" };
+export const metadata = { title: "Відеозона — L-TEX Manager" };
 
 const STATUS_META: Record<string, { label: string; cls: string }> = {
   new: { label: "Принести мішок", cls: "bg-amber-100 text-amber-700" },
@@ -76,7 +76,7 @@ export default async function VideoTasksPage({
       <AutoRefresh />
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <h1 className="text-2xl font-semibold">Відеозавдання</h1>
+          <h1 className="text-2xl font-semibold">Відеозона</h1>
           <p className="mt-1 text-sm text-gray-500">
             Зйомка відеооглядів для клієнтів. Склад приносить мішок → відеозона
             знімає, заповнює характеристики й формує опис.
@@ -134,6 +134,7 @@ export default async function VideoTasksPage({
                     {t.quantity} шт.
                     {t.articleCode ? ` · арт. ${t.articleCode}` : ""}
                     {t.barcode ? ` · мішок ${t.barcode}` : ""}
+                    {t.managerName ? ` · менеджер: ${t.managerName}` : ""}
                   </p>
                 </div>
                 <div className="flex items-center gap-2">

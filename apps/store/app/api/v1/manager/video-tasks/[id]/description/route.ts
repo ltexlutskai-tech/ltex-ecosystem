@@ -3,6 +3,10 @@ import { prisma } from "@ltex/db";
 import { getCurrentUser } from "@/lib/auth/manager-auth";
 import { buildYoutubeDescription } from "@/lib/manager/video-description";
 import { getVideoLinks } from "@/lib/manager/video-links";
+import {
+  loadProductAttributeOptions,
+  type AttrOption,
+} from "@/lib/manager/product-attributes";
 
 /**
  * POST /api/v1/manager/video-tasks/[id]/description
@@ -49,17 +53,26 @@ export async function POST(
     select: { code1C: true },
   });
 
-  const links = await getVideoLinks();
+  const [links, attrs] = await Promise.all([
+    getVideoLinks(),
+    loadProductAttributeOptions(),
+  ]);
   const lotUrl = `${SITE_BASE}/lot/${encodeURIComponent(task.barcode)}`;
+
+  // Характеристики зберігаються як коди довідників — у опис пишемо їх назви.
+  const labelOf = (opts: AttrOption[], code: string | null): string | null => {
+    if (!code) return code;
+    return opts.find((o) => o.value === code)?.label ?? code;
+  };
 
   const text = buildYoutubeDescription(
     {
-      season: task.season,
-      quality: task.quality,
+      season: labelOf(attrs.seasons, task.season),
+      quality: labelOf(attrs.quality, task.quality),
       unitsCount: task.unitsCount,
       unitWeight: task.unitWeight,
       lotWeightKg: task.lotWeightKg,
-      gender: task.gender,
+      gender: labelOf(attrs.genders, task.gender),
       sizes: task.sizes,
       lotUrl,
       barcode: task.barcode,

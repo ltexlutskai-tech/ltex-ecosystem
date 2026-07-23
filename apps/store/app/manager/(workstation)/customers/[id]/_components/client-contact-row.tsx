@@ -60,6 +60,10 @@ export function ClientContactRow({ phone, label, messenger, masked }: Props) {
         {telUrl && (
           <a
             href={telUrl}
+            onClick={(e) => {
+              e.preventDefault();
+              window.open(telUrl, "_blank", "noopener,noreferrer");
+            }}
             aria-label={`Подзвонити на ${formatted}`}
             title="Подзвонити"
             className="flex h-7 w-7 items-center justify-center rounded-md bg-gray-100 text-gray-700 hover:bg-gray-200"
@@ -70,6 +74,10 @@ export function ClientContactRow({ phone, label, messenger, masked }: Props) {
         {viberUrl && (
           <a
             href={viberUrl}
+            onClick={(e) => {
+              e.preventDefault();
+              window.open(viberUrl, "_blank", "noopener,noreferrer");
+            }}
             aria-label={`Viber: ${formatted}`}
             title="Viber"
             className="flex h-7 w-7 items-center justify-center rounded-md bg-purple-50 hover:bg-purple-100"

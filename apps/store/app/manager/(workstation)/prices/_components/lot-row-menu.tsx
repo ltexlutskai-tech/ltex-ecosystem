@@ -154,6 +154,7 @@ export function LotRowMenu({
           productName={activeTarget.productName}
           articleCode={activeTarget.articleCode}
           productId={activeTarget.productId}
+          barcode={activeTarget.barcode}
           sellerName={sellerName}
         />
       )}

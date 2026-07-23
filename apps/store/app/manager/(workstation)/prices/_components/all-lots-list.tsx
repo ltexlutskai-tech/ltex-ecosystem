@@ -47,7 +47,8 @@ function formatDateShort(iso: string | null): string {
   });
 }
 
-/** Бронь-комірка/підпис: ім'я клієнта + дата «до», бейдж «ваша». */
+/** Бронь-комірка/підпис: показуємо МЕНЕДЖЕРА, що забронював (не контрагента) +
+ *  дата «до», бейдж «ваша». */
 function BookingCell({ lot }: { lot: LotListItem }) {
   if (lot.status === "in_transit") {
     return (
@@ -67,7 +68,7 @@ function BookingCell({ lot }: { lot: LotListItem }) {
   return (
     <div className="space-y-0.5">
       <span className={`inline-block rounded px-1.5 py-0.5 ${badgeClass}`}>
-        {lot.reservedForName ?? "Заброньовано"}
+        {lot.reservedByName ?? lot.reservedForName ?? "Заброньовано"}
       </span>
       <div className="text-[11px] text-gray-500">
         {lot.reservedUntilIso

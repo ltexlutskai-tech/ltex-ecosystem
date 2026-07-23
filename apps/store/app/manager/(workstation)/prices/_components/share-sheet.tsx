@@ -11,7 +11,7 @@ import {
   Textarea,
   useToast,
 } from "@ltex/ui";
-import { phoneToViberUrl } from "@ltex/shared";
+import { phoneToViberUrl, phoneToWhatsAppUrl } from "@ltex/shared";
 
 /**
  * Manager — єдине вікно «Поділитися».
@@ -34,12 +34,31 @@ interface Props {
   /** Готовий текст (initial) — користувач може редагувати перед відправкою. */
   text: string;
   /**
-   * Телефон конкретного клієнта. Коли заданий — зʼявляється кнопка «Відкрити
-   * Viber клієнта»: копіює текст у буфер і відкриває чат саме цього клієнта
-   * (текст не передаємо в deep-link — Viber обрізає довгу кирилицю; менеджер
-   * вставляє з буфера).
+   * Телефон конкретного клієнта. Коли заданий — зʼявляються кнопки «Viber
+   * клієнта» / «WhatsApp клієнта»: копіюють текст у буфер і відкривають чат
+   * саме цього клієнта (текст не передаємо в deep-link — месенджери обрізають
+   * довгу кирилицю; менеджер вставляє з буфера).
    */
   clientPhone?: string | null;
+  /**
+   * Викликається, коли менеджер відкрив месенджер клієнта (Viber/WhatsApp) —
+   * тобто фактично надіслав. Дає змогу авто-закрити повʼязане нагадування.
+   */
+  onOpenedClientMessenger?: () => void;
+}
+
+/**
+ * Відкриває deep-link месенджера у НОВІЙ вкладці (`window.open`), а не через
+ * `location.href` — інакше всередині iframe-вкладки менеджерки перехід затирав
+ * би сторінку («нічого не відкривалось» / бланк). Нова вкладка передає схему
+ * ОС (Viber/WhatsApp) і сама закривається.
+ */
+function openDeepLink(url: string): void {
+  try {
+    window.open(url, "_blank", "noopener,noreferrer");
+  } catch {
+    // ignore
+  }
 }
 
 /** Чи доступний Web Share API (мобільні браузери / частина десктопних). */
@@ -55,11 +74,13 @@ export function ShareSheet({
   title,
   text,
   clientPhone,
+  onOpenedClientMessenger,
 }: Props) {
   const { toast } = useToast();
   const [draft, setDraft] = useState(text);
   const [canShare, setCanShare] = useState(false);
   const viberUrl = phoneToViberUrl(clientPhone);
+  const whatsAppUrl = phoneToWhatsAppUrl(clientPhone);
 
   // Скидаємо текст при кожному новому відкритті.
   useEffect(() => {
@@ -94,19 +115,21 @@ export function ShareSheet({
     }
   }
 
-  /** Копіює текст у буфер і відкриває чат клієнта у Viber. */
-  async function handleOpenClientViber() {
-    if (!viberUrl) return;
+  /** Копіює текст у буфер, відкриває чат клієнта у месенджері (нова вкладка),
+   *  і сигналить батьку, що надіслано (авто-закриття нагадування). */
+  async function openClientMessenger(url: string) {
     try {
       await navigator.clipboard.writeText(draft);
       toast({
         title: "Текст скопійовано",
-        description: "Відкриваємо Viber клієнта — вставте повідомлення у чат.",
+        description:
+          "Відкриваємо месенджер клієнта — вставте повідомлення у чат.",
       });
     } catch {
       // Навіть якщо копіювання не вдалось — все одно відкриваємо чат.
     }
-    window.location.href = viberUrl;
+    openDeepLink(url);
+    onOpenedClientMessenger?.();
   }
 
   return (
@@ -138,9 +161,18 @@ export function ShareSheet({
               <Button
                 type="button"
                 variant="outline"
-                onClick={handleOpenClientViber}
+                onClick={() => openClientMessenger(viberUrl)}
               >
-                Відкрити Viber клієнта
+                Viber клієнта
+              </Button>
+            )}
+            {whatsAppUrl && (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => openClientMessenger(whatsAppUrl)}
+              >
+                WhatsApp клієнта
               </Button>
             )}
             {canShare && (

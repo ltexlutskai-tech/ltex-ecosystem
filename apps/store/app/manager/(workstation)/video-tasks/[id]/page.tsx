@@ -1,6 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import { prisma } from "@ltex/db";
 import { getCurrentUser } from "@/lib/auth/manager-auth";
+import { loadProductAttributeOptions } from "@/lib/manager/product-attributes";
 import { AutoRefresh } from "../../_components/auto-refresh";
 import {
   VideoTaskDetail,
@@ -8,7 +9,7 @@ import {
 } from "./_components/video-task-detail";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "Відеозавдання — L-TEX Manager" };
+export const metadata = { title: "Відеозона — L-TEX Manager" };
 
 export default async function VideoTaskDetailPage({
   params,
@@ -21,6 +22,8 @@ export default async function VideoTaskDetailPage({
   const { id } = await params;
   const task = await prisma.mgrVideoTask.findUnique({ where: { id } });
   if (!task) notFound();
+
+  const attrs = await loadProductAttributeOptions();
 
   const view: VideoTaskView = {
     id: task.id,
@@ -48,7 +51,13 @@ export default async function VideoTaskDetailPage({
   return (
     <div className="mx-auto max-w-3xl space-y-4">
       <AutoRefresh />
-      <VideoTaskDetail task={view} role={user.role} />
+      <VideoTaskDetail
+        task={view}
+        role={user.role}
+        seasonOptions={attrs.seasons}
+        qualityOptions={attrs.quality}
+        genderOptions={attrs.genders}
+      />
     </div>
   );
 }

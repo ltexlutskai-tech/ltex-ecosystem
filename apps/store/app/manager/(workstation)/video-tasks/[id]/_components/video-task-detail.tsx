@@ -4,6 +4,12 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button, Input, useToast } from "@ltex/ui";
 import { usePortalConfirm } from "../../../_components/use-portal-confirm";
+import { BarcodeInput } from "../../../sales/new/_components/barcode-input";
+
+export interface AttrOption {
+  value: string;
+  label: string;
+}
 
 export interface VideoTaskView {
   id: string;
@@ -41,9 +47,15 @@ const BRING_ROLES = ["warehouse", "admin", "owner"];
 export function VideoTaskDetail({
   task,
   role,
+  seasonOptions,
+  qualityOptions,
+  genderOptions,
 }: {
   task: VideoTaskView;
   role: string;
+  seasonOptions: AttrOption[];
+  qualityOptions: AttrOption[];
+  genderOptions: AttrOption[];
 }) {
   const router = useRouter();
   const { confirm, dialog } = usePortalConfirm();
@@ -94,7 +106,12 @@ export function VideoTaskDetail({
       ) : null}
 
       {task.status === "filming" && FILM_ROLES.includes(role) ? (
-        <FilmSection task={task} />
+        <FilmSection
+          task={task}
+          seasonOptions={seasonOptions}
+          qualityOptions={qualityOptions}
+          genderOptions={genderOptions}
+        />
       ) : null}
 
       {task.status === "done" ? <DoneSection task={task} /> : null}
@@ -137,37 +154,37 @@ export function VideoTaskDetail({
   );
 }
 
-/** Крок складу: взяти будь-який вільний мішок і ВІДСКАНУВАТИ його штрихкод. */
+/**
+ * Крок складу: взяти будь-який вільний мішок і ВІДСКАНУВАТИ його штрихкод
+ * (камерою або сканером/вручну — через спільний `BarcodeInput`).
+ */
 function BringSection({ task }: { task: VideoTaskView }) {
   const router = useRouter();
   const { toast } = useToast();
-  const [barcode, setBarcode] = useState("");
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  async function bring() {
-    const code = barcode.trim();
-    if (!code) return;
+  async function bring(code: string) {
+    const barcode = code.trim();
+    if (!barcode || busy) return;
     setBusy(true);
+    setError(null);
     try {
       const res = await fetch(`/api/v1/manager/video-tasks/${task.id}/bring`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ barcode: code }),
+        body: JSON.stringify({ barcode }),
       });
       const data = (await res.json().catch(() => ({}))) as {
         error?: string;
         barcode?: string;
       };
       if (!res.ok) {
-        toast({
-          title: data.error ?? "Не вдалося",
-          variant: "destructive",
-        });
+        setError(data.error ?? "Не вдалося");
+        toast({ title: data.error ?? "Не вдалося", variant: "destructive" });
         return;
       }
-      toast({
-        title: `Мішок ${data.barcode ?? code} передано у відеозону`,
-      });
+      toast({ title: `Мішок ${data.barcode ?? barcode} передано у відеозону` });
       router.refresh();
     } finally {
       setBusy(false);
@@ -178,36 +195,83 @@ function BringSection({ task }: { task: VideoTaskView }) {
     <div className="space-y-3 rounded-md border bg-white p-4">
       <p className="text-sm text-gray-600">
         Візьміть будь-який вільний мішок цього товару, відскануйте його штрихкод
-        і віднесіть у відеозону. Мішок одразу забронюється на клієнта.
+        (камерою чи сканером) — і віднесіть у відеозону. Мішок одразу
+        забронюється на клієнта.
       </p>
-      <form
-        className="flex flex-wrap items-end gap-2"
-        onSubmit={(e) => {
-          e.preventDefault();
-          void bring();
-        }}
-      >
-        <div className="min-w-[180px] flex-1">
-          <label className="mb-1 block text-sm font-medium text-gray-700">
-            Штрихкод мішка
-          </label>
-          <Input
-            value={barcode}
-            onChange={(e) => setBarcode(e.target.value)}
-            placeholder="Відскануйте ШК"
-            autoFocus
-          />
+      {task.requestedBarcode ? (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-md bg-amber-50 p-2 text-sm">
+          <span>
+            Менеджер просив конкретний мішок:{" "}
+            <span className="font-mono">{task.requestedBarcode}</span>
+          </span>
+          <Button
+            type="button"
+            size="sm"
+            disabled={busy}
+            onClick={() => bring(task.requestedBarcode!)}
+          >
+            Передати цей мішок
+          </Button>
         </div>
-        <Button type="submit" disabled={busy || !barcode.trim()}>
-          {busy ? "…" : "Передати у відеозону"}
-        </Button>
-      </form>
+      ) : null}
+      <div>
+        <label className="mb-1 block text-sm font-medium text-gray-700">
+          Штрихкод мішка
+        </label>
+        <BarcodeInput onCode={bring} error={error} disabled={busy} />
+      </div>
+    </div>
+  );
+}
+
+/** Селект характеристики з довідника (сезон/сорт/стать). Показує поточне
+ *  значення навіть якщо його немає у списку (легасі-код). */
+function AttrField({
+  label,
+  value,
+  options,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  options: AttrOption[];
+  onChange: (v: string) => void;
+}) {
+  const known = options.some((o) => o.value === value);
+  return (
+    <div>
+      <label className="mb-1 block text-sm font-medium text-gray-700">
+        {label}
+      </label>
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="h-10 w-full rounded-md border border-input bg-white px-3 text-sm"
+      >
+        <option value="">— не вказано —</option>
+        {!known && value ? <option value={value}>{value}</option> : null}
+        {options.map((o) => (
+          <option key={o.value} value={o.value}>
+            {o.label}
+          </option>
+        ))}
+      </select>
     </div>
   );
 }
 
 /** Крок відеозони: характеристики + відео + опис + Готово. */
-function FilmSection({ task }: { task: VideoTaskView }) {
+function FilmSection({
+  task,
+  seasonOptions,
+  qualityOptions,
+  genderOptions,
+}: {
+  task: VideoTaskView;
+  seasonOptions: AttrOption[];
+  qualityOptions: AttrOption[];
+  genderOptions: AttrOption[];
+}) {
   const router = useRouter();
   const { toast } = useToast();
   const [form, setForm] = useState({
@@ -398,33 +462,24 @@ function FilmSection({ task }: { task: VideoTaskView }) {
             = вага лота ÷ кількість одиниць (можна змінити)
           </p>
         </div>
-        <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">
-            Сезон
-          </label>
-          <Input
-            value={form.season}
-            onChange={(e) => set("season")(e.target.value)}
-          />
-        </div>
-        <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">
-            Сорт
-          </label>
-          <Input
-            value={form.quality}
-            onChange={(e) => set("quality")(e.target.value)}
-          />
-        </div>
-        <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">
-            Стать
-          </label>
-          <Input
-            value={form.gender}
-            onChange={(e) => set("gender")(e.target.value)}
-          />
-        </div>
+        <AttrField
+          label="Сезон"
+          value={form.season}
+          options={seasonOptions}
+          onChange={set("season")}
+        />
+        <AttrField
+          label="Сорт"
+          value={form.quality}
+          options={qualityOptions}
+          onChange={set("quality")}
+        />
+        <AttrField
+          label="Стать"
+          value={form.gender}
+          options={genderOptions}
+          onChange={set("gender")}
+        />
         <div className="sm:col-span-2">
           <label className="mb-1 block text-sm font-medium text-gray-700">
             Розміри
@@ -436,7 +491,8 @@ function FilmSection({ task }: { task: VideoTaskView }) {
         </div>
       </div>
       <p className="text-xs text-gray-400">
-        Стать і розміри підтягнуто з картки товару — за потреби скоригуйте.
+        Сезон / сорт / стать / розміри підтягнуто з картки товару (довідники) —
+        за потреби скоригуйте.
       </p>
 
       <div>

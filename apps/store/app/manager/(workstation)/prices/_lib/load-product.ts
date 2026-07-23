@@ -56,6 +56,8 @@ export interface ProductLotVM {
   // ── Бронь (Етап 4) — для дисплею в таблиці лотів картки товару ──
   /** Ім'я клієнта, на якого заброньовано (для показу). */
   reservedForName: string | null;
+  /** Ім.я менеджера, що забронював (показуємо у колонці «Бронь»). */
+  reservedByName: string | null;
   /** Дата «до якої діє бронь» (ISO) або null. */
   reservedUntilIso: string | null;
   /** Активна бронь (reservedUntil ще не минув). */
@@ -225,6 +227,7 @@ export async function loadProductCard(
           isOpen: true,
           videoDate: true,
           reservedForName: true,
+          reservedByName: true,
           reservedByUserId: true,
           reservedUntil: true,
         },
@@ -307,6 +310,7 @@ export async function loadProductCard(
         videoDateIso: l.videoDate ? l.videoDate.toISOString() : null,
         isReserved: l.status === "reserved",
         reservedForName: l.reservedForName,
+        reservedByName: l.reservedByName,
         reservedUntilIso: l.reservedUntil
           ? l.reservedUntil.toISOString()
           : null,

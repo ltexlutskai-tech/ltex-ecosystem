@@ -1,10 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { Check, CheckCircle2, Clock, Pencil, Trash2 } from "lucide-react";
 import { Badge, Button, useToast } from "@ltex/ui";
 import { ShareSheet } from "../../prices/_components/share-sheet";
+import { openManagerTab } from "../../_components/open-manager-tab";
 import { buildReminderActions } from "@/lib/manager/reminder-actions";
 import { PERIOD_BADGE, type ReminderRow } from "./types";
 
@@ -32,7 +32,6 @@ export function ReminderListItem({
   onChanged,
 }: Props) {
   const { toast } = useToast();
-  const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [editing, setEditing] = useState(false);
   const [editBody, setEditBody] = useState(reminder.body);
@@ -103,11 +102,24 @@ export function ReminderListItem({
     void patch({ action: "snooze", snoozedUntil: d.toISOString() });
   }
 
-  /** Виконати контекстну дію (крім video-share, що має власний fetch). */
+  /** Виконати контекстну дію (крім video-share, що має власний fetch).
+   *  Внутрішні маршрути відкриваємо в НОВІЙ вкладці менеджерки (вкладка з
+   *  нагадуваннями лишається окремо); зовнішні протоколи (tel:/viber:) — у
+   *  новій вкладці браузера, щоб не затирати shell. */
   function runAction(href: string | undefined, internal: boolean) {
     if (!href) return;
-    if (internal) router.push(href);
-    else window.location.href = href;
+    if (internal) {
+      openManagerTab(href);
+    } else {
+      window.open(href, "_blank", "noopener,noreferrer");
+    }
+  }
+
+  /** Авто-закрити нагадування «надіслати відео», коли менеджер відкрив
+   *  месенджер клієнта з вікна «Поділитися». */
+  function completeAfterShare() {
+    setShareOpen(false);
+    void patch({ action: "complete" });
   }
 
   /** Дія «Надіслати відео» — будує текст на сервері й відкриває ShareSheet. */
@@ -372,6 +384,7 @@ export function ReminderListItem({
         title="Надіслати відео клієнту"
         text={shareText}
         clientPhone={reminder.client?.phone}
+        onOpenedClientMessenger={completeAfterShare}
       />
     </>
   );

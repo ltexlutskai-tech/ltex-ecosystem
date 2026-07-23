@@ -325,7 +325,7 @@ function BookingCell({ lot }: { lot: ProductLotVM }) {
   return (
     <div className="space-y-0.5">
       <span className={`inline-block rounded px-1.5 py-0.5 ${badgeClass}`}>
-        {lot.reservedForName ?? "Заброньовано"}
+        {lot.reservedByName ?? lot.reservedForName ?? "Заброньовано"}
       </span>
       <div className="text-[11px] text-gray-500">
         {lot.reservedUntilIso

@@ -7,6 +7,7 @@ import { ChatUnreadBadge } from "./chat-unread-badge";
 import { DeletionsBadge } from "./deletions-badge";
 import { MessengerUnreadBadge } from "./messenger-unread-badge";
 import { PendingBadge } from "./pending-badge";
+import { RemindersBadge } from "./reminders-badge";
 import { TasksBadge } from "./tasks-badge";
 import { VideoTasksBadge } from "./video-tasks-badge";
 import { WarehouseTasksBadge } from "./warehouse-tasks-badge";
@@ -37,6 +38,8 @@ function badgeNode(badge: SidebarBadge | undefined): ReactNode {
       return <WarehouseTasksBadge />;
     case "video-tasks":
       return <VideoTasksBadge />;
+    case "reminders":
+      return <RemindersBadge />;
     case "deletions":
       return <DeletionsBadge />;
     default:
