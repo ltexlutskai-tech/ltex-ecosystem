@@ -9,6 +9,7 @@ import { Pagination } from "@/components/store/pagination";
 import { Breadcrumbs } from "@/components/store/breadcrumbs";
 import { InfiniteScrollCatalog } from "@/components/store/infinite-scroll-catalog";
 import { CatalogLayoutToggle } from "@/components/store/catalog-layout-toggle";
+import { WelcomeTour } from "@/components/store/welcome-tour";
 import { getDictionary } from "@/lib/i18n";
 
 const dict = getDictionary();
@@ -109,6 +110,7 @@ export default async function CatalogPage({
 
   return (
     <div className="container mx-auto px-4 py-6">
+      <WelcomeTour />
       <Breadcrumbs items={[{ label: "Каталог" }]} />
 
       <div className="mt-4 flex items-center justify-between">

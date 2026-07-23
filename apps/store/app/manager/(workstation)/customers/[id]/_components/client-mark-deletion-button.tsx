@@ -144,10 +144,11 @@ export function ClientMarkDeletionButton({ clientId }: { clientId: string }) {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="inline-flex h-10 items-center justify-center gap-1.5 rounded-md border border-red-200 bg-white px-4 text-sm font-medium text-red-700 hover:bg-red-50"
+        title="Позначити на вилучення"
+        aria-label="Позначити на вилучення"
+        className="inline-flex h-10 w-10 items-center justify-center rounded-md border border-red-200 bg-white text-red-700 hover:bg-red-50"
       >
         <Trash2 className="h-4 w-4" />
-        Позначити на вилучення
       </button>
       {dialog}
     </>

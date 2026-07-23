@@ -109,6 +109,14 @@ export const DICTIONARIES: readonly DictionaryEntry[] = [
     status: "ready",
   },
   {
+    key: "video_links",
+    label: "Посилання відеоопису (Відеозона)",
+    description:
+      "Контакти, сайти, соцмережі та хештеги, що підставляються у YouTube-опис відеоогляду.",
+    href: "/manager/video-links",
+    status: "ready",
+  },
+  {
     key: "routes",
     label: "Маршрути",
     description: "Маршрути виїздів торгових агентів.",

@@ -117,6 +117,8 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       ok: true,
+      // Новий покупець → фронт веде на каталог і показує туторіал.
+      created: wasCreated,
       customer: { id: customer.id, name },
     });
   } catch (err) {

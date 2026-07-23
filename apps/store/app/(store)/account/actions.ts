@@ -56,7 +56,9 @@ export async function updateProfileAction(
       name: data.name,
       email: data.email && data.email.length > 0 ? data.email : null,
       telegram: data.telegram ?? null,
-      city: data.city ?? null,
+      // Селект «Область» пише в канонічне поле `region` (реєстрація/кошик
+      // читають саме його); легасі `city` не чіпаємо.
+      region: data.city ?? null,
     },
   });
 

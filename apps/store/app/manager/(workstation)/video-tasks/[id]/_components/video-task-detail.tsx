@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Button, Input, useToast } from "@ltex/ui";
 import { usePortalConfirm } from "../../../_components/use-portal-confirm";
 import { BarcodeInput } from "../../../sales/new/_components/barcode-input";
+import { videoTaskStatusMeta } from "@/lib/manager/video-task-status";
 
 export interface AttrOption {
   value: string;
@@ -41,13 +42,6 @@ export interface VideoTaskView {
   bags: VideoBagView[];
 }
 
-const STATUS_META: Record<string, { label: string; cls: string }> = {
-  new: { label: "Принести мішки", cls: "bg-amber-100 text-amber-700" },
-  filming: { label: "На зйомці", cls: "bg-blue-100 text-blue-700" },
-  done: { label: "Готово", cls: "bg-green-100 text-green-700" },
-  cancelled: { label: "Скасовано", cls: "bg-gray-100 text-gray-500" },
-};
-
 const FILM_ROLES = ["videozone", "admin", "owner"];
 const BRING_ROLES = ["warehouse", "admin", "owner"];
 
@@ -65,7 +59,7 @@ export function VideoTaskDetail({
   genderOptions: AttrOption[];
 }) {
   const router = useRouter();
-  const meta = STATUS_META[task.status] ?? STATUS_META.new!;
+  const meta = videoTaskStatusMeta(task);
   // Відеозона не бачить клієнта — лише артикул, назву товару та менеджера.
   const hideClient = role === "videozone";
 

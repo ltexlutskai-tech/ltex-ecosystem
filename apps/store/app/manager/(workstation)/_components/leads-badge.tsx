@@ -5,16 +5,15 @@ import { useCallback, useEffect, useState } from "react";
 const POLL_INTERVAL_MS = 30_000;
 
 /**
- * Лічильник відкритих завдань «на мене» для сайдбару — сумарний по всіх типах
- * (доручення + відправлення складу + відеозона, залежно від ролі; агрегацію
- * робить `tasks/badge-count`). Polling 30с + при поверненні видимості.
+ * Індикатор активних лідів з сайту на пункті «Клієнти» у сайдбарі.
+ * Polling 30с + при поверненні видимості. Помилки ковтаються.
  */
-export function TasksBadge() {
+export function LeadsBadge() {
   const [total, setTotal] = useState(0);
 
   const refetch = useCallback(async () => {
     try {
-      const r = await fetch("/api/v1/manager/tasks/badge-count", {
+      const r = await fetch("/api/v1/manager/leads/count", {
         cache: "no-store",
       });
       if (!r.ok) return;
@@ -41,8 +40,8 @@ export function TasksBadge() {
   if (total <= 0) return null;
   return (
     <span
-      className="rounded-full bg-amber-500 px-2 py-0.5 text-xs font-medium text-white"
-      title="Відкриті завдання для вас"
+      className="rounded-full bg-blue-500 px-2 py-0.5 text-xs font-medium text-white"
+      title="Нові ліди з сайту"
     >
       {total > 9 ? "9+" : total}
     </span>

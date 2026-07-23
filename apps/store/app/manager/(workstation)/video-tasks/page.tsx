@@ -4,16 +4,10 @@ import { prisma } from "@ltex/db";
 import { getCurrentUser } from "@/lib/auth/manager-auth";
 import { AutoRefresh } from "../_components/auto-refresh";
 import { TaskTypeTabs } from "../_components/task-type-tabs";
+import { videoTaskStatusMeta } from "@/lib/manager/video-task-status";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Відеозона — L-TEX Manager" };
-
-const STATUS_META: Record<string, { label: string; cls: string }> = {
-  new: { label: "Принести мішок", cls: "bg-amber-100 text-amber-700" },
-  filming: { label: "На зйомці", cls: "bg-blue-100 text-blue-700" },
-  done: { label: "Готово", cls: "bg-green-100 text-green-700" },
-  cancelled: { label: "Скасовано", cls: "bg-gray-100 text-gray-500" },
-};
 
 function firstParam(v: string | string[] | undefined): string | undefined {
   return Array.isArray(v) ? v[0] : v;
@@ -126,7 +120,7 @@ export default async function VideoTasksPage({
       ) : (
         <div className="grid gap-2">
           {tasks.map((t) => {
-            const meta = STATUS_META[t.status] ?? STATUS_META.new!;
+            const meta = videoTaskStatusMeta(t);
             return (
               <Link
                 key={t.id}

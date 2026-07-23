@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { prisma } from "@ltex/db";
 import { getCurrentUser } from "@/lib/auth/manager-auth";
 import { getCurrentRate } from "@/lib/exchange-rate";
+import { phoneMatchKey } from "@ltex/shared";
 import { canViewOrder } from "@/lib/manager/order-ownership";
 import { getOwnedClientIds } from "@/lib/manager/client-visibility";
 import { canEditOrder, isOrderLocked } from "@/lib/manager/order-status";
@@ -131,11 +132,15 @@ export default async function ManagerOrderDetailPage({
 
   // Допоміжні дані для форми (тільки коли редагуємо).
   // Резолв MgrClient (для деталей + лінка на картку): за code1C, а для сайтових
-  // клієнтів без code1C — за основним телефоном (7.2 фікс навігації).
+  // клієнтів без code1C — за телефоном ПО КЛЮЧУ (останні 9 цифр, phoneKey) —
+  // формат номера у Customer і MgrClient може відрізнятись.
+  const phoneKey = order.customer.phone
+    ? phoneMatchKey(order.customer.phone)
+    : null;
   const mgrWhere = order.customer.code1C
     ? { code1C: order.customer.code1C }
-    : order.customer.phone
-      ? { phonePrimary: order.customer.phone }
+    : phoneKey
+      ? { phoneKey }
       : null;
   const [exchangeRate, mgr, ownedIds] = await Promise.all([
     // Задача B: живий курс — лише дефолт/fallback. Форма редагування існуючого

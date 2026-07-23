@@ -47,6 +47,7 @@ export default async function AccountPage() {
       email: true,
       telegram: true,
       city: true,
+      region: true,
       notes: true,
     },
   });
@@ -94,7 +95,7 @@ export default async function AccountPage() {
                 phone: customer.phone ?? "",
                 email: customer.email,
                 telegram: customer.telegram,
-                city: customer.city,
+                city: customer.region ?? customer.city,
               }}
             />
           </CardContent>

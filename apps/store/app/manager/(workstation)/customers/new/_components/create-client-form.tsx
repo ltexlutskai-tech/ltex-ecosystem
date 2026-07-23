@@ -34,6 +34,9 @@ interface Props {
     | "expeditor"
     | "bookkeeper"
     | "videozone";
+  /** Префіл (напр. створення з картки замовлення сайтового клієнта). */
+  initialName?: string;
+  initialPhone?: string;
 }
 
 export function CreateClientForm({
@@ -43,14 +46,16 @@ export function CreateClientForm({
   assortmentCodes,
   agents,
   userRole,
+  initialName = "",
+  initialPhone = "",
 }: Props) {
   const router = useRouter();
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [phoneDuplicates, setPhoneDuplicates] = useState<DuplicateHit[]>([]);
   const [form, setForm] = useState({
-    name: "",
-    phonePrimary: "",
+    name: initialName,
+    phonePrimary: initialPhone,
     tradePointName: "",
     region: "",
     city: "",

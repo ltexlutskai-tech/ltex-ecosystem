@@ -18,19 +18,24 @@ interface CartClientProps {
   /** Префіл з кабінету покупця (getCurrentCustomer), якщо залогінений. */
   initialName?: string;
   initialPhone?: string;
+  /** Область (slug) з профілю — щоб не перепитувати обране при реєстрації. */
+  initialRegion?: string;
+  initialTelegram?: string;
 }
 
 export function CartClient({
   rate,
   initialName = "",
   initialPhone = "",
+  initialRegion = "",
+  initialTelegram = "",
 }: CartClientProps) {
   const { items, removeItem, clearCart, totalWeight, totalEur, itemCount } =
     useCart();
   const [customerName, setCustomerName] = useState(initialName);
   const [customerPhone, setCustomerPhone] = useState(initialPhone);
-  const [customerTelegram, setCustomerTelegram] = useState("");
-  const [customerRegion, setCustomerRegion] = useState("");
+  const [customerTelegram, setCustomerTelegram] = useState(initialTelegram);
+  const [customerRegion, setCustomerRegion] = useState(initialRegion);
   const [notes, setNotes] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [orderResult, setOrderResult] = useState<{

@@ -69,10 +69,19 @@ export function LoginForm({ returnTo }: { returnTo: string }) {
         setIsSubmitting(false);
         return;
       }
+      const data = (await res.json().catch(() => ({}))) as {
+        created?: boolean;
+      };
       try {
         localStorage.setItem(NAME_HINT_KEY, name.trim());
       } catch {}
-      router.replace(returnTo);
+      // Нового покупця ведемо на каталог із туторіалом «як користуватись»;
+      // наявного — куди йшов (returnTo).
+      if (data.created) {
+        router.replace("/catalog?welcome=1");
+      } else {
+        router.replace(returnTo);
+      }
       router.refresh();
     } catch {
       setError(dict.auth.networkError);

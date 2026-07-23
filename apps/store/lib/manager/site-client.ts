@@ -1,5 +1,5 @@
 import { prisma } from "@ltex/db";
-import { normalizePhone } from "@ltex/shared";
+import { normalizePhone, phoneMatchKey } from "@ltex/shared";
 import { matchClientByPhone } from "@/lib/chat/phone-match";
 import { getRegionLabel, isValidRegionSlug } from "@/lib/constants/regions";
 import { markLeadsConverted } from "@/lib/manager/site-lead";
@@ -80,13 +80,32 @@ export async function resolveOrCreateSiteClient(opts: {
     }
 
     const normalized = normalizePhone(opts.phone);
-    const agentUserId = await regionAgentId();
+    let agentUserId = await regionAgentId();
+    let regionLabel = regionSlug ? getRegionLabel(regionSlug) : null;
+
+    // Кошик міг не передати область — тоді успадковуємо її та менеджера з
+    // АКТИВНОГО ліда цього телефону (створеного при реєстрації): інформацію
+    // записуємо один раз і далі підставляємо, а не губимо при конвертації.
+    if ((!agentUserId || !regionLabel) && normalized) {
+      const leadKey = phoneMatchKey(opts.phone);
+      const lead = leadKey
+        ? await prisma.mgrLead.findFirst({
+            where: { phoneKey: leadKey, status: { not: "converted" } },
+            orderBy: { createdAt: "desc" },
+            select: { region: true, agentUserId: true },
+          })
+        : null;
+      if (lead) {
+        if (!regionLabel && lead.region) regionLabel = lead.region;
+        if (!agentUserId && lead.agentUserId) agentUserId = lead.agentUserId;
+      }
+    }
 
     const client = await prisma.mgrClient.create({
       data: {
         name: opts.name.trim() || normalized || "Клієнт із сайту",
         phonePrimary: normalized,
-        region: regionSlug ? getRegionLabel(regionSlug) : null,
+        region: regionLabel,
         agentUserId,
       },
       select: { id: true },

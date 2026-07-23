@@ -283,6 +283,7 @@ export type SidebarBadge =
   | "warehouse-tasks"
   | "video-tasks"
   | "reminders"
+  | "leads"
   | "deletions";
 
 export interface SidebarItem {
@@ -348,7 +349,9 @@ export function getSidebarSections(role: ManagerRole): SidebarItem[][] {
     secondary.map((l) =>
       l.href === "/manager/reminders"
         ? { ...l, badge: "reminders" as const }
-        : { ...l },
+        : l.href === "/manager/customers"
+          ? { ...l, badge: "leads" as const }
+          : { ...l },
     ),
   );
 

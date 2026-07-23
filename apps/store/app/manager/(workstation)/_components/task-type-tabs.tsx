@@ -59,6 +59,16 @@ function tabsForRole(role: string): TabDef[] {
   return ALL_TABS.filter((t) => t.key !== "warehouse");
 }
 
+/**
+ * Чи показувати лічильник на вкладці. Менеджеру відеозона — лише ЗАПИСИ зі
+ * статусами (він не виконавець цих завдань, індикатор йому не потрібен);
+ * рахують виконавці — склад/відеозона/адмін.
+ */
+function showCount(role: string, key: TaskTabKey): boolean {
+  if (key !== "video") return true;
+  return ["warehouse", "admin", "owner"].includes(role);
+}
+
 const POLL_INTERVAL_MS = 30_000;
 
 export function TaskTypeTabs({
@@ -74,16 +84,18 @@ export function TaskTypeTabs({
   const refetch = useCallback(async () => {
     const next: Record<string, number> = {};
     await Promise.all(
-      tabs.map(async (t) => {
-        try {
-          const r = await fetch(t.countUrl, { cache: "no-store" });
-          if (!r.ok) return;
-          const j = (await r.json()) as Record<string, unknown>;
-          next[t.key] = t.pick(j);
-        } catch {
-          // silent
-        }
-      }),
+      tabs
+        .filter((t) => showCount(role, t.key))
+        .map(async (t) => {
+          try {
+            const r = await fetch(t.countUrl, { cache: "no-store" });
+            if (!r.ok) return;
+            const j = (await r.json()) as Record<string, unknown>;
+            next[t.key] = t.pick(j);
+          } catch {
+            // silent
+          }
+        }),
     );
     setCounts((prev) => ({ ...prev, ...next }));
     // eslint-disable-next-line react-hooks/exhaustive-deps

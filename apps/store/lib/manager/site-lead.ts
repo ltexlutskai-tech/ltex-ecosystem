@@ -32,9 +32,19 @@ export async function createSiteLead(opts: {
     const key = phoneMatchKey(opts.phone);
     if (!normalized || !key) return;
 
-    // Уже повноцінний клієнт → не лід.
+    // Уже повноцінний клієнт → не лід. АЛЕ архівного/вилученого клієнта
+    // трактуємо як «не існує»: створюємо лід знову + сповіщаємо адміністратора
+    // про ситуацію (рішення user, 2026-07-23).
+    let archivedClientName: string | null = null;
     const client = await matchClientByPhone(normalized);
-    if (client) return;
+    if (client) {
+      const row = await prisma.mgrClient.findUnique({
+        where: { id: client.clientId },
+        select: { name: true, archived: true, markedForDeletion: true },
+      });
+      if (row && !row.archived && !row.markedForDeletion) return;
+      archivedClientName = row?.name ?? null;
+    }
 
     // Дедуп: активний лід із цим телефоном уже є (звірка по 9 цифрах).
     const existing = await prisma.mgrLead.findFirst({
@@ -57,9 +67,10 @@ export async function createSiteLead(opts: {
         )?.userId ?? null)
       : null;
 
+    const displayName = opts.name.trim() || normalized;
     await prisma.mgrLead.create({
       data: {
-        name: opts.name.trim() || normalized,
+        name: displayName,
         phone: normalized,
         region,
         agentUserId,
@@ -68,6 +79,62 @@ export async function createSiteLead(opts: {
         status: "new",
       },
     });
+
+    // Сповіщення (MgrReminder → дзвіночок): менеджеру за областю, а без нього —
+    // адмінам/власникам. Кейс архівного клієнта — окреме сповіщення адмінам.
+    await notifyAboutNewLead({
+      name: displayName,
+      phone: normalized,
+      region,
+      agentUserId,
+      archivedClientName,
+    });
+  } catch {
+    // best-effort
+  }
+}
+
+/** Сповіщення про новий лід: агенту області або адмінам (fallback). */
+async function notifyAboutNewLead(opts: {
+  name: string;
+  phone: string;
+  region: string | null;
+  agentUserId: string | null;
+  archivedClientName: string | null;
+}): Promise<void> {
+  try {
+    const admins = await prisma.user.findMany({
+      where: { isActive: true, role: { in: ["admin", "owner"] } },
+      select: { id: true },
+    });
+    const adminIds = admins.map((a) => a.id);
+
+    const base = `Новий лід з сайту: ${opts.name}, ${opts.phone}${opts.region ? ", " + opts.region : ""}. Дивіться «Клієнти → Ліди».`;
+    const recipients = new Set<string>(
+      opts.agentUserId ? [opts.agentUserId] : adminIds,
+    );
+
+    const now = new Date();
+    await prisma.mgrReminder.createMany({
+      data: [...recipients].map((ownerUserId) => ({
+        ownerUserId,
+        body: base,
+        remindAt: now,
+        source: "manual" as const,
+      })),
+    });
+
+    // Архівний клієнт з таким самим номером — окремо адмінам.
+    if (opts.archivedClientName) {
+      await prisma.mgrReminder.createMany({
+        data: adminIds.map((ownerUserId) => ({
+          ownerUserId,
+          body: `⚠️ Лід з сайту (${opts.name}, ${opts.phone}) має номер АРХІВНОГО клієнта «${opts.archivedClientName}» — перевірте, чи не відновити картку.`,
+          remindAt: now,
+          source: "manual" as const,
+        })),
+      });
+    }
   } catch {
     // best-effort
   }

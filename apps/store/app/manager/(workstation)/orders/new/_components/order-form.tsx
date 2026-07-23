@@ -453,7 +453,7 @@ export function OrderForm({
                 </div>
               </div>
               <div className="flex flex-col items-end gap-1">
-                {mgrClientId && (
+                {mgrClientId ? (
                   <button
                     type="button"
                     onClick={() =>
@@ -466,7 +466,22 @@ export function OrderForm({
                   >
                     Відкрити картку клієнта →
                   </button>
-                )}
+                ) : clientSummary ? (
+                  // Сайтовий покупець без картки в CRM — створити одним кліком
+                  // (форма префілиться імʼям/телефоном).
+                  <button
+                    type="button"
+                    onClick={() =>
+                      openManagerTab(
+                        `/manager/customers/new?name=${encodeURIComponent(clientSummary.name)}&phone=${encodeURIComponent(clientSummary.phone ?? "")}`,
+                        "Новий клієнт",
+                      )
+                    }
+                    className="text-xs font-medium text-green-700 hover:text-green-800"
+                  >
+                    + Створити клієнта
+                  </button>
+                ) : null}
                 <span className="text-xs text-gray-400">не змінюється</span>
               </div>
             </div>

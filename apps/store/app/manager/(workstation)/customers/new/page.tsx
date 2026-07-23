@@ -6,10 +6,15 @@ import { CreateClientForm } from "./_components/create-client-form";
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Новий клієнт — L-TEX Manager" };
 
-export default async function NewClientPage() {
+export default async function NewClientPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ name?: string; phone?: string }>;
+}) {
   const user = await getCurrentUser();
   if (!user) redirect("/manager/login");
 
+  const sp = await searchParams;
   const dictionaries = await loadDictionariesSnapshot();
 
   return (
@@ -27,6 +32,8 @@ export default async function NewClientPage() {
         assortmentCodes={dictionaries.assortmentCodes}
         agents={dictionaries.agents}
         userRole={user.role}
+        initialName={sp.name ?? ""}
+        initialPhone={sp.phone ?? ""}
       />
     </div>
   );

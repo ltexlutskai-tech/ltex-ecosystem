@@ -1,7 +1,5 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
-import { Landmark, ListTree } from "lucide-react";
 import { prisma } from "@ltex/db";
 import {
   getCurrentUser,
@@ -83,38 +81,8 @@ export default async function SettingsPage() {
           />
         </>
       )}
-      {(user.role === "admin" || user.role === "owner") && (
-        <section className="rounded-lg border bg-white p-4">
-          <h2 className="text-sm font-semibold text-gray-700">Довідники</h2>
-          <p className="mt-1 text-xs text-gray-500">
-            Керування довідниками каси. У «Банківські рахунки» також задаються
-            реквізити для «Скинути реквізити» (одержувач/IBAN/ЄДРПОУ).
-          </p>
-          <div className="mt-3 grid gap-2 sm:grid-cols-2">
-            <Link
-              href="/manager/bank-accounts"
-              className="flex items-center gap-2 rounded-md border px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
-            >
-              <Landmark className="h-4 w-4 text-green-600" />
-              Банківські рахунки
-            </Link>
-            <Link
-              href="/manager/cash-flow-articles"
-              className="flex items-center gap-2 rounded-md border px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
-            >
-              <ListTree className="h-4 w-4 text-green-600" />
-              Статті руху коштів
-            </Link>
-            <Link
-              href="/manager/video-links"
-              className="flex items-center gap-2 rounded-md border px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
-            >
-              <ListTree className="h-4 w-4 text-green-600" />
-              Посилання відеоопису (Відеозона)
-            </Link>
-          </div>
-        </section>
-      )}
+      {/* Довідники (банк-рахунки / статті ДДС / посилання відеоопису) переїхали
+          у «Довідники та регістри» → секція «Довідники» (рішення user). */}
       <div className="flex justify-end">
         <LogoutButton />
       </div>
