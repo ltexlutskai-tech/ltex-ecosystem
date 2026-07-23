@@ -49,6 +49,8 @@ export function VideoTaskDetail({
   const { confirm, dialog } = usePortalConfirm();
 
   const meta = STATUS_META[task.status] ?? STATUS_META.new!;
+  // Відеозона не бачить клієнта — лише артикул, назву товару та менеджера.
+  const hideClient = role === "videozone";
 
   return (
     <>
@@ -58,11 +60,16 @@ export function VideoTaskDetail({
             {task.productName}
           </h1>
           <p className="mt-1 text-sm text-gray-500">
-            Клієнт:{" "}
-            <span className="font-medium">{task.clientName ?? "—"}</span> ·{" "}
+            {!hideClient ? (
+              <>
+                Клієнт:{" "}
+                <span className="font-medium">{task.clientName ?? "—"}</span>{" "}
+                ·{" "}
+              </>
+            ) : null}
             {task.quantity} шт.
             {task.articleCode ? ` · арт. ${task.articleCode}` : ""}
-            {task.managerName ? ` · замовив: ${task.managerName}` : ""}
+            {task.managerName ? ` · менеджер: ${task.managerName}` : ""}
           </p>
           {task.barcode ? (
             <p className="mt-0.5 text-sm text-gray-500">
@@ -130,22 +137,22 @@ export function VideoTaskDetail({
   );
 }
 
-/** Крок складу: принести мішок (обрати ШК або авто-рандом). */
+/** Крок складу: взяти будь-який вільний мішок і ВІДСКАНУВАТИ його штрихкод. */
 function BringSection({ task }: { task: VideoTaskView }) {
   const router = useRouter();
   const { toast } = useToast();
-  const [barcode, setBarcode] = useState(task.requestedBarcode ?? "");
+  const [barcode, setBarcode] = useState("");
   const [busy, setBusy] = useState(false);
 
-  async function bring(useBarcode: boolean) {
+  async function bring() {
+    const code = barcode.trim();
+    if (!code) return;
     setBusy(true);
     try {
       const res = await fetch(`/api/v1/manager/video-tasks/${task.id}/bring`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(
-          useBarcode && barcode.trim() ? { barcode: barcode.trim() } : {},
-        ),
+        body: JSON.stringify({ barcode: code }),
       });
       const data = (await res.json().catch(() => ({}))) as {
         error?: string;
@@ -158,7 +165,9 @@ function BringSection({ task }: { task: VideoTaskView }) {
         });
         return;
       }
-      toast({ title: `Мішок ${data.barcode ?? ""} передано у відеозону` });
+      toast({
+        title: `Мішок ${data.barcode ?? code} передано у відеозону`,
+      });
       router.refresh();
     } finally {
       setBusy(false);
@@ -168,36 +177,31 @@ function BringSection({ task }: { task: VideoTaskView }) {
   return (
     <div className="space-y-3 rounded-md border bg-white p-4">
       <p className="text-sm text-gray-600">
-        Візьміть будь-який вільний мішок цього товару, відскануйте штрихкод (або
-        залиште порожнім — система візьме випадковий вільний мішок).
+        Візьміть будь-який вільний мішок цього товару, відскануйте його штрихкод
+        і віднесіть у відеозону. Мішок одразу забронюється на клієнта.
       </p>
-      <div className="flex flex-wrap items-end gap-2">
-        <div className="flex-1 min-w-[180px]">
+      <form
+        className="flex flex-wrap items-end gap-2"
+        onSubmit={(e) => {
+          e.preventDefault();
+          void bring();
+        }}
+      >
+        <div className="min-w-[180px] flex-1">
           <label className="mb-1 block text-sm font-medium text-gray-700">
             Штрихкод мішка
           </label>
           <Input
             value={barcode}
             onChange={(e) => setBarcode(e.target.value)}
-            placeholder="Відскануйте або введіть ШК"
+            placeholder="Відскануйте ШК"
+            autoFocus
           />
         </div>
-        <Button
-          type="button"
-          disabled={busy || !barcode.trim()}
-          onClick={() => bring(true)}
-        >
-          Передати цей мішок
+        <Button type="submit" disabled={busy || !barcode.trim()}>
+          {busy ? "…" : "Передати у відеозону"}
         </Button>
-        <Button
-          type="button"
-          variant="outline"
-          disabled={busy}
-          onClick={() => bring(false)}
-        >
-          Взяти будь-який
-        </Button>
-      </div>
+      </form>
     </div>
   );
 }
@@ -223,6 +227,38 @@ function FilmSection({ task }: { task: VideoTaskView }) {
 
   const set = (k: keyof typeof form) => (v: string) =>
     setForm((f) => ({ ...f, [k]: v }));
+
+  // Вага одиниці рахується автоматично = вага лота ÷ кількість одиниць
+  // (перераховуємо при зміні кількості або ваги лота).
+  function recalcUnitWeight(next: {
+    unitsCount: string;
+    lotWeightKg: string;
+  }): string {
+    const units = parseFloat(next.unitsCount.replace(",", "."));
+    const lotKg = parseFloat(next.lotWeightKg.replace(",", "."));
+    if (units > 0 && lotKg > 0) {
+      return String(Math.round((lotKg / units) * 1000) / 1000);
+    }
+    return form.unitWeight;
+  }
+  const setUnitsCount = (v: string) =>
+    setForm((f) => {
+      const nf = { ...f, unitsCount: v };
+      nf.unitWeight = recalcUnitWeight({
+        unitsCount: v,
+        lotWeightKg: f.lotWeightKg,
+      });
+      return nf;
+    });
+  const setLotWeight = (v: string) =>
+    setForm((f) => {
+      const nf = { ...f, lotWeightKg: v };
+      nf.unitWeight = recalcUnitWeight({
+        unitsCount: f.unitsCount,
+        lotWeightKg: v,
+      });
+      return nf;
+    });
 
   async function save(): Promise<boolean> {
     setSaving(true);
@@ -322,41 +358,86 @@ function FilmSection({ task }: { task: VideoTaskView }) {
     }
   }
 
-  const fields: {
-    key: keyof typeof form;
-    label: string;
-    placeholder?: string;
-    type?: string;
-  }[] = [
-    { key: "season", label: "Сезон" },
-    { key: "quality", label: "Сорт" },
-    { key: "unitsCount", label: "Кількість одиниць" },
-    { key: "unitWeight", label: "Вага одиниці" },
-    { key: "lotWeightKg", label: "Вага лота, кг", type: "number" },
-    { key: "gender", label: "Стать" },
-    { key: "sizes", label: "Розміри" },
-  ];
-
   return (
     <div className="space-y-4 rounded-md border bg-white p-4">
       <h2 className="text-sm font-semibold text-gray-800">
         Характеристики лота
       </h2>
       <div className="grid gap-3 sm:grid-cols-2">
-        {fields.map((f) => (
-          <div key={f.key}>
-            <label className="mb-1 block text-sm font-medium text-gray-700">
-              {f.label}
-            </label>
-            <Input
-              type={f.type ?? "text"}
-              value={form[f.key]}
-              onChange={(e) => set(f.key)(e.target.value)}
-              placeholder={f.placeholder}
-            />
-          </div>
-        ))}
+        <div>
+          <label className="mb-1 block text-sm font-medium text-gray-700">
+            Вага лота, кг
+          </label>
+          <Input
+            type="number"
+            value={form.lotWeightKg}
+            onChange={(e) => setLotWeight(e.target.value)}
+          />
+        </div>
+        <div>
+          <label className="mb-1 block text-sm font-medium text-gray-700">
+            Кількість одиниць
+          </label>
+          <Input
+            type="number"
+            value={form.unitsCount}
+            onChange={(e) => setUnitsCount(e.target.value)}
+            placeholder="напр. 20"
+          />
+        </div>
+        <div>
+          <label className="mb-1 block text-sm font-medium text-gray-700">
+            Вага одиниці
+          </label>
+          <Input
+            value={form.unitWeight}
+            onChange={(e) => set("unitWeight")(e.target.value)}
+            placeholder="розрахується автоматично"
+          />
+          <p className="mt-1 text-xs text-gray-400">
+            = вага лота ÷ кількість одиниць (можна змінити)
+          </p>
+        </div>
+        <div>
+          <label className="mb-1 block text-sm font-medium text-gray-700">
+            Сезон
+          </label>
+          <Input
+            value={form.season}
+            onChange={(e) => set("season")(e.target.value)}
+          />
+        </div>
+        <div>
+          <label className="mb-1 block text-sm font-medium text-gray-700">
+            Сорт
+          </label>
+          <Input
+            value={form.quality}
+            onChange={(e) => set("quality")(e.target.value)}
+          />
+        </div>
+        <div>
+          <label className="mb-1 block text-sm font-medium text-gray-700">
+            Стать
+          </label>
+          <Input
+            value={form.gender}
+            onChange={(e) => set("gender")(e.target.value)}
+          />
+        </div>
+        <div className="sm:col-span-2">
+          <label className="mb-1 block text-sm font-medium text-gray-700">
+            Розміри
+          </label>
+          <Input
+            value={form.sizes}
+            onChange={(e) => set("sizes")(e.target.value)}
+          />
+        </div>
       </div>
+      <p className="text-xs text-gray-400">
+        Стать і розміри підтягнуто з картки товару — за потреби скоригуйте.
+      </p>
 
       <div>
         <label className="mb-1 block text-sm font-medium text-gray-700">

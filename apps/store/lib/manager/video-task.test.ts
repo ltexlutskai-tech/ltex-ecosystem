@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { endOfTomorrow } from "./video-task";
+import { endOfTomorrow, videoReservationData } from "./video-task";
 
 describe("endOfTomorrow", () => {
   it("повертає 23:59:59.999 наступного дня", () => {
@@ -18,5 +18,25 @@ describe("endOfTomorrow", () => {
     const r = endOfTomorrow(now);
     expect(r.getMonth()).toBe(7); // серпень
     expect(r.getDate()).toBe(1);
+  });
+});
+
+describe("videoReservationData", () => {
+  it("бронює лот на клієнта+менеджера завдання до вказаної дати", () => {
+    const until = new Date(2026, 6, 24, 23, 59, 59);
+    const data = videoReservationData(
+      {
+        clientId: "cli1",
+        clientName: "ТОВ Ромашка",
+        managerUserId: "mgr1",
+        managerName: "Іван",
+      },
+      until,
+    );
+    expect(data.status).toBe("reserved");
+    expect(data.reservedForClientId).toBe("cli1");
+    expect(data.reservedForName).toBe("ТОВ Ромашка");
+    expect(data.reservedByUserId).toBe("mgr1");
+    expect(data.reservedUntil).toBe(until);
   });
 });

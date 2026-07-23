@@ -26,35 +26,43 @@ describe("extractArticleCode4", () => {
 describe("buildYoutubeDescription", () => {
   const links = defaultVideoLinkMap();
 
-  it("будує опис з характеристик + посилання на лот + хештег + штрихкод", () => {
+  it("будує опис у форматі L-TEX: хештег зверху, характеристики ✅, соцмережі, штрихкод унизу", () => {
     const text = buildYoutubeDescription(
       {
         season: "Зима",
-        quality: "1 сорт",
-        unitsCount: "20",
-        unitWeight: "0.9 кг",
-        lotWeightKg: 18,
+        quality: "Сток",
+        unitsCount: "63",
+        unitWeight: "0.22",
+        lotWeightKg: 14.1,
         gender: "Жіноча",
         sizes: "S-XL",
-        lotUrl: "https://new.ltex.com.ua/lot/L-0658-00042",
-        barcode: "L-0658-00042",
-        productName: "Куртки зимові (0658)",
+        lotUrl: "https://new.ltex.com.ua/lot/2000141395292",
+        barcode: "2000141395292",
+        productName: "Куртки зимові (1676)",
         fallbackCode: null,
       },
       links,
     );
 
-    expect(text).toContain("✔️Сезон: Зима");
-    expect(text).toContain("✔️Сорт: 1 сорт");
-    expect(text).toContain("✔️Вага лота: 18кг");
+    // Хештег зверху + додаткові.
+    expect(text.startsWith("#ltex1676 #секондхендоптом #стокоптом")).toBe(true);
+    // Характеристики з ✅ + форматування чисел.
+    expect(text).toContain("✅ Сорт: Сток");
+    expect(text).toContain("✅ Кількість одиниць: 63шт");
+    expect(text).toContain("✅ Вага одиниці: 0,22кг");
+    expect(text).toContain("✅ Вага лота: 14,1кг");
     expect(text).toContain(
-      "✅Замовити лот: https://new.ltex.com.ua/lot/L-0658-00042",
+      "✅ Замовити лот: https://new.ltex.com.ua/lot/2000141395292",
     );
-    expect(text).toContain("#ltex0658");
-    expect(text.trim().endsWith("L-0658-00042")).toBe(true);
+    expect(text).toContain("📄 Переглянути каталог:");
+    expect(text).toContain("🔗 МИ В СОЦМЕРЕЖАХ:");
+    expect(text).toContain("📘 Telegram: https://t.me/LTEX_Second");
+    // Хештег + штрихкод унизу.
+    expect(text.trim().endsWith("2000141395292")).toBe(true);
+    expect(text).toContain("\n#ltex1676\n2000141395292");
   });
 
-  it("пропускає порожні характеристики", () => {
+  it("показує всі 7 характеристик навіть коли порожні (з «-»)", () => {
     const text = buildYoutubeDescription(
       {
         season: "",
@@ -70,12 +78,13 @@ describe("buildYoutubeDescription", () => {
       },
       links,
     );
-    expect(text).not.toContain("✔️Сезон");
-    expect(text).not.toContain("✔️Вага лота");
+    expect(text).toContain("✅ Сезон: -");
+    expect(text).toContain("✅ Вага лота: -");
+    expect(text).toContain("✅ Розміри: -");
     expect(text).toContain("#ltex0001");
   });
 
-  it("не залишає >2 порожніх рядків підряд", () => {
+  it("пропускає блок соцмереж, коли посилань немає, і не лишає >2 порожніх рядків", () => {
     const text = buildYoutubeDescription(
       {
         lotUrl: "https://new.ltex.com.ua/lot/X",
@@ -84,6 +93,7 @@ describe("buildYoutubeDescription", () => {
       },
       {}, // без жодних посилань
     );
+    expect(text).not.toContain("МИ В СОЦМЕРЕЖАХ");
     expect(text).not.toMatch(/\n{3,}/);
   });
 });

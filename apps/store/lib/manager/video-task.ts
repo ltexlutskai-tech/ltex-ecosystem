@@ -39,7 +39,17 @@ export async function createVideoTask(args: CreateVideoTaskArgs): Promise<{
   const [product, client] = await Promise.all([
     prisma.product.findUnique({
       where: { id: args.productId },
-      select: { id: true, name: true, articleCode: true, code1C: true },
+      select: {
+        id: true,
+        name: true,
+        articleCode: true,
+        code1C: true,
+        // Загальна інформація позиції — знімок як дефолти для відеозони.
+        season: true,
+        quality: true,
+        gender: true,
+        sizes: true,
+      },
     }),
     prisma.mgrClient.findUnique({
       where: { id: args.clientId },
@@ -75,10 +85,38 @@ export async function createVideoTask(args: CreateVideoTaskArgs): Promise<{
       articleCode: product.articleCode,
       quantity: args.quantity,
       requestedBarcode: requested,
+      // Загальна інформація з картки позиції — відеозона за потреби коригує.
+      season: product.season || null,
+      quality: product.quality || null,
+      gender: product.gender,
+      sizes: product.sizes,
     },
     select: { id: true },
   });
   return created;
+}
+
+/**
+ * Бронювання лота на клієнта завдання (склад сканує мішок → одразу тримаємо
+ * його за клієнтом до 23:59 наступного дня). Викликається у транзакції.
+ */
+export function videoReservationData(
+  task: {
+    clientId: string | null;
+    clientName: string | null;
+    managerUserId: string | null;
+    managerName: string | null;
+  },
+  until: Date,
+): Record<string, unknown> {
+  return {
+    status: "reserved",
+    reservedForClientId: task.clientId,
+    reservedForName: task.clientName,
+    reservedByUserId: task.managerUserId,
+    reservedByName: task.managerName,
+    reservedUntil: until,
+  };
 }
 
 /**
@@ -125,15 +163,11 @@ export async function completeVideoTask(opts: {
       });
     }
 
-    // 2. Відео + вага → лот, + бронь на клієнта/менеджера до завтра 23:59.
+    // 2. Відео + вага → лот. Бронь оновлюємо (лот уже заброньовано при скануванні
+    //    складом; тут освіжаємо вікно до 23:59 наступного дня від готовності).
     const lotData: Record<string, unknown> = {
       videoDate: now,
-      status: "reserved",
-      reservedForClientId: task.clientId,
-      reservedForName: task.clientName,
-      reservedByUserId: task.managerUserId,
-      reservedByName: task.managerName,
-      reservedUntil: until,
+      ...videoReservationData(task, until),
     };
     if (task.videoUrl && task.videoUrl.trim()) lotData.videoUrl = task.videoUrl;
     if (task.lotWeightKg != null && Number.isFinite(task.lotWeightKg)) {

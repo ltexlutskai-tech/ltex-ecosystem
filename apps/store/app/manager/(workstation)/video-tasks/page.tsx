@@ -35,6 +35,8 @@ export default async function VideoTasksPage({
 
   const isVideozone = ["videozone", "admin", "owner"].includes(user.role);
   const isWarehouse = user.role === "warehouse";
+  // Відеозона не бачить клієнта у списку — лише товар/артикул/мішок.
+  const hideClient = user.role === "videozone";
 
   // Зріз «на мене» за роллю.
   const scope: Record<string, unknown> = isVideozone
@@ -128,7 +130,9 @@ export default async function VideoTasksPage({
                     {t.productName}
                   </p>
                   <p className="mt-0.5 text-sm text-gray-500">
-                    Клієнт: {t.clientName ?? "—"} · {t.quantity} шт.
+                    {hideClient ? "" : `Клієнт: ${t.clientName ?? "—"} · `}
+                    {t.quantity} шт.
+                    {t.articleCode ? ` · арт. ${t.articleCode}` : ""}
                     {t.barcode ? ` · мішок ${t.barcode}` : ""}
                   </p>
                 </div>

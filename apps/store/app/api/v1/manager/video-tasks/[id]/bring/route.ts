@@ -3,14 +3,17 @@ import { prisma } from "@ltex/db";
 import { getCurrentUser } from "@/lib/auth/manager-auth";
 import { bringVideoTaskSchema } from "@/lib/validations/video-task";
 import { isActiveReservation } from "@/lib/manager/lot-booking";
+import { endOfTomorrow, videoReservationData } from "@/lib/manager/video-task";
+import { buildBronEventBody } from "@/lib/manager/client-timeline";
 
 /**
  * POST /api/v1/manager/video-tasks/[id]/bring
  *
- * Склад приносить мішок для відеозйомки. Обирає конкретний лот (`lotId`/
- * `barcode`) АБО — якщо нічого не передано — система бере рандомний вільний лот
- * товару. Лот прикріплюється до завдання, статус → `filming` (мішок у відеозоні).
- * Гейт: склад / admin / owner.
+ * Склад фізично бере будь-який вільний мішок цього товару й СКАНУЄ його штрихкод
+ * (система не диктує, який мішок брати). Лот прикріплюється до завдання, статус →
+ * `filming`, і лот ОДРАЗУ бронюється на клієнта завдання до 23:59 наступного дня
+ * (щоб його не продали, поки відеозона знімає). Відеозона далі бачить конкретне
+ * завдання по конкретному лоту. Гейт: склад / admin / owner.
  */
 
 const BRING_ROLES = ["warehouse", "admin", "owner"];
@@ -33,6 +36,14 @@ export async function POST(
   if (!parsed.success) {
     return NextResponse.json({ error: "Невірні дані" }, { status: 400 });
   }
+  // Мішок треба саме відсканувати (ШК) або обрати конкретний лот — «навмання»
+  // склад не передає, бере фізично будь-який і сканує.
+  if (!parsed.data.barcode && !parsed.data.lotId) {
+    return NextResponse.json(
+      { error: "Відскануйте штрихкод мішка" },
+      { status: 400 },
+    );
+  }
 
   const task = await prisma.mgrVideoTask.findUnique({ where: { id } });
   if (!task) {
@@ -47,49 +58,16 @@ export async function POST(
 
   const now = new Date();
 
-  // Знайти лот: за ШК / lotId, або рандомний вільний лот товару.
-  let lot: {
-    id: string;
-    barcode: string;
-    productId: string;
-    weight: number;
-    status: string;
-    reservedByUserId: string | null;
-    reservedUntil: Date | null;
-  } | null = null;
-
-  // ШК/lotId беремо ЛИШЕ якщо склад передав явно (пре-заповнений
-  // `requestedBarcode` — це підказка в UI, а не примус: «Взяти будь-який»
-  // має брати рандом навіть коли менеджер просив конкретний мішок).
-  if (parsed.data.lotId) {
-    lot = await prisma.lot.findUnique({ where: { id: parsed.data.lotId } });
-  } else if (parsed.data.barcode) {
-    lot = await prisma.lot.findFirst({
-      where: { barcode: parsed.data.barcode },
-    });
-  } else {
-    // Рандомний вільний лот товару (без активної броні).
-    const candidates = await prisma.lot.findMany({
-      where: {
-        productId: task.productId,
-        status: "free",
-        OR: [{ reservedUntil: null }, { reservedUntil: { lt: now } }],
-      },
-      take: 20,
-      orderBy: { createdAt: "asc" },
-    });
-    lot = candidates.length > 0 ? candidates[0]! : null;
-  }
+  const lot = parsed.data.lotId
+    ? await prisma.lot.findUnique({ where: { id: parsed.data.lotId } })
+    : await prisma.lot.findFirst({ where: { barcode: parsed.data.barcode } });
 
   if (!lot) {
-    return NextResponse.json(
-      { error: "Вільний мішок цього товару не знайдено" },
-      { status: 404 },
-    );
+    return NextResponse.json({ error: "Мішок не знайдено" }, { status: 404 });
   }
   if (lot.productId !== task.productId) {
     return NextResponse.json(
-      { error: "Мішок належить іншому товару" },
+      { error: "Цей мішок належить іншому товару" },
       { status: 409 },
     );
   }
@@ -103,20 +81,57 @@ export async function POST(
       now,
     )
   ) {
-    return NextResponse.json({ error: "Мішок заброньовано" }, { status: 409 });
+    return NextResponse.json(
+      {
+        error: lot.reservedForName
+          ? `Мішок заброньовано (${lot.reservedForName})`
+          : "Мішок заброньовано",
+      },
+      { status: 409 },
+    );
   }
 
-  await prisma.mgrVideoTask.update({
-    where: { id },
-    data: {
-      status: "filming",
-      lotId: lot.id,
-      barcode: lot.barcode,
-      lotWeightKg: task.lotWeightKg ?? lot.weight,
-      broughtAt: now,
-      broughtByUserId: user.id,
-      broughtByName: user.fullName,
-    },
+  const until = endOfTomorrow(now);
+
+  await prisma.$transaction(async (tx) => {
+    // Прикріпити лот до завдання + перевести у зйомку + зафіксувати ваги/склад.
+    await tx.mgrVideoTask.update({
+      where: { id },
+      data: {
+        status: "filming",
+        lotId: lot.id,
+        barcode: lot.barcode,
+        lotWeightKg: task.lotWeightKg ?? lot.weight,
+        broughtAt: now,
+        broughtByUserId: user.id,
+        broughtByName: user.fullName,
+      },
+    });
+
+    // Одразу забронювати лот на клієнта завдання (до 23:59 наступного дня).
+    await tx.lot.update({
+      where: { id: lot.id },
+      data: videoReservationData(task, until),
+    });
+
+    if (task.clientId) {
+      await tx.mgrClientTimelineEntry.create({
+        data: {
+          clientId: task.clientId,
+          kind: "bron",
+          body: buildBronEventBody(lot.barcode, until),
+          occurredAt: now,
+          authorUserId: user.id,
+          metadata: {
+            lotId: lot.id,
+            barcode: lot.barcode,
+            weight: lot.weight,
+            reservedUntil: until.toISOString(),
+            videoTaskId: task.id,
+          },
+        },
+      });
+    }
   });
 
   return NextResponse.json({ ok: true, barcode: lot.barcode });
