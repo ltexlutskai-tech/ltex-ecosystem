@@ -20,6 +20,7 @@ import { LotVideoPlayer } from "@/components/store/lot-video-player";
 import { ShareIcons } from "@/components/store/share-icons";
 import { AddToCartButton } from "@/components/store/add-to-cart-button";
 import { PriceOrLogin } from "@/components/store/price-or-login";
+import { VideoJsonLd } from "@/components/store/video-json-ld";
 import { extractYouTubeId } from "@/lib/youtube";
 import { getCurrentRate, eurToUah, formatUah } from "@/lib/exchange-rate";
 import { getCurrentCustomer } from "@/lib/customer-auth";
@@ -171,6 +172,12 @@ export default async function LotDetailPage({ params }: Props) {
 
   return (
     <div className="container mx-auto px-4 py-6">
+      <VideoJsonLd
+        name={`${lot.product.name} · лот ${barcode}`}
+        description={lot.description ?? lot.product.description}
+        videoUrl={lot.videoUrl}
+        uploadDate={(lot.videoDate ?? lot.createdAt).toISOString()}
+      />
       <Breadcrumbs
         items={[{ label: "Лоти", href: "/lots" }, { label: `Лот ${barcode}` }]}
       />

@@ -2,7 +2,12 @@ import type { Metadata } from "next";
 import { prisma } from "@ltex/db";
 import { notFound } from "next/navigation";
 import { CATEGORIES, OVERSIZE_SLUG } from "@ltex/shared";
-import { getCatalogProducts } from "@/lib/catalog";
+import {
+  getCatalogProducts,
+  getCategoryMinPrice,
+  minPriceUnitLabel,
+} from "@/lib/catalog";
+import { getCurrentRate, eurToUah, formatUah } from "@/lib/exchange-rate";
 import { loadProductAttributeOptions } from "@/lib/manager/product-attributes";
 import { ProductCard } from "@/components/store/product-card";
 import { CatalogSidebar } from "@/components/store/catalog-sidebar";
@@ -53,7 +58,11 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     prisma.category.findUnique({ where: { slug: subcategorySlug } }),
   ]);
   if (!parent || !sub) return {};
-  const description = `${sub.name} з категорії ${parent.name} гуртом від 10 кг. Секонд хенд, сток з Англії, Німеччини, Канади. L-TEX.`;
+  const minPrice = await getCategoryMinPrice([sub.id]);
+  const fromPart = minPrice
+    ? `Ціни від ${minPrice.amount.toFixed(2).replace(/\.?0+$/, "")} €/${minPriceUnitLabel(minPrice.unit)}. `
+    : "";
+  const description = `${sub.name} з категорії ${parent.name} гуртом від 10 кг. ${fromPart}Секонд хенд, сток з Англії, Німеччини, Канади. L-TEX.`;
   return {
     title: `${sub.name} (${parent.name}) — секонд хенд та сток гуртом`,
     description,
@@ -148,6 +157,15 @@ export default async function SubcategoryPage({ params, searchParams }: Props) {
 
   const attributeOptions = await loadProductAttributeOptions();
 
+  // «Ціна від …» — публічний агрегат по підкатегорії (точні ціни за
+  // реєстрацією). Псевдо-підкатегорія oversize не має Category-рядка → без цін.
+  const [minPrice, rate] = await Promise.all([
+    subcategory.id
+      ? getCategoryMinPrice([subcategory.id])
+      : Promise.resolve(null),
+    getCurrentRate(),
+  ]);
+
   const filterParams = new URLSearchParams();
   const qParam = getStr(sp.quality);
   if (qParam) filterParams.set("quality", qParam);
@@ -215,7 +233,20 @@ export default async function SubcategoryPage({ params, searchParams }: Props) {
       <div className="mt-4 flex items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold">{subcategory.name}</h1>
-          <p className="mt-1 text-gray-500">{total} товарів</p>
+          <p className="mt-1 text-gray-500">
+            {total} товарів
+            {minPrice ? (
+              <>
+                {" · ціни від "}
+                <span className="font-semibold text-green-700">
+                  {minPrice.amount.toFixed(2).replace(/\.?0+$/, "")} €/
+                  {minPriceUnitLabel(minPrice.unit)}
+                </span>{" "}
+                (~{formatUah(eurToUah(minPrice.amount, rate))}) — повний прайс
+                після реєстрації
+              </>
+            ) : null}
+          </p>
         </div>
         <CatalogLayoutToggle currentLayout={layout} />
       </div>

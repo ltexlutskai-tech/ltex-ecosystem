@@ -2,7 +2,12 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { prisma } from "@ltex/db";
 import { notFound } from "next/navigation";
-import { getCatalogProducts } from "@/lib/catalog";
+import {
+  getCatalogProducts,
+  getCategoryMinPrice,
+  minPriceUnitLabel,
+} from "@/lib/catalog";
+import { getCurrentRate, eurToUah, formatUah } from "@/lib/exchange-rate";
 import { loadProductAttributeOptions } from "@/lib/manager/product-attributes";
 import { ProductCard } from "@/components/store/product-card";
 import { CatalogSidebar } from "@/components/store/catalog-sidebar";
@@ -26,9 +31,19 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { categorySlug } = await params;
   const category = await prisma.category.findUnique({
     where: { slug: categorySlug },
+    include: { children: { select: { id: true } } },
   });
   if (!category) return {};
-  const description = `${category.name} гуртом від 10 кг. Секонд хенд, сток, оригінал з Англії, Німеччини, Канади, Польщі. L-TEX — доставка по Україні.`;
+  // «Від X €/кг» у описі — цифра потрапляє у сніпет Google (агрегат по
+  // категорії; точні ціни лишаються за реєстрацією).
+  const minPrice = await getCategoryMinPrice([
+    category.id,
+    ...category.children.map((c) => c.id),
+  ]);
+  const fromPart = minPrice
+    ? `Ціни від ${minPrice.amount.toFixed(2).replace(/\.?0+$/, "")} €/${minPriceUnitLabel(minPrice.unit)}. `
+    : "";
+  const description = `${category.name} гуртом від 10 кг. ${fromPart}Секонд хенд, сток, оригінал з Англії, Німеччини, Канади, Польщі. L-TEX — доставка по Україні.`;
   return {
     title: `${category.name} — секонд хенд та сток гуртом`,
     description,
@@ -115,6 +130,12 @@ export default async function CategoryPage({ params, searchParams }: Props) {
 
   const attributeOptions = await loadProductAttributeOptions();
 
+  // «Ціна від …» — публічний агрегат по категорії (точні ціни за реєстрацією).
+  const [minPrice, rate] = await Promise.all([
+    getCategoryMinPrice(categoryIds),
+    getCurrentRate(),
+  ]);
+
   const filterParams = new URLSearchParams();
   const qParam = getStr(sp.quality);
   if (qParam) filterParams.set("quality", qParam);
@@ -181,7 +202,20 @@ export default async function CategoryPage({ params, searchParams }: Props) {
       <div className="mt-4 flex items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold">{category.name}</h1>
-          <p className="mt-1 text-gray-500">{total} товарів</p>
+          <p className="mt-1 text-gray-500">
+            {total} товарів
+            {minPrice ? (
+              <>
+                {" · ціни від "}
+                <span className="font-semibold text-green-700">
+                  {minPrice.amount.toFixed(2).replace(/\.?0+$/, "")} €/
+                  {minPriceUnitLabel(minPrice.unit)}
+                </span>{" "}
+                (~{formatUah(eurToUah(minPrice.amount, rate))}) — повний прайс
+                після реєстрації
+              </>
+            ) : null}
+          </p>
         </div>
         <CatalogLayoutToggle currentLayout={layout} />
       </div>

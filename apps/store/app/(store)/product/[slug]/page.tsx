@@ -12,6 +12,7 @@ import {
 import { Package, Truck, Clock, Scale } from "lucide-react";
 import { Breadcrumbs } from "@/components/store/breadcrumbs";
 import { ProductJsonLd } from "@/components/store/product-json-ld";
+import { VideoJsonLd } from "@/components/store/video-json-ld";
 import { ProductCard } from "@/components/store/product-card";
 import { ShareIcons } from "@/components/store/share-icons";
 import { TrustBadge } from "@/components/store/trust-badge";
@@ -202,6 +203,12 @@ export default async function ProductPage({ params }: Props) {
         product={product}
         price={displayPrice ?? undefined}
         currency={salePrice?.currency ?? wholesalePrice?.currency ?? "EUR"}
+      />
+      <VideoJsonLd
+        name={product.name}
+        description={product.description}
+        videoUrl={product.videoUrl}
+        uploadDate={product.updatedAt.toISOString()}
       />
       <Breadcrumbs items={breadcrumbs} />
 

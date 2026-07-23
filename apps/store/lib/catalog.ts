@@ -625,3 +625,49 @@ export async function autocompleteSearch(
   );
   return results.slice(0, 5);
 }
+
+// ─── «Ціна від …» для сторінок категорій (SEO, 2026-07-23) ──────────────────
+// Публічний АГРЕГАТ (мінімальна гуртова ціна по піддереву категорії) — свідоме
+// рішення user: точні ціни по товарах лишаються за реєстрацією, а «від X €/кг»
+// у заголовку/описі категорії дає цифру в сніпет Google і підігріває лід.
+
+export interface CategoryMinPrice {
+  amount: number;
+  unit: "kg" | "pair" | "piece";
+}
+
+const MIN_PRICE_UNITS = ["kg", "pair", "piece"] as const;
+
+/**
+ * Мінімальна активна гуртова ціна серед in-stock товарів категорії + її
+ * прямих підкатегорій. Повертає першу знайдену за пріоритетом одиниці
+ * (кг → пара → шт). null — коли товарів з цінами немає.
+ */
+export async function getCategoryMinPrice(
+  categoryIds: string[],
+): Promise<CategoryMinPrice | null> {
+  for (const unit of MIN_PRICE_UNITS) {
+    const agg = await prisma.price.aggregate({
+      _min: { amount: true },
+      where: {
+        priceType: "wholesale",
+        amount: { gt: 0 },
+        validTo: null,
+        product: {
+          inStock: true,
+          categoryId: { in: categoryIds },
+          priceUnit: unit,
+        },
+      },
+    });
+    if (agg._min.amount != null) {
+      return { amount: agg._min.amount, unit };
+    }
+  }
+  return null;
+}
+
+/** Людський суфікс одиниці для «від X €/…». */
+export function minPriceUnitLabel(unit: CategoryMinPrice["unit"]): string {
+  return unit === "kg" ? "кг" : unit === "pair" ? "пару" : "шт";
+}
