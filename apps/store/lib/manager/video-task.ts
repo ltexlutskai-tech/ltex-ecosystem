@@ -1,15 +1,19 @@
 import { prisma } from "@ltex/db";
+import { isActiveReservation } from "@/lib/manager/lot-booking";
+import { buildBronEventBody } from "@/lib/manager/client-timeline";
 
 /**
- * Блок «Відеозона» — оркестрація завдань на відеоогляд.
+ * Блок «Відеозона» — оркестрація завдань на відеоогляд (по МІШКАХ).
  *
- * Потік: менеджер замовляє огляд з Прайсу/картки клієнта → `createVideoTask`
- * (статус `new` = складу треба принести мішок) → склад приносить рандомний
- * вільний мішок (`bring` у роуті → `filming`) → відеозона заповнює
- * характеристики + посилання на відео + формує YouTube-опис → «Готово»
- * (`completeVideoTask`): характеристики пишуться у товар/лот, лот бронюється на
- * клієнта+менеджера до 23:59 наступного дня, менеджеру приходить інтерактивне
- * нагадування «відео готове» (`viber_video`) з дією «Надіслати відео клієнту».
+ * Одне замовлення = одне завдання (`MgrVideoTask`) на N одиниць (quantity).
+ * Склад сканує по одному ШК на кожен мішок → кожен стає рядком `MgrVideoTaskBag`
+ * і одразу бронюється на клієнта до 23:59 наступного дня. Коли зібрано всі
+ * заплановані мішки — завдання переходить у зйомку (`filming`). Відеозона знімає
+ * й описує КОЖЕН мішок окремо (свій ШК/вага/к-сть/відео/опис); спільні
+ * характеристики (сезон/сорт/стать/розміри) — на завданні. «Готово» доступне,
+ * коли кожен мішок має сформований YouTube-опис: характеристики пишуться у
+ * товар/лоти, бронь оновлюється, менеджеру приходить сповіщення на кожен мішок
+ * (кнопка «Надіслати відео клієнту»).
  */
 
 /** Кінець наступного дня (23:59:59.999 завтра) від `now`. */
@@ -28,11 +32,7 @@ export interface CreateVideoTaskArgs {
   manager: { id: string; fullName: string };
 }
 
-/**
- * Створює завдання на відеоогляд (статус `new`). Резолвить назву товару/артикул
- * і назву клієнта (+ дзеркальний Customer.id по code1C для сумісності). Кидає
- * помилку, якщо товар/клієнт не знайдено (роут перетворює на 4xx).
- */
+/** Створює завдання на відеоогляд (статус `new`, ще без мішків). */
 export async function createVideoTask(args: CreateVideoTaskArgs): Promise<{
   id: string;
 }> {
@@ -44,7 +44,6 @@ export async function createVideoTask(args: CreateVideoTaskArgs): Promise<{
         name: true,
         articleCode: true,
         code1C: true,
-        // Загальна інформація позиції — знімок як дефолти для відеозони.
         season: true,
         quality: true,
         gender: true,
@@ -59,8 +58,6 @@ export async function createVideoTask(args: CreateVideoTaskArgs): Promise<{
   if (!product) throw new Error("PRODUCT_NOT_FOUND");
   if (!client) throw new Error("CLIENT_NOT_FOUND");
 
-  // Дзеркальний Customer (по code1C) — best-effort, для сумісності з бронюванням
-  // на боці магазину. Відсутність не блокує.
   let customerId: string | null = null;
   if (client.code1C) {
     const customer = await prisma.customer.findFirst({
@@ -69,8 +66,6 @@ export async function createVideoTask(args: CreateVideoTaskArgs): Promise<{
     });
     customerId = customer?.id ?? null;
   }
-
-  const requested = args.requestedBarcode?.trim() || null;
 
   const created = await prisma.mgrVideoTask.create({
     data: {
@@ -83,9 +78,8 @@ export async function createVideoTask(args: CreateVideoTaskArgs): Promise<{
       productId: product.id,
       productName: product.name,
       articleCode: product.articleCode,
-      quantity: args.quantity,
-      requestedBarcode: requested,
-      // Загальна інформація з картки позиції — відеозона за потреби коригує.
+      quantity: Math.max(1, args.quantity),
+      requestedBarcode: args.requestedBarcode?.trim() || null,
       season: product.season || null,
       quality: product.quality || null,
       gender: product.gender,
@@ -96,10 +90,7 @@ export async function createVideoTask(args: CreateVideoTaskArgs): Promise<{
   return created;
 }
 
-/**
- * Бронювання лота на клієнта завдання (склад сканує мішок → одразу тримаємо
- * його за клієнтом до 23:59 наступного дня). Викликається у транзакції.
- */
+/** Дані бронювання лота на клієнта завдання (у транзакції). */
 export function videoReservationData(
   task: {
     clientId: string | null;
@@ -120,10 +111,152 @@ export function videoReservationData(
 }
 
 /**
- * «Готово»: пише характеристики у товар/лот, бронює лот на клієнта+менеджера до
- * 23:59 наступного дня, ставить завдання `done`, створює менеджеру інтерактивне
- * нагадування «відео готове». Усе в одній транзакції; сповіщення best-effort
- * після коміту (не валить операцію).
+ * Склад сканує мішок → додає його у завдання (рядок `MgrVideoTaskBag`) і одразу
+ * бронює лот на клієнта. Кидає типізовані помилки для роуту.
+ */
+export async function addVideoTaskBag(opts: {
+  taskId: string;
+  barcode?: string | null;
+  lotId?: string | null;
+  actor: { id: string; fullName: string };
+  now?: Date;
+}): Promise<{ barcode: string }> {
+  const now = opts.now ?? new Date();
+  const task = await prisma.mgrVideoTask.findUnique({
+    where: { id: opts.taskId },
+    include: { bags: { select: { id: true, barcode: true } } },
+  });
+  if (!task) throw new Error("TASK_NOT_FOUND");
+  if (task.status !== "new") throw new Error("NOT_COLLECTING");
+  if (task.bags.length >= task.quantity) throw new Error("ENOUGH_BAGS");
+
+  const lot = opts.lotId
+    ? await prisma.lot.findUnique({ where: { id: opts.lotId } })
+    : await prisma.lot.findFirst({ where: { barcode: opts.barcode ?? "" } });
+  if (!lot) throw new Error("LOT_NOT_FOUND");
+  if (lot.productId !== task.productId) throw new Error("WRONG_PRODUCT");
+  if (task.bags.some((b) => b.barcode === lot.barcode)) {
+    throw new Error("ALREADY_ADDED");
+  }
+  if (
+    isActiveReservation(
+      {
+        status: lot.status,
+        reservedByUserId: lot.reservedByUserId,
+        reservedUntil: lot.reservedUntil,
+      },
+      now,
+    )
+  ) {
+    throw new Error("RESERVED");
+  }
+
+  const until = endOfTomorrow(now);
+  await prisma.$transaction(async (tx) => {
+    await tx.mgrVideoTaskBag.create({
+      data: {
+        taskId: task.id,
+        status: "pending",
+        lotId: lot.id,
+        barcode: lot.barcode,
+        weight: lot.weight,
+        lotWeightKg: lot.weight,
+        broughtByUserId: opts.actor.id,
+        broughtByName: opts.actor.fullName,
+        broughtAt: now,
+      },
+    });
+    await tx.lot.update({
+      where: { id: lot.id },
+      data: videoReservationData(task, until),
+    });
+    if (task.clientId) {
+      await tx.mgrClientTimelineEntry.create({
+        data: {
+          clientId: task.clientId,
+          kind: "bron",
+          body: buildBronEventBody(lot.barcode, until),
+          occurredAt: now,
+          authorUserId: opts.actor.id,
+          metadata: {
+            lotId: lot.id,
+            barcode: lot.barcode,
+            weight: lot.weight,
+            reservedUntil: until.toISOString(),
+            videoTaskId: task.id,
+          },
+        },
+      });
+    }
+  });
+  return { barcode: lot.barcode };
+}
+
+/**
+ * Прибирає мішок із завдання (склад не несе його на відео) і знімає бронь з
+ * лота (лише якщо це бронь цього завдання — не чіпаємо чужу).
+ */
+export async function removeVideoTaskBag(opts: {
+  taskId: string;
+  bagId: string;
+}): Promise<void> {
+  const bag = await prisma.mgrVideoTaskBag.findUnique({
+    where: { id: opts.bagId },
+    include: { task: { select: { id: true, status: true, clientId: true } } },
+  });
+  if (!bag || bag.taskId !== opts.taskId) throw new Error("BAG_NOT_FOUND");
+  if (bag.task.status !== "new") throw new Error("NOT_COLLECTING");
+
+  await prisma.$transaction(async (tx) => {
+    if (bag.lotId) {
+      // Знімаємо бронь лише якщо вона належить цьому завданню/клієнту.
+      const lot = await tx.lot.findUnique({
+        where: { id: bag.lotId },
+        select: { reservedForClientId: true },
+      });
+      if (lot && lot.reservedForClientId === bag.task.clientId) {
+        await tx.lot.update({
+          where: { id: bag.lotId },
+          data: {
+            status: "free",
+            reservedForClientId: null,
+            reservedForName: null,
+            reservedByUserId: null,
+            reservedByName: null,
+            reservedUntil: null,
+          },
+        });
+      }
+    }
+    await tx.mgrVideoTaskBag.delete({ where: { id: bag.id } });
+  });
+}
+
+/** Склад завершив збирання мішків → завдання переходить у зйомку. */
+export async function advanceVideoTaskToFilming(taskId: string): Promise<void> {
+  const task = await prisma.mgrVideoTask.findUnique({
+    where: { id: taskId },
+    include: { bags: { select: { id: true } } },
+  });
+  if (!task) throw new Error("TASK_NOT_FOUND");
+  if (task.status !== "new") throw new Error("NOT_COLLECTING");
+  if (task.bags.length < 1) throw new Error("NO_BAGS");
+
+  await prisma.mgrVideoTask.update({
+    where: { id: taskId },
+    data: {
+      status: "filming",
+      // Синхронізуємо заплановану к-сть із фактично зібраною.
+      quantity: task.bags.length,
+      broughtAt: new Date(),
+    },
+  });
+}
+
+/**
+ * «Готово»: пише спільні характеристики у товар, по кожному мішку — відео/вагу
+ * у лот + оновлює бронь, ставить завдання й мішки `done`, і надсилає менеджеру
+ * інтерактивне нагадування на КОЖЕН мішок. Вимагає, щоб кожен мішок мав опис.
  */
 export async function completeVideoTask(opts: {
   taskId: string;
@@ -131,31 +264,27 @@ export async function completeVideoTask(opts: {
   now?: Date;
 }): Promise<void> {
   const now = opts.now ?? new Date();
-
   const task = await prisma.mgrVideoTask.findUnique({
     where: { id: opts.taskId },
+    include: { bags: true },
   });
   if (!task) throw new Error("TASK_NOT_FOUND");
-  if (task.status === "done") return; // ідемпотентно
-  if (!task.lotId) throw new Error("NO_LOT");
-  if (!task.youtubeDescription || !task.youtubeDescription.trim()) {
-    throw new Error("NO_DESCRIPTION");
-  }
+  if (task.status === "done") return;
+  if (task.bags.length < 1) throw new Error("NO_LOT");
+  const missing = task.bags.some(
+    (b) => !b.youtubeDescription || !b.youtubeDescription.trim(),
+  );
+  if (missing) throw new Error("NO_DESCRIPTION");
 
   const until = endOfTomorrow(now);
 
   await prisma.$transaction(async (tx) => {
-    // 1. Характеристики → товар (порожні значення не перетирають обовʼязкові
-    //    поля quality/season).
+    // Спільні характеристики → товар (порожні не перетирають обовʼязкові поля).
     const productData: Record<string, unknown> = {};
     if (task.quality && task.quality.trim()) productData.quality = task.quality;
     if (task.season && task.season.trim()) productData.season = task.season;
     if (task.gender != null) productData.gender = task.gender || null;
     if (task.sizes != null) productData.sizes = task.sizes || null;
-    if (task.unitsCount != null)
-      productData.unitsPerKg = task.unitsCount || null;
-    if (task.unitWeight != null)
-      productData.unitWeight = task.unitWeight || null;
     if (Object.keys(productData).length > 0) {
       await tx.product.update({
         where: { id: task.productId },
@@ -163,19 +292,26 @@ export async function completeVideoTask(opts: {
       });
     }
 
-    // 2. Відео + вага → лот. Бронь оновлюємо (лот уже заброньовано при скануванні
-    //    складом; тут освіжаємо вікно до 23:59 наступного дня від готовності).
-    const lotData: Record<string, unknown> = {
-      videoDate: now,
-      ...videoReservationData(task, until),
-    };
-    if (task.videoUrl && task.videoUrl.trim()) lotData.videoUrl = task.videoUrl;
-    if (task.lotWeightKg != null && Number.isFinite(task.lotWeightKg)) {
-      lotData.weight = task.lotWeightKg;
+    // Кожен мішок: відео/вага → лот + бронь; статус bag → done.
+    for (const bag of task.bags) {
+      if (bag.lotId) {
+        const lotData: Record<string, unknown> = {
+          videoDate: now,
+          ...videoReservationData(task, until),
+        };
+        if (bag.videoUrl && bag.videoUrl.trim())
+          lotData.videoUrl = bag.videoUrl;
+        if (bag.lotWeightKg != null && Number.isFinite(bag.lotWeightKg)) {
+          lotData.weight = bag.lotWeightKg;
+        }
+        await tx.lot.update({ where: { id: bag.lotId }, data: lotData });
+      }
+      await tx.mgrVideoTaskBag.update({
+        where: { id: bag.id },
+        data: { status: "done" },
+      });
     }
-    await tx.lot.update({ where: { id: task.lotId! }, data: lotData });
 
-    // 3. Завдання → done.
     await tx.mgrVideoTask.update({
       where: { id: task.id },
       data: {
@@ -185,49 +321,44 @@ export async function completeVideoTask(opts: {
       },
     });
 
-    // 4. Таймлайн клієнта (бронь) — best-effort всередині tx.
     if (task.clientId) {
       await tx.mgrClientTimelineEntry.create({
         data: {
           clientId: task.clientId,
           kind: "bron",
-          body: `Відеоогляд готовий — лот ${task.barcode ?? ""} заброньовано до ${until.toLocaleDateString("uk-UA")}`,
+          body: `Відеоогляд готовий (${task.bags.length} міш.) — заброньовано до ${until.toLocaleDateString("uk-UA")}`,
           occurredAt: now,
           authorUserId: opts.actorUserId,
-          metadata: {
-            lotId: task.lotId,
-            barcode: task.barcode,
-            reservedUntil: until.toISOString(),
-            videoTaskId: task.id,
-          },
+          metadata: { videoTaskId: task.id, bags: task.bags.length },
         },
       });
     }
   });
 
-  // 5. Нагадування менеджеру «відео готове» — інтерактивне (viber_video) →
-  //    у списку зʼявиться кнопка «Надіслати відео клієнту». Best-effort.
+  // Нагадування менеджеру — на кожен мішок (кожне відео шариться окремо).
   if (task.managerUserId) {
-    try {
-      await prisma.mgrReminder.create({
-        data: {
-          ownerUserId: task.managerUserId,
-          clientId: task.clientId,
-          productId: task.productId,
-          lotId: task.lotId,
-          body: `Відео готове: ${task.productName}${task.barcode ? " · " + task.barcode : ""} для ${task.clientName ?? "клієнта"}. Надішліть клієнту.`,
-          remindAt: now,
-          periodicity: "event",
-          orderVideo: true,
-          actionType: "viber_video",
-          source: "auto_video",
-        },
-      });
-    } catch (err) {
-      console.error("[L-TEX] completeVideoTask notify failed", {
-        taskId: task.id,
-        error: err instanceof Error ? err.message : String(err),
-      });
+    for (const bag of task.bags) {
+      try {
+        await prisma.mgrReminder.create({
+          data: {
+            ownerUserId: task.managerUserId,
+            clientId: task.clientId,
+            productId: task.productId,
+            lotId: bag.lotId,
+            body: `Відео готове: ${task.productName}${bag.barcode ? " · " + bag.barcode : ""} для ${task.clientName ?? "клієнта"}. Надішліть клієнту.`,
+            remindAt: now,
+            periodicity: "event",
+            orderVideo: true,
+            actionType: "viber_video",
+            source: "auto_video",
+          },
+        });
+      } catch (err) {
+        console.error("[L-TEX] completeVideoTask notify failed", {
+          taskId: task.id,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
     }
   }
 }

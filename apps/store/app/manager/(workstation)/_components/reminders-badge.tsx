@@ -1,12 +1,15 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { subscribeRemindersChanged } from "@/lib/manager/reminders-broadcast";
 
 const POLL_INTERVAL_MS = 30_000;
 
 /**
  * Лічильник незакритих нагадувань «на мене» для пункту «Нагадування» у сайдбарі.
- * Polling 30с + при поверненні видимості. Помилки ковтаються.
+ * Polling 30с + при поверненні видимості + МИТТЄВЕ оновлення через broadcast
+ * (сторінка нагадувань шле подію при виконати/відкласти/видалити). Помилки
+ * ковтаються.
  */
 export function RemindersBadge() {
   const [total, setTotal] = useState(0);
@@ -31,9 +34,11 @@ export function RemindersBadge() {
       if (document.visibilityState === "visible") void refetch();
     }
     document.addEventListener("visibilitychange", onVis);
+    const unsubscribe = subscribeRemindersChanged(() => void refetch());
     return () => {
       window.clearInterval(id);
       document.removeEventListener("visibilitychange", onVis);
+      unsubscribe();
     };
   }, [refetch]);
 

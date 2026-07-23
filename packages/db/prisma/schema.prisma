@@ -2751,10 +2751,46 @@ model MgrVideoTask {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
+  // Мішки завдання (може бути кілька — по одному на кожну одиницю «quantity»).
+  // Склад сканує кожен окремо; відеозона знімає й описує кожен окремо.
+  bags MgrVideoTaskBag[]
+
   @@index([status])
   @@index([assignedUserId, status])
   @@index([managerUserId, status])
   @@map("mgr_video_tasks")
+}
+
+// Окремий мішок у складі відеозавдання (по одному ШК на одиницю). Склад сканує
+// кожен → бронюється на клієнта; відеозона знімає й описує кожен окремо
+// (свій ШК/вага/к-сть/відео/опис). Спільні характеристики (сезон/сорт/стать/
+// розміри) лежать на завданні. `status`: pending → done.
+model MgrVideoTaskBag {
+  id     String @id @default(cuid())
+  taskId String @map("task_id")
+  status String @default("pending") // pending | done
+
+  lotId   String? @map("lot_id")
+  barcode String?
+  weight  Float? // знімок ваги лота при скануванні
+
+  unitsCount         String? @map("units_count")
+  unitWeight         String? @map("unit_weight")
+  lotWeightKg        Float?  @map("lot_weight_kg")
+  videoUrl           String? @map("video_url")
+  youtubeDescription String? @map("youtube_description") @db.Text
+
+  broughtByUserId String?   @map("brought_by_user_id")
+  broughtByName   String?   @map("brought_by_name")
+  broughtAt       DateTime? @map("brought_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  task MgrVideoTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@index([taskId])
+  @@map("mgr_video_task_bags")
 }
 
 // Довідник посилань для YouTube-опису відеоогляду (група Viber, сайт, TikTok,

@@ -3,6 +3,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Bell } from "lucide-react";
 import { useRouter } from "next/navigation";
+import {
+  broadcastRemindersChanged,
+  subscribeRemindersChanged,
+} from "@/lib/manager/reminders-broadcast";
 
 interface NotificationItem {
   id: string;
@@ -57,7 +61,11 @@ export function HeaderNotificationsBell() {
   useEffect(() => {
     void refetch();
     const id = window.setInterval(() => void refetch(), POLL_INTERVAL_MS);
-    return () => window.clearInterval(id);
+    const unsubscribe = subscribeRemindersChanged(() => void refetch());
+    return () => {
+      window.clearInterval(id);
+      unsubscribe();
+    };
   }, [refetch]);
 
   useEffect(() => {
@@ -111,6 +119,7 @@ export function HeaderNotificationsBell() {
       } catch {
         // best-effort
       }
+      broadcastRemindersChanged(); // бейдж «Нагадування» у сайдбарі — миттєво
       void refetch();
     },
     [refetch],

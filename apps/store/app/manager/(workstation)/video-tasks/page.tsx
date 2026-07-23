@@ -54,6 +54,12 @@ export default async function VideoTasksPage({
     where,
     orderBy: { updatedAt: "desc" },
     take: 200,
+    include: {
+      bags: {
+        select: { barcode: true, videoUrl: true },
+        orderBy: { createdAt: "asc" },
+      },
+    },
   });
 
   // Лічильник виконаних за поточний місяць (реєстр «я відзняв»).
@@ -131,14 +137,19 @@ export default async function VideoTasksPage({
                   </p>
                   <p className="mt-0.5 text-sm text-gray-500">
                     {hideClient ? "" : `Клієнт: ${t.clientName ?? "—"} · `}
-                    {t.quantity} шт.
+                    {t.quantity} міш.
                     {t.articleCode ? ` · арт. ${t.articleCode}` : ""}
-                    {t.barcode ? ` · мішок ${t.barcode}` : ""}
+                    {t.bags.length > 0
+                      ? ` · ${t.bags
+                          .map((b) => b.barcode)
+                          .filter(Boolean)
+                          .join(", ")}`
+                      : ""}
                     {t.managerName ? ` · менеджер: ${t.managerName}` : ""}
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
-                  {t.videoUrl ? (
+                  {t.bags.some((b) => b.videoUrl) ? (
                     <span className="rounded bg-green-50 px-2 py-0.5 text-xs text-green-700">
                       відео є
                     </span>

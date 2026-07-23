@@ -1,22 +1,26 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@ltex/db";
 import { getCurrentUser } from "@/lib/auth/manager-auth";
-import { bringVideoTaskSchema } from "@/lib/validations/video-task";
-import { isActiveReservation } from "@/lib/manager/lot-booking";
-import { endOfTomorrow, videoReservationData } from "@/lib/manager/video-task";
-import { buildBronEventBody } from "@/lib/manager/client-timeline";
+import { addBagSchema } from "@/lib/validations/video-task";
+import { addVideoTaskBag } from "@/lib/manager/video-task";
 
 /**
  * POST /api/v1/manager/video-tasks/[id]/bring
  *
- * Склад фізично бере будь-який вільний мішок цього товару й СКАНУЄ його штрихкод
- * (система не диктує, який мішок брати). Лот прикріплюється до завдання, статус →
- * `filming`, і лот ОДРАЗУ бронюється на клієнта завдання до 23:59 наступного дня
- * (щоб його не продали, поки відеозона знімає). Відеозона далі бачить конкретне
- * завдання по конкретному лоту. Гейт: склад / admin / owner.
+ * Склад сканує черговий мішок (ШК) → додає його у завдання й одразу бронює лот
+ * на клієнта. Повертає ШК доданого мішка. Гейт: склад / admin / owner.
  */
 
 const BRING_ROLES = ["warehouse", "admin", "owner"];
+
+const ERR_STATUS: Record<string, { code: number; msg: string }> = {
+  TASK_NOT_FOUND: { code: 404, msg: "Завдання не знайдено" },
+  NOT_COLLECTING: { code: 409, msg: "Мішки вже передано у відеозону" },
+  ENOUGH_BAGS: { code: 409, msg: "Відскановано потрібну кількість мішків" },
+  LOT_NOT_FOUND: { code: 404, msg: "Мішок не знайдено" },
+  WRONG_PRODUCT: { code: 409, msg: "Цей мішок належить іншому товару" },
+  ALREADY_ADDED: { code: 409, msg: "Цей мішок уже додано" },
+  RESERVED: { code: 409, msg: "Мішок заброньовано" },
+};
 
 export async function POST(
   req: NextRequest,
@@ -32,107 +36,29 @@ export async function POST(
 
   const { id } = await params;
   const body = await req.json().catch(() => ({}));
-  const parsed = bringVideoTaskSchema.safeParse(body ?? {});
-  if (!parsed.success) {
-    return NextResponse.json({ error: "Невірні дані" }, { status: 400 });
-  }
-  // Мішок треба саме відсканувати (ШК) або обрати конкретний лот — «навмання»
-  // склад не передає, бере фізично будь-який і сканує.
-  if (!parsed.data.barcode && !parsed.data.lotId) {
+  const parsed = addBagSchema.safeParse(body ?? {});
+  if (!parsed.success || (!parsed.data.barcode && !parsed.data.lotId)) {
     return NextResponse.json(
       { error: "Відскануйте штрихкод мішка" },
       { status: 400 },
     );
   }
 
-  const task = await prisma.mgrVideoTask.findUnique({ where: { id } });
-  if (!task) {
-    return NextResponse.json(
-      { error: "Завдання не знайдено" },
-      { status: 404 },
-    );
-  }
-  if (task.status !== "new") {
-    return NextResponse.json({ error: "Мішок уже принесено" }, { status: 409 });
-  }
-
-  const now = new Date();
-
-  const lot = parsed.data.lotId
-    ? await prisma.lot.findUnique({ where: { id: parsed.data.lotId } })
-    : await prisma.lot.findFirst({ where: { barcode: parsed.data.barcode } });
-
-  if (!lot) {
-    return NextResponse.json({ error: "Мішок не знайдено" }, { status: 404 });
-  }
-  if (lot.productId !== task.productId) {
-    return NextResponse.json(
-      { error: "Цей мішок належить іншому товару" },
-      { status: 409 },
-    );
-  }
-  if (
-    isActiveReservation(
-      {
-        status: lot.status,
-        reservedByUserId: lot.reservedByUserId,
-        reservedUntil: lot.reservedUntil,
-      },
-      now,
-    )
-  ) {
-    return NextResponse.json(
-      {
-        error: lot.reservedForName
-          ? `Мішок заброньовано (${lot.reservedForName})`
-          : "Мішок заброньовано",
-      },
-      { status: 409 },
-    );
-  }
-
-  const until = endOfTomorrow(now);
-
-  await prisma.$transaction(async (tx) => {
-    // Прикріпити лот до завдання + перевести у зйомку + зафіксувати ваги/склад.
-    await tx.mgrVideoTask.update({
-      where: { id },
-      data: {
-        status: "filming",
-        lotId: lot.id,
-        barcode: lot.barcode,
-        lotWeightKg: task.lotWeightKg ?? lot.weight,
-        broughtAt: now,
-        broughtByUserId: user.id,
-        broughtByName: user.fullName,
-      },
+  try {
+    const res = await addVideoTaskBag({
+      taskId: id,
+      barcode: parsed.data.barcode ?? null,
+      lotId: parsed.data.lotId ?? null,
+      actor: { id: user.id, fullName: user.fullName },
     });
-
-    // Одразу забронювати лот на клієнта завдання (до 23:59 наступного дня).
-    await tx.lot.update({
-      where: { id: lot.id },
-      data: videoReservationData(task, until),
-    });
-
-    if (task.clientId) {
-      await tx.mgrClientTimelineEntry.create({
-        data: {
-          clientId: task.clientId,
-          kind: "bron",
-          body: buildBronEventBody(lot.barcode, until),
-          occurredAt: now,
-          authorUserId: user.id,
-          metadata: {
-            lotId: lot.id,
-            barcode: lot.barcode,
-            weight: lot.weight,
-            reservedUntil: until.toISOString(),
-            videoTaskId: task.id,
-          },
-        },
-      });
+    return NextResponse.json({ ok: true, barcode: res.barcode });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    const known = ERR_STATUS[msg];
+    if (known) {
+      return NextResponse.json({ error: known.msg }, { status: known.code });
     }
-  });
-
-  return NextResponse.json({ ok: true, barcode: lot.barcode });
+    console.error("[L-TEX] add video bag failed", { error: msg });
+    return NextResponse.json({ error: "Не вдалося" }, { status: 500 });
+  }
 }

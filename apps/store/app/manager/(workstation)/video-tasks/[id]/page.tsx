@@ -20,7 +20,10 @@ export default async function VideoTaskDetailPage({
   if (!user) redirect("/manager/login");
 
   const { id } = await params;
-  const task = await prisma.mgrVideoTask.findUnique({ where: { id } });
+  const task = await prisma.mgrVideoTask.findUnique({
+    where: { id },
+    include: { bags: { orderBy: { createdAt: "asc" } } },
+  });
   if (!task) notFound();
 
   const attrs = await loadProductAttributeOptions();
@@ -33,19 +36,24 @@ export default async function VideoTaskDetailPage({
     productName: task.productName,
     articleCode: task.articleCode,
     quantity: task.quantity,
-    barcode: task.barcode,
     requestedBarcode: task.requestedBarcode,
     assignedName: task.assignedName,
-    videoUrl: task.videoUrl,
-    youtubeDescription: task.youtubeDescription,
     season: task.season,
     quality: task.quality,
     gender: task.gender,
     sizes: task.sizes,
-    unitsCount: task.unitsCount,
-    unitWeight: task.unitWeight,
-    lotWeightKg: task.lotWeightKg,
     completedAt: task.completedAt ? task.completedAt.toISOString() : null,
+    bags: task.bags.map((b) => ({
+      id: b.id,
+      status: b.status,
+      barcode: b.barcode,
+      weight: b.weight,
+      unitsCount: b.unitsCount,
+      unitWeight: b.unitWeight,
+      lotWeightKg: b.lotWeightKg,
+      videoUrl: b.videoUrl,
+      youtubeDescription: b.youtubeDescription,
+    })),
   };
 
   return (

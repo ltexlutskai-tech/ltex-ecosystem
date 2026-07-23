@@ -11,6 +11,18 @@ export interface AttrOption {
   label: string;
 }
 
+export interface VideoBagView {
+  id: string;
+  status: string;
+  barcode: string | null;
+  weight: number | null;
+  unitsCount: string | null;
+  unitWeight: string | null;
+  lotWeightKg: number | null;
+  videoUrl: string | null;
+  youtubeDescription: string | null;
+}
+
 export interface VideoTaskView {
   id: string;
   status: string;
@@ -19,23 +31,18 @@ export interface VideoTaskView {
   productName: string;
   articleCode: string | null;
   quantity: number;
-  barcode: string | null;
   requestedBarcode: string | null;
   assignedName: string | null;
-  videoUrl: string | null;
-  youtubeDescription: string | null;
   season: string | null;
   quality: string | null;
   gender: string | null;
   sizes: string | null;
-  unitsCount: string | null;
-  unitWeight: string | null;
-  lotWeightKg: number | null;
   completedAt: string | null;
+  bags: VideoBagView[];
 }
 
 const STATUS_META: Record<string, { label: string; cls: string }> = {
-  new: { label: "Принести мішок", cls: "bg-amber-100 text-amber-700" },
+  new: { label: "Принести мішки", cls: "bg-amber-100 text-amber-700" },
   filming: { label: "На зйомці", cls: "bg-blue-100 text-blue-700" },
   done: { label: "Готово", cls: "bg-green-100 text-green-700" },
   cancelled: { label: "Скасовано", cls: "bg-gray-100 text-gray-500" },
@@ -58,8 +65,6 @@ export function VideoTaskDetail({
   genderOptions: AttrOption[];
 }) {
   const router = useRouter();
-  const { confirm, dialog } = usePortalConfirm();
-
   const meta = STATUS_META[task.status] ?? STATUS_META.new!;
   // Відеозона не бачить клієнта — лише артикул, назву товару та менеджера.
   const hideClient = role === "videozone";
@@ -79,20 +84,10 @@ export function VideoTaskDetail({
                 ·{" "}
               </>
             ) : null}
-            {task.quantity} шт.
+            {task.quantity} міш.
             {task.articleCode ? ` · арт. ${task.articleCode}` : ""}
             {task.managerName ? ` · менеджер: ${task.managerName}` : ""}
           </p>
-          {task.barcode ? (
-            <p className="mt-0.5 text-sm text-gray-500">
-              Мішок: <span className="font-mono">{task.barcode}</span>
-            </p>
-          ) : task.requestedBarcode ? (
-            <p className="mt-0.5 text-sm text-gray-500">
-              Просили мішок:{" "}
-              <span className="font-mono">{task.requestedBarcode}</span>
-            </p>
-          ) : null}
         </div>
         <span
           className={`rounded-full px-3 py-1 text-sm font-medium ${meta.cls}`}
@@ -102,7 +97,7 @@ export function VideoTaskDetail({
       </div>
 
       {task.status === "new" && BRING_ROLES.includes(role) ? (
-        <BringSection task={task} />
+        <CollectSection task={task} />
       ) : null}
 
       {task.status === "filming" && FILM_ROLES.includes(role) ? (
@@ -119,11 +114,29 @@ export function VideoTaskDetail({
       {task.status !== "done" &&
       !(task.status === "new" && BRING_ROLES.includes(role)) &&
       !(task.status === "filming" && FILM_ROLES.includes(role)) ? (
-        <p className="rounded-md border border-dashed p-6 text-center text-sm text-gray-500">
-          {task.status === "new"
-            ? "Очікуємо, поки склад принесе мішок."
-            : "Завдання на зйомці у відеозоні."}
-        </p>
+        <div className="rounded-md border border-dashed p-6 text-sm text-gray-500">
+          <p className="text-center">
+            {task.status === "new"
+              ? "Очікуємо, поки склад збере й принесе мішки."
+              : "Завдання на зйомці у відеозоні."}
+          </p>
+          {task.bags.length > 0 ? (
+            <ul className="mx-auto mt-3 max-w-sm space-y-1">
+              {task.bags.map((b) => (
+                <li key={b.id} className="flex justify-between font-mono">
+                  <span>{b.barcode}</span>
+                  <span>
+                    {b.videoUrl
+                      ? "🎬 відео є"
+                      : b.status === "done"
+                        ? "готово"
+                        : "очікує"}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+        </div>
       ) : null}
 
       <div className="pt-2">
@@ -131,40 +144,32 @@ export function VideoTaskDetail({
           type="button"
           variant="outline"
           size="sm"
-          onClick={() => {
-            if (task.status === "filming" && FILM_ROLES.includes(role)) {
-              confirm({
-                title: "Скасувати завдання?",
-                message: "Завдання буде скасовано без збереження.",
-                destructive: true,
-                confirmLabel: "Скасувати завдання",
-                cancelLabel: "Ні",
-                onConfirm: () => router.push("/manager/video-tasks"),
-              });
-            } else {
-              router.push("/manager/video-tasks");
-            }
-          }}
+          onClick={() => router.push("/manager/video-tasks")}
         >
           ← До списку
         </Button>
       </div>
-      {dialog}
     </>
   );
 }
 
 /**
- * Крок складу: взяти будь-який вільний мішок і ВІДСКАНУВАТИ його штрихкод
- * (камерою або сканером/вручну — через спільний `BarcodeInput`).
+ * Крок складу: сканує по одному ШК на кожен мішок (камера/сканер). Може
+ * видалити зайвий рядок (мішок не несуть на відео з якоїсь причини) — тоді
+ * бронь з нього знімається, а планова к-сть зменшується. «Передати у відеозону»
+ * активна, коли є хоча б один мішок.
  */
-function BringSection({ task }: { task: VideoTaskView }) {
+function CollectSection({ task }: { task: VideoTaskView }) {
   const router = useRouter();
   const { toast } = useToast();
+  const { confirm, dialog } = usePortalConfirm();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function bring(code: string) {
+  const scanned = task.bags.length;
+  const remaining = Math.max(0, task.quantity - scanned);
+
+  async function addBag(code: string) {
     const barcode = code.trim();
     if (!barcode || busy) return;
     setBusy(true);
@@ -184,7 +189,55 @@ function BringSection({ task }: { task: VideoTaskView }) {
         toast({ title: data.error ?? "Не вдалося", variant: "destructive" });
         return;
       }
-      toast({ title: `Мішок ${data.barcode ?? barcode} передано у відеозону` });
+      toast({
+        title: `Мішок ${data.barcode ?? barcode} додано (заброньовано)`,
+      });
+      router.refresh();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function removeBag(bagId: string, barcode: string | null) {
+    confirm({
+      title: "Прибрати мішок?",
+      message: `Мішок ${barcode ?? ""} не понесуть на відео — бронь буде знято.`,
+      destructive: true,
+      confirmLabel: "Прибрати",
+      cancelLabel: "Ні",
+      onConfirm: async () => {
+        const res = await fetch(
+          `/api/v1/manager/video-tasks/${task.id}/bags/${bagId}`,
+          { method: "DELETE" },
+        );
+        if (!res.ok) {
+          const data = (await res.json().catch(() => ({}))) as {
+            error?: string;
+          };
+          toast({ title: data.error ?? "Не вдалося", variant: "destructive" });
+          return;
+        }
+        toast({ title: "Мішок прибрано, бронь знято" });
+        router.refresh();
+      },
+    });
+  }
+
+  async function advance() {
+    setBusy(true);
+    try {
+      const res = await fetch(
+        `/api/v1/manager/video-tasks/${task.id}/advance`,
+        {
+          method: "POST",
+        },
+      );
+      if (!res.ok) {
+        const data = (await res.json().catch(() => ({}))) as { error?: string };
+        toast({ title: data.error ?? "Не вдалося", variant: "destructive" });
+        return;
+      }
+      toast({ title: "Мішки передано у відеозону" });
       router.refresh();
     } finally {
       setBusy(false);
@@ -194,10 +247,14 @@ function BringSection({ task }: { task: VideoTaskView }) {
   return (
     <div className="space-y-3 rounded-md border bg-white p-4">
       <p className="text-sm text-gray-600">
-        Візьміть будь-який вільний мішок цього товару, відскануйте його штрихкод
-        (камерою чи сканером) — і віднесіть у відеозону. Мішок одразу
-        забронюється на клієнта.
+        Візьміть{" "}
+        {task.quantity > 1
+          ? `${task.quantity} вільних мішки(ів)`
+          : "вільний мішок"}{" "}
+        цього товару і відскануйте штрихкод кожного (камерою чи сканером). Кожен
+        відсканований мішок одразу бронюється на клієнта.
       </p>
+
       {task.requestedBarcode ? (
         <div className="flex flex-wrap items-center justify-between gap-2 rounded-md bg-amber-50 p-2 text-sm">
           <span>
@@ -208,24 +265,74 @@ function BringSection({ task }: { task: VideoTaskView }) {
             type="button"
             size="sm"
             disabled={busy}
-            onClick={() => bring(task.requestedBarcode!)}
+            onClick={() => addBag(task.requestedBarcode!)}
           >
-            Передати цей мішок
+            Додати цей мішок
           </Button>
         </div>
       ) : null}
-      <div>
-        <label className="mb-1 block text-sm font-medium text-gray-700">
-          Штрихкод мішка
-        </label>
-        <BarcodeInput onCode={bring} error={error} disabled={busy} />
+
+      {task.bags.length > 0 ? (
+        <ul className="space-y-1">
+          {task.bags.map((b, i) => (
+            <li
+              key={b.id}
+              className="flex items-center justify-between rounded-md bg-gray-50 px-3 py-2 text-sm"
+            >
+              <span>
+                <span className="mr-2 text-gray-400">{i + 1}.</span>
+                <span className="font-mono">{b.barcode}</span>
+                {b.weight != null ? (
+                  <span className="ml-2 text-gray-500">{b.weight} кг</span>
+                ) : null}
+              </span>
+              <button
+                type="button"
+                className="text-xs text-red-600 hover:underline"
+                onClick={() => removeBag(b.id, b.barcode)}
+              >
+                Прибрати
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+
+      <div className="text-sm text-gray-500">
+        Відскановано {scanned} з {task.quantity}
+        {remaining > 0 ? ` — ще ${remaining}` : " ✓"}
       </div>
+
+      {remaining > 0 ? (
+        <div>
+          <label className="mb-1 block text-sm font-medium text-gray-700">
+            Штрихкод мішка №{scanned + 1}
+          </label>
+          <BarcodeInput onCode={addBag} error={error} disabled={busy} />
+        </div>
+      ) : null}
+
+      <div className="border-t pt-3">
+        <Button
+          type="button"
+          disabled={busy || scanned === 0}
+          onClick={advance}
+        >
+          Передати у відеозону ({scanned} міш.)
+        </Button>
+        {scanned < task.quantity && scanned > 0 ? (
+          <p className="mt-1 text-xs text-gray-500">
+            Можна передати й менше, ніж просили — планова кількість зміниться на{" "}
+            {scanned}.
+          </p>
+        ) : null}
+      </div>
+      {dialog}
     </div>
   );
 }
 
-/** Селект характеристики з довідника (сезон/сорт/стать). Показує поточне
- *  значення навіть якщо його немає у списку (легасі-код). */
+/** Селект характеристики з довідника (сезон/сорт/стать). */
 function AttrField({
   label,
   value,
@@ -260,7 +367,10 @@ function AttrField({
   );
 }
 
-/** Крок відеозони: характеристики + відео + опис + Готово. */
+/**
+ * Крок відеозони: спільні характеристики (довідники) + по кожному мішку —
+ * вага/к-сть/відео/опис. «Готово» активне, коли КОЖЕН мішок має опис.
+ */
 function FilmSection({
   task,
   seasonOptions,
@@ -274,72 +384,34 @@ function FilmSection({
 }) {
   const router = useRouter();
   const { toast } = useToast();
-  const [form, setForm] = useState({
+  const [shared, setShared] = useState({
     season: task.season ?? "",
     quality: task.quality ?? "",
     gender: task.gender ?? "",
     sizes: task.sizes ?? "",
-    unitsCount: task.unitsCount ?? "",
-    unitWeight: task.unitWeight ?? "",
-    lotWeightKg: task.lotWeightKg != null ? String(task.lotWeightKg) : "",
-    videoUrl: task.videoUrl ?? "",
   });
-  const [description, setDescription] = useState(task.youtubeDescription ?? "");
-  const [saving, setSaving] = useState(false);
-  const [forming, setForming] = useState(false);
+  const [savingShared, setSavingShared] = useState(false);
   const [finishing, setFinishing] = useState(false);
+  // Лічильник описів (локальний стан з бекенду через bags props).
+  const [described, setDescribed] = useState<Set<string>>(
+    new Set(
+      task.bags.filter((b) => b.youtubeDescription?.trim()).map((b) => b.id),
+    ),
+  );
 
-  const set = (k: keyof typeof form) => (v: string) =>
-    setForm((f) => ({ ...f, [k]: v }));
+  const allDescribed =
+    task.bags.length > 0 && task.bags.every((b) => described.has(b.id));
 
-  // Вага одиниці рахується автоматично = вага лота ÷ кількість одиниць
-  // (перераховуємо при зміні кількості або ваги лота).
-  function recalcUnitWeight(next: {
-    unitsCount: string;
-    lotWeightKg: string;
-  }): string {
-    const units = parseFloat(next.unitsCount.replace(",", "."));
-    const lotKg = parseFloat(next.lotWeightKg.replace(",", "."));
-    if (units > 0 && lotKg > 0) {
-      return String(Math.round((lotKg / units) * 1000) / 1000);
-    }
-    return form.unitWeight;
-  }
-  const setUnitsCount = (v: string) =>
-    setForm((f) => {
-      const nf = { ...f, unitsCount: v };
-      nf.unitWeight = recalcUnitWeight({
-        unitsCount: v,
-        lotWeightKg: f.lotWeightKg,
-      });
-      return nf;
-    });
-  const setLotWeight = (v: string) =>
-    setForm((f) => {
-      const nf = { ...f, lotWeightKg: v };
-      nf.unitWeight = recalcUnitWeight({
-        unitsCount: f.unitsCount,
-        lotWeightKg: v,
-      });
-      return nf;
-    });
+  const setS = (k: keyof typeof shared) => (v: string) =>
+    setShared((f) => ({ ...f, [k]: v }));
 
-  async function save(): Promise<boolean> {
-    setSaving(true);
+  async function saveShared(): Promise<boolean> {
+    setSavingShared(true);
     try {
       const res = await fetch(`/api/v1/manager/video-tasks/${task.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          season: form.season,
-          quality: form.quality,
-          gender: form.gender,
-          sizes: form.sizes,
-          unitsCount: form.unitsCount,
-          unitWeight: form.unitWeight,
-          lotWeightKg: form.lotWeightKg ? Number(form.lotWeightKg) : null,
-          videoUrl: form.videoUrl,
-        }),
+        body: JSON.stringify(shared),
       });
       if (!res.ok) {
         const data = (await res.json().catch(() => ({}))) as { error?: string };
@@ -351,41 +423,7 @@ function FilmSection({
       }
       return true;
     } finally {
-      setSaving(false);
-    }
-  }
-
-  async function formDescription() {
-    if (!form.videoUrl.trim()) {
-      toast({
-        title: "Спершу вставте посилання на відео",
-        variant: "destructive",
-      });
-      return;
-    }
-    setForming(true);
-    try {
-      const ok = await save();
-      if (!ok) return;
-      const res = await fetch(
-        `/api/v1/manager/video-tasks/${task.id}/description`,
-        { method: "POST" },
-      );
-      const data = (await res.json().catch(() => ({}))) as {
-        error?: string;
-        description?: string;
-      };
-      if (!res.ok || !data.description) {
-        toast({
-          title: data.error ?? "Не вдалося сформувати опис",
-          variant: "destructive",
-        });
-        return;
-      }
-      setDescription(data.description);
-      toast({ title: "Опис сформовано" });
-    } finally {
-      setForming(false);
+      setSavingShared(false);
     }
   }
 
@@ -404,12 +442,212 @@ function FilmSection({
         return;
       }
       toast({
-        title: "Готово! Лот заброньовано, менеджеру надіслано сповіщення.",
+        title: "Готово! Лоти заброньовано, менеджеру надіслано сповіщення.",
       });
       router.push("/manager/video-tasks");
       router.refresh();
     } finally {
       setFinishing(false);
+    }
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="space-y-4 rounded-md border bg-white p-4">
+        <h2 className="text-sm font-semibold text-gray-800">
+          Спільні характеристики (для всіх мішків)
+        </h2>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <AttrField
+            label="Сезон"
+            value={shared.season}
+            options={seasonOptions}
+            onChange={setS("season")}
+          />
+          <AttrField
+            label="Сорт"
+            value={shared.quality}
+            options={qualityOptions}
+            onChange={setS("quality")}
+          />
+          <AttrField
+            label="Стать"
+            value={shared.gender}
+            options={genderOptions}
+            onChange={setS("gender")}
+          />
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700">
+              Розміри
+            </label>
+            <Input
+              value={shared.sizes}
+              onChange={(e) => setS("sizes")(e.target.value)}
+            />
+          </div>
+        </div>
+        <p className="text-xs text-gray-400">
+          Підтягнуто з картки товару (довідники) — за потреби скоригуйте, потім
+          «Зберегти». Значення потраплять у кожен опис.
+        </p>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          disabled={savingShared}
+          onClick={saveShared}
+        >
+          {savingShared ? "…" : "Зберегти характеристики"}
+        </Button>
+      </div>
+
+      {task.bags.map((bag, i) => (
+        <BagCard
+          key={bag.id}
+          taskId={task.id}
+          bag={bag}
+          index={i}
+          total={task.bags.length}
+          onSaveShared={saveShared}
+          onDescribed={(id) =>
+            setDescribed((s) => {
+              const next = new Set(s);
+              next.add(id);
+              return next;
+            })
+          }
+        />
+      ))}
+
+      <div className="rounded-md border bg-white p-4">
+        <Button
+          type="button"
+          disabled={finishing || !allDescribed}
+          onClick={finish}
+          title={allDescribed ? undefined : "Сформуйте опис для кожного мішка"}
+        >
+          {finishing ? "…" : "Готово"}
+        </Button>
+        {!allDescribed ? (
+          <p className="mt-1 text-xs text-gray-500">
+            Кнопка активна, коли для кожного мішка сформовано YouTube-опис.
+          </p>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+/** Картка одного мішка у зйомці: вага/к-сть/відео + опис. */
+function BagCard({
+  taskId,
+  bag,
+  index,
+  total,
+  onSaveShared,
+  onDescribed,
+}: {
+  taskId: string;
+  bag: VideoBagView;
+  index: number;
+  total: number;
+  onSaveShared: () => Promise<boolean>;
+  onDescribed: (bagId: string) => void;
+}) {
+  const { toast } = useToast();
+  const [form, setForm] = useState({
+    unitsCount: bag.unitsCount ?? "",
+    unitWeight: bag.unitWeight ?? "",
+    lotWeightKg:
+      bag.lotWeightKg != null
+        ? String(bag.lotWeightKg)
+        : bag.weight != null
+          ? String(bag.weight)
+          : "",
+    videoUrl: bag.videoUrl ?? "",
+  });
+  const [description, setDescription] = useState(bag.youtubeDescription ?? "");
+  const [busy, setBusy] = useState(false);
+
+  // Вага одиниці = вага лота ÷ кількість (авто, редагована).
+  function recalc(units: string, lotKg: string): string {
+    const u = parseFloat(units.replace(",", "."));
+    const w = parseFloat(lotKg.replace(",", "."));
+    if (u > 0 && w > 0) return String(Math.round((w / u) * 1000) / 1000);
+    return form.unitWeight;
+  }
+  const setUnits = (v: string) =>
+    setForm((f) => ({
+      ...f,
+      unitsCount: v,
+      unitWeight: recalc(v, f.lotWeightKg),
+    }));
+  const setLotKg = (v: string) =>
+    setForm((f) => ({
+      ...f,
+      lotWeightKg: v,
+      unitWeight: recalc(f.unitsCount, v),
+    }));
+
+  async function saveBag(): Promise<boolean> {
+    const res = await fetch(
+      `/api/v1/manager/video-tasks/${taskId}/bags/${bag.id}`,
+      {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          unitsCount: form.unitsCount,
+          unitWeight: form.unitWeight,
+          lotWeightKg: form.lotWeightKg ? Number(form.lotWeightKg) : null,
+          videoUrl: form.videoUrl,
+        }),
+      },
+    );
+    if (!res.ok) {
+      const data = (await res.json().catch(() => ({}))) as { error?: string };
+      toast({
+        title: data.error ?? "Не вдалося зберегти",
+        variant: "destructive",
+      });
+      return false;
+    }
+    return true;
+  }
+
+  async function formDescription() {
+    if (!form.videoUrl.trim()) {
+      toast({
+        title: "Спершу вставте посилання на відео",
+        variant: "destructive",
+      });
+      return;
+    }
+    setBusy(true);
+    try {
+      const okShared = await onSaveShared();
+      if (!okShared) return;
+      const okBag = await saveBag();
+      if (!okBag) return;
+      const res = await fetch(
+        `/api/v1/manager/video-tasks/${taskId}/bags/${bag.id}/description`,
+        { method: "POST" },
+      );
+      const data = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        description?: string;
+      };
+      if (!res.ok || !data.description) {
+        toast({
+          title: data.error ?? "Не вдалося сформувати опис",
+          variant: "destructive",
+        });
+        return;
+      }
+      setDescription(data.description);
+      onDescribed(bag.id);
+      toast({ title: "Опис сформовано" });
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -423,11 +661,20 @@ function FilmSection({
   }
 
   return (
-    <div className="space-y-4 rounded-md border bg-white p-4">
-      <h2 className="text-sm font-semibold text-gray-800">
-        Характеристики лота
-      </h2>
-      <div className="grid gap-3 sm:grid-cols-2">
+    <div className="space-y-3 rounded-md border bg-white p-4">
+      <div className="flex items-center justify-between">
+        <h3 className="text-sm font-semibold text-gray-800">
+          Мішок {total > 1 ? `${index + 1} з ${total}` : ""}{" "}
+          <span className="font-mono text-gray-500">{bag.barcode}</span>
+        </h3>
+        {description ? (
+          <span className="rounded bg-green-50 px-2 py-0.5 text-xs text-green-700">
+            опис є
+          </span>
+        ) : null}
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-3">
         <div>
           <label className="mb-1 block text-sm font-medium text-gray-700">
             Вага лота, кг
@@ -435,7 +682,7 @@ function FilmSection({
           <Input
             type="number"
             value={form.lotWeightKg}
-            onChange={(e) => setLotWeight(e.target.value)}
+            onChange={(e) => setLotKg(e.target.value)}
           />
         </div>
         <div>
@@ -445,7 +692,7 @@ function FilmSection({
           <Input
             type="number"
             value={form.unitsCount}
-            onChange={(e) => setUnitsCount(e.target.value)}
+            onChange={(e) => setUnits(e.target.value)}
             placeholder="напр. 20"
           />
         </div>
@@ -455,45 +702,13 @@ function FilmSection({
           </label>
           <Input
             value={form.unitWeight}
-            onChange={(e) => set("unitWeight")(e.target.value)}
-            placeholder="розрахується автоматично"
-          />
-          <p className="mt-1 text-xs text-gray-400">
-            = вага лота ÷ кількість одиниць (можна змінити)
-          </p>
-        </div>
-        <AttrField
-          label="Сезон"
-          value={form.season}
-          options={seasonOptions}
-          onChange={set("season")}
-        />
-        <AttrField
-          label="Сорт"
-          value={form.quality}
-          options={qualityOptions}
-          onChange={set("quality")}
-        />
-        <AttrField
-          label="Стать"
-          value={form.gender}
-          options={genderOptions}
-          onChange={set("gender")}
-        />
-        <div className="sm:col-span-2">
-          <label className="mb-1 block text-sm font-medium text-gray-700">
-            Розміри
-          </label>
-          <Input
-            value={form.sizes}
-            onChange={(e) => set("sizes")(e.target.value)}
+            onChange={(e) =>
+              setForm((f) => ({ ...f, unitWeight: e.target.value }))
+            }
+            placeholder="авто"
           />
         </div>
       </div>
-      <p className="text-xs text-gray-400">
-        Сезон / сорт / стать / розміри підтягнуто з картки товару (довідники) —
-        за потреби скоригуйте.
-      </p>
 
       <div>
         <label className="mb-1 block text-sm font-medium text-gray-700">
@@ -501,7 +716,7 @@ function FilmSection({
         </label>
         <Input
           value={form.videoUrl}
-          onChange={(e) => set("videoUrl")(e.target.value)}
+          onChange={(e) => setForm((f) => ({ ...f, videoUrl: e.target.value }))}
           placeholder="https://youtu.be/…"
         />
       </div>
@@ -510,13 +725,19 @@ function FilmSection({
         <Button
           type="button"
           variant="outline"
-          disabled={saving}
-          onClick={save}
+          size="sm"
+          disabled={busy}
+          onClick={() => void saveBag()}
         >
-          {saving ? "…" : "Зберегти"}
+          Зберегти
         </Button>
-        <Button type="button" disabled={forming} onClick={formDescription}>
-          {forming ? "…" : "Сформувати опис YouTube"}
+        <Button
+          type="button"
+          size="sm"
+          disabled={busy}
+          onClick={formDescription}
+        >
+          {busy ? "…" : "Сформувати опис YouTube"}
         </Button>
       </div>
 
@@ -538,52 +759,22 @@ function FilmSection({
           <textarea
             readOnly
             value={description}
-            rows={14}
+            rows={12}
             className="w-full rounded-md border border-input bg-gray-50 p-2 font-mono text-xs"
           />
         </div>
       ) : null}
-
-      <div className="border-t pt-3">
-        <Button
-          type="button"
-          disabled={finishing || !description}
-          onClick={finish}
-          title={description ? undefined : "Спершу сформуйте YouTube-опис"}
-        >
-          {finishing ? "…" : "Готово"}
-        </Button>
-        {!description ? (
-          <p className="mt-1 text-xs text-gray-500">
-            Кнопка активна після формування опису.
-          </p>
-        ) : null}
-      </div>
     </div>
   );
 }
 
-/** Завершене завдання — характеристики + опис (лише перегляд + копіювання). */
+/** Завершене завдання — по кожному мішку відео + опис (копіювання). */
 function DoneSection({ task }: { task: VideoTaskView }) {
   const { toast } = useToast();
-  const rows: [string, string | null][] = [
-    ["Сезон", task.season],
-    ["Сорт", task.quality],
-    ["Кількість одиниць", task.unitsCount],
-    ["Вага одиниці", task.unitWeight],
-    [
-      "Вага лота, кг",
-      task.lotWeightKg != null ? String(task.lotWeightKg) : null,
-    ],
-    ["Стать", task.gender],
-    ["Розміри", task.sizes],
-    ["Виконав", task.assignedName],
-  ];
 
-  async function copy() {
-    if (!task.youtubeDescription) return;
+  async function copy(text: string) {
     try {
-      await navigator.clipboard.writeText(task.youtubeDescription);
+      await navigator.clipboard.writeText(text);
       toast({ title: "Опис скопійовано" });
     } catch {
       toast({ title: "Не вдалося скопіювати", variant: "destructive" });
@@ -591,48 +782,54 @@ function DoneSection({ task }: { task: VideoTaskView }) {
   }
 
   return (
-    <div className="space-y-4 rounded-md border bg-white p-4">
-      <dl className="grid gap-x-4 gap-y-1 sm:grid-cols-2">
-        {rows
-          .filter(([, v]) => v)
-          .map(([k, v]) => (
-            <div key={k} className="flex justify-between gap-2 text-sm">
-              <dt className="text-gray-500">{k}</dt>
-              <dd className="font-medium text-gray-900">{v}</dd>
-            </div>
-          ))}
-      </dl>
-      {task.videoUrl ? (
-        <p className="text-sm">
-          Відео:{" "}
-          <a
-            href={task.videoUrl}
-            target="_blank"
-            rel="noreferrer"
-            className="text-blue-600 underline"
-          >
-            {task.videoUrl}
-          </a>
-        </p>
+    <div className="space-y-3">
+      {task.assignedName ? (
+        <p className="text-sm text-gray-500">Виконав: {task.assignedName}</p>
       ) : null}
-      {task.youtubeDescription ? (
-        <div className="space-y-2">
+      {task.bags.map((bag, i) => (
+        <div key={bag.id} className="space-y-2 rounded-md border bg-white p-4">
           <div className="flex items-center justify-between">
-            <span className="text-sm font-medium text-gray-700">
-              YouTube-опис
-            </span>
-            <Button type="button" variant="outline" size="sm" onClick={copy}>
-              Скопіювати
-            </Button>
+            <h3 className="text-sm font-semibold text-gray-800">
+              Мішок {task.bags.length > 1 ? `${i + 1}` : ""}{" "}
+              <span className="font-mono text-gray-500">{bag.barcode}</span>
+              {bag.lotWeightKg != null ? (
+                <span className="ml-2 text-gray-500">{bag.lotWeightKg} кг</span>
+              ) : null}
+            </h3>
+            {bag.youtubeDescription ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => copy(bag.youtubeDescription!)}
+              >
+                Скопіювати опис
+              </Button>
+            ) : null}
           </div>
-          <textarea
-            readOnly
-            value={task.youtubeDescription}
-            rows={14}
-            className="w-full rounded-md border border-input bg-gray-50 p-2 font-mono text-xs"
-          />
+          {bag.videoUrl ? (
+            <p className="text-sm">
+              Відео:{" "}
+              <a
+                href={bag.videoUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="text-blue-600 underline"
+              >
+                {bag.videoUrl}
+              </a>
+            </p>
+          ) : null}
+          {bag.youtubeDescription ? (
+            <textarea
+              readOnly
+              value={bag.youtubeDescription}
+              rows={8}
+              className="w-full rounded-md border border-input bg-gray-50 p-2 font-mono text-xs"
+            />
+          ) : null}
         </div>
-      ) : null}
+      ))}
     </div>
   );
 }

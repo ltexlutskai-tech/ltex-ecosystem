@@ -83,10 +83,7 @@ export async function PATCH(
       quality: d.quality ?? undefined,
       gender: d.gender ?? undefined,
       sizes: d.sizes ?? undefined,
-      unitsCount: d.unitsCount ?? undefined,
-      unitWeight: d.unitWeight ?? undefined,
-      lotWeightKg: d.lotWeightKg ?? undefined,
-      videoUrl: d.videoUrl ?? undefined,
+      quantity: d.quantity ?? undefined,
       // Прикріпив виконавця (відеозона), якщо ще не задано.
       assignedUserId: user.id,
       assignedName: user.fullName,

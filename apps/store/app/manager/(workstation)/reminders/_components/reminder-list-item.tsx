@@ -6,6 +6,7 @@ import { Badge, Button, useToast } from "@ltex/ui";
 import { ShareSheet } from "../../prices/_components/share-sheet";
 import { openManagerTab } from "../../_components/open-manager-tab";
 import { buildReminderActions } from "@/lib/manager/reminder-actions";
+import { broadcastRemindersChanged } from "@/lib/manager/reminders-broadcast";
 import { PERIOD_BADGE, type ReminderRow } from "./types";
 
 function fmtDateTime(iso: string) {
@@ -62,6 +63,7 @@ export function ReminderListItem({
         throw new Error(data.error ?? "Помилка");
       }
       setEditing(false);
+      broadcastRemindersChanged(); // бейдж у сайдбарі оновлюється миттєво
       onChanged();
     } catch (e: unknown) {
       toast({
@@ -84,6 +86,7 @@ export function ReminderListItem({
         const data = (await res.json().catch(() => ({}))) as { error?: string };
         throw new Error(data.error ?? "Помилка");
       }
+      broadcastRemindersChanged();
       onChanged();
     } catch (e: unknown) {
       toast({
@@ -102,12 +105,28 @@ export function ReminderListItem({
     void patch({ action: "snooze", snoozedUntil: d.toISOString() });
   }
 
+  /** Фіксує в історії клієнта, що йому надіслано відеоогляд (артикул/назва/
+   *  посилання/ШК/вага резолвляться на сервері). Fire-and-forget. */
+  function logVideoSent() {
+    void fetch(`/api/v1/manager/reminders/${reminder.id}/video-sent`, {
+      method: "POST",
+    }).catch(() => {});
+  }
+
   /** Виконати контекстну дію (крім video-share, що має власний fetch).
    *  Внутрішні маршрути відкриваємо в НОВІЙ вкладці менеджерки (вкладка з
    *  нагадуваннями лишається окремо); зовнішні протоколи (tel:/viber:) — у
    *  новій вкладці браузера, щоб не затирати shell. */
-  function runAction(href: string | undefined, internal: boolean) {
+  function runAction(
+    kind: string,
+    href: string | undefined,
+    internal: boolean,
+  ) {
     if (!href) return;
+    // «Написати у Viber» на відео-нагадуванні = надіслали огляд → в історію.
+    if (kind === "client-viber" && reminder.actionType === "viber_video") {
+      logVideoSent();
+    }
     if (internal) {
       openManagerTab(href);
     } else {
@@ -115,10 +134,11 @@ export function ReminderListItem({
     }
   }
 
-  /** Авто-закрити нагадування «надіслати відео», коли менеджер відкрив
-   *  месенджер клієнта з вікна «Поділитися». */
+  /** Менеджер відкрив месенджер клієнта з вікна «Поділитися» → фіксуємо в
+   *  історії клієнта «надіслано відеоогляд» + авто-закриваємо нагадування. */
   function completeAfterShare() {
     setShareOpen(false);
+    logVideoSent();
     void patch({ action: "complete" });
   }
 
@@ -266,7 +286,7 @@ export function ReminderListItem({
                     type="button"
                     variant={a.kind === "open-order" ? "default" : "outline"}
                     disabled={busy}
-                    onClick={() => runAction(a.href, a.internal)}
+                    onClick={() => runAction(a.kind, a.href, a.internal)}
                   >
                     {a.label}
                   </Button>
