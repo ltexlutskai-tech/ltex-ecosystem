@@ -156,4 +156,25 @@ describe("GET /api/mobile/recommendations", () => {
       "public, s-maxage=60, stale-while-revalidate=120",
     );
   });
+
+  // ── Прайс-гейт (S73) для мобільного API ────────────────────────────────
+  it("гість (без сесії) отримує prices: [] — ціни не витікають анонімно", async () => {
+    mockTrySession.mockReturnValue(null);
+    mockPrisma.product.findMany.mockResolvedValue([makeProduct("a")]);
+
+    const res = await GET(buildRequest() as never);
+    const body = await res.json();
+    expect(body.products[0].prices).toEqual([]);
+  });
+
+  it("авторизована відповідь (з цінами) — private, no-store", async () => {
+    mockTrySession.mockReturnValue({ customerId: "cust-1" });
+    mockPrisma.viewLog.findMany.mockResolvedValue([]);
+    mockPrisma.product.findMany.mockResolvedValue([makeProduct("a")]);
+
+    const res = await GET(buildRequest("Bearer x") as never);
+    const body = await res.json();
+    expect(body.products[0].prices.length).toBeGreaterThan(0);
+    expect(res.headers.get("Cache-Control")).toBe("private, no-store");
+  });
 });

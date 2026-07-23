@@ -30,6 +30,17 @@ export interface MobileRawProduct {
   _count: { lots: number };
 }
 
+/**
+ * Прайс-гейт (S73) для мобільного API: гостям (запит без mobile-сесії) ціни не
+ * віддаємо — так само, як server-side strip на веб-сторінках. Повертає той
+ * самий шейп з `prices: []`.
+ */
+export function stripMobilePrices<T extends { prices: unknown[] }>(
+  products: T[],
+): T[] {
+  return products.map((p) => ({ ...p, prices: [] }));
+}
+
 export function mapMobileProduct(p: MobileRawProduct) {
   return {
     id: p.id,

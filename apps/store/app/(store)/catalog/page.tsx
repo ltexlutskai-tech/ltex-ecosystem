@@ -15,7 +15,10 @@ import { getDictionary } from "@/lib/i18n";
 const dict = getDictionary();
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://ltex.com.ua";
 
-export const revalidate = 60;
+// Cookie-aware (прайс-гейт S73): сторінка МУСИТЬ рендеритись на кожен запит —
+// ISR закешував би одну версію для гостя й залогіненого. Раніше revalidate=60
+// «рятував» лише side-effect: getCatalogProducts читає cookies(). Фіксуємо явно.
+export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "Каталог — секонд хенд, сток, іграшки гуртом",

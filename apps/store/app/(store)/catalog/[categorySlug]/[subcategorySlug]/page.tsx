@@ -10,7 +10,10 @@ import { Pagination } from "@/components/store/pagination";
 import { Breadcrumbs } from "@/components/store/breadcrumbs";
 import { CatalogLayoutToggle } from "@/components/store/catalog-layout-toggle";
 
-export const revalidate = 60;
+// Cookie-aware (прайс-гейт S73): сторінка МУСИТЬ рендеритись на кожен запит —
+// ISR закешував би одну версію для гостя й залогіненого. Раніше revalidate=60
+// «рятував» лише side-effect: getCatalogProducts читає cookies(). Фіксуємо явно.
+export const dynamic = "force-dynamic";
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://ltex.com.ua";
 

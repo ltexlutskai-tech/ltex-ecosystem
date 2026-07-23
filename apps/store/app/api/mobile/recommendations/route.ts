@@ -4,6 +4,7 @@ import { tryMobileSession } from "@/lib/mobile-auth";
 import {
   mobileProductInclude,
   mapMobileProduct,
+  stripMobilePrices,
   type MobileRawProduct,
 } from "@/lib/mobile-product-shape";
 import { getHiddenCategoryIds } from "@/lib/catalog-visibility";
@@ -86,11 +87,16 @@ export async function GET(request: NextRequest) {
     })) as unknown as MobileRawProduct[];
   }
 
+  // Прайс-гейт (S73): гість без mobile-сесії цін не отримує; авторизовану
+  // відповідь (з цінами) не кладемо у спільний CDN-кеш.
+  const mapped = products.map(mapMobileProduct);
   return NextResponse.json(
-    { products: products.map(mapMobileProduct) },
+    { products: customerId ? mapped : stripMobilePrices(mapped) },
     {
       headers: {
-        "Cache-Control": "public, s-maxage=60, stale-while-revalidate=120",
+        "Cache-Control": customerId
+          ? "private, no-store"
+          : "public, s-maxage=60, stale-while-revalidate=120",
       },
     },
   );

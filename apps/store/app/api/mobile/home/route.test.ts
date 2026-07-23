@@ -9,8 +9,19 @@ vi.mock("@ltex/db", () => ({
   },
 }));
 
+vi.mock("@/lib/mobile-auth", () => ({
+  tryMobileSession: vi.fn(),
+}));
+
 import { GET } from "./route";
 import { prisma } from "@ltex/db";
+import { tryMobileSession } from "@/lib/mobile-auth";
+
+const mockTrySession = tryMobileSession as unknown as ReturnType<typeof vi.fn>;
+
+function buildRequest(): Request {
+  return new Request("http://localhost/api/mobile/home", { method: "GET" });
+}
 
 const mockPrisma = prisma as unknown as {
   banner: { findMany: ReturnType<typeof vi.fn> };
@@ -44,6 +55,9 @@ beforeEach(() => {
   vi.clearAllMocks();
   // Default: empty categories so existing tests don't need to set them.
   mockPrisma.category.findMany.mockResolvedValue([]);
+  // Default: авторизована mobile-сесія — легасі-кейси нижче перевіряють
+  // повний шейп З цінами. Гейт для гостя — окремі кейси в кінці файлу.
+  mockTrySession.mockReturnValue({ customerId: "cust-1" });
 });
 
 describe("GET /api/mobile/home", () => {
@@ -77,7 +91,7 @@ describe("GET /api/mobile/home", () => {
       },
     ]);
 
-    const res = await GET();
+    const res = await GET(buildRequest() as never);
     const body = await res.json();
 
     expect(Object.keys(body).sort()).toEqual([
@@ -105,7 +119,7 @@ describe("GET /api/mobile/home", () => {
     mockPrisma.product.findMany.mockResolvedValue([]);
     mockPrisma.category.findMany.mockResolvedValue([]);
 
-    const res = await GET();
+    const res = await GET(buildRequest() as never);
     const body = await res.json();
 
     expect(body).toEqual({
@@ -126,7 +140,7 @@ describe("GET /api/mobile/home", () => {
     mockPrisma.product.findMany.mockResolvedValue([]);
     mockPrisma.category.findMany.mockResolvedValue([]);
 
-    const res = await GET();
+    const res = await GET(buildRequest() as never);
     const body = await res.json();
     const product = body.featured[0];
 
@@ -144,7 +158,7 @@ describe("GET /api/mobile/home", () => {
     mockPrisma.product.findMany.mockResolvedValue([]);
     mockPrisma.category.findMany.mockResolvedValue([]);
 
-    await GET();
+    await GET(buildRequest() as never);
 
     expect(mockPrisma.category.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -152,5 +166,40 @@ describe("GET /api/mobile/home", () => {
         orderBy: { position: "asc" },
       }),
     );
+  });
+
+  // ── Прайс-гейт (S73) для мобільного API ────────────────────────────────
+  it("гість (без mobile-сесії) отримує prices: [] у всіх рейках + public cache", async () => {
+    mockTrySession.mockReturnValue(null);
+    mockPrisma.banner.findMany.mockResolvedValue([]);
+    mockPrisma.featuredProduct.findMany.mockResolvedValue([
+      { product: makeProduct() },
+    ]);
+    mockPrisma.product.findMany.mockResolvedValue([makeProduct({ id: "p2" })]);
+
+    const res = await GET(buildRequest() as never);
+    const body = await res.json();
+
+    expect(body.featured[0].prices).toEqual([]);
+    expect(body.onSale[0].prices).toEqual([]);
+    expect(body.newArrivals[0].prices).toEqual([]);
+    expect(body.videoReviews[0].prices).toEqual([]);
+    // Гостьова (без цін) відповідь може кешуватись публічно.
+    expect(res.headers.get("Cache-Control")).toContain("public");
+  });
+
+  it("авторизована відповідь (з цінами) — private, no-store (не в CDN-кеш)", async () => {
+    mockTrySession.mockReturnValue({ customerId: "cust-1" });
+    mockPrisma.banner.findMany.mockResolvedValue([]);
+    mockPrisma.featuredProduct.findMany.mockResolvedValue([
+      { product: makeProduct() },
+    ]);
+    mockPrisma.product.findMany.mockResolvedValue([]);
+
+    const res = await GET(buildRequest() as never);
+    const body = await res.json();
+
+    expect(body.featured[0].prices).toHaveLength(2);
+    expect(res.headers.get("Cache-Control")).toBe("private, no-store");
   });
 });
