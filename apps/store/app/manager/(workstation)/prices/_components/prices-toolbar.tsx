@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
+import { ChevronDown } from "lucide-react";
 import {
   Button,
   Input,
@@ -45,10 +46,30 @@ export function PricesToolbar({ categories, totalCount }: Props) {
   const searchParams = useSearchParams();
   const [isPending, startTransition] = useTransition();
   const [search, setSearch] = useState(searchParams.get("q") ?? "");
+  // Шапку прайсу закріплено; при прокручуванні вниз вона згортається у шторку
+  // (лишається пошук + Фільтри), а не зникає. Розгортається кнопкою або вгорі.
+  const [collapsed, setCollapsed] = useState(false);
+  const lastScrollY = useRef(0);
 
   useEffect(() => {
     setSearch(searchParams.get("q") ?? "");
   }, [searchParams]);
+
+  useEffect(() => {
+    function onScroll(e: Event) {
+      const el = e.target;
+      const y =
+        el instanceof HTMLElement
+          ? el.scrollTop
+          : window.scrollY || document.documentElement.scrollTop;
+      if (y <= 6) setCollapsed(false);
+      else if (y > lastScrollY.current + 6) setCollapsed(true);
+      lastScrollY.current = y;
+    }
+    // capture:true — щоб ловити скрол і у вкладених контейнерах списку.
+    window.addEventListener("scroll", onScroll, true);
+    return () => window.removeEventListener("scroll", onScroll, true);
+  }, []);
 
   function setParams(updates: Record<string, string | null>) {
     const sp = new URLSearchParams(searchParams.toString());
@@ -107,11 +128,12 @@ export function PricesToolbar({ categories, totalCount }: Props) {
     dir !== "asc";
 
   return (
-    <div className="space-y-2">
+    <div className="sticky top-0 z-20 -mx-1 space-y-2 border-b bg-gray-50 px-1 pt-1 pb-2">
+      {/* Завжди видимо: пошук + Фільтри + перемикач згортання + лічильник. */}
       <div className="flex flex-wrap items-center gap-2">
         <form
           onSubmit={submitSearch}
-          className="flex min-w-[240px] flex-1 gap-2"
+          className="flex min-w-[220px] flex-1 gap-2"
         >
           <Input
             type="search"
@@ -122,82 +144,102 @@ export function PricesToolbar({ categories, totalCount }: Props) {
           />
         </form>
 
-        <div className="flex flex-wrap items-center gap-2">
-          <PriceFiltersSheet categories={categories} setParams={setParams} />
+        <PriceFiltersSheet categories={categories} setParams={setParams} />
 
-          {anyFilterActive && (
+        <button
+          type="button"
+          onClick={() => setCollapsed((v) => !v)}
+          title={collapsed ? "Розгорнути панель" : "Згорнути панель"}
+          aria-label={collapsed ? "Розгорнути панель" : "Згорнути панель"}
+          className="inline-flex h-9 items-center gap-1 rounded-md border bg-white px-2 text-sm text-gray-600 hover:bg-gray-50"
+        >
+          <ChevronDown
+            className={`h-4 w-4 transition-transform ${
+              collapsed ? "" : "rotate-180"
+            }`}
+          />
+        </button>
+
+        <span className="ml-auto text-xs text-gray-500">
+          {isPending ? "Оновлюємо…" : `Знайдено: ${totalCount}`}
+        </span>
+      </div>
+
+      {/* Згортається при прокручуванні: сортування, чипи, дії. */}
+      {!collapsed && (
+        <>
+          <div className="flex flex-wrap items-center gap-2">
+            {anyFilterActive && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={resetAllFilters}
+                title="Скинути пошук і всі фільтри"
+              >
+                Скинути фільтри
+              </Button>
+            )}
+
+            <label className="inline-flex items-center gap-1 text-sm">
+              <span className="hidden text-gray-500 sm:inline">Сортувати:</span>
+              <select
+                value={sort}
+                onChange={(e) => setParams({ sort: e.target.value })}
+                className="rounded-md border bg-white px-2 py-1.5 text-sm"
+              >
+                <option value="name">За назвою</option>
+                <option value="arrival">За приходом</option>
+              </select>
+            </label>
             <Button
               type="button"
               variant="outline"
               size="sm"
-              onClick={resetAllFilters}
-              title="Скинути пошук і всі фільтри"
+              onClick={() => setParams({ dir: dir === "asc" ? "desc" : "asc" })}
+              title={dir === "asc" ? "За зростанням" : "За спаданням"}
             >
-              Скинути фільтри
+              {dir === "asc" ? "↑" : "↓"}
             </Button>
-          )}
 
-          <label className="inline-flex items-center gap-1 text-sm">
-            <span className="hidden sm:inline text-gray-500">Сортувати:</span>
-            <select
-              value={sort}
-              onChange={(e) => setParams({ sort: e.target.value })}
-              className="rounded-md border bg-white px-2 py-1.5 text-sm"
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              disabled={isPending}
+              onClick={() => startTransition(() => router.refresh())}
+              title="Оновити дані (зазвичай оновлюється автоматично)"
             >
-              <option value="name">За назвою</option>
-              <option value="arrival">За приходом</option>
-            </select>
-          </label>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => setParams({ dir: dir === "asc" ? "desc" : "asc" })}
-            title={dir === "asc" ? "За зростанням" : "За спаданням"}
-          >
-            {dir === "asc" ? "↑" : "↓"}
-          </Button>
-        </div>
-      </div>
-
-      <div className="flex flex-wrap items-center gap-2">
-        {BOOL_FILTERS.map((f) => {
-          const active = searchParams.get(f.key) === "true";
-          return (
-            <Chip
-              key={f.key}
-              active={active}
-              onClick={() => setParams({ [f.key]: active ? null : "true" })}
-            >
-              {f.label}
-            </Chip>
-          );
-        })}
-      </div>
-
-      <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-gray-500">
-        <div className="flex items-center gap-2">
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            disabled={isPending}
-            onClick={() => startTransition(() => router.refresh())}
-            title="Оновити дані (зазвичай оновлюється автоматично)"
-          >
-            {isPending ? "Оновлення…" : "↻ Оновити"}
-          </Button>
-          <Link href="/manager/prices/lots">
-            <Button type="button" variant="outline" size="sm">
-              Деталі по мішках
+              {isPending ? "Оновлення…" : "↻ Оновити"}
             </Button>
-          </Link>
-          {filterCount > 0 && (
-            <span className="text-gray-500">Фільтрів: {filterCount}</span>
-          )}
-        </div>
-        <span>{isPending ? "Оновлюємо…" : `Знайдено: ${totalCount}`}</span>
-      </div>
+            <Link href="/manager/prices/lots">
+              <Button type="button" variant="outline" size="sm">
+                Деталі по мішках
+              </Button>
+            </Link>
+            {filterCount > 0 && (
+              <span className="text-xs text-gray-500">
+                Фільтрів: {filterCount}
+              </span>
+            )}
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            {BOOL_FILTERS.map((f) => {
+              const active = searchParams.get(f.key) === "true";
+              return (
+                <Chip
+                  key={f.key}
+                  active={active}
+                  onClick={() => setParams({ [f.key]: active ? null : "true" })}
+                >
+                  {f.label}
+                </Chip>
+              );
+            })}
+          </div>
+        </>
+      )}
     </div>
   );
 }
