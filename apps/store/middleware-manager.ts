@@ -65,7 +65,19 @@ const ALLOWED_PREFIXES: Partial<Record<ManagerRole, readonly string[]>> = {
     "/manager/prices",
     "/manager/products",
     "/manager/messenger",
+    "/manager/video-tasks",
     "/manager/trash",
+    "/manager/settings",
+  ],
+  // Відеозона — лише свій набір: Відеозавдання, Зміна стану мішка, Нагадування,
+  // Прайс (+ products для карток), Чат LTEX, Налаштування.
+  videozone: [
+    "/manager/video-tasks",
+    "/manager/bag-state-changes",
+    "/manager/reminders",
+    "/manager/prices",
+    "/manager/products",
+    "/manager/messenger",
     "/manager/settings",
   ],
 };

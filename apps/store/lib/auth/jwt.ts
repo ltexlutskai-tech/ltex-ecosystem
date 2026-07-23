@@ -27,7 +27,9 @@ export type ManagerRole =
   | "warehouse"
   // Експедитор — водій маршрутних листів (доставка/завантаження)
   | "expeditor"
-  | "bookkeeper";
+  | "bookkeeper"
+  // Відеозона — зйомка відеооглядів товарів + викладення на YouTube
+  | "videozone";
 
 // Усі валідні ролі токена. Раніше verifyAccessToken приймав лише
 // manager/senior_manager/admin — токени owner/warehouse/… не проходили
@@ -42,6 +44,7 @@ export const VALID_ROLES: ReadonlySet<ManagerRole> = new Set<ManagerRole>([
   "warehouse",
   "expeditor",
   "bookkeeper",
+  "videozone",
 ]);
 
 // Ролі з доступом до адмін-панелі (/admin/*).

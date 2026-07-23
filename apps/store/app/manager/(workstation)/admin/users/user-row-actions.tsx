@@ -15,7 +15,8 @@ type Role =
   | "analyst"
   | "warehouse"
   | "expeditor"
-  | "bookkeeper";
+  | "bookkeeper"
+  | "videozone";
 
 const ROLE_OPTIONS: { value: Role; label: string }[] = [
   { value: "manager", label: "Менеджер" },
@@ -27,6 +28,7 @@ const ROLE_OPTIONS: { value: Role; label: string }[] = [
   { value: "warehouse", label: "Склад" },
   { value: "expeditor", label: "Експедитор" },
   { value: "bookkeeper", label: "Бухгалтер" },
+  { value: "videozone", label: "Відеозона" },
 ];
 
 export function UserRowActions({

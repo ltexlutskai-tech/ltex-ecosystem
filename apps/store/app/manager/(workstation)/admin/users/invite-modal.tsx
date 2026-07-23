@@ -24,7 +24,8 @@ type Role =
   | "analyst"
   | "warehouse"
   | "expeditor"
-  | "bookkeeper";
+  | "bookkeeper"
+  | "videozone";
 
 const ROLE_LABELS: Record<Role, string> = {
   manager: "Менеджер",
@@ -36,6 +37,7 @@ const ROLE_LABELS: Record<Role, string> = {
   warehouse: "Склад",
   expeditor: "Експедитор",
   bookkeeper: "Бухгалтер",
+  videozone: "Відеозона",
 };
 
 export function InviteModal() {

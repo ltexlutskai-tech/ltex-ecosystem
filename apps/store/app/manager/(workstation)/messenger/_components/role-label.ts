@@ -8,6 +8,7 @@ const ROLE_LABELS: Record<string, string> = {
   expeditor: "Експедитор",
   analyst: "Аналітик",
   bookkeeper: "Бухгалтер",
+  videozone: "Відеозона",
 };
 
 /** Людська назва ролі українською для показу в месенджері. */

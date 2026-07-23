@@ -53,6 +53,7 @@ export const RESOURCES = [
   "settings", // Налаштування системи
   "audit_log", // Журнал дій
   "exchange_rates", // Курси валют
+  "video_tasks", // Відеозавдання (замовлення відеооглядів)
 ] as const;
 export type Resource = (typeof RESOURCES)[number];
 
@@ -379,6 +380,30 @@ export const ROLE_PERMISSIONS: Record<ManagerRole, RolePermissions> = {
       export: true,
     },
     exchange_rates: {
+      view: "all",
+      create: true,
+      edit: "all",
+      delete: "none",
+      export: false,
+    },
+  }),
+
+  // ── videozone: зйомка відеооглядів ─────────────────────────────────────
+  // Доступ: Прайс (read), лоти (read, для зміни стану мішка), Нагадування
+  // (свої), Чат LTEX (внутрішній месенджер — гейт по шляху), Відеозавдання.
+  videozone: fillResources({
+    prices: READ_ONLY_NO_EXPORT,
+    products: READ_ONLY_NO_EXPORT,
+    lots: {
+      view: "all",
+      create: false,
+      edit: "all", // зміна стану мішка (характеристики/відео лота)
+      delete: "none",
+      export: false,
+    },
+    reminders: MINE_ONLY,
+    chat: MINE_ONLY,
+    video_tasks: {
       view: "all",
       create: true,
       edit: "all",

@@ -32,7 +32,8 @@ interface Props {
     | "analyst"
     | "warehouse"
     | "expeditor"
-    | "bookkeeper";
+    | "bookkeeper"
+    | "videozone";
 }
 
 export function CreateClientForm({

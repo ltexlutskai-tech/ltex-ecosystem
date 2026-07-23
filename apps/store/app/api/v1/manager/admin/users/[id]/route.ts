@@ -76,7 +76,8 @@ export async function PATCH(
       | "analyst"
       | "warehouse"
       | "expeditor"
-      | "bookkeeper";
+      | "bookkeeper"
+      | "videozone";
     fullName?: string;
     email?: string;
     passwordHash?: string;

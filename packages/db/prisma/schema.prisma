@@ -1337,6 +1337,11 @@ enum UserRole {
   // Бухгалтер — каса/банк/оплати/взаєморозрахунки. Без редагування товарів/
   // клієнтів/замовлень.
   bookkeeper
+  // Відеозона (2026-07-23) — знімає відеоогляди товарів і викладає на YouTube.
+  // Отримує завдання від менеджера, заповнює характеристики лота + посилання на
+  // відео, формує YouTube-опис. Доступ: Прайс, Зміна стану мішка, Нагадування,
+  // Чат LTEX, Відеозавдання.
+  videozone
 }
 
 model User {
@@ -2688,6 +2693,81 @@ model MgrSetting {
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
 
   @@map("mgr_settings")
+}
+
+// ─── Відеозона (2026-07-23) ─────────────────────────────────────────────────
+// Завдання на відеоогляд товару для конкретного клієнта. Менеджер замовляє
+// огляд (з Прайсу/лота/картки клієнта) → склад приносить мішок → відеозона
+// знімає, заповнює характеристики + посилання на відео, формує YouTube-опис →
+// «Готово»: характеристики пишуться у товар/лот, лот бронюється на клієнта до
+// 23:59 наступного дня, менеджеру приходить сповіщення «відео готове».
+model MgrVideoTask {
+  id     String @id @default(cuid())
+  // new (склад несе мішок) | filming (мішок у відеозоні) | done | cancelled
+  status String @default("new")
+
+  // Замовник (менеджер) + клієнт (без контактних даних для відеозони).
+  managerUserId String? @map("manager_user_id")
+  managerName   String? @map("manager_name")
+  clientId      String? @map("client_id") // MgrClient.id
+  clientName    String? @map("client_name")
+  customerId    String? @map("customer_id") // Customer.id (дзеркало по code1C)
+
+  // Товар/позиція.
+  productId   String  @map("product_id")
+  productName String  @map("product_name")
+  articleCode String? @map("article_code")
+  quantity    Int     @default(1)
+
+  // Мішок: обирає склад (рандомний вільний), або менеджер задав конкретний ШК.
+  lotId            String? @map("lot_id")
+  barcode          String?
+  requestedBarcode String? @map("requested_barcode")
+
+  // Виконавець (відеозона).
+  assignedUserId String? @map("assigned_user_id")
+  assignedName   String? @map("assigned_name")
+
+  // Результат зйомки.
+  videoUrl           String? @map("video_url")
+  youtubeDescription String? @map("youtube_description") @db.Text
+
+  // Знімок характеристик (дублюється у Product/Lot при «Готово»).
+  season      String?
+  quality     String?
+  gender      String?
+  sizes       String?
+  unitsCount  String? @map("units_count")
+  unitWeight  String? @map("unit_weight")
+  lotWeightKg Float?  @map("lot_weight_kg")
+
+  // Життєвий цикл.
+  broughtAt         DateTime? @map("brought_at")
+  broughtByUserId   String?   @map("brought_by_user_id")
+  broughtByName     String?   @map("brought_by_name")
+  completedAt       DateTime? @map("completed_at")
+  completedByUserId String?   @map("completed_by_user_id")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([status])
+  @@index([assignedUserId, status])
+  @@index([managerUserId, status])
+  @@map("mgr_video_tasks")
+}
+
+// Довідник посилань для YouTube-опису відеоогляду (група Viber, сайт, TikTok,
+// Instagram, Facebook, Telegram, прайс-лист, «написати нам», телефон тощо).
+// key — стабільний ідентифікатор рядка опису; url/label редагуються.
+model MgrVideoLink {
+  key       String   @id
+  label     String
+  url       String   @default("")
+  sortOrder Int      @default(0) @map("sort_order")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@map("mgr_video_links")
 }
 
 // ─── Manager message templates (M1.7 / Прайс Stage 5b) ──────────────────────

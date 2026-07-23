@@ -21,6 +21,7 @@ const ROLES_ORDER: ManagerRole[] = [
   "warehouse",
   "expeditor",
   "bookkeeper",
+  "videozone",
 ];
 
 const ROLE_LABEL: Record<ManagerRole, string> = {
@@ -33,6 +34,7 @@ const ROLE_LABEL: Record<ManagerRole, string> = {
   warehouse: "Склад",
   expeditor: "Експедитор",
   bookkeeper: "Бухгалтер",
+  videozone: "Відеозона",
 };
 
 const RESOURCE_LABEL: Record<string, string> = {
@@ -58,6 +60,7 @@ const RESOURCE_LABEL: Record<string, string> = {
   settings: "Налаштування",
   audit_log: "Журнал дій",
   exchange_rates: "Курси валют",
+  video_tasks: "Відеозавдання",
 };
 
 function actionsCell(perm: {

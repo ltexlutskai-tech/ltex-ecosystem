@@ -1,0 +1,50 @@
+"use client";
+
+import { useCallback, useEffect, useState } from "react";
+
+const POLL_INTERVAL_MS = 30_000;
+
+/**
+ * Лічильник активних відеозавдань «на мене» для сайдбару (відеозона/склад/
+ * менеджер бачать різні зрізи — визначає сервер). Polling 30с + при поверненні
+ * видимості. Помилки ковтаються.
+ */
+export function VideoTasksBadge() {
+  const [total, setTotal] = useState(0);
+
+  const refetch = useCallback(async () => {
+    try {
+      const r = await fetch("/api/v1/manager/video-tasks/count", {
+        cache: "no-store",
+      });
+      if (!r.ok) return;
+      const json = (await r.json()) as { total: number };
+      setTotal(typeof json.total === "number" ? json.total : 0);
+    } catch {
+      // silent
+    }
+  }, []);
+
+  useEffect(() => {
+    void refetch();
+    const id = window.setInterval(() => void refetch(), POLL_INTERVAL_MS);
+    function onVis() {
+      if (document.visibilityState === "visible") void refetch();
+    }
+    document.addEventListener("visibilitychange", onVis);
+    return () => {
+      window.clearInterval(id);
+      document.removeEventListener("visibilitychange", onVis);
+    };
+  }, [refetch]);
+
+  if (total <= 0) return null;
+  return (
+    <span
+      className="rounded-full bg-amber-500 px-2 py-0.5 text-xs font-medium text-white"
+      title="Активні відеозавдання"
+    >
+      {total > 9 ? "9+" : total}
+    </span>
+  );
+}

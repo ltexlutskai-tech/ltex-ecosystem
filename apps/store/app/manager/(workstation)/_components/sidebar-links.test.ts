@@ -86,6 +86,7 @@ describe("getSidebarSections — доступ меню за роллю", () => {
       "/manager/stock-documents/repackings", // Перепаковка
       "/manager/stock-documents/inventories", // Інвентаризація
       "/manager/bag-state-changes", // Зміна стану мішка
+      "/manager/video-tasks", // Відеозавдання
       "/manager/np-registers", // Реєстри НП
       "/manager/reports/stock-balance", // Залишки складу
       "/manager/prices", // Прайс
@@ -94,8 +95,26 @@ describe("getSidebarSections — доступ меню за роллю", () => {
       "/manager/settings", // Налаштування
     ];
     for (const href of allowed) expect(h.has(href), href).toBe(true);
-    // Рівно 14 пунктів — жодного зайвого блоку.
+    // Рівно дозволений набір — жодного зайвого блоку.
     expect(h.size).toBe(allowed.length);
+  });
+
+  it("відеозона бачить лише свій вузький набір блоків (2026-07-23)", () => {
+    const h = hrefs("videozone");
+    const allowed = [
+      "/manager", // Робочий стіл
+      "/manager/video-tasks", // Відеозавдання
+      "/manager/bag-state-changes", // Зміна стану мішка
+      "/manager/reminders", // Нагадування
+      "/manager/prices", // Прайс
+      "/manager/messenger", // Чат LTEX
+      "/manager/settings", // Налаштування
+    ];
+    for (const href of allowed) expect(h.has(href), href).toBe(true);
+    expect(h.size).toBe(allowed.length);
+    // Не бачить фінансів/адмінки/замовлень.
+    expect(h.has("/manager/orders")).toBe(false);
+    expect(h.has("/manager/admin/users")).toBe(false);
   });
 
   it("склад НЕ бачить менеджерські/адмін/фінансові блоки", () => {

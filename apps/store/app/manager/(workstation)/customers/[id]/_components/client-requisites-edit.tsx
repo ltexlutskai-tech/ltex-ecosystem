@@ -84,7 +84,8 @@ interface Props {
     | "analyst"
     | "warehouse"
     | "expeditor"
-    | "bookkeeper";
+    | "bookkeeper"
+    | "videozone";
   onCancel: () => void;
   onSaved: () => void;
 }

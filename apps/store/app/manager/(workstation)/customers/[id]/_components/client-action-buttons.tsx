@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { Button, useToast } from "@ltex/ui";
 import { ClientMarkDeletionButton } from "./client-mark-deletion-button";
+import { ClientVideoOrderButton } from "./client-video-order-button";
 
 /**
  * `clientId` (MgrClient.id) і `customerId` (Customer.id) — різні namespace-и.
@@ -56,6 +57,7 @@ export function ClientActionButtons({
       >
         Створити оплату
       </Link>
+      {clientId && <ClientVideoOrderButton clientId={clientId} />}
       <Button
         type="button"
         variant="outline"

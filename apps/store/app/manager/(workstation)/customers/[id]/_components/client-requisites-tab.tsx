@@ -15,7 +15,8 @@ interface Props {
     | "analyst"
     | "warehouse"
     | "expeditor"
-    | "bookkeeper";
+    | "bookkeeper"
+    | "videozone";
   editDisabledReason?: string;
   isForeign?: boolean;
   /** `Customer.id` (дзеркало по code1C) для prefill Замовлення/Реалізації. */

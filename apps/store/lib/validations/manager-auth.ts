@@ -45,6 +45,7 @@ export const MANAGER_ROLES = [
   "warehouse",
   "expeditor",
   "bookkeeper",
+  "videozone",
 ] as const;
 
 export const inviteUserSchema = z.object({

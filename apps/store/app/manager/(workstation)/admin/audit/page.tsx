@@ -43,6 +43,7 @@ export default async function AuditLogPage({
       | "warehouse"
       | "expeditor"
       | "bookkeeper"
+      | "videozone"
       | undefined,
     action: sp.action as
       | "create"

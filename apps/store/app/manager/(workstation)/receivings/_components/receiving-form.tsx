@@ -91,7 +91,8 @@ export function ReceivingForm({
     | "supervisor"
     | "analyst"
     | "expeditor"
-    | "bookkeeper";
+    | "bookkeeper"
+    | "videozone";
   /** Якщо передано — режим РЕДАГУВАННЯ існуючої чернетки (PATCH). */
   initial?: ReceivingFormInitial;
 }) {

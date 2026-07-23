@@ -5,6 +5,7 @@ import {
   BarChart3,
   Bell,
   Boxes,
+  Clapperboard,
   ClipboardList,
   Database,
   FileStack,
@@ -167,6 +168,14 @@ export const BAG_STATE_LINK: SidebarLink = {
   icon: Boxes,
 };
 
+// ── Відеозавдання (2026-07-23) — відеозона/склад/адмін/власник ─────────────
+// Завдання на відеоогляд товару: склад несе мішок → відеозона знімає й описує.
+export const VIDEO_TASKS_LINK: SidebarLink = {
+  href: "/manager/video-tasks",
+  label: "Відеозавдання",
+  icon: Clapperboard,
+};
+
 // ── Реєстри Нової Пошти (2026-07-21) — склад + адмін/власник ──────────────
 // Групування ТТН у реєстр відправлень (передавальна відомість для кур'єра).
 export const NP_REGISTERS_LINK: SidebarLink = {
@@ -272,6 +281,7 @@ export type SidebarBadge =
   | "messenger"
   | "tasks"
   | "warehouse-tasks"
+  | "video-tasks"
   | "deletions";
 
 export interface SidebarItem {
@@ -311,6 +321,9 @@ export function getSidebarSections(role: ManagerRole): SidebarItem[][] {
   // (справжній RBAC: приховане в меню недоступне й за прямим URL).
   if (isWarehouse) return getWarehouseSections();
 
+  // ── Кабінет «Відеозона» (2026-07-23) — лише свій вузький набір блоків.
+  if (role === "videozone") return getVideozoneSections();
+
   const sections: SidebarItem[][] = [];
 
   // Секція A — основні документи (бейджі pending для сайтових).
@@ -344,6 +357,10 @@ export function getSidebarSections(role: ManagerRole): SidebarItem[][] {
     sectionC.push({ ...WAREHOUSE_RECEIVINGS_LINK });
     sectionC.push({ ...BAG_STATE_LINK });
     sectionC.push({ ...NP_REGISTERS_LINK });
+  }
+  // Відеозавдання — нагляд для admin/owner (відеозона має власний кабінет).
+  if (adminOrOwner) {
+    sectionC.push({ ...VIDEO_TASKS_LINK, badge: "video-tasks" });
   }
   // Довідники та регістри — усі, крім складу, експедитора і менеджера.
   if (!isWarehouse && role !== "expeditor" && !isManager) {
@@ -419,6 +436,7 @@ function getWarehouseSections(): SidebarItem[][] {
       { ...REPACKINGS_LINK },
       { ...INVENTORIES_LINK },
       { ...BAG_STATE_LINK },
+      { ...VIDEO_TASKS_LINK, badge: "video-tasks" },
       { ...NP_REGISTERS_LINK },
       { ...STOCK_BALANCE_LINK },
     ],
@@ -429,5 +447,29 @@ function getWarehouseSections(): SidebarItem[][] {
     ],
     // 4. Система
     [{ ...TRASH_LINK }, { ...SETTINGS_LINK }],
+  ];
+}
+
+/**
+ * Меню кабінету «Відеозона» — зйомка відеооглядів:
+ *  1. Основне — Робочий стіл, Відеозавдання, Зміна стану мішка, Нагадування
+ *  2. Прайс і чат — Прайс, Чат LTEX
+ *  3. Система — Налаштування
+ *
+ * ⚠️ Набір href має збігатися з allow-list у `middleware-manager.ts`.
+ */
+function getVideozoneSections(): SidebarItem[][] {
+  return [
+    [
+      { href: "/manager", label: "Робочий стіл", icon: Home },
+      { ...VIDEO_TASKS_LINK, badge: "video-tasks" },
+      { ...BAG_STATE_LINK },
+      { href: "/manager/reminders", label: "Нагадування", icon: Bell },
+    ],
+    [
+      { href: "/manager/prices", label: "Прайс", icon: BarChart3 },
+      { ...MESSENGER_LINK, badge: "messenger" },
+    ],
+    [{ ...SETTINGS_LINK }],
   ];
 }

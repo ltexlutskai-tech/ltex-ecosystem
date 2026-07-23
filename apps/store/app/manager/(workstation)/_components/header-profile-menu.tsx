@@ -10,6 +10,7 @@ const ROLE_LABEL: Record<string, string> = {
   admin: "Адмін",
   senior_manager: "Старший менеджер",
   manager: "Менеджер",
+  videozone: "Відеозона",
 };
 
 export function HeaderProfileMenu({

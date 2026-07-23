@@ -28,7 +28,8 @@ interface ManagerOption {
     | "analyst"
     | "warehouse"
     | "expeditor"
-    | "bookkeeper";
+    | "bookkeeper"
+    | "videozone";
   isActive: boolean;
 }
 

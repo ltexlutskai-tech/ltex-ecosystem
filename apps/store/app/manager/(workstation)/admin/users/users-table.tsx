@@ -11,7 +11,8 @@ type Role =
   | "analyst"
   | "warehouse"
   | "expeditor"
-  | "bookkeeper";
+  | "bookkeeper"
+  | "videozone";
 
 export interface ManagerUserRow {
   id: string;
@@ -36,6 +37,7 @@ const ROLE_LABELS: Record<Role, string> = {
   warehouse: "Склад",
   expeditor: "Експедитор",
   bookkeeper: "Бухгалтер",
+  videozone: "Відеозона",
 };
 
 function formatDate(iso: string | null): string {
