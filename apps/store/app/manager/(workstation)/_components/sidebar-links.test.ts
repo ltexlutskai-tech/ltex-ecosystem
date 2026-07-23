@@ -86,7 +86,6 @@ describe("getSidebarSections — доступ меню за роллю", () => {
       "/manager/stock-documents/repackings", // Перепаковка
       "/manager/stock-documents/inventories", // Інвентаризація
       "/manager/bag-state-changes", // Зміна стану мішка
-      "/manager/video-tasks", // Відеозавдання
       "/manager/np-registers", // Реєстри НП
       "/manager/reports/stock-balance", // Залишки складу
       "/manager/prices", // Прайс

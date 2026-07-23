@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { prisma } from "@ltex/db";
 import { getCurrentUser } from "@/lib/auth/manager-auth";
 import { AutoRefresh } from "../_components/auto-refresh";
+import { TaskTypeTabs } from "../_components/task-type-tabs";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Відеозона — L-TEX Manager" };
@@ -80,6 +81,7 @@ export default async function VideoTasksPage({
   return (
     <div className="space-y-4">
       <AutoRefresh />
+      <TaskTypeTabs role={user.role} active="video" />
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <h1 className="text-2xl font-semibold">Відеозона</h1>

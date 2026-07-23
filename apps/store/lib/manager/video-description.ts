@@ -118,6 +118,7 @@ export function buildYoutubeDescription(
   parts.push("");
   parts.push(`✅ Замовити лот: ${input.lotUrl}`);
   if (L("catalog")) parts.push(`📄 Переглянути каталог: ${L("catalog")}`);
+  if (L("price_list")) parts.push(`📋 Отримати прайс лист: ${L("price_list")}`);
 
   // 4. Шапка + контакти.
   parts.push("");

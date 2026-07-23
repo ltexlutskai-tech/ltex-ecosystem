@@ -105,6 +105,13 @@ export default async function SettingsPage() {
               <ListTree className="h-4 w-4 text-green-600" />
               Статті руху коштів
             </Link>
+            <Link
+              href="/manager/video-links"
+              className="flex items-center gap-2 rounded-md border px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+            >
+              <ListTree className="h-4 w-4 text-green-600" />
+              Посилання відеоопису (Відеозона)
+            </Link>
           </div>
         </section>
       )}

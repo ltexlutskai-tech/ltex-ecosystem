@@ -27,6 +27,12 @@ export const VIDEO_LINK_DEFS: VideoLinkDef[] = [
     sortOrder: 5,
   },
   {
+    key: "price_list",
+    label: "Отримати прайс лист",
+    url: "https://new.ltex.com.ua/get-price",
+    sortOrder: 8,
+  },
+  {
     key: "catalog",
     label: "Переглянути каталог",
     url: "https://new.ltex.com.ua/catalog",

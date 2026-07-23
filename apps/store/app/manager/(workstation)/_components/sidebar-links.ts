@@ -365,11 +365,9 @@ export function getSidebarSections(role: ManagerRole): SidebarItem[][] {
     sectionC.push({ ...BAG_STATE_LINK });
     sectionC.push({ ...NP_REGISTERS_LINK });
   }
-  // Відеозона — admin/owner (нагляд) + менеджери (відстежують свої замовлення
-  // відео). Відеозона й склад мають блок у власних секціях.
-  if (adminOrOwner || isManager || role === "senior_manager") {
-    sectionC.push({ ...VIDEO_TASKS_LINK, badge: "video-tasks" });
-  }
+  // «Відеозона» окремим пунктом більше не показується — вона вкладка всередині
+  // блоку «Завдання» (TaskTypeTabs). Власний пункт лишився лише в кабінеті
+  // відеозони (getVideozoneSections).
   // Довідники та регістри — усі, крім складу, експедитора і менеджера.
   if (!isWarehouse && role !== "expeditor" && !isManager) {
     sectionC.push({ ...REGISTRY_LINK });
@@ -449,7 +447,6 @@ function getWarehouseSections(): SidebarItem[][] {
       { ...REPACKINGS_LINK },
       { ...INVENTORIES_LINK },
       { ...BAG_STATE_LINK },
-      { ...VIDEO_TASKS_LINK, badge: "video-tasks" },
       { ...NP_REGISTERS_LINK },
       { ...STOCK_BALANCE_LINK },
     ],

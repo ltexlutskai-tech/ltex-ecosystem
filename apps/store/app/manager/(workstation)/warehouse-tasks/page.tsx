@@ -7,6 +7,7 @@ import {
   buildWarehouseTasksOrderBy,
 } from "@/lib/manager/warehouse-tasks-list";
 import { AutoRefresh } from "../_components/auto-refresh";
+import { TaskTypeTabs } from "../_components/task-type-tabs";
 import { WarehouseTasksToolbar } from "./_components/warehouse-tasks-toolbar";
 import { TaskSortHeader } from "./_components/task-sort-header";
 
@@ -63,8 +64,11 @@ export default async function WarehouseTasksPage({
   return (
     <div className="mx-auto max-w-5xl space-y-4">
       <AutoRefresh intervalMs={20_000} />
+      <TaskTypeTabs role={user.role} active="warehouse" />
       <header>
-        <h1 className="text-2xl font-bold text-gray-800">Завдання складу</h1>
+        <h1 className="text-2xl font-bold text-gray-800">
+          Підготовка відправлень
+        </h1>
         <p className="mt-1 text-sm text-gray-600">
           Підготувати товари до відправлення + перевірити/створити ТТН. Завдання
           створюється при проведенні реалізації.

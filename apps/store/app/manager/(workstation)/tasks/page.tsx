@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/manager-auth";
 import { prisma } from "@ltex/db";
 import { getTasksForUser } from "@/lib/manager/tasks";
+import { TaskTypeTabs } from "../_components/task-type-tabs";
 import { TasksClient } from "./_components/tasks-client";
 
 export const dynamic = "force-dynamic";
@@ -21,12 +22,15 @@ export default async function TasksPage() {
   ]);
 
   return (
-    <TasksClient
-      assignedToMe={assignedToMe}
-      createdByMe={createdByMe}
-      completed={completed}
-      users={users}
-      currentUserId={user.id}
-    />
+    <div className="space-y-4">
+      <TaskTypeTabs role={user.role} active="assignments" />
+      <TasksClient
+        assignedToMe={assignedToMe}
+        createdByMe={createdByMe}
+        completed={completed}
+        users={users}
+        currentUserId={user.id}
+      />
+    </div>
   );
 }
