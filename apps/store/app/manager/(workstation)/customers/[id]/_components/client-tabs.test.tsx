@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { ClientTabs } from "./client-tabs";
 
 afterEach(() => cleanup());
@@ -23,41 +23,58 @@ const PANELS = {
   debtMovements: <div>debt-movements-panel</div>,
 };
 
-describe("ClientTabs — CRM групи + M1.3f foreign visibility filtering", () => {
-  it("mine view: рендерить усі 10 tabs (без Viber і без Соцмереж — вони у шапці)", () => {
+describe("ClientTabs — горизонтальні вкладки + «Ще» + M1.3f foreign", () => {
+  it("mine view: 7 основних вкладок у стрічці + кнопка «Ще»", () => {
     render(<ClientTabs {...PANELS} isForeign={false} />);
     const tabs = screen.getAllByRole("tab");
-    expect(tabs).toHaveLength(10);
+    expect(tabs).toHaveLength(7);
+    const labels = tabs.map((b) => b.textContent?.trim());
+    expect(labels).toContain("Історія");
+    expect(labels).toContain("Нагадування");
+    expect(labels).toContain("Реквізити");
+    expect(labels).toContain("Рухи боргу");
+    expect(screen.getByText("Ще")).toBeDefined();
   });
 
-  it("admin view (default isForeign=false): рендерить усі 10 tabs", () => {
+  it("mine view: «Ще» відкриває Презентації / Іст. презентацій / Ключові слова", () => {
     render(<ClientTabs {...PANELS} />);
-    const tabs = screen.getAllByRole("tab");
-    expect(tabs).toHaveLength(10);
+    fireEvent.click(screen.getByText("Ще"));
+    const labels = screen.getAllByRole("tab").map((b) => b.textContent?.trim());
+    expect(labels).toContain("Презентації");
+    expect(labels).toContain("Іст. презентацій");
+    expect(labels).toContain("Ключові слова");
+    // 7 основних + 3 у меню = 10
+    expect(screen.getAllByRole("tab")).toHaveLength(10);
   });
 
-  it("вкладки «Соцмережі та месенджери» більше немає (перенесено в шапку)", () => {
+  it("дефолтна активна вкладка — Історія", () => {
     render(<ClientTabs {...PANELS} />);
-    const tabs = screen.getAllByRole("tab");
-    const labels = new Set(tabs.map((b) => b.textContent?.trim() ?? ""));
+    expect(screen.getByText("history-panel")).toBeDefined();
+  });
+
+  it("вибір вкладки перемикає панель", () => {
+    render(<ClientTabs {...PANELS} />);
+    fireEvent.click(screen.getByRole("tab", { name: "Реквізити" }));
+    expect(screen.getByText("requisites-panel")).toBeDefined();
+  });
+
+  it("вкладок «Соцмережі та месенджери» / «Viber» немає", () => {
+    render(<ClientTabs {...PANELS} />);
+    fireEvent.click(screen.getByText("Ще"));
+    const labels = new Set(
+      screen.getAllByRole("tab").map((b) => b.textContent?.trim() ?? ""),
+    );
     expect(labels.has("Соцмережі та месенджери")).toBe(false);
-  });
-
-  it("Viber вкладки більше немає", () => {
-    render(<ClientTabs {...PANELS} />);
-    const tabs = screen.getAllByRole("tab");
-    const labels = new Set(tabs.map((b) => b.textContent?.trim() ?? ""));
     expect(labels.has("Viber")).toBe(false);
   });
 
-  it("foreign view: вкладка «Рухи боргу» прихована", () => {
-    render(<ClientTabs {...PANELS} isForeign={true} />);
-    const tabs = screen.getAllByRole("tab");
-    const labels = new Set(tabs.map((b) => b.textContent?.trim() ?? ""));
-    expect(labels.has("Рухи боргу")).toBe(false);
+  it("overdue-бейдж на «Нагадування» коли є прострочені", () => {
+    render(<ClientTabs {...PANELS} overdueRemindersCount={3} />);
+    const remindersTab = screen.getByRole("tab", { name: /Нагадування/ });
+    expect(remindersTab.textContent).toContain("3");
   });
 
-  it("foreign view: лише 4 tabs у порядку розділів", () => {
+  it("foreign view: рівно 4 вкладки у порядку розділів, без «Ще»", () => {
     render(<ClientTabs {...PANELS} isForeign={true} />);
     const tabs = screen.getAllByRole("tab");
     expect(tabs).toHaveLength(4);
@@ -68,21 +85,22 @@ describe("ClientTabs — CRM групи + M1.3f foreign visibility filtering", (
       "Асортимент",
       "Замовлення",
     ]);
+    expect(screen.queryByText("Ще")).toBeNull();
   });
 
-  it("foreign view: hidden tabs не у DOM", () => {
+  it("foreign view: приховані вкладки не у DOM", () => {
     render(<ClientTabs {...PANELS} isForeign={true} />);
-    const tabs = screen.getAllByRole("tab");
-    const labels = new Set(tabs.map((b) => b.textContent?.trim() ?? ""));
-    expect(labels.has("Презентації")).toBe(false);
+    const labels = new Set(
+      screen.getAllByRole("tab").map((b) => b.textContent?.trim() ?? ""),
+    );
     expect(labels.has("Історія")).toBe(false);
     expect(labels.has("Нагадування")).toBe(false);
-    expect(labels.has("Іст. презентацій")).toBe(false);
-    expect(labels.has("Соцмережі та месенджери")).toBe(false);
+    expect(labels.has("Рухи боргу")).toBe(false);
+    expect(labels.has("Презентації")).toBe(false);
     expect(labels.has("Ключові слова")).toBe(false);
   });
 
-  it("foreign view: початковий active tab — Реквізити", () => {
+  it("foreign view: початкова активна вкладка — Реквізити", () => {
     render(<ClientTabs {...PANELS} isForeign={true} />);
     expect(screen.getByText("requisites-panel")).toBeDefined();
   });

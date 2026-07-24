@@ -28,8 +28,14 @@ interface ProductHit {
 
 export function ClientVideoOrderButton({
   clientId,
+  triggerClassName = "h-10",
+  triggerLabel = "Замовити відео",
 }: {
   clientId: string; // MgrClient.id
+  /** Клас тригер-кнопки (для компактної шапки — напр. "h-8"). */
+  triggerClassName?: string;
+  /** Підпис тригер-кнопки. */
+  triggerLabel?: string;
 }) {
   const { toast } = useToast();
   const [open, setOpen] = useState(false);
@@ -107,9 +113,9 @@ export function ClientVideoOrderButton({
         type="button"
         variant="outline"
         onClick={() => setOpen(true)}
-        className="h-10"
+        className={triggerClassName}
       >
-        Замовити відео
+        {triggerLabel}
       </Button>
 
       <Dialog

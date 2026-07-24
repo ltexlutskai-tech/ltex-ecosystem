@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { ChevronDown } from "lucide-react";
 
 type TabId =
   | "requisites"
@@ -18,66 +19,66 @@ interface TabDef {
   id: TabId;
   label: string;
   foreignVisible: boolean;
-}
-
-interface GroupDef {
-  id: string;
-  label: string;
-  tabs: TabDef[];
+  /** true → у головній горизонтальній стрічці; false → у меню «Ще ▾». */
+  primary: boolean;
 }
 
 /**
- * Картка клієнта у стилі CRM: 10 вкладок згруповано у 4 логічні розділи з
- * бічним меню (Огляд · Продажі й замовлення · Комунікація · Фінанси). Поле
- * `foreignVisible` — чи показати вкладку коли поточний user дивиться на чужого
- * клієнта (M1.3f): у foreign-режимі ховаються розділи з чутливими контактами;
- * розділ без жодної видимої вкладки не показується взагалі.
+ * Картка клієнта у стилі CRM (HubSpot/Pipedrive/Kommo): ліва «візитка» з
+ * контактами (окремо) + основна колонка з ГОРИЗОНТАЛЬНИМИ вкладками. Часті
+ * вкладки — у стрічці, рідші (Презентації/Іст. презентацій/Ключові слова) —
+ * у випадайці «Ще ▾». `foreignVisible` — чи показати вкладку для чужого клієнта
+ * (M1.3f). Порядок збережено так, щоб для чужого клієнта лишались саме
+ * Реквізити · Історія продаж · Асортимент · Замовлення.
  *
- * Вкладку «Viber» прибрано — цей функціонал живе в окремому місці (Месенджер /
- * чат-inbox). Блок «Соцмережі та месенджери» винесено у шапку картки (разом із
- * телефонами), тож окремої вкладки більше немає.
+ * Вкладку «Соцмережі та месенджери» / «Viber» прибрано — контакти живуть у
+ * лівій «візитці» та шапці картки.
  */
-const GROUPS: GroupDef[] = [
+const TABS: TabDef[] = [
+  { id: "history", label: "Історія", foreignVisible: false, primary: true },
   {
-    // Комунікація — перший розділ; головна вкладка картки = «Історія» (робота
-    // з клієнтом). Для чужого клієнта весь розділ приховано → дефолт впаде на
-    // перший видимий («Реквізити»).
-    id: "communication",
-    label: "Комунікація",
-    tabs: [
-      { id: "history", label: "Історія", foreignVisible: false },
-      { id: "reminders", label: "Нагадування", foreignVisible: false },
-    ],
+    id: "reminders",
+    label: "Нагадування",
+    foreignVisible: false,
+    primary: true,
+  },
+  { id: "requisites", label: "Реквізити", foreignVisible: true, primary: true },
+  {
+    id: "sales-history",
+    label: "Історія продаж",
+    foreignVisible: true,
+    primary: true,
   },
   {
-    id: "overview",
-    label: "Огляд",
-    tabs: [
-      { id: "requisites", label: "Реквізити", foreignVisible: true },
-      { id: "keywords", label: "Ключові слова", foreignVisible: false },
-    ],
+    id: "assortment",
+    label: "Асортимент",
+    foreignVisible: true,
+    primary: true,
+  },
+  { id: "orders", label: "Замовлення", foreignVisible: true, primary: true },
+  {
+    id: "debt-movements",
+    label: "Рухи боргу",
+    foreignVisible: false,
+    primary: true,
   },
   {
-    id: "sales",
-    label: "Продажі й замовлення",
-    tabs: [
-      { id: "sales-history", label: "Історія продаж", foreignVisible: true },
-      { id: "assortment", label: "Асортимент", foreignVisible: true },
-      { id: "orders", label: "Замовлення", foreignVisible: true },
-      { id: "presentations", label: "Презентації", foreignVisible: false },
-      {
-        id: "presentation-history",
-        label: "Іст. презентацій",
-        foreignVisible: false,
-      },
-    ],
+    id: "presentations",
+    label: "Презентації",
+    foreignVisible: false,
+    primary: false,
   },
   {
-    id: "finance",
-    label: "Фінанси",
-    tabs: [
-      { id: "debt-movements", label: "Рухи боргу", foreignVisible: false },
-    ],
+    id: "presentation-history",
+    label: "Іст. презентацій",
+    foreignVisible: false,
+    primary: false,
+  },
+  {
+    id: "keywords",
+    label: "Ключові слова",
+    foreignVisible: false,
+    primary: false,
   },
 ];
 
@@ -108,38 +109,51 @@ export function ClientTabs({
   overdueRemindersCount?: number;
   isForeign?: boolean;
 }) {
-  // Групи з відфільтрованими за foreign-режимом вкладками; порожні групи геть.
-  const visibleGroups = useMemo(
-    () =>
-      GROUPS.map((g) => ({
-        ...g,
-        tabs: isForeign ? g.tabs.filter((t) => t.foreignVisible) : g.tabs,
-      })).filter((g) => g.tabs.length > 0),
+  const visibleTabs = useMemo(
+    () => (isForeign ? TABS.filter((t) => t.foreignVisible) : TABS),
     [isForeign],
+  );
+  const primaryTabs = useMemo(
+    () => visibleTabs.filter((t) => t.primary),
+    [visibleTabs],
+  );
+  const overflowTabs = useMemo(
+    () => visibleTabs.filter((t) => !t.primary),
+    [visibleTabs],
   );
 
   const visibleIds = useMemo(
-    () =>
-      new Set<string>(visibleGroups.flatMap((g) => g.tabs.map((t) => t.id))),
-    [visibleGroups],
+    () => new Set<string>(visibleTabs.map((t) => t.id)),
+    [visibleTabs],
   );
 
-  const firstId = visibleGroups[0]?.tabs[0]?.id ?? "requisites";
+  const firstId = visibleTabs[0]?.id ?? "requisites";
   const [tab, setTab] = useState<TabId>(firstId);
+  const [moreOpen, setMoreOpen] = useState(false);
 
+  // Ініціалізація з hash + реакція на зміну hash (напр. лінки з лівої «візитки»
+  // «Усі реквізити →» / «Редагувати →» ключові слова).
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const hash = window.location.hash.replace(/^#/, "");
-    if (hash && visibleIds.has(hash)) {
-      setTab(hash as TabId);
-    } else if (hash && !visibleIds.has(hash)) {
-      setTab(firstId);
-      window.history.replaceState(null, "", `#${firstId}`);
+    function applyHash() {
+      const hash = window.location.hash.replace(/^#/, "");
+      if (hash && visibleIds.has(hash)) {
+        setTab(hash as TabId);
+      }
     }
-  }, [visibleIds, firstId]);
+    applyHash();
+    window.addEventListener("hashchange", applyHash);
+    return () => window.removeEventListener("hashchange", applyHash);
+  }, [visibleIds]);
+
+  // Якщо активна вкладка стала невидимою (перемикання foreign) — впасти на першу.
+  useEffect(() => {
+    if (!visibleIds.has(tab)) setTab(firstId);
+  }, [visibleIds, tab, firstId]);
 
   function selectTab(id: TabId) {
     setTab(id);
+    setMoreOpen(false);
     if (typeof window !== "undefined") {
       window.history.replaceState(null, "", `#${id}`);
     }
@@ -158,48 +172,82 @@ export function ClientTabs({
     "debt-movements": debtMovements,
   };
 
+  const activeInOverflow = overflowTabs.some((t) => t.id === tab);
+
+  function tabClass(active: boolean): string {
+    return active
+      ? "flex items-center gap-1 whitespace-nowrap border-b-2 border-blue-600 px-3 py-2 text-sm font-medium text-blue-700"
+      : "flex items-center gap-1 whitespace-nowrap border-b-2 border-transparent px-3 py-2 text-sm text-gray-600 hover:text-gray-900";
+  }
+
   return (
-    <div className="grid gap-4 md:grid-cols-[220px_1fr]">
-      <nav
-        aria-label="Розділи картки клієнта"
-        // Закріплюємо ПІД шапкою (її висота — у CSS-змінній `--ccard-header-h`,
-        // яку виставляє StickyHeader; змінна має дефолт 0px у globals). Sticky
-        // лише md+; inline-top коректний і на моб. (де position:static → ігнорується).
-        style={{ top: "calc(var(--ccard-header-h) + 0.75rem)" }}
-        className="space-y-3 md:sticky md:max-h-[calc(100vh_-_var(--ccard-header-h)_-_1.5rem)] md:self-start md:overflow-y-auto"
+    <div>
+      <div
+        // Стрічка вкладок закріплюється під шапкою картки (її висота — у CSS-
+        // змінній `--ccard-header-h`, яку виставляє StickyHeader).
+        style={{ top: "var(--ccard-header-h)" }}
+        className="sticky z-10 flex items-center gap-0.5 overflow-x-auto border-b border-gray-200 bg-gray-50"
       >
-        {visibleGroups.map((g) => (
-          <div key={g.id}>
-            <p className="px-2 pb-1 text-[11px] font-semibold tracking-wide text-gray-400 uppercase">
-              {g.label}
-            </p>
-            <div className="flex flex-col gap-0.5">
-              {g.tabs.map((t) => (
-                <button
-                  key={t.id}
-                  type="button"
-                  role="tab"
-                  aria-selected={tab === t.id}
-                  onClick={() => selectTab(t.id)}
-                  className={
-                    tab === t.id
-                      ? "flex items-center justify-between gap-1 rounded-md bg-blue-50 px-3 py-1.5 text-left text-sm font-medium text-blue-700"
-                      : "flex items-center justify-between gap-1 rounded-md px-3 py-1.5 text-left text-sm text-gray-600 hover:bg-gray-100 hover:text-gray-900"
-                  }
-                >
-                  <span>{t.label}</span>
-                  {t.id === "reminders" && overdueRemindersCount > 0 && (
-                    <span className="inline-flex h-4 min-w-[16px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-medium text-white">
-                      {overdueRemindersCount > 9 ? "9+" : overdueRemindersCount}
-                    </span>
-                  )}
-                </button>
-              ))}
-            </div>
-          </div>
+        {primaryTabs.map((t) => (
+          <button
+            key={t.id}
+            type="button"
+            role="tab"
+            aria-selected={tab === t.id}
+            onClick={() => selectTab(t.id)}
+            className={tabClass(tab === t.id)}
+          >
+            <span>{t.label}</span>
+            {t.id === "reminders" && overdueRemindersCount > 0 && (
+              <span className="inline-flex h-4 min-w-[16px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-medium text-white">
+                {overdueRemindersCount > 9 ? "9+" : overdueRemindersCount}
+              </span>
+            )}
+          </button>
         ))}
-      </nav>
-      <div className="min-w-0">{panels[tab]}</div>
+
+        {overflowTabs.length > 0 && (
+          <div className="relative ml-auto">
+            <button
+              type="button"
+              onClick={() => setMoreOpen((v) => !v)}
+              aria-expanded={moreOpen}
+              className={tabClass(activeInOverflow)}
+            >
+              Ще <ChevronDown className="h-3.5 w-3.5" />
+            </button>
+            {moreOpen && (
+              <>
+                <div
+                  className="fixed inset-0 z-10"
+                  onClick={() => setMoreOpen(false)}
+                  role="presentation"
+                />
+                <div className="absolute top-full right-0 z-20 w-48 rounded-md border border-gray-200 bg-white py-1 shadow-lg">
+                  {overflowTabs.map((t) => (
+                    <button
+                      key={t.id}
+                      type="button"
+                      role="tab"
+                      aria-selected={tab === t.id}
+                      onClick={() => selectTab(t.id)}
+                      className={
+                        tab === t.id
+                          ? "block w-full px-3 py-1.5 text-left text-sm font-medium text-blue-700"
+                          : "block w-full px-3 py-1.5 text-left text-sm text-gray-700 hover:bg-gray-50"
+                      }
+                    >
+                      {t.label}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+        )}
+      </div>
+
+      <div className="min-w-0 pt-4">{panels[tab]}</div>
     </div>
   );
 }
