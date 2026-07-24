@@ -2705,12 +2705,104 @@ model BankTransaction {
   hold         Boolean  @default(false) // блокування (ще не фінальна)
   raw          Json? // сирий обʼєкт з API — для аудиту/дорозбору
 
+  // ── Стан рознесення (Крок 3 — воронка авто-рознесення платежів) ────────
+  // Сам рядок виписки незмінний; мутуються лише ці службові поля.
+  // pending → авто-обробка ще не пройшла; auto_posted → авто-проведений
+  // BankPaymentIncoming/Outgoing; draft_created → чернетка (1 сигнал, чекає
+  // підтвердження); manual_posted → рознесено вручну з дошки; unmatched →
+  // на дошці «Нерознесені гроші»; skipped → не обробляємо (USD/hold);
+  // ignored → бухгалтер свідомо проігнорував (внутрішній переказ тощо).
+  matchStatus           String    @default("pending") @map("match_status")
+  matchedCustomerId     String?   @map("matched_customer_id") // Customer.id
+  bankPaymentIncomingId String?   @map("bank_payment_incoming_id")
+  bankPaymentOutgoingId String?   @map("bank_payment_outgoing_id")
+  matchNote             String?   @map("match_note") // людське пояснення рішення
+  matchedAt             DateTime? @map("matched_at")
+
   createdAt DateTime @default(now()) @map("created_at")
 
   @@unique([provider, externalId])
   @@index([feedAccountId, occurredAt])
   @@index([occurredAt])
+  @@index([matchStatus])
   @@map("bank_transactions")
+}
+
+// ─── Крок 3 — воронка авто-рознесення платежів (2026-07-24) ──────────────────
+// «Очікування оплати»: пишеться, коли менеджер тисне «Скинути реквізити» на
+// суму X для клієнта Y (суми в L-TEX некруглі — вага×ціна/кг, тому точний збіг
+// суми у вікні TTL = сильний сигнал упізнавання платежу).
+
+model PaymentExpectation {
+  id            String  @id @default(cuid())
+  customerId    String  @map("customer_id") // Customer.id
+  customerName  String? @map("customer_name") // знімок для дошки
+  saleId        String? @map("sale_id")
+  amountUah     Decimal @map("amount_uah") @db.Decimal(15, 2)
+  // Рахунок реквізитів (MgrBankAccount.id) — на який чекаємо оплату.
+  bankAccountId String? @map("bank_account_id")
+
+  status               String    @default("open") // open | matched | expired | cancelled
+  matchedTransactionId String?   @map("matched_transaction_id")
+  matchedAt            DateTime? @map("matched_at")
+
+  createdByUserId String?  @map("created_by_user_id")
+  createdAt       DateTime @default(now()) @map("created_at")
+  expiresAt       DateTime @map("expires_at")
+
+  @@index([status, expiresAt])
+  @@index([customerId])
+  @@map("payment_expectations")
+}
+
+// «Памʼять платників» (самонавчання): звʼязка реквізитів платника з банківської
+// виписки ↔ клієнт. Перше ручне рознесення з дошки (галочка «запамʼятати») або
+// авто-збіг пише сюди запис — далі всі платежі цього платника лягають самі.
+// У клієнта може бути кілька платників (дружина, друга картка).
+
+model ClientPayerRequisite {
+  id            String  @id @default(cuid())
+  customerId    String  @map("customer_id") // Customer.id
+  counterIban   String? @map("counter_iban")
+  counterEdrpou String? @map("counter_edrpou")
+  counterName   String? @map("counter_name") // довідково (матчимо по iban/edrpou)
+  note          String?
+
+  createdByUserId String?  @map("created_by_user_id")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  @@index([counterIban])
+  @@index([counterEdrpou])
+  @@index([customerId])
+  @@map("client_payer_requisites")
+}
+
+// ─── Крок 4 — щоденне підбиття готівкової каси (2026-07-24) ──────────────────
+// Бухгалтер вводить фактично порахований залишок ₴/€/$ → система фіксує знімок
+// «облік vs факт» (обліковий залишок = рухи ДДС по сентинелу каси CASH).
+// Різниця рахується на льоту (actual − expected); документ вирівнювання
+// створюється окремо касовим ордером.
+
+model CashCountSession {
+  id String @id @default(cuid())
+
+  countDate DateTime @map("count_date") // день підбиття
+
+  expectedUah Decimal @map("expected_uah") @db.Decimal(15, 2)
+  expectedEur Decimal @map("expected_eur") @db.Decimal(15, 2)
+  expectedUsd Decimal @map("expected_usd") @db.Decimal(15, 2)
+  actualUah   Decimal @map("actual_uah") @db.Decimal(15, 2)
+  actualEur   Decimal @map("actual_eur") @db.Decimal(15, 2)
+  actualUsd   Decimal @map("actual_usd") @db.Decimal(15, 2)
+
+  comment String?
+
+  createdByUserId String?  @map("created_by_user_id")
+  createdByName   String?  @map("created_by_name")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  @@index([countDate])
+  @@map("cash_count_sessions")
 }
 
 // ─── Email DLQ (persistent retry queue, Session 70) ─────────────────────────

@@ -1043,6 +1043,25 @@ export function SaleForm({
    * Фактична сума = сума документа − уже отримані оплати (передоплати); коли є
    * передоплата — у тексті показуємо розбивку «Сума / Передоплата / До сплати».
    */
+  /**
+   * «Очікування оплати» (Крок 3 банкінгу): фіксуємо, що клієнту скинули
+   * реквізити на конкретну суму — точний збіг суми вхідної банківської
+   * транзакції стане сильним сигналом авто-рознесення. Fire-and-forget.
+   */
+  function recordPaymentExpectation(amountUah: number): void {
+    if (!clientId || amountUah <= 0) return;
+    void fetch("/api/v1/manager/payment-expectations", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        customerId: clientId,
+        saleId: savedId ?? undefined,
+        amountUah,
+        bankAccountId: selectedRequisiteId || undefined,
+      }),
+    }).catch(() => undefined);
+  }
+
   function openRequisitesMessage(): void {
     setShareTitle("Реквізити оплати");
     setShareText(
@@ -1053,6 +1072,7 @@ export function SaleForm({
       }),
     );
     setShareOpen(true);
+    recordPaymentExpectation(remainingUah);
   }
 
   /** Реквізити ПЕРЕДОПЛАТИ (500 грн/лот) — сума = к-сть лотів × 500 грн. */
@@ -1066,6 +1086,7 @@ export function SaleForm({
       ),
     );
     setShareOpen(true);
+    recordPaymentExpectation(prepaymentUah);
   }
 
   return (
