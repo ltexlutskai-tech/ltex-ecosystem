@@ -1,0 +1,900 @@
+<!doctype html>
+<html lang="uk">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Макет: нова картка клієнта (пропозиція)</title>
+    <style>
+      :root {
+        --bg: #f6f7f9;
+        --card: #ffffff;
+        --border: #e5e7eb;
+        --text: #111827;
+        --muted: #6b7280;
+        --green: #16a34a;
+        --green-soft: #dcfce7;
+        --red: #dc2626;
+        --amber: #d97706;
+        --amber-soft: #fef3c7;
+        --blue: #2563eb;
+        --blue-soft: #eff6ff;
+        --ann: #7c3aed;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+      }
+      body {
+        background: var(--bg);
+        color: var(--text);
+        font:
+          14px/1.45 -apple-system,
+          "Segoe UI",
+          Roboto,
+          "Helvetica Neue",
+          Arial,
+          sans-serif;
+      }
+      .wrap {
+        max-width: 1280px;
+        margin: 0 auto;
+        padding: 12px 16px 48px;
+      }
+      /* ─── Пояснення зверху ─── */
+      .legend {
+        background: #f5f3ff;
+        border: 1px solid #ddd6fe;
+        border-radius: 10px;
+        padding: 10px 14px;
+        margin-bottom: 12px;
+        font-size: 13px;
+      }
+      .legend b {
+        color: #5b21b6;
+      }
+      .legend ul {
+        margin: 6px 0 0;
+        padding-left: 0;
+        list-style: none;
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+        gap: 4px 18px;
+      }
+      .legend li {
+        display: flex;
+        gap: 8px;
+        align-items: flex-start;
+      }
+      .ann {
+        flex: none;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 18px;
+        height: 18px;
+        border-radius: 50%;
+        background: var(--ann);
+        color: #fff;
+        font-size: 11px;
+        font-weight: 700;
+        line-height: 1;
+        margin-top: 1px;
+      }
+      .ann.inline {
+        width: 16px;
+        height: 16px;
+        font-size: 10px;
+        vertical-align: -3px;
+        margin: 0 0 0 6px;
+      }
+      /* ─── Липка шапка ─── */
+      .hdr {
+        position: sticky;
+        top: 0;
+        z-index: 30;
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        box-shadow: 0 1px 2px rgb(0 0 0 / 0.05);
+        padding: 8px 14px;
+      }
+      .hdr-row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+      .hdr-row + .hdr-row {
+        margin-top: 6px;
+        padding-top: 6px;
+        border-top: 1px solid #f3f4f6;
+      }
+      .back {
+        flex: none;
+        width: 26px;
+        height: 26px;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        background: #fff;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--muted);
+        font-size: 14px;
+      }
+      .cname {
+        font-size: 18px;
+        font-weight: 700;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 34ch;
+      }
+      .dot {
+        width: 9px;
+        height: 9px;
+        border-radius: 50%;
+        background: #facc15;
+        flex: none;
+      }
+      .pill {
+        font-size: 11px;
+        padding: 2px 8px;
+        border-radius: 999px;
+        white-space: nowrap;
+      }
+      .pill.amber {
+        background: var(--amber-soft);
+        color: #92400e;
+      }
+      .pill.red {
+        background: #fee2e2;
+        color: #991b1b;
+      }
+      .hdr-right {
+        margin-left: auto;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        white-space: nowrap;
+      }
+      .debt {
+        font-size: 15px;
+        font-weight: 700;
+        color: var(--red);
+      }
+      .debt small {
+        font-weight: 400;
+        color: var(--muted);
+        font-size: 12px;
+      }
+      .mgr {
+        font-size: 12.5px;
+        color: var(--muted);
+      }
+      .mgr b {
+        color: var(--text);
+        font-weight: 600;
+      }
+      .iconbtn {
+        width: 26px;
+        height: 26px;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        background: #fff;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--muted);
+        font-size: 13px;
+        cursor: pointer;
+      }
+      .meta {
+        font-size: 12.5px;
+        color: var(--muted);
+        white-space: nowrap;
+      }
+      .phone-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 13px;
+        font-weight: 600;
+        white-space: nowrap;
+      }
+      .ci {
+        width: 24px;
+        height: 24px;
+        border-radius: 7px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 11px;
+        font-weight: 700;
+        color: #fff;
+        flex: none;
+      }
+      .ci.tel {
+        background: #6b7280;
+      }
+      .ci.vb {
+        background: #7360f2;
+      }
+      .ci.wa {
+        background: #25d366;
+      }
+      .ci.tg {
+        background: #29a9eb;
+      }
+      .ci.ig {
+        background: #e1306c;
+      }
+      .more-phones {
+        font-size: 12px;
+        color: var(--blue);
+        background: var(--blue-soft);
+        border-radius: 999px;
+        padding: 3px 8px;
+        white-space: nowrap;
+      }
+      .actions {
+        margin-left: auto;
+        display: flex;
+        gap: 6px;
+        flex-wrap: wrap;
+      }
+      .btn {
+        height: 30px;
+        padding: 0 10px;
+        border-radius: 8px;
+        border: 1px solid var(--border);
+        background: #fff;
+        font-size: 13px;
+        font-weight: 500;
+        color: #374151;
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        cursor: pointer;
+        white-space: nowrap;
+      }
+      .btn.primary {
+        background: var(--green);
+        border-color: var(--green);
+        color: #fff;
+      }
+      .btn.dots {
+        width: 30px;
+        padding: 0;
+        justify-content: center;
+        font-weight: 700;
+      }
+      /* ─── Дві колонки ─── */
+      .cols {
+        display: grid;
+        grid-template-columns: 300px 1fr;
+        gap: 12px;
+        margin-top: 12px;
+        align-items: start;
+      }
+      .sidebar {
+        position: sticky;
+        top: 122px; /* висота шапки + відступ */
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        max-height: calc(100vh - 134px);
+        overflow-y: auto;
+        padding-bottom: 4px;
+      }
+      .card {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 10px 12px;
+      }
+      .card h4 {
+        margin: 0 0 8px;
+        font-size: 11px;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        color: #9ca3af;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .card h4 .add {
+        margin-left: auto;
+        color: var(--blue);
+        font-size: 12px;
+        text-transform: none;
+        letter-spacing: 0;
+        cursor: pointer;
+      }
+      .card h4 .chev {
+        margin-left: auto;
+        color: #9ca3af;
+        font-size: 12px;
+      }
+      .next {
+        background: var(--amber-soft);
+        border-color: #fde68a;
+      }
+      .next h4 {
+        color: #92400e;
+      }
+      .next .task {
+        font-size: 13px;
+        font-weight: 600;
+        color: #78350f;
+      }
+      .next .when {
+        font-size: 12px;
+        color: #b45309;
+        margin: 2px 0 8px;
+      }
+      .next .row {
+        display: flex;
+        gap: 6px;
+      }
+      .mini {
+        height: 26px;
+        padding: 0 9px;
+        border-radius: 7px;
+        border: 1px solid #fcd34d;
+        background: #fff;
+        font-size: 12px;
+        cursor: pointer;
+      }
+      .mini.ok {
+        background: var(--green);
+        border-color: var(--green);
+        color: #fff;
+      }
+      .crow {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        padding: 4px 0;
+        font-size: 13px;
+      }
+      .crow .num {
+        font-family: ui-monospace, Menlo, Consolas, monospace;
+        font-size: 12.5px;
+      }
+      .crow .lbl {
+        color: var(--muted);
+        font-size: 11px;
+      }
+      .crow .right {
+        margin-left: auto;
+        display: flex;
+        gap: 4px;
+      }
+      .msgr-row {
+        display: flex;
+        gap: 6px;
+        padding-top: 6px;
+        border-top: 1px dashed #f3f4f6;
+        margin-top: 4px;
+        align-items: center;
+      }
+      .kv {
+        display: flex;
+        gap: 8px;
+        padding: 3px 0;
+        font-size: 13px;
+      }
+      .kv .k {
+        color: var(--muted);
+        flex: none;
+        width: 108px;
+      }
+      .kv .v {
+        font-weight: 500;
+      }
+      .ok-mark {
+        color: var(--green);
+        font-size: 12px;
+      }
+      .chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 5px;
+      }
+      .chip {
+        font-size: 12px;
+        background: #eef2ff;
+        color: #3730a3;
+        border-radius: 999px;
+        padding: 2px 9px;
+      }
+      .linkish {
+        color: var(--blue);
+        font-size: 12.5px;
+        cursor: pointer;
+      }
+      /* ─── Основна колонка ─── */
+      .tabs {
+        display: flex;
+        gap: 2px;
+        border-bottom: 1px solid var(--border);
+        overflow-x: auto;
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 12px 12px 0 0;
+        padding: 4px 8px 0;
+      }
+      .tab {
+        padding: 8px 12px 9px;
+        font-size: 13.5px;
+        color: var(--muted);
+        border-bottom: 2px solid transparent;
+        white-space: nowrap;
+        cursor: pointer;
+        display: inline-flex;
+        gap: 6px;
+        align-items: center;
+      }
+      .tab.active {
+        color: var(--blue);
+        font-weight: 600;
+        border-bottom-color: var(--blue);
+      }
+      .tab .badge {
+        background: var(--red);
+        color: #fff;
+        border-radius: 999px;
+        font-size: 10px;
+        min-width: 16px;
+        height: 16px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0 4px;
+      }
+      .main-card {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-top: none;
+        border-radius: 0 0 12px 12px;
+        padding: 12px 14px;
+      }
+      .composer {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 8px 12px;
+        color: var(--muted);
+        font-size: 13.5px;
+        background: #fafafa;
+      }
+      .composer .go {
+        margin-left: auto;
+        color: #fff;
+        background: var(--green);
+        border-radius: 7px;
+        padding: 4px 12px;
+        font-size: 12.5px;
+      }
+      .filters {
+        display: flex;
+        gap: 6px;
+        margin: 10px 0 4px;
+        flex-wrap: wrap;
+      }
+      .f {
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 4px 10px;
+        font-size: 12.5px;
+        color: var(--muted);
+        background: #fff;
+      }
+      .f.grow {
+        flex: 1;
+        min-width: 160px;
+      }
+      .titem {
+        display: flex;
+        gap: 10px;
+        padding: 9px 2px;
+        border-top: 1px solid #f3f4f6;
+      }
+      .titem:first-of-type {
+        border-top: none;
+      }
+      .ticon {
+        flex: none;
+        width: 28px;
+        height: 28px;
+        border-radius: 8px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 14px;
+        background: #f3f4f6;
+      }
+      .ticon.pay {
+        background: var(--green-soft);
+      }
+      .ticon.sale {
+        background: #e0e7ff;
+      }
+      .ticon.rem {
+        background: var(--amber-soft);
+      }
+      .ticon.ord {
+        background: var(--blue-soft);
+      }
+      .tbody .top {
+        font-size: 12px;
+        color: var(--muted);
+      }
+      .tbody .top b {
+        color: var(--text);
+        font-size: 12.5px;
+      }
+      .tbody .txt {
+        font-size: 13.5px;
+        margin-top: 1px;
+      }
+      .foot-note {
+        margin-top: 16px;
+        font-size: 12.5px;
+        color: var(--muted);
+        text-align: center;
+      }
+      .scrollhint {
+        text-align: center;
+        font-size: 12.5px;
+        color: #5b21b6;
+        margin: 8px 0 2px;
+      }
+      @media (max-width: 900px) {
+        .cols {
+          grid-template-columns: 1fr;
+        }
+        .sidebar {
+          position: static;
+          max-height: none;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <!-- Пояснення -->
+      <div class="legend">
+        <b>Макет нової картки клієнта</b> (дані умовні). Фіолетові кружечки — що
+        саме змінилось:
+        <ul>
+          <li>
+            <span class="ann">1</span> Шапка стала компактною (2 рядки замість
+            великої картки) і <b>липкою</b> — ім'я, борг і телефон видно завжди.
+          </li>
+          <li>
+            <span class="ann">2</span> <b>Кнопки дій тепер у шапці</b> — не
+            зникають при прокрутці; другорядні дії сховані у меню «⋮».
+          </li>
+          <li>
+            <span class="ann">3</span> <b>«Візитка» зліва</b>: контакти, адреса
+            й доставка, ключові слова — видно завжди, поки працюєш з історією.
+          </li>
+          <li>
+            <span class="ann">4</span> <b>«Наступний крок»</b> — найближче
+            нагадування зверху, з кнопками «Виконано / Відкласти» (як у
+            Pipedrive).
+          </li>
+          <li>
+            <span class="ann">5</span> Вкладки — <b>горизонтально</b>: контенту
+            на 220px ширше, «Історія» видна одразу без прокрутки.
+          </li>
+          <li>
+            <span class="ann">6</span> Все <b>компактніше</b>: менші шрифти,
+            відступи і кнопки — на екран влазить удвічі більше.
+          </li>
+        </ul>
+      </div>
+
+      <div class="scrollhint">
+        ▼ Прокрутіть сторінку вниз — шапка з кнопками і ліва колонка лишаються
+        на місці ▼
+      </div>
+
+      <!-- ЛИПКА ШАПКА -->
+      <div class="hdr">
+        <div class="hdr-row">
+          <span class="back">←</span>
+          <span class="cname">Алєксєєнко Наталія</span>
+          <span class="dot" title="Світлофор активності"></span>
+          <span class="pill amber">Малоактивний</span>
+          <span class="pill red">📞 Неактивний · цей місяць</span>
+          <span class="ann inline">1</span>
+          <span class="hdr-right">
+            <span class="debt"
+              >Борг: 216,57 € <small>(прострочено)</small></span
+            >
+            <span class="mgr">Менеджер: <b>Бойко Катерина</b></span>
+            <span class="iconbtn" title="Обговорити в месенджері">💬</span>
+          </span>
+        </div>
+        <div class="hdr-row">
+          <span class="meta">📍 Сумська обл. · Кириківка</span>
+          <span class="phone-chip">
+            +380 95 454 72 39
+            <span class="ci tel" title="Подзвонити">☎</span>
+            <span class="ci vb" title="Viber">V</span>
+            <span class="ci wa" title="WhatsApp">W</span>
+          </span>
+          <span class="more-phones">ще 1 номер ▾</span>
+          <span class="actions">
+            <span class="ann inline" style="margin-right: -2px">2</span>
+            <button class="btn primary">+ Замовлення</button>
+            <button class="btn">+ Реалізація</button>
+            <button class="btn">+ Оплата</button>
+            <button class="btn">🎥 Відео</button>
+            <button
+              class="btn dots"
+              title="Повідомити про борг · Призначити менеджера · Позначити на вилучення"
+            >
+              ⋮
+            </button>
+          </span>
+        </div>
+      </div>
+
+      <!-- ДВІ КОЛОНКИ -->
+      <div class="cols">
+        <!-- ВІЗИТКА -->
+        <aside class="sidebar">
+          <div class="card next">
+            <h4>⏰ Наступний крок <span class="ann">4</span></h4>
+            <div class="task">Подзвонити щодо оплати боргу</div>
+            <div class="when">прострочено на 3 дні (21.07)</div>
+            <div class="row">
+              <button class="mini ok">✓ Виконано</button>
+              <button class="mini">Відкласти ▾</button>
+            </div>
+          </div>
+
+          <div class="card">
+            <h4>
+              ☎ Контакти <span class="ann">3</span>
+              <span class="add">+ Додати</span>
+            </h4>
+            <div class="crow">
+              <span class="num">+380 95 454 72 39</span>
+              <span class="lbl">(основний)</span>
+              <span class="right">
+                <span class="ci tel">☎</span><span class="ci vb">V</span
+                ><span class="ci wa">W</span>
+              </span>
+            </div>
+            <div class="crow">
+              <span class="num">+380 66 123 45 67</span>
+              <span class="lbl">(чоловік)</span>
+              <span class="right">
+                <span class="ci tel">☎</span><span class="ci vb">V</span>
+              </span>
+            </div>
+            <div class="msgr-row">
+              <span class="ci ig" title="Instagram">Ig</span>
+              <span class="ci tg" title="Telegram">Tg</span>
+              <span class="linkish">natalia_shop_kyrykivka</span>
+            </div>
+          </div>
+
+          <div class="card">
+            <h4>🚚 Адреса й доставка</h4>
+            <div class="kv">
+              <span class="k">Адреса</span
+              ><span class="v">Кириківка, вул. Центральна, 12</span>
+            </div>
+            <div class="kv">
+              <span class="k">Доставка</span><span class="v">Нова Пошта</span>
+            </div>
+            <div class="kv">
+              <span class="k">Відділення</span>
+              <span class="v">№1 <span class="ok-mark">✓ звірено</span></span>
+            </div>
+            <div class="kv">
+              <span class="k">Маршрут</span><span class="v">Суми-Схід</span>
+            </div>
+          </div>
+
+          <div class="card">
+            <h4>🏷 Ключові слова <span class="add">+</span></h4>
+            <div class="chips">
+              <span class="chip">дитячий одяг</span>
+              <span class="chip">сток</span>
+              <span class="chip">опт від 50 кг</span>
+            </div>
+          </div>
+
+          <div class="card">
+            <h4>📋 Огляд</h4>
+            <div class="kv">
+              <span class="k">Тип цін</span><span class="v">Оптова</span>
+            </div>
+            <div class="kv">
+              <span class="k">Категорія ТТ</span><span class="v">Магазин</span>
+            </div>
+            <div class="kv">
+              <span class="k">Канал</span><span class="v">Instagram</span>
+            </div>
+            <div class="kv">
+              <span class="k">Ост. покупка</span
+              ><span class="v">16 дн тому</span>
+            </div>
+            <div class="kv">
+              <span class="k">Обсяг/міс</span><span class="v">≈ 250 кг</span>
+            </div>
+          </div>
+
+          <div class="card">
+            <h4>🧾 Реквізити <span class="chev">▸</span></h4>
+            <div class="kv">
+              <span class="k">Тип особи</span><span class="v">Фізична</span>
+            </div>
+            <div class="kv">
+              <span class="k">ІПН</span><span class="v">3351808816</span>
+            </div>
+            <div class="linkish" style="margin-top: 4px">Усі реквізити →</div>
+          </div>
+        </aside>
+
+        <!-- ОСНОВНА КОЛОНКА -->
+        <main>
+          <div class="tabs">
+            <span class="tab active">Історія</span>
+            <span class="tab">Нагадування <span class="badge">2</span></span>
+            <span class="tab">Замовлення</span>
+            <span class="tab">Історія продаж</span>
+            <span class="tab">Асортимент</span>
+            <span class="tab">Рухи боргу</span>
+            <span class="tab">Реквізити</span>
+            <span class="tab">Ще ▾</span>
+            <span class="ann inline" style="margin: 8px 0 0 2px">5</span>
+          </div>
+          <div class="main-card">
+            <div class="composer">
+              ✏️ Додати коментар про клієнта…
+              <span style="font-size: 12px">📎 0/2000</span>
+              <span class="go">Записати</span>
+            </div>
+            <div class="filters">
+              <span class="f grow">🔎 Пошук у історії…</span>
+              <span class="f">Тип: Усі ▾</span>
+              <span class="f">Від: дд.мм.рррр</span>
+              <span class="f">До: дд.мм.рррр</span>
+              <span class="ann inline" style="margin-top: 4px">6</span>
+            </div>
+
+            <div class="titem">
+              <span class="ticon">📝</span>
+              <span class="tbody">
+                <span class="top"
+                  ><b>Запис (1С)</b> · 07.07.2026, 18:16 (16 дн тому) · Бойко
+                  Катерина</span
+                >
+                <div class="txt">
+                  Доброго дня, Наталія. Домовились: чекає відео нової партії
+                  дитячого стоку, набере після 15-го.
+                </div>
+              </span>
+            </div>
+            <div class="titem">
+              <span class="ticon pay">💶</span>
+              <span class="tbody">
+                <span class="top"
+                  ><b>Оплата</b> · 05.07.2026 · ПКО №Л-000123</span
+                >
+                <div class="txt">
+                  Отримано 3 500 ₴ (готівка). Залишок боргу — 216,57 €.
+                </div>
+              </span>
+            </div>
+            <div class="titem">
+              <span class="ticon sale">📦</span>
+              <span class="tbody">
+                <span class="top"
+                  ><b>Реалізація</b> · 01.07.2026 · Л-0004567</span
+                >
+                <div class="txt">
+                  4 мішки · 84 кг · 412,50 € (Секонд Екстра, дитяче).
+                </div>
+              </span>
+            </div>
+            <div class="titem">
+              <span class="ticon rem">🔔</span>
+              <span class="tbody">
+                <span class="top"
+                  ><b>Нагадування виконано</b> · 28.06.2026 · Бойко
+                  Катерина</span
+                >
+                <div class="txt">
+                  «Нагадати про залишок боргу» — виконано, клієнт пообіцяв
+                  оплату до 5-го.
+                </div>
+              </span>
+            </div>
+            <div class="titem">
+              <span class="ticon ord">🛒</span>
+              <span class="tbody">
+                <span class="top"
+                  ><b>Замовлення</b> · 25.06.2026 · L0000002477</span
+                >
+                <div class="txt">
+                  Дитячий мікс 60 кг + взуття 20 пар. Проведено.
+                </div>
+              </span>
+            </div>
+            <div class="titem">
+              <span class="ticon">📝</span>
+              <span class="tbody">
+                <span class="top"
+                  ><b>Запис</b> · 20.06.2026 · Бойко Катерина</span
+                >
+                <div class="txt">
+                  Просила більше літнього асортименту, взуття 36–39.
+                </div>
+              </span>
+            </div>
+            <div class="titem">
+              <span class="ticon pay">💶</span>
+              <span class="tbody">
+                <span class="top"
+                  ><b>Оплата</b> · 14.06.2026 · ПКО №Л-000098</span
+                >
+                <div class="txt">Отримано 5 000 ₴ (на рахунок ФОП).</div>
+              </span>
+            </div>
+            <div class="titem">
+              <span class="ticon sale">📦</span>
+              <span class="tbody">
+                <span class="top"
+                  ><b>Реалізація</b> · 10.06.2026 · Л-0004401</span
+                >
+                <div class="txt">6 мішків · 122 кг · 588,00 €.</div>
+              </span>
+            </div>
+            <div class="titem">
+              <span class="ticon">📝</span>
+              <span class="tbody">
+                <span class="top"
+                  ><b>Запис (1С)</b> · 02.06.2026 · Бойко Катерина</span
+                >
+                <div class="txt">
+                  Відкрила другу точку в Охтирці — цікавить Bric-a-Brac та
+                  іграшки.
+                </div>
+              </span>
+            </div>
+            <div class="titem">
+              <span class="ticon ord">🛒</span>
+              <span class="tbody">
+                <span class="top"
+                  ><b>Замовлення</b> · 28.05.2026 · L0000002391</span
+                >
+                <div class="txt">Сток жіночий 40 кг. Закрите (продано).</div>
+              </span>
+            </div>
+          </div>
+
+          <div class="foot-note">
+            Це статичний макет для погодження вигляду: кольори, тексти й цифри —
+            умовні. Уся логіка (права доступу, «чужий клієнт», редагування) —
+            без змін.
+          </div>
+        </main>
+      </div>
+    </div>
+  </body>
+</html>
