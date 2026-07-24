@@ -15,6 +15,7 @@ const PANELS = {
   assortment: <div>assortment-panel</div>,
   presentations: <div>presentations-panel</div>,
   history: <div>history-panel</div>,
+  messages: <div>messages-panel</div>,
   salesHistory: <div>sales-history-panel</div>,
   orders: <div>orders-panel</div>,
   reminders: <div>reminders-panel</div>,
@@ -24,12 +25,13 @@ const PANELS = {
 };
 
 describe("ClientTabs — горизонтальні вкладки + «Ще» + M1.3f foreign", () => {
-  it("mine view: 7 основних вкладок у стрічці + кнопка «Ще»", () => {
+  it("mine view: 8 основних вкладок у стрічці + кнопка «Ще»", () => {
     render(<ClientTabs {...PANELS} isForeign={false} />);
     const tabs = screen.getAllByRole("tab");
-    expect(tabs).toHaveLength(7);
+    expect(tabs).toHaveLength(8);
     const labels = tabs.map((b) => b.textContent?.trim());
     expect(labels).toContain("Історія");
+    expect(labels).toContain("Повідомлення");
     expect(labels).toContain("Нагадування");
     expect(labels).toContain("Реквізити");
     expect(labels).toContain("Рухи боргу");
@@ -43,8 +45,8 @@ describe("ClientTabs — горизонтальні вкладки + «Ще» + 
     expect(labels).toContain("Презентації");
     expect(labels).toContain("Іст. презентацій");
     expect(labels).toContain("Ключові слова");
-    // 7 основних + 3 у меню = 10
-    expect(screen.getAllByRole("tab")).toHaveLength(10);
+    // 8 основних + 3 у меню = 11
+    expect(screen.getAllByRole("tab")).toHaveLength(11);
   });
 
   it("дефолтна активна вкладка — Історія", () => {
@@ -72,6 +74,12 @@ describe("ClientTabs — горизонтальні вкладки + «Ще» + 
     render(<ClientTabs {...PANELS} overdueRemindersCount={3} />);
     const remindersTab = screen.getByRole("tab", { name: /Нагадування/ });
     expect(remindersTab.textContent).toContain("3");
+  });
+
+  it("синій бейдж на «Повідомлення» коли є непрочитані", () => {
+    render(<ClientTabs {...PANELS} unreadMessagesCount={5} />);
+    const messagesTab = screen.getByRole("tab", { name: /Повідомлення/ });
+    expect(messagesTab.textContent).toContain("5");
   });
 
   it("foreign view: рівно 4 вкладки у порядку розділів, без «Ще»", () => {

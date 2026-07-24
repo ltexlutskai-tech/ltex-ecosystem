@@ -8,6 +8,7 @@ type TabId =
   | "assortment"
   | "presentations"
   | "history"
+  | "messages"
   | "sales-history"
   | "orders"
   | "reminders"
@@ -36,6 +37,12 @@ interface TabDef {
  */
 const TABS: TabDef[] = [
   { id: "history", label: "Історія", foreignVisible: false, primary: true },
+  {
+    id: "messages",
+    label: "Повідомлення",
+    foreignVisible: false,
+    primary: true,
+  },
   {
     id: "reminders",
     label: "Нагадування",
@@ -87,6 +94,7 @@ export function ClientTabs({
   assortment,
   presentations,
   history,
+  messages,
   salesHistory,
   orders,
   reminders,
@@ -94,12 +102,14 @@ export function ClientTabs({
   keywords,
   debtMovements,
   overdueRemindersCount = 0,
+  unreadMessagesCount = 0,
   isForeign = false,
 }: {
   requisites: React.ReactNode;
   assortment: React.ReactNode;
   presentations: React.ReactNode;
   history: React.ReactNode;
+  messages: React.ReactNode;
   salesHistory: React.ReactNode;
   orders: React.ReactNode;
   reminders: React.ReactNode;
@@ -107,6 +117,8 @@ export function ClientTabs({
   keywords: React.ReactNode;
   debtMovements: React.ReactNode;
   overdueRemindersCount?: number;
+  /** Непрочитані повідомлення клієнта — синій бейдж на вкладці «Повідомлення». */
+  unreadMessagesCount?: number;
   isForeign?: boolean;
 }) {
   const visibleTabs = useMemo(
@@ -164,6 +176,7 @@ export function ClientTabs({
     assortment,
     presentations,
     history,
+    messages,
     "sales-history": salesHistory,
     orders,
     reminders,
@@ -201,6 +214,11 @@ export function ClientTabs({
             {t.id === "reminders" && overdueRemindersCount > 0 && (
               <span className="inline-flex h-4 min-w-[16px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-medium text-white">
                 {overdueRemindersCount > 9 ? "9+" : overdueRemindersCount}
+              </span>
+            )}
+            {t.id === "messages" && unreadMessagesCount > 0 && (
+              <span className="inline-flex h-4 min-w-[16px] items-center justify-center rounded-full bg-blue-600 px-1 text-[10px] font-medium text-white">
+                {unreadMessagesCount > 9 ? "9+" : unreadMessagesCount}
               </span>
             )}
           </button>

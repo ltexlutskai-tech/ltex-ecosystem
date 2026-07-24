@@ -132,8 +132,10 @@ const mockSender: PlatformSender = {
 };
 
 /**
- * Фабрика — повертає sender за платформою. WhatsApp / Instagram поки mock-mode
- * (інтеграція — Phase 3, Meta).
+ * Фабрика — повертає sender за платформою. WhatsApp / Instagram / Facebook /
+ * TikTok поки mock-mode (вихідний API ще не інтегровано — див.
+ * `CHAT_PLATFORMS[…].outbound` у `lib/chat/platforms.ts`). Exhaustive-`never`
+ * гарантує: додав платформу в enum → мусиш вирішити її sender тут.
  */
 export function getPlatformSender(platform: ChatPlatform): PlatformSender {
   switch (platform) {
@@ -143,6 +145,8 @@ export function getPlatformSender(platform: ChatPlatform): PlatformSender {
       return viberSender;
     case "whatsapp":
     case "instagram":
+    case "facebook":
+    case "tiktok":
       return mockSender;
     default: {
       const exhaustive: never = platform;

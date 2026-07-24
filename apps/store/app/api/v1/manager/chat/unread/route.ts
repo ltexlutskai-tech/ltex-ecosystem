@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { Prisma, prisma } from "@ltex/db";
+import { prisma } from "@ltex/db";
 import { getCurrentUser } from "@/lib/auth/manager-auth";
-import { canView } from "@/lib/permissions/role-permissions";
+import { buildChatScopeWhere } from "@/lib/chat/conversation-access";
 
 /**
  * GET /api/v1/manager/chat/unread
@@ -19,13 +19,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Не авторизовано" }, { status: 401 });
   }
 
-  const chatScope = canView({ role: user.role }, "chat").scope;
-  const where: Prisma.ChatConversationWhereInput =
-    chatScope === "all"
-      ? {}
-      : {
-          OR: [{ agentUserId: user.id }, { client: { agentUserId: user.id } }],
-        };
+  const where = buildChatScopeWhere(user);
 
   const result = await prisma.chatConversation.aggregate({
     where,

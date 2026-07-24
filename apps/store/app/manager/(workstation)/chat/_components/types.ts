@@ -2,7 +2,15 @@
 //   - GET /api/v1/manager/chat/conversations        — список розмов
 //   - GET /api/v1/manager/chat/conversations/[id]   — заголовок + тред
 
-export type ChatPlatform = "telegram" | "viber" | "whatsapp" | "instagram";
+// Дзеркалить enum `ChatPlatform` з @ltex/db (тримати синхронно). Список / картка
+// / inbox беруть мітки й іконки з реєстру `lib/chat/platforms.ts`.
+export type ChatPlatform =
+  | "telegram"
+  | "viber"
+  | "whatsapp"
+  | "instagram"
+  | "facebook"
+  | "tiktok";
 export type ChatDirection = "in" | "out";
 export type ChatSender = "client" | "manager" | "system";
 

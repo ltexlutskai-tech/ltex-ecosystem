@@ -2,7 +2,7 @@
 
 import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, MessageCircle } from "lucide-react";
 import {
   ClientAddressLink,
   ClientWebsiteLink,
@@ -124,10 +124,13 @@ export function ClientSidebar({
   client,
   canEdit,
   isForeign,
+  unreadMessagesCount = 0,
 }: {
   client: ClientDetail;
   canEdit: boolean;
   isForeign: boolean;
+  /** Непрочитані повідомлення — бейдж на кнопці «Повідомлення» у «Контактах». */
+  unreadMessagesCount?: number;
 }) {
   const tags = parseKeywords(client.keywords);
   const lastPurchase =
@@ -162,6 +165,21 @@ export function ClientSidebar({
               bare
             />
           </div>
+        )}
+        {!isForeign && (
+          <button
+            type="button"
+            onClick={() => goToTab("messages")}
+            className="mt-2 flex w-full items-center gap-1.5 rounded-md border border-blue-200 bg-blue-50 px-2.5 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-100"
+          >
+            <MessageCircle className="h-3.5 w-3.5" />
+            Повідомлення
+            {unreadMessagesCount > 0 && (
+              <span className="ml-auto inline-flex h-4 min-w-[16px] items-center justify-center rounded-full bg-blue-600 px-1 text-[10px] font-medium text-white">
+                {unreadMessagesCount > 9 ? "9+" : unreadMessagesCount}
+              </span>
+            )}
+          </button>
         )}
       </SidebarSection>
 

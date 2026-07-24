@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { MessageCircle } from "lucide-react";
 import { CLIENT_COLOR_META } from "@/lib/manager/client-color";
 import { ClientStatusBadge } from "../_components/client-status-badge";
 import { DebtCell } from "../_components/debt-cell";
@@ -69,6 +70,15 @@ export function renderCell(key: string, c: ClientListItem): ReactNode {
         >
           <div className="flex flex-wrap items-center gap-1.5 font-medium">
             <span>{c.name}</span>
+            {c.unreadMessageCount > 0 && (
+              <span
+                className="inline-flex items-center gap-0.5 rounded-full bg-blue-100 px-1.5 py-0.5 text-[10px] font-medium text-blue-700"
+                title={`Нові повідомлення в месенджері: ${c.unreadMessageCount}`}
+              >
+                <MessageCircle className="h-3 w-3" />
+                {c.unreadMessageCount > 9 ? "9+" : c.unreadMessageCount}
+              </span>
+            )}
             {c.npNotMatched && (
               <span
                 className="inline-flex items-center rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-800"

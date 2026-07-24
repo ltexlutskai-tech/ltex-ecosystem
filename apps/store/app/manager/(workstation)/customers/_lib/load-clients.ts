@@ -5,6 +5,7 @@ import {
   computeClientColor,
   type ClientColor,
 } from "@/lib/manager/client-color";
+import { buildChatScopeWhere } from "@/lib/chat/conversation-access";
 import type { CurrentManager } from "@/lib/auth/manager-auth";
 import type { ClientListItem } from "../_components/types";
 
@@ -71,6 +72,8 @@ export interface LoadClientsParams {
   colors?: ClientColor[];
   /** Лише клієнти з активними (незавершеними) нагадуваннями. */
   hasReminder?: boolean;
+  /** Лише клієнти з непрочитаними повідомленнями в месенджері. */
+  hasUnreadMessage?: boolean;
 }
 
 /** Ключі сортування → Prisma orderBy. Дефолт — ім'я за зростанням. */
@@ -211,6 +214,19 @@ export async function loadClients(
     andClauses.push({ reminders: { some: { completedAt: null } } });
   }
 
+  // Лише клієнти з непрочитаними повідомленнями в месенджері (у зоні доступу
+  // менеджера — той самий chat-scope, що й у картці/inbox-і).
+  if (p.hasUnreadMessage) {
+    andClauses.push({
+      chatConversations: {
+        some: {
+          unreadForManager: { gt: 0 },
+          ...buildChatScopeWhere({ id: p.userId, role: p.userRole }),
+        },
+      },
+    });
+  }
+
   if (p.daysSinceMin !== undefined || p.daysSinceMax !== undefined) {
     const f: Prisma.IntNullableFilter = {};
     if (p.daysSinceMin !== undefined) f.gte = p.daysSinceMin;
@@ -305,7 +321,7 @@ export async function loadClients(
     .map((r) => r.code1C)
     .filter((c): c is string => Boolean(c));
 
-  const [lastContactRows, activePageCodesArr, customerMirrorRows] =
+  const [lastContactRows, activePageCodesArr, customerMirrorRows, unreadRows] =
     await Promise.all([
       pageClientIds.length > 0
         ? prisma.mgrClientTimelineEntry.groupBy({
@@ -325,6 +341,19 @@ export async function loadClients(
             select: { id: true, code1C: true },
           })
         : Promise.resolve([]),
+      // Непрочитані повідомлення месенджера по клієнтах сторінки (один батч,
+      // у зоні доступу менеджера — той самий chat-scope, що й у картці/inbox-і).
+      pageClientIds.length > 0
+        ? prisma.chatConversation.groupBy({
+            by: ["clientId"],
+            where: {
+              clientId: { in: pageClientIds },
+              unreadForManager: { gt: 0 },
+              ...buildChatScopeWhere({ id: p.userId, role: p.userRole }),
+            },
+            _sum: { unreadForManager: true },
+          })
+        : Promise.resolve([]),
     ]);
 
   const lastContactMap = new Map<string, Date>();
@@ -335,6 +364,12 @@ export async function loadClients(
   const customerIdByCode = new Map<string, string>();
   for (const cu of customerMirrorRows) {
     if (cu.code1C) customerIdByCode.set(cu.code1C, cu.id);
+  }
+  const unreadByClient = new Map<string, number>();
+  for (const g of unreadRows) {
+    if (g.clientId) {
+      unreadByClient.set(g.clientId, g._sum.unreadForManager ?? 0);
+    }
   }
 
   return {
@@ -407,6 +442,7 @@ export async function loadClients(
         now,
       }),
       lastContactAt: (lastContactMap.get(c.id) ?? null)?.toISOString() ?? null,
+      unreadMessageCount: unreadByClient.get(c.id) ?? 0,
       // Є легасі «№ відділення НП», але структуровану адресу ще не звірено.
       npNotMatched:
         Boolean(c.novaPoshtaBranch?.trim()) && c.npAddressMatchedAt == null,

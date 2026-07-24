@@ -1,12 +1,14 @@
 import { notFound, redirect } from "next/navigation";
 import { prisma } from "@ltex/db";
 import { getCurrentUser } from "@/lib/auth/manager-auth";
+import { buildChatScopeWhere } from "@/lib/chat/conversation-access";
 import { canEditClient } from "@/lib/permissions/mgr-client-edit";
 import { ClientAssortmentTab } from "./_components/client-assortment-tab";
 import { ClientDebtMovementsTab } from "./_components/client-debt-movements-tab";
 import { ClientHeaderBar } from "./_components/client-header-bar";
 import { ClientHistoryTab } from "./_components/client-history-tab";
 import { ClientKeywordsTab } from "./_components/client-keywords-tab";
+import { ClientMessagesTab } from "./_components/client-messages-tab";
 import { ClientOrdersTab } from "./_components/client-orders-tab";
 import { ClientPresentationHistoryTab } from "./_components/client-presentation-history-tab";
 import { ClientPresentationsTab } from "./_components/client-presentations-tab";
@@ -70,6 +72,18 @@ export default async function ClientDetailPage({
       })
     : null;
 
+  // Непрочитані повідомлення клієнта — синій бейдж на вкладці «Повідомлення».
+  // Для чужого клієнта вкладка прихована (M1.3f), тому не рахуємо/не вантажимо.
+  // Той самий chat-scope, що й вміст вкладки (щоб бейдж = відкривані розмови).
+  const unreadMessagesCount = isForeign
+    ? 0
+    : ((
+        await prisma.chatConversation.aggregate({
+          where: { clientId: client.id, ...buildChatScopeWhere(user) },
+          _sum: { unreadForManager: true },
+        })
+      )._sum.unreadForManager ?? 0);
+
   return (
     <div className="mx-auto max-w-7xl space-y-3">
       {/* Компактна закріплена шапка: ім'я, статуси, борг, менеджер, телефони,
@@ -95,6 +109,7 @@ export default async function ClientDetailPage({
             client={client}
             canEdit={canEdit}
             isForeign={isForeign}
+            unreadMessagesCount={unreadMessagesCount}
           />
         </aside>
 
@@ -102,7 +117,13 @@ export default async function ClientDetailPage({
         <div className="min-w-0">
           <ClientTabs
             overdueRemindersCount={overdueCount}
+            unreadMessagesCount={unreadMessagesCount}
             isForeign={isForeign}
+            messages={
+              isForeign ? null : (
+                <ClientMessagesTab clientId={client.id} user={user} />
+              )
+            }
             requisites={
               <ClientRequisitesTab
                 client={client}

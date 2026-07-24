@@ -6,6 +6,8 @@ import { Send } from "lucide-react";
 import { Button, Textarea, useToast } from "@ltex/ui";
 import { BrandIcon } from "../../_components/brand-icons";
 import { formatRelativeShort } from "../../_components/format-relative";
+import { chatPlatformLabel } from "@/lib/chat/platforms";
+import { broadcastChatRead } from "@/lib/chat/read-broadcast";
 import type {
   ChatMessage,
   ConversationHeader,
@@ -19,10 +21,16 @@ const MAX_MESSAGE_LEN = 4_000;
 export function ConversationThread({
   conversationId,
   onReadCleared,
+  showClientLink = true,
 }: {
   conversationId: string;
   /** Викликати після успішного `/read` (щоб список оновив unread). */
   onReadCleared: () => void;
+  /**
+   * Чи показувати у шапці лінк на картку клієнта. `false` — коли тред вбудований
+   * У саму картку клієнта (вкладка «Повідомлення»), де лінк на себе зайвий.
+   */
+  showClientLink?: boolean;
 }) {
   const [header, setHeader] = useState<ConversationHeader | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -57,6 +65,9 @@ export function ConversationThread({
           { method: "POST", cache: "no-store" },
         );
         onReadCleared();
+        // Сповіщаємо верхнє вікно (бейдж «Месенджери» у сайдбарі) миттєво,
+        // бо картка/inbox живуть в iframe-вкладці (інакше — затримка polling 30с).
+        broadcastChatRead();
       } catch {
         // silent
       }
@@ -196,7 +207,7 @@ export function ConversationThread({
 
   return (
     <div className="flex h-full flex-1 flex-col bg-gray-50">
-      <ThreadHeader header={header} />
+      <ThreadHeader header={header} showClientLink={showClientLink} />
       <div
         ref={scrollRef}
         onScroll={onScroll}
@@ -220,19 +231,29 @@ export function ConversationThread({
   );
 }
 
-function ThreadHeader({ header }: { header: ConversationHeader }) {
-  const primaryName =
-    header.client?.name ??
-    header.externalUserName ??
-    header.phone ??
-    `#${header.externalUserId.slice(0, 12)}`;
+function ThreadHeader({
+  header,
+  showClientLink,
+}: {
+  header: ConversationHeader;
+  showClientLink: boolean;
+}) {
+  const platformLabel = chatPlatformLabel(header.platform);
+  // У вбудованому (картковому) режимі ім'я клієнта відоме з картки — показуємо
+  // платформу як заголовок; у inbox-і — ім'я/лінк на клієнта.
+  const primaryName = showClientLink
+    ? (header.client?.name ??
+      header.externalUserName ??
+      header.phone ??
+      `#${header.externalUserId.slice(0, 12)}`)
+    : platformLabel;
 
   return (
     <div className="flex items-center gap-3 border-b bg-white px-4 py-2">
       <BrandIcon kind={header.platform} className="h-5 w-5" />
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
-          {header.client ? (
+          {showClientLink && header.client ? (
             <Link
               href={`/manager/customers/${header.client.id}`}
               className="truncate text-sm font-medium text-green-700 hover:underline"
@@ -244,7 +265,7 @@ function ThreadHeader({ header }: { header: ConversationHeader }) {
               {primaryName}
             </p>
           )}
-          {!header.client && (
+          {showClientLink && !header.client && (
             <span className="rounded bg-gray-100 px-1.5 py-0.5 text-[10px] text-gray-500">
               Невпізнаний
             </span>
