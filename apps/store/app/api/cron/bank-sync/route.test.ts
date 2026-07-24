@@ -16,7 +16,11 @@ const SECRET = "c".repeat(32);
 beforeEach(() => {
   vi.clearAllMocks();
   process.env.CRON_SECRET = SECRET;
-  runBankSyncMock.mockResolvedValue({ mode: "client-info", accounts: 3 });
+  runBankSyncMock.mockResolvedValue({
+    mono: { mode: "client-info", accounts: 3 },
+    privat: { mode: "skipped" },
+    reconciled: { checked: 0 },
+  });
 });
 
 describe("GET /api/cron/bank-sync", () => {
@@ -36,8 +40,9 @@ describe("GET /api/cron/bank-sync", () => {
     );
     expect(res.status).toBe(200);
     const body = await res.json();
-    expect(body.mode).toBe("client-info");
-    expect(body.accounts).toBe(3);
+    expect(body.mono.mode).toBe("client-info");
+    expect(body.mono.accounts).toBe(3);
+    expect(body.privat.mode).toBe("skipped");
   });
 
   it("200 з ?token=", async () => {

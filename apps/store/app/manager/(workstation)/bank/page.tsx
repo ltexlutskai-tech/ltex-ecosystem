@@ -3,11 +3,16 @@ import { Prisma, prisma } from "@ltex/db";
 import { requireRole } from "@/lib/auth/manager-auth";
 import { isMonoConfigured } from "@/lib/bank/monobank";
 import { MONO_CLIENT_INFO_AT_KEY } from "@/lib/bank/ingest";
+import Link from "next/link";
 import { AutoRefresh } from "../_components/auto-refresh";
 import { EmptyState } from "../_components/empty-state";
 import { ListPagination } from "../customers/_components/list-pagination";
 import { FeedAccountLink } from "./_components/feed-account-link";
 import { WebhookSetupButton } from "./_components/webhook-setup-button";
+import {
+  UnmatchedBoard,
+  type UnmatchedTxnRow,
+} from "./_components/unmatched-board";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Банк — рухи по рахунках — L-TEX Manager" };
@@ -42,6 +47,26 @@ function one(v: string | string[] | undefined): string | undefined {
   return Array.isArray(v) ? v[0] : v;
 }
 
+/** Бейдж стану рознесення транзакції (Крок 3 воронки). */
+function matchBadge(status: string): { label: string; cls: string } | null {
+  switch (status) {
+    case "auto_posted":
+      return { label: "Авто ✓", cls: "bg-emerald-100 text-emerald-700" };
+    case "manual_posted":
+      return { label: "Вручну ✓", cls: "bg-emerald-100 text-emerald-700" };
+    case "draft_created":
+      return { label: "Чернетка", cls: "bg-blue-100 text-blue-700" };
+    case "unmatched":
+      return { label: "Рознести!", cls: "bg-red-100 text-red-700" };
+    case "ignored":
+      return { label: "Ігнор", cls: "bg-gray-100 text-gray-500" };
+    case "skipped":
+      return { label: "Вручну", cls: "bg-gray-100 text-gray-500" };
+    default:
+      return null; // pending — ще в обробці
+  }
+}
+
 /**
  * «Банк» — стрічка рухів по рахунках з банківського фіда + залишки наживо.
  * Крок 1 інтеграції банкінгу (Monobank webhook + фонове опитування).
@@ -60,6 +85,7 @@ export default async function BankFeedPage({
   const accountId = one(sp.account) || undefined;
   const dir = one(sp.dir);
   const q = one(sp.q)?.trim() || undefined;
+  const view = one(sp.view) === "unmatched" ? "unmatched" : "all";
 
   const where: Prisma.BankTransactionWhereInput = {};
   if (accountId) where.feedAccountId = accountId;
@@ -75,34 +101,75 @@ export default async function BankFeedPage({
     ];
   }
 
-  const [accounts, mgrAccounts, items, total, clientInfoSetting] =
-    await Promise.all([
-      prisma.bankFeedAccount.findMany({
-        where: { archived: false },
-        orderBy: [{ provider: "asc" }, { currencyCode: "asc" }],
-        include: { mgrBankAccount: { select: { id: true, name: true } } },
-      }),
-      prisma.mgrBankAccount.findMany({
-        where: { archived: false, kind: { in: ["account", "card"] } },
-        orderBy: { name: "asc" },
-        select: { id: true, name: true },
-      }),
-      prisma.bankTransaction.findMany({
-        where,
-        orderBy: { occurredAt: "desc" },
-        skip: (page - 1) * PAGE_SIZE,
-        take: PAGE_SIZE,
-        include: {
-          feedAccount: { select: { title: true, currencyCode: true } },
-        },
-      }),
-      prisma.bankTransaction.count({ where }),
-      prisma.mgrSetting.findUnique({
-        where: { key: MONO_CLIENT_INFO_AT_KEY },
-      }),
-    ]);
+  const [
+    accounts,
+    mgrAccounts,
+    items,
+    total,
+    clientInfoSetting,
+    unmatchedCount,
+    unmatchedRows,
+    expenseArticles,
+  ] = await Promise.all([
+    prisma.bankFeedAccount.findMany({
+      where: { archived: false },
+      orderBy: [{ provider: "asc" }, { currencyCode: "asc" }],
+      include: { mgrBankAccount: { select: { id: true, name: true } } },
+    }),
+    prisma.mgrBankAccount.findMany({
+      where: { archived: false, kind: { in: ["account", "card"] } },
+      orderBy: { name: "asc" },
+      select: { id: true, name: true },
+    }),
+    prisma.bankTransaction.findMany({
+      where,
+      orderBy: { occurredAt: "desc" },
+      skip: (page - 1) * PAGE_SIZE,
+      take: PAGE_SIZE,
+      include: {
+        feedAccount: { select: { title: true, currencyCode: true } },
+      },
+    }),
+    prisma.bankTransaction.count({ where }),
+    prisma.mgrSetting.findUnique({
+      where: { key: MONO_CLIENT_INFO_AT_KEY },
+    }),
+    prisma.bankTransaction.count({ where: { matchStatus: "unmatched" } }),
+    view === "unmatched"
+      ? prisma.bankTransaction.findMany({
+          where: { matchStatus: "unmatched" },
+          orderBy: { occurredAt: "desc" },
+          take: 100,
+          include: {
+            feedAccount: {
+              select: { title: true, mgrBankAccountId: true },
+            },
+          },
+        })
+      : Promise.resolve([]),
+    view === "unmatched"
+      ? prisma.mgrCashFlowArticle.findMany({
+          where: { archived: false, direction: { in: ["expense", "both"] } },
+          orderBy: { name: "asc" },
+          select: { id: true, name: true },
+        })
+      : Promise.resolve([]),
+  ]);
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const boardRows: UnmatchedTxnRow[] = unmatchedRows.map((t) => ({
+    id: t.id,
+    occurredAt: t.occurredAt.toISOString(),
+    accountTitle: t.feedAccount.title ?? "рахунок",
+    accountLinked: t.feedAccount.mgrBankAccountId !== null,
+    amount: Number(t.amount),
+    currencyCode: t.currencyCode,
+    counterName: t.counterName,
+    counterIban: t.counterIban,
+    counterEdrpou: t.counterEdrpou,
+    purpose: [t.comment, t.description].filter(Boolean).join(" · ") || null,
+    matchNote: t.matchNote,
+  }));
   const monoConfigured = isMonoConfigured();
   const lastSyncAt = clientInfoSetting
     ? new Date(clientInfoSetting.value)
@@ -180,139 +247,181 @@ export default async function BankFeedPage({
         </div>
       ) : null}
 
-      {/* Фільтри */}
-      <form
-        method="GET"
-        className="flex flex-wrap items-end gap-2 rounded-md border bg-white p-3 text-sm"
-      >
-        <label className="flex flex-col gap-1">
-          <span className="text-xs text-gray-500">Рахунок</span>
-          <select
-            name="account"
-            defaultValue={accountId ?? ""}
-            className="h-9 rounded border border-gray-300 px-2"
-          >
-            <option value="">Усі рахунки</option>
-            {accounts.map((a) => (
-              <option key={a.id} value={a.id}>
-                {a.title ?? a.externalId} ({a.currencyCode})
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="flex flex-col gap-1">
-          <span className="text-xs text-gray-500">Напрям</span>
-          <select
-            name="dir"
-            defaultValue={dir ?? ""}
-            className="h-9 rounded border border-gray-300 px-2"
-          >
-            <option value="">Усі</option>
-            <option value="in">Надходження</option>
-            <option value="out">Списання</option>
-          </select>
-        </label>
-        <label className="flex min-w-[220px] flex-1 flex-col gap-1">
-          <span className="text-xs text-gray-500">
-            Пошук (платник / призначення / IBAN / ЄДРПОУ)
-          </span>
-          <input
-            type="text"
-            name="q"
-            defaultValue={q ?? ""}
-            placeholder="Напр.: Мельник або L0002477"
-            className="h-9 rounded border border-gray-300 px-2"
-          />
-        </label>
-        <button
-          type="submit"
-          className="h-9 rounded-md bg-emerald-600 px-4 font-medium text-white hover:bg-emerald-700"
+      {/* Вкладки: стрічка / дошка нерознесених */}
+      <div className="flex items-center gap-2 text-sm">
+        <Link
+          href="/manager/bank"
+          className={`rounded-full px-3 py-1 font-medium ${
+            view === "all"
+              ? "bg-emerald-600 text-white"
+              : "border bg-white text-gray-600 hover:bg-gray-50"
+          }`}
         >
-          Фільтрувати
-        </button>
-      </form>
+          Усі операції
+        </Link>
+        <Link
+          href="/manager/bank?view=unmatched"
+          className={`rounded-full px-3 py-1 font-medium ${
+            view === "unmatched"
+              ? "bg-red-600 text-white"
+              : unmatchedCount > 0
+                ? "border border-red-200 bg-red-50 text-red-700 hover:bg-red-100"
+                : "border bg-white text-gray-600 hover:bg-gray-50"
+          }`}
+        >
+          Нерознесені гроші{unmatchedCount > 0 ? ` (${unmatchedCount})` : ""}
+        </Link>
+      </div>
 
-      {/* Стрічка операцій */}
-      {items.length === 0 ? (
-        <EmptyState
-          message="Операцій поки немає"
-          hint={
-            monoConfigured
-              ? "Щойно по рахунку буде рух — він зʼявиться тут автоматично."
-              : "Підключіть Monobank, щоб бачити рухи по рахунках наживо."
-          }
-        />
-      ) : (
+      {view === "unmatched" ? (
+        <UnmatchedBoard rows={boardRows} articles={expenseArticles} />
+      ) : null}
+
+      {/* Фільтри + стрічка (ховаються, коли відкрита дошка нерознесених) */}
+      {view === "all" ? (
         <>
-          <div className="overflow-x-auto rounded-md border bg-white">
-            <table className="w-full text-sm">
-              <thead className="bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
-                <tr>
-                  <th className="px-3 py-2">Дата</th>
-                  <th className="px-3 py-2">Рахунок</th>
-                  <th className="px-3 py-2">Платник / отримувач</th>
-                  <th className="px-3 py-2">Призначення</th>
-                  <th className="px-3 py-2 text-right">Сума</th>
-                  <th className="px-3 py-2 text-right">Залишок після</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {items.map((t) => {
-                  const amount = Number(t.amount);
-                  const isIncome = amount > 0;
-                  return (
-                    <tr key={t.id} className="hover:bg-gray-50">
-                      <td className="whitespace-nowrap px-3 py-2 text-gray-600">
-                        {fmtDateTime(t.occurredAt)}
-                        {t.hold ? (
-                          <span className="ml-1.5 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700">
-                            блок
-                          </span>
-                        ) : null}
-                      </td>
-                      <td className="whitespace-nowrap px-3 py-2 text-gray-500">
-                        {t.feedAccount.title ?? "—"} (
-                        {t.feedAccount.currencyCode})
-                      </td>
-                      <td className="px-3 py-2">
-                        <span className="font-medium text-gray-800">
-                          {t.counterName ?? "—"}
-                        </span>
-                        {t.counterEdrpou || t.counterIban ? (
-                          <span className="block text-xs text-gray-400">
-                            {[t.counterEdrpou, t.counterIban]
-                              .filter(Boolean)
-                              .join(" · ")}
-                          </span>
-                        ) : null}
-                      </td>
-                      <td className="max-w-[320px] px-3 py-2 text-gray-600">
-                        {[t.comment, t.description]
-                          .filter(Boolean)
-                          .join(" · ") || "—"}
-                      </td>
-                      <td
-                        className={`whitespace-nowrap px-3 py-2 text-right font-semibold tabular-nums ${
-                          isIncome ? "text-emerald-700" : "text-gray-700"
-                        }`}
-                      >
-                        {isIncome ? "+" : ""}
-                        {fmtMoney(amount, t.currencyCode)}
-                      </td>
-                      <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums text-gray-400">
-                        {t.balanceAfter !== null
-                          ? fmtMoney(Number(t.balanceAfter), t.currencyCode)
-                          : "—"}
-                      </td>
+          <form
+            method="GET"
+            className="flex flex-wrap items-end gap-2 rounded-md border bg-white p-3 text-sm"
+          >
+            <label className="flex flex-col gap-1">
+              <span className="text-xs text-gray-500">Рахунок</span>
+              <select
+                name="account"
+                defaultValue={accountId ?? ""}
+                className="h-9 rounded border border-gray-300 px-2"
+              >
+                <option value="">Усі рахунки</option>
+                {accounts.map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.title ?? a.externalId} ({a.currencyCode})
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="flex flex-col gap-1">
+              <span className="text-xs text-gray-500">Напрям</span>
+              <select
+                name="dir"
+                defaultValue={dir ?? ""}
+                className="h-9 rounded border border-gray-300 px-2"
+              >
+                <option value="">Усі</option>
+                <option value="in">Надходження</option>
+                <option value="out">Списання</option>
+              </select>
+            </label>
+            <label className="flex min-w-[220px] flex-1 flex-col gap-1">
+              <span className="text-xs text-gray-500">
+                Пошук (платник / призначення / IBAN / ЄДРПОУ)
+              </span>
+              <input
+                type="text"
+                name="q"
+                defaultValue={q ?? ""}
+                placeholder="Напр.: Мельник або L0002477"
+                className="h-9 rounded border border-gray-300 px-2"
+              />
+            </label>
+            <button
+              type="submit"
+              className="h-9 rounded-md bg-emerald-600 px-4 font-medium text-white hover:bg-emerald-700"
+            >
+              Фільтрувати
+            </button>
+          </form>
+
+          {/* Стрічка операцій */}
+          {items.length === 0 ? (
+            <EmptyState
+              message="Операцій поки немає"
+              hint={
+                monoConfigured
+                  ? "Щойно по рахунку буде рух — він зʼявиться тут автоматично."
+                  : "Підключіть Monobank, щоб бачити рухи по рахунках наживо."
+              }
+            />
+          ) : (
+            <>
+              <div className="overflow-x-auto rounded-md border bg-white">
+                <table className="w-full text-sm">
+                  <thead className="bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
+                    <tr>
+                      <th className="px-3 py-2">Дата</th>
+                      <th className="px-3 py-2">Рахунок</th>
+                      <th className="px-3 py-2">Платник / отримувач</th>
+                      <th className="px-3 py-2">Призначення</th>
+                      <th className="px-3 py-2 text-right">Сума</th>
+                      <th className="px-3 py-2 text-right">Залишок після</th>
                     </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-          <ListPagination page={page} totalPages={totalPages} />
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {items.map((t) => {
+                      const amount = Number(t.amount);
+                      const isIncome = amount > 0;
+                      const badge = matchBadge(t.matchStatus);
+                      return (
+                        <tr key={t.id} className="hover:bg-gray-50">
+                          <td className="whitespace-nowrap px-3 py-2 text-gray-600">
+                            {fmtDateTime(t.occurredAt)}
+                            {t.hold ? (
+                              <span className="ml-1.5 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700">
+                                блок
+                              </span>
+                            ) : null}
+                            {badge ? (
+                              <span
+                                className={`ml-1.5 rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${badge.cls}`}
+                              >
+                                {badge.label}
+                              </span>
+                            ) : null}
+                          </td>
+                          <td className="whitespace-nowrap px-3 py-2 text-gray-500">
+                            {t.feedAccount.title ?? "—"} (
+                            {t.feedAccount.currencyCode})
+                          </td>
+                          <td className="px-3 py-2">
+                            <span className="font-medium text-gray-800">
+                              {t.counterName ?? "—"}
+                            </span>
+                            {t.counterEdrpou || t.counterIban ? (
+                              <span className="block text-xs text-gray-400">
+                                {[t.counterEdrpou, t.counterIban]
+                                  .filter(Boolean)
+                                  .join(" · ")}
+                              </span>
+                            ) : null}
+                          </td>
+                          <td className="max-w-[320px] px-3 py-2 text-gray-600">
+                            {[t.comment, t.description]
+                              .filter(Boolean)
+                              .join(" · ") || "—"}
+                          </td>
+                          <td
+                            className={`whitespace-nowrap px-3 py-2 text-right font-semibold tabular-nums ${
+                              isIncome ? "text-emerald-700" : "text-gray-700"
+                            }`}
+                          >
+                            {isIncome ? "+" : ""}
+                            {fmtMoney(amount, t.currencyCode)}
+                          </td>
+                          <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums text-gray-400">
+                            {t.balanceAfter !== null
+                              ? fmtMoney(Number(t.balanceAfter), t.currencyCode)
+                              : "—"}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+              <ListPagination page={page} totalPages={totalPages} />
+            </>
+          )}
         </>
-      )}
+      ) : null}
     </div>
   );
 }

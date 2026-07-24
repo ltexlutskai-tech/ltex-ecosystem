@@ -55,6 +55,14 @@ export async function POST(request: NextRequest) {
   if (body?.type === "StatementItem" && account && item?.id) {
     try {
       await ingestMonoStatementItems(account, [item]);
+      // Миттєве авто-рознесення нового руху (fire-and-forget — банк чекає 200).
+      import("@/lib/bank/reconcile")
+        .then(({ reconcileBankTransactions }) => reconcileBankTransactions(10))
+        .catch((e: unknown) => {
+          console.error("[L-TEX] monobank webhook reconcile failed", {
+            error: e instanceof Error ? e.message : String(e),
+          });
+        });
     } catch (e: unknown) {
       const message = e instanceof Error ? e.message : "Unknown error";
       console.error("[L-TEX] monobank webhook ingest failed", {

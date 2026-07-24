@@ -148,6 +148,13 @@ export const BANK_FEED_LINK: SidebarLink = {
   icon: Landmark,
 };
 
+// ── Каса — щоденне підбиття (Крок 4 банкінгу) ─────────────────────────────
+export const CASH_COUNT_LINK: SidebarLink = {
+  href: "/manager/cash-count",
+  label: "Каса (підбиття)",
+  icon: Wallet,
+};
+
 // ── Тиждень 5 блоку Ролі (Analyst) ──────────────────────────────────────
 export const REPORTS_LINK: SidebarLink = {
   href: "/manager/reports",
@@ -405,6 +412,7 @@ export function getSidebarSections(role: ManagerRole): SidebarItem[][] {
   if (role === "bookkeeper" || adminOrOwner) {
     sections.push([
       { ...BANK_FEED_LINK },
+      { ...CASH_COUNT_LINK },
       ...FINANCE_LINKS.map((l) => ({ ...l })),
       { ...NP_CHECK_LINK },
     ]);
