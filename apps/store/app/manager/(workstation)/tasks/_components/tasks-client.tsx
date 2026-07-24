@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { Search, X } from "lucide-react";
 import {
   Button,
   Dialog,
@@ -15,7 +16,11 @@ import {
   Textarea,
   useToast,
 } from "@ltex/ui";
-import { taskTypeMeta, type TaskCard } from "@/lib/manager/task-types";
+import {
+  taskMatchesQuery,
+  taskTypeMeta,
+  type TaskCard,
+} from "@/lib/manager/task-types";
 
 interface UserOption {
   id: string;
@@ -51,6 +56,22 @@ export function TasksClient({
 }) {
   const [createOpen, setCreateOpen] = useState(false);
   const [showCompleted, setShowCompleted] = useState(false);
+  const [query, setQuery] = useState("");
+
+  // Пошук по всьому, що є в завданні (частина рядка) — фільтрує всі секції.
+  const filteredAssigned = useMemo(
+    () => assignedToMe.filter((t) => taskMatchesQuery(t, query)),
+    [assignedToMe, query],
+  );
+  const filteredCreated = useMemo(
+    () => createdByMe.filter((t) => taskMatchesQuery(t, query)),
+    [createdByMe, query],
+  );
+  const filteredCompleted = useMemo(
+    () => completed.filter((t) => taskMatchesQuery(t, query)),
+    [completed, query],
+  );
+  const searching = query.trim().length > 0;
 
   return (
     <div className="max-w-none space-y-5">
@@ -66,15 +87,44 @@ export function TasksClient({
         </Button>
       </header>
 
+      <div className="relative max-w-md">
+        <Search className="pointer-events-none absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+        <Input
+          type="search"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Пошук у завданнях (текст, хто поставив, виконавець)…"
+          className="pl-8"
+        />
+        {query && (
+          <button
+            type="button"
+            onClick={() => setQuery("")}
+            className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+            aria-label="Очистити пошук"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        )}
+      </div>
+
       <Section
         title="Мені (виконати)"
-        empty="Немає активних завдань для вас."
-        tasks={assignedToMe}
+        empty={
+          searching
+            ? "Нічого не знайдено за вашим запитом."
+            : "Немає активних завдань для вас."
+        }
+        tasks={filteredAssigned}
       />
       <Section
         title="Від мене (я поставив)"
-        empty="Ви ще не ставили завдань."
-        tasks={createdByMe}
+        empty={
+          searching
+            ? "Нічого не знайдено за вашим запитом."
+            : "Ви ще не ставили завдань."
+        }
+        tasks={filteredCreated}
       />
 
       {/* Реєстр виконаних завдань — згорнуто за замовчуванням. */}
@@ -86,17 +136,19 @@ export function TasksClient({
         >
           {showCompleted ? "▾" : "▸"} Виконані{" "}
           <span className="font-normal text-gray-400">
-            ({completed.length})
+            ({filteredCompleted.length})
           </span>
         </button>
         {showCompleted &&
-          (completed.length === 0 ? (
+          (filteredCompleted.length === 0 ? (
             <p className="rounded-md border border-dashed border-gray-200 p-4 text-center text-sm text-gray-400">
-              Виконаних завдань поки немає.
+              {searching
+                ? "Нічого не знайдено за вашим запитом."
+                : "Виконаних завдань поки немає."}
             </p>
           ) : (
             <div className="space-y-2">
-              {completed.map((t) => (
+              {filteredCompleted.map((t) => (
                 <TaskRow key={`${t.kind}-${t.id}`} task={t} />
               ))}
             </div>
@@ -195,9 +247,12 @@ function TaskRow({ task }: { task: TaskCard }) {
   async function remove() {
     setBusy(true);
     try {
-      const res = await fetch(`/api/v1/manager/tasks/${task.id}`, {
-        method: "DELETE",
-      });
+      // Складські завдання видаляються своїм роутом (окрема модель).
+      const url =
+        task.kind === "warehouse"
+          ? `/api/v1/manager/warehouse-tasks/${task.id}`
+          : `/api/v1/manager/tasks/${task.id}`;
+      const res = await fetch(url, { method: "DELETE" });
       if (!res.ok) throw new Error();
       router.refresh();
     } catch {

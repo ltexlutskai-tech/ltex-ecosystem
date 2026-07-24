@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   bookLotSchema,
   canBook,
+  canRemoveReservation,
   canUnbook,
   isActiveReservation,
   type LotBookingState,
@@ -123,6 +124,72 @@ describe("canUnbook", () => {
 
   it("вільний лот — нічого знімати — false", () => {
     expect(canUnbook(lot(), "u1", NOW)).toBe(false);
+  });
+});
+
+describe("canRemoveReservation", () => {
+  const FUTURE = new Date("2026-05-27T00:00:00.000Z");
+  const PAST = new Date("2026-05-10T00:00:00.000Z");
+  const reserved = {
+    status: "reserved",
+    reservedByUserId: "u1",
+    reservedForName: "ТОВ Ромашка",
+    reservedUntil: FUTURE,
+  };
+
+  it("менеджер з броні може вилучити свою активну бронь", () => {
+    expect(canRemoveReservation(reserved, { id: "u1", isAdmin: false })).toBe(
+      true,
+    );
+  });
+
+  it("менеджер з броні може почистити й ПРОТЕРМІНОВАНУ свою бронь", () => {
+    expect(
+      canRemoveReservation(
+        { ...reserved, reservedUntil: PAST },
+        { id: "u1", isAdmin: false },
+      ),
+    ).toBe(true);
+  });
+
+  it("чужу бронь звичайний менеджер вилучити не може", () => {
+    expect(canRemoveReservation(reserved, { id: "u2", isAdmin: false })).toBe(
+      false,
+    );
+  });
+
+  it("admin/owner може вилучити будь-чию бронь", () => {
+    expect(canRemoveReservation(reserved, { id: "adm", isAdmin: true })).toBe(
+      true,
+    );
+  });
+
+  it("без даних броні — нічого вилучати", () => {
+    expect(
+      canRemoveReservation(
+        {
+          status: "free",
+          reservedByUserId: null,
+          reservedForName: null,
+          reservedUntil: null,
+        },
+        { id: "adm", isAdmin: true },
+      ),
+    ).toBe(false);
+  });
+
+  it("проданий/архівний/у-дорозі лот не чіпаємо (навіть адмін)", () => {
+    for (const status of ["sold", "archived", "in_transit"]) {
+      expect(
+        canRemoveReservation(
+          { ...reserved, status },
+          {
+            id: "adm",
+            isAdmin: true,
+          },
+        ),
+      ).toBe(false);
+    }
   });
 });
 

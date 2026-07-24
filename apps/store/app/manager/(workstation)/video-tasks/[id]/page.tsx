@@ -56,12 +56,19 @@ export default async function VideoTaskDetailPage({
     })),
   };
 
+  // Вилучати може той, хто створив (менеджер-замовник), або admin/owner.
+  const canDelete =
+    user.role === "admin" ||
+    user.role === "owner" ||
+    (task.managerUserId != null && task.managerUserId === user.id);
+
   return (
     <div className="mx-auto max-w-3xl space-y-4">
       <AutoRefresh />
       <VideoTaskDetail
         task={view}
         role={user.role}
+        canDelete={canDelete}
         seasonOptions={attrs.seasons}
         qualityOptions={attrs.quality}
         genderOptions={attrs.genders}

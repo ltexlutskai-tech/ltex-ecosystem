@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/manager-auth";
 import { addBagSchema } from "@/lib/validations/video-task";
-import { addVideoTaskBag } from "@/lib/manager/video-task";
+import {
+  addVideoTaskBag,
+  VideoBagReservedError,
+} from "@/lib/manager/video-task";
 
 /**
  * POST /api/v1/manager/video-tasks/[id]/bring
@@ -53,6 +56,17 @@ export async function POST(
     });
     return NextResponse.json({ ok: true, barcode: res.barcode });
   } catch (err) {
+    // Чужа бронь — з деталями (хто/до коли), щоб склад розумів, чому блок.
+    if (err instanceof VideoBagReservedError) {
+      const until = err.reservedUntil
+        ? ` до ${err.reservedUntil.toLocaleDateString("uk-UA")}`
+        : "";
+      const who = err.reservedByName ? `: ${err.reservedByName}` : "";
+      return NextResponse.json(
+        { error: `Мішок заброньовано іншим менеджером${who}${until}` },
+        { status: 409 },
+      );
+    }
     const msg = err instanceof Error ? err.message : String(err);
     const known = ERR_STATUS[msg];
     if (known) {

@@ -13,7 +13,8 @@ import {
 
 /**
  * Тулбар фільтрів списку складських завдань. Веде URL-параметри
- * (`status`/`customerName`/`deliveryMethod`), які читає серверна сторінка.
+ * (`status`/`q`/`deliveryMethod`), які читає серверна сторінка. Пошук `q`
+ * шукає по всьому, що є в завданні (клієнт/товар/ШК/ТТН/адреса/коментар).
  */
 export function WarehouseTasksToolbar() {
   const router = useRouter();
@@ -21,20 +22,18 @@ export function WarehouseTasksToolbar() {
   const searchParams = useSearchParams();
   const [, startTransition] = useTransition();
 
-  const [customer, setCustomer] = useState(
-    searchParams.get("customerName") ?? "",
-  );
+  const [customer, setCustomer] = useState(searchParams.get("q") ?? "");
   const status = searchParams.get("status") ?? "";
   const deliveryMethod = searchParams.get("deliveryMethod") ?? "";
 
-  // Живий пошук по клієнту (debounce 350мс) без Enter.
+  // Живий пошук (debounce 350мс) без Enter.
   useEffect(() => {
-    const urlValue = searchParams.get("customerName") ?? "";
+    const urlValue = searchParams.get("q") ?? "";
     if (customer.trim() === urlValue) return;
     const handle = window.setTimeout(() => {
       const sp = new URLSearchParams(searchParams.toString());
-      if (customer.trim()) sp.set("customerName", customer.trim());
-      else sp.delete("customerName");
+      if (customer.trim()) sp.set("q", customer.trim());
+      else sp.delete("q");
       sp.delete("page");
       startTransition(() => router.replace(`${pathname}?${sp.toString()}`));
     }, 350);
@@ -65,7 +64,7 @@ export function WarehouseTasksToolbar() {
           type="search"
           value={customer}
           onChange={(e) => setCustomer(e.target.value)}
-          placeholder="Пошук за клієнтом…"
+          placeholder="Пошук у завданнях (клієнт, товар, ШК, ТТН)…"
           className="pl-8"
         />
       </div>

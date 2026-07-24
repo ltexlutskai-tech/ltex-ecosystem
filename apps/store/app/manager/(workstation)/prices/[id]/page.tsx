@@ -30,7 +30,11 @@ export default async function ProductCardPage({
 
   const { id } = await params;
   const [product, rateUah, categoryNodes] = await Promise.all([
-    loadProductCard(id, user.id),
+    loadProductCard(
+      id,
+      user.id,
+      user.role === "admin" || user.role === "owner",
+    ),
     getCurrentRate(),
     loadCategoryNodes(),
   ]);

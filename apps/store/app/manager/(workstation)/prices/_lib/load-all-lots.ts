@@ -18,6 +18,8 @@ export interface LoadAllLotsParams extends BuildLotsWhereParams {
   pageSize: number;
   /** id поточного менеджера — для фільтра «моя бронь» + флагів дисплею. */
   viewerUserId: string;
+  /** admin/owner — може вилучати будь-чию бронь (ПКМ «Вилучити бронь»). */
+  viewerIsAdmin?: boolean;
 }
 
 export interface LoadAllLotsResult {
@@ -46,7 +48,9 @@ export async function loadAllLots(
     }),
   ]);
 
-  const items = rows.map((r) => serializeLotRow(r, p.viewerUserId, now));
+  const items = rows.map((r) =>
+    serializeLotRow(r, p.viewerUserId, now, p.viewerIsAdmin ?? false),
+  );
   const groups = groupLotsByProduct(items);
 
   return {

@@ -1,10 +1,12 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { prisma } from "@ltex/db";
+import { Prisma, prisma } from "@ltex/db";
 import { getCurrentUser } from "@/lib/auth/manager-auth";
 import { AutoRefresh } from "../_components/auto-refresh";
 import { TaskTypeTabs } from "../_components/task-type-tabs";
 import { videoTaskStatusMeta } from "@/lib/manager/video-task-status";
+import { VideoTaskDeleteButton } from "./_components/video-task-delete-button";
+import { VideoTasksSearch } from "./_components/video-tasks-search";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Відеозона — L-TEX Manager" };
@@ -27,23 +29,50 @@ export default async function VideoTasksPage({
 
   const sp = await searchParams;
   const tab = firstParam(sp.tab) === "done" ? "done" : "active";
+  const q = (firstParam(sp.q) ?? "").trim();
 
   const isVideozone = ["videozone", "admin", "owner"].includes(user.role);
   const isWarehouse = user.role === "warehouse";
+  const isAdminOwner = user.role === "admin" || user.role === "owner";
   // Відеозона не бачить клієнта у списку — лише товар/артикул/мішок.
   const hideClient = user.role === "videozone";
 
   // Зріз «на мене» за роллю.
-  const scope: Record<string, unknown> = isVideozone
+  const scope: Prisma.MgrVideoTaskWhereInput = isVideozone
     ? {}
     : isWarehouse
       ? {} // склад бачить усі, діє на «new»
       : { managerUserId: user.id }; // менеджер — свої
 
-  const where =
-    tab === "done"
-      ? { ...scope, status: "done" }
-      : { ...scope, status: { in: ["new", "filming"] } };
+  // Пошук по всьому, що є в завданні (частина рядка, без регістру). Клієнта
+  // не матчимо для ролі відеозони — вона його не бачить.
+  const search: Prisma.MgrVideoTaskWhereInput | null = q
+    ? {
+        OR: [
+          { productName: { contains: q, mode: "insensitive" } },
+          { articleCode: { contains: q, mode: "insensitive" } },
+          { managerName: { contains: q, mode: "insensitive" } },
+          { requestedBarcode: { contains: q, mode: "insensitive" } },
+          { bags: { some: { barcode: { contains: q, mode: "insensitive" } } } },
+          ...(hideClient
+            ? []
+            : [
+                {
+                  clientName: {
+                    contains: q,
+                    mode: "insensitive" as const,
+                  },
+                },
+              ]),
+        ],
+      }
+    : null;
+
+  const where: Prisma.MgrVideoTaskWhereInput = {
+    ...scope,
+    ...(search ? { AND: [search] } : {}),
+    status: tab === "done" ? "done" : { in: ["new", "filming"] },
+  };
 
   const tasks = await prisma.mgrVideoTask.findMany({
     where,
@@ -90,37 +119,49 @@ export default async function VideoTasksPage({
         </div>
       </div>
 
-      <div className="flex gap-2 border-b">
-        {(
-          [
-            { key: "active", label: "Активні" },
-            { key: "done", label: "Виконані" },
-          ] as const
-        ).map((t) => (
-          <Link
-            key={t.key}
-            href={`/manager/video-tasks?tab=${t.key}`}
-            className={`-mb-px border-b-2 px-3 py-2 text-sm ${
-              tab === t.key
-                ? "border-green-600 font-medium text-green-700"
-                : "border-transparent text-gray-500 hover:text-gray-700"
-            }`}
-          >
-            {t.label}
-          </Link>
-        ))}
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b pb-px">
+        <div className="flex gap-2">
+          {(
+            [
+              { key: "active", label: "Активні" },
+              { key: "done", label: "Виконані" },
+            ] as const
+          ).map((t) => (
+            <Link
+              key={t.key}
+              href={`/manager/video-tasks?tab=${t.key}${
+                q ? `&q=${encodeURIComponent(q)}` : ""
+              }`}
+              className={`-mb-px border-b-2 px-3 py-2 text-sm ${
+                tab === t.key
+                  ? "border-green-600 font-medium text-green-700"
+                  : "border-transparent text-gray-500 hover:text-gray-700"
+              }`}
+            >
+              {t.label}
+            </Link>
+          ))}
+        </div>
+        <div className="mb-1 flex-1 sm:max-w-md">
+          <VideoTasksSearch />
+        </div>
       </div>
 
       {tasks.length === 0 ? (
         <p className="rounded-md border border-dashed p-8 text-center text-sm text-gray-500">
-          {tab === "done"
-            ? "Виконаних відеозавдань поки немає."
-            : "Активних відеозавдань немає."}
+          {q
+            ? "Нічого не знайдено за вашим запитом."
+            : tab === "done"
+              ? "Виконаних відеозавдань поки немає."
+              : "Активних відеозавдань немає."}
         </p>
       ) : (
         <div className="grid gap-2">
           {tasks.map((t) => {
             const meta = videoTaskStatusMeta(t);
+            const canDelete =
+              isAdminOwner ||
+              (t.managerUserId != null && t.managerUserId === user.id);
             return (
               <Link
                 key={t.id}
@@ -155,6 +196,13 @@ export default async function VideoTasksPage({
                   >
                     {meta.label}
                   </span>
+                  {canDelete ? (
+                    <VideoTaskDeleteButton
+                      taskId={t.id}
+                      label={t.productName}
+                      afterDelete="refresh"
+                    />
+                  ) : null}
                 </div>
               </Link>
             );

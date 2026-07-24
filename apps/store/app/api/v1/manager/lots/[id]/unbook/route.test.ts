@@ -140,6 +140,50 @@ describe("POST /api/v1/manager/lots/[id]/unbook", () => {
     expect(mockPrisma.$transaction).not.toHaveBeenCalled();
   });
 
+  it("admin може вилучити ЧУЖУ бронь", async () => {
+    getCurrentUserMock.mockResolvedValueOnce({
+      ...MANAGER_USER,
+      id: "adm",
+      role: "admin" as const,
+    });
+    mockPrisma.lot.findUnique.mockResolvedValueOnce({
+      ...baseLot,
+      reservedByUserId: "u2",
+    });
+    const res = await POST(makeReq("lot1"), {
+      params: Promise.resolve({ id: "lot1" }),
+    });
+    expect(res.status).toBe(200);
+    expect(txState.lotUpdateData).toMatchObject({ status: "free" });
+  });
+
+  it("менеджер з броні може почистити свою ПРОТЕРМІНОВАНУ бронь", async () => {
+    mockPrisma.lot.findUnique.mockResolvedValueOnce({
+      ...baseLot,
+      reservedUntil: new Date(Date.now() - 24 * 60 * 60 * 1000),
+    });
+    const res = await POST(makeReq("lot1"), {
+      params: Promise.resolve({ id: "lot1" }),
+    });
+    expect(res.status).toBe(200);
+  });
+
+  it("403 для проданого лота (бронь — частина історії)", async () => {
+    getCurrentUserMock.mockResolvedValueOnce({
+      ...MANAGER_USER,
+      id: "adm",
+      role: "admin" as const,
+    });
+    mockPrisma.lot.findUnique.mockResolvedValueOnce({
+      ...baseLot,
+      status: "sold",
+    });
+    const res = await POST(makeReq("lot1"), {
+      params: Promise.resolve({ id: "lot1" }),
+    });
+    expect(res.status).toBe(403);
+  });
+
   it("403 коли лот вільний (нічого знімати)", async () => {
     mockPrisma.lot.findUnique.mockResolvedValueOnce({
       ...baseLot,

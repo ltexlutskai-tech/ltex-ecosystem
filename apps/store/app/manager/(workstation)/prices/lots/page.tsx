@@ -44,6 +44,7 @@ export default async function AllLotsPage({
       page,
       pageSize,
       viewerUserId: user.id,
+      viewerIsAdmin: user.role === "admin" || user.role === "owner",
     }),
     productId ? loadProductLabel(productId) : Promise.resolve(null),
     getCurrentRate(),

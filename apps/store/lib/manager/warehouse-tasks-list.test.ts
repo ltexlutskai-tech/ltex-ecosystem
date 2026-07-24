@@ -109,3 +109,40 @@ describe("buildWarehouseTasksOrderBy", () => {
     ]);
   });
 });
+
+describe("buildWarehouseTasksWhere — загальний пошук q", () => {
+  it("шукає по всіх полях завдання + позиціях", () => {
+    const where = buildWarehouseTasksWhere({
+      managerUserId: null,
+      q: "  37065 ",
+    });
+    const and = where.AND as Array<Record<string, unknown>>;
+    const orClause = and.find((c) => "OR" in c) as { OR: unknown[] };
+    expect(orClause).toBeTruthy();
+    expect(orClause.OR).toEqual(
+      expect.arrayContaining([
+        { customerName: { contains: "37065", mode: "insensitive" } },
+        { expressWaybill: { contains: "37065", mode: "insensitive" } },
+        { managerName: { contains: "37065", mode: "insensitive" } },
+        {
+          items: {
+            some: {
+              OR: [
+                { productName: { contains: "37065", mode: "insensitive" } },
+                { articleCode: { contains: "37065", mode: "insensitive" } },
+                { barcode: { contains: "37065", mode: "insensitive" } },
+                { sector: { contains: "37065", mode: "insensitive" } },
+              ],
+            },
+          },
+        },
+      ]),
+    );
+  });
+
+  it("порожній q — не додає умов", () => {
+    const where = buildWarehouseTasksWhere({ managerUserId: null, q: "   " });
+    const and = where.AND as Array<Record<string, unknown>>;
+    expect(and.some((c) => "OR" in c)).toBe(false);
+  });
+});

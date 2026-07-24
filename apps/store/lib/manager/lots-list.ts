@@ -1,4 +1,5 @@
 import { Prisma } from "@ltex/db";
+import { canRemoveReservation } from "@/lib/manager/lot-booking";
 
 /**
  * Manager «Прайс» — Stage 3b global lots list helpers.
@@ -214,6 +215,8 @@ export interface LotListItem {
   isActiveReservation: boolean;
   /** Активна бронь належить поточному менеджеру. */
   isMineReservation: boolean;
+  /** Поточний користувач може вилучити бронь (менеджер з броні або адмін). */
+  canUnbook: boolean;
   product: {
     id: string;
     articleCode: string | null;
@@ -224,12 +227,14 @@ export interface LotListItem {
 
 /**
  * Перетворює raw-лот (з findMany include) у плаский рядок списку.
- * Чиста функція — без I/O. `viewerUserId`/`now` — для похідних флагів броні.
+ * Чиста функція — без I/O. `viewerUserId`/`now` — для похідних флагів броні;
+ * `viewerIsAdmin` — admin/owner може вилучати будь-чию бронь (ПКМ).
  */
 export function serializeLotRow(
   l: RawLotRow,
   viewerUserId?: string,
   now: Date = new Date(),
+  viewerIsAdmin = false,
 ): LotListItem {
   const isActive = l.reservedUntil
     ? l.reservedUntil.getTime() >= now.getTime()
@@ -255,6 +260,17 @@ export function serializeLotRow(
       isActive &&
       viewerUserId !== undefined &&
       l.reservedByUserId === viewerUserId,
+    canUnbook:
+      viewerUserId !== undefined &&
+      canRemoveReservation(
+        {
+          status: l.status,
+          reservedByUserId: l.reservedByUserId,
+          reservedForName: l.reservedForName,
+          reservedUntil: l.reservedUntil,
+        },
+        { id: viewerUserId, isAdmin: viewerIsAdmin },
+      ),
     product: {
       id: l.product.id,
       articleCode: l.product.articleCode,

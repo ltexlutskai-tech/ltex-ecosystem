@@ -24,6 +24,39 @@ export function endOfTomorrow(now: Date): Date {
   return d;
 }
 
+/**
+ * Чи блокує бронь лоту сканування у відеозавдання (чиста, з тестами).
+ *
+ * Власна бронь менеджера-замовника — його потреба: він сам вирішує віддати
+ * свій заброньований мішок під відео (навіть для іншого свого клієнта), тому
+ * скан проходить. Блокуємо лише АКТИВНУ бронь ІНШОГО менеджера (або бронь без
+ * менеджера у завдання без менеджера — нема кому «дозволити»).
+ */
+export function blocksVideoTaskScan(
+  lot: {
+    status: string;
+    reservedByUserId: string | null;
+    reservedUntil: Date | null;
+  },
+  taskManagerUserId: string | null,
+  now: Date,
+): boolean {
+  if (!isActiveReservation(lot, now)) return false;
+  if (taskManagerUserId == null) return true;
+  return lot.reservedByUserId !== taskManagerUserId;
+}
+
+/** Бронь чужого менеджера — з деталями для людського повідомлення складу. */
+export class VideoBagReservedError extends Error {
+  constructor(
+    public readonly reservedByName: string | null,
+    public readonly reservedUntil: Date | null,
+  ) {
+    super("RESERVED");
+    this.name = "VideoBagReservedError";
+  }
+}
+
 export interface CreateVideoTaskArgs {
   productId: string;
   clientId: string; // MgrClient.id
@@ -138,17 +171,20 @@ export async function addVideoTaskBag(opts: {
   if (task.bags.some((b) => b.barcode === lot.barcode)) {
     throw new Error("ALREADY_ADDED");
   }
+  // Бронь самого менеджера-замовника НЕ блокує (його потреба — його рішення);
+  // чужа активна бронь — блокує з деталями «хто/до коли».
   if (
-    isActiveReservation(
+    blocksVideoTaskScan(
       {
         status: lot.status,
         reservedByUserId: lot.reservedByUserId,
         reservedUntil: lot.reservedUntil,
       },
+      task.managerUserId,
       now,
     )
   ) {
-    throw new Error("RESERVED");
+    throw new VideoBagReservedError(lot.reservedByName, lot.reservedUntil);
   }
 
   const until = endOfTomorrow(now);
@@ -229,6 +265,50 @@ export async function removeVideoTaskBag(opts: {
       }
     }
     await tx.mgrVideoTaskBag.delete({ where: { id: bag.id } });
+  });
+}
+
+/**
+ * Вилучає відеозавдання (рішення user 2026-07-24: видаляти може той, хто його
+ * створив — менеджер-замовник, або admin/owner; перевірка прав — у роуті).
+ *
+ * Для НЕзавершеного завдання (new/filming) знімає броні, які поставило саме це
+ * завдання (бронь на клієнта завдання) — як `removeVideoTaskBag`. Для
+ * завершеного (done) броні НЕ чіпаємо: після зйомки це вже робоча бронь
+ * клієнта, її можна зняти окремо через «Вилучити бронь» у Прайсі.
+ * Мішки завдання видаляються каскадом.
+ */
+export async function deleteVideoTask(opts: { taskId: string }): Promise<void> {
+  const task = await prisma.mgrVideoTask.findUnique({
+    where: { id: opts.taskId },
+    include: { bags: { select: { id: true, lotId: true } } },
+  });
+  if (!task) throw new Error("TASK_NOT_FOUND");
+
+  await prisma.$transaction(async (tx) => {
+    if (task.status !== "done") {
+      for (const bag of task.bags) {
+        if (!bag.lotId) continue;
+        const lot = await tx.lot.findUnique({
+          where: { id: bag.lotId },
+          select: { reservedForClientId: true },
+        });
+        if (lot && lot.reservedForClientId === task.clientId) {
+          await tx.lot.update({
+            where: { id: bag.lotId },
+            data: {
+              status: "free",
+              reservedForClientId: null,
+              reservedForName: null,
+              reservedByUserId: null,
+              reservedByName: null,
+              reservedUntil: null,
+            },
+          });
+        }
+      }
+    }
+    await tx.mgrVideoTask.delete({ where: { id: task.id } });
   });
 }
 

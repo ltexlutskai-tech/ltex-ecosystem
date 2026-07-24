@@ -3,11 +3,14 @@ import {
   isAssignee,
   normalizeTask,
   normalizeWarehouseTask,
+  taskMatchesQuery,
   taskTypeMeta,
   type RawTask,
   type RawWarehouseTask,
   type Viewer,
 } from "./task-types";
+
+const viewerAssignee: Viewer = { id: "mgr", role: "manager" };
 
 const base: RawTask = {
   id: "t1",
@@ -117,6 +120,7 @@ describe("normalizeWarehouseTask", () => {
     status: "new",
     deliveryLabel: "Нова Пошта",
     comment: null,
+    managerUserId: "mgr",
     managerName: "Бойко Катерина",
     createdAt: new Date("2026-07-18T09:00:00Z"),
   };
@@ -129,11 +133,84 @@ describe("normalizeWarehouseTask", () => {
     const sent = normalizeWarehouseTask({ ...w, status: "sent" });
     expect(sent.status).toBe("done");
   });
-  it("складські картки не мають дій вилучення/архіву", () => {
+  it("складські картки не мають архіву/виконання зі списку", () => {
     const c = normalizeWarehouseTask(w);
-    expect(c.canDelete).toBe(false);
+    expect(c.canComplete).toBe(false);
     expect(c.canArchive).toBe(false);
     expect(c.canUnarchive).toBe(false);
+  });
+  it("вилучати може менеджер реалізації або admin/owner", () => {
+    // Без viewer (легасі-виклик) — заборонено.
+    expect(normalizeWarehouseTask(w).canDelete).toBe(false);
+    // Менеджер реалізації (створив завдання проведенням) — може.
+    expect(
+      normalizeWarehouseTask(w, { id: "mgr", role: "manager" }).canDelete,
+    ).toBe(true);
+    // Інший менеджер — ні.
+    expect(
+      normalizeWarehouseTask(w, { id: "other", role: "manager" }).canDelete,
+    ).toBe(false);
+    // Admin/owner — можуть будь-яке.
+    expect(
+      normalizeWarehouseTask(w, { id: "x", role: "admin" }).canDelete,
+    ).toBe(true);
+    expect(
+      normalizeWarehouseTask(w, { id: "x", role: "owner" }).canDelete,
+    ).toBe(true);
+    // Завдання без менеджера — лише admin/owner.
+    expect(
+      normalizeWarehouseTask(
+        { ...w, managerUserId: null },
+        {
+          id: "mgr",
+          role: "manager",
+        },
+      ).canDelete,
+    ).toBe(false);
+  });
+});
+
+describe("taskMatchesQuery", () => {
+  const card = normalizeTask(base, viewerAssignee);
+  it("порожній запит матчить усе", () => {
+    expect(taskMatchesQuery(card, "")).toBe(true);
+    expect(taskMatchesQuery(card, "   ")).toBe(true);
+  });
+  it("частина рядка у назві/описі, без регістру", () => {
+    expect(taskMatchesQuery(card, "обдзвон")).toBe(true);
+    expect(taskMatchesQuery(card, "НОВИЙ СТОК")).toBe(true);
+    expect(taskMatchesQuery(card, "немає такого")).toBe(false);
+  });
+  it("матчить постановника/виконавця/тип", () => {
+    expect(taskMatchesQuery(card, "власник")).toBe(true);
+    expect(taskMatchesQuery(card, "менеджер")).toBe(true);
+    expect(taskMatchesQuery(card, "доручення")).toBe(true);
+  });
+  it("кілька слів — усі мають зустрітись (у різних полях)", () => {
+    expect(taskMatchesQuery(card, "обдзвонити власник")).toBe(true);
+    expect(taskMatchesQuery(card, "обдзвонити відпустка")).toBe(false);
+  });
+  it("шукає й у результаті виконання", () => {
+    const done = normalizeTask(
+      { ...base, status: "done", resultComment: "троє замовили" },
+      viewerAssignee,
+    );
+    expect(taskMatchesQuery(done, "троє")).toBe(true);
+  });
+  it("складська картка — по клієнту/менеджеру", () => {
+    const wh = normalizeWarehouseTask({
+      id: "w1",
+      customerName: "ТОВ Ромашка",
+      status: "new",
+      deliveryLabel: "Нова Пошта",
+      comment: null,
+      managerUserId: "mgr",
+      managerName: "Бойко Катерина",
+      createdAt: new Date("2026-07-18T09:00:00Z"),
+    });
+    expect(taskMatchesQuery(wh, "ромашка")).toBe(true);
+    expect(taskMatchesQuery(wh, "бойко")).toBe(true);
+    expect(taskMatchesQuery(wh, "нова пошта")).toBe(true);
   });
 });
 

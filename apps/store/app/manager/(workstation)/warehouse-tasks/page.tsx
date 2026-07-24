@@ -48,6 +48,7 @@ export default async function WarehouseTasksPage({
     status: statusParam === "all" ? undefined : statusParam,
     openOnly: !statusParam,
     customerName: firstParam(sp.customerName),
+    q: firstParam(sp.q),
     deliveryMethod: firstParam(sp.deliveryMethod),
   });
 

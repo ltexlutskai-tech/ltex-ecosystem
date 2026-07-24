@@ -155,13 +155,23 @@ export interface RawWarehouseTask {
   status: string; // new | received | sent | cancelled
   deliveryLabel: string | null;
   comment: string | null;
+  managerUserId: string | null;
   managerName: string | null;
   createdAt: Date;
 }
 
-export function normalizeWarehouseTask(raw: RawWarehouseTask): TaskCard {
+export function normalizeWarehouseTask(
+  raw: RawWarehouseTask,
+  viewer?: Viewer,
+): TaskCard {
   const status: TaskStatus = raw.status === "sent" ? "done" : "open";
   const parts = [raw.deliveryLabel, raw.comment].filter(Boolean);
+  // Складське завдання створюється автоматично при проведенні реалізації —
+  // «створив» його менеджер реалізації. Вилучати може він або admin/owner.
+  const canDelete =
+    viewer != null &&
+    (isAdminOwner(viewer.role) ||
+      (raw.managerUserId != null && raw.managerUserId === viewer.id));
   return {
     id: raw.id,
     kind: "warehouse",
@@ -178,10 +188,36 @@ export function normalizeWarehouseTask(raw: RawWarehouseTask): TaskCard {
     href: `/manager/warehouse-tasks/${raw.id}`,
     canComplete: false, // керується на детальній сторінці складу
     canReopen: false,
-    canDelete: false,
+    canDelete,
     canArchive: false,
     canUnarchive: false,
     clientId: null,
     saleId: null,
   };
+}
+
+// ─── Пошук по завданнях ──────────────────────────────────────────────────────
+
+/**
+ * Чи картка завдання матчить пошуковий запит: по ЧАСТИНІ рядка і по ВСЬОМУ,
+ * що є в завданні (назва/опис/хто поставив/виконавець/результат/тип/архів).
+ * Кілька слів — усі мають зустрітись (у будь-яких полях). Порожній запит —
+ * матчить усе. Чиста функція (з тестами).
+ */
+export function taskMatchesQuery(card: TaskCard, query: string): boolean {
+  const q = query.trim().toLowerCase();
+  if (!q) return true;
+  const haystack = [
+    card.title,
+    card.description,
+    card.createdByName,
+    card.assigneeName,
+    card.resultComment,
+    card.archivedByName,
+    taskTypeMeta(card.type).label,
+  ]
+    .filter(Boolean)
+    .join(" \n ")
+    .toLowerCase();
+  return q.split(/\s+/).every((word) => haystack.includes(word));
 }

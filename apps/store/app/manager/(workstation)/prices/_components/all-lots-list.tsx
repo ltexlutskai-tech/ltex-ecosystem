@@ -173,6 +173,8 @@ function LotGroupSection({
       productId: group.productId,
       productName: group.productName,
       articleCode: group.articleCode,
+      canUnbook: lot.canUnbook,
+      bookingLabel: lot.reservedByName ?? lot.reservedForName,
     };
   }
   function startLongPress(lot: LotListItem, x: number, y: number) {

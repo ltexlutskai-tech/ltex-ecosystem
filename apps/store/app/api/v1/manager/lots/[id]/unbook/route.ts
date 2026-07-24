@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@ltex/db";
 import { getCurrentUser } from "@/lib/auth/manager-auth";
-import { canUnbook } from "@/lib/manager/lot-booking";
+import { canRemoveReservation } from "@/lib/manager/lot-booking";
 import {
   lotCardInclude,
   serializeLotCard,
@@ -10,10 +10,13 @@ import {
 /**
  * Manager «Прайс» — Stage 4: POST /api/v1/manager/lots/[id]/unbook.
  *
- * Знімає бронь. Дозволено ЛИШЕ свою активну бронь (`canUnbook`) — чужу активну
- * зняти не можна (403). Очищає reserved* + status="free". Лишає запис у timeline
- * клієнта про зняття броні (best-effort у тій самій транзакції).
+ * Знімає/вилучає бронь. Дозволено лише менеджеру, вказаному у броні
+ * (`reservedByUserId`, включно з протермінованою — щоб чистити хвости), та
+ * admin/owner (будь-чию). Іншим — 403. Очищає reserved* + status="free".
+ * Лишає запис у timeline клієнта про зняття броні (у тій самій транзакції).
  */
+
+const ADMIN_ROLES = ["admin", "owner"];
 
 const lotInclude = lotCardInclude;
 
@@ -35,20 +38,24 @@ export async function POST(
 
   const now = new Date();
 
-  // Зняти можна лише СВОЮ активну бронь. Чужу активну → 403.
+  // Вилучити бронь може лише менеджер, вказаний у броні, або admin/owner.
   if (
-    !canUnbook(
+    !canRemoveReservation(
       {
         status: lot.status,
         reservedByUserId: lot.reservedByUserId,
+        reservedForClientId: lot.reservedForClientId,
+        reservedForName: lot.reservedForName,
         reservedUntil: lot.reservedUntil,
       },
-      user.id,
-      now,
+      { id: user.id, isAdmin: ADMIN_ROLES.includes(user.role) },
     )
   ) {
     return NextResponse.json(
-      { error: "Можна зняти лише власну активну бронь" },
+      {
+        error:
+          "Вилучити бронь може лише менеджер, вказаний у броні, або адміністратор",
+      },
       { status: 403 },
     );
   }

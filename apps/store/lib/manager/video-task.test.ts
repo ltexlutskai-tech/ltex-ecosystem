@@ -1,5 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { endOfTomorrow, videoReservationData } from "./video-task";
+import {
+  blocksVideoTaskScan,
+  endOfTomorrow,
+  videoReservationData,
+} from "./video-task";
 
 describe("endOfTomorrow", () => {
   it("повертає 23:59:59.999 наступного дня", () => {
@@ -38,5 +42,61 @@ describe("videoReservationData", () => {
     expect(data.reservedForName).toBe("ТОВ Ромашка");
     expect(data.reservedByUserId).toBe("mgr1");
     expect(data.reservedUntil).toBe(until);
+  });
+});
+
+describe("blocksVideoTaskScan", () => {
+  const NOW = new Date("2026-07-23T12:00:00.000Z");
+  const FUTURE = new Date("2026-07-24T23:59:59.000Z");
+  const PAST = new Date("2026-07-01T00:00:00.000Z");
+
+  it("вільний мішок (без броні) — не блокує", () => {
+    expect(
+      blocksVideoTaskScan(
+        { status: "free", reservedByUserId: null, reservedUntil: null },
+        "mgr1",
+        NOW,
+      ),
+    ).toBe(false);
+  });
+
+  it("власна бронь менеджера-замовника — проходить (його потреба)", () => {
+    expect(
+      blocksVideoTaskScan(
+        { status: "reserved", reservedByUserId: "mgr1", reservedUntil: FUTURE },
+        "mgr1",
+        NOW,
+      ),
+    ).toBe(false);
+  });
+
+  it("активна бронь ІНШОГО менеджера — блокує", () => {
+    expect(
+      blocksVideoTaskScan(
+        { status: "reserved", reservedByUserId: "mgr2", reservedUntil: FUTURE },
+        "mgr1",
+        NOW,
+      ),
+    ).toBe(true);
+  });
+
+  it("протермінована чужа бронь — не блокує", () => {
+    expect(
+      blocksVideoTaskScan(
+        { status: "reserved", reservedByUserId: "mgr2", reservedUntil: PAST },
+        "mgr1",
+        NOW,
+      ),
+    ).toBe(false);
+  });
+
+  it("завдання без менеджера: будь-яка активна бронь блокує", () => {
+    expect(
+      blocksVideoTaskScan(
+        { status: "reserved", reservedByUserId: "mgr2", reservedUntil: FUTURE },
+        null,
+        NOW,
+      ),
+    ).toBe(true);
   });
 });

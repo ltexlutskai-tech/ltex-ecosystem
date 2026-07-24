@@ -52,6 +52,37 @@ export function canUnbook(
   return lot.reservedByUserId === userId;
 }
 
+/** Знімок лоту для перевірки «Вилучити бронь» (ПКМ у таблицях лотів). */
+export interface LotUnbookSnapshot {
+  status: string;
+  reservedByUserId: string | null;
+  reservedForClientId?: string | null;
+  reservedForName?: string | null;
+  reservedUntil: Date | null;
+}
+
+/**
+ * Чи може користувач ВИЛУЧИТИ бронь лоту (рішення user 2026-07-24):
+ * лише менеджер, вказаний у броні (`reservedByUserId`), або admin/owner.
+ * На відміну від `canUnbook`, дозволяє чистити й ПРОТЕРМІНОВАНУ власну бронь
+ * (вона висить у таблицях як «протермін.»), а адміну — будь-чию.
+ * Статуси sold/archived/in_transit не чіпаємо (там бронь — частина історії).
+ */
+export function canRemoveReservation(
+  lot: LotUnbookSnapshot,
+  viewer: { id: string; isAdmin: boolean },
+): boolean {
+  const hasReservation =
+    lot.reservedUntil != null ||
+    lot.reservedByUserId != null ||
+    (lot.reservedForClientId ?? null) != null ||
+    (lot.reservedForName ?? null) != null;
+  if (!hasReservation) return false;
+  if (lot.status !== "reserved" && lot.status !== "free") return false;
+  if (viewer.isAdmin) return true;
+  return lot.reservedByUserId != null && lot.reservedByUserId === viewer.id;
+}
+
 /**
  * Zod-схема тіла POST /book.
  *  • `clientId` — id MgrClient (обов'язково).

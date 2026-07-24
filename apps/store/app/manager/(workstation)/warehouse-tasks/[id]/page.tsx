@@ -100,6 +100,11 @@ export default async function WarehouseTaskDetailPage({
 
       <WarehouseTaskClient
         canAct={isWarehouse}
+        canDelete={
+          user.role === "admin" ||
+          user.role === "owner" ||
+          (task.managerUserId != null && task.managerUserId === user.id)
+        }
         ttnDraft={ttnDraft}
         ttnStatusText={ttnStatusText}
         suggestedSeats={suggestedSeats}

@@ -6,6 +6,7 @@ import { Button, Input, useToast } from "@ltex/ui";
 import { usePortalConfirm } from "../../../_components/use-portal-confirm";
 import { BarcodeInput } from "../../../sales/new/_components/barcode-input";
 import { videoTaskStatusMeta } from "@/lib/manager/video-task-status";
+import { VideoTaskDeleteButton } from "../../_components/video-task-delete-button";
 
 export interface AttrOption {
   value: string;
@@ -48,12 +49,15 @@ const BRING_ROLES = ["warehouse", "admin", "owner"];
 export function VideoTaskDetail({
   task,
   role,
+  canDelete = false,
   seasonOptions,
   qualityOptions,
   genderOptions,
 }: {
   task: VideoTaskView;
   role: string;
+  /** Може вилучити завдання (менеджер-замовник або admin/owner). */
+  canDelete?: boolean;
   seasonOptions: AttrOption[];
   qualityOptions: AttrOption[];
   genderOptions: AttrOption[];
@@ -133,7 +137,7 @@ export function VideoTaskDetail({
         </div>
       ) : null}
 
-      <div className="pt-2">
+      <div className="flex items-center justify-between pt-2">
         <Button
           type="button"
           variant="outline"
@@ -142,6 +146,13 @@ export function VideoTaskDetail({
         >
           ← До списку
         </Button>
+        {canDelete ? (
+          <VideoTaskDeleteButton
+            taskId={task.id}
+            label={task.productName}
+            afterDelete="toList"
+          />
+        ) : null}
       </div>
     </>
   );
