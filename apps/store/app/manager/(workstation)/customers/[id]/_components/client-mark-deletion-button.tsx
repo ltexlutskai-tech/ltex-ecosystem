@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { Trash2 } from "lucide-react";
@@ -16,7 +16,17 @@ import { useToast } from "@ltex/ui";
  * Діалог — власний портальний (не `window.confirm`), бо менеджерка рендериться
  * у вкладках-iframe, де нативні модалки браузера тихо ігноруються.
  */
-export function ClientMarkDeletionButton({ clientId }: { clientId: string }) {
+export function ClientMarkDeletionButton({
+  clientId,
+  renderTrigger,
+}: {
+  clientId: string;
+  /**
+   * Кастомний тригер (напр. рядок у меню «⋮»). Отримує `open` — виклик відкриває
+   * діалог підтвердження. Якщо не задано — показуємо дефолтну іконку-кошик.
+   */
+  renderTrigger?: (open: () => void) => ReactNode;
+}) {
   const router = useRouter();
   const { toast } = useToast();
   const [open, setOpen] = useState(false);
@@ -141,15 +151,19 @@ export function ClientMarkDeletionButton({ clientId }: { clientId: string }) {
 
   return (
     <>
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        title="Позначити на вилучення"
-        aria-label="Позначити на вилучення"
-        className="inline-flex h-10 w-10 items-center justify-center rounded-md border border-red-200 bg-white text-red-700 hover:bg-red-50"
-      >
-        <Trash2 className="h-4 w-4" />
-      </button>
+      {renderTrigger ? (
+        renderTrigger(() => setOpen(true))
+      ) : (
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          title="Позначити на вилучення"
+          aria-label="Позначити на вилучення"
+          className="inline-flex h-10 w-10 items-center justify-center rounded-md border border-red-200 bg-white text-red-700 hover:bg-red-50"
+        >
+          <Trash2 className="h-4 w-4" />
+        </button>
+      )}
       {dialog}
     </>
   );

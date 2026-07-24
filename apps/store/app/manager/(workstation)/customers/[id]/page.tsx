@@ -2,12 +2,9 @@ import { notFound, redirect } from "next/navigation";
 import { prisma } from "@ltex/db";
 import { getCurrentUser } from "@/lib/auth/manager-auth";
 import { canEditClient } from "@/lib/permissions/mgr-client-edit";
-import { BackButton } from "../../_components/back-button";
-import { DiscussButton } from "../../messenger/_components/discuss-button";
-import { ClientActionButtons } from "./_components/client-action-buttons";
 import { ClientAssortmentTab } from "./_components/client-assortment-tab";
 import { ClientDebtMovementsTab } from "./_components/client-debt-movements-tab";
-import { ClientHeader } from "./_components/client-header";
+import { ClientHeaderBar } from "./_components/client-header-bar";
 import { ClientHistoryTab } from "./_components/client-history-tab";
 import { ClientKeywordsTab } from "./_components/client-keywords-tab";
 import { ClientOrdersTab } from "./_components/client-orders-tab";
@@ -16,7 +13,7 @@ import { ClientPresentationsTab } from "./_components/client-presentations-tab";
 import { ClientRemindersTab } from "./_components/client-reminders-tab";
 import { ClientRequisitesTab } from "./_components/client-requisites-tab";
 import { ClientSalesHistoryTab } from "./_components/client-sales-history-tab";
-import { ClientSocialTab } from "./_components/client-social-tab";
+import { ClientSidebar } from "./_components/client-sidebar";
 import { ClientTabs } from "./_components/client-tabs";
 import { StickyHeader } from "./_components/sticky-header";
 import { countOverdue } from "./_components/client-reminders-grouping";
@@ -74,93 +71,90 @@ export default async function ClientDetailPage({
     : null;
 
   return (
-    <div className="mx-auto max-w-6xl space-y-4">
-      <div className="flex items-center justify-between">
-        <BackButton fallbackHref="/manager/customers" />
-        <DiscussButton
-          docRef={{
-            type: "client",
-            label: client.name,
-            subtitle: client.city ?? undefined,
-            url: `/manager/customers/${client.id}`,
-          }}
-        />
-      </div>
-
-      {/* Закріплена шапка картки (з телефонами/месенджерами) — завжди видно,
-          з ким працюємо. */}
+    <div className="mx-auto max-w-7xl space-y-3">
+      {/* Компактна закріплена шапка: ім'я, статуси, борг, менеджер, телефони,
+          кнопки дій (+ Замовлення / + Реалізація / + Оплата / Відео) — завжди
+          на екрані під час прокрутки. */}
       <StickyHeader>
-        <ClientHeader client={client} canAssign={canAssign} canEdit={canEdit} />
-      </StickyHeader>
-
-      {/* Соцмережі та месенджери — окремим блоком на всю ширину під шапкою.
-          Для чужого клієнта приховано (masking). */}
-      {!isForeign && (
-        <ClientSocialTab
+        <ClientHeaderBar
           client={client}
           canEdit={canEdit}
-          isForeign={isForeign}
+          canAssign={canAssign}
+          customerId={customerMirror?.id ?? null}
         />
-      )}
+      </StickyHeader>
 
-      {/* Дії по клієнту — на верху картки, поза «Реквізитами» (C1). */}
-      <ClientActionButtons
-        clientId={client.id}
-        customerId={customerMirror?.id ?? null}
-        canEdit={canEdit}
-      />
-
-      <ClientTabs
-        overdueRemindersCount={overdueCount}
-        isForeign={isForeign}
-        requisites={
-          <ClientRequisitesTab
+      <div className="grid items-start gap-4 lg:grid-cols-[300px_1fr]">
+        {/* Ліва «візитка» — контакти, адреса, ключові слова, огляд, реквізити.
+            Закріплюється під шапкою (свій скрол на широкому екрані). */}
+        <aside
+          style={{ top: "calc(var(--ccard-header-h) + 0.75rem)" }}
+          className="lg:sticky lg:max-h-[calc(100vh_-_var(--ccard-header-h)_-_1.5rem)] lg:self-start lg:overflow-y-auto"
+        >
+          <ClientSidebar
             client={client}
-            dictionaries={dictionaries}
-            canEdit={canEdit}
-            currentUserRole={user.role}
-            editDisabledReason={editDisabledReason}
-            isForeign={isForeign}
-            customerId={customerMirror?.id ?? null}
-          />
-        }
-        assortment={<ClientAssortmentTab clientId={client.id} />}
-        presentations={<ClientPresentationsTab items={client.presentations} />}
-        history={
-          <ClientHistoryTab
-            clientId={client.id}
-            timeline={client.timeline}
-            canEdit={canEdit}
-            currentUserId={user.id}
-            currentUserRole={user.role}
-          />
-        }
-        salesHistory={<ClientSalesHistoryTab clientId={client.id} />}
-        orders={<ClientOrdersTab clientId={client.id} />}
-        reminders={
-          <ClientRemindersTab
-            clientId={client.id}
-            clientName={client.name}
-            currentUserId={user.id}
-            currentUserRole={user.role}
-          />
-        }
-        presentationHistory={<ClientPresentationHistoryTab />}
-        keywords={
-          <ClientKeywordsTab
-            clientId={client.id}
-            keywords={client.keywords}
             canEdit={canEdit}
             isForeign={isForeign}
           />
-        }
-        debtMovements={
-          <ClientDebtMovementsTab
-            clientId={client.id}
-            canCorrectDebt={canCorrectDebt}
+        </aside>
+
+        {/* Основна колонка — горизонтальні вкладки + вміст */}
+        <div className="min-w-0">
+          <ClientTabs
+            overdueRemindersCount={overdueCount}
+            isForeign={isForeign}
+            requisites={
+              <ClientRequisitesTab
+                client={client}
+                dictionaries={dictionaries}
+                canEdit={canEdit}
+                currentUserRole={user.role}
+                editDisabledReason={editDisabledReason}
+                isForeign={isForeign}
+                customerId={customerMirror?.id ?? null}
+              />
+            }
+            assortment={<ClientAssortmentTab clientId={client.id} />}
+            presentations={
+              <ClientPresentationsTab items={client.presentations} />
+            }
+            history={
+              <ClientHistoryTab
+                clientId={client.id}
+                timeline={client.timeline}
+                canEdit={canEdit}
+                currentUserId={user.id}
+                currentUserRole={user.role}
+              />
+            }
+            salesHistory={<ClientSalesHistoryTab clientId={client.id} />}
+            orders={<ClientOrdersTab clientId={client.id} />}
+            reminders={
+              <ClientRemindersTab
+                clientId={client.id}
+                clientName={client.name}
+                currentUserId={user.id}
+                currentUserRole={user.role}
+              />
+            }
+            presentationHistory={<ClientPresentationHistoryTab />}
+            keywords={
+              <ClientKeywordsTab
+                clientId={client.id}
+                keywords={client.keywords}
+                canEdit={canEdit}
+                isForeign={isForeign}
+              />
+            }
+            debtMovements={
+              <ClientDebtMovementsTab
+                clientId={client.id}
+                canCorrectDebt={canCorrectDebt}
+              />
+            }
           />
-        }
-      />
+        </div>
+      </div>
     </div>
   );
 }

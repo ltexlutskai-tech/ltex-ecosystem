@@ -373,10 +373,13 @@ export function ClientSocialTab({
   client,
   canEdit = false,
   isForeign = false,
+  bare = false,
 }: {
   client: ClientDetail;
   canEdit?: boolean;
   isForeign?: boolean;
+  /** true → без зовнішньої картки (вбудовується у ліву «візитку»). */
+  bare?: boolean;
 }) {
   const router = useRouter();
   const [adding, setAdding] = useState(false);
@@ -390,50 +393,62 @@ export function ClientSocialTab({
     router.refresh();
   }
 
-  return (
-    <div className="space-y-4">
-      <div className="rounded-lg border bg-white p-5 shadow-sm">
-        <div className="mb-2 flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-gray-700">
-            Соцмережі та месенджери
-          </h3>
-          {editable && !adding && (
-            <button
-              type="button"
-              onClick={() => setAdding(true)}
-              className="flex items-center gap-1 rounded border bg-white px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50"
-            >
-              <Plus className="h-3.5 w-3.5" /> Додати
-            </button>
-          )}
-        </div>
-
-        {messengers.length === 0 ? (
-          <p className="text-sm text-gray-500">
-            Соцмереж або месенджерів не вказано.
-          </p>
-        ) : (
-          <div className="divide-y divide-gray-100">
-            {messengers.map((m) => (
-              <MessengerRow
-                key={m.id}
-                messenger={m}
-                clientId={client.id}
-                canEdit={editable}
-                onChanged={refresh}
-              />
-            ))}
-          </div>
-        )}
-
-        {editable && adding && (
-          <AddMessengerForm
-            clientId={client.id}
-            onAdded={refresh}
-            onCancel={() => setAdding(false)}
-          />
+  const inner = (
+    <>
+      <div className="mb-2 flex items-center justify-between">
+        <h3 className="text-sm font-semibold text-gray-700">
+          Соцмережі та месенджери
+        </h3>
+        {editable && !adding && (
+          <button
+            type="button"
+            onClick={() => setAdding(true)}
+            className="flex items-center gap-1 rounded border bg-white px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50"
+          >
+            <Plus className="h-3.5 w-3.5" /> Додати
+          </button>
         )}
       </div>
+
+      {messengers.length === 0 ? (
+        <p className="text-sm text-gray-500">
+          Соцмереж або месенджерів не вказано.
+        </p>
+      ) : (
+        <div className="divide-y divide-gray-100">
+          {messengers.map((m) => (
+            <MessengerRow
+              key={m.id}
+              messenger={m}
+              clientId={client.id}
+              canEdit={editable}
+              onChanged={refresh}
+            />
+          ))}
+        </div>
+      )}
+
+      {editable && adding && (
+        <AddMessengerForm
+          clientId={client.id}
+          onAdded={refresh}
+          onCancel={() => setAdding(false)}
+        />
+      )}
+
+      {bare && hasWebsite && (
+        <div className="mt-3 border-t pt-3">
+          <ClientWebsiteLink url={client.websiteUrl} />
+        </div>
+      )}
+    </>
+  );
+
+  if (bare) return inner;
+
+  return (
+    <div className="space-y-4">
+      <div className="rounded-lg border bg-white p-5 shadow-sm">{inner}</div>
 
       {hasWebsite && (
         <div className="rounded-lg border bg-white p-5 shadow-sm">
