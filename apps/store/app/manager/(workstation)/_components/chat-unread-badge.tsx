@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { subscribeChatRead } from "@/lib/chat/read-broadcast";
 
 const POLL_INTERVAL_MS = 30_000;
 
@@ -39,9 +40,12 @@ export function ChatUnreadBadge() {
       if (document.visibilityState === "visible") void refetch();
     }
     document.addEventListener("visibilitychange", onVis);
+    // Миттєвий refetch коли розмову прочитано в iframe-вкладці (inbox / картка).
+    const unsubscribe = subscribeChatRead(() => void refetch());
     return () => {
       window.clearInterval(id);
       document.removeEventListener("visibilitychange", onVis);
+      unsubscribe();
     };
   }, [refetch]);
 

@@ -76,6 +76,7 @@ export default async function CustomersPage({
       assortmentSearch: pickString(sp.assortmentSearch),
       colors: pickColors(sp.colors),
       hasReminder: pickBool(sp.hasReminder),
+      hasUnreadMessage: pickBool(sp.hasMessage),
       // bool
       hasDebt: pickBool(sp.hasDebt),
       hasOverpayment: pickBool(sp.hasOverpayment),

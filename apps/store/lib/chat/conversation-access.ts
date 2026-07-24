@@ -1,13 +1,37 @@
-import { prisma } from "@ltex/db";
+import { Prisma, prisma } from "@ltex/db";
+import type { ChatPlatform } from "@ltex/db";
 import type { CurrentManager } from "@/lib/auth/manager-auth";
 import { canView } from "@/lib/permissions/role-permissions";
 
 export interface ConversationAccess {
   conversationId: string;
-  platform: "telegram" | "viber" | "whatsapp" | "instagram";
+  platform: ChatPlatform;
   externalUserId: string;
   agentUserId: string | null;
   clientId: string | null;
+}
+
+/**
+ * ЄДИНЕ джерело chat-scope для розмов (ТЗ 2026-07-17). Використовується скрізь,
+ * де показуємо/рахуємо розмови (inbox-список, лічильник unread, вкладка
+ * «Повідомлення» картки, індикатор списку клієнтів), щоб показане завжди
+ * збігалося з тим, що менеджер реально може відкрити (`getConversationForUser`):
+ *   • повний доступ (chat view:all — admin/owner/supervisor) → усі розмови;
+ *   • менеджер (chat view:mine) → лише призначені йому (`agentUserId`) АБО зі
+ *     своїм клієнтом (`client.agentUserId`).
+ *
+ * Повертає порожній `{}` для повного доступу (додається до інших умов через
+ * spread) або `{ OR: [...] }` для обмеженого.
+ */
+export function buildChatScopeWhere(
+  user: Pick<CurrentManager, "id" | "role">,
+): Prisma.ChatConversationWhereInput {
+  const scope = canView({ role: user.role }, "chat").scope;
+  return scope === "all"
+    ? {}
+    : {
+        OR: [{ agentUserId: user.id }, { client: { agentUserId: user.id } }],
+      };
 }
 
 /**
