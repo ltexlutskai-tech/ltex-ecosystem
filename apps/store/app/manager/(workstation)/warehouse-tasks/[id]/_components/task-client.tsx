@@ -18,6 +18,7 @@ import {
   NpWarehousePicker,
   type NpSelection,
 } from "../../../_components/np-warehouse-picker";
+import { usePortalConfirm } from "../../../_components/use-portal-confirm";
 import { SeatsEditor, type SeatInit } from "./seats-editor";
 import type { SuggestedSeat } from "@/lib/manager/warehouse-seat-suggest";
 
@@ -88,6 +89,7 @@ const BASE = "/api/v1/manager/warehouse-tasks";
 export function WarehouseTaskClient({
   task,
   canAct,
+  canDelete = false,
   ttnDraft,
   ttnStatusText,
   suggestedSeats = [],
@@ -95,6 +97,8 @@ export function WarehouseTaskClient({
   task: TaskData;
   /** Чи може користувач діяти (склад/адмін/власник). Менеджер — лише перегляд. */
   canAct: boolean;
+  /** Може вилучити завдання (менеджер реалізації, що його створив, або admin/owner). */
+  canDelete?: boolean;
   /** ТТН НП ще «Чернетка» — тоді габарити/друк доступні навіть на відправленому. */
   ttnDraft: boolean;
   /** Людський статус ТТН НП (для нотатки, коли вже в дорозі). */
@@ -104,6 +108,7 @@ export function WarehouseTaskClient({
 }) {
   const router = useRouter();
   const { toast } = useToast();
+  const { confirm, dialog: confirmDialog } = usePortalConfirm();
   const [, startTransition] = useTransition();
   const [busy, setBusy] = useState(false);
   const [receiptBusy, setReceiptBusy] = useState(false);
@@ -235,6 +240,30 @@ export function WarehouseTaskClient({
     }
   }
 
+  function askDelete() {
+    confirm({
+      title: "Вилучити завдання?",
+      message: `Завдання «${task.customerName}» зникне зі списку відправлень. Реалізацію це не зачепить.`,
+      destructive: true,
+      confirmLabel: "Вилучити",
+      cancelLabel: "Скасувати",
+      onConfirm: async () => {
+        const res = await fetch(`${BASE}/${task.id}`, { method: "DELETE" });
+        if (!res.ok) {
+          const j = (await res.json().catch(() => ({}))) as { error?: string };
+          toast({
+            description: j.error ?? "Не вдалося вилучити",
+            variant: "destructive",
+          });
+          return;
+        }
+        toast({ description: "Завдання вилучено" });
+        router.push("/manager/warehouse-tasks");
+        router.refresh();
+      },
+    });
+  }
+
   async function retryReceipt() {
     if (!task.saleId) return;
     setReceiptBusy(true);
@@ -269,12 +298,24 @@ export function WarehouseTaskClient({
           <h1 className="text-xl font-bold text-gray-800">
             Завдання: {task.customerName}
           </h1>
-          <span
-            className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${st.cls}`}
-          >
-            {st.label}
-          </span>
+          <div className="flex items-center gap-2">
+            <span
+              className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${st.cls}`}
+            >
+              {st.label}
+            </span>
+            {canDelete && (
+              <button
+                type="button"
+                onClick={askDelete}
+                className="rounded border border-red-200 px-2 py-0.5 text-xs text-red-600 hover:bg-red-50"
+              >
+                Вилучити
+              </button>
+            )}
+          </div>
         </div>
+        {confirmDialog}
         <dl className="mt-4 grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
           <Field label="Реалізація">
             {task.saleId ? (

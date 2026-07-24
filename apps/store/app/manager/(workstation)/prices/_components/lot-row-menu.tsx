@@ -2,6 +2,9 @@
 
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { useRouter } from "next/navigation";
+import { useToast } from "@ltex/ui";
+import { usePortalConfirm } from "../../_components/use-portal-confirm";
 import { OrderVideoButton } from "./order-video-button";
 
 /** Дані лоту, потрібні контекстному меню рядка лоту. */
@@ -11,6 +14,10 @@ export interface LotRowMenuTarget {
   productId: string;
   productName: string;
   articleCode: string | null;
+  /** Поточний користувач може вилучити бронь (менеджер з броні або адмін). */
+  canUnbook: boolean;
+  /** Підпис броні для підтвердження («на кого / хто забронював»). */
+  bookingLabel: string | null;
 }
 
 interface Props {
@@ -37,6 +44,9 @@ export function LotRowMenu({
   sellerName,
 }: Props) {
   const menuRef = useRef<HTMLDivElement | null>(null);
+  const router = useRouter();
+  const { toast } = useToast();
+  const { confirm, dialog } = usePortalConfirm();
   const [mounted, setMounted] = useState(false);
   const [videoOpen, setVideoOpen] = useState(false);
   const [coords, setCoords] = useState<{ left: number; top: number } | null>(
@@ -100,6 +110,36 @@ export function LotRowMenu({
     }
   }
 
+  /** «Вилучити бронь» — підтвердження → POST /unbook → оновити таблицю. */
+  function askUnbook(t: LotRowMenuTarget) {
+    confirm({
+      title: "Вилучити бронь?",
+      message: `Мішок ${t.barcode}${
+        t.bookingLabel ? ` (бронь: ${t.bookingLabel})` : ""
+      } стане вільним.`,
+      destructive: true,
+      confirmLabel: "Вилучити бронь",
+      cancelLabel: "Скасувати",
+      onConfirm: async () => {
+        const res = await fetch(`/api/v1/manager/lots/${t.lotId}/unbook`, {
+          method: "POST",
+        });
+        if (!res.ok) {
+          const data = (await res.json().catch(() => ({}))) as {
+            error?: string;
+          };
+          toast({
+            title: data.error ?? "Не вдалося вилучити бронь",
+            variant: "destructive",
+          });
+          return;
+        }
+        toast({ title: `Бронь з мішка ${t.barcode} вилучено` });
+        router.refresh();
+      },
+    });
+  }
+
   return (
     <>
       {open &&
@@ -142,9 +182,27 @@ export function LotRowMenu({
             >
               Замовити відео
             </MenuItem>
+            {target.canUnbook && (
+              <>
+                <div className="my-1 border-t" />
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    askUnbook(target);
+                    onClose();
+                  }}
+                  className="block w-full px-3 py-2 text-left text-red-600 hover:bg-red-50"
+                >
+                  Вилучити бронь
+                </button>
+              </>
+            )}
           </div>,
           document.body,
         )}
+
+      {dialog}
 
       {activeTarget && (
         <OrderVideoButton

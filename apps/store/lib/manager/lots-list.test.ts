@@ -287,6 +287,52 @@ describe("serializeLotRow", () => {
     expect(row.isActiveReservation).toBe(false);
     expect(row.isMineReservation).toBe(false);
   });
+
+  it("canUnbook: своя бронь (навіть протермінована) — так; чужа — ні", () => {
+    const now = new Date("2026-05-20T12:00:00.000Z");
+    const mine = serializeLotRow(
+      rawLot({
+        status: "reserved",
+        reservedForName: "Клієнт",
+        reservedByUserId: "u1",
+        reservedUntil: new Date("2026-05-10T00:00:00.000Z"),
+      }),
+      "u1",
+      now,
+    );
+    expect(mine.canUnbook).toBe(true);
+
+    const foreign = serializeLotRow(
+      rawLot({
+        status: "reserved",
+        reservedForName: "Клієнт",
+        reservedByUserId: "u2",
+        reservedUntil: new Date("2026-05-25T00:00:00.000Z"),
+      }),
+      "u1",
+      now,
+    );
+    expect(foreign.canUnbook).toBe(false);
+  });
+
+  it("canUnbook: admin може вилучити чужу бронь; вільний лот — ні", () => {
+    const now = new Date("2026-05-20T12:00:00.000Z");
+    const foreignForAdmin = serializeLotRow(
+      rawLot({
+        status: "reserved",
+        reservedForName: "Клієнт",
+        reservedByUserId: "u2",
+        reservedUntil: new Date("2026-05-25T00:00:00.000Z"),
+      }),
+      "adm",
+      now,
+      true,
+    );
+    expect(foreignForAdmin.canUnbook).toBe(true);
+
+    const freeLot = serializeLotRow(rawLot(), "adm", now, true);
+    expect(freeLot.canUnbook).toBe(false);
+  });
 });
 
 function item(
@@ -312,6 +358,7 @@ function item(
     reservedUntilIso: null,
     isActiveReservation: false,
     isMineReservation: false,
+    canUnbook: false,
     product: {
       id: productId,
       articleCode: `art-${productId}`,

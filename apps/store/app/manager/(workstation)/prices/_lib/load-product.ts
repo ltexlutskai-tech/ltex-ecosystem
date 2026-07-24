@@ -15,6 +15,7 @@ import {
   SALE_PRICE_TYPE,
   newProductCutoff,
 } from "@/lib/manager/prices";
+import { canRemoveReservation } from "@/lib/manager/lot-booking";
 import { isInStockStatus } from "@/lib/manager/lots-list";
 import {
   getProductClaims,
@@ -64,6 +65,8 @@ export interface ProductLotVM {
   isActiveReservation: boolean;
   /** Активна бронь належить поточному менеджеру. */
   isMineReservation: boolean;
+  /** Поточний користувач може вилучити бронь (менеджер з броні або адмін). */
+  canUnbook: boolean;
 }
 
 export interface ProductCardVM {
@@ -145,6 +148,7 @@ function numOrEmpty(n: number | null | undefined): string {
 export async function loadProductCard(
   id: string,
   viewerUserId?: string,
+  viewerIsAdmin = false,
 ): Promise<ProductCardVM | null> {
   const now = new Date();
   const product = await prisma.product.findUnique({
@@ -319,6 +323,17 @@ export async function loadProductCard(
           isActive &&
           viewerUserId !== undefined &&
           l.reservedByUserId === viewerUserId,
+        canUnbook:
+          viewerUserId !== undefined &&
+          canRemoveReservation(
+            {
+              status: l.status,
+              reservedByUserId: l.reservedByUserId,
+              reservedForName: l.reservedForName,
+              reservedUntil: l.reservedUntil,
+            },
+            { id: viewerUserId, isAdmin: viewerIsAdmin },
+          ),
       };
     });
 

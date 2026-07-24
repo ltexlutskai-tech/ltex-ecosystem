@@ -74,6 +74,8 @@ export function ProductCardView({
       productId: product.id,
       productName: product.name,
       articleCode: product.articleCode,
+      canUnbook: lot.canUnbook,
+      bookingLabel: lot.reservedByName ?? lot.reservedForName,
     });
     setLotMenuPos({ x, y });
   }

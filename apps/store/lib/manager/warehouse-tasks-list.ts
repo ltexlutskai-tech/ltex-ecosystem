@@ -73,6 +73,12 @@ export interface BuildWarehouseTasksWhereParams {
   status?: string;
   /** Пошук по імені клієнта (contains, insensitive). */
   customerName?: string;
+  /**
+   * Загальний пошук по всьому, що є в завданні (частина рядка, insensitive):
+   * клієнт / доставка / № відділення / ТТН / адреса / коментар / менеджер +
+   * позиції (товар / артикул / штрихкод / сектор).
+   */
+  q?: string;
   /** Спосіб доставки (нормалізується). */
   deliveryMethod?: string;
   /**
@@ -110,6 +116,33 @@ export function buildWarehouseTasksWhere(
   const name = (params.customerName ?? "").trim();
   if (name) {
     and.push({ customerName: { contains: name, mode: "insensitive" } });
+  }
+
+  const q = (params.q ?? "").trim();
+  if (q) {
+    and.push({
+      OR: [
+        { customerName: { contains: q, mode: "insensitive" } },
+        { deliveryLabel: { contains: q, mode: "insensitive" } },
+        { novaPoshtaBranch: { contains: q, mode: "insensitive" } },
+        { expressWaybill: { contains: q, mode: "insensitive" } },
+        { deliveryAddress: { contains: q, mode: "insensitive" } },
+        { comment: { contains: q, mode: "insensitive" } },
+        { managerName: { contains: q, mode: "insensitive" } },
+        {
+          items: {
+            some: {
+              OR: [
+                { productName: { contains: q, mode: "insensitive" } },
+                { articleCode: { contains: q, mode: "insensitive" } },
+                { barcode: { contains: q, mode: "insensitive" } },
+                { sector: { contains: q, mode: "insensitive" } },
+              ],
+            },
+          },
+        },
+      ],
+    });
   }
 
   return and.length > 0 ? { AND: and } : {};

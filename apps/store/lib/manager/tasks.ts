@@ -138,16 +138,16 @@ export async function getTasksForUser(
 
   const assignedToMe = sortCards([
     ...assignedTasks.map((t) => normalizeTask(toRaw(t), viewer)),
-    ...whAssigned.map((w) => normalizeWarehouseTask(w)),
+    ...whAssigned.map((w) => normalizeWarehouseTask(w, viewer)),
   ]);
   const createdByMe = sortCards([
     ...createdTasks.map((t) => normalizeTask(toRaw(t), viewer)),
-    ...whCreated.map((w) => normalizeWarehouseTask(w)),
+    ...whCreated.map((w) => normalizeWarehouseTask(w, viewer)),
   ]);
   // Виконані — новіші зверху (за фактом виконання/створення).
   const completed = [
     ...completedTasks.map((t) => normalizeTask(toRaw(t), viewer)),
-    ...whCompleted.map((w) => normalizeWarehouseTask(w)),
+    ...whCompleted.map((w) => normalizeWarehouseTask(w, viewer)),
   ].sort((a, b) => {
     const at = a.completedAt ?? a.createdAt;
     const bt = b.completedAt ?? b.createdAt;

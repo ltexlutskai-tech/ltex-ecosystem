@@ -2,17 +2,22 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@ltex/db";
 import { getCurrentUser } from "@/lib/auth/manager-auth";
 import { patchVideoTaskSchema } from "@/lib/validations/video-task";
+import { deleteVideoTask } from "@/lib/manager/video-task";
 
 /**
  * GET  /api/v1/manager/video-tasks/[id] — картка завдання (усі поля).
  * PATCH /api/v1/manager/video-tasks/[id] — відеозона зберігає чернетку
  *   характеристик + посилання на відео (доступно у статусі `filming`).
+ * DELETE /api/v1/manager/video-tasks/[id] — вилучити завдання. Може лише той,
+ *   хто його створив (менеджер-замовник), або admin/owner. Броні, поставлені
+ *   незавершеним завданням, знімаються.
  *
  * Гейт PATCH: відеозона / admin / owner. GET — будь-який залогінений (картку
  * бачать і менеджер-замовник, і склад).
  */
 
 const FILM_ROLES = ["videozone", "admin", "owner"];
+const ADMIN_ROLES = ["admin", "owner"];
 
 export async function GET(
   req: NextRequest,
@@ -90,4 +95,54 @@ export async function PATCH(
     },
   });
   return NextResponse.json({ task: updated });
+}
+
+export async function DELETE(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  const user = await getCurrentUser(req);
+  if (!user) {
+    return NextResponse.json({ error: "Не авторизовано" }, { status: 401 });
+  }
+
+  const { id } = await params;
+  const task = await prisma.mgrVideoTask.findUnique({
+    where: { id },
+    select: { id: true, managerUserId: true },
+  });
+  if (!task) {
+    return NextResponse.json(
+      { error: "Завдання не знайдено" },
+      { status: 404 },
+    );
+  }
+
+  const canDelete =
+    ADMIN_ROLES.includes(user.role) ||
+    (task.managerUserId != null && task.managerUserId === user.id);
+  if (!canDelete) {
+    return NextResponse.json(
+      {
+        error:
+          "Вилучити завдання може лише менеджер, що його створив, або адміністратор",
+      },
+      { status: 403 },
+    );
+  }
+
+  try {
+    await deleteVideoTask({ taskId: id });
+    return NextResponse.json({ ok: true });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (msg === "TASK_NOT_FOUND") {
+      return NextResponse.json(
+        { error: "Завдання не знайдено" },
+        { status: 404 },
+      );
+    }
+    console.error("[L-TEX] delete video task failed", { error: msg });
+    return NextResponse.json({ error: "Не вдалося" }, { status: 500 });
+  }
 }
