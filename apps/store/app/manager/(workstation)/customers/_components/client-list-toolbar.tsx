@@ -12,7 +12,7 @@ import {
   CLIENT_COLOR_META,
   CLIENT_COLOR_ORDER,
 } from "@/lib/manager/client-color";
-import { Bell, ChevronDown } from "lucide-react";
+import { Bell, ChevronDown, MessageCircle } from "lucide-react";
 import type { ConfigItem, DictionariesSnapshot } from "./types";
 
 interface Props {
@@ -88,6 +88,7 @@ export function ClientListToolbar({
   const onlyMine = searchParams.get("onlyMine") === "true";
   const hideTrashOff = searchParams.get("hideTrash") === "false";
   const hasReminder = searchParams.get("hasReminder") === "true";
+  const hasMessage = searchParams.get("hasMessage") === "true";
 
   const activeColors = (searchParams.get("colors") ?? "")
     .split(",")
@@ -108,6 +109,7 @@ export function ClientListToolbar({
     (searchParams.get("assortmentSearch") ? 1 : 0) +
     activeColors.length +
     (hasReminder ? 1 : 0) +
+    (hasMessage ? 1 : 0) +
     (hideTrashOff ? 1 : 0);
 
   return (
@@ -237,6 +239,24 @@ export function ClientListToolbar({
                   {openReminderCount > 99 ? "99+" : openReminderCount}
                 </span>
               )}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setParam("hasMessage", hasMessage ? null : "true")}
+              title="Клієнти з непрочитаними повідомленнями в месенджері"
+              className={
+                hasMessage
+                  ? "inline-flex items-center gap-1.5 rounded-full border border-gray-900 bg-gray-900 px-2.5 py-1 text-xs text-white"
+                  : "inline-flex items-center gap-1.5 rounded-full border bg-white px-2.5 py-1 text-xs text-gray-700 hover:bg-gray-50"
+              }
+            >
+              <MessageCircle
+                className={
+                  hasMessage ? "h-3.5 w-3.5" : "h-3.5 w-3.5 text-blue-600"
+                }
+              />
+              Є повідомлення
             </button>
           </div>
 

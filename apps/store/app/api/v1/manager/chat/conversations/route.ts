@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { Prisma, prisma } from "@ltex/db";
+import { prisma } from "@ltex/db";
 import { getCurrentUser } from "@/lib/auth/manager-auth";
-import { canView } from "@/lib/permissions/role-permissions";
+import { buildChatScopeWhere } from "@/lib/chat/conversation-access";
 
 /**
  * GET /api/v1/manager/chat/conversations
@@ -27,13 +27,7 @@ export async function GET(req: NextRequest) {
   const pageSizeRaw = Number(url.searchParams.get("pageSize") ?? 20);
   const pageSize = Math.min(100, Math.max(1, pageSizeRaw || 20));
 
-  const chatScope = canView({ role: user.role }, "chat").scope;
-  const where: Prisma.ChatConversationWhereInput =
-    chatScope === "all"
-      ? {}
-      : {
-          OR: [{ agentUserId: user.id }, { client: { agentUserId: user.id } }],
-        };
+  const where = buildChatScopeWhere(user);
 
   const [items, total] = await Promise.all([
     prisma.chatConversation.findMany({

@@ -2835,11 +2835,18 @@ model MgrMessageTemplate {
 // Окремо від наявного `ChatMessage` (внутрішній чат магазину). Підстава —
 // docs/CHAT_INBOX_PLAN.md.
 
+// Платформи об'єднаного inbox-у. Розширюється додаванням значення сюди +
+// запису в `lib/chat/platforms.ts` (мітка/іконка/порядок/чи вміє слати) +
+// гілки у `getPlatformSender`. Картка клієнта / список / inbox читають реєстр,
+// тому нова платформа не потребує змін UI. TikTok DM API немає (deep-link),
+// але значення enum лишаємо для майбутніх чат-ботів / ручного лінкування.
 enum ChatPlatform {
   telegram
   viber
   whatsapp
   instagram
+  facebook
+  tiktok
 
   @@map("chat_platform")
 }
