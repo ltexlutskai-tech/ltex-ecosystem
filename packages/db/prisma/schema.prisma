@@ -581,6 +581,7 @@ model MgrBankAccount {
   bankPaymentsOutgoing BankPaymentOutgoing[]
   cashTransfersFrom    CashTransfer[]        @relation("CashTransferFrom")
   cashTransfersTo      CashTransfer[]        @relation("CashTransferTo")
+  feedAccounts         BankFeedAccount[]
 
   @@map("mgr_bank_accounts")
 }
@@ -2635,6 +2636,81 @@ model CashTransfer {
   @@index([archived])
   @@index([transferredAt])
   @@map("cash_transfers")
+}
+
+// ─── Банківський фід (2026-07-24, Крок 1 інтеграції банкінгу) ────────────────
+// Рахунки, які система читає напряму з API банку (Monobank webhook + опитування;
+// далі PrivatBank). Авто-відкриваються з client-info банку; бухгалтер лінкує їх
+// до нашого довідника MgrBankAccount (для майбутнього авто-створення платіжок).
+// Кожна валюта в Monobank = окремий рахунок банку = окремий рядок тут.
+
+model BankFeedAccount {
+  id           String  @id @default(cuid())
+  provider     String // "monobank" | "privatbank"
+  externalId   String  @map("external_id") // id рахунку в API банку (mono account id / IBAN)
+  iban         String?
+  title        String? // людська назва: тип рахунку + маска картки
+  // Валюта рахунку: "UAH" | "EUR" | "USD" (числові ISO-коди мапляться при інжесті).
+  currencyCode String  @default("UAH") @map("currency_code")
+
+  // Останній відомий залишок з банку (основна валюта рахунку).
+  balance     Decimal?  @db.Decimal(15, 2)
+  creditLimit Decimal?  @map("credit_limit") @db.Decimal(15, 2)
+  balanceAt   DateTime? @map("balance_at")
+
+  // Лінк на наш довідник рахунків (для проведень у Кроці 3). SetNull — фід
+  // живе незалежно від довідника.
+  mgrBankAccountId String?         @map("mgr_bank_account_id")
+  mgrBankAccount   MgrBankAccount? @relation(fields: [mgrBankAccountId], references: [id], onDelete: SetNull)
+
+  archived            Boolean   @default(false)
+  // Курсор фонового дозбору виписки (webhook — основний канал, опитування — резерв).
+  lastStatementSyncAt DateTime? @map("last_statement_sync_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  transactions BankTransaction[]
+
+  @@unique([provider, externalId])
+  @@map("bank_feed_accounts")
+}
+
+// Незмінний архів банківських транзакцій (сира виписка). Дедуп по (provider,
+// externalId) — webhook і фонове опитування можуть принести один рух двічі.
+// Рядки НЕ редагуються і НЕ видаляються (аудит); звʼязка з документами обліку
+// зʼявиться у Кроці 3 (авто-рознесення платежів).
+
+model BankTransaction {
+  id            String          @id @default(cuid())
+  provider      String // "monobank" | "privatbank"
+  externalId    String          @map("external_id") // id транзакції в банку
+  feedAccountId String          @map("feed_account_id")
+  feedAccount   BankFeedAccount @relation(fields: [feedAccountId], references: [id], onDelete: Cascade)
+
+  occurredAt   DateTime @map("occurred_at")
+  // Сума зі знаком у валюті рахунку: + прихід, − розхід.
+  amount       Decimal  @db.Decimal(15, 2)
+  currencyCode String   @map("currency_code")
+
+  // Контрагент (у ФОП-виписці Monobank / виписці Privat).
+  counterName   String? @map("counter_name")
+  counterIban   String? @map("counter_iban")
+  counterEdrpou String? @map("counter_edrpou")
+
+  description String? // опис банку
+  comment     String? // коментар платника (призначення платежу)
+
+  balanceAfter Decimal? @map("balance_after") @db.Decimal(15, 2) // залишок після операції
+  hold         Boolean  @default(false) // блокування (ще не фінальна)
+  raw          Json? // сирий обʼєкт з API — для аудиту/дорозбору
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@unique([provider, externalId])
+  @@index([feedAccountId, occurredAt])
+  @@index([occurredAt])
+  @@map("bank_transactions")
 }
 
 // ─── Email DLQ (persistent retry queue, Session 70) ─────────────────────────
