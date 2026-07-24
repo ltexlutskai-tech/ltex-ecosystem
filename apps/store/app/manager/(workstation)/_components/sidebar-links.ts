@@ -22,6 +22,7 @@ import {
   ArrowUpFromLine,
   ArrowLeftRight,
   ClipboardCheck,
+  Landmark,
   PackageCheck,
   PackageOpen,
   PackagePlus,
@@ -136,6 +137,15 @@ export const NP_CHECK_LINK: SidebarLink = {
   href: "/manager/novapay-check",
   label: "Звірка NovaPay",
   icon: BadgeCheck,
+};
+
+// ── Банк — рухи по рахунках (2026-07-24, Крок 1 інтеграції банкінгу) ─────
+// Стрічка операцій з банківського фіда (Monobank webhook + опитування) +
+// залишки наживо. Доступ — фінансовий контур (bookkeeper/admin/owner).
+export const BANK_FEED_LINK: SidebarLink = {
+  href: "/manager/bank",
+  label: "Банк (рухи)",
+  icon: Landmark,
 };
 
 // ── Тиждень 5 блоку Ролі (Analyst) ──────────────────────────────────────
@@ -390,9 +400,11 @@ export function getSidebarSections(role: ManagerRole): SidebarItem[][] {
   }
   sections.push(sectionC);
 
-  // Секція D — фінансові документи + звірка NovaPay (bookkeeper/admin/owner).
+  // Секція D — фінансові документи + банк-фід + звірка NovaPay
+  // (bookkeeper/admin/owner).
   if (role === "bookkeeper" || adminOrOwner) {
     sections.push([
+      { ...BANK_FEED_LINK },
       ...FINANCE_LINKS.map((l) => ({ ...l })),
       { ...NP_CHECK_LINK },
     ]);
